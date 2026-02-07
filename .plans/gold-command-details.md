@@ -113,6 +113,7 @@ It is intentionally concrete and should be re-read during implementation checkpo
 
 - Alias normalization tests for native + OMZ gold aliases.
 - Flow planner tests for core `jj` default alias behavior (`b`/`ci`/`desc`/`op`/`st`).
+- Command-registry tests for default alias annotation/filtering in `:commands`.
 - Flow planner tests for prompt-vs-execute behavior of every gold command.
 - Safety tests proving all Tier `C` commands require confirmation.
 - Snapshot smoke test for log-first default frame.

@@ -164,7 +164,7 @@
   - expanded alias-catalog parity with the installed OMZ `jj` plugin aliases (`jjbc`, `jjbd`,
     `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) and added direct catalog coverage tests
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
-    `cargo test` (184 passed), and strict `cargo clippy`
+    `cargo test` (185 passed), and strict `cargo clippy`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
@@ -213,10 +213,14 @@
   - added explicit `operation revert` wrapper routing coverage in decorator tests.
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
-    `cargo test` (184 passed), and strict `cargo clippy`.
+    `cargo test` (185 passed), and strict `cargo clippy`.
 - Latest pass:
   - aligned alias normalization with core `jj` defaults so `b`, `ci`, and `op` canonicalize to
     `bookmark`, `commit`, and `operation` for consistent in-app flow routing.
 - Latest pass:
   - added core `jj` default aliases (`b`, `ci`, `desc`, `op`, `st`) to the in-app alias catalog.
   - added focused flow-planner and alias-catalog tests for core `jj` default alias behavior.
+- Latest pass:
+  - added top-level default-alias annotation in `:commands` output
+    (`bookmark (b)`, `commit (ci)`, `describe (desc)`, `operation (op)`, `status (st)`).
+  - added command-registry tests for default-alias rendering and alias-based filtering.

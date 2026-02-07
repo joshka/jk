@@ -37,6 +37,8 @@
   - added `v` for `resolve -l`
   - added `f`/`t` for `file list`/`tag list`
 - Discoverability:
+  - `:commands` now annotates top-level `jj` default aliases
+    (`bookmark (b)`, `commit (ci)`, `describe (desc)`, `operation (op)`, `status (st)`).
   - added in-app alias catalog via `:aliases` and `:aliases <query>`
   - added keymap catalog via `:keys` and `:keys <query>` (also `jk keys` on startup)
   - added normal-mode `K` shortcut for quick keymap access
@@ -80,6 +82,7 @@
   - added wrapper-routing matrix tests for bookmark/workspace mutation subcommands and operation
     `revert`
   - added focused tests for core `jj` default alias flow planning and alias-catalog coverage
+  - added command-registry tests for default-alias annotation and alias-based filtering
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
@@ -103,6 +106,7 @@
 
 ## Recent commit stack
 
+- `feat(commands): annotate default aliases in registry` (`change: ywqkqkkxuruv`)
 - `feat(alias): surface core jj default shorthands` (`change: lnvzquozzqny`)
 - `fix(alias): canonicalize core jj shorthands` (`change: rklkwyoyqlsp`)
 - `test(view): add mutation wrapper routing matrix` (`change: xluyuvkxnqsn`)
@@ -133,7 +137,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (184 passed)
+  - `cargo test` (185 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

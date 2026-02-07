@@ -44,6 +44,8 @@ This repository is in active development. The current baseline includes:
 - `:` command parsing supports shell-style quoting for multi-word arguments.
 - Command mode supports history navigation with `Up`/`Down`.
 - `:commands` renders an in-app command registry with mode/tier coverage.
+- `:commands` also annotates top-level `jj` default aliases
+  (`bookmark (b)`, `commit (ci)`, `describe (desc)`, `operation (op)`, `status (st)`).
 - `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).
 - The command registry also surfaces local TUI views (`aliases`, `keys`, `keymap`).
 - `:aliases` renders an in-app alias catalog and supports filtering (for example `:aliases push`).

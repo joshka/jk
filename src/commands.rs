@@ -287,15 +287,16 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
     lines.push("-".repeat(40));
 
     for spec in TOP_LEVEL_SPECS {
+        let display_name = command_display_name(spec);
         if let Some(filter) = &filter
-            && !spec.name.to_ascii_lowercase().contains(filter)
+            && !display_name.to_ascii_lowercase().contains(filter)
         {
             continue;
         }
 
         lines.push(format!(
             "{:<18} {:<12} {}",
-            spec.name,
+            display_name,
             spec.mode.as_str(),
             spec.tier.as_str()
         ));
@@ -318,7 +319,8 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
     if filter.is_none() {
         lines.push(String::new());
         lines.push(
-            "high-frequency aliases: gf, gp, rbm, rbt, jjgf, jjgp, jjrbm, jjst, jjl".to_string(),
+            "high-frequency aliases: b, ci, desc, op, st, gf, gp, rbm, rbt, jjgf, jjgp, jjrbm, jjst, jjl"
+                .to_string(),
         );
         lines.push("tips: use :aliases for mappings and :keys for active keybinds".to_string());
         lines.push(
@@ -327,6 +329,24 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
     }
 
     lines
+}
+
+fn command_display_name(spec: CommandSpec) -> String {
+    match top_level_default_alias(spec.name) {
+        Some(alias) => format!("{} ({alias})", spec.name),
+        None => spec.name.to_string(),
+    }
+}
+
+fn top_level_default_alias(name: &str) -> Option<&'static str> {
+    match name {
+        "bookmark" => Some("b"),
+        "commit" => Some("ci"),
+        "describe" => Some("desc"),
+        "operation" => Some("op"),
+        "status" => Some("st"),
+        _ => None,
+    }
 }
 
 pub fn command_safety(tokens: &[String]) -> SafetyTier {
@@ -473,6 +493,8 @@ mod tests {
             Some(&"jk command registry (jj top-level coverage)".to_string())
         );
         assert!(lines.iter().any(|line| line.starts_with("log")));
+        assert!(lines.iter().any(|line| line.starts_with("bookmark (b)")));
+        assert!(lines.iter().any(|line| line.starts_with("status (st)")));
         assert!(lines.iter().any(|line| line.starts_with("workspace")));
         assert!(
             lines
@@ -493,6 +515,13 @@ mod tests {
         let lines = command_overview_lines_with_query(Some("work"));
         assert!(lines.iter().any(|line| line.starts_with("workspace")));
         assert!(!lines.iter().any(|line| line.starts_with("rebase")));
+    }
+
+    #[test]
+    fn filters_overview_lines_by_default_alias() {
+        let lines = command_overview_lines_with_query(Some("ci"));
+        assert!(lines.iter().any(|line| line.starts_with("commit (ci)")));
+        assert!(!lines.iter().any(|line| line.starts_with("workspace")));
     }
 
     #[test]
