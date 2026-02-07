@@ -83,6 +83,8 @@
     `revert`
   - added focused tests for core `jj` default alias flow planning and alias-catalog coverage
   - added command-registry tests for default-alias annotation and alias-based filtering
+  - added startup-action regression test coverage for core `jj` default aliases
+    (`jk st`, `jk ci`, `jk desc`, `jk b`, `jk op`)
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
@@ -106,6 +108,7 @@
 
 ## Recent commit stack
 
+- `test(startup): cover core jj alias routing` (`change: ywvronpkrvxs`)
 - `feat(commands): annotate default aliases in registry` (`change: ywqkqkkxuruv`)
 - `feat(alias): surface core jj default shorthands` (`change: lnvzquozzqny`)
 - `fix(alias): canonicalize core jj shorthands` (`change: rklkwyoyqlsp`)
@@ -137,7 +140,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (185 passed)
+  - `cargo test` (186 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

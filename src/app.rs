@@ -2496,6 +2496,39 @@ mod tests {
     }
 
     #[test]
+    fn startup_action_supports_core_jj_default_aliases() {
+        assert_eq!(
+            startup_action(&["st".to_string()]),
+            FlowAction::Execute(vec!["status".to_string()])
+        );
+        assert_eq!(
+            startup_action(&["b".to_string()]),
+            FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
+        );
+        assert_eq!(
+            startup_action(&["op".to_string()]),
+            FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
+        );
+
+        match startup_action(&["ci".to_string()]) {
+            FlowAction::Prompt(request) => assert_eq!(request.kind, PromptKind::CommitMessage),
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match startup_action(&["desc".to_string()]) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::DescribeMessage {
+                        revision: "@".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn startup_dangerous_command_requires_confirmation() {
         let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
         app.apply_startup_tokens(vec![
