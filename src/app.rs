@@ -3528,6 +3528,43 @@ mod tests {
     }
 
     #[test]
+    fn decorates_all_bookmark_mutation_subcommands_with_wrappers() {
+        let cases = [
+            ("create", "Bookmark Create"),
+            ("set", "Bookmark Set"),
+            ("move", "Bookmark Move"),
+            ("track", "Bookmark Track"),
+            ("untrack", "Bookmark Untrack"),
+            ("delete", "Bookmark Delete"),
+            ("forget", "Bookmark Forget"),
+            ("rename", "Bookmark Rename"),
+        ];
+
+        for (subcommand, expected_header) in cases {
+            let rendered = decorate_command_output(
+                &[
+                    "bookmark".to_string(),
+                    subcommand.to_string(),
+                    "feature".to_string(),
+                ],
+                vec![format!("{subcommand} bookmark output")],
+            );
+
+            assert_eq!(
+                rendered.first(),
+                Some(&expected_header.to_string()),
+                "expected wrapper header for bookmark {subcommand}",
+            );
+            assert!(
+                rendered
+                    .iter()
+                    .any(|line| line.contains("Summary: 1 output line")),
+                "expected summary line for bookmark {subcommand}",
+            );
+        }
+    }
+
+    #[test]
     fn renders_workspace_mutation_view_with_summary_and_tip() {
         let rendered = render_workspace_mutation_view(
             Some("add"),
@@ -3567,6 +3604,39 @@ mod tests {
     }
 
     #[test]
+    fn decorates_all_workspace_mutation_subcommands_with_wrappers() {
+        let cases = [
+            ("add", "Workspace Add"),
+            ("forget", "Workspace Forget"),
+            ("rename", "Workspace Rename"),
+            ("update-stale", "Workspace Update-stale"),
+        ];
+
+        for (subcommand, expected_header) in cases {
+            let rendered = decorate_command_output(
+                &[
+                    "workspace".to_string(),
+                    subcommand.to_string(),
+                    "demo".to_string(),
+                ],
+                vec![format!("{subcommand} workspace output")],
+            );
+
+            assert_eq!(
+                rendered.first(),
+                Some(&expected_header.to_string()),
+                "expected wrapper header for workspace {subcommand}",
+            );
+            assert!(
+                rendered
+                    .iter()
+                    .any(|line| line.contains("Summary: 1 output line")),
+                "expected summary line for workspace {subcommand}",
+            );
+        }
+    }
+
+    #[test]
     fn renders_operation_restore_view_with_summary_and_tip() {
         let rendered = render_operation_mutation_view(
             "restore",
@@ -3598,6 +3668,25 @@ mod tests {
         );
 
         assert_eq!(rendered.first(), Some(&"Operation Restore".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn decorates_operation_revert_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &[
+                "operation".to_string(),
+                "revert".to_string(),
+                "7699d9773e37".to_string(),
+            ],
+            vec!["Reverted operation 7699d9773e37".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Operation Revert".to_string()));
         assert!(
             rendered
                 .iter()

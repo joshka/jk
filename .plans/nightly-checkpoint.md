@@ -73,6 +73,8 @@
   - added `insta` snapshots for the remaining top-level mutation wrappers:
     `describe`, `edit`, `next`, `prev`, `squash`, `split`, `redo`, and `revert`
   - added broad top-level mutation wrapper regression coverage plus command-specific tip assertions
+  - added wrapper-routing matrix tests for bookmark/workspace mutation subcommands and operation
+    `revert`
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
@@ -96,6 +98,7 @@
 
 ## Recent commit stack
 
+- `test(view): add mutation wrapper routing matrix` (`change: xluyuvkxnqsn`)
 - `test(view): snapshot remaining top-level mutations` (`change: nuvpwspkpwzx`)
 - `test(view): snapshot top-level mutation variants` (`change: umvnxkynouzz`)
 - `test(view): snapshot remaining bookmark mutations` (`change: xsovkmssrwnt`)
@@ -123,7 +126,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (179 passed)
+  - `cargo test` (182 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers
