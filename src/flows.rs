@@ -969,6 +969,29 @@ mod tests {
     }
 
     #[test]
+    fn maps_core_jj_default_aliases() {
+        assert_eq!(
+            plan_command("st", selected()),
+            FlowAction::Execute(vec!["status".to_string()])
+        );
+        assert_prompt_kind(
+            plan_command("desc", selected()),
+            PromptKind::DescribeMessage {
+                revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(plan_command("ci", selected()), PromptKind::CommitMessage);
+        assert_eq!(
+            plan_command("b", selected()),
+            FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
+        );
+        assert_eq!(
+            plan_command("op", selected()),
+            FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
+        );
+    }
+
+    #[test]
     fn covers_oh_my_zsh_gold_alias_flow_contract() {
         assert_prompt_kind(plan_command("jjgf", selected()), PromptKind::GitFetchRemote);
         assert_prompt_kind(

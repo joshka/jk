@@ -51,6 +51,8 @@
 - Alias behavior:
   - core `jj` default aliases `b`, `ci`, and `op` now canonicalize to `bookmark`, `commit`, and
     `operation` so native `jj` shorthand paths use the same guided/native wrappers.
+  - in-app alias catalog now includes core `jj` defaults:
+    `b`, `ci`, `desc`, `op`, and `st`.
   - `rbm`/`rbt` now preserve explicit destination flags (`-d`/`--destination`/`--to`/`--into`)
     so explicit user intent wins over alias defaults.
   - alias catalog now includes the full installed OMZ plugin set (including `jjbc`, `jjbd`,
@@ -77,6 +79,7 @@
   - added broad top-level mutation wrapper regression coverage plus command-specific tip assertions
   - added wrapper-routing matrix tests for bookmark/workspace mutation subcommands and operation
     `revert`
+  - added focused tests for core `jj` default alias flow planning and alias-catalog coverage
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
@@ -100,6 +103,7 @@
 
 ## Recent commit stack
 
+- `feat(alias): surface core jj default shorthands` (`change: lnvzquozzqny`)
 - `fix(alias): canonicalize core jj shorthands` (`change: rklkwyoyqlsp`)
 - `test(view): add mutation wrapper routing matrix` (`change: xluyuvkxnqsn`)
 - `test(view): snapshot remaining top-level mutations` (`change: nuvpwspkpwzx`)
@@ -129,7 +133,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (182 passed)
+  - `cargo test` (184 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

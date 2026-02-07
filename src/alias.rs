@@ -17,11 +17,16 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
     result
 }
 
-const ALIAS_CATALOG: [(&str, &str); 39] = [
+const ALIAS_CATALOG: [(&str, &str); 44] = [
+    ("b", "bookmark"),
+    ("ci", "commit"),
+    ("desc", "describe"),
     ("gf", "git fetch"),
     ("gp", "git push"),
+    ("op", "operation"),
     ("rbm", "rebase -d main"),
     ("rbt", "rebase -d trunk()"),
+    ("st", "status"),
     ("jja", "abandon"),
     ("jjb", "bookmark (defaults to list in jk)"),
     ("jjbc", "bookmark create"),
@@ -185,7 +190,9 @@ mod tests {
     fn maps_core_short_aliases() {
         assert_eq!(normalize_alias(&to_vec(&["b"])), to_vec(&["bookmark"]));
         assert_eq!(normalize_alias(&to_vec(&["ci"])), to_vec(&["commit"]));
+        assert_eq!(normalize_alias(&to_vec(&["desc"])), to_vec(&["describe"]));
         assert_eq!(normalize_alias(&to_vec(&["op"])), to_vec(&["operation"]));
+        assert_eq!(normalize_alias(&to_vec(&["st"])), to_vec(&["status"]));
         assert_eq!(normalize_alias(&to_vec(&["gf"])), to_vec(&["git", "fetch"]));
         assert_eq!(normalize_alias(&to_vec(&["gp"])), to_vec(&["git", "push"]));
         assert_eq!(
@@ -321,8 +328,20 @@ mod tests {
     fn renders_alias_catalog_with_expected_entries() {
         let lines = alias_overview_lines();
         assert_eq!(lines.first(), Some(&"jk alias catalog".to_string()));
+        assert!(lines.iter().any(|line| line.contains("desc")));
         assert!(lines.iter().any(|line| line.contains("rbm")));
         assert!(lines.iter().any(|line| line.contains("jjrt")));
+    }
+
+    #[test]
+    fn catalog_includes_core_jj_default_aliases() {
+        let lines = alias_overview_lines();
+        for alias in ["b", "ci", "desc", "op", "st"] {
+            assert!(
+                lines.iter().any(|line| line.contains(alias)),
+                "expected alias {alias} in catalog"
+            );
+        }
     }
 
     #[test]
