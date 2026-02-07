@@ -110,6 +110,12 @@
   - added `insta` snapshot coverage for bookmark-list and operation-log wrapper views
   - added quick read-mode shortcuts (`o`, `L`, `w`) for operation log/bookmark list/root views
   - aligned `workspace root` rendering with the native root wrapper presentation
+  - added in-app `:aliases` catalog view with optional query filtering
+  - improved `show`/`diff` wrapper rendering with automatic section spacing between file blocks
+  - added in-app `:keys` keymap view with query filtering and startup support (`jk keys`)
+  - added normal-mode `K` shortcut for direct keymap access
+  - added `:commands` tips that point to `:aliases` and `:keys` discovery views
+  - added normal-mode `A` shortcut for direct alias-catalog access
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

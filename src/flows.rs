@@ -1,4 +1,4 @@
-use crate::alias::normalize_alias;
+use crate::alias::{alias_overview_lines, alias_overview_lines_with_query, normalize_alias};
 use crate::commands::{command_overview_lines, command_overview_lines_with_query};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -308,6 +308,13 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
                 status: format!("Showing command registry for `{query}`"),
             }
         }
+        [command, tail @ ..] if command == "aliases" && !tail.is_empty() => {
+            let query = tail.join(" ");
+            FlowAction::Render {
+                lines: alias_overview_lines_with_query(Some(&query)),
+                status: format!("Showing alias catalog for `{query}`"),
+            }
+        }
         [command] if command == "commands" || command == "?" => FlowAction::Render {
             lines: command_overview_lines(),
             status: "Showing command registry".to_string(),
@@ -315,6 +322,10 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         [command] if command == "help" => FlowAction::Render {
             lines: command_overview_lines(),
             status: "Showing command registry".to_string(),
+        },
+        [command] if command == "aliases" => FlowAction::Render {
+            lines: alias_overview_lines(),
+            status: "Showing alias catalog".to_string(),
         },
         [command] if command == "operation" => {
             FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
@@ -1505,6 +1516,29 @@ mod tests {
                 assert_eq!(status, "Showing command registry for `work`".to_string());
                 assert!(lines.iter().any(|line| line.starts_with("workspace")));
                 assert!(!lines.iter().any(|line| line.starts_with("rebase")));
+            }
+            other => panic!("expected render action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn renders_alias_catalog_in_app() {
+        match plan_command("aliases", selected()) {
+            FlowAction::Render { lines, status } => {
+                assert_eq!(status, "Showing alias catalog".to_string());
+                assert!(lines.iter().any(|line| line.contains("jjrbm")));
+            }
+            other => panic!("expected render action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn filters_alias_catalog_with_query() {
+        match plan_command("aliases push", selected()) {
+            FlowAction::Render { lines, status } => {
+                assert_eq!(status, "Showing alias catalog for `push`".to_string());
+                assert!(lines.iter().any(|line| line.contains("jjgp")));
+                assert!(!lines.iter().any(|line| line.contains("jjrbm")));
             }
             other => panic!("expected render action, got {other:?}"),
         }

@@ -17,6 +17,69 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
     result
 }
 
+const ALIAS_CATALOG: [(&str, &str); 31] = [
+    ("gf", "git fetch"),
+    ("gp", "git push"),
+    ("rbm", "rebase -d main"),
+    ("rbt", "rebase -d trunk()"),
+    ("jjgf", "git fetch"),
+    ("jjgfa", "git fetch --all-remotes"),
+    ("jjgp", "git push"),
+    ("jjgpt", "git push --tracked"),
+    ("jjgpa", "git push --all"),
+    ("jjgpd", "git push --deleted"),
+    ("jjrb", "rebase"),
+    ("jjrbm", "rebase -d trunk()"),
+    ("jjst", "status"),
+    ("jjl", "log"),
+    ("jjd", "diff"),
+    ("jjc", "commit"),
+    ("jjds", "describe"),
+    ("jje", "edit"),
+    ("jjn", "new"),
+    ("jjnt", "new trunk()"),
+    ("jjsp", "split"),
+    ("jjsq", "squash"),
+    ("jjb", "bookmark list"),
+    ("jjbl", "bookmark list"),
+    ("jjbs", "bookmark set"),
+    ("jjbm", "bookmark move"),
+    ("jjbt", "bookmark track"),
+    ("jjbu", "bookmark untrack"),
+    ("jjrs", "restore"),
+    ("jja", "abandon"),
+    ("jjrt", "root (in-app equivalent of plugin cd alias)"),
+];
+
+pub fn alias_overview_lines() -> Vec<String> {
+    alias_overview_lines_with_query(None)
+}
+
+pub fn alias_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
+    let filter = query
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase);
+
+    let mut lines = vec![
+        "jk alias catalog".to_string(),
+        format!("{:<8} {}", "alias", "expands to"),
+        "-".repeat(40),
+    ];
+
+    for (alias, expansion) in ALIAS_CATALOG {
+        if let Some(filter) = &filter
+            && !alias.to_ascii_lowercase().contains(filter)
+            && !expansion.to_ascii_lowercase().contains(filter)
+        {
+            continue;
+        }
+        lines.push(format!("{:<8} {}", alias, expansion));
+    }
+
+    lines
+}
+
 fn normalize_destination_alias(alias: &str, tokens: &[String]) -> Option<Vec<String>> {
     let default_destination = match alias {
         "rbm" => "main",
@@ -77,7 +140,7 @@ fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_alias;
+    use super::{alias_overview_lines, alias_overview_lines_with_query, normalize_alias};
 
     fn to_vec(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_string()).collect()
@@ -199,5 +262,20 @@ mod tests {
     fn leaves_regular_commands_unchanged() {
         let input = to_vec(&["log", "-n", "10"]);
         assert_eq!(normalize_alias(&input), input);
+    }
+
+    #[test]
+    fn renders_alias_catalog_with_expected_entries() {
+        let lines = alias_overview_lines();
+        assert_eq!(lines.first(), Some(&"jk alias catalog".to_string()));
+        assert!(lines.iter().any(|line| line.contains("rbm")));
+        assert!(lines.iter().any(|line| line.contains("jjrt")));
+    }
+
+    #[test]
+    fn filters_alias_catalog_by_query() {
+        let lines = alias_overview_lines_with_query(Some("push"));
+        assert!(lines.iter().any(|line| line.contains("jjgp")));
+        assert!(!lines.iter().any(|line| line.contains("jjrbm")));
     }
 }

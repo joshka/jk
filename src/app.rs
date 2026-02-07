@@ -134,6 +134,16 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.keymap, key) {
+            self.execute_command_line("keys")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.aliases, key) {
+            self.execute_command_line("aliases")?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.repeat_last, key) {
             let tokens = if self.last_command.is_empty() {
                 vec!["log".to_string()]
@@ -463,8 +473,38 @@ impl App {
     }
 
     fn execute_command_line(&mut self, command: &str) -> Result<(), JkError> {
+        if let Some(action) = self.local_view_action(command) {
+            return self.apply_flow_action(action);
+        }
+
         let action = plan_command(command, self.selected_revision());
         self.apply_flow_action(action)
+    }
+
+    fn local_view_action(&self, command: &str) -> Option<FlowAction> {
+        let trimmed = command.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        let mut parts = trimmed.split_whitespace();
+        let head = parts.next()?;
+        if head != "keys" && head != "keymap" {
+            return None;
+        }
+
+        let query = parts.collect::<Vec<_>>().join(" ");
+        if query.is_empty() {
+            Some(FlowAction::Render {
+                lines: keymap_overview_lines(&self.keybinds, None),
+                status: "Showing keymap".to_string(),
+            })
+        } else {
+            Some(FlowAction::Render {
+                lines: keymap_overview_lines(&self.keybinds, Some(&query)),
+                status: format!("Showing keymap for `{query}`"),
+            })
+        }
     }
 
     fn record_command_history(&mut self, command: &str) {
@@ -526,6 +566,13 @@ impl App {
     }
 
     fn apply_startup_tokens(&mut self, startup_tokens: Vec<String>) -> Result<(), JkError> {
+        if !startup_tokens.is_empty() {
+            let startup_command = startup_tokens.join(" ");
+            if let Some(action) = self.local_view_action(&startup_command) {
+                return self.apply_flow_action(action);
+            }
+        }
+
         let action = startup_action(&startup_tokens);
         self.apply_flow_action(action)
     }
@@ -1101,7 +1148,7 @@ fn render_show_view(lines: Vec<String>) -> Vec<String> {
         "=========".to_string(),
         String::new(),
     ];
-    rendered.extend(lines);
+    rendered.extend(normalize_show_lines(lines));
     rendered.push(String::new());
     rendered.push("Shortcuts: Enter show selected, d diff selected, s status".to_string());
     rendered
@@ -1117,10 +1164,161 @@ fn render_diff_view(lines: Vec<String>) -> Vec<String> {
         "=========".to_string(),
         String::new(),
     ];
-    rendered.extend(lines);
+    rendered.extend(normalize_diff_lines(lines));
     rendered.push(String::new());
     rendered.push("Shortcuts: d diff selected, Enter show selected, s status".to_string());
     rendered
+}
+
+fn normalize_show_lines(lines: Vec<String>) -> Vec<String> {
+    let mut rendered: Vec<String> = Vec::new();
+
+    for raw_line in lines {
+        let line = raw_line.trim_end().to_string();
+        if line.is_empty() {
+            if matches!(rendered.last(), Some(previous) if !previous.is_empty()) {
+                rendered.push(String::new());
+            }
+            continue;
+        }
+
+        if is_top_level_section_header(&line)
+            && matches!(rendered.last(), Some(previous) if !previous.is_empty())
+        {
+            rendered.push(String::new());
+        }
+
+        rendered.push(line);
+    }
+
+    while matches!(rendered.last(), Some(previous) if previous.is_empty()) {
+        rendered.pop();
+    }
+
+    rendered
+}
+
+fn normalize_diff_lines(lines: Vec<String>) -> Vec<String> {
+    let mut rendered: Vec<String> = Vec::new();
+
+    for raw_line in lines {
+        let line = raw_line.trim_end().to_string();
+
+        if is_top_level_section_header(&line)
+            && matches!(rendered.last(), Some(previous) if !previous.is_empty())
+        {
+            rendered.push(String::new());
+        }
+
+        rendered.push(line);
+    }
+
+    while matches!(rendered.last(), Some(previous) if previous.is_empty()) {
+        rendered.pop();
+    }
+
+    rendered
+}
+
+fn is_top_level_section_header(line: &str) -> bool {
+    !line.starts_with(' ') && line.ends_with(':')
+}
+
+fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>) -> Vec<String> {
+    let filter = query
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase);
+
+    let entries: [(&str, &Vec<KeyBinding>); 44] = [
+        ("normal.quit", &config.normal.quit),
+        ("normal.refresh", &config.normal.refresh),
+        ("normal.up", &config.normal.up),
+        ("normal.down", &config.normal.down),
+        ("normal.top", &config.normal.top),
+        ("normal.bottom", &config.normal.bottom),
+        ("normal.command_mode", &config.normal.command_mode),
+        ("normal.help", &config.normal.help),
+        ("normal.keymap", &config.normal.keymap),
+        ("normal.aliases", &config.normal.aliases),
+        ("normal.show", &config.normal.show),
+        ("normal.diff", &config.normal.diff),
+        ("normal.status", &config.normal.status),
+        ("normal.operation_log", &config.normal.operation_log),
+        ("normal.bookmark_list", &config.normal.bookmark_list),
+        ("normal.root", &config.normal.root),
+        ("normal.repeat_last", &config.normal.repeat_last),
+        ("normal.toggle_patch", &config.normal.toggle_patch),
+        ("normal.fetch", &config.normal.fetch),
+        ("normal.push", &config.normal.push),
+        ("normal.rebase_main", &config.normal.rebase_main),
+        ("normal.rebase_trunk", &config.normal.rebase_trunk),
+        ("normal.new", &config.normal.new),
+        ("normal.next", &config.normal.next),
+        ("normal.prev", &config.normal.prev),
+        ("normal.edit", &config.normal.edit),
+        ("normal.commit", &config.normal.commit),
+        ("normal.describe", &config.normal.describe),
+        ("normal.bookmark_set", &config.normal.bookmark_set),
+        ("normal.abandon", &config.normal.abandon),
+        ("normal.rebase", &config.normal.rebase),
+        ("normal.squash", &config.normal.squash),
+        ("normal.split", &config.normal.split),
+        ("normal.restore", &config.normal.restore),
+        ("normal.revert", &config.normal.revert),
+        ("normal.undo", &config.normal.undo),
+        ("normal.redo", &config.normal.redo),
+        ("command.submit", &config.command.submit),
+        ("command.cancel", &config.command.cancel),
+        ("command.backspace", &config.command.backspace),
+        ("command.history_prev", &config.command.history_prev),
+        ("command.history_next", &config.command.history_next),
+        ("confirm.accept", &config.confirm.accept),
+        ("confirm.reject", &config.confirm.reject),
+    ];
+
+    let mut lines = vec![
+        "jk keymap".to_string(),
+        format!("{:<24} {}", "action", "keys"),
+        "-".repeat(44),
+    ];
+
+    for (action, bindings) in entries {
+        let labels = key_binding_labels(bindings);
+        if let Some(filter) = &filter
+            && !action.to_ascii_lowercase().contains(filter)
+            && !labels.to_ascii_lowercase().contains(filter)
+        {
+            continue;
+        }
+
+        lines.push(format!("{:<24} {}", action, labels));
+    }
+
+    lines
+}
+
+fn key_binding_labels(bindings: &[KeyBinding]) -> String {
+    bindings
+        .iter()
+        .map(key_binding_label)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn key_binding_label(binding: &KeyBinding) -> String {
+    match binding {
+        KeyBinding::Char(value) => value.to_string(),
+        KeyBinding::Enter => "Enter".to_string(),
+        KeyBinding::Esc => "Esc".to_string(),
+        KeyBinding::Backspace => "Backspace".to_string(),
+        KeyBinding::Up => "Up".to_string(),
+        KeyBinding::Down => "Down".to_string(),
+        KeyBinding::Left => "Left".to_string(),
+        KeyBinding::Right => "Right".to_string(),
+        KeyBinding::Home => "Home".to_string(),
+        KeyBinding::End => "End".to_string(),
+    }
 }
 
 fn render_root_view(lines: Vec<String>) -> Vec<String> {
@@ -1218,10 +1416,10 @@ mod tests {
 
     use super::{
         App, Mode, build_row_revision_map, confirmation_preview_tokens, decorate_command_output,
-        extract_revision, is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row,
-        metadata_log_tokens, render_bookmark_list_view, render_diff_view,
-        render_operation_log_view, render_root_view, render_show_view, render_status_view,
-        startup_action, toggle_patch_flag,
+        extract_revision, is_change_id, is_commit_id, is_dangerous, keymap_overview_lines,
+        looks_like_graph_commit_row, metadata_log_tokens, render_bookmark_list_view,
+        render_diff_view, render_operation_log_view, render_root_view, render_show_view,
+        render_status_view, startup_action, toggle_patch_flag,
     };
 
     #[test]
@@ -1373,6 +1571,40 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("jj top-level coverage"))
         );
+    }
+
+    #[test]
+    fn startup_keys_view_renders_without_running_jj() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.apply_startup_tokens(vec!["keys".to_string()])
+            .expect("startup action should succeed");
+
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(app.status_line, "Showing keymap".to_string());
+        assert!(app.lines.iter().any(|line| line.contains("jk keymap")));
+        assert!(app.lines.iter().any(|line| line.contains("normal.push")));
+    }
+
+    #[test]
+    fn filters_keymap_view_by_query() {
+        let lines = keymap_overview_lines(
+            &KeybindConfig::load().expect("keybind config should parse"),
+            Some("push"),
+        );
+
+        assert!(lines.iter().any(|line| line.contains("normal.push")));
+        assert!(!lines.iter().any(|line| line.contains("normal.quit")));
+    }
+
+    #[test]
+    fn command_keys_view_renders_and_filters() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.execute_command_line("keys push")
+            .expect("keys command should render");
+
+        assert_eq!(app.status_line, "Showing keymap for `push`".to_string());
+        assert!(app.lines.iter().any(|line| line.contains("normal.push")));
+        assert!(!app.lines.iter().any(|line| line.contains("normal.quit")));
     }
 
     #[test]
@@ -1687,6 +1919,24 @@ mod tests {
     }
 
     #[test]
+    fn inserts_section_spacing_in_show_view() {
+        let rendered = render_show_view(vec![
+            "Commit ID: abcdef0123456789".to_string(),
+            "Change ID: abcdefghijklmnop".to_string(),
+            "Modified regular file src/app.rs:".to_string(),
+            "  1: old".to_string(),
+            "Modified regular file src/config.rs:".to_string(),
+            "  1: new".to_string(),
+        ]);
+
+        let second_section_index = rendered
+            .iter()
+            .position(|line| line == "Modified regular file src/config.rs:")
+            .expect("second show section should exist");
+        assert_eq!(rendered.get(second_section_index - 1), Some(&String::new()));
+    }
+
+    #[test]
     fn renders_diff_view_with_header_and_shortcuts() {
         let rendered = render_diff_view(vec![
             "Modified regular file src/app.rs:".to_string(),
@@ -1704,6 +1954,22 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("Shortcuts: d diff selected"))
         );
+    }
+
+    #[test]
+    fn inserts_file_spacing_in_diff_view() {
+        let rendered = render_diff_view(vec![
+            "Modified regular file src/app.rs:".to_string(),
+            "  1  1: use std::collections::HashMap;".to_string(),
+            "Modified regular file src/config.rs:".to_string(),
+            "  1  1: use std::env;".to_string(),
+        ]);
+
+        let second_file_index = rendered
+            .iter()
+            .position(|line| line == "Modified regular file src/config.rs:")
+            .expect("second diff file should exist");
+        assert_eq!(rendered.get(second_file_index - 1), Some(&String::new()));
     }
 
     #[test]
@@ -2066,6 +2332,32 @@ mod tests {
                 .lines
                 .iter()
                 .any(|line| line.contains("jj top-level coverage"))
+        );
+
+        let mut keymap_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        keymap_app
+            .handle_key(KeyEvent::from(KeyCode::Char('K')))
+            .expect("keymap shortcut should be handled");
+        assert_eq!(keymap_app.mode, Mode::Normal);
+        assert_eq!(keymap_app.status_line, "Showing keymap".to_string());
+        assert!(
+            keymap_app
+                .lines
+                .iter()
+                .any(|line| line.contains("jk keymap"))
+        );
+
+        let mut aliases_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        aliases_app
+            .handle_key(KeyEvent::from(KeyCode::Char('A')))
+            .expect("aliases shortcut should be handled");
+        assert_eq!(aliases_app.mode, Mode::Normal);
+        assert_eq!(aliases_app.status_line, "Showing alias catalog".to_string());
+        assert!(
+            aliases_app
+                .lines
+                .iter()
+                .any(|line| line.contains("jk alias catalog"))
         );
 
         let mut repeat_app = App::new(KeybindConfig::load().expect("keybind config should parse"));

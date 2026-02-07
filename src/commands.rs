@@ -306,6 +306,7 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
         lines.push(
             "high-frequency aliases: gf, gp, rbm, rbt, jjgf, jjgp, jjrbm, jjst, jjl".to_string(),
         );
+        lines.push("tips: use :aliases for mappings and :keys for active keybinds".to_string());
     }
 
     lines
@@ -435,6 +436,11 @@ mod tests {
             lines
                 .iter()
                 .any(|line| line.contains("high-frequency aliases"))
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains(":aliases for mappings"))
         );
     }
 

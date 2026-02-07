@@ -26,6 +26,8 @@ pub struct NormalKeys {
     pub bottom: Vec<KeyBinding>,
     pub command_mode: Vec<KeyBinding>,
     pub help: Vec<KeyBinding>,
+    pub keymap: Vec<KeyBinding>,
+    pub aliases: Vec<KeyBinding>,
     pub show: Vec<KeyBinding>,
     pub diff: Vec<KeyBinding>,
     pub status: Vec<KeyBinding>,
@@ -87,6 +89,8 @@ struct RawNormal {
     bottom: Vec<String>,
     command_mode: Vec<String>,
     help: Vec<String>,
+    keymap: Vec<String>,
+    aliases: Vec<String>,
     show: Vec<String>,
     diff: Vec<String>,
     status: Vec<String>,
@@ -148,6 +152,8 @@ struct PartialNormal {
     bottom: Option<Vec<String>>,
     command_mode: Option<Vec<String>>,
     help: Option<Vec<String>>,
+    keymap: Option<Vec<String>>,
+    aliases: Option<Vec<String>>,
     show: Option<Vec<String>>,
     diff: Option<Vec<String>>,
     status: Option<Vec<String>>,
@@ -224,6 +230,8 @@ impl RawConfig {
                 bottom: parse_bindings(&self.normal.bottom)?,
                 command_mode: parse_bindings(&self.normal.command_mode)?,
                 help: parse_bindings(&self.normal.help)?,
+                keymap: parse_bindings(&self.normal.keymap)?,
+                aliases: parse_bindings(&self.normal.aliases)?,
                 show: parse_bindings(&self.normal.show)?,
                 diff: parse_bindings(&self.normal.diff)?,
                 status: parse_bindings(&self.normal.status)?,
@@ -313,6 +321,12 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         }
         if let Some(value) = normal.help {
             base.normal.help = value;
+        }
+        if let Some(value) = normal.keymap {
+            base.normal.keymap = value;
+        }
+        if let Some(value) = normal.aliases {
+            base.normal.aliases = value;
         }
         if let Some(value) = normal.show {
             base.normal.show = value;
@@ -451,6 +465,8 @@ mod tests {
         assert_eq!(config.normal.bookmark_set, vec![KeyBinding::Char('b')]);
         assert_eq!(config.normal.abandon, vec![KeyBinding::Char('a')]);
         assert_eq!(config.normal.help, vec![KeyBinding::Char('?')]);
+        assert_eq!(config.normal.keymap, vec![KeyBinding::Char('K')]);
+        assert_eq!(config.normal.aliases, vec![KeyBinding::Char('A')]);
         assert_eq!(config.normal.status, vec![KeyBinding::Char('s')]);
         assert_eq!(config.normal.operation_log, vec![KeyBinding::Char('o')]);
         assert_eq!(config.normal.bookmark_list, vec![KeyBinding::Char('L')]);
@@ -484,6 +500,8 @@ mod tests {
         assert!(!config.normal.bookmark_set.is_empty());
         assert!(!config.normal.abandon.is_empty());
         assert!(!config.normal.help.is_empty());
+        assert!(!config.normal.keymap.is_empty());
+        assert!(!config.normal.aliases.is_empty());
         assert!(!config.normal.status.is_empty());
         assert!(!config.normal.operation_log.is_empty());
         assert!(!config.normal.bookmark_list.is_empty());
