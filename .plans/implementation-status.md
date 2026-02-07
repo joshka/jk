@@ -62,7 +62,14 @@
 ## Notes
 
 - Keep this file updated after each meaningful implementation step.
+- Plan-to-implementation handoff rule:
+  - when work starts from a Plan Mode proposal, write the handoff entry here before any
+    implementation edits.
 - Every status transition should include tests or clear rationale in commit/body text.
+- Current handoff for module refactor:
+  - source plan: command-first module architecture with soft 300/hard 500 LOC and co-located tests.
+  - full durable execution plan written to `.plans/module-refactor-execution-plan.md`.
+  - refactor execution is now active and will proceed in atomic jj commits by subsystem.
 - Latest checkpoint:
   - expanded OMZ alias support and `rbm` default-to-`main` behavior
   - added guided flows for rewrite/recovery, bookmark, and remote commands in `src/flows.rs`
@@ -318,3 +325,12 @@
   - threaded `normal.log` through keybind config loading, keymap rendering, shortcut routing,
     and focused tests.
   - updated README onboarding to document the new one-key return-to-log flow.
+- Latest pass:
+  - began module-architecture refactor by converting `src/app.rs` into `src/app/` directory
+    modules with explicit files for `mod`, `selection`, `preview`, `view`, and `terminal`.
+  - moved all `insta` snapshots to `src/app/snapshots` to keep snapshot discovery aligned with the
+    new Rust module path.
+  - extracted the large app test block into `src/app/tests.rs` and rewired imports to module-local
+    helpers.
+  - added durable refactor execution plan file:
+    `.plans/module-refactor-execution-plan.md`.

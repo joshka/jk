@@ -46,6 +46,9 @@
 ## Documentation & Execution Discipline
 
 - This project is documentation-heavy: update docs and plans as you implement.
+- Before implementation starts from a Plan Mode proposal, write the full execution plan to a
+  dedicated file under `.plans/` and record a handoff entry in
+  `.plans/implementation-status.md`.
 - Lint Markdown immediately after writing docs.
 - After code changes, run `cargo fmt --all` and `cargo check`.
 - Run targeted tests for changed behavior first, then full `cargo test` + strict clippy at
