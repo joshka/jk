@@ -33,6 +33,9 @@ pub struct App {
     scroll: usize,
     status_line: String,
     command_input: String,
+    command_history: Vec<String>,
+    command_history_index: Option<usize>,
+    command_history_draft: String,
     row_revision_map: Vec<Option<String>>,
     pending_confirm: Option<Vec<String>>,
     pending_prompt: Option<PromptState>,
@@ -59,6 +62,9 @@ impl App {
             scroll: 0,
             status_line: "Press : for commands, q to quit".to_string(),
             command_input: String::new(),
+            command_history: Vec::new(),
+            command_history_index: None,
+            command_history_draft: String::new(),
             row_revision_map: Vec::new(),
             pending_confirm: None,
             pending_prompt: None,
@@ -118,6 +124,8 @@ impl App {
         if matches_any(&self.keybinds.normal.command_mode, key) {
             self.mode = Mode::Command;
             self.command_input.clear();
+            self.command_history_index = None;
+            self.command_history_draft.clear();
             return Ok(());
         }
 
@@ -281,20 +289,35 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.command.history_prev, key) {
+            self.navigate_command_history_prev();
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.command.history_next, key) {
+            self.navigate_command_history_next();
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.command.backspace, key) {
+            self.command_history_index = None;
             self.command_input.pop();
             return Ok(());
         }
 
         if matches_any(&self.keybinds.command.submit, key) {
             let command = self.command_input.clone();
+            self.record_command_history(&command);
             self.mode = Mode::Normal;
             self.command_input.clear();
+            self.command_history_index = None;
+            self.command_history_draft.clear();
             self.execute_command_line(&command)?;
             return Ok(());
         }
 
         if let KeyCode::Char(ch) = key.code {
+            self.command_history_index = None;
             self.command_input.push(ch);
         }
 
@@ -402,6 +425,53 @@ impl App {
     fn execute_command_line(&mut self, command: &str) -> Result<(), JkError> {
         let action = plan_command(command, self.selected_revision());
         self.apply_flow_action(action)
+    }
+
+    fn record_command_history(&mut self, command: &str) {
+        let trimmed = command.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+
+        if self.command_history.last().map(String::as_str) == Some(trimmed) {
+            return;
+        }
+
+        self.command_history.push(trimmed.to_string());
+    }
+
+    fn navigate_command_history_prev(&mut self) {
+        if self.command_history.is_empty() {
+            return;
+        }
+
+        let next_index = match self.command_history_index {
+            Some(index) if index > 0 => index - 1,
+            Some(index) => index,
+            None => {
+                self.command_history_draft = self.command_input.clone();
+                self.command_history.len() - 1
+            }
+        };
+
+        self.command_history_index = Some(next_index);
+        self.command_input = self.command_history[next_index].clone();
+    }
+
+    fn navigate_command_history_next(&mut self) {
+        let Some(index) = self.command_history_index else {
+            return;
+        };
+
+        if index + 1 < self.command_history.len() {
+            let next_index = index + 1;
+            self.command_history_index = Some(next_index);
+            self.command_input = self.command_history[next_index].clone();
+            return;
+        }
+
+        self.command_history_index = None;
+        self.command_input = self.command_history_draft.clone();
     }
 
     fn start_prompt(&mut self, request: PromptRequest) {
@@ -1767,5 +1837,40 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("jj top-level coverage"))
         );
+    }
+
+    #[test]
+    fn command_history_navigates_previous_and_next_entries() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.mode = Mode::Command;
+        app.command_history = vec!["status".to_string(), "log -n 5".to_string()];
+
+        app.handle_key(KeyEvent::from(KeyCode::Up))
+            .expect("history previous should succeed");
+        assert_eq!(app.command_input, "log -n 5".to_string());
+
+        app.handle_key(KeyEvent::from(KeyCode::Up))
+            .expect("history previous should stay at oldest");
+        assert_eq!(app.command_input, "status".to_string());
+
+        app.handle_key(KeyEvent::from(KeyCode::Down))
+            .expect("history next should succeed");
+        assert_eq!(app.command_input, "log -n 5".to_string());
+    }
+
+    #[test]
+    fn command_history_restores_draft_after_navigation() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.mode = Mode::Command;
+        app.command_history = vec!["status".to_string(), "log -n 5".to_string()];
+        app.command_input = "boo".to_string();
+
+        app.handle_key(KeyEvent::from(KeyCode::Up))
+            .expect("history previous should succeed");
+        assert_eq!(app.command_input, "log -n 5".to_string());
+
+        app.handle_key(KeyEvent::from(KeyCode::Down))
+            .expect("history next should restore draft");
+        assert_eq!(app.command_input, "boo".to_string());
     }
 }

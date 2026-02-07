@@ -53,6 +53,8 @@ pub struct CommandKeys {
     pub submit: Vec<KeyBinding>,
     pub cancel: Vec<KeyBinding>,
     pub backspace: Vec<KeyBinding>,
+    pub history_prev: Vec<KeyBinding>,
+    pub history_next: Vec<KeyBinding>,
 }
 
 #[derive(Debug, Clone)]
@@ -105,6 +107,8 @@ struct RawCommand {
     submit: Vec<String>,
     cancel: Vec<String>,
     backspace: Vec<String>,
+    history_prev: Vec<String>,
+    history_next: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -157,6 +161,8 @@ struct PartialCommand {
     submit: Option<Vec<String>>,
     cancel: Option<Vec<String>>,
     backspace: Option<Vec<String>>,
+    history_prev: Option<Vec<String>>,
+    history_next: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -222,6 +228,8 @@ impl RawConfig {
                 submit: parse_bindings(&self.command.submit)?,
                 cancel: parse_bindings(&self.command.cancel)?,
                 backspace: parse_bindings(&self.command.backspace)?,
+                history_prev: parse_bindings(&self.command.history_prev)?,
+                history_next: parse_bindings(&self.command.history_next)?,
             },
             confirm: ConfirmKeys {
                 accept: parse_bindings(&self.confirm.accept)?,
@@ -350,6 +358,12 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         if let Some(value) = command.backspace {
             base.command.backspace = value;
         }
+        if let Some(value) = command.history_prev {
+            base.command.history_prev = value;
+        }
+        if let Some(value) = command.history_next {
+            base.command.history_next = value;
+        }
     }
 
     if let Some(confirm) = user.confirm {
@@ -394,6 +408,8 @@ mod tests {
         assert_eq!(config.normal.revert, vec![KeyBinding::Char('R')]);
         assert_eq!(config.normal.undo, vec![KeyBinding::Char('u')]);
         assert_eq!(config.normal.redo, vec![KeyBinding::Char('U')]);
+        assert_eq!(config.command.history_prev, vec![KeyBinding::Up]);
+        assert_eq!(config.command.history_next, vec![KeyBinding::Down]);
     }
 
     #[test]
@@ -418,5 +434,7 @@ mod tests {
         assert!(!config.normal.revert.is_empty());
         assert!(!config.normal.undo.is_empty());
         assert!(!config.normal.redo.is_empty());
+        assert!(!config.command.history_prev.is_empty());
+        assert!(!config.command.history_next.is_empty());
     }
 }

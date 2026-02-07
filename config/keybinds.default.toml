@@ -32,6 +32,8 @@ redo = ["U"]
 submit = ["Enter"]
 cancel = ["Esc"]
 backspace = ["Backspace"]
+history_prev = ["Up"]
+history_next = ["Down"]
 
 [confirm]
 accept = ["y"]

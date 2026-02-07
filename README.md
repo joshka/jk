@@ -36,6 +36,7 @@ This repository is in active development. The current baseline includes:
 - `jk <command> [args...]` starts in the same TUI and runs/plans that command.
 - Commands entered with `:` use the same normalization and safety rules.
 - `:` command parsing supports shell-style quoting for multi-word arguments.
+- Command mode supports history navigation with `Up`/`Down`.
 - `:commands` renders an in-app command registry with mode/tier coverage.
 - `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).
 - Unfiltered command registry output also includes a high-frequency alias hint line.
