@@ -1,83 +1,11 @@
-use std::env;
-use std::fs;
-use std::path::PathBuf;
-
 use serde::Deserialize;
 
 use crate::error::JkError;
-use crate::keys::KeyBinding;
 
-const DEFAULT_KEYBINDS: &str = include_str!("../config/keybinds.default.toml");
-
-#[derive(Debug, Clone)]
-pub struct KeybindConfig {
-    pub normal: NormalKeys,
-    pub command: CommandKeys,
-    pub confirm: ConfirmKeys,
-}
-
-#[derive(Debug, Clone)]
-pub struct NormalKeys {
-    pub quit: Vec<KeyBinding>,
-    pub refresh: Vec<KeyBinding>,
-    pub up: Vec<KeyBinding>,
-    pub down: Vec<KeyBinding>,
-    pub top: Vec<KeyBinding>,
-    pub bottom: Vec<KeyBinding>,
-    pub command_mode: Vec<KeyBinding>,
-    pub help: Vec<KeyBinding>,
-    pub keymap: Vec<KeyBinding>,
-    pub aliases: Vec<KeyBinding>,
-    pub show: Vec<KeyBinding>,
-    pub diff: Vec<KeyBinding>,
-    pub status: Vec<KeyBinding>,
-    pub log: Vec<KeyBinding>,
-    pub operation_log: Vec<KeyBinding>,
-    pub bookmark_list: Vec<KeyBinding>,
-    pub resolve_list: Vec<KeyBinding>,
-    pub file_list: Vec<KeyBinding>,
-    pub tag_list: Vec<KeyBinding>,
-    pub root: Vec<KeyBinding>,
-    pub repeat_last: Vec<KeyBinding>,
-    pub toggle_patch: Vec<KeyBinding>,
-    pub fetch: Vec<KeyBinding>,
-    pub push: Vec<KeyBinding>,
-    pub rebase_main: Vec<KeyBinding>,
-    pub rebase_trunk: Vec<KeyBinding>,
-    pub new: Vec<KeyBinding>,
-    pub next: Vec<KeyBinding>,
-    pub prev: Vec<KeyBinding>,
-    pub edit: Vec<KeyBinding>,
-    pub commit: Vec<KeyBinding>,
-    pub describe: Vec<KeyBinding>,
-    pub bookmark_set: Vec<KeyBinding>,
-    pub abandon: Vec<KeyBinding>,
-    pub rebase: Vec<KeyBinding>,
-    pub squash: Vec<KeyBinding>,
-    pub split: Vec<KeyBinding>,
-    pub restore: Vec<KeyBinding>,
-    pub revert: Vec<KeyBinding>,
-    pub undo: Vec<KeyBinding>,
-    pub redo: Vec<KeyBinding>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CommandKeys {
-    pub submit: Vec<KeyBinding>,
-    pub cancel: Vec<KeyBinding>,
-    pub backspace: Vec<KeyBinding>,
-    pub history_prev: Vec<KeyBinding>,
-    pub history_next: Vec<KeyBinding>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ConfirmKeys {
-    pub accept: Vec<KeyBinding>,
-    pub reject: Vec<KeyBinding>,
-}
+use super::{CommandKeys, ConfirmKeys, KeybindConfig, NormalKeys, parse_bindings};
 
 #[derive(Debug, Deserialize)]
-struct RawConfig {
+pub(super) struct RawConfig {
     normal: RawNormal,
     command: RawCommand,
     confirm: RawConfirm,
@@ -144,7 +72,7 @@ struct RawConfirm {
 }
 
 #[derive(Debug, Deserialize)]
-struct PartialConfig {
+pub(super) struct PartialConfig {
     normal: Option<PartialNormal>,
     command: Option<PartialCommand>,
     confirm: Option<PartialConfirm>,
@@ -210,28 +138,8 @@ struct PartialConfirm {
     reject: Option<Vec<String>>,
 }
 
-impl KeybindConfig {
-    pub fn load() -> Result<Self, JkError> {
-        let mut raw: RawConfig = toml::from_str(DEFAULT_KEYBINDS)
-            .map_err(|err| JkError::ConfigParse(format!("default keybind parse error: {err}")))?;
-
-        if let Some(user_path) = user_keybind_path().filter(|path| path.exists()) {
-            let content = fs::read_to_string(&user_path).map_err(|source| JkError::ConfigRead {
-                path: user_path.display().to_string(),
-                source,
-            })?;
-            let user: PartialConfig = toml::from_str(&content).map_err(|err| {
-                JkError::ConfigParse(format!("{} parse error: {err}", user_path.display()))
-            })?;
-            apply_partial(&mut raw, user);
-        }
-
-        raw.into_config()
-    }
-}
-
 impl RawConfig {
-    fn into_config(self) -> Result<KeybindConfig, JkError> {
+    pub(super) fn into_config(self) -> Result<KeybindConfig, JkError> {
         Ok(KeybindConfig {
             normal: NormalKeys {
                 quit: parse_bindings(&self.normal.quit)?,
@@ -291,28 +199,7 @@ impl RawConfig {
     }
 }
 
-fn user_keybind_path() -> Option<PathBuf> {
-    if let Ok(path) = env::var("JK_KEYBINDS") {
-        return Some(PathBuf::from(path));
-    }
-
-    env::var("HOME")
-        .ok()
-        .map(|home| PathBuf::from(home).join(".config/jk/keybinds.toml"))
-}
-
-fn parse_bindings(values: &[String]) -> Result<Vec<KeyBinding>, JkError> {
-    values
-        .iter()
-        .map(|value| {
-            KeyBinding::parse(value).ok_or_else(|| {
-                JkError::ConfigParse(format!("unknown keybinding `{value}` in keybind config"))
-            })
-        })
-        .collect()
-}
-
-fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
+pub(super) fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
     if let Some(normal) = user.normal {
         if let Some(value) = normal.quit {
             base.normal.quit = value;
@@ -464,94 +351,5 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         if let Some(value) = confirm.reject {
             base.confirm.reject = value;
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{DEFAULT_KEYBINDS, KeybindConfig, RawConfig};
-    use crate::keys::KeyBinding;
-
-    #[test]
-    fn default_keybinds_include_high_frequency_shortcuts() {
-        let raw: RawConfig =
-            toml::from_str(DEFAULT_KEYBINDS).expect("default keybinds should parse");
-        let config = raw
-            .into_config()
-            .expect("default keybinds should convert into runtime config");
-
-        assert_eq!(config.normal.fetch, vec![KeyBinding::Char('F')]);
-        assert_eq!(config.normal.push, vec![KeyBinding::Char('P')]);
-        assert_eq!(config.normal.rebase_main, vec![KeyBinding::Char('M')]);
-        assert_eq!(config.normal.rebase_trunk, vec![KeyBinding::Char('T')]);
-        assert_eq!(config.normal.new, vec![KeyBinding::Char('n')]);
-        assert_eq!(config.normal.next, vec![KeyBinding::Char(']')]);
-        assert_eq!(config.normal.prev, vec![KeyBinding::Char('[')]);
-        assert_eq!(config.normal.edit, vec![KeyBinding::Char('e')]);
-        assert_eq!(config.normal.commit, vec![KeyBinding::Char('c')]);
-        assert_eq!(config.normal.describe, vec![KeyBinding::Char('D')]);
-        assert_eq!(config.normal.bookmark_set, vec![KeyBinding::Char('b')]);
-        assert_eq!(config.normal.abandon, vec![KeyBinding::Char('a')]);
-        assert_eq!(config.normal.help, vec![KeyBinding::Char('?')]);
-        assert_eq!(config.normal.keymap, vec![KeyBinding::Char('K')]);
-        assert_eq!(config.normal.aliases, vec![KeyBinding::Char('A')]);
-        assert_eq!(config.normal.status, vec![KeyBinding::Char('s')]);
-        assert_eq!(config.normal.log, vec![KeyBinding::Char('l')]);
-        assert_eq!(config.normal.operation_log, vec![KeyBinding::Char('o')]);
-        assert_eq!(config.normal.bookmark_list, vec![KeyBinding::Char('L')]);
-        assert_eq!(config.normal.resolve_list, vec![KeyBinding::Char('v')]);
-        assert_eq!(config.normal.file_list, vec![KeyBinding::Char('f')]);
-        assert_eq!(config.normal.tag_list, vec![KeyBinding::Char('t')]);
-        assert_eq!(config.normal.root, vec![KeyBinding::Char('w')]);
-        assert_eq!(config.normal.repeat_last, vec![KeyBinding::Char('.')]);
-        assert_eq!(config.normal.toggle_patch, vec![KeyBinding::Char('p')]);
-        assert_eq!(config.normal.rebase, vec![KeyBinding::Char('B')]);
-        assert_eq!(config.normal.squash, vec![KeyBinding::Char('S')]);
-        assert_eq!(config.normal.split, vec![KeyBinding::Char('X')]);
-        assert_eq!(config.normal.restore, vec![KeyBinding::Char('O')]);
-        assert_eq!(config.normal.revert, vec![KeyBinding::Char('R')]);
-        assert_eq!(config.normal.undo, vec![KeyBinding::Char('u')]);
-        assert_eq!(config.normal.redo, vec![KeyBinding::Char('U')]);
-        assert_eq!(config.command.history_prev, vec![KeyBinding::Up]);
-        assert_eq!(config.command.history_next, vec![KeyBinding::Down]);
-    }
-
-    #[test]
-    fn load_keeps_keybind_configuration_valid() {
-        let config = KeybindConfig::load().expect("keybind config should load");
-        assert!(!config.normal.fetch.is_empty());
-        assert!(!config.normal.push.is_empty());
-        assert!(!config.normal.rebase_main.is_empty());
-        assert!(!config.normal.rebase_trunk.is_empty());
-        assert!(!config.normal.new.is_empty());
-        assert!(!config.normal.next.is_empty());
-        assert!(!config.normal.prev.is_empty());
-        assert!(!config.normal.edit.is_empty());
-        assert!(!config.normal.commit.is_empty());
-        assert!(!config.normal.describe.is_empty());
-        assert!(!config.normal.bookmark_set.is_empty());
-        assert!(!config.normal.abandon.is_empty());
-        assert!(!config.normal.help.is_empty());
-        assert!(!config.normal.keymap.is_empty());
-        assert!(!config.normal.aliases.is_empty());
-        assert!(!config.normal.status.is_empty());
-        assert!(!config.normal.log.is_empty());
-        assert!(!config.normal.operation_log.is_empty());
-        assert!(!config.normal.bookmark_list.is_empty());
-        assert!(!config.normal.resolve_list.is_empty());
-        assert!(!config.normal.file_list.is_empty());
-        assert!(!config.normal.tag_list.is_empty());
-        assert!(!config.normal.root.is_empty());
-        assert!(!config.normal.repeat_last.is_empty());
-        assert!(!config.normal.toggle_patch.is_empty());
-        assert!(!config.normal.rebase.is_empty());
-        assert!(!config.normal.squash.is_empty());
-        assert!(!config.normal.split.is_empty());
-        assert!(!config.normal.restore.is_empty());
-        assert!(!config.normal.revert.is_empty());
-        assert!(!config.normal.undo.is_empty());
-        assert!(!config.normal.redo.is_empty());
-        assert!(!config.command.history_prev.is_empty());
-        assert!(!config.command.history_next.is_empty());
     }
 }

@@ -348,3 +348,9 @@
   - split `src/app/view.rs` into command-aligned modules under `src/app/view/` while keeping the
     same `super::view::*` function surface used by app logic and tests.
   - reran `cargo fmt --all`, `cargo check`, and full `app::tests::` coverage (167 passed).
+- Latest pass:
+  - moved `src/config.rs` to `src/config/mod.rs` and extracted schema/merge internals into
+    `src/config/raw.rs`.
+  - kept `KeybindConfig::load()` and runtime keybinding structs stable for existing call sites.
+  - moved config tests to `src/config/tests.rs` and reran `cargo fmt`, `cargo check`,
+    `cargo test`, and strict `cargo clippy`.

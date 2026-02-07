@@ -46,6 +46,10 @@ src/
     mod.rs
     normalize.rs
     catalog.rs
+  config/
+    mod.rs
+    raw.rs
+    tests.rs
 ```
 
 ## Phase plan
@@ -74,6 +78,11 @@ src/
 5. Documentation and rule alignment
    - Keep `.plans/implementation-status.md` updated per phase.
    - Update README/AGENTS if module paths or conventions change.
+
+6. Config split follow-up
+   - Move `src/config.rs` to `src/config/mod.rs`.
+   - Extract deserialization/merge internals into `src/config/raw.rs`.
+   - Keep `KeybindConfig::load()` behavior unchanged and keep config tests passing.
 
 ## Validation gates per phase
 
