@@ -261,10 +261,27 @@ impl App {
             self.pending_confirm = Some(tokens.clone());
             self.mode = Mode::Confirm;
             self.status_line = format!("Confirm dangerous command: jj {}", tokens.join(" "));
+            self.render_confirmation_preview(&tokens);
             return Ok(());
         }
 
         self.execute_tokens(tokens)
+    }
+
+    fn render_confirmation_preview(&mut self, tokens: &[String]) {
+        let mut lines = vec![format!("Confirm: jj {}", tokens.join(" "))];
+
+        if let Some(preview_tokens) = dry_run_preview_tokens(tokens)
+            && let Ok(preview) = jj::run(&preview_tokens)
+        {
+            lines.push(String::new());
+            lines.push(format!("Preview: jj {}", preview_tokens.join(" ")));
+            lines.extend(preview.output);
+        }
+
+        self.lines = lines;
+        self.cursor = 0;
+        self.scroll = 0;
     }
 
     fn execute_command_line(&mut self, command: &str) -> Result<(), JkError> {
@@ -508,6 +525,23 @@ fn is_dangerous(tokens: &[String]) -> bool {
     command_safety(tokens) == SafetyTier::C
 }
 
+fn dry_run_preview_tokens(tokens: &[String]) -> Option<Vec<String>> {
+    if matches!(
+        (
+            tokens.first().map(String::as_str),
+            tokens.get(1).map(String::as_str)
+        ),
+        (Some("git"), Some("push"))
+    ) && !tokens.iter().any(|token| token == "--dry-run")
+    {
+        let mut preview = tokens.to_vec();
+        preview.push("--dry-run".to_string());
+        return Some(preview);
+    }
+
+    None
+}
+
 struct TerminalSession {
     stdout: Stdout,
 }
@@ -544,7 +578,8 @@ mod tests {
     use crate::flows::{FlowAction, PromptKind};
 
     use super::{
-        App, Mode, extract_revision, is_change_id, is_commit_id, is_dangerous, startup_action,
+        App, Mode, dry_run_preview_tokens, extract_revision, is_change_id, is_commit_id,
+        is_dangerous, startup_action,
     };
 
     #[test]
@@ -696,5 +731,43 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("jj top-level coverage"))
         );
+    }
+
+    #[test]
+    fn confirm_preview_renders_header_for_tier_c_commands() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.execute_with_confirmation(vec![
+            "rebase".to_string(),
+            "-d".to_string(),
+            "main".to_string(),
+        ])
+        .expect("confirmation setup should succeed");
+
+        assert_eq!(app.mode, Mode::Confirm);
+        assert!(
+            app.lines
+                .iter()
+                .any(|line| line.contains("Confirm: jj rebase -d main"))
+        );
+    }
+
+    #[test]
+    fn builds_dry_run_preview_for_git_push() {
+        let preview = dry_run_preview_tokens(&["git".to_string(), "push".to_string()]);
+        assert_eq!(
+            preview,
+            Some(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--dry-run".to_string()
+            ])
+        );
+
+        let existing = dry_run_preview_tokens(&[
+            "git".to_string(),
+            "push".to_string(),
+            "--dry-run".to_string(),
+        ]);
+        assert_eq!(existing, None);
     }
 }

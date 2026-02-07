@@ -40,6 +40,7 @@ This repository is in active development. The current baseline includes:
 - Command groups: `operation` defaults to `operation log`; `workspace` defaults to `workspace list`.
 
 Mutating high-risk commands run through confirmation guards.
+`git push` confirmation now includes a best-effort `--dry-run` preview in-app when available.
 
 `jk` also keeps an explicit top-level command registry aligned to the current `jj` command surface so
 new flow work can evolve without ambiguity.
