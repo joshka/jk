@@ -27,6 +27,7 @@ pub struct NormalKeys {
     pub command_mode: Vec<KeyBinding>,
     pub show: Vec<KeyBinding>,
     pub diff: Vec<KeyBinding>,
+    pub status: Vec<KeyBinding>,
     pub toggle_patch: Vec<KeyBinding>,
     pub fetch: Vec<KeyBinding>,
     pub push: Vec<KeyBinding>,
@@ -77,6 +78,7 @@ struct RawNormal {
     command_mode: Vec<String>,
     show: Vec<String>,
     diff: Vec<String>,
+    status: Vec<String>,
     toggle_patch: Vec<String>,
     fetch: Vec<String>,
     push: Vec<String>,
@@ -127,6 +129,7 @@ struct PartialNormal {
     command_mode: Option<Vec<String>>,
     show: Option<Vec<String>>,
     diff: Option<Vec<String>>,
+    status: Option<Vec<String>>,
     toggle_patch: Option<Vec<String>>,
     fetch: Option<Vec<String>>,
     push: Option<Vec<String>>,
@@ -192,6 +195,7 @@ impl RawConfig {
                 command_mode: parse_bindings(&self.normal.command_mode)?,
                 show: parse_bindings(&self.normal.show)?,
                 diff: parse_bindings(&self.normal.diff)?,
+                status: parse_bindings(&self.normal.status)?,
                 toggle_patch: parse_bindings(&self.normal.toggle_patch)?,
                 fetch: parse_bindings(&self.normal.fetch)?,
                 push: parse_bindings(&self.normal.push)?,
@@ -272,6 +276,9 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         }
         if let Some(value) = normal.diff {
             base.normal.diff = value;
+        }
+        if let Some(value) = normal.status {
+            base.normal.status = value;
         }
         if let Some(value) = normal.toggle_patch {
             base.normal.toggle_patch = value;
@@ -370,6 +377,7 @@ mod tests {
         assert_eq!(config.normal.describe, vec![KeyBinding::Char('D')]);
         assert_eq!(config.normal.bookmark_set, vec![KeyBinding::Char('b')]);
         assert_eq!(config.normal.abandon, vec![KeyBinding::Char('a')]);
+        assert_eq!(config.normal.status, vec![KeyBinding::Char('s')]);
         assert_eq!(config.normal.toggle_patch, vec![KeyBinding::Char('p')]);
         assert_eq!(config.normal.rebase, vec![KeyBinding::Char('B')]);
         assert_eq!(config.normal.squash, vec![KeyBinding::Char('S')]);
@@ -392,6 +400,7 @@ mod tests {
         assert!(!config.normal.describe.is_empty());
         assert!(!config.normal.bookmark_set.is_empty());
         assert!(!config.normal.abandon.is_empty());
+        assert!(!config.normal.status.is_empty());
         assert!(!config.normal.toggle_patch.is_empty());
         assert!(!config.normal.rebase.is_empty());
         assert!(!config.normal.squash.is_empty());

@@ -167,6 +167,11 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.status, key) {
+            self.execute_command_line("status")?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.toggle_patch, key) {
             if !matches!(
                 self.last_log_tokens.first().map(String::as_str),
@@ -442,7 +447,7 @@ impl App {
             self.last_log_tokens = result.command.clone();
         }
         self.row_revision_map = derive_row_revision_map(&result.command, &result.output);
-        self.lines = result.output;
+        self.lines = decorate_command_output(&result.command, result.output);
         self.cursor = 0;
         self.scroll = 0;
         self.last_command = result.command;
@@ -907,6 +912,92 @@ fn operation_log_preview_tokens() -> Vec<String> {
     ]
 }
 
+fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<String> {
+    match command.first().map(String::as_str) {
+        Some("status") => render_status_view(output),
+        Some("show") => render_show_view(output),
+        Some("diff") => render_diff_view(output),
+        _ => output,
+    }
+}
+
+fn render_status_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut rendered = vec![
+        "Status Overview".to_string(),
+        "===============".to_string(),
+        String::new(),
+    ];
+
+    let mut section_has_items = false;
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed.ends_with(':') {
+            if section_has_items {
+                rendered.push(String::new());
+            }
+            rendered.push(trimmed.to_string());
+            section_has_items = false;
+            continue;
+        }
+
+        if matches!(
+            rendered.last().map(String::as_str),
+            Some("Working copy changes:")
+        ) {
+            rendered.push(format!("  {trimmed}"));
+            section_has_items = true;
+            continue;
+        }
+
+        rendered.push(trimmed.to_string());
+        section_has_items = true;
+    }
+
+    rendered.push(String::new());
+    rendered.push("Shortcuts: s status, F fetch, P push, B rebase, :commands".to_string());
+    rendered
+}
+
+fn render_show_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut rendered = vec![
+        "Show View".to_string(),
+        "=========".to_string(),
+        String::new(),
+    ];
+    rendered.extend(lines);
+    rendered.push(String::new());
+    rendered.push("Shortcuts: Enter show selected, d diff selected, s status".to_string());
+    rendered
+}
+
+fn render_diff_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut rendered = vec![
+        "Diff View".to_string(),
+        "=========".to_string(),
+        String::new(),
+    ];
+    rendered.extend(lines);
+    rendered.push(String::new());
+    rendered.push("Shortcuts: d diff selected, Enter show selected, s status".to_string());
+    rendered
+}
+
 struct TerminalSession {
     stdout: Stdout,
 }
@@ -947,7 +1038,7 @@ mod tests {
     use super::{
         App, Mode, build_row_revision_map, confirmation_preview_tokens, extract_revision,
         is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
-        startup_action, toggle_patch_flag,
+        render_diff_view, render_show_view, render_status_view, startup_action, toggle_patch_flag,
     };
 
     #[test]
@@ -1369,6 +1460,70 @@ mod tests {
     }
 
     #[test]
+    fn renders_status_output_as_scannable_sections() {
+        let rendered = render_status_view(vec![
+            "Working copy changes:".to_string(),
+            "M src/app.rs".to_string(),
+            "A src/new.rs".to_string(),
+            "Working copy  (@) : abcdefgh 0123abcd summary".to_string(),
+            "Parent commit (@-): hgfedcba 89abcdef parent".to_string(),
+            "Conflicted bookmarks:".to_string(),
+            "  feature".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Status Overview".to_string()));
+        assert!(rendered.iter().any(|line| line == "Working copy changes:"));
+        assert!(rendered.iter().any(|line| line == "  M src/app.rs"));
+        assert!(rendered.iter().any(|line| line == "Conflicted bookmarks:"));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Shortcuts: s status"))
+        );
+    }
+
+    #[test]
+    fn renders_show_view_with_header_and_shortcuts() {
+        let rendered = render_show_view(vec![
+            "Commit ID: abcdef0123456789".to_string(),
+            "Change ID: abcdefghijklmnop".to_string(),
+            "Modified regular file src/app.rs:".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Show View".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line == "Commit ID: abcdef0123456789")
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Shortcuts: Enter show selected"))
+        );
+    }
+
+    #[test]
+    fn renders_diff_view_with_header_and_shortcuts() {
+        let rendered = render_diff_view(vec![
+            "Modified regular file src/app.rs:".to_string(),
+            "  1  1: use std::collections::HashMap;".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Diff View".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line == "Modified regular file src/app.rs:")
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Shortcuts: d diff selected"))
+        );
+    }
+
+    #[test]
     fn toggles_patch_flag_for_log_commands() {
         assert_eq!(
             toggle_patch_flag(&["log".to_string(), "-r".to_string(), "all()".to_string()]),
@@ -1581,5 +1736,18 @@ mod tests {
             .expect("redo shortcut should be handled");
         assert_eq!(redo_app.mode, Mode::Confirm);
         assert_eq!(redo_app.pending_confirm, Some(vec!["redo".to_string()]));
+
+        let mut status_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        status_app
+            .handle_key(KeyEvent::from(KeyCode::Char('s')))
+            .expect("status shortcut should be handled");
+        assert_eq!(status_app.mode, Mode::Normal);
+        assert_eq!(status_app.last_command, vec!["status".to_string()]);
+        assert!(
+            status_app
+                .lines
+                .iter()
+                .any(|line| line.contains("Status Overview"))
+        );
     }
 }

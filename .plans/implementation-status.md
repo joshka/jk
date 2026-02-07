@@ -95,8 +95,10 @@
   - added log patch toggle shortcut (`p`) with argument-preserving `log` patch on/off behavior
   - added normal-mode rewrite/recovery shortcuts (`B`, `S`, `X`, `O`, `R`, `u`, `U`) that route
     through existing prompt/confirm safety flows
+  - added `s` status shortcut and sectioned status rendering for improved in-app scanability
   - surfaced high-frequency alias hints directly in unfiltered `:commands`/`:help` output
   - switched `:` command parsing to shell-style tokenization with invalid-quote status feedback
+  - added native header/shortcut wrappers for `show` and `diff` outputs to improve scanability
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

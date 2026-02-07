@@ -21,8 +21,8 @@ This repository is in active development. The current baseline includes:
 - Command mode (`:`), confirmation mode, and prompt mode.
 - `jj` subprocess execution via `jj --no-pager ...`.
 - Configurable keybinds from `config/keybinds.default.toml` and optional user override.
-- High-frequency normal-mode shortcuts: `F` fetch, `P` push, `M` rebase to main, `T` rebase to
-  trunk.
+- High-frequency normal-mode shortcuts: `s` status, `F` fetch, `P` push, `M` rebase to main,
+  `T` rebase to trunk.
 - Log shortcut: `p` toggles `--patch` for the active log command arguments.
 - Action shortcuts in normal mode: `n` new, `c` commit, `D` describe selected change, `b` bookmark
   set for selected change, `a` abandon selected change.
@@ -38,6 +38,8 @@ This repository is in active development. The current baseline includes:
 - `:commands` renders an in-app command registry with mode/tier coverage.
 - `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).
 - Unfiltered command registry output also includes a high-frequency alias hint line.
+- `status`, `show`, and `diff` use lightweight in-app view headers/shortcuts while preserving
+  command output content.
 
 ## Implemented Flow Coverage (Baseline)
 
