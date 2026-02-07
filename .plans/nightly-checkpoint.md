@@ -27,6 +27,7 @@
 - Regression safety:
   - added OMZ gold-alias flow matrix test
   - added `insta` snapshots for bookmark and operation wrapper views
+  - added `insta` snapshot for status wrapper output
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing

@@ -1,0 +1,19 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Status Overview
+===============
+
+Summary: 2 working-copy changes, 1 conflicted bookmark
+
+Working copy changes:
+  M src/app.rs
+  A src/new.rs
+Working copy  (@) : abcdefgh 0123abcd summary
+Parent commit (@-): hgfedcba 89abcdef parent
+
+Conflicted bookmarks:
+feature
+
+Shortcuts: s status, F fetch, P push, B rebase, :commands

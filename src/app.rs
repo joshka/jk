@@ -2165,6 +2165,20 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_status_wrapper_view() {
+        let rendered = render_status_view(vec![
+            "Working copy changes:".to_string(),
+            "M src/app.rs".to_string(),
+            "A src/new.rs".to_string(),
+            "Working copy  (@) : abcdefgh 0123abcd summary".to_string(),
+            "Parent commit (@-): hgfedcba 89abcdef parent".to_string(),
+            "Conflicted bookmarks:".to_string(),
+            "feature".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_operation_log_wrapper_view() {
         let rendered = render_operation_log_view(vec![
             "@  fac974146f86 user 5 seconds ago".to_string(),
