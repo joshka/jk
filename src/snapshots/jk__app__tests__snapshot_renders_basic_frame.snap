@@ -1,0 +1,10 @@
+---
+source: src/app.rs
+expression: "app.render_for_snapshot(60, 6)"
+---
+jk [normal] :: jj log
+> @  abcdefgh 0123abcd message
+  ○  hgfedcba 89abcdef parent
+
+
+Ready
