@@ -36,6 +36,7 @@
 
 - `restore`, `revert`: `done` (guided prompt defaults wired)
 - `bookmark rename`, `bookmark delete`, `bookmark forget`: `done` (guided prompts wired)
+- `operation` / `workspace` defaults: `done` (`operation log` and `workspace list`)
 
 ### Testing baseline
 
@@ -66,6 +67,7 @@
   - added explicit top-level `jj` command registry and safety-tier lookup in `src/commands.rs`
   - expanded guided prompts for `restore`, `revert`, and additional bookmark mutations
   - improved revision selection by resolving detail rows to the nearest prior revision line
+  - added in-app `:commands` registry view from command metadata
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

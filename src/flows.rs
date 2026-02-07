@@ -1,8 +1,10 @@
 use crate::alias::normalize_alias;
+use crate::commands::command_overview_lines;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowAction {
     Execute(Vec<String>),
+    Render { lines: Vec<String>, status: String },
     Prompt(PromptRequest),
     Status(String),
     Quit,
@@ -228,6 +230,16 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
     let selected = selected_revision.unwrap_or_else(|| "@".to_string());
 
     match tokens.as_slice() {
+        [command] if command == "commands" || command == "?" => FlowAction::Render {
+            lines: command_overview_lines(),
+            status: "Showing command registry".to_string(),
+        },
+        [command] if command == "operation" => {
+            FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
+        }
+        [command] if command == "workspace" => {
+            FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
+        }
         [command] if command == "new" => FlowAction::Prompt(PromptRequest {
             label: "new message (blank for none)".to_string(),
             allow_empty: true,
@@ -390,6 +402,9 @@ fn canonical_command_name(command: &str) -> String {
     match command {
         "desc" => "describe".to_string(),
         "st" => "status".to_string(),
+        "ci" => "commit".to_string(),
+        "b" => "bookmark".to_string(),
+        "op" => "operation".to_string(),
         value => value.to_string(),
     }
 }
@@ -801,6 +816,33 @@ mod tests {
         assert_eq!(
             plan_command("redo", selected()),
             FlowAction::Execute(vec!["redo".to_string()])
+        );
+    }
+
+    #[test]
+    fn renders_command_registry_in_app() {
+        match plan_command("commands", selected()) {
+            FlowAction::Render { lines, status } => {
+                assert_eq!(status, "Showing command registry".to_string());
+                assert!(
+                    lines
+                        .iter()
+                        .any(|line| line.contains("jj top-level coverage"))
+                );
+            }
+            other => panic!("expected render action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn defaults_operation_and_workspace_to_list_views() {
+        assert_eq!(
+            plan_command("op", selected()),
+            FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
+        );
+        assert_eq!(
+            plan_command("workspace", selected()),
+            FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
         );
     }
 }

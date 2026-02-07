@@ -274,6 +274,13 @@ impl App {
                 self.should_quit = true;
                 Ok(())
             }
+            FlowAction::Render { lines, status } => {
+                self.lines = lines;
+                self.cursor = 0;
+                self.scroll = 0;
+                self.status_line = status;
+                Ok(())
+            }
             FlowAction::Status(message) => {
                 self.status_line = message;
                 Ok(())

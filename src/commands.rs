@@ -6,11 +6,32 @@ pub enum ExecutionMode {
     Defer,
 }
 
+impl ExecutionMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Native => "native",
+            Self::Guided => "guided",
+            Self::Passthrough => "passthrough",
+            Self::Defer => "defer",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafetyTier {
     A,
     B,
     C,
+}
+
+impl SafetyTier {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::A => "A",
+            Self::B => "B",
+            Self::C => "C",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -250,6 +271,24 @@ pub fn lookup_top_level(command: &str) -> Option<CommandSpec> {
         .find(|spec| spec.name == command)
 }
 
+pub fn command_overview_lines() -> Vec<String> {
+    let mut lines = Vec::with_capacity(TOP_LEVEL_SPECS.len() + 3);
+    lines.push("jk command registry (jj top-level coverage)".to_string());
+    lines.push(format!("{:<18} {:<12} {}", "command", "mode", "tier"));
+    lines.push("-".repeat(40));
+
+    for spec in TOP_LEVEL_SPECS {
+        lines.push(format!(
+            "{:<18} {:<12} {}",
+            spec.name,
+            spec.mode.as_str(),
+            spec.tier.as_str()
+        ));
+    }
+
+    lines
+}
+
 pub fn command_safety(tokens: &[String]) -> SafetyTier {
     let Some(first) = tokens.first().map(String::as_str) else {
         return SafetyTier::A;
@@ -278,7 +317,10 @@ pub fn command_safety(tokens: &[String]) -> SafetyTier {
 mod tests {
     use std::collections::HashSet;
 
-    use super::{ExecutionMode, SafetyTier, TOP_LEVEL_SPECS, command_safety, lookup_top_level};
+    use super::{
+        ExecutionMode, SafetyTier, TOP_LEVEL_SPECS, command_overview_lines, command_safety,
+        lookup_top_level,
+    };
 
     fn to_vec(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_string()).collect()
@@ -327,5 +369,16 @@ mod tests {
         assert_eq!(command_safety(&to_vec(&["log"])), SafetyTier::A);
         assert_eq!(command_safety(&to_vec(&["rebase"])), SafetyTier::C);
         assert_eq!(command_safety(&to_vec(&["new"])), SafetyTier::B);
+    }
+
+    #[test]
+    fn renders_overview_lines_with_headers() {
+        let lines = command_overview_lines();
+        assert_eq!(
+            lines.first(),
+            Some(&"jk command registry (jj top-level coverage)".to_string())
+        );
+        assert!(lines.iter().any(|line| line.starts_with("log")));
+        assert!(lines.iter().any(|line| line.starts_with("workspace")));
     }
 }

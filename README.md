@@ -27,6 +27,7 @@ This repository is in active development. The current baseline includes:
 - `jk` defaults to `log`.
 - `jk <command> [args...]` starts in the same TUI and runs/plans that command.
 - Commands entered with `:` use the same normalization and safety rules.
+- `:commands` renders an in-app command registry with mode/tier coverage.
 
 ## Implemented Flow Coverage (Baseline)
 
@@ -36,6 +37,7 @@ This repository is in active development. The current baseline includes:
 - Recovery extras: `restore`, `revert`.
 - Bookmarks: `bookmark list/create/set/move/delete/forget/rename/track/untrack`.
 - Remote: `git fetch`, `git push`.
+- Command groups: `operation` defaults to `operation log`; `workspace` defaults to `workspace list`.
 
 Mutating high-risk commands run through confirmation guards.
 
