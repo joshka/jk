@@ -44,6 +44,7 @@
   - render loop now resets terminal color after every row so truncated ANSI-styled lines do not
     leak style into following rows.
 - Shortcut coverage:
+  - added `l` as a dedicated home shortcut to jump to `log` from any normal-mode view
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`
   - added `v` for `resolve -l`

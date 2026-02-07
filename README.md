@@ -20,11 +20,11 @@ In `jk`, you stay in one full-screen session and switch views by running command
 `status`, `log`, `show`, and `help` are not separate apps or tabs; each is just the current view.
 
 That means there is no dedicated "back" action yet. To leave any view, run the next command you
-want (usually `:log`, `:status`, or `:operation log`).
+want (usually `:log`, `:status`, or `:operation log`), or use the `l` shortcut to jump to `log`.
 
 ## Getting Unstuck Quickly
 
-- Go from `status` back to `log`: press `:` then type `log` and press `Enter`.
+- Go from `status` back to `log`: press `l` (or `:` then `log` + `Enter`).
 - Dismiss help (`?` / `:commands`): run another command, usually `:log`.
 - Cancel command entry: press `Esc` in command mode.
 - Cancel prompts: press `Esc` in prompt mode.
@@ -94,8 +94,8 @@ This repository is in active development. The current baseline includes:
 - Configurable keybinds from `config/keybinds.default.toml` and optional user override.
 - High-frequency normal-mode shortcuts: `s` status, `F` fetch, `P` push, `M` rebase to main,
   `T` rebase to trunk.
-- Quick read shortcuts in normal mode: `o` operation log, `L` bookmark list, `v` resolve list,
-  `f` file list, `t` tag list, `w` workspace root.
+- Quick read shortcuts in normal mode: `l` log (home), `o` operation log, `L` bookmark list,
+  `v` resolve list, `f` file list, `t` tag list, `w` workspace root.
 - Help shortcut: `?` opens the command registry directly from normal mode.
 - Keymap shortcut: `K` opens the in-app keymap directly from normal mode.
 - Alias shortcut: `A` opens the in-app alias catalog directly from normal mode.

@@ -205,6 +205,11 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.log, key) {
+            self.execute_command_line("log")?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.operation_log, key) {
             self.execute_command_line("operation log")?;
             return Ok(());
@@ -1541,7 +1546,7 @@ fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>) -> Vec<Str
         .filter(|value| !value.is_empty())
         .map(str::to_ascii_lowercase);
 
-    let entries: [(&str, &Vec<KeyBinding>); 47] = [
+    let entries: [(&str, &Vec<KeyBinding>); 48] = [
         ("normal.quit", &config.normal.quit),
         ("normal.refresh", &config.normal.refresh),
         ("normal.up", &config.normal.up),
@@ -1555,6 +1560,7 @@ fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>) -> Vec<Str
         ("normal.show", &config.normal.show),
         ("normal.diff", &config.normal.diff),
         ("normal.status", &config.normal.status),
+        ("normal.log", &config.normal.log),
         ("normal.operation_log", &config.normal.operation_log),
         ("normal.bookmark_list", &config.normal.bookmark_list),
         ("normal.resolve_list", &config.normal.resolve_list),
@@ -5600,6 +5606,14 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("Status Overview"))
         );
+
+        let mut log_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        log_app
+            .handle_key(KeyEvent::from(KeyCode::Char('l')))
+            .expect("log shortcut should be handled");
+        assert_eq!(log_app.mode, Mode::Normal);
+        assert_eq!(log_app.last_command, vec!["log".to_string()]);
+        assert!(!log_app.lines.is_empty());
 
         let mut operation_log_app =
             App::new(KeybindConfig::load().expect("keybind config should parse"));

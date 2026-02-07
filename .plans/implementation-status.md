@@ -312,3 +312,9 @@
   - reset terminal color after each rendered row to prevent ANSI style bleed when long colorized
     lines are width-trimmed in the TUI.
   - reran `cargo fmt`, `cargo check`, focused ANSI regression tests, and strict `cargo clippy`.
+- Latest pass:
+  - added a dedicated normal-mode home binding (`l`) that jumps directly to `log`, making it
+    possible to leave transient wrappers (for example `status` and `:commands`) with one keypress.
+  - threaded `normal.log` through keybind config loading, keymap rendering, shortcut routing,
+    and focused tests.
+  - updated README onboarding to document the new one-key return-to-log flow.
