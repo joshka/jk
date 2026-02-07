@@ -4084,6 +4084,33 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_bookmark_delete_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("delete"),
+            vec!["Deleted bookmark stale-feature".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_bookmark_forget_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("forget"),
+            vec!["Forgot bookmark stale-feature@origin".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_bookmark_rename_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("rename"),
+            vec!["Renamed bookmark main to primary".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_file_list_wrapper_view() {
         let rendered = render_file_list_view(vec![
             "src/app.rs".to_string(),

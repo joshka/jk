@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Bookmark Forget
+================
+
+Summary: 1 output line
+
+Forgot bookmark stale-feature@origin
+
+Tip: run `bookmark list` to verify bookmark state
