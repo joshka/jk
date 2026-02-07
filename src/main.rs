@@ -3,6 +3,7 @@ mod app;
 mod cli;
 mod config;
 mod error;
+mod flows;
 mod jj;
 mod keys;
 

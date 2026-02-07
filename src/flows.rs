@@ -1,0 +1,567 @@
+use crate::alias::normalize_alias;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FlowAction {
+    Execute(Vec<String>),
+    Prompt(PromptRequest),
+    Status(String),
+    Quit,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PromptRequest {
+    pub label: String,
+    pub allow_empty: bool,
+    pub kind: PromptKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PromptKind {
+    NewMessage,
+    DescribeMessage { revision: String },
+    CommitMessage,
+    GitFetchRemote,
+    GitPushBookmark,
+    BookmarkCreate { target_revision: String },
+    BookmarkSet { target_revision: String },
+    BookmarkMove { target_revision: String },
+    BookmarkTrack,
+    BookmarkUntrack,
+    RebaseDestination { source_revision: String },
+    SquashInto { from_revision: String },
+    SplitFileset { revision: String },
+}
+
+impl PromptKind {
+    pub fn to_tokens(&self, input: &str) -> Result<Vec<String>, String> {
+        match self {
+            Self::NewMessage => {
+                if input.is_empty() {
+                    Ok(vec!["new".to_string()])
+                } else {
+                    Ok(vec!["new".to_string(), "-m".to_string(), input.to_string()])
+                }
+            }
+            Self::DescribeMessage { revision } => {
+                if input.is_empty() {
+                    return Err("description is required".to_string());
+                }
+
+                let mut tokens = vec!["describe".to_string(), "-m".to_string(), input.to_string()];
+                if revision != "@" {
+                    tokens.push(revision.clone());
+                }
+                Ok(tokens)
+            }
+            Self::CommitMessage => {
+                if input.is_empty() {
+                    Ok(vec!["commit".to_string()])
+                } else {
+                    Ok(vec![
+                        "commit".to_string(),
+                        "-m".to_string(),
+                        input.to_string(),
+                    ])
+                }
+            }
+            Self::GitFetchRemote => {
+                if input.is_empty() {
+                    Ok(vec!["git".to_string(), "fetch".to_string()])
+                } else {
+                    Ok(vec![
+                        "git".to_string(),
+                        "fetch".to_string(),
+                        "--remote".to_string(),
+                        input.to_string(),
+                    ])
+                }
+            }
+            Self::GitPushBookmark => {
+                if input.is_empty() {
+                    Ok(vec!["git".to_string(), "push".to_string()])
+                } else {
+                    Ok(vec![
+                        "git".to_string(),
+                        "push".to_string(),
+                        "--bookmark".to_string(),
+                        input.to_string(),
+                    ])
+                }
+            }
+            Self::BookmarkCreate { target_revision } => build_bookmark_target_command(
+                "create",
+                input,
+                target_revision,
+                "bookmark name required",
+                "-r",
+            ),
+            Self::BookmarkSet { target_revision } => build_bookmark_target_command(
+                "set",
+                input,
+                target_revision,
+                "bookmark name required",
+                "-r",
+            ),
+            Self::BookmarkMove { target_revision } => build_bookmark_target_command(
+                "move",
+                input,
+                target_revision,
+                "bookmark name required",
+                "--to",
+            ),
+            Self::BookmarkTrack => build_track_command("track", input),
+            Self::BookmarkUntrack => build_track_command("untrack", input),
+            Self::RebaseDestination { source_revision } => {
+                if input.is_empty() {
+                    Err("destination revset is required".to_string())
+                } else {
+                    Ok(vec![
+                        "rebase".to_string(),
+                        "-r".to_string(),
+                        source_revision.to_string(),
+                        "-d".to_string(),
+                        input.to_string(),
+                    ])
+                }
+            }
+            Self::SquashInto { from_revision } => {
+                let into = if input.is_empty() { "@-" } else { input };
+                Ok(vec![
+                    "squash".to_string(),
+                    "--from".to_string(),
+                    from_revision.to_string(),
+                    "--into".to_string(),
+                    into.to_string(),
+                ])
+            }
+            Self::SplitFileset { revision } => {
+                if input.is_empty() {
+                    Err("split fileset is required (for example: src/main.rs)".to_string())
+                } else {
+                    Ok(vec![
+                        "split".to_string(),
+                        "-r".to_string(),
+                        revision.to_string(),
+                        input.to_string(),
+                    ])
+                }
+            }
+        }
+    }
+}
+
+pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> FlowAction {
+    let trimmed = raw_command.trim();
+    if trimmed.is_empty() {
+        return FlowAction::Status("Ready".to_string());
+    }
+
+    if trimmed == "q" || trimmed == "quit" {
+        return FlowAction::Quit;
+    }
+
+    let raw_tokens: Vec<String> = trimmed
+        .split_whitespace()
+        .map(ToString::to_string)
+        .collect();
+    let mut tokens = normalize_alias(&raw_tokens);
+    tokens = canonicalize_tokens(tokens);
+
+    if tokens.is_empty() {
+        return FlowAction::Execute(vec!["log".to_string()]);
+    }
+
+    let selected = selected_revision.unwrap_or_else(|| "@".to_string());
+
+    match tokens.as_slice() {
+        [command] if command == "new" => FlowAction::Prompt(PromptRequest {
+            label: "new message (blank for none)".to_string(),
+            allow_empty: true,
+            kind: PromptKind::NewMessage,
+        }),
+        [command] if command == "describe" => FlowAction::Prompt(PromptRequest {
+            label: format!("describe message for {selected}"),
+            allow_empty: false,
+            kind: PromptKind::DescribeMessage { revision: selected },
+        }),
+        [command] if command == "commit" => FlowAction::Prompt(PromptRequest {
+            label: "commit message (blank for default)".to_string(),
+            allow_empty: true,
+            kind: PromptKind::CommitMessage,
+        }),
+        [command] if command == "next" => FlowAction::Execute(vec!["next".to_string()]),
+        [command] if command == "prev" => FlowAction::Execute(vec!["prev".to_string()]),
+        [command] if command == "edit" => FlowAction::Execute(vec!["edit".to_string(), selected]),
+        [command] if command == "show" => FlowAction::Execute(vec!["show".to_string(), selected]),
+        [command] if command == "diff" => {
+            FlowAction::Execute(vec!["diff".to_string(), "-r".to_string(), selected])
+        }
+        [command] if command == "abandon" => {
+            FlowAction::Execute(vec!["abandon".to_string(), selected])
+        }
+        [command] if command == "undo" => FlowAction::Execute(vec!["undo".to_string()]),
+        [command] if command == "redo" => FlowAction::Execute(vec!["redo".to_string()]),
+        [command] if command == "bookmark" => {
+            FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "create" => {
+            FlowAction::Prompt(PromptRequest {
+                label: format!("bookmark name for revision {selected}"),
+                allow_empty: false,
+                kind: PromptKind::BookmarkCreate {
+                    target_revision: selected,
+                },
+            })
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "set" => {
+            FlowAction::Prompt(PromptRequest {
+                label: format!("bookmark name for revision {selected}"),
+                allow_empty: false,
+                kind: PromptKind::BookmarkSet {
+                    target_revision: selected,
+                },
+            })
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "move" => {
+            FlowAction::Prompt(PromptRequest {
+                label: format!("bookmark name to move to {selected}"),
+                allow_empty: false,
+                kind: PromptKind::BookmarkMove {
+                    target_revision: selected,
+                },
+            })
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "track" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "track: <name> [remote]".to_string(),
+                allow_empty: false,
+                kind: PromptKind::BookmarkTrack,
+            })
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "untrack" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "untrack: <name> [remote]".to_string(),
+                allow_empty: false,
+                kind: PromptKind::BookmarkUntrack,
+            })
+        }
+        [command, subcommand] if command == "git" && subcommand == "fetch" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "fetch remote (blank for default)".to_string(),
+                allow_empty: true,
+                kind: PromptKind::GitFetchRemote,
+            })
+        }
+        [command, subcommand] if command == "git" && subcommand == "push" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "push bookmark (blank for default tracked push)".to_string(),
+                allow_empty: true,
+                kind: PromptKind::GitPushBookmark,
+            })
+        }
+        [command] if command == "rebase" => FlowAction::Prompt(PromptRequest {
+            label: format!("rebase destination revset for {selected}"),
+            allow_empty: false,
+            kind: PromptKind::RebaseDestination {
+                source_revision: selected,
+            },
+        }),
+        [command] if command == "squash" => FlowAction::Prompt(PromptRequest {
+            label: format!("squash into revset (blank = @-) from {selected}"),
+            allow_empty: true,
+            kind: PromptKind::SquashInto {
+                from_revision: selected,
+            },
+        }),
+        [command] if command == "split" => FlowAction::Prompt(PromptRequest {
+            label: "split fileset (required for non-interactive mode)".to_string(),
+            allow_empty: false,
+            kind: PromptKind::SplitFileset { revision: selected },
+        }),
+        _ => FlowAction::Execute(tokens),
+    }
+}
+
+fn canonicalize_tokens(mut tokens: Vec<String>) -> Vec<String> {
+    if tokens.is_empty() {
+        return tokens;
+    }
+
+    tokens[0] = canonical_command_name(&tokens[0]);
+
+    if tokens[0] == "bookmark" && tokens.len() > 1 {
+        tokens[1] = canonical_bookmark_subcommand(&tokens[1]);
+    }
+
+    tokens
+}
+
+fn canonical_command_name(command: &str) -> String {
+    match command {
+        "desc" => "describe".to_string(),
+        "st" => "status".to_string(),
+        value => value.to_string(),
+    }
+}
+
+fn canonical_bookmark_subcommand(command: &str) -> String {
+    match command {
+        "c" => "create".to_string(),
+        "d" => "delete".to_string(),
+        "f" => "forget".to_string(),
+        "l" => "list".to_string(),
+        "m" => "move".to_string(),
+        "r" => "rename".to_string(),
+        "s" => "set".to_string(),
+        "t" => "track".to_string(),
+        "u" => "untrack".to_string(),
+        value => value.to_string(),
+    }
+}
+
+fn build_bookmark_target_command(
+    subcommand: &str,
+    input: &str,
+    target_revision: &str,
+    empty_message: &str,
+    target_flag: &str,
+) -> Result<Vec<String>, String> {
+    if input.is_empty() {
+        return Err(empty_message.to_string());
+    }
+
+    Ok(vec![
+        "bookmark".to_string(),
+        subcommand.to_string(),
+        input.to_string(),
+        target_flag.to_string(),
+        target_revision.to_string(),
+    ])
+}
+
+fn build_track_command(subcommand: &str, input: &str) -> Result<Vec<String>, String> {
+    if input.is_empty() {
+        return Err("bookmark name is required".to_string());
+    }
+
+    let segments: Vec<&str> = input.split_whitespace().collect();
+    if segments.len() > 2 {
+        return Err("use format: <bookmark> [remote]".to_string());
+    }
+
+    let mut tokens = vec![
+        "bookmark".to_string(),
+        subcommand.to_string(),
+        segments[0].to_string(),
+    ];
+
+    if let Some(remote) = segments.get(1) {
+        tokens.push("--remote".to_string());
+        tokens.push((*remote).to_string());
+    }
+
+    Ok(tokens)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FlowAction, PromptKind, plan_command};
+
+    fn selected() -> Option<String> {
+        Some("abc12345".to_string())
+    }
+
+    #[test]
+    fn plans_show_diff_edit_and_abandon_with_selected_revision() {
+        assert_eq!(
+            plan_command("show", selected()),
+            FlowAction::Execute(vec!["show".to_string(), "abc12345".to_string()])
+        );
+        assert_eq!(
+            plan_command("diff", selected()),
+            FlowAction::Execute(vec![
+                "diff".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("edit", selected()),
+            FlowAction::Execute(vec!["edit".to_string(), "abc12345".to_string()])
+        );
+        assert_eq!(
+            plan_command("abandon", selected()),
+            FlowAction::Execute(vec!["abandon".to_string(), "abc12345".to_string()])
+        );
+    }
+
+    #[test]
+    fn plans_prompt_for_describe_commit_and_rewrite_flows() {
+        let describe = plan_command("describe", selected());
+        match describe {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::DescribeMessage {
+                        revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        let commit = plan_command("commit", selected());
+        match commit {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::CommitMessage);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        let rebase = plan_command("rebase", selected());
+        match rebase {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::RebaseDestination {
+                        source_revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        let squash = plan_command("jjsq", selected());
+        match squash {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::SquashInto {
+                        from_revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        let split = plan_command("split", selected());
+        match split {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::SplitFileset {
+                        revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn maps_alias_and_prompts_fetch_push() {
+        let fetch = plan_command("gf", selected());
+        match fetch {
+            FlowAction::Prompt(request) => assert_eq!(request.kind, PromptKind::GitFetchRemote),
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        let push = plan_command("jjgp", selected());
+        match push {
+            FlowAction::Prompt(request) => assert_eq!(request.kind, PromptKind::GitPushBookmark),
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bookmark_without_subcommand_lists() {
+        assert_eq!(
+            plan_command("bookmark", selected()),
+            FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
+        );
+    }
+
+    #[test]
+    fn bookmark_short_subcommand_is_canonicalized() {
+        match plan_command("bookmark s", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::BookmarkSet {
+                        target_revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_kind_builds_tokens() {
+        let bookmark = PromptKind::BookmarkSet {
+            target_revision: "abc12345".to_string(),
+        };
+        assert_eq!(
+            bookmark.to_tokens("feature"),
+            Ok(vec![
+                "bookmark".to_string(),
+                "set".to_string(),
+                "feature".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+
+        let track = PromptKind::BookmarkTrack;
+        assert_eq!(
+            track.to_tokens("topic origin"),
+            Ok(vec![
+                "bookmark".to_string(),
+                "track".to_string(),
+                "topic".to_string(),
+                "--remote".to_string(),
+                "origin".to_string()
+            ])
+        );
+
+        let rebase = PromptKind::RebaseDestination {
+            source_revision: "abc12345".to_string(),
+        };
+        assert_eq!(
+            rebase.to_tokens("main"),
+            Ok(vec![
+                "rebase".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string(),
+                "-d".to_string(),
+                "main".to_string()
+            ])
+        );
+
+        let squash = PromptKind::SquashInto {
+            from_revision: "abc12345".to_string(),
+        };
+        assert_eq!(
+            squash.to_tokens(""),
+            Ok(vec![
+                "squash".to_string(),
+                "--from".to_string(),
+                "abc12345".to_string(),
+                "--into".to_string(),
+                "@-".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn undo_and_redo_execute_directly() {
+        assert_eq!(
+            plan_command("undo", selected()),
+            FlowAction::Execute(vec!["undo".to_string()])
+        );
+        assert_eq!(
+            plan_command("redo", selected()),
+            FlowAction::Execute(vec!["redo".to_string()])
+        );
+    }
+}

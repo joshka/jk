@@ -11,9 +11,9 @@ use crossterm::terminal::{
 use crossterm::{execute, queue};
 use regex::Regex;
 
-use crate::alias::normalize_alias;
 use crate::config::KeybindConfig;
 use crate::error::JkError;
+use crate::flows::{FlowAction, PromptKind, PromptRequest, plan_command};
 use crate::jj;
 use crate::keys::KeyBinding;
 
@@ -22,6 +22,7 @@ enum Mode {
     Normal,
     Command,
     Confirm,
+    Prompt,
 }
 
 pub struct App {
@@ -33,8 +34,17 @@ pub struct App {
     status_line: String,
     command_input: String,
     pending_confirm: Option<Vec<String>>,
+    pending_prompt: Option<PromptState>,
     last_command: Vec<String>,
     should_quit: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PromptState {
+    kind: PromptKind,
+    label: String,
+    allow_empty: bool,
+    input: String,
 }
 
 impl App {
@@ -48,6 +58,7 @@ impl App {
             status_line: "Press : for commands, q to quit".to_string(),
             command_input: String::new(),
             pending_confirm: None,
+            pending_prompt: None,
             last_command: vec!["log".to_string()],
             should_quit: false,
         }
@@ -81,6 +92,7 @@ impl App {
             Mode::Normal => self.handle_normal_key(key),
             Mode::Command => self.handle_command_key(key),
             Mode::Confirm => self.handle_confirm_key(key),
+            Mode::Prompt => self.handle_prompt_key(key),
         }
     }
 
@@ -163,30 +175,66 @@ impl App {
         }
 
         if matches_any(&self.keybinds.command.submit, key) {
-            let command = self.command_input.trim();
-            if command.is_empty() {
-                self.mode = Mode::Normal;
-                self.status_line = "Ready".to_string();
-                return Ok(());
-            }
-
-            if command == "q" || command == "quit" {
-                self.should_quit = true;
-                return Ok(());
-            }
-
-            let tokens: Vec<String> = command
-                .split_whitespace()
-                .map(ToString::to_string)
-                .collect();
-            let tokens = normalize_alias(&tokens);
+            let command = self.command_input.clone();
             self.mode = Mode::Normal;
-            self.execute_with_confirmation(tokens)?;
+            self.command_input.clear();
+            self.execute_command_line(&command)?;
             return Ok(());
         }
 
         if let KeyCode::Char(ch) = key.code {
             self.command_input.push(ch);
+        }
+
+        Ok(())
+    }
+
+    fn handle_prompt_key(&mut self, key: KeyEvent) -> Result<(), JkError> {
+        if matches_any(&self.keybinds.command.cancel, key) {
+            self.pending_prompt = None;
+            self.mode = Mode::Normal;
+            self.status_line = "Prompt canceled".to_string();
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.command.backspace, key) {
+            if let Some(prompt) = self.pending_prompt.as_mut() {
+                prompt.input.pop();
+            }
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.command.submit, key) {
+            if let Some(prompt) = self.pending_prompt.take() {
+                let input = prompt.input.trim();
+                if !prompt.allow_empty && input.is_empty() {
+                    self.pending_prompt = Some(prompt);
+                    self.status_line = "Input required for this flow".to_string();
+                    return Ok(());
+                }
+
+                match prompt.kind.to_tokens(input) {
+                    Ok(tokens) => {
+                        self.mode = Mode::Normal;
+                        self.execute_with_confirmation(tokens)?;
+                    }
+                    Err(message) => {
+                        self.pending_prompt = Some(prompt);
+                        self.mode = Mode::Prompt;
+                        self.status_line = message;
+                    }
+                }
+            } else {
+                self.mode = Mode::Normal;
+                self.status_line = "Prompt unavailable".to_string();
+            }
+            return Ok(());
+        }
+
+        if let KeyCode::Char(ch) = key.code
+            && let Some(prompt) = self.pending_prompt.as_mut()
+        {
+            prompt.input.push(ch);
         }
 
         Ok(())
@@ -219,6 +267,35 @@ impl App {
         }
 
         self.execute_tokens(tokens)
+    }
+
+    fn execute_command_line(&mut self, command: &str) -> Result<(), JkError> {
+        match plan_command(command, self.selected_revision()) {
+            FlowAction::Quit => {
+                self.should_quit = true;
+                Ok(())
+            }
+            FlowAction::Status(message) => {
+                self.status_line = message;
+                Ok(())
+            }
+            FlowAction::Execute(tokens) => self.execute_with_confirmation(tokens),
+            FlowAction::Prompt(request) => {
+                self.start_prompt(request);
+                Ok(())
+            }
+        }
+    }
+
+    fn start_prompt(&mut self, request: PromptRequest) {
+        self.pending_prompt = Some(PromptState {
+            kind: request.kind,
+            label: request.label.clone(),
+            allow_empty: request.allow_empty,
+            input: String::new(),
+        });
+        self.mode = Mode::Prompt;
+        self.status_line = format!("Prompt: {}", request.label);
     }
 
     fn execute_tokens(&mut self, tokens: Vec<String>) -> Result<(), JkError> {
@@ -316,6 +393,13 @@ impl App {
                 let pending = self.pending_confirm.clone().unwrap_or_default();
                 format!("Run `jj {}` ? [y/n]", pending.join(" "))
             }
+            Mode::Prompt => {
+                if let Some(prompt) = &self.pending_prompt {
+                    format!("{} > {}", prompt.label, prompt.input)
+                } else {
+                    "prompt unavailable".to_string()
+                }
+            }
         };
         rows.push(trim_to_width(&footer, width));
 
@@ -327,6 +411,7 @@ impl App {
             Mode::Normal => "normal",
             Mode::Command => "command",
             Mode::Confirm => "confirm",
+            Mode::Prompt => "prompt",
         }
     }
 
