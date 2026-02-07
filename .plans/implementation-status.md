@@ -298,3 +298,13 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (216 passed), and strict `cargo clippy`.
+- Latest pass:
+  - aligned command rendering with `jj` color semantics by forcing colorized subprocess output in
+    the `jj` runner for interactive command execution.
+  - kept metadata parsing deterministic by using a plain-color runner path for internal log metadata
+    queries.
+  - hardened ANSI handling in TUI rendering/parsing (width trimming, revision extraction, and
+    signal-summary detection) with focused regression tests.
+- Latest pass:
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (218 passed), and strict `cargo clippy`.

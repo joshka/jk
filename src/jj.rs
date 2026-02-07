@@ -10,8 +10,18 @@ pub struct CommandResult {
 }
 
 pub fn run(tokens: &[String]) -> Result<CommandResult, JkError> {
+    run_with_color(tokens, "always")
+}
+
+pub fn run_plain(tokens: &[String]) -> Result<CommandResult, JkError> {
+    run_with_color(tokens, "never")
+}
+
+fn run_with_color(tokens: &[String], color: &str) -> Result<CommandResult, JkError> {
     let mut command = Command::new("jj");
     command.arg("--no-pager");
+    command.arg("--color");
+    command.arg(color);
     command.args(tokens);
 
     let output = command

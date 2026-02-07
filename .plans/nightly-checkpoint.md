@@ -39,6 +39,8 @@
   - rewrite flow `fix` now renders via native mutation wrapper.
   - resolve flow now has full wrapper parity for both `resolve -l` and direct resolve actions.
   - rewrite flow `diffedit` now renders via native mutation wrapper.
+  - command output now preserves `jj` color styling in TUI views by forcing `jj --color=always`
+    for interactive command execution.
 - Shortcut coverage:
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`
@@ -116,6 +118,8 @@
   - added `insta` snapshot for top-level `fix` wrapper
   - added `insta` snapshot for resolve action wrapper output
   - added `insta` snapshot for top-level `diffedit` wrapper
+  - added ANSI-specific regression tests for revision extraction and width trimming in colored
+    output lines
   - refreshed `insta` snapshots for bookmark/workspace/operation mutation wrappers to lock in
     signal-first summary behavior
   - refreshed `insta` snapshot for `git push` wrapper signal-first summary behavior
@@ -149,6 +153,8 @@
   - resolve output now renders through native wrappers for both list and action forms
   - top-level mutation wrappers now include rewrite-signal support for `diffedit`
     (`Rebased ...` output lines)
+  - ANSI-aware parsing and width trimming now prevent color escape sequences from corrupting
+    revision detection and line truncation
   - top-level mutation wrappers now include signal-first summary support for
     `absorb`/`duplicate`/`parallelize` when command output includes explicit action lines
   - command-safety mapping now marks read-only `file`/`tag` subcommands as Tier `A`
@@ -191,7 +197,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (216 passed)
+  - `cargo test` (218 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

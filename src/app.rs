@@ -778,7 +778,7 @@ fn derive_row_revision_map(tokens: &[String], lines: &[String]) -> Vec<Option<St
         return vec![None; lines.len()];
     };
 
-    let revisions = match jj::run(&metadata_tokens) {
+    let revisions = match jj::run_plain(&metadata_tokens) {
         Ok(result) if result.success => parse_log_revisions(&result.output),
         _ => Vec::new(),
     };
@@ -820,7 +820,8 @@ fn metadata_log_tokens(tokens: &[String]) -> Option<Vec<String>> {
 fn parse_log_revisions(lines: &[String]) -> Vec<String> {
     let mut revisions = Vec::new();
     for line in lines {
-        let Some(token) = line.split_whitespace().next().map(trim_revision_token) else {
+        let stripped = strip_ansi(line);
+        let Some(token) = stripped.split_whitespace().next().map(trim_revision_token) else {
             continue;
         };
         if is_change_id(token) || is_commit_id(token) {
@@ -895,11 +896,88 @@ fn trim_to_width(text: &str, width: usize) -> String {
         return String::new();
     }
 
-    text.chars().take(width).collect()
+    let mut result = String::new();
+    let mut chars = text.chars().peekable();
+    let mut visible = 0usize;
+
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}'
+            && let Some('[') = chars.peek().copied()
+        {
+            result.push(ch);
+            result.push('[');
+            let _ = chars.next();
+            for control in chars.by_ref() {
+                result.push(control);
+                if ('@'..='~').contains(&control) {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        if visible >= width {
+            break;
+        }
+
+        result.push(ch);
+        visible += 1;
+    }
+
+    if visible >= width {
+        loop {
+            if !matches!(chars.peek(), Some('\u{1b}')) {
+                break;
+            }
+
+            let Some(escape) = chars.next() else {
+                break;
+            };
+            if !matches!(chars.peek(), Some('[')) {
+                continue;
+            }
+            result.push(escape);
+            result.push('[');
+            let _ = chars.next();
+
+            for control in chars.by_ref() {
+                result.push(control);
+                if ('@'..='~').contains(&control) {
+                    break;
+                }
+            }
+        }
+    }
+
+    result
+}
+
+fn strip_ansi(text: &str) -> String {
+    let mut result = String::new();
+    let mut chars = text.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}'
+            && let Some('[') = chars.peek().copied()
+        {
+            let _ = chars.next();
+            for control in chars.by_ref() {
+                if ('@'..='~').contains(&control) {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        result.push(ch);
+    }
+
+    result
 }
 
 fn extract_revision(line: &str) -> Option<String> {
-    let tokens: Vec<&str> = line
+    let stripped = strip_ansi(line);
+    let tokens: Vec<&str> = stripped
         .split_whitespace()
         .map(trim_revision_token)
         .filter(|token| !token.is_empty())
@@ -1223,7 +1301,10 @@ fn render_status_view(lines: Vec<String>) -> Vec<String> {
     let mut conflicted_bookmarks = 0usize;
 
     for raw_line in lines {
-        let trimmed = raw_line.trim();
+        let display_line = raw_line.trim_end().to_string();
+        let stripped = strip_ansi(&display_line);
+        let trimmed = stripped.trim();
+        let display_trimmed = display_line.trim();
         if trimmed.is_empty() {
             continue;
         }
@@ -1240,26 +1321,26 @@ fn render_status_view(lines: Vec<String>) -> Vec<String> {
             if trimmed == "Conflicted bookmarks:" {
                 has_conflicted_section = true;
             }
-            section_lines.push(trimmed.to_string());
+            section_lines.push(display_trimmed.to_string());
             continue;
         }
 
         match current_section.as_deref() {
             Some("Working copy changes:") => {
                 if is_working_copy_change_line(trimmed) {
-                    section_lines.push(format!("  {trimmed}"));
+                    section_lines.push(format!("  {display_trimmed}"));
                     working_copy_changes += 1;
                 } else {
                     current_section = None;
-                    section_lines.push(trimmed.to_string());
+                    section_lines.push(display_trimmed.to_string());
                 }
             }
             Some("Conflicted bookmarks:") => {
-                section_lines.push(trimmed.to_string());
+                section_lines.push(display_trimmed.to_string());
                 conflicted_bookmarks += 1;
             }
             _ => {
-                section_lines.push(trimmed.to_string());
+                section_lines.push(display_trimmed.to_string());
             }
         }
     }
@@ -1450,7 +1531,8 @@ fn normalize_diff_lines(lines: Vec<String>) -> Vec<String> {
 }
 
 fn is_top_level_section_header(line: &str) -> bool {
-    !line.starts_with(' ') && line.ends_with(':')
+    let stripped = strip_ansi(line);
+    !stripped.starts_with(' ') && stripped.ends_with(':')
 }
 
 fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>) -> Vec<String> {
@@ -1565,11 +1647,14 @@ fn render_root_view(lines: Vec<String>) -> Vec<String> {
     ];
 
     for line in lines {
-        let trimmed = line.trim();
+        let display_line = line.trim_end().to_string();
+        let stripped = strip_ansi(&display_line);
+        let trimmed = stripped.trim();
+        let display_trimmed = display_line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        rendered.push(trimmed.to_string());
+        rendered.push(display_trimmed.to_string());
     }
 
     rendered.push(String::new());
@@ -1615,7 +1700,10 @@ fn render_resolve_list_view(lines: Vec<String>) -> Vec<String> {
     let mut saw_no_conflicts = false;
 
     for line in lines {
-        let trimmed = line.trim();
+        let display_line = line.trim_end().to_string();
+        let stripped = strip_ansi(&display_line);
+        let trimmed = stripped.trim();
+        let display_trimmed = display_line.trim();
         if trimmed.is_empty() {
             continue;
         }
@@ -1630,7 +1718,7 @@ fn render_resolve_list_view(lines: Vec<String>) -> Vec<String> {
             conflict_count += 1;
         }
 
-        body_lines.push(trimmed.to_string());
+        body_lines.push(display_trimmed.to_string());
     }
 
     let summary = if saw_no_conflicts || conflict_count == 0 {
@@ -1670,11 +1758,11 @@ fn render_resolve_action_view(lines: Vec<String>) -> Vec<String> {
         .collect();
     let detail_count = detail_lines.len();
 
-    let summary = if let Some(signal) = detail_lines
-        .iter()
-        .find(|line| line.trim().starts_with("Resolved "))
-    {
-        format!("Summary: {}", signal.trim())
+    let summary = if let Some(signal) = detail_lines.iter().find(|line| {
+        let stripped = strip_ansi(line);
+        stripped.trim().starts_with("Resolved ")
+    }) {
+        format!("Summary: {}", strip_ansi(signal).trim())
     } else if detail_count == 0 {
         "Summary: resolve command completed with no output".to_string()
     } else {
@@ -2092,7 +2180,7 @@ fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
 fn git_fetch_summary(detail_lines: &[String]) -> String {
     if detail_lines
         .iter()
-        .any(|line| line.contains("Nothing changed"))
+        .any(|line| strip_ansi(line).contains("Nothing changed"))
     {
         return "Summary: no remote updates fetched".to_string();
     }
@@ -2100,7 +2188,7 @@ fn git_fetch_summary(detail_lines: &[String]) -> String {
         return "Summary: fetch completed with no output".to_string();
     }
     if let Some(signal) = detail_lines.iter().find(|line| is_git_fetch_signal(line)) {
-        return format!("Summary: {}", signal.trim());
+        return format!("Summary: {}", strip_ansi(signal).trim());
     }
 
     format!(
@@ -2111,7 +2199,8 @@ fn git_fetch_summary(detail_lines: &[String]) -> String {
 }
 
 fn is_git_fetch_signal(line: &str) -> bool {
-    let trimmed = line.trim();
+    let stripped = strip_ansi(line);
+    let trimmed = stripped.trim();
     trimmed.starts_with("Fetched ")
         || trimmed.starts_with("From ")
         || trimmed.starts_with("Updated bookmark ")
@@ -2120,7 +2209,7 @@ fn is_git_fetch_signal(line: &str) -> bool {
 fn git_push_summary(detail_lines: &[String]) -> String {
     if detail_lines
         .iter()
-        .any(|line| line.contains("Nothing changed"))
+        .any(|line| strip_ansi(line).contains("Nothing changed"))
     {
         return "Summary: no bookmark updates pushed".to_string();
     }
@@ -2128,7 +2217,7 @@ fn git_push_summary(detail_lines: &[String]) -> String {
         return "Summary: push completed with no output".to_string();
     }
     if let Some(signal) = detail_lines.iter().find(|line| is_git_push_signal(line)) {
-        return format!("Summary: {}", signal.trim());
+        return format!("Summary: {}", strip_ansi(signal).trim());
     }
 
     format!(
@@ -2139,7 +2228,8 @@ fn git_push_summary(detail_lines: &[String]) -> String {
 }
 
 fn is_git_push_signal(line: &str) -> bool {
-    let trimmed = line.trim();
+    let stripped = strip_ansi(line);
+    let trimmed = stripped.trim();
     trimmed.starts_with("Pushed bookmark ") || trimmed.starts_with("Pushed ")
 }
 
@@ -2179,7 +2269,7 @@ fn top_level_mutation_summary(command_name: &str, detail_lines: &[String]) -> St
         .iter()
         .find(|line| is_top_level_mutation_signal(command_name, line))
     {
-        return format!("Summary: {}", signal.trim());
+        return format!("Summary: {}", strip_ansi(signal).trim());
     }
 
     format!(
@@ -2190,7 +2280,8 @@ fn top_level_mutation_summary(command_name: &str, detail_lines: &[String]) -> St
 }
 
 fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
-    let trimmed = line.trim();
+    let stripped = strip_ansi(line);
+    let trimmed = stripped.trim();
     match command_name {
         "new" | "describe" | "commit" | "metaedit" | "edit" | "next" | "prev" => {
             trimmed.starts_with("Working copy now at:")
@@ -2265,7 +2356,7 @@ fn bookmark_mutation_summary(subcommand: &str, detail_lines: &[String]) -> Strin
         .iter()
         .find(|line| is_bookmark_mutation_signal(subcommand, line))
     {
-        return format!("Summary: {}", signal.trim());
+        return format!("Summary: {}", strip_ansi(signal).trim());
     }
 
     format!(
@@ -2276,7 +2367,8 @@ fn bookmark_mutation_summary(subcommand: &str, detail_lines: &[String]) -> Strin
 }
 
 fn is_bookmark_mutation_signal(subcommand: &str, line: &str) -> bool {
-    let trimmed = line.trim();
+    let stripped = strip_ansi(line);
+    let trimmed = stripped.trim();
     match subcommand {
         "create" => trimmed.starts_with("Created bookmark "),
         "set" | "move" => trimmed.starts_with("Moved bookmark "),
@@ -2350,7 +2442,7 @@ fn workspace_mutation_summary(subcommand: &str, detail_lines: &[String]) -> Stri
         .iter()
         .find(|line| is_workspace_mutation_signal(subcommand, line))
     {
-        return format!("Summary: {}", signal.trim());
+        return format!("Summary: {}", strip_ansi(signal).trim());
     }
 
     format!(
@@ -2361,7 +2453,8 @@ fn workspace_mutation_summary(subcommand: &str, detail_lines: &[String]) -> Stri
 }
 
 fn is_workspace_mutation_signal(subcommand: &str, line: &str) -> bool {
-    let trimmed = line.trim();
+    let stripped = strip_ansi(line);
+    let trimmed = stripped.trim();
     match subcommand {
         "add" => trimmed.starts_with("Created workspace "),
         "forget" => trimmed.starts_with("Forgot workspace "),
@@ -2455,7 +2548,7 @@ fn operation_mutation_summary(subcommand: &str, detail_lines: &[String]) -> Stri
         .iter()
         .find(|line| is_operation_mutation_signal(subcommand, line))
     {
-        return format!("Summary: {}", signal.trim());
+        return format!("Summary: {}", strip_ansi(signal).trim());
     }
 
     format!(
@@ -2466,7 +2559,8 @@ fn operation_mutation_summary(subcommand: &str, detail_lines: &[String]) -> Stri
 }
 
 fn is_operation_mutation_signal(subcommand: &str, line: &str) -> bool {
-    let trimmed = line.trim();
+    let stripped = strip_ansi(line);
+    let trimmed = stripped.trim();
     match subcommand {
         "restore" => trimmed.starts_with("Restored to operation "),
         "revert" => trimmed.starts_with("Reverted operation "),
@@ -2576,7 +2670,8 @@ fn render_operation_log_view(lines: Vec<String>) -> Vec<String> {
 }
 
 fn is_operation_entry_header(line: &str) -> bool {
-    let trimmed = line.trim_start();
+    let stripped = strip_ansi(line);
+    let trimmed = stripped.trim_start();
     trimmed.starts_with('@') || trimmed.starts_with('○')
 }
 
@@ -2593,7 +2688,8 @@ fn plural_suffix(count: usize) -> &'static str {
 }
 
 fn is_working_copy_change_line(line: &str) -> bool {
-    let mut chars = line.chars();
+    let stripped = strip_ansi(line);
+    let mut chars = stripped.chars();
     match (chars.next(), chars.next()) {
         (Some(status), Some(' ')) => matches!(status, 'M' | 'A' | 'D' | 'R' | 'C' | '?' | 'U'),
         _ => false,
@@ -2651,7 +2747,7 @@ mod tests {
         render_status_view, render_tag_delete_view, render_tag_list_view, render_tag_set_view,
         render_top_level_mutation_view, render_version_view, render_workspace_list_view,
         render_workspace_mutation_view, startup_action, toggle_patch_flag,
-        top_level_mutation_summary, workspace_mutation_summary,
+        top_level_mutation_summary, trim_to_width, workspace_mutation_summary,
     };
 
     #[test]
@@ -2664,6 +2760,19 @@ mod tests {
     fn extracts_commit_id_when_change_missing() {
         let line = "Commit hash 0123abcd updated";
         assert_eq!(extract_revision(line), Some("0123abcd".to_string()));
+    }
+
+    #[test]
+    fn extracts_revision_from_ansi_colored_log_line() {
+        let line = "\u{1b}[32m@\u{1b}[0m  \u{1b}[36mabcdefgh\u{1b}[0m user 2026-02-07 0123abcd";
+        assert_eq!(extract_revision(line), Some("abcdefgh".to_string()));
+    }
+
+    #[test]
+    fn trim_to_width_preserves_ansi_sequences() {
+        let line = "\u{1b}[31m@a\u{1b}[0m trailing";
+        let trimmed = trim_to_width(line, 1);
+        assert_eq!(trimmed, "\u{1b}[31m@\u{1b}[0m");
     }
 
     #[test]
@@ -4189,6 +4298,15 @@ mod tests {
         assert_eq!(
             top_level_mutation_summary("fix", &[String::from("Fixed 5 files across 3 revisions")]),
             "Summary: Fixed 5 files across 3 revisions"
+        );
+        assert_eq!(
+            top_level_mutation_summary(
+                "rebase",
+                &[String::from(
+                    "\u{1b}[32mRebased 2 commits onto main\u{1b}[0m"
+                )]
+            ),
+            "Summary: Rebased 2 commits onto main"
         );
     }
 
