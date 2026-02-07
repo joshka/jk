@@ -301,6 +301,20 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
         ));
     }
 
+    for (name, mode, tier) in [
+        ("aliases (local)", "native", "A"),
+        ("keys (local)", "native", "A"),
+        ("keymap (local)", "native", "A"),
+    ] {
+        if let Some(filter) = &filter
+            && !name.to_ascii_lowercase().contains(filter)
+        {
+            continue;
+        }
+
+        lines.push(format!("{:<18} {:<12} {}", name, mode, tier));
+    }
+
     if filter.is_none() {
         lines.push(String::new());
         lines.push(
@@ -442,6 +456,7 @@ mod tests {
                 .iter()
                 .any(|line| line.contains(":aliases for mappings"))
         );
+        assert!(lines.iter().any(|line| line.starts_with("aliases (local)")));
     }
 
     #[test]
@@ -449,5 +464,12 @@ mod tests {
         let lines = command_overview_lines_with_query(Some("work"));
         assert!(lines.iter().any(|line| line.starts_with("workspace")));
         assert!(!lines.iter().any(|line| line.starts_with("rebase")));
+    }
+
+    #[test]
+    fn filters_overview_lines_for_local_views() {
+        let lines = command_overview_lines_with_query(Some("keys"));
+        assert!(lines.iter().any(|line| line.starts_with("keys (local)")));
+        assert!(!lines.iter().any(|line| line.starts_with("workspace")));
     }
 }
