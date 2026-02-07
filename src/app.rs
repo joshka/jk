@@ -2675,6 +2675,57 @@ mod tests {
     }
 
     #[test]
+    fn startup_action_supports_high_frequency_omz_aliases() {
+        assert_eq!(
+            startup_action(&["jjst".to_string()]),
+            FlowAction::Execute(vec!["status".to_string()])
+        );
+        assert_eq!(
+            startup_action(&["jjl".to_string()]),
+            FlowAction::Execute(vec!["log".to_string()])
+        );
+        assert_eq!(
+            startup_action(&["jjd".to_string()]),
+            FlowAction::Execute(vec!["diff".to_string(), "-r".to_string(), "@".to_string()])
+        );
+        assert_eq!(
+            startup_action(&["jjrbm".to_string()]),
+            FlowAction::Execute(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "trunk()".to_string()
+            ])
+        );
+
+        match startup_action(&["jjgf".to_string()]) {
+            FlowAction::Prompt(request) => assert_eq!(request.kind, PromptKind::GitFetchRemote),
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match startup_action(&["jjgp".to_string()]) {
+            FlowAction::Prompt(request) => assert_eq!(request.kind, PromptKind::GitPushBookmark),
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match startup_action(&["jjc".to_string()]) {
+            FlowAction::Prompt(request) => assert_eq!(request.kind, PromptKind::CommitMessage),
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match startup_action(&["jjds".to_string()]) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::DescribeMessage {
+                        revision: "@".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn startup_dangerous_command_requires_confirmation() {
         let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
         app.apply_startup_tokens(vec![

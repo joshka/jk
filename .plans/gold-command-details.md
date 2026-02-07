@@ -118,6 +118,7 @@ It is intentionally concrete and should be re-read during implementation checkpo
 - Alias normalization tests for native + OMZ gold aliases.
 - Flow planner tests for core `jj` default alias behavior (`b`/`ci`/`desc`/`op`/`st`).
 - Startup-action tests for core `jj` default aliases (`jk st/ci/desc/b/op`).
+- Startup-action tests for high-frequency OMZ aliases (`jk jjst/jjl/jjd/jjgf/jjgp/jjrbm`).
 - Command-registry tests for default alias annotation/filtering in `:commands`.
 - Flow planner tests for prompt-vs-execute behavior of every gold command.
 - Wrapper summary tests proving bookmark/workspace/operation mutations prefer signal lines when

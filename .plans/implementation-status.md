@@ -243,3 +243,6 @@
   - added a native wrapper for `version` command output with concise summary/tip presentation to
     keep low-risk utility flows consistent with the in-app design language.
   - added targeted render/decorator tests plus an `insta` snapshot for the version wrapper view.
+- Latest pass:
+  - added startup-action regression coverage for high-frequency OMZ aliases
+    (`jk jjst`, `jk jjl`, `jk jjd`, `jk jjgf`, `jk jjgp`, `jk jjrbm`, `jk jjc`, `jk jjds`).

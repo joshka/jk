@@ -87,6 +87,8 @@
   - added command-registry tests for default-alias annotation and alias-based filtering
   - added startup-action regression test coverage for core `jj` default aliases
     (`jk st`, `jk ci`, `jk desc`, `jk b`, `jk op`)
+  - added startup-action regression test coverage for high-frequency OMZ aliases
+    (`jk jjst`, `jk jjl`, `jk jjd`, `jk jjgf`, `jk jjgp`, `jk jjrbm`, `jk jjc`, `jk jjds`)
   - added explicit summary-heuristic tests for bookmark/workspace/operation mutation wrappers
   - added explicit summary-heuristic tests for `git fetch`/`git push` wrapper summaries
   - added explicit wrapper render/decorator tests for `version` output
