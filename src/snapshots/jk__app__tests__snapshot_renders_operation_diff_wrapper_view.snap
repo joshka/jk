@@ -1,0 +1,22 @@
+---
+source: src/app.rs
+assertion_line: 2785
+expression: "rendered.join(\"\\n\")"
+---
+Operation Diff
+==============
+
+Summary: 1 changed commit entry shown
+
+From operation: 67d547b627fb (2026-02-07) describe commit old
+  To operation: 3c63d5e89db3 (2026-02-07) describe commit new
+
+Changed commits:
+○  + uxqqtlkq 722c112d feat(ux): expand read-mode wrappers and shortcuts
+   - uxqqtlkq/1 f8cbf93c (hidden) feat(ux): expand read-mode wrappers and shortcuts
+
+Changed working copy default@:
++ uxqqtlkq 722c112d feat(ux): expand read-mode wrappers and shortcuts
+- uxqqtlkq/1 f8cbf93c (hidden) feat(ux): expand read-mode wrappers and shortcuts
+
+Tip: use operation show/restore/revert for deeper operation workflows

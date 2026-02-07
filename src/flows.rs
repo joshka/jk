@@ -40,6 +40,10 @@ pub enum PromptKind {
     BookmarkRename,
     BookmarkTrack,
     BookmarkUntrack,
+    TagSet {
+        default_revision: String,
+    },
+    TagDelete,
     RebaseDestination {
         source_revision: String,
     },
@@ -56,10 +60,6 @@ pub enum PromptKind {
         default_revisions: String,
         onto_revision: String,
     },
-    OperationShow {
-        default_operation: String,
-    },
-    OperationDiff,
     OperationRestore,
     OperationRevert {
         default_operation: String,
@@ -67,6 +67,11 @@ pub enum PromptKind {
     WorkspaceAdd,
     WorkspaceForget,
     WorkspaceRename,
+    FileTrack,
+    FileUntrack,
+    FileChmod {
+        default_revision: String,
+    },
 }
 
 impl PromptKind {
@@ -151,6 +156,8 @@ impl PromptKind {
             Self::BookmarkRename => build_bookmark_rename_command(input),
             Self::BookmarkTrack => build_track_command("track", input),
             Self::BookmarkUntrack => build_track_command("untrack", input),
+            Self::TagSet { default_revision } => build_tag_set_command(input, default_revision),
+            Self::TagDelete => build_tag_delete_command(input),
             Self::RebaseDestination { source_revision } => {
                 if input.is_empty() {
                     Err("destination revset is required".to_string())
@@ -213,24 +220,6 @@ impl PromptKind {
                     onto_revision.to_string(),
                 ])
             }
-            Self::OperationShow { default_operation } => {
-                let operation = if input.is_empty() {
-                    default_operation
-                } else {
-                    input
-                };
-
-                if operation == "@" {
-                    Ok(vec!["operation".to_string(), "show".to_string()])
-                } else {
-                    Ok(vec![
-                        "operation".to_string(),
-                        "show".to_string(),
-                        operation.to_string(),
-                    ])
-                }
-            }
-            Self::OperationDiff => build_operation_diff_command(input),
             Self::OperationRestore => {
                 if input.is_empty() {
                     Err("operation id is required".to_string())
@@ -271,6 +260,11 @@ impl PromptKind {
                         input.to_string(),
                     ])
                 }
+            }
+            Self::FileTrack => build_file_track_command(input),
+            Self::FileUntrack => build_file_untrack_command(input),
+            Self::FileChmod { default_revision } => {
+                build_file_chmod_command(input, default_revision)
             }
         }
     }
@@ -331,20 +325,10 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
             FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
         }
         [command, subcommand] if command == "operation" && subcommand == "show" => {
-            FlowAction::Prompt(PromptRequest {
-                label: "operation id for show (blank = @)".to_string(),
-                allow_empty: true,
-                kind: PromptKind::OperationShow {
-                    default_operation: "@".to_string(),
-                },
-            })
+            FlowAction::Execute(vec!["operation".to_string(), "show".to_string()])
         }
         [command, subcommand] if command == "operation" && subcommand == "diff" => {
-            FlowAction::Prompt(PromptRequest {
-                label: "operation diff: blank | <op> | <from> <to>".to_string(),
-                allow_empty: true,
-                kind: PromptKind::OperationDiff,
-            })
+            FlowAction::Execute(vec!["operation".to_string(), "diff".to_string()])
         }
         [command, subcommand] if command == "operation" && subcommand == "restore" => {
             FlowAction::Prompt(PromptRequest {
@@ -371,8 +355,51 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         [command] if command == "file" => {
             FlowAction::Execute(vec!["file".to_string(), "list".to_string()])
         }
+        [command, subcommand] if command == "file" && subcommand == "track" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "file paths/filesets to track".to_string(),
+                allow_empty: false,
+                kind: PromptKind::FileTrack,
+            })
+        }
+        [command, subcommand] if command == "file" && subcommand == "untrack" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "file paths/filesets to untrack".to_string(),
+                allow_empty: false,
+                kind: PromptKind::FileUntrack,
+            })
+        }
+        [command, subcommand] if command == "file" && subcommand == "chmod" => {
+            FlowAction::Prompt(PromptRequest {
+                label: format!(
+                    "file chmod: <mode> <path...> [--revision REVSET] (defaults to {selected})"
+                ),
+                allow_empty: false,
+                kind: PromptKind::FileChmod {
+                    default_revision: selected,
+                },
+            })
+        }
         [command] if command == "tag" => {
             FlowAction::Execute(vec!["tag".to_string(), "list".to_string()])
+        }
+        [command, subcommand] if command == "tag" && subcommand == "set" => {
+            FlowAction::Prompt(PromptRequest {
+                label: format!(
+                    "tag set: <name...> [revision] (blank revision defaults to {selected})"
+                ),
+                allow_empty: false,
+                kind: PromptKind::TagSet {
+                    default_revision: selected,
+                },
+            })
+        }
+        [command, subcommand] if command == "tag" && subcommand == "delete" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "tag names to delete (space-separated)".to_string(),
+                allow_empty: false,
+                kind: PromptKind::TagDelete,
+            })
         }
         [command, subcommand] if command == "workspace" && subcommand == "root" => {
             FlowAction::Execute(vec!["workspace".to_string(), "root".to_string()])
@@ -666,26 +693,47 @@ fn build_bookmark_rename_command(input: &str) -> Result<Vec<String>, String> {
     ])
 }
 
-fn build_operation_diff_command(input: &str) -> Result<Vec<String>, String> {
-    let segments: Vec<&str> = input.split_whitespace().collect();
-    match segments.as_slice() {
-        [] => Ok(vec!["operation".to_string(), "diff".to_string()]),
-        [operation] => Ok(vec![
-            "operation".to_string(),
-            "diff".to_string(),
-            "--operation".to_string(),
-            (*operation).to_string(),
-        ]),
-        [from, to] => Ok(vec![
-            "operation".to_string(),
-            "diff".to_string(),
-            "--from".to_string(),
-            (*from).to_string(),
-            "--to".to_string(),
-            (*to).to_string(),
-        ]),
-        _ => Err("use blank, <op>, or <from> <to>".to_string()),
+fn has_revision_flag(tokens: &[String]) -> bool {
+    tokens.iter().any(|token| {
+        matches!(token.as_str(), "-r" | "--revision" | "--to")
+            || token.starts_with("-r=")
+            || token.starts_with("--revision=")
+            || token.starts_with("--to=")
+    })
+}
+
+fn build_tag_set_command(input: &str, default_revision: &str) -> Result<Vec<String>, String> {
+    let segments: Vec<String> = input.split_whitespace().map(ToString::to_string).collect();
+    if segments.is_empty() {
+        return Err("at least one tag name is required".to_string());
     }
+
+    let mut tokens = vec!["tag".to_string(), "set".to_string()];
+    if segments.len() >= 2 && !segments[1].starts_with('-') && !has_revision_flag(&segments) {
+        tokens.push(segments[0].clone());
+        tokens.push("--revision".to_string());
+        tokens.push(segments[1].clone());
+        tokens.extend(segments.into_iter().skip(2));
+        return Ok(tokens);
+    }
+
+    tokens.extend(segments.clone());
+    if !has_revision_flag(&segments) {
+        tokens.push("--revision".to_string());
+        tokens.push(default_revision.to_string());
+    }
+    Ok(tokens)
+}
+
+fn build_tag_delete_command(input: &str) -> Result<Vec<String>, String> {
+    let names: Vec<&str> = input.split_whitespace().collect();
+    if names.is_empty() {
+        return Err("at least one tag name is required".to_string());
+    }
+
+    let mut tokens = vec!["tag".to_string(), "delete".to_string()];
+    tokens.extend(names.into_iter().map(ToString::to_string));
+    Ok(tokens)
 }
 
 fn build_workspace_add_command(input: &str) -> Result<Vec<String>, String> {
@@ -715,6 +763,43 @@ fn build_workspace_forget_command(input: &str) -> Result<Vec<String>, String> {
             .map(ToString::to_string)
             .collect::<Vec<_>>(),
     );
+    Ok(tokens)
+}
+
+fn build_file_track_command(input: &str) -> Result<Vec<String>, String> {
+    let paths: Vec<&str> = input.split_whitespace().collect();
+    if paths.is_empty() {
+        return Err("at least one file/fileset is required".to_string());
+    }
+
+    let mut tokens = vec!["file".to_string(), "track".to_string()];
+    tokens.extend(paths.into_iter().map(ToString::to_string));
+    Ok(tokens)
+}
+
+fn build_file_untrack_command(input: &str) -> Result<Vec<String>, String> {
+    let paths: Vec<&str> = input.split_whitespace().collect();
+    if paths.is_empty() {
+        return Err("at least one file/fileset is required".to_string());
+    }
+
+    let mut tokens = vec!["file".to_string(), "untrack".to_string()];
+    tokens.extend(paths.into_iter().map(ToString::to_string));
+    Ok(tokens)
+}
+
+fn build_file_chmod_command(input: &str, default_revision: &str) -> Result<Vec<String>, String> {
+    let parts: Vec<String> = input.split_whitespace().map(ToString::to_string).collect();
+    if parts.len() < 2 {
+        return Err("use format: <mode> <path...> [--revision REVSET]".to_string());
+    }
+
+    let mut tokens = vec!["file".to_string(), "chmod".to_string()];
+    tokens.extend(parts.clone());
+    if !has_revision_flag(&parts) {
+        tokens.push("--revision".to_string());
+        tokens.push(default_revision.to_string());
+    }
     Ok(tokens)
 }
 
@@ -1249,15 +1334,17 @@ mod tests {
     #[test]
     fn adds_guided_operation_subcommand_flows() {
         match plan_command("operation show", selected()) {
-            FlowAction::Prompt(request) => {
-                assert_eq!(
-                    request.kind,
-                    PromptKind::OperationShow {
-                        default_operation: "@".to_string()
-                    }
-                );
+            FlowAction::Execute(tokens) => {
+                assert_eq!(tokens, vec!["operation".to_string(), "show".to_string()]);
             }
-            other => panic!("expected prompt, got {other:?}"),
+            other => panic!("expected execute, got {other:?}"),
+        }
+
+        match plan_command("operation diff", selected()) {
+            FlowAction::Execute(tokens) => {
+                assert_eq!(tokens, vec!["operation".to_string(), "diff".to_string()]);
+            }
+            other => panic!("expected execute, got {other:?}"),
         }
 
         match plan_command("operation restore", selected()) {
@@ -1411,27 +1498,6 @@ mod tests {
             ])
         );
 
-        let operation_show = PromptKind::OperationShow {
-            default_operation: "@".to_string(),
-        };
-        assert_eq!(
-            operation_show.to_tokens(""),
-            Ok(vec!["operation".to_string(), "show".to_string()])
-        );
-
-        let operation_diff = PromptKind::OperationDiff;
-        assert_eq!(
-            operation_diff.to_tokens("abcd efgh"),
-            Ok(vec![
-                "operation".to_string(),
-                "diff".to_string(),
-                "--from".to_string(),
-                "abcd".to_string(),
-                "--to".to_string(),
-                "efgh".to_string()
-            ])
-        );
-
         let operation_restore = PromptKind::OperationRestore;
         assert_eq!(
             operation_restore.to_tokens("abc123"),
@@ -1459,6 +1525,98 @@ mod tests {
                 "--name".to_string(),
                 "demo".to_string(),
                 "tmp/ws".to_string()
+            ])
+        );
+
+        let tag_set = PromptKind::TagSet {
+            default_revision: "abc12345".to_string(),
+        };
+        assert_eq!(
+            tag_set.to_tokens("v0.2.0"),
+            Ok(vec![
+                "tag".to_string(),
+                "set".to_string(),
+                "v0.2.0".to_string(),
+                "--revision".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_eq!(
+            tag_set.to_tokens("v0.2.0 main"),
+            Ok(vec![
+                "tag".to_string(),
+                "set".to_string(),
+                "v0.2.0".to_string(),
+                "--revision".to_string(),
+                "main".to_string()
+            ])
+        );
+        assert_eq!(
+            tag_set.to_tokens("v0.2.0 --revision release"),
+            Ok(vec![
+                "tag".to_string(),
+                "set".to_string(),
+                "v0.2.0".to_string(),
+                "--revision".to_string(),
+                "release".to_string()
+            ])
+        );
+
+        let tag_delete = PromptKind::TagDelete;
+        assert_eq!(
+            tag_delete.to_tokens("v0.1.0 v0.2.0"),
+            Ok(vec![
+                "tag".to_string(),
+                "delete".to_string(),
+                "v0.1.0".to_string(),
+                "v0.2.0".to_string()
+            ])
+        );
+
+        let file_track = PromptKind::FileTrack;
+        assert_eq!(
+            file_track.to_tokens("src/app.rs src/flows.rs"),
+            Ok(vec![
+                "file".to_string(),
+                "track".to_string(),
+                "src/app.rs".to_string(),
+                "src/flows.rs".to_string()
+            ])
+        );
+
+        let file_untrack = PromptKind::FileUntrack;
+        assert_eq!(
+            file_untrack.to_tokens("target/generated.txt"),
+            Ok(vec![
+                "file".to_string(),
+                "untrack".to_string(),
+                "target/generated.txt".to_string()
+            ])
+        );
+
+        let file_chmod = PromptKind::FileChmod {
+            default_revision: "abc12345".to_string(),
+        };
+        assert_eq!(
+            file_chmod.to_tokens("x scripts/deploy.sh"),
+            Ok(vec![
+                "file".to_string(),
+                "chmod".to_string(),
+                "x".to_string(),
+                "scripts/deploy.sh".to_string(),
+                "--revision".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_eq!(
+            file_chmod.to_tokens("n scripts/deploy.sh --revision @-"),
+            Ok(vec![
+                "file".to_string(),
+                "chmod".to_string(),
+                "n".to_string(),
+                "scripts/deploy.sh".to_string(),
+                "--revision".to_string(),
+                "@-".to_string()
             ])
         );
 
@@ -1564,6 +1722,76 @@ mod tests {
                 "v0.1.0".to_string()
             ])
         );
+    }
+
+    #[test]
+    fn adds_guided_tag_set_and_delete_flows() {
+        match plan_command("tag set", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::TagSet {
+                        default_revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("tag delete", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::TagDelete);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("tag s", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::TagSet {
+                        default_revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("tag d", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::TagDelete);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn adds_guided_file_track_and_untrack_flows() {
+        match plan_command("file track", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::FileTrack);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("file untrack", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::FileUntrack);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("file chmod", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::FileChmod {
+                        default_revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
     }
 
     #[test]

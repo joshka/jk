@@ -1,0 +1,13 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Tag Delete
+==========
+
+Summary: 2 output lines
+
+Deleted tag v0.1.0
+Deleted tag release-1
+
+Tip: run `tag list` to confirm removed tags

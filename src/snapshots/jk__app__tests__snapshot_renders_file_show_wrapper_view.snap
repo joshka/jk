@@ -1,0 +1,14 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+File Show
+=========
+
+Summary: 3 content lines
+
+fn main() {
+    println!("hi");
+}
+
+Tip: use `show`/`diff -r <rev>` to inspect surrounding change context

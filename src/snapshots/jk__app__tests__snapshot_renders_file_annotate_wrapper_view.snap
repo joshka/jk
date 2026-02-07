@@ -1,0 +1,13 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+File Annotate
+=============
+
+Summary: 2 annotated lines
+
+uxqqtlkq src/app.rs:1 use std::io;
+qtswpusn src/app.rs:2 fn main() {}
+
+Tip: pair with `show <rev>` to inspect the source revision details

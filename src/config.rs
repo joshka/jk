@@ -33,6 +33,9 @@ pub struct NormalKeys {
     pub status: Vec<KeyBinding>,
     pub operation_log: Vec<KeyBinding>,
     pub bookmark_list: Vec<KeyBinding>,
+    pub resolve_list: Vec<KeyBinding>,
+    pub file_list: Vec<KeyBinding>,
+    pub tag_list: Vec<KeyBinding>,
     pub root: Vec<KeyBinding>,
     pub repeat_last: Vec<KeyBinding>,
     pub toggle_patch: Vec<KeyBinding>,
@@ -96,6 +99,9 @@ struct RawNormal {
     status: Vec<String>,
     operation_log: Vec<String>,
     bookmark_list: Vec<String>,
+    resolve_list: Vec<String>,
+    file_list: Vec<String>,
+    tag_list: Vec<String>,
     root: Vec<String>,
     repeat_last: Vec<String>,
     toggle_patch: Vec<String>,
@@ -159,6 +165,9 @@ struct PartialNormal {
     status: Option<Vec<String>>,
     operation_log: Option<Vec<String>>,
     bookmark_list: Option<Vec<String>>,
+    resolve_list: Option<Vec<String>>,
+    file_list: Option<Vec<String>>,
+    tag_list: Option<Vec<String>>,
     root: Option<Vec<String>>,
     repeat_last: Option<Vec<String>>,
     toggle_patch: Option<Vec<String>>,
@@ -237,6 +246,9 @@ impl RawConfig {
                 status: parse_bindings(&self.normal.status)?,
                 operation_log: parse_bindings(&self.normal.operation_log)?,
                 bookmark_list: parse_bindings(&self.normal.bookmark_list)?,
+                resolve_list: parse_bindings(&self.normal.resolve_list)?,
+                file_list: parse_bindings(&self.normal.file_list)?,
+                tag_list: parse_bindings(&self.normal.tag_list)?,
                 root: parse_bindings(&self.normal.root)?,
                 repeat_last: parse_bindings(&self.normal.repeat_last)?,
                 toggle_patch: parse_bindings(&self.normal.toggle_patch)?,
@@ -342,6 +354,15 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         }
         if let Some(value) = normal.bookmark_list {
             base.normal.bookmark_list = value;
+        }
+        if let Some(value) = normal.resolve_list {
+            base.normal.resolve_list = value;
+        }
+        if let Some(value) = normal.file_list {
+            base.normal.file_list = value;
+        }
+        if let Some(value) = normal.tag_list {
+            base.normal.tag_list = value;
         }
         if let Some(value) = normal.root {
             base.normal.root = value;
@@ -470,6 +491,9 @@ mod tests {
         assert_eq!(config.normal.status, vec![KeyBinding::Char('s')]);
         assert_eq!(config.normal.operation_log, vec![KeyBinding::Char('o')]);
         assert_eq!(config.normal.bookmark_list, vec![KeyBinding::Char('L')]);
+        assert_eq!(config.normal.resolve_list, vec![KeyBinding::Char('v')]);
+        assert_eq!(config.normal.file_list, vec![KeyBinding::Char('f')]);
+        assert_eq!(config.normal.tag_list, vec![KeyBinding::Char('t')]);
         assert_eq!(config.normal.root, vec![KeyBinding::Char('w')]);
         assert_eq!(config.normal.repeat_last, vec![KeyBinding::Char('.')]);
         assert_eq!(config.normal.toggle_patch, vec![KeyBinding::Char('p')]);
@@ -505,6 +529,9 @@ mod tests {
         assert!(!config.normal.status.is_empty());
         assert!(!config.normal.operation_log.is_empty());
         assert!(!config.normal.bookmark_list.is_empty());
+        assert!(!config.normal.resolve_list.is_empty());
+        assert!(!config.normal.file_list.is_empty());
+        assert!(!config.normal.tag_list.is_empty());
         assert!(!config.normal.root.is_empty());
         assert!(!config.normal.repeat_last.is_empty());
         assert!(!config.normal.toggle_patch.is_empty());

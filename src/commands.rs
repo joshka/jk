@@ -104,7 +104,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "file",
-        mode: ExecutionMode::Passthrough,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::B,
     },
     CommandSpec {
@@ -234,7 +234,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "tag",
-        mode: ExecutionMode::Passthrough,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::B,
     },
     CommandSpec {
@@ -322,7 +322,7 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
         );
         lines.push("tips: use :aliases for mappings and :keys for active keybinds".to_string());
         lines.push(
-            "group defaults: bookmark/file/tag/workspace -> list, operation -> log".to_string(),
+            "group defaults: bookmark/file/tag/workspace -> list, resolve -> resolve -l, operation -> log".to_string(),
         );
     }
 

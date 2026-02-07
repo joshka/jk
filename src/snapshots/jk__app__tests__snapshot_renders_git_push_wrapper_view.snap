@@ -1,0 +1,13 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Git Push
+========
+
+Summary: 2 output lines
+
+Pushed bookmark main to origin
+Done.
+
+Tip: push stays confirm-gated with a dry-run preview when available

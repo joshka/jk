@@ -1,0 +1,15 @@
+---
+source: src/app.rs
+assertion_line: 2471
+expression: "rendered.join(\"\\n\")"
+---
+File List
+=========
+
+Summary: 3 files listed
+
+src/app.rs
+src/flows.rs
+README.md
+
+Tip: use `show`/`diff` with selection to inspect file-affecting revisions

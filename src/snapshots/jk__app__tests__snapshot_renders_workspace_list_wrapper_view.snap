@@ -1,0 +1,14 @@
+---
+source: src/app.rs
+assertion_line: 2338
+expression: "rendered.join(\"\\n\")"
+---
+Workspace List
+==============
+
+Summary: 2 workspaces listed
+
+default: qqrxwkpt c245343e feature workspace
+staging: abcdef12 release workspace
+
+Tip: use `workspace add/forget/rename` flows from normal mode or `:`

@@ -1,0 +1,21 @@
+---
+source: src/app.rs
+assertion_line: 2375
+expression: "rendered.join(\"\\n\")"
+---
+Operation Details
+=================
+
+Summary: operation 7699d9773e37
+
+7699d9773e37 user 41 seconds ago, lasted 19 milliseconds
+snapshot working copy
+
+Changed commits:
+○  + qqrxwkpt c245343e feature
+
+Changed working copy default@:
++ qqrxwkpt c245343e feature
+- qqrxwkpt/1 2fb0ae09 (hidden) feature
+
+Tip: operation restore/revert remain confirm-gated with previews

@@ -1,0 +1,13 @@
+---
+source: src/app.rs
+assertion_line: 2610
+expression: "rendered.join(\"\\n\")"
+---
+Resolve List
+============
+
+Summary: no conflicts listed
+
+Error: No conflicts found at this revision
+
+Tip: run `resolve <path>` to open a merge tool for specific conflicts

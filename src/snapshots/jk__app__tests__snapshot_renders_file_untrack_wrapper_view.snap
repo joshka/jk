@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+File Untrack
+============
+
+Summary: 1 output line
+
+Stopped tracking target/generated.txt
+
+Tip: ensure paths are ignored before untracking and confirm with `status`

@@ -215,6 +215,21 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.resolve_list, key) {
+            self.execute_command_line("resolve -l")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.file_list, key) {
+            self.execute_command_line("file list")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.tag_list, key) {
+            self.execute_command_line("tag list")?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.root, key) {
             self.execute_command_line("root")?;
             return Ok(());
@@ -1080,11 +1095,57 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("show") => render_show_view(output),
         Some("diff") => render_diff_view(output),
         Some("root") => render_root_view(output),
+        Some("resolve") if has_resolve_list_flag(command) => render_resolve_list_view(output),
+        Some("file") if matches!(command.get(1).map(String::as_str), Some("list")) => {
+            render_file_list_view(output)
+        }
+        Some("file") if matches!(command.get(1).map(String::as_str), Some("show")) => {
+            render_file_show_view(output)
+        }
+        Some("file") if matches!(command.get(1).map(String::as_str), Some("search")) => {
+            render_file_search_view(output)
+        }
+        Some("file") if matches!(command.get(1).map(String::as_str), Some("annotate")) => {
+            render_file_annotate_view(output)
+        }
+        Some("file") if matches!(command.get(1).map(String::as_str), Some("track")) => {
+            render_file_track_view(output)
+        }
+        Some("file") if matches!(command.get(1).map(String::as_str), Some("untrack")) => {
+            render_file_untrack_view(output)
+        }
+        Some("file") if matches!(command.get(1).map(String::as_str), Some("chmod")) => {
+            render_file_chmod_view(output)
+        }
+        Some("tag") if matches!(command.get(1).map(String::as_str), Some("list")) => {
+            render_tag_list_view(output)
+        }
+        Some("tag") if matches!(command.get(1).map(String::as_str), Some("set")) => {
+            render_tag_set_view(output)
+        }
+        Some("tag") if matches!(command.get(1).map(String::as_str), Some("delete")) => {
+            render_tag_delete_view(output)
+        }
+        Some("workspace") if matches!(command.get(1).map(String::as_str), Some("list")) => {
+            render_workspace_list_view(output)
+        }
         Some("workspace") if matches!(command.get(1).map(String::as_str), Some("root")) => {
             render_root_view(output)
         }
+        Some("git") if matches!(command.get(1).map(String::as_str), Some("fetch")) => {
+            render_git_fetch_view(output)
+        }
+        Some("git") if matches!(command.get(1).map(String::as_str), Some("push")) => {
+            render_git_push_view(output)
+        }
         Some("bookmark") if matches!(command.get(1).map(String::as_str), Some("list")) => {
             render_bookmark_list_view(output)
+        }
+        Some("operation") if matches!(command.get(1).map(String::as_str), Some("diff")) => {
+            render_operation_diff_view(output)
+        }
+        Some("operation") if matches!(command.get(1).map(String::as_str), Some("show")) => {
+            render_operation_show_view(output)
         }
         Some("operation") if matches!(command.get(1).map(String::as_str), Some("log")) => {
             render_operation_log_view(output)
@@ -1276,7 +1337,7 @@ fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>) -> Vec<Str
         .filter(|value| !value.is_empty())
         .map(str::to_ascii_lowercase);
 
-    let entries: [(&str, &Vec<KeyBinding>); 44] = [
+    let entries: [(&str, &Vec<KeyBinding>); 47] = [
         ("normal.quit", &config.normal.quit),
         ("normal.refresh", &config.normal.refresh),
         ("normal.up", &config.normal.up),
@@ -1292,6 +1353,9 @@ fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>) -> Vec<Str
         ("normal.status", &config.normal.status),
         ("normal.operation_log", &config.normal.operation_log),
         ("normal.bookmark_list", &config.normal.bookmark_list),
+        ("normal.resolve_list", &config.normal.resolve_list),
+        ("normal.file_list", &config.normal.file_list),
+        ("normal.tag_list", &config.normal.tag_list),
         ("normal.root", &config.normal.root),
         ("normal.repeat_last", &config.normal.repeat_last),
         ("normal.toggle_patch", &config.normal.toggle_patch),
@@ -1391,6 +1455,470 @@ fn render_root_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+fn render_resolve_list_view(lines: Vec<String>) -> Vec<String> {
+    let mut body_lines = Vec::new();
+    let mut conflict_count = 0usize;
+    let mut saw_no_conflicts = false;
+
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed == "(no output)" {
+            continue;
+        }
+
+        if trimmed.contains("No conflicts found") {
+            saw_no_conflicts = true;
+        } else if !trimmed.starts_with("Error:") && !trimmed.starts_with("Hint:") {
+            conflict_count += 1;
+        }
+
+        body_lines.push(trimmed.to_string());
+    }
+
+    let summary = if saw_no_conflicts || conflict_count == 0 {
+        "Summary: no conflicts listed".to_string()
+    } else {
+        format!(
+            "Summary: {conflict_count} conflicted path{} listed",
+            plural_suffix(conflict_count)
+        )
+    };
+
+    let mut rendered = vec![
+        "Resolve List".to_string(),
+        "============".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if body_lines.is_empty() {
+        rendered.push("(no conflicts found)".to_string());
+    } else {
+        rendered.extend(body_lines);
+    }
+
+    rendered.push(String::new());
+    rendered
+        .push("Tip: run `resolve <path>` to open a merge tool for specific conflicts".to_string());
+    rendered
+}
+
+fn has_resolve_list_flag(command: &[String]) -> bool {
+    command
+        .iter()
+        .any(|token| token == "-l" || token == "--list")
+}
+
+fn render_file_list_view(lines: Vec<String>) -> Vec<String> {
+    let file_lines: Vec<String> = lines
+        .into_iter()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && trimmed != "(no output)"
+        })
+        .collect();
+    let file_count = file_lines.len();
+
+    let mut rendered = vec![
+        "File List".to_string(),
+        "=========".to_string(),
+        String::new(),
+        format!(
+            "Summary: {file_count} file{} listed",
+            plural_suffix(file_count)
+        ),
+        String::new(),
+    ];
+
+    if file_count == 0 {
+        rendered.push("(no files listed)".to_string());
+    } else {
+        rendered.extend(file_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push(
+        "Tip: use `show`/`diff` with selection to inspect file-affecting revisions".to_string(),
+    );
+    rendered
+}
+
+fn render_file_show_view(lines: Vec<String>) -> Vec<String> {
+    let mut content_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .collect();
+    if content_lines.len() == 1 && content_lines[0].trim() == "(no output)" {
+        content_lines.clear();
+    }
+
+    let line_count = content_lines.len();
+    let mut rendered = vec![
+        "File Show".to_string(),
+        "=========".to_string(),
+        String::new(),
+        format!(
+            "Summary: {line_count} content line{}",
+            plural_suffix(line_count)
+        ),
+        String::new(),
+    ];
+
+    if content_lines.is_empty() {
+        rendered.push("(no file content shown)".to_string());
+    } else {
+        rendered.extend(content_lines);
+    }
+
+    rendered.push(String::new());
+    rendered
+        .push("Tip: use `show`/`diff -r <rev>` to inspect surrounding change context".to_string());
+    rendered
+}
+
+fn render_file_search_view(lines: Vec<String>) -> Vec<String> {
+    let match_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let match_count = match_lines.len();
+
+    let mut rendered = vec![
+        "File Search".to_string(),
+        "===========".to_string(),
+        String::new(),
+        format!(
+            "Summary: {match_count} match line{}",
+            plural_suffix(match_count)
+        ),
+        String::new(),
+    ];
+
+    if match_lines.is_empty() {
+        rendered.push("(no matches found)".to_string());
+    } else {
+        rendered.extend(match_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: refine search patterns with additional terms or regex options".to_string());
+    rendered
+}
+
+fn render_file_annotate_view(lines: Vec<String>) -> Vec<String> {
+    let annotation_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let annotation_count = annotation_lines.len();
+
+    let mut rendered = vec![
+        "File Annotate".to_string(),
+        "=============".to_string(),
+        String::new(),
+        format!(
+            "Summary: {annotation_count} annotated line{}",
+            plural_suffix(annotation_count)
+        ),
+        String::new(),
+    ];
+
+    if annotation_lines.is_empty() {
+        rendered.push("(no annotation output)".to_string());
+    } else {
+        rendered.extend(annotation_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: pair with `show <rev>` to inspect the source revision details".to_string());
+    rendered
+}
+
+fn render_file_track_view(lines: Vec<String>) -> Vec<String> {
+    render_file_mutation_view(
+        "File Track",
+        "==========",
+        lines,
+        "Tip: review tracked paths with `file list` and verify with `status`",
+    )
+}
+
+fn render_file_untrack_view(lines: Vec<String>) -> Vec<String> {
+    render_file_mutation_view(
+        "File Untrack",
+        "============",
+        lines,
+        "Tip: ensure paths are ignored before untracking and confirm with `status`",
+    )
+}
+
+fn render_file_chmod_view(lines: Vec<String>) -> Vec<String> {
+    render_file_mutation_view(
+        "File Chmod",
+        "==========",
+        lines,
+        "Tip: run `file show` or `diff` to verify executable-bit updates",
+    )
+}
+
+fn render_file_mutation_view(
+    title: &str,
+    underline: &str,
+    lines: Vec<String>,
+    tip: &str,
+) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let detail_count = detail_lines.len();
+
+    let summary = if detail_count == 0 {
+        "Summary: command completed with no output".to_string()
+    } else {
+        format!(
+            "Summary: {detail_count} output line{}",
+            plural_suffix(detail_count)
+        )
+    };
+
+    let mut rendered = vec![
+        title.to_string(),
+        underline.to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push(tip.to_string());
+    rendered
+}
+
+fn render_tag_list_view(lines: Vec<String>) -> Vec<String> {
+    let tag_lines: Vec<String> = lines
+        .into_iter()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && trimmed != "(no output)"
+        })
+        .collect();
+    let tag_count = tag_lines.len();
+
+    let mut rendered = vec![
+        "Tag List".to_string(),
+        "========".to_string(),
+        String::new(),
+        format!(
+            "Summary: {tag_count} tag{} listed",
+            plural_suffix(tag_count)
+        ),
+        String::new(),
+    ];
+
+    if tag_count == 0 {
+        rendered.push("(no tags listed)".to_string());
+    } else {
+        rendered.extend(tag_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push(
+        "Tip: use `tag create` and `tag forget` from command mode for tag updates".to_string(),
+    );
+    rendered
+}
+
+fn render_tag_set_view(lines: Vec<String>) -> Vec<String> {
+    render_tag_mutation_view(
+        "Tag Set",
+        "=======",
+        lines,
+        "Tip: run `tag list` to confirm updated tag targets",
+    )
+}
+
+fn render_tag_delete_view(lines: Vec<String>) -> Vec<String> {
+    render_tag_mutation_view(
+        "Tag Delete",
+        "==========",
+        lines,
+        "Tip: run `tag list` to confirm removed tags",
+    )
+}
+
+fn render_tag_mutation_view(
+    title: &str,
+    underline: &str,
+    lines: Vec<String>,
+    tip: &str,
+) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let detail_count = detail_lines.len();
+
+    let summary = if detail_count == 0 {
+        "Summary: command completed with no output".to_string()
+    } else {
+        format!(
+            "Summary: {detail_count} output line{}",
+            plural_suffix(detail_count)
+        )
+    };
+
+    let mut rendered = vec![
+        title.to_string(),
+        underline.to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push(tip.to_string());
+    rendered
+}
+
+fn render_workspace_list_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut workspace_lines = Vec::new();
+    let mut workspace_count = 0usize;
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if line.contains(':') {
+            workspace_count += 1;
+        }
+        workspace_lines.push(line);
+    }
+
+    let mut rendered = vec![
+        "Workspace List".to_string(),
+        "==============".to_string(),
+        String::new(),
+        format!(
+            "Summary: {workspace_count} workspace{} listed",
+            plural_suffix(workspace_count)
+        ),
+        String::new(),
+    ];
+    rendered.extend(workspace_lines);
+    rendered.push(String::new());
+    rendered
+        .push("Tip: use `workspace add/forget/rename` flows from normal mode or `:`".to_string());
+    rendered
+}
+
+fn render_git_fetch_view(lines: Vec<String>) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+
+    let summary = if detail_lines
+        .iter()
+        .any(|line| line.contains("Nothing changed"))
+    {
+        "Summary: no remote updates fetched".to_string()
+    } else if detail_lines.is_empty() {
+        "Summary: fetch completed with no output".to_string()
+    } else {
+        format!(
+            "Summary: {} output line{}",
+            detail_lines.len(),
+            plural_suffix(detail_lines.len())
+        )
+    };
+
+    let mut rendered = vec![
+        "Git Fetch".to_string(),
+        "=========".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: run `log` or `status` to inspect fetched changes".to_string());
+    rendered
+}
+
+fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+
+    let summary = if detail_lines
+        .iter()
+        .any(|line| line.contains("Nothing changed"))
+    {
+        "Summary: no bookmark updates pushed".to_string()
+    } else if detail_lines.is_empty() {
+        "Summary: push completed with no output".to_string()
+    } else {
+        format!(
+            "Summary: {} output line{}",
+            detail_lines.len(),
+            plural_suffix(detail_lines.len())
+        )
+    };
+
+    let mut rendered = vec![
+        "Git Push".to_string(),
+        "========".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered
+        .push("Tip: push stays confirm-gated with a dry-run preview when available".to_string());
+    rendered
+}
+
 fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -1404,6 +1932,103 @@ fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
     rendered.extend(lines);
     rendered.push(String::new());
     rendered.push("Tip: use `bookmark set/move/track` flows from normal mode or `:`".to_string());
+    rendered
+}
+
+fn render_operation_show_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut detail_lines: Vec<String> = Vec::new();
+    for raw_line in lines {
+        let line = raw_line.trim_end().to_string();
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        if line.ends_with(':')
+            && matches!(detail_lines.last(), Some(previous) if !previous.is_empty())
+        {
+            detail_lines.push(String::new());
+        }
+
+        detail_lines.push(line);
+    }
+
+    while matches!(detail_lines.last(), Some(previous) if previous.is_empty()) {
+        detail_lines.pop();
+    }
+
+    let operation_id = detail_lines
+        .first()
+        .and_then(|line| line.split_whitespace().next())
+        .unwrap_or("@");
+
+    let mut rendered = vec![
+        "Operation Details".to_string(),
+        "=================".to_string(),
+        String::new(),
+        format!("Summary: operation {operation_id}"),
+        String::new(),
+    ];
+    rendered.extend(detail_lines);
+    rendered.push(String::new());
+    rendered.push("Tip: operation restore/revert remain confirm-gated with previews".to_string());
+    rendered
+}
+
+fn render_operation_diff_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut detail_lines: Vec<String> = Vec::new();
+    let mut commit_count = 0usize;
+
+    for raw_line in lines {
+        let line = raw_line.trim_end().to_string();
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        if is_operation_entry_header(&line) {
+            commit_count += 1;
+        }
+
+        if line.ends_with(':')
+            && matches!(detail_lines.last(), Some(previous) if !previous.is_empty())
+        {
+            detail_lines.push(String::new());
+        }
+
+        detail_lines.push(line);
+    }
+
+    while matches!(detail_lines.last(), Some(previous) if previous.is_empty()) {
+        detail_lines.pop();
+    }
+
+    let summary = if commit_count == 0 {
+        "Summary: operation delta shown".to_string()
+    } else {
+        format!(
+            "Summary: {commit_count} changed commit entr{} shown",
+            if commit_count == 1 { "y" } else { "ies" }
+        )
+    };
+
+    let mut rendered = vec![
+        "Operation Diff".to_string(),
+        "==============".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+    rendered.extend(detail_lines);
+    rendered.push(String::new());
+    rendered
+        .push("Tip: use operation show/restore/revert for deeper operation workflows".to_string());
     rendered
 }
 
@@ -1509,8 +2134,13 @@ mod tests {
         App, Mode, build_row_revision_map, confirmation_preview_tokens, decorate_command_output,
         extract_revision, is_change_id, is_commit_id, is_dangerous, keymap_overview_lines,
         looks_like_graph_commit_row, metadata_log_tokens, render_bookmark_list_view,
-        render_diff_view, render_operation_log_view, render_root_view, render_show_view,
-        render_status_view, startup_action, toggle_patch_flag,
+        render_diff_view, render_file_annotate_view, render_file_chmod_view, render_file_list_view,
+        render_file_search_view, render_file_show_view, render_file_track_view,
+        render_file_untrack_view, render_git_fetch_view, render_git_push_view,
+        render_operation_diff_view, render_operation_log_view, render_operation_show_view,
+        render_resolve_list_view, render_root_view, render_show_view, render_status_view,
+        render_tag_delete_view, render_tag_list_view, render_tag_set_view,
+        render_workspace_list_view, startup_action, toggle_patch_flag,
     };
 
     #[test]
@@ -1674,6 +2304,21 @@ mod tests {
         assert_eq!(app.status_line, "Showing keymap".to_string());
         assert!(app.lines.iter().any(|line| line.contains("jk keymap")));
         assert!(app.lines.iter().any(|line| line.contains("normal.push")));
+        assert!(
+            app.lines
+                .iter()
+                .any(|line| line.contains("normal.file_list"))
+        );
+        assert!(
+            app.lines
+                .iter()
+                .any(|line| line.contains("normal.resolve_list"))
+        );
+        assert!(
+            app.lines
+                .iter()
+                .any(|line| line.contains("normal.tag_list"))
+        );
     }
 
     #[test]
@@ -2083,6 +2728,388 @@ mod tests {
     }
 
     #[test]
+    fn renders_resolve_list_view_with_no_conflicts_summary() {
+        let rendered = render_resolve_list_view(vec![
+            "Error: No conflicts found at this revision".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Resolve List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: no conflicts listed"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("No conflicts found at this revision"))
+        );
+    }
+
+    #[test]
+    fn renders_resolve_list_view_with_conflict_count() {
+        let rendered =
+            render_resolve_list_view(vec!["src/app.rs".to_string(), "src/flows.rs".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"Resolve List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 conflicted paths listed"))
+        );
+        assert!(rendered.iter().any(|line| line == "src/app.rs"));
+    }
+
+    #[test]
+    fn decorates_resolve_list_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["resolve".to_string(), "-l".to_string()],
+            vec!["Error: No conflicts found at this revision".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Resolve List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: no conflicts listed"))
+        );
+    }
+
+    #[test]
+    fn renders_file_list_view_with_summary_and_tip() {
+        let rendered =
+            render_file_list_view(vec!["src/app.rs".to_string(), "src/flows.rs".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"File List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 files listed"))
+        );
+        assert!(rendered.iter().any(|line| line == "src/app.rs"));
+        assert!(rendered.iter().any(|line| line.contains("show`/`diff")));
+    }
+
+    #[test]
+    fn renders_file_show_view_with_summary_and_tip() {
+        let rendered = render_file_show_view(vec![
+            "fn main() {".to_string(),
+            String::new(),
+            "}".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"File Show".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 3 content lines"))
+        );
+        assert!(rendered.iter().any(|line| line == "fn main() {"));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("surrounding change context"))
+        );
+    }
+
+    #[test]
+    fn renders_file_search_view_with_summary_and_tip() {
+        let rendered = render_file_search_view(vec![
+            "src/app.rs:120:render_status_view".to_string(),
+            "src/flows.rs:88:plan_command".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"File Search".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 match lines"))
+        );
+        assert!(rendered.iter().any(|line| line.contains("src/app.rs:120")));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("refine search patterns"))
+        );
+    }
+
+    #[test]
+    fn renders_file_annotate_view_with_summary_and_tip() {
+        let rendered = render_file_annotate_view(vec![
+            "uxqqtlkq src/app.rs:1 use std::io;".to_string(),
+            "qtswpusn src/app.rs:2 fn main() {}".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"File Annotate".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 annotated lines"))
+        );
+        assert!(rendered.iter().any(|line| line.contains("src/app.rs:1")));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("source revision details"))
+        );
+    }
+
+    #[test]
+    fn renders_file_track_view_with_summary_and_tip() {
+        let rendered = render_file_track_view(vec![
+            "Started tracking 2 paths".to_string(),
+            "src/new.rs".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"File Track".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 output lines"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("review tracked paths"))
+        );
+    }
+
+    #[test]
+    fn renders_file_untrack_view_with_summary_and_tip() {
+        let rendered =
+            render_file_untrack_view(vec!["Stopped tracking target/generated.txt".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"File Untrack".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("ensure paths are ignored"))
+        );
+    }
+
+    #[test]
+    fn renders_file_chmod_view_with_summary_and_tip() {
+        let rendered = render_file_chmod_view(vec![
+            "Updated mode to executable for scripts/deploy.sh".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"File Chmod".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("verify executable-bit updates"))
+        );
+    }
+
+    #[test]
+    fn renders_tag_list_view_with_empty_state() {
+        let rendered = render_tag_list_view(vec!["(no output)".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"Tag List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 0 tags listed"))
+        );
+        assert!(rendered.iter().any(|line| line == "(no tags listed)"));
+    }
+
+    #[test]
+    fn renders_tag_set_view_with_summary_and_tip() {
+        let rendered =
+            render_tag_set_view(vec!["Created tag v0.2.0 pointing to abc12345".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"Tag Set".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("confirm updated tag targets"))
+        );
+    }
+
+    #[test]
+    fn renders_tag_delete_view_with_summary_and_tip() {
+        let rendered = render_tag_delete_view(vec!["Deleted tag v0.1.0".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"Tag Delete".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("confirm removed tags"))
+        );
+    }
+
+    #[test]
+    fn decorates_file_list_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["file".to_string(), "list".to_string()],
+            vec!["src/main.rs".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"File List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 file listed"))
+        );
+    }
+
+    #[test]
+    fn decorates_file_show_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["file".to_string(), "show".to_string()],
+            vec!["fn main() {}".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"File Show".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 content line"))
+        );
+    }
+
+    #[test]
+    fn decorates_file_search_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["file".to_string(), "search".to_string()],
+            vec!["src/app.rs:1:fn main()".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"File Search".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 match line"))
+        );
+    }
+
+    #[test]
+    fn decorates_file_annotate_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["file".to_string(), "annotate".to_string()],
+            vec!["uxqqtlkq src/app.rs:1 use std::io;".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"File Annotate".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 annotated line"))
+        );
+    }
+
+    #[test]
+    fn decorates_file_track_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["file".to_string(), "track".to_string()],
+            vec!["Started tracking src/new.rs".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"File Track".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn decorates_file_untrack_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["file".to_string(), "untrack".to_string()],
+            vec!["Stopped tracking target/generated.txt".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"File Untrack".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn decorates_file_chmod_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["file".to_string(), "chmod".to_string()],
+            vec!["Updated mode for scripts/deploy.sh".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"File Chmod".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn decorates_tag_list_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["tag".to_string(), "list".to_string()],
+            vec!["v0.1.0: abcdef12".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Tag List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 tag listed"))
+        );
+    }
+
+    #[test]
+    fn decorates_tag_set_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["tag".to_string(), "set".to_string()],
+            vec!["Created tag v0.2.0".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Tag Set".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn decorates_tag_delete_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["tag".to_string(), "delete".to_string()],
+            vec!["Deleted tag v0.1.0".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Tag Delete".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
     fn decorates_workspace_root_output_with_root_wrapper() {
         let rendered = decorate_command_output(
             &["workspace".to_string(), "root".to_string()],
@@ -2091,6 +3118,116 @@ mod tests {
 
         assert_eq!(rendered.first(), Some(&"Workspace Root".to_string()));
         assert!(rendered.iter().any(|line| line == "/Users/joshka/local/jk"));
+    }
+
+    #[test]
+    fn renders_workspace_list_view_with_summary_and_tip() {
+        let rendered = render_workspace_list_view(vec![
+            "default: abcdef12 main workspace".to_string(),
+            "staging: 0123abcd staging workspace".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Workspace List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 workspaces listed"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line == "default: abcdef12 main workspace")
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("workspace add/forget/rename"))
+        );
+    }
+
+    #[test]
+    fn decorates_workspace_list_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["workspace".to_string(), "list".to_string()],
+            vec!["default: abcdef12 main workspace".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Workspace List".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 workspace listed"))
+        );
+    }
+
+    #[test]
+    fn renders_git_fetch_view_with_summary_and_tip() {
+        let rendered = render_git_fetch_view(vec![
+            "Nothing changed.".to_string(),
+            "Hint: use -b to fetch bookmarks".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Git Fetch".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: no remote updates fetched"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("run `log` or `status`"))
+        );
+    }
+
+    #[test]
+    fn renders_git_push_view_with_summary_and_tip() {
+        let rendered = render_git_push_view(vec![
+            "Pushed bookmark main to origin".to_string(),
+            "Done.".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Git Push".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 output lines"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("confirm-gated with a dry-run preview"))
+        );
+    }
+
+    #[test]
+    fn decorates_git_fetch_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["git".to_string(), "fetch".to_string()],
+            vec!["Nothing changed.".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Git Fetch".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: no remote updates fetched"))
+        );
+    }
+
+    #[test]
+    fn decorates_git_push_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["git".to_string(), "push".to_string()],
+            vec!["Pushed bookmark main to origin".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Git Push".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
     }
 
     #[test]
@@ -2135,6 +3272,91 @@ mod tests {
     }
 
     #[test]
+    fn renders_operation_show_view_with_header_and_tip() {
+        let rendered = render_operation_show_view(vec![
+            "7699d9773e37 user 41 seconds ago, lasted 19 milliseconds".to_string(),
+            "snapshot working copy".to_string(),
+            "Changed commits:".to_string(),
+            "○  + qqrxwkpt c245343e feat(help): surface local views".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Operation Details".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: operation 7699d9773e37"))
+        );
+        assert!(rendered.iter().any(|line| line == "Changed commits:"));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("operation restore/revert remain confirm-gated"))
+        );
+    }
+
+    #[test]
+    fn renders_operation_diff_view_with_header_and_summary() {
+        let rendered = render_operation_diff_view(vec![
+            "From operation: abc123 (2026-02-07) describe commit old".to_string(),
+            "  To operation: def456 (2026-02-07) describe commit new".to_string(),
+            "Changed commits:".to_string(),
+            "○  + uxqqtlkq 722c112d feat(ux): expand read-mode wrappers and shortcuts".to_string(),
+            "Changed working copy default@:".to_string(),
+            "+ uxqqtlkq 722c112d feat(ux): expand read-mode wrappers and shortcuts".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Operation Diff".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 changed commit entry shown"))
+        );
+        assert!(rendered.iter().any(|line| line == "Changed commits:"));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("operation show/restore/revert"))
+        );
+    }
+
+    #[test]
+    fn decorates_operation_diff_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["operation".to_string(), "diff".to_string()],
+            vec![
+                "From operation: abc123 (2026-02-07) describe commit old".to_string(),
+                "Changed commits:".to_string(),
+                "○  + uxqqtlkq 722c112d feature".to_string(),
+            ],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Operation Diff".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 changed commit entry shown"))
+        );
+    }
+
+    #[test]
+    fn decorates_operation_show_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["operation".to_string(), "show".to_string()],
+            vec![
+                "7699d9773e37 user 41 seconds ago, lasted 19 milliseconds".to_string(),
+                "snapshot working copy".to_string(),
+            ],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Operation Details".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: operation 7699d9773e37"))
+        );
+    }
+
+    #[test]
     fn inserts_spacing_between_operation_entries() {
         let rendered = render_operation_log_view(vec![
             "@  fac974146f86 user 5 seconds ago".to_string(),
@@ -2165,6 +3387,85 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_file_list_wrapper_view() {
+        let rendered = render_file_list_view(vec![
+            "src/app.rs".to_string(),
+            "src/flows.rs".to_string(),
+            "README.md".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_file_show_wrapper_view() {
+        let rendered = render_file_show_view(vec![
+            "fn main() {".to_string(),
+            "    println!(\"hi\");".to_string(),
+            "}".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_file_search_wrapper_view() {
+        let rendered = render_file_search_view(vec![
+            "src/app.rs:627:decorate_command_output".to_string(),
+            "src/flows.rs:264:plan_command".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_file_annotate_wrapper_view() {
+        let rendered = render_file_annotate_view(vec![
+            "uxqqtlkq src/app.rs:1 use std::io;".to_string(),
+            "qtswpusn src/app.rs:2 fn main() {}".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_file_track_wrapper_view() {
+        let rendered = render_file_track_view(vec![
+            "Started tracking 2 paths".to_string(),
+            "src/new.rs".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_file_untrack_wrapper_view() {
+        let rendered =
+            render_file_untrack_view(vec!["Stopped tracking target/generated.txt".to_string()]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_file_chmod_wrapper_view() {
+        let rendered = render_file_chmod_view(vec![
+            "Updated mode to executable for scripts/deploy.sh".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_resolve_list_wrapper_view() {
+        let rendered = render_resolve_list_view(vec![
+            "Error: No conflicts found at this revision".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_workspace_list_wrapper_view() {
+        let rendered = render_workspace_list_view(vec![
+            "default: qqrxwkpt c245343e feature workspace".to_string(),
+            "staging: abcdef12 release workspace".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_status_wrapper_view() {
         let rendered = render_status_view(vec![
             "Working copy changes:".to_string(),
@@ -2183,6 +3484,77 @@ mod tests {
         let rendered = render_operation_log_view(vec![
             "@  fac974146f86 user 5 seconds ago".to_string(),
             "│  snapshot working copy".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_operation_show_wrapper_view() {
+        let rendered = render_operation_show_view(vec![
+            "7699d9773e37 user 41 seconds ago, lasted 19 milliseconds".to_string(),
+            "snapshot working copy".to_string(),
+            "Changed commits:".to_string(),
+            "○  + qqrxwkpt c245343e feature".to_string(),
+            "Changed working copy default@:".to_string(),
+            "+ qqrxwkpt c245343e feature".to_string(),
+            "- qqrxwkpt/1 2fb0ae09 (hidden) feature".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_operation_diff_wrapper_view() {
+        let rendered = render_operation_diff_view(vec![
+            "From operation: 67d547b627fb (2026-02-07) describe commit old".to_string(),
+            "  To operation: 3c63d5e89db3 (2026-02-07) describe commit new".to_string(),
+            "Changed commits:".to_string(),
+            "○  + uxqqtlkq 722c112d feat(ux): expand read-mode wrappers and shortcuts".to_string(),
+            "   - uxqqtlkq/1 f8cbf93c (hidden) feat(ux): expand read-mode wrappers and shortcuts"
+                .to_string(),
+            "Changed working copy default@:".to_string(),
+            "+ uxqqtlkq 722c112d feat(ux): expand read-mode wrappers and shortcuts".to_string(),
+            "- uxqqtlkq/1 f8cbf93c (hidden) feat(ux): expand read-mode wrappers and shortcuts"
+                .to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_git_fetch_wrapper_view() {
+        let rendered = render_git_fetch_view(vec![
+            "Nothing changed.".to_string(),
+            "Hint: use -b to fetch bookmarks".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_git_push_wrapper_view() {
+        let rendered = render_git_push_view(vec![
+            "Pushed bookmark main to origin".to_string(),
+            "Done.".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_tag_list_wrapper_view() {
+        let rendered = render_tag_list_view(vec!["(no output)".to_string()]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_tag_set_wrapper_view() {
+        let rendered =
+            render_tag_set_view(vec!["Created tag v0.2.0 pointing to abc12345".to_string()]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_tag_delete_wrapper_view() {
+        let rendered = render_tag_delete_view(vec![
+            "Deleted tag v0.1.0".to_string(),
+            "Deleted tag release-1".to_string(),
         ]);
         insta::assert_snapshot!(rendered.join("\n"));
     }
@@ -2447,6 +3819,57 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("Bookmark List"))
                 || bookmark_list_app.lines == vec!["(no output)".to_string()]
+        );
+
+        let mut resolve_list_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        resolve_list_app
+            .handle_key(KeyEvent::from(KeyCode::Char('v')))
+            .expect("resolve-list shortcut should be handled");
+        assert_eq!(resolve_list_app.mode, Mode::Normal);
+        assert_eq!(
+            resolve_list_app.last_command,
+            vec!["resolve".to_string(), "-l".to_string()]
+        );
+        assert!(
+            resolve_list_app
+                .lines
+                .iter()
+                .any(|line| line.contains("Resolve List"))
+        );
+
+        let mut file_list_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        file_list_app
+            .handle_key(KeyEvent::from(KeyCode::Char('f')))
+            .expect("file-list shortcut should be handled");
+        assert_eq!(file_list_app.mode, Mode::Normal);
+        assert_eq!(
+            file_list_app.last_command,
+            vec!["file".to_string(), "list".to_string()]
+        );
+        assert!(
+            file_list_app
+                .lines
+                .iter()
+                .any(|line| line.contains("File List"))
+        );
+
+        let mut tag_list_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        tag_list_app
+            .handle_key(KeyEvent::from(KeyCode::Char('t')))
+            .expect("tag-list shortcut should be handled");
+        assert_eq!(tag_list_app.mode, Mode::Normal);
+        assert_eq!(
+            tag_list_app.last_command,
+            vec!["tag".to_string(), "list".to_string()]
+        );
+        assert!(
+            tag_list_app
+                .lines
+                .iter()
+                .any(|line| line.contains("Tag List"))
         );
 
         let mut root_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
