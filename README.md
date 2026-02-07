@@ -70,6 +70,8 @@ This repository is in active development. The current baseline includes:
 - Top-level mutation commands (`new`, `describe`, `commit`, `edit`, `next`, `prev`, `rebase`,
   `squash`, `split`, `abandon`, `undo`, `redo`, `restore`, `revert`) now render with native
   post-action wrappers and command-specific follow-up tips.
+  - these wrappers now prefer signal-first summaries (for example `Rebased N commits` or
+    `Undid operation ...`) and fall back to output-line counts when no signal line is present.
 - `resolve -l` now uses a native wrapper with conflict-count or no-conflicts summary.
 - `operation diff` now uses a native wrapper with compact changed-commit summary.
 - `operation restore` and `operation revert` now render with native mutation wrappers after

@@ -63,6 +63,7 @@
   - added `insta` snapshots for `bookmark set`, `workspace add`, and `operation restore` wrappers
   - added `insta` snapshots for top-level `commit` and `rebase` wrapper views
   - added broad top-level mutation wrapper regression coverage plus command-specific tip assertions
+  - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing
@@ -78,11 +79,15 @@
   - `bookmark`, `workspace`, and `operation restore/revert` mutation wrappers now include compact
     summaries and follow-up verification tips
   - top-level daily/rewrite mutation wrappers now include command-specific follow-up tips
+  - top-level mutation wrappers now prefer signal-first summary lines (for example rebase/undo
+    action output) before falling back to generic output counts
   - command-safety mapping now marks read-only `file`/`tag` subcommands as Tier `A`
   - command-safety mapping now marks `resolve -l` as Tier `A`
 
 ## Recent commit stack
 
+- `feat(view): add mutation summary heuristics` (`change: lvxysqknvsxt`)
+- `test(view): broaden mutation wrapper coverage` (`change: pkvvwklrwnso`)
 - `feat(view): wrap mutation outputs` (`change: tpqrulwsxpvr`)
 - `feat(ux): expand read-mode wrappers and shortcuts` (`change: srzlwxtxtkll`)
 - `fix(alias): preserve explicit destinations and parity` (`change: uxqqtlkqotxq`)
@@ -103,7 +108,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (153 passed)
+  - `cargo test` (155 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

@@ -5,7 +5,7 @@ expression: "rendered.join(\"\\n\")"
 Rebase Result
 =============
 
-Summary: 1 output line
+Summary: Rebased 3 commits onto 0123abcd
 
 Rebased 3 commits onto 0123abcd
 

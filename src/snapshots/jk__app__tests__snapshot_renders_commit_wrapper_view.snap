@@ -5,7 +5,7 @@ expression: "rendered.join(\"\\n\")"
 Commit Result
 =============
 
-Summary: 1 output line
+Summary: Working copy now at: abcdef12 commit message
 
 Working copy now at: abcdef12 commit message
 

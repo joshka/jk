@@ -164,7 +164,7 @@
   - expanded alias-catalog parity with the installed OMZ `jj` plugin aliases (`jjbc`, `jjbd`,
     `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) and added direct catalog coverage tests
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
-    `cargo test` (153 passed), and strict `cargo clippy`
+    `cargo test` (155 passed), and strict `cargo clippy`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
@@ -186,3 +186,10 @@
     wrapper.
   - added command-specific tip assertions for `commit`, `undo`, `rebase`, and `next` wrapper
     output.
+- Latest pass:
+  - refined top-level mutation wrapper summaries to prefer signal-first action lines (for example
+    rebase/undo/restore results) before falling back to generic output-line counts.
+  - updated top-level `commit` and `rebase` snapshots to lock in signal-first summary rendering.
+- Current pass (in progress):
+  - add a gold-command wrapper matrix regression test to ensure core read/mutation/bookmark/remote
+    commands consistently render native wrapper headers instead of raw passthrough output.

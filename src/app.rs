@@ -1970,15 +1970,7 @@ fn render_top_level_mutation_view(command_name: &str, lines: Vec<String>) -> Vec
         .map(|line| line.trim_end().to_string())
         .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
         .collect();
-    let summary = if detail_lines.is_empty() {
-        format!("Summary: `{command_name}` completed with no output")
-    } else {
-        format!(
-            "Summary: {} output line{}",
-            detail_lines.len(),
-            plural_suffix(detail_lines.len())
-        )
-    };
+    let summary = top_level_mutation_summary(command_name, &detail_lines);
     let title = format!("{} Result", capitalize_word(command_name));
     let mut rendered = vec![
         title.clone(),
@@ -1997,6 +1989,42 @@ fn render_top_level_mutation_view(command_name: &str, lines: Vec<String>) -> Vec
     rendered.push(String::new());
     rendered.push(top_level_mutation_tip(command_name).to_string());
     rendered
+}
+
+fn top_level_mutation_summary(command_name: &str, detail_lines: &[String]) -> String {
+    if detail_lines.is_empty() {
+        return format!("Summary: `{command_name}` completed with no output");
+    }
+
+    if let Some(signal) = detail_lines
+        .iter()
+        .find(|line| is_top_level_mutation_signal(command_name, line))
+    {
+        return format!("Summary: {}", signal.trim());
+    }
+
+    format!(
+        "Summary: {} output line{}",
+        detail_lines.len(),
+        plural_suffix(detail_lines.len())
+    )
+}
+
+fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
+    let trimmed = line.trim();
+    match command_name {
+        "new" | "describe" | "commit" | "edit" | "next" | "prev" => {
+            trimmed.starts_with("Working copy now at:")
+                || trimmed.starts_with("Working copy  (@) :")
+        }
+        "undo" => trimmed.starts_with("Undid operation"),
+        "redo" => trimmed.starts_with("Redid operation"),
+        "rebase" | "squash" | "split" => trimmed.starts_with("Rebased "),
+        "abandon" => trimmed.starts_with("Abandoned "),
+        "restore" => trimmed.starts_with("Restored "),
+        "revert" => trimmed.starts_with("Reverted "),
+        _ => false,
+    }
 }
 
 fn top_level_mutation_tip(command_name: &str) -> &'static str {
@@ -2349,7 +2377,7 @@ mod tests {
         render_resolve_list_view, render_root_view, render_show_view, render_status_view,
         render_tag_delete_view, render_tag_list_view, render_tag_set_view,
         render_top_level_mutation_view, render_workspace_list_view, render_workspace_mutation_view,
-        startup_action, toggle_patch_flag,
+        startup_action, toggle_patch_flag, top_level_mutation_summary,
     };
 
     #[test]
@@ -3588,7 +3616,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Working copy now at: abcdef12"))
         );
         assert!(rendered.iter().any(|line| line.contains("show` or `log")));
     }
@@ -3608,7 +3636,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Working copy now at: abcdef12"))
         );
     }
 
@@ -3623,13 +3651,29 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Rebased 3 commits onto main"))
         );
         assert!(
             rendered
                 .iter()
                 .any(|line| line.contains("log`, `status`, or `diff`"))
         );
+    }
+
+    #[test]
+    fn mutation_summary_uses_signal_line_when_available() {
+        let summary =
+            top_level_mutation_summary("undo", &[String::from("Undid operation 67d547b627fb")]);
+        assert_eq!(summary, "Summary: Undid operation 67d547b627fb");
+    }
+
+    #[test]
+    fn mutation_summary_falls_back_to_line_count() {
+        let summary = top_level_mutation_summary(
+            "abandon",
+            &[String::from("Random line"), String::from("Second line")],
+        );
+        assert_eq!(summary, "Summary: 2 output lines");
     }
 
     #[test]
