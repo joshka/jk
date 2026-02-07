@@ -1,6 +1,12 @@
 use std::io::{self, Stdout, Write};
 use std::time::Duration;
 
+use crate::commands::{SafetyTier, command_safety};
+use crate::config::KeybindConfig;
+use crate::error::JkError;
+use crate::flows::{FlowAction, PromptKind, PromptRequest, plan_command};
+use crate::jj;
+use crate::keys::KeyBinding;
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::Print;
@@ -9,14 +15,6 @@ use crossterm::terminal::{
     enable_raw_mode,
 };
 use crossterm::{execute, queue};
-use regex::Regex;
-
-use crate::commands::{SafetyTier, command_safety};
-use crate::config::KeybindConfig;
-use crate::error::JkError;
-use crate::flows::{FlowAction, PromptKind, PromptRequest, plan_command};
-use crate::jj;
-use crate::keys::KeyBinding;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -339,8 +337,15 @@ impl App {
     }
 
     fn selected_revision(&self) -> Option<String> {
-        let line = self.lines.get(self.cursor)?;
-        extract_revision(line)
+        for line_index in (0..=self.cursor).rev() {
+            if let Some(line) = self.lines.get(line_index)
+                && let Some(revision) = extract_revision(line)
+            {
+                return Some(revision);
+            }
+        }
+
+        None
     }
 
     fn draw(&mut self, stdout: &mut Stdout) -> Result<(), JkError> {
@@ -431,13 +436,43 @@ fn trim_to_width(text: &str, width: usize) -> String {
 }
 
 fn extract_revision(line: &str) -> Option<String> {
-    let change_re = Regex::new(r"\b[a-z]{8,}(?:/[0-9]+)?\b").ok()?;
-    if let Some(found) = change_re.find(line) {
-        return Some(found.as_str().to_string());
+    let tokens: Vec<&str> = line
+        .split_whitespace()
+        .map(trim_revision_token)
+        .filter(|token| !token.is_empty())
+        .collect();
+
+    let commit_index = tokens.iter().position(|token| is_commit_id(token))?;
+
+    for token in &tokens[..commit_index] {
+        if is_change_id(token) {
+            return Some((*token).to_string());
+        }
     }
 
-    let commit_re = Regex::new(r"\b[0-9a-f]{8,}\b").ok()?;
-    commit_re.find(line).map(|found| found.as_str().to_string())
+    tokens.get(commit_index).map(|token| (*token).to_string())
+}
+
+fn trim_revision_token(token: &str) -> &str {
+    token.trim_matches(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '/'))
+}
+
+fn is_commit_id(value: &str) -> bool {
+    value.len() >= 8 && value.chars().all(|ch| ch.is_ascii_hexdigit())
+}
+
+fn is_change_id(value: &str) -> bool {
+    let Some((head, _counter)) = value.split_once('/') else {
+        return value.len() >= 8 && value.chars().all(|ch| ch.is_ascii_lowercase());
+    };
+
+    !head.is_empty()
+        && head.chars().all(|ch| ch.is_ascii_lowercase())
+        && value.len() >= 8
+        && value
+            .rsplit_once('/')
+            .map(|(_, suffix)| suffix.chars().all(|ch| ch.is_ascii_digit()))
+            .unwrap_or(false)
 }
 
 fn matches_any(bindings: &[KeyBinding], key: KeyEvent) -> bool {
@@ -481,7 +516,7 @@ impl Drop for TerminalSession {
 mod tests {
     use crate::config::KeybindConfig;
 
-    use super::{App, extract_revision, is_dangerous};
+    use super::{App, extract_revision, is_change_id, is_commit_id, is_dangerous};
 
     #[test]
     fn extracts_change_id_from_log_line() {
@@ -548,5 +583,34 @@ mod tests {
         assert!(!is_dangerous(&["next".to_string()]));
         assert!(!is_dangerous(&["prev".to_string()]));
         assert!(!is_dangerous(&["edit".to_string()]));
+    }
+
+    #[test]
+    fn selected_revision_falls_back_to_previous_revision_line() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.lines = vec![
+            "@  abcdefgh 0123abcd top commit".to_string(),
+            "│  detailed message line without ids".to_string(),
+            "○  hgfedcba 89abcdef parent commit".to_string(),
+        ];
+        app.cursor = 1;
+
+        assert_eq!(app.selected_revision(), Some("abcdefgh".to_string()));
+    }
+
+    #[test]
+    fn does_not_extract_revision_from_message_line_without_commit_id() {
+        let line = "│  detailed message line without ids";
+        assert_eq!(extract_revision(line), None);
+    }
+
+    #[test]
+    fn recognizes_change_and_commit_id_formats() {
+        assert!(is_change_id("abcdefgh"));
+        assert!(is_change_id("abcdefgh/12"));
+        assert!(!is_change_id("abc-defgh"));
+
+        assert!(is_commit_id("0123abcd"));
+        assert!(!is_commit_id("abcdefgh"));
     }
 }
