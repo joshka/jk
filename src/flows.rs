@@ -480,6 +480,9 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
             "--to".to_string(),
             selected,
         ]),
+        [command] if command == "fix" => {
+            FlowAction::Execute(vec!["fix".to_string(), "-s".to_string(), selected])
+        }
         [command] if command == "abandon" => {
             FlowAction::Execute(vec!["abandon".to_string(), selected])
         }
@@ -1370,6 +1373,14 @@ mod tests {
         assert_eq!(
             plan_command("simplify-parents", selected()),
             FlowAction::Execute(vec!["simplify-parents".to_string(), "abc12345".to_string()])
+        );
+        assert_eq!(
+            plan_command("fix", selected()),
+            FlowAction::Execute(vec![
+                "fix".to_string(),
+                "-s".to_string(),
+                "abc12345".to_string()
+            ])
         );
     }
 

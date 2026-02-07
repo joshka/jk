@@ -274,3 +274,11 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (212 passed), and strict `cargo clippy`.
+- Latest pass:
+  - lifted `fix` from passthrough to a selection-aware guided default:
+    `fix -s <selected>`.
+  - aligned command metadata and safety tier so `fix` is treated as a confirm-gated rewrite flow.
+  - added native top-level mutation wrapper coverage (including snapshot) for `fix` output.
+- Latest pass:
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (213 passed), and strict `cargo clippy`.

@@ -107,8 +107,8 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "fix",
-        mode: ExecutionMode::Passthrough,
-        tier: SafetyTier::B,
+        mode: ExecutionMode::Guided,
+        tier: SafetyTier::C,
     },
     CommandSpec {
         name: "gerrit",
@@ -469,6 +469,10 @@ mod tests {
             lookup_top_level("simplify-parents").map(|spec| spec.mode),
             Some(ExecutionMode::Guided)
         );
+        assert_eq!(
+            lookup_top_level("fix").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
     }
 
     #[test]
@@ -509,6 +513,7 @@ mod tests {
         assert_eq!(command_safety(&to_vec(&["log"])), SafetyTier::A);
         assert_eq!(command_safety(&to_vec(&["rebase"])), SafetyTier::C);
         assert_eq!(command_safety(&to_vec(&["new"])), SafetyTier::B);
+        assert_eq!(command_safety(&to_vec(&["fix"])), SafetyTier::C);
     }
 
     #[test]
