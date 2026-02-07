@@ -23,7 +23,8 @@ This repository is in active development. The current baseline includes:
 - Configurable keybinds from `config/keybinds.default.toml` and optional user override.
 - High-frequency normal-mode shortcuts: `s` status, `F` fetch, `P` push, `M` rebase to main,
   `T` rebase to trunk.
-- Quick read shortcuts in normal mode: `o` operation log, `L` bookmark list, `w` workspace root.
+- Quick read shortcuts in normal mode: `o` operation log, `L` bookmark list, `v` resolve list,
+  `f` file list, `t` tag list, `w` workspace root.
 - Help shortcut: `?` opens the command registry directly from normal mode.
 - Keymap shortcut: `K` opens the in-app keymap directly from normal mode.
 - Alias shortcut: `A` opens the in-app alias catalog directly from normal mode.
@@ -44,9 +45,12 @@ This repository is in active development. The current baseline includes:
 - Command mode supports history navigation with `Up`/`Down`.
 - `:commands` renders an in-app command registry with mode/tier coverage.
 - `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).
+- The command registry also surfaces local TUI views (`aliases`, `keys`, `keymap`).
 - `:aliases` renders an in-app alias catalog and supports filtering (for example `:aliases push`).
 - `:keys` renders the active keymap and supports filtering (for example `:keys push`).
-- Unfiltered command registry output includes a high-frequency alias hint and discovery tips.
+- Unfiltered command registry output includes a high-frequency alias hint, discovery tips, and
+  group-default hints (for example `resolve -> resolve -l`, `file -> file list`, and
+  `operation -> operation log`).
 - `status`, `show`, and `diff` use lightweight in-app view headers/shortcuts while preserving
   command output content.
 - `show`/`diff` wrappers add section spacing for file headers to improve scanability.
@@ -54,6 +58,14 @@ This repository is in active development. The current baseline includes:
 - `root` and `workspace root` use a native path-focused wrapper view for quick workspace
   inspection.
 - `bookmark list` and `operation log` also use native wrapper headers/tips for faster scanning.
+- `workspace list` and `operation show` now use native wrappers with compact summaries and tips.
+- `file list` and `tag list` now use native wrappers with compact summaries and empty-state hints.
+- `file show`, `file search`, and `file annotate` now use native wrappers with concise summaries.
+- `file track`, `file untrack`, and `file chmod` now use native wrappers with mutation-focused
+  summaries and follow-up tips.
+- `resolve -l` now uses a native wrapper with conflict-count or no-conflicts summary.
+- `operation diff` now uses a native wrapper with compact changed-commit summary.
+- `git fetch` and `git push` now use native wrappers with compact summaries and follow-up tips.
 
 ## Implemented Flow Coverage (Baseline)
 
@@ -63,14 +75,22 @@ This repository is in active development. The current baseline includes:
 - Recovery extras: `restore`, `revert`.
 - Bookmarks: `bookmark list/create/set/move/delete/forget/rename/track/untrack`.
 - Remote: `git fetch`, `git push`.
-- Command groups: `operation` defaults to `operation log`; `workspace` defaults to `workspace list`.
-- Operation guided prompts: `operation show`, `operation diff`, `operation restore`,
-  `operation revert`.
+- Command groups: `operation` defaults to `operation log`; `workspace` defaults to
+  `workspace list`; `resolve` defaults to `resolve -l`; `file` defaults to `file list`; `tag`
+  defaults to `tag list`.
+- File read flows: `file list`, `file show`, `file search`, and `file annotate` execute with
+  native wrapper rendering.
+- File mutation flows: `file track`, `file untrack`, and `file chmod` run as guided prompts.
+- Tag mutation flows: `tag set` and `tag delete` are now guided prompts with sensible defaults.
+- Operation read flows: `operation show` and `operation diff` execute directly in-app.
+- Operation guided prompts: `operation restore`, `operation revert`.
 - Workspace guided prompts: `workspace add`, `workspace forget`, `workspace rename`;
   direct actions for `workspace root` and `workspace update-stale`.
 
 Mutating high-risk commands run through confirmation guards.
 `git push` confirmation now includes a best-effort `--dry-run` preview in-app when available.
+`git fetch` and `git push` output now render through native wrappers instead of raw passthrough
+lines.
 `operation restore`/`operation revert` confirmation includes an operation summary preview.
 Rewrite, recovery, and bookmark Tier `C` flows also render targeted log/show previews before
 confirmation when enough command context is available.
@@ -86,12 +106,16 @@ Native aliases:
 
 - `gf`, `gp`, `rbm`, `rbt`
 - `rbm` defaults to `main` and accepts an optional destination override (for example `rbm release`).
+- `rbm`/`rbt` preserve explicit destination flags (for example `rbm -d release` or
+  `rbt --to main`) instead of forcing default destinations.
 
 Oh My Zsh `jj` plugin compatibility is included for common aliases such as:
 
 - `jjgf`, `jjgfa`, `jjgp`, `jjgpt`, `jjgpa`, `jjgpd`
 - `jjrb`, `jjrbm`, `jjst`, `jjl`, `jjd`, `jjc`, `jjsp`, `jjsq`, `jjrs`, `jja`
 - `jjb`, `jjbl`, `jjbs`, `jjbm`, `jjbt`, `jjbu`, `jjrt`
+- plus plugin parity aliases including `jjbc`, `jjbd`, `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`,
+  `jjgcl`, and `jjla`.
 
 ## Development
 

@@ -15,30 +15,80 @@
 ## Latest additions this pass
 
 - Native wrapper parity:
-  - `bookmark list`, `operation log`, and `workspace root` render with native wrappers.
+  - `bookmark list`, `operation log`, `workspace root`, `workspace list`, `operation show`,
+    `operation diff`, `resolve -l`, `file list`, `tag list`, `git fetch`, and `git push` render
+    with native wrappers.
+  - additional `file` read flows now render via native wrappers: `file show`, `file search`,
+    `file annotate`.
+  - additional `file` mutation flows now render via native wrappers: `file track`,
+    `file untrack`, `file chmod`.
 - Shortcut coverage:
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`
+  - added `v` for `resolve -l`
+  - added `f`/`t` for `file list`/`tag list`
 - Discoverability:
   - added in-app alias catalog via `:aliases` and `:aliases <query>`
   - added keymap catalog via `:keys` and `:keys <query>` (also `jk keys` on startup)
   - added normal-mode `K` shortcut for quick keymap access
   - added normal-mode `A` shortcut for quick alias-catalog access
+  - surfaced local discovery views (`aliases`, `keys`, `keymap`) in `:commands`
+  - surfaced command-group default hints in unfiltered `:commands` output
+  - defaulted `resolve` to `resolve -l` for list-first conflict inspection
+  - defaulted `file` and `tag` groups to `list` views for faster command-mode inspection
+  - switched `operation show` and `operation diff` to direct read execution without prompts
+  - added guided prompts for `file track`, `file untrack`, and `file chmod`.
+  - added guided prompts for `tag set` and `tag delete` while keeping list-first `tag` default.
+- Alias behavior:
+  - `rbm`/`rbt` now preserve explicit destination flags (`-d`/`--destination`/`--to`/`--into`)
+    so explicit user intent wins over alias defaults.
+  - alias catalog now includes the full installed OMZ plugin set (including `jjbc`, `jjbd`,
+    `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) with explicit coverage tests.
 - Regression safety:
   - added OMZ gold-alias flow matrix test
   - added `insta` snapshots for bookmark and operation wrapper views
   - added `insta` snapshot for status wrapper output
+  - added `insta` snapshots for `git fetch` and `git push` wrapper views
+  - added `insta` snapshots for `file show`, `file search`, and `file annotate` wrappers
+  - added `insta` snapshots for `file track`, `file untrack`, and `file chmod` wrappers
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing
+  - `workspace list` and `operation show` wrappers now include compact summaries and tips
+  - `operation diff` wrapper now includes changed-commit summary and operation-flow tip
+  - `file list` and `tag list` wrappers now include compact summaries and empty-state hints
+  - `resolve -l` wrapper now includes conflict-count and no-conflicts summaries
+  - `git fetch` and `git push` wrappers now include compact summaries and follow-up tips
+  - `file show`, `file search`, and `file annotate` wrappers now include concise summaries and
+    direct follow-up tips
+  - `file track`, `file untrack`, and `file chmod` wrappers now include mutation-focused summaries
+    and follow-up tips
+  - command-safety mapping now marks read-only `file`/`tag` subcommands as Tier `A`
+  - command-safety mapping now marks `resolve -l` as Tier `A`
 
 ## Recent commit stack
 
-- `feat(help): add alias catalog and nightly checkpoint`
-- `feat(view): unify workspace-root presentation`
-- `feat(ux): add quick read-mode shortcuts`
-- `test(ux): expand alias and wrapper coverage`
-- `feat(ux): add nav keys and list wrappers`
+- `feat(ux): expand read-mode wrappers and shortcuts` (`change: qtswpusnskwp`)
+- `fix(alias): preserve explicit destinations and parity` (`change: uxqqtlkqotxq`)
+- `feat(flow): default list-first command groups` (`change: pmzoznlxuulu`)
+- `feat(flow): default file and tag list views` (`change: qulmnqullnpn`)
+- `feat(help): add local views to command registry` (`change: qqrxwkptvkns`)
+- `test(view): snapshot status wrapper output` (`3edf25f61dc5`)
+- `feat(view): refine status and operation summaries` (`544b9889c581`)
+- `feat(tui): improve discoverability and scanability` (`b902e6a158f7`)
+- `feat(view): unify workspace-root presentation` (`d3dc67c0af99`)
+- `feat(ux): add quick read-mode shortcuts` (`69605ad1ece1`)
+- `test(ux): expand alias and wrapper coverage` (`7c1746fee75e`)
+- `feat(ux): add nav keys and list wrappers` (`8dd98891847f`)
+
+## Validation checkpoint
+
+- Latest full checkpoint passed on current working commit:
+  - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
+  - `cargo fmt --all`
+  - `cargo check`
+  - `cargo test` (137 passed)
+  - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers
 
@@ -48,5 +98,6 @@
 
 ## Suggested first task tomorrow
 
-- Expand native rendering depth for `status` and operation views (section grouping + compact
-  metadata summaries) without adding box-heavy layout chrome.
+- Start Phase 3 passthrough hardening:
+  - improve structured wrappers for additional passthrough command families (`file`, `tag`,
+    `resolve`) while keeping pager-first layout and minimal chrome.

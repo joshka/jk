@@ -38,7 +38,8 @@
 - `restore`, `revert`: `done` (guided prompt defaults wired)
 - `bookmark rename`, `bookmark delete`, `bookmark forget`: `done` (guided prompts wired)
 - `operation` / `workspace` defaults: `done` (`operation log` and `workspace list`)
-- `operation show`, `operation diff`, `operation restore`, `operation revert`: `done` (guided prompts)
+- `operation show`, `operation diff`, `operation restore`, `operation revert`: `done` (direct read
+  flows for show/diff, guided prompts for restore/revert)
 - `workspace add`, `workspace forget`, `workspace rename`: `done` (guided prompts)
 
 ### Testing baseline
@@ -118,6 +119,40 @@
   - added normal-mode `A` shortcut for direct alias-catalog access
   - refined `status`/`operation log` wrappers with compact summaries and section-spacing rules
   - added `insta` snapshot coverage for the updated status wrapper presentation
+  - surfaced local discovery views (`aliases`, `keys`, `keymap`) in the `:commands` catalog
+  - added native wrapper views for `workspace list` and `operation show` output
+  - added `insta` snapshot coverage for workspace-list and operation-show wrapper presentation
+  - added native wrapper views for `file list` and `tag list` output
+  - added `insta` snapshot coverage for file-list and tag-list wrapper presentation
+  - defaulted `file` and `tag` command groups to `file list` and `tag list` flows
+  - defaulted `resolve` command group to `resolve -l` for list-first conflict inspection
+  - switched `operation show` and `operation diff` to direct read execution without prompt
+  - added `tag` short-subcommand canonicalization (`l`/`s`/`d`) in flow planning
+  - refined command safety mapping for read-only `file`/`tag` subcommands
+  - refined command safety mapping for read-only `resolve -l`
+  - surfaced command-group default hints in `:commands` unfiltered tips
+  - added normal-mode quick-read shortcut for `resolve -l` (`v`)
+  - added normal-mode quick-read shortcuts for `file list` (`f`) and `tag list` (`t`)
+  - added native wrapper view and snapshot coverage for `resolve -l` output
+  - added native wrapper view and snapshot coverage for `operation diff` output
+  - added native wrapper views and coverage tests for `git fetch` and `git push` output
+  - added `insta` snapshot coverage for `git fetch` and `git push` wrapper views
+  - added native wrapper views and coverage for `file show`, `file search`, and `file annotate`
+    output
+  - added `insta` snapshot coverage for `file show`, `file search`, and `file annotate` wrappers
+  - added guided prompt flows for `file track`, `file untrack`, and `file chmod`
+  - added native wrapper views and tests for `file track`, `file untrack`, and `file chmod`
+    output
+  - added `insta` snapshot coverage for `file track`, `file untrack`, and `file chmod` wrappers
+  - added guided prompt flows for `tag set` and `tag delete` with selected-revision defaults
+    for tag set
+  - aligned command-registry metadata so `file` and `tag` now report `guided` mode
+  - refined `rbm`/`rbt` alias normalization to preserve explicit destination flags (`-d`/`--to`)
+    without forcing default destinations
+  - expanded alias-catalog parity with the installed OMZ `jj` plugin aliases (`jjbc`, `jjbd`,
+    `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) and added direct catalog coverage tests
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (137 passed), and strict `cargo clippy`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
