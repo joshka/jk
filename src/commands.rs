@@ -321,6 +321,9 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
             "high-frequency aliases: gf, gp, rbm, rbt, jjgf, jjgp, jjrbm, jjst, jjl".to_string(),
         );
         lines.push("tips: use :aliases for mappings and :keys for active keybinds".to_string());
+        lines.push(
+            "group defaults: bookmark/file/tag/workspace -> list, operation -> log".to_string(),
+        );
     }
 
     lines
@@ -348,6 +351,16 @@ pub fn command_safety(tokens: &[String]) -> SafetyTier {
             Some("list" | "root") => SafetyTier::A,
             _ => SafetyTier::B,
         },
+        "resolve" => {
+            if tokens
+                .iter()
+                .any(|token| token == "-l" || token == "--list")
+            {
+                SafetyTier::A
+            } else {
+                SafetyTier::B
+            }
+        }
         "bookmark" => match tokens.get(1).map(String::as_str) {
             Some("set" | "move" | "delete" | "forget" | "rename") => SafetyTier::C,
             Some("create" | "track" | "untrack") => SafetyTier::B,
@@ -428,6 +441,8 @@ mod tests {
             command_safety(&to_vec(&["workspace", "root"])),
             SafetyTier::A
         );
+        assert_eq!(command_safety(&to_vec(&["resolve", "-l"])), SafetyTier::A);
+        assert_eq!(command_safety(&to_vec(&["resolve"])), SafetyTier::B);
         assert_eq!(
             command_safety(&to_vec(&["bookmark", "set", "feature"])),
             SafetyTier::C
@@ -470,6 +485,7 @@ mod tests {
                 .any(|line| line.contains(":aliases for mappings"))
         );
         assert!(lines.iter().any(|line| line.starts_with("aliases (local)")));
+        assert!(lines.iter().any(|line| line.contains("group defaults:")));
     }
 
     #[test]

@@ -365,6 +365,9 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         [command] if command == "workspace" => {
             FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
         }
+        [command] if command == "resolve" => {
+            FlowAction::Execute(vec!["resolve".to_string(), "-l".to_string()])
+        }
         [command] if command == "file" => {
             FlowAction::Execute(vec!["file".to_string(), "list".to_string()])
         }
@@ -1516,7 +1519,7 @@ mod tests {
     }
 
     #[test]
-    fn defaults_operation_workspace_file_and_tag_to_list_views() {
+    fn defaults_operation_workspace_resolve_file_and_tag_to_list_views() {
         assert_eq!(
             plan_command("op", selected()),
             FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
@@ -1524,6 +1527,10 @@ mod tests {
         assert_eq!(
             plan_command("workspace", selected()),
             FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
+        );
+        assert_eq!(
+            plan_command("resolve", selected()),
+            FlowAction::Execute(vec!["resolve".to_string(), "-l".to_string()])
         );
         assert_eq!(
             plan_command("file", selected()),
