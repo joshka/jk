@@ -41,6 +41,8 @@ This repository is in active development. The current baseline includes:
 - Command groups: `operation` defaults to `operation log`; `workspace` defaults to `workspace list`.
 - Operation guided prompts: `operation show`, `operation diff`, `operation restore`,
   `operation revert`.
+- Workspace guided prompts: `workspace add`, `workspace forget`, `workspace rename`;
+  direct actions for `workspace root` and `workspace update-stale`.
 
 Mutating high-risk commands run through confirmation guards.
 `git push` confirmation now includes a best-effort `--dry-run` preview in-app when available.

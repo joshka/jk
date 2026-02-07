@@ -64,6 +64,9 @@ pub enum PromptKind {
     OperationRevert {
         default_operation: String,
     },
+    WorkspaceAdd,
+    WorkspaceForget,
+    WorkspaceRename,
 }
 
 impl PromptKind {
@@ -256,6 +259,19 @@ impl PromptKind {
                     ])
                 }
             }
+            Self::WorkspaceAdd => build_workspace_add_command(input),
+            Self::WorkspaceForget => build_workspace_forget_command(input),
+            Self::WorkspaceRename => {
+                if input.is_empty() {
+                    Err("workspace name is required".to_string())
+                } else {
+                    Ok(vec![
+                        "workspace".to_string(),
+                        "rename".to_string(),
+                        input.to_string(),
+                    ])
+                }
+            }
         }
     }
 }
@@ -338,6 +354,33 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         }
         [command] if command == "workspace" => {
             FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
+        }
+        [command, subcommand] if command == "workspace" && subcommand == "root" => {
+            FlowAction::Execute(vec!["workspace".to_string(), "root".to_string()])
+        }
+        [command, subcommand] if command == "workspace" && subcommand == "update-stale" => {
+            FlowAction::Execute(vec!["workspace".to_string(), "update-stale".to_string()])
+        }
+        [command, subcommand] if command == "workspace" && subcommand == "rename" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "new workspace name".to_string(),
+                allow_empty: false,
+                kind: PromptKind::WorkspaceRename,
+            })
+        }
+        [command, subcommand] if command == "workspace" && subcommand == "forget" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "workspace names to forget (blank = current)".to_string(),
+                allow_empty: true,
+                kind: PromptKind::WorkspaceForget,
+            })
+        }
+        [command, subcommand] if command == "workspace" && subcommand == "add" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "workspace add: <destination> [name]".to_string(),
+                allow_empty: false,
+                kind: PromptKind::WorkspaceAdd,
+            })
         }
         [command] if command == "new" => FlowAction::Prompt(PromptRequest {
             label: "new message (blank for none)".to_string(),
@@ -614,6 +657,36 @@ fn build_operation_diff_command(input: &str) -> Result<Vec<String>, String> {
     }
 }
 
+fn build_workspace_add_command(input: &str) -> Result<Vec<String>, String> {
+    let segments: Vec<&str> = input.split_whitespace().collect();
+    match segments.as_slice() {
+        [destination] => Ok(vec![
+            "workspace".to_string(),
+            "add".to_string(),
+            (*destination).to_string(),
+        ]),
+        [destination, name] => Ok(vec![
+            "workspace".to_string(),
+            "add".to_string(),
+            "--name".to_string(),
+            (*name).to_string(),
+            (*destination).to_string(),
+        ]),
+        _ => Err("use format: <destination> [name]".to_string()),
+    }
+}
+
+fn build_workspace_forget_command(input: &str) -> Result<Vec<String>, String> {
+    let mut tokens = vec!["workspace".to_string(), "forget".to_string()];
+    tokens.extend(
+        input
+            .split_whitespace()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+    );
+    Ok(tokens)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{FlowAction, PromptKind, plan_command};
@@ -855,6 +928,30 @@ mod tests {
     }
 
     #[test]
+    fn adds_guided_workspace_subcommand_flows() {
+        match plan_command("workspace rename", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::WorkspaceRename);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("workspace add", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::WorkspaceAdd);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("workspace root", selected()) {
+            FlowAction::Execute(tokens) => {
+                assert_eq!(tokens, vec!["workspace".to_string(), "root".to_string()])
+            }
+            other => panic!("expected execute, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn prompt_kind_builds_tokens() {
         let bookmark = PromptKind::BookmarkSet {
             target_revision: "abc12345".to_string(),
@@ -998,6 +1095,34 @@ mod tests {
         assert_eq!(
             operation_revert.to_tokens(""),
             Ok(vec!["operation".to_string(), "revert".to_string()])
+        );
+
+        let workspace_add = PromptKind::WorkspaceAdd;
+        assert_eq!(
+            workspace_add.to_tokens("tmp/ws demo"),
+            Ok(vec![
+                "workspace".to_string(),
+                "add".to_string(),
+                "--name".to_string(),
+                "demo".to_string(),
+                "tmp/ws".to_string()
+            ])
+        );
+
+        let workspace_forget = PromptKind::WorkspaceForget;
+        assert_eq!(
+            workspace_forget.to_tokens(""),
+            Ok(vec!["workspace".to_string(), "forget".to_string()])
+        );
+
+        let workspace_rename = PromptKind::WorkspaceRename;
+        assert_eq!(
+            workspace_rename.to_tokens("main"),
+            Ok(vec![
+                "workspace".to_string(),
+                "rename".to_string(),
+                "main".to_string()
+            ])
         );
     }
 
