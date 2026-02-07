@@ -10,7 +10,6 @@ mod keys;
 
 use clap::Parser;
 
-use alias::normalize_alias;
 use app::App;
 use cli::Cli;
 use config::KeybindConfig;
@@ -33,5 +32,5 @@ fn startup_command(cli: Cli) -> Vec<String> {
         tokens.extend(cli.args);
     }
 
-    normalize_alias(&tokens)
+    tokens
 }

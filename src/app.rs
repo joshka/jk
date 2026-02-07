@@ -64,9 +64,8 @@ impl App {
     }
 
     pub fn run(&mut self, startup_tokens: Vec<String>) -> Result<(), JkError> {
-        self.execute_tokens(startup_tokens)?;
-
         let mut terminal = TerminalSession::enter()?;
+        self.apply_startup_tokens(startup_tokens)?;
 
         while !self.should_quit {
             self.draw(terminal.stdout_mut())?;
@@ -269,7 +268,28 @@ impl App {
     }
 
     fn execute_command_line(&mut self, command: &str) -> Result<(), JkError> {
-        match plan_command(command, self.selected_revision()) {
+        let action = plan_command(command, self.selected_revision());
+        self.apply_flow_action(action)
+    }
+
+    fn start_prompt(&mut self, request: PromptRequest) {
+        self.pending_prompt = Some(PromptState {
+            kind: request.kind,
+            label: request.label.clone(),
+            allow_empty: request.allow_empty,
+            input: String::new(),
+        });
+        self.mode = Mode::Prompt;
+        self.status_line = format!("Prompt: {}", request.label);
+    }
+
+    fn apply_startup_tokens(&mut self, startup_tokens: Vec<String>) -> Result<(), JkError> {
+        let action = startup_action(&startup_tokens);
+        self.apply_flow_action(action)
+    }
+
+    fn apply_flow_action(&mut self, action: FlowAction) -> Result<(), JkError> {
+        match action {
             FlowAction::Quit => {
                 self.should_quit = true;
                 Ok(())
@@ -291,17 +311,6 @@ impl App {
                 Ok(())
             }
         }
-    }
-
-    fn start_prompt(&mut self, request: PromptRequest) {
-        self.pending_prompt = Some(PromptState {
-            kind: request.kind,
-            label: request.label.clone(),
-            allow_empty: request.allow_empty,
-            input: String::new(),
-        });
-        self.mode = Mode::Prompt;
-        self.status_line = format!("Prompt: {}", request.label);
     }
 
     fn execute_tokens(&mut self, tokens: Vec<String>) -> Result<(), JkError> {
@@ -434,6 +443,15 @@ impl App {
     }
 }
 
+fn startup_action(startup_tokens: &[String]) -> FlowAction {
+    if startup_tokens.is_empty() {
+        FlowAction::Execute(vec!["log".to_string()])
+    } else {
+        let startup_command = startup_tokens.join(" ");
+        plan_command(&startup_command, None)
+    }
+}
+
 fn trim_to_width(text: &str, width: usize) -> String {
     if width == 0 {
         return String::new();
@@ -523,7 +541,9 @@ impl Drop for TerminalSession {
 mod tests {
     use crate::config::KeybindConfig;
 
-    use super::{App, extract_revision, is_change_id, is_commit_id, is_dangerous};
+    use crate::flows::{FlowAction, PromptKind};
+
+    use super::{App, extract_revision, is_change_id, is_commit_id, is_dangerous, startup_action};
 
     #[test]
     fn extracts_change_id_from_log_line() {
@@ -619,5 +639,24 @@ mod tests {
 
         assert!(is_commit_id("0123abcd"));
         assert!(!is_commit_id("abcdefgh"));
+    }
+
+    #[test]
+    fn startup_action_defaults_to_log() {
+        assert_eq!(
+            startup_action(&[]),
+            FlowAction::Execute(vec!["log".to_string()])
+        );
+    }
+
+    #[test]
+    fn startup_action_uses_guided_planner() {
+        let tokens = vec!["new".to_string()];
+        match startup_action(&tokens) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::NewMessage);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
     }
 }
