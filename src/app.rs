@@ -1109,6 +1109,7 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("restore") => render_top_level_mutation_view("restore", output),
         Some("revert") => render_top_level_mutation_view("revert", output),
         Some("root") => render_root_view(output),
+        Some("version") => render_version_view(output),
         Some("resolve") if has_resolve_list_flag(command) => render_resolve_list_view(output),
         Some("file") if matches!(command.get(1).map(String::as_str), Some("list")) => {
             render_file_list_view(output)
@@ -1497,6 +1498,38 @@ fn render_root_view(lines: Vec<String>) -> Vec<String> {
 
     rendered.push(String::new());
     rendered.push("Tip: use jjrt/jk root to inspect current workspace path".to_string());
+    rendered
+}
+
+fn render_version_view(lines: Vec<String>) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+
+    let summary = if let Some(line) = detail_lines.first() {
+        format!("Summary: {}", line.trim())
+    } else {
+        "Summary: version command completed with no output".to_string()
+    };
+
+    let mut rendered = vec![
+        "Version".to_string(),
+        "=======".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: run `version` after upgrades to confirm toolchain state".to_string());
     rendered
 }
 
@@ -2488,8 +2521,9 @@ mod tests {
         render_operation_diff_view, render_operation_log_view, render_operation_mutation_view,
         render_operation_show_view, render_resolve_list_view, render_root_view, render_show_view,
         render_status_view, render_tag_delete_view, render_tag_list_view, render_tag_set_view,
-        render_top_level_mutation_view, render_workspace_list_view, render_workspace_mutation_view,
-        startup_action, toggle_patch_flag, top_level_mutation_summary, workspace_mutation_summary,
+        render_top_level_mutation_view, render_version_view, render_workspace_list_view,
+        render_workspace_mutation_view, startup_action, toggle_patch_flag,
+        top_level_mutation_summary, workspace_mutation_summary,
     };
 
     #[test]
@@ -3110,6 +3144,23 @@ mod tests {
     }
 
     #[test]
+    fn renders_version_view_with_summary_and_tip() {
+        let rendered = render_version_view(vec!["jj 0.31.0".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"Version".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: jj 0.31.0"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("confirm toolchain state"))
+        );
+    }
+
+    #[test]
     fn renders_resolve_list_view_with_no_conflicts_summary() {
         let rendered = render_resolve_list_view(vec![
             "Error: No conflicts found at this revision".to_string(),
@@ -3500,6 +3551,19 @@ mod tests {
 
         assert_eq!(rendered.first(), Some(&"Workspace Root".to_string()));
         assert!(rendered.iter().any(|line| line == "/Users/joshka/local/jk"));
+    }
+
+    #[test]
+    fn decorates_version_output_with_wrapper() {
+        let rendered =
+            decorate_command_output(&["version".to_string()], vec!["jj 0.31.0".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"Version".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: jj 0.31.0"))
+        );
     }
 
     #[test]
@@ -4627,6 +4691,12 @@ mod tests {
             "Nothing changed.".to_string(),
             "Hint: use -b to fetch bookmarks".to_string(),
         ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_version_wrapper_view() {
+        let rendered = render_version_view(vec!["jj 0.31.0".to_string()]);
         insta::assert_snapshot!(rendered.join("\n"));
     }
 

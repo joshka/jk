@@ -164,7 +164,7 @@
   - expanded alias-catalog parity with the installed OMZ `jj` plugin aliases (`jjbc`, `jjbd`,
     `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) and added direct catalog coverage tests
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
-    `cargo test` (196 passed), and strict `cargo clippy`
+    `cargo test` (199 passed), and strict `cargo clippy`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
@@ -213,7 +213,7 @@
   - added explicit `operation revert` wrapper routing coverage in decorator tests.
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
-    `cargo test` (196 passed), and strict `cargo clippy`.
+    `cargo test` (199 passed), and strict `cargo clippy`.
 - Latest pass:
   - aligned alias normalization with core `jj` defaults so `b`, `ci`, and `op` canonicalize to
     `bookmark`, `commit`, and `operation` for consistent in-app flow routing.
@@ -239,3 +239,7 @@
     output includes clear action lines, while preserving no-change and fallback count summaries.
   - added focused `git fetch`/`git push` summary-heuristic tests and refreshed the `git push`
     wrapper snapshot.
+- Latest pass:
+  - added a native wrapper for `version` command output with concise summary/tip presentation to
+    keep low-risk utility flows consistent with the in-app design language.
+  - added targeted render/decorator tests plus an `insta` snapshot for the version wrapper view.

@@ -50,6 +50,8 @@
   - switched `operation show` and `operation diff` to direct read execution without prompts
   - added guided prompts for `file track`, `file untrack`, and `file chmod`.
   - added guided prompts for `tag set` and `tag delete` while keeping list-first `tag` default.
+  - added native wrapper presentation for `version` output so utility command results remain
+    scan-friendly inside the TUI.
 - Alias behavior:
   - core `jj` default aliases `b`, `ci`, and `op` now canonicalize to `bookmark`, `commit`, and
     `operation` so native `jj` shorthand paths use the same guided/native wrappers.
@@ -87,10 +89,12 @@
     (`jk st`, `jk ci`, `jk desc`, `jk b`, `jk op`)
   - added explicit summary-heuristic tests for bookmark/workspace/operation mutation wrappers
   - added explicit summary-heuristic tests for `git fetch`/`git push` wrapper summaries
+  - added explicit wrapper render/decorator tests for `version` output
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
   - refreshed `insta` snapshots for bookmark/workspace/operation mutation wrappers to lock in
     signal-first summary behavior
   - refreshed `insta` snapshot for `git push` wrapper signal-first summary behavior
+  - added `insta` snapshot for `version` wrapper presentation
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing
@@ -116,6 +120,7 @@
 
 ## Recent commit stack
 
+- `feat(view): add native version output wrapper` (`change: vtnvvxmvvzpk`)
 - `feat(view): add signal summaries for remote wrappers` (`change: kkuqnwpqzmks`)
 - `feat(view): prefer signal summaries in mutation wrappers` (`change: mmookzxkmqos`)
 - `test(startup): cover core jj alias routing` (`change: ywvronpkrvxs`)
@@ -150,7 +155,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (196 passed)
+  - `cargo test` (199 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

@@ -97,6 +97,9 @@ Each command has a mode, safety tier, and explicit test target.
 - `config *`, `util *`, `gerrit upload`, `operation integrate`, `operation abandon`,
   `bisect run`
   - Mode/Tier: `passthrough` / mixed tiers.
+- `version`
+  - Mode/Tier: `passthrough` / `A`, with native wrapper presentation for consistency.
+  - Tests: wrapper-render unit test + snapshot for version output formatting.
 
 Passthrough-first means command invocation is in-app, output is in-app, and no shell escape is
 required.

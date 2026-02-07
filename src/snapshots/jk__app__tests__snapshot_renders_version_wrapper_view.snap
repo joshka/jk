@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Version
+=======
+
+Summary: jj 0.31.0
+
+jj 0.31.0
+
+Tip: run `version` after upgrades to confirm toolchain state
