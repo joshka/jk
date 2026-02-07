@@ -864,6 +864,15 @@ mod tests {
                 "trunk()".to_string()
             ])
         );
+
+        assert_eq!(
+            plan_command("rbm release", selected()),
+            FlowAction::Execute(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "release".to_string()
+            ])
+        );
     }
 
     #[test]

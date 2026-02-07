@@ -4,6 +4,10 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
     }
 
     let first = tokens[0].as_str();
+    if let Some(tokens) = normalize_destination_alias(first, tokens) {
+        return tokens;
+    }
+
     let Some(prefix) = alias_prefix(first) else {
         return tokens.to_vec();
     };
@@ -11,6 +15,24 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
     let mut result = prefix.iter().map(ToString::to_string).collect::<Vec<_>>();
     result.extend_from_slice(&tokens[1..]);
     result
+}
+
+fn normalize_destination_alias(alias: &str, tokens: &[String]) -> Option<Vec<String>> {
+    let default_destination = match alias {
+        "rbm" => "main",
+        "rbt" | "jjrbm" => "trunk()",
+        _ => return None,
+    };
+
+    let remainder = &tokens[1..];
+    let (destination, tail) = match remainder.first() {
+        Some(value) if !value.starts_with('-') => (value.clone(), &remainder[1..]),
+        _ => (default_destination.to_string(), remainder),
+    };
+
+    let mut result = vec!["rebase".to_string(), "-d".to_string(), destination];
+    result.extend(tail.iter().cloned());
+    Some(result)
 }
 
 fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
@@ -24,8 +46,6 @@ fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
         "gpt" | "jjgpt" => Some(&["git", "push", "--tracked"]),
         "gpa" | "jjgpa" => Some(&["git", "push", "--all"]),
         "gpd" | "jjgpd" => Some(&["git", "push", "--deleted"]),
-        "rbm" => Some(&["rebase", "-d", "main"]),
-        "rbt" | "jjrbm" => Some(&["rebase", "-d", "trunk()"]),
         "jjrb" => Some(&["rebase"]),
         "jjl" => Some(&["log"]),
         "jjla" => Some(&["log", "-r", "all()"]),
@@ -79,6 +99,34 @@ mod tests {
         assert_eq!(
             normalize_alias(&to_vec(&["rbt"])),
             to_vec(&["rebase", "-d", "trunk()"])
+        );
+    }
+
+    #[test]
+    fn supports_destination_overrides_for_rebase_shortcuts() {
+        assert_eq!(
+            normalize_alias(&to_vec(&["rbm", "release"])),
+            to_vec(&["rebase", "-d", "release"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["rbt", "main"])),
+            to_vec(&["rebase", "-d", "main"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjrbm", "main"])),
+            to_vec(&["rebase", "-d", "main"])
+        );
+    }
+
+    #[test]
+    fn keeps_flag_arguments_for_rebase_shortcuts() {
+        assert_eq!(
+            normalize_alias(&to_vec(&["rbm", "-r", "abc123"])),
+            to_vec(&["rebase", "-d", "main", "-r", "abc123"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["rbm", "release", "-r", "abc123"])),
+            to_vec(&["rebase", "-d", "release", "-r", "abc123"])
         );
     }
 
