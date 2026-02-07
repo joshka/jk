@@ -543,7 +543,9 @@ mod tests {
 
     use crate::flows::{FlowAction, PromptKind};
 
-    use super::{App, extract_revision, is_change_id, is_commit_id, is_dangerous, startup_action};
+    use super::{
+        App, Mode, extract_revision, is_change_id, is_commit_id, is_dangerous, startup_action,
+    };
 
     #[test]
     fn extracts_change_id_from_log_line() {
@@ -658,5 +660,41 @@ mod tests {
             }
             other => panic!("expected prompt, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn startup_dangerous_command_requires_confirmation() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.apply_startup_tokens(vec![
+            "rebase".to_string(),
+            "-d".to_string(),
+            "main".to_string(),
+        ])
+        .expect("startup action should succeed");
+
+        assert_eq!(app.mode, Mode::Confirm);
+        assert_eq!(
+            app.pending_confirm,
+            Some(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "main".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn startup_commands_view_renders_without_running_jj() {
+        let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        app.apply_startup_tokens(vec!["commands".to_string()])
+            .expect("startup action should succeed");
+
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(app.status_line, "Showing command registry".to_string());
+        assert!(
+            app.lines
+                .iter()
+                .any(|line| line.contains("jj top-level coverage"))
+        );
     }
 }
