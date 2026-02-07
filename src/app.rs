@@ -134,6 +134,16 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.repeat_last, key) {
+            let tokens = if self.last_command.is_empty() {
+                vec!["log".to_string()]
+            } else {
+                self.last_command.clone()
+            };
+            self.execute_tokens(tokens)?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.up, key) {
             self.move_cursor_up();
             return Ok(());
@@ -1836,6 +1846,20 @@ mod tests {
                 .lines
                 .iter()
                 .any(|line| line.contains("jj top-level coverage"))
+        );
+
+        let mut repeat_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        repeat_app.last_command = vec!["status".to_string()];
+        repeat_app
+            .handle_key(KeyEvent::from(KeyCode::Char('.')))
+            .expect("repeat-last shortcut should be handled");
+        assert_eq!(repeat_app.mode, Mode::Normal);
+        assert_eq!(repeat_app.last_command, vec!["status".to_string()]);
+        assert!(
+            repeat_app
+                .lines
+                .iter()
+                .any(|line| line.contains("Status Overview"))
         );
     }
 

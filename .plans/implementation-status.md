@@ -101,6 +101,7 @@
   - added native header/shortcut wrappers for `show` and `diff` outputs to improve scanability
   - added normal-mode `?` shortcut that opens the in-app command registry/help view
   - added command-mode history navigation (`Up`/`Down`) with draft restoration
+  - added normal-mode `.` shortcut to re-run the last executed command
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
