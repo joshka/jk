@@ -109,3 +109,5 @@ It is intentionally concrete and should be re-read during implementation checkpo
 - Flow planner tests for prompt-vs-execute behavior of every gold command.
 - Safety tests proving all Tier `C` commands require confirmation.
 - Snapshot smoke test for log-first default frame.
+- Gold command wrapper matrix test validating native header rendering for core
+  read/mutation/bookmark/remote flows.

@@ -55,6 +55,7 @@
     `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) with explicit coverage tests.
 - Regression safety:
   - added OMZ gold-alias flow matrix test
+  - added gold-command wrapper matrix regression test for native header rendering
   - added `insta` snapshots for bookmark and operation wrapper views
   - added `insta` snapshot for status wrapper output
   - added `insta` snapshots for `git fetch` and `git push` wrapper views
@@ -86,6 +87,7 @@
 
 ## Recent commit stack
 
+- `test(view): add gold wrapper matrix` (`change: nxlpypntzumw`)
 - `feat(view): add mutation summary heuristics` (`change: lvxysqknvsxt`)
 - `test(view): broaden mutation wrapper coverage` (`change: pkvvwklrwnso`)
 - `feat(view): wrap mutation outputs` (`change: tpqrulwsxpvr`)
@@ -108,7 +110,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (155 passed)
+  - `cargo test` (156 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

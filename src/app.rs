@@ -3759,6 +3759,146 @@ mod tests {
     }
 
     #[test]
+    fn decorates_gold_command_set_with_native_wrapper_headers() {
+        let cases = vec![
+            (
+                vec!["status"],
+                vec!["Working copy changes:", "M src/app.rs"],
+                "Status Overview",
+            ),
+            (
+                vec!["show", "-r", "abc12345"],
+                vec!["Commit ID: abc12345", "Change ID: qtswpusn"],
+                "Show View",
+            ),
+            (
+                vec!["diff", "-r", "abc12345"],
+                vec!["Modified regular file src/app.rs:", "@@ -1,1 +1,2 @@"],
+                "Diff View",
+            ),
+            (
+                vec!["new"],
+                vec!["Working copy now at: abcdef12 new change"],
+                "New Result",
+            ),
+            (
+                vec!["describe"],
+                vec!["Working copy now at: abcdef12 described change"],
+                "Describe Result",
+            ),
+            (
+                vec!["commit"],
+                vec!["Working copy now at: abcdef12 commit change"],
+                "Commit Result",
+            ),
+            (
+                vec!["next"],
+                vec!["Working copy now at: abcdef12 next change"],
+                "Next Result",
+            ),
+            (
+                vec!["prev"],
+                vec!["Working copy now at: abcdef12 prev change"],
+                "Prev Result",
+            ),
+            (
+                vec!["edit"],
+                vec!["Working copy now at: abcdef12 edit change"],
+                "Edit Result",
+            ),
+            (
+                vec!["rebase", "-d", "main"],
+                vec!["Rebased 3 commits onto main"],
+                "Rebase Result",
+            ),
+            (
+                vec!["squash", "--into", "main"],
+                vec!["Rebased 1 commits onto main"],
+                "Squash Result",
+            ),
+            (
+                vec!["split", "-r", "abc12345"],
+                vec!["Rebased 1 commits onto abc12345"],
+                "Split Result",
+            ),
+            (
+                vec!["abandon", "abc12345"],
+                vec!["Abandoned 1 commits."],
+                "Abandon Result",
+            ),
+            (
+                vec!["undo"],
+                vec!["Undid operation 67d547b627fb"],
+                "Undo Result",
+            ),
+            (
+                vec!["redo"],
+                vec!["Redid operation 67d547b627fb"],
+                "Redo Result",
+            ),
+            (
+                vec!["bookmark", "list"],
+                vec!["main: abcdef12", "feature: 0123abcd"],
+                "Bookmark List",
+            ),
+            (
+                vec!["bookmark", "create", "feature"],
+                vec!["Created bookmark feature at abcdef12"],
+                "Bookmark Create",
+            ),
+            (
+                vec!["bookmark", "set", "main"],
+                vec!["Moved bookmark main to abcdef12"],
+                "Bookmark Set",
+            ),
+            (
+                vec!["bookmark", "move", "main"],
+                vec!["Moved bookmark main to abcdef12"],
+                "Bookmark Move",
+            ),
+            (
+                vec!["bookmark", "track", "main"],
+                vec!["Started tracking bookmark main@origin"],
+                "Bookmark Track",
+            ),
+            (
+                vec!["bookmark", "untrack", "main"],
+                vec!["Stopped tracking bookmark main@origin"],
+                "Bookmark Untrack",
+            ),
+            (
+                vec!["git", "fetch"],
+                vec!["Fetched 2 commits from origin"],
+                "Git Fetch",
+            ),
+            (
+                vec!["git", "push"],
+                vec!["Pushed bookmark main to origin"],
+                "Git Push",
+            ),
+        ];
+
+        for (command, output, expected_header) in cases {
+            let command_tokens = command
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>();
+            let output_lines = output
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<_>>();
+
+            let rendered = decorate_command_output(&command_tokens, output_lines);
+            assert_eq!(
+                rendered.first(),
+                Some(&expected_header.to_string()),
+                "expected native wrapper header for command `{}`",
+                command.join(" "),
+            );
+        }
+    }
+
+    #[test]
     fn renders_operation_log_view_with_header_and_tip() {
         let rendered = render_operation_log_view(vec![
             "@  fac974146f86 user 5 seconds ago".to_string(),
