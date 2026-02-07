@@ -56,6 +56,14 @@ pub enum PromptKind {
         default_revisions: String,
         onto_revision: String,
     },
+    OperationShow {
+        default_operation: String,
+    },
+    OperationDiff,
+    OperationRestore,
+    OperationRevert {
+        default_operation: String,
+    },
 }
 
 impl PromptKind {
@@ -202,6 +210,52 @@ impl PromptKind {
                     onto_revision.to_string(),
                 ])
             }
+            Self::OperationShow { default_operation } => {
+                let operation = if input.is_empty() {
+                    default_operation
+                } else {
+                    input
+                };
+
+                if operation == "@" {
+                    Ok(vec!["operation".to_string(), "show".to_string()])
+                } else {
+                    Ok(vec![
+                        "operation".to_string(),
+                        "show".to_string(),
+                        operation.to_string(),
+                    ])
+                }
+            }
+            Self::OperationDiff => build_operation_diff_command(input),
+            Self::OperationRestore => {
+                if input.is_empty() {
+                    Err("operation id is required".to_string())
+                } else {
+                    Ok(vec![
+                        "operation".to_string(),
+                        "restore".to_string(),
+                        input.to_string(),
+                    ])
+                }
+            }
+            Self::OperationRevert { default_operation } => {
+                let operation = if input.is_empty() {
+                    default_operation
+                } else {
+                    input
+                };
+
+                if operation == "@" {
+                    Ok(vec!["operation".to_string(), "revert".to_string()])
+                } else {
+                    Ok(vec![
+                        "operation".to_string(),
+                        "revert".to_string(),
+                        operation.to_string(),
+                    ])
+                }
+            }
         }
     }
 }
@@ -249,6 +303,38 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         },
         [command] if command == "operation" => {
             FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
+        }
+        [command, subcommand] if command == "operation" && subcommand == "show" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "operation id for show (blank = @)".to_string(),
+                allow_empty: true,
+                kind: PromptKind::OperationShow {
+                    default_operation: "@".to_string(),
+                },
+            })
+        }
+        [command, subcommand] if command == "operation" && subcommand == "diff" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "operation diff: blank | <op> | <from> <to>".to_string(),
+                allow_empty: true,
+                kind: PromptKind::OperationDiff,
+            })
+        }
+        [command, subcommand] if command == "operation" && subcommand == "restore" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "operation id to restore (required)".to_string(),
+                allow_empty: false,
+                kind: PromptKind::OperationRestore,
+            })
+        }
+        [command, subcommand] if command == "operation" && subcommand == "revert" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "operation id to revert (blank = @)".to_string(),
+                allow_empty: true,
+                kind: PromptKind::OperationRevert {
+                    default_operation: "@".to_string(),
+                },
+            })
         }
         [command] if command == "workspace" => {
             FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
@@ -506,6 +592,28 @@ fn build_bookmark_rename_command(input: &str) -> Result<Vec<String>, String> {
     ])
 }
 
+fn build_operation_diff_command(input: &str) -> Result<Vec<String>, String> {
+    let segments: Vec<&str> = input.split_whitespace().collect();
+    match segments.as_slice() {
+        [] => Ok(vec!["operation".to_string(), "diff".to_string()]),
+        [operation] => Ok(vec![
+            "operation".to_string(),
+            "diff".to_string(),
+            "--operation".to_string(),
+            (*operation).to_string(),
+        ]),
+        [from, to] => Ok(vec![
+            "operation".to_string(),
+            "diff".to_string(),
+            "--from".to_string(),
+            (*from).to_string(),
+            "--to".to_string(),
+            (*to).to_string(),
+        ]),
+        _ => Err("use blank, <op>, or <from> <to>".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{FlowAction, PromptKind, plan_command};
@@ -713,6 +821,40 @@ mod tests {
     }
 
     #[test]
+    fn adds_guided_operation_subcommand_flows() {
+        match plan_command("operation show", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::OperationShow {
+                        default_operation: "@".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("operation restore", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::OperationRestore);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("operation revert", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::OperationRevert {
+                        default_operation: "@".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn prompt_kind_builds_tokens() {
         let bookmark = PromptKind::BookmarkSet {
             target_revision: "abc12345".to_string(),
@@ -817,6 +959,45 @@ mod tests {
                 "-o".to_string(),
                 "@".to_string()
             ])
+        );
+
+        let operation_show = PromptKind::OperationShow {
+            default_operation: "@".to_string(),
+        };
+        assert_eq!(
+            operation_show.to_tokens(""),
+            Ok(vec!["operation".to_string(), "show".to_string()])
+        );
+
+        let operation_diff = PromptKind::OperationDiff;
+        assert_eq!(
+            operation_diff.to_tokens("abcd efgh"),
+            Ok(vec![
+                "operation".to_string(),
+                "diff".to_string(),
+                "--from".to_string(),
+                "abcd".to_string(),
+                "--to".to_string(),
+                "efgh".to_string()
+            ])
+        );
+
+        let operation_restore = PromptKind::OperationRestore;
+        assert_eq!(
+            operation_restore.to_tokens("abc123"),
+            Ok(vec![
+                "operation".to_string(),
+                "restore".to_string(),
+                "abc123".to_string()
+            ])
+        );
+
+        let operation_revert = PromptKind::OperationRevert {
+            default_operation: "@".to_string(),
+        };
+        assert_eq!(
+            operation_revert.to_tokens(""),
+            Ok(vec!["operation".to_string(), "revert".to_string()])
         );
     }
 

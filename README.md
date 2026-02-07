@@ -39,6 +39,8 @@ This repository is in active development. The current baseline includes:
 - Bookmarks: `bookmark list/create/set/move/delete/forget/rename/track/untrack`.
 - Remote: `git fetch`, `git push`.
 - Command groups: `operation` defaults to `operation log`; `workspace` defaults to `workspace list`.
+- Operation guided prompts: `operation show`, `operation diff`, `operation restore`,
+  `operation revert`.
 
 Mutating high-risk commands run through confirmation guards.
 `git push` confirmation now includes a best-effort `--dry-run` preview in-app when available.

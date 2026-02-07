@@ -37,6 +37,7 @@
 - `restore`, `revert`: `done` (guided prompt defaults wired)
 - `bookmark rename`, `bookmark delete`, `bookmark forget`: `done` (guided prompts wired)
 - `operation` / `workspace` defaults: `done` (`operation log` and `workspace list`)
+- `operation show`, `operation diff`, `operation restore`, `operation revert`: `done` (guided prompts)
 
 ### Testing baseline
 
@@ -72,6 +73,7 @@
   - added startup regression tests for confirm-gated and render-only startup actions
   - added confirmation preview rendering with `git push --dry-run` support
   - added filtered command registry lookup via `:commands <query>` and `:help <query>`
+  - added guided operation subcommand prompts and operation/workspace safety overrides
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

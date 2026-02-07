@@ -317,6 +317,15 @@ pub fn command_safety(tokens: &[String]) -> SafetyTier {
                 SafetyTier::B
             }
         }
+        "operation" => match tokens.get(1).map(String::as_str) {
+            Some("restore" | "revert") => SafetyTier::C,
+            Some("log" | "show" | "diff") => SafetyTier::A,
+            _ => SafetyTier::B,
+        },
+        "workspace" => match tokens.get(1).map(String::as_str) {
+            Some("list" | "root") => SafetyTier::A,
+            _ => SafetyTier::B,
+        },
         "bookmark" => match tokens.get(1).map(String::as_str) {
             Some("set" | "move" | "delete" | "forget" | "rename") => SafetyTier::C,
             Some("create" | "track" | "untrack") => SafetyTier::B,
@@ -369,6 +378,18 @@ mod tests {
     fn applies_subcommand_safety_overrides() {
         assert_eq!(command_safety(&to_vec(&["git", "push"])), SafetyTier::C);
         assert_eq!(command_safety(&to_vec(&["git", "fetch"])), SafetyTier::B);
+        assert_eq!(
+            command_safety(&to_vec(&["operation", "restore", "abc"])),
+            SafetyTier::C
+        );
+        assert_eq!(
+            command_safety(&to_vec(&["operation", "show"])),
+            SafetyTier::A
+        );
+        assert_eq!(
+            command_safety(&to_vec(&["workspace", "root"])),
+            SafetyTier::A
+        );
         assert_eq!(
             command_safety(&to_vec(&["bookmark", "set", "feature"])),
             SafetyTier::C
