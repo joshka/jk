@@ -1094,9 +1094,12 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("status") => render_status_view(output),
         Some("show") => render_show_view(output),
         Some("diff") => render_diff_view(output),
+        Some("interdiff") => render_interdiff_view(output),
+        Some("evolog") => render_evolog_view(output),
         Some("new") => render_top_level_mutation_view("new", output),
         Some("describe") => render_top_level_mutation_view("describe", output),
         Some("commit") => render_top_level_mutation_view("commit", output),
+        Some("metaedit") => render_top_level_mutation_view("metaedit", output),
         Some("edit") => render_top_level_mutation_view("edit", output),
         Some("next") => render_top_level_mutation_view("next", output),
         Some("prev") => render_top_level_mutation_view("prev", output),
@@ -1323,6 +1326,72 @@ fn render_diff_view(lines: Vec<String>) -> Vec<String> {
     rendered.extend(normalize_diff_lines(lines));
     rendered.push(String::new());
     rendered.push("Shortcuts: d diff selected, Enter show selected, s status".to_string());
+    rendered
+}
+
+fn render_interdiff_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut rendered = vec![
+        "Interdiff View".to_string(),
+        "==============".to_string(),
+        String::new(),
+    ];
+    rendered.extend(normalize_diff_lines(lines));
+    rendered.push(String::new());
+    rendered.push("Tip: compare patch intent with `interdiff --from ... --to ...`".to_string());
+    rendered
+}
+
+fn render_evolog_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut history_lines: Vec<String> = Vec::new();
+    let mut entry_count = 0usize;
+
+    for raw_line in lines {
+        let line = raw_line.trim_end().to_string();
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        if looks_like_graph_commit_row(&line) {
+            entry_count += 1;
+            if matches!(history_lines.last(), Some(previous) if !previous.is_empty()) {
+                history_lines.push(String::new());
+            }
+        }
+
+        history_lines.push(line);
+    }
+
+    while matches!(history_lines.last(), Some(previous) if previous.is_empty()) {
+        history_lines.pop();
+    }
+
+    let summary = if entry_count == 0 {
+        "Summary: change evolution shown".to_string()
+    } else {
+        format!(
+            "Summary: {entry_count} evolution entr{} shown",
+            if entry_count == 1 { "y" } else { "ies" }
+        )
+    };
+
+    let mut rendered = vec![
+        "Evolution Log".to_string(),
+        "=============".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+    rendered.extend(history_lines);
+    rendered.push(String::new());
+    rendered.push("Tip: use `evolog -p` to inspect patch-level evolution".to_string());
     rendered
 }
 
@@ -2077,9 +2146,10 @@ fn top_level_mutation_summary(command_name: &str, detail_lines: &[String]) -> St
 fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
     let trimmed = line.trim();
     match command_name {
-        "new" | "describe" | "commit" | "edit" | "next" | "prev" => {
+        "new" | "describe" | "commit" | "metaedit" | "edit" | "next" | "prev" => {
             trimmed.starts_with("Working copy now at:")
                 || trimmed.starts_with("Working copy  (@) :")
+                || trimmed.starts_with("Rebased ")
         }
         "undo" => trimmed.starts_with("Undid operation"),
         "redo" => trimmed.starts_with("Redid operation"),
@@ -2096,7 +2166,9 @@ fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
 
 fn top_level_mutation_tip(command_name: &str) -> &'static str {
     match command_name {
-        "new" | "describe" | "commit" => "Tip: run `show` or `log` to inspect the updated revision",
+        "new" | "describe" | "commit" | "metaedit" => {
+            "Tip: run `show` or `log` to inspect the updated revision"
+        }
         "edit" | "next" | "prev" => "Tip: run `show` or `diff` to inspect the selected revision",
         "undo" | "redo" => "Tip: run `operation log` to inspect operation history",
         "rebase" | "squash" | "split" | "abandon" | "restore" | "revert" | "absorb"
@@ -4149,6 +4221,7 @@ mod tests {
             ("new", "New Result"),
             ("describe", "Describe Result"),
             ("commit", "Commit Result"),
+            ("metaedit", "Metaedit Result"),
             ("edit", "Edit Result"),
             ("next", "Next Result"),
             ("prev", "Prev Result"),
@@ -4183,6 +4256,52 @@ mod tests {
                 "expected summary line for command `{command}`",
             );
         }
+    }
+
+    #[test]
+    fn decorates_interdiff_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &[
+                "interdiff".to_string(),
+                "--from".to_string(),
+                "@-".to_string(),
+                "--to".to_string(),
+                "@".to_string(),
+            ],
+            vec![
+                "Modified regular file src/app.rs:".to_string(),
+                "    1      1: use std::collections::HashMap;".to_string(),
+            ],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Interdiff View".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("compare patch intent"))
+        );
+    }
+
+    #[test]
+    fn decorates_evolog_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &[
+                "evolog".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string(),
+            ],
+            vec![
+                "@  abcdef12 user 2026-02-07 00:00:00 0123abcd".to_string(),
+                "│  evolve message".to_string(),
+            ],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Evolution Log".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 evolution entry shown"))
+        );
     }
 
     #[test]
@@ -4774,6 +4893,40 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_interdiff_wrapper_view() {
+        let rendered = decorate_command_output(
+            &[
+                "interdiff".to_string(),
+                "--from".to_string(),
+                "@-".to_string(),
+                "--to".to_string(),
+                "@".to_string(),
+            ],
+            vec![
+                "Modified regular file src/app.rs:".to_string(),
+                "    1      1: use std::collections::HashMap;".to_string(),
+            ],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_evolog_wrapper_view() {
+        let rendered = decorate_command_output(
+            &[
+                "evolog".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string(),
+            ],
+            vec![
+                "@  abcdef12 user 2026-02-07 00:00:00 0123abcd".to_string(),
+                "│  evolve message".to_string(),
+            ],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_git_fetch_wrapper_view() {
         let rendered = render_git_fetch_view(vec![
             "Nothing changed.".to_string(),
@@ -4802,6 +4955,15 @@ mod tests {
         let rendered = render_top_level_mutation_view(
             "commit",
             vec!["Working copy now at: abcdef12 commit message".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_metaedit_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "metaedit",
+            vec!["Working copy now at: abcdef12 updated metadata".to_string()],
         );
         insta::assert_snapshot!(rendered.join("\n"));
     }

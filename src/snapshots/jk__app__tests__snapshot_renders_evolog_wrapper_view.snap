@@ -1,0 +1,13 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Evolution Log
+=============
+
+Summary: 1 evolution entry shown
+
+@  abcdef12 user 2026-02-07 00:00:00 0123abcd
+│  evolve message
+
+Tip: use `evolog -p` to inspect patch-level evolution

@@ -33,6 +33,8 @@
     `undo`, `redo`, `restore`, `revert`.
   - lifted rewrite-adjacent flows now also render via native wrappers:
     `absorb`, `duplicate`, and `parallelize`.
+  - additional advanced command wrappers now render natively:
+    `interdiff`, `evolog`, and `metaedit`.
 - Shortcut coverage:
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`
@@ -96,14 +98,20 @@
   - added explicit wrapper render/decorator tests for `version` output
   - added flow-planner tests for selection-aware `absorb`/`duplicate`/`parallelize` defaults
   - added command-registry tests asserting `absorb`/`duplicate`/`parallelize` are `guided`
+  - added flow-planner tests for selection-aware `interdiff`/`evolog` defaults and `metaedit`
+    prompt routing
+  - added command-registry tests asserting `interdiff`/`evolog`/`metaedit` are `guided`
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
   - added `insta` snapshots for top-level `absorb`, `duplicate`, and `parallelize` wrappers
+  - added `insta` snapshots for `interdiff`, `evolog`, and top-level `metaedit` wrappers
   - refreshed `insta` snapshots for bookmark/workspace/operation mutation wrappers to lock in
     signal-first summary behavior
   - refreshed `insta` snapshot for `git push` wrapper signal-first summary behavior
   - added `insta` snapshot for `version` wrapper presentation
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
+  - `interdiff` now uses a native diff-style wrapper with concise guidance for from/to comparison
+  - `evolog` now uses a native evolution wrapper with compact entry-count summary
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing
   - `workspace list` and `operation show` wrappers now include compact summaries and tips
   - `operation diff` wrapper now includes changed-commit summary and operation-flow tip
@@ -164,7 +172,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (205 passed)
+  - `cargo test` (211 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

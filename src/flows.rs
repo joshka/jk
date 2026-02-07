@@ -24,6 +24,9 @@ pub enum PromptKind {
         revision: String,
     },
     CommitMessage,
+    MetaeditMessage {
+        revision: String,
+    },
     GitFetchRemote,
     GitPushBookmark,
     BookmarkCreate {
@@ -103,6 +106,18 @@ impl PromptKind {
                         "commit".to_string(),
                         "-m".to_string(),
                         input.to_string(),
+                    ])
+                }
+            }
+            Self::MetaeditMessage { revision } => {
+                if input.is_empty() {
+                    Err("metadata message is required".to_string())
+                } else {
+                    Ok(vec![
+                        "metaedit".to_string(),
+                        "-m".to_string(),
+                        input.to_string(),
+                        revision.to_string(),
                     ])
                 }
             }
@@ -443,6 +458,11 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
             allow_empty: true,
             kind: PromptKind::CommitMessage,
         }),
+        [command] if command == "metaedit" => FlowAction::Prompt(PromptRequest {
+            label: format!("metaedit message for {selected}"),
+            allow_empty: false,
+            kind: PromptKind::MetaeditMessage { revision: selected },
+        }),
         [command] if command == "next" => FlowAction::Execute(vec!["next".to_string()]),
         [command] if command == "prev" => FlowAction::Execute(vec!["prev".to_string()]),
         [command] if command == "edit" => FlowAction::Execute(vec!["edit".to_string(), selected]),
@@ -450,6 +470,16 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         [command] if command == "diff" => {
             FlowAction::Execute(vec!["diff".to_string(), "-r".to_string(), selected])
         }
+        [command] if command == "evolog" => {
+            FlowAction::Execute(vec!["evolog".to_string(), "-r".to_string(), selected])
+        }
+        [command] if command == "interdiff" => FlowAction::Execute(vec![
+            "interdiff".to_string(),
+            "--from".to_string(),
+            "@-".to_string(),
+            "--to".to_string(),
+            selected,
+        ]),
         [command] if command == "abandon" => {
             FlowAction::Execute(vec!["abandon".to_string(), selected])
         }
@@ -1309,6 +1339,34 @@ mod tests {
     }
 
     #[test]
+    fn adds_selection_aware_evolog_interdiff_and_metaedit_flows() {
+        assert_eq!(
+            plan_command("evolog", selected()),
+            FlowAction::Execute(vec![
+                "evolog".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("interdiff", selected()),
+            FlowAction::Execute(vec![
+                "interdiff".to_string(),
+                "--from".to_string(),
+                "@-".to_string(),
+                "--to".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_prompt_kind(
+            plan_command("metaedit", selected()),
+            PromptKind::MetaeditMessage {
+                revision: "abc12345".to_string(),
+            },
+        );
+    }
+
+    #[test]
     fn bookmark_without_subcommand_lists() {
         assert_eq!(
             plan_command("bookmark", selected()),
@@ -1577,6 +1635,19 @@ mod tests {
                 "--name".to_string(),
                 "demo".to_string(),
                 "tmp/ws".to_string()
+            ])
+        );
+
+        let metaedit = PromptKind::MetaeditMessage {
+            revision: "abc12345".to_string(),
+        };
+        assert_eq!(
+            metaedit.to_tokens("rewrite metadata"),
+            Ok(vec![
+                "metaedit".to_string(),
+                "-m".to_string(),
+                "rewrite metadata".to_string(),
+                "abc12345".to_string()
             ])
         );
 

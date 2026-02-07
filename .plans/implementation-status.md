@@ -256,3 +256,13 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (205 passed), and strict `cargo clippy`.
+- Latest pass:
+  - lifted `interdiff` and `evolog` from passthrough to selection-aware guided defaults:
+    `interdiff --from @- --to <selected>` and `evolog -r <selected>`.
+  - lifted `metaedit` to a guided prompt flow using selected-revision default:
+    `metaedit -m <message> <selected>`.
+  - added native wrapper presentation and snapshot coverage for `interdiff`, `evolog`, and
+    `metaedit` outputs.
+- Latest pass:
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (211 passed), and strict `cargo clippy`.

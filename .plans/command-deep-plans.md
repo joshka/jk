@@ -84,6 +84,19 @@ Each command has a mode, safety tier, and explicit test target.
   - Mode/Tier: `guided` / `C`
   - Default flow: selection-aware execute as `parallelize <selected>`.
   - Presentation: render with native top-level mutation wrapper.
+- `interdiff`
+  - Mode/Tier: `guided` / `A`
+  - Default flow: selection-aware execute as `interdiff --from @- --to <selected>`.
+  - Presentation: render with a native diff-like wrapper for scanability.
+- `evolog`
+  - Mode/Tier: `guided` / `A`
+  - Default flow: selection-aware execute as `evolog -r <selected>`.
+  - Presentation: render with a native evolution-log wrapper and compact entry summary.
+- `metaedit`
+  - Mode/Tier: `guided` / `B`
+  - Default flow: guided message prompt for selected revision, then
+    `metaedit -m <message> <selected>`.
+  - Presentation: render with native top-level mutation wrapper.
 
 ### Operation log workflows
 

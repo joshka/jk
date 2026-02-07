@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Metaedit Result
+===============
+
+Summary: Working copy now at: abcdef12 updated metadata
+
+Working copy now at: abcdef12 updated metadata
+
+Tip: run `show` or `log` to inspect the updated revision

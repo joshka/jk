@@ -97,7 +97,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "evolog",
-        mode: ExecutionMode::Passthrough,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::A,
     },
     CommandSpec {
@@ -127,7 +127,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "interdiff",
-        mode: ExecutionMode::Passthrough,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::A,
     },
     CommandSpec {
@@ -137,7 +137,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "metaedit",
-        mode: ExecutionMode::Passthrough,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::B,
     },
     CommandSpec {
@@ -451,6 +451,18 @@ mod tests {
         );
         assert_eq!(
             lookup_top_level("parallelize").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("interdiff").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("evolog").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("metaedit").map(|spec| spec.mode),
             Some(ExecutionMode::Guided)
         );
     }
