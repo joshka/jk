@@ -28,6 +28,7 @@ This repository is in active development. The current baseline includes:
 - Log shortcut: `p` toggles `--patch` for the active log command arguments.
 - Action shortcuts in normal mode: `n` new, `c` commit, `D` describe selected change, `b` bookmark
   set for selected change, `a` abandon selected change.
+- Navigation/action shortcuts in normal mode: `]` next, `[` prev, `e` edit selected change.
 - Rewrite/recovery shortcuts in normal mode: `B` rebase selected, `S` squash selected, `X` split
   selected, `O` restore into selected, `R` revert selected, `u` undo, `U` redo.
 
@@ -44,6 +45,7 @@ This repository is in active development. The current baseline includes:
 - `status`, `show`, and `diff` use lightweight in-app view headers/shortcuts while preserving
   command output content.
 - `root` uses a native path-focused wrapper view for quick workspace inspection.
+- `bookmark list` and `operation log` also use native wrapper headers/tips for faster scanning.
 
 ## Implemented Flow Coverage (Baseline)
 

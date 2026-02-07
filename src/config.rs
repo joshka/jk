@@ -36,6 +36,9 @@ pub struct NormalKeys {
     pub rebase_main: Vec<KeyBinding>,
     pub rebase_trunk: Vec<KeyBinding>,
     pub new: Vec<KeyBinding>,
+    pub next: Vec<KeyBinding>,
+    pub prev: Vec<KeyBinding>,
+    pub edit: Vec<KeyBinding>,
     pub commit: Vec<KeyBinding>,
     pub describe: Vec<KeyBinding>,
     pub bookmark_set: Vec<KeyBinding>,
@@ -91,6 +94,9 @@ struct RawNormal {
     rebase_main: Vec<String>,
     rebase_trunk: Vec<String>,
     new: Vec<String>,
+    next: Vec<String>,
+    prev: Vec<String>,
+    edit: Vec<String>,
     commit: Vec<String>,
     describe: Vec<String>,
     bookmark_set: Vec<String>,
@@ -146,6 +152,9 @@ struct PartialNormal {
     rebase_main: Option<Vec<String>>,
     rebase_trunk: Option<Vec<String>>,
     new: Option<Vec<String>>,
+    next: Option<Vec<String>>,
+    prev: Option<Vec<String>>,
+    edit: Option<Vec<String>>,
     commit: Option<Vec<String>>,
     describe: Option<Vec<String>>,
     bookmark_set: Option<Vec<String>>,
@@ -216,6 +225,9 @@ impl RawConfig {
                 rebase_main: parse_bindings(&self.normal.rebase_main)?,
                 rebase_trunk: parse_bindings(&self.normal.rebase_trunk)?,
                 new: parse_bindings(&self.normal.new)?,
+                next: parse_bindings(&self.normal.next)?,
+                prev: parse_bindings(&self.normal.prev)?,
+                edit: parse_bindings(&self.normal.edit)?,
                 commit: parse_bindings(&self.normal.commit)?,
                 describe: parse_bindings(&self.normal.describe)?,
                 bookmark_set: parse_bindings(&self.normal.bookmark_set)?,
@@ -320,6 +332,15 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         if let Some(value) = normal.new {
             base.normal.new = value;
         }
+        if let Some(value) = normal.next {
+            base.normal.next = value;
+        }
+        if let Some(value) = normal.prev {
+            base.normal.prev = value;
+        }
+        if let Some(value) = normal.edit {
+            base.normal.edit = value;
+        }
         if let Some(value) = normal.commit {
             base.normal.commit = value;
         }
@@ -401,6 +422,9 @@ mod tests {
         assert_eq!(config.normal.rebase_main, vec![KeyBinding::Char('M')]);
         assert_eq!(config.normal.rebase_trunk, vec![KeyBinding::Char('T')]);
         assert_eq!(config.normal.new, vec![KeyBinding::Char('n')]);
+        assert_eq!(config.normal.next, vec![KeyBinding::Char(']')]);
+        assert_eq!(config.normal.prev, vec![KeyBinding::Char('[')]);
+        assert_eq!(config.normal.edit, vec![KeyBinding::Char('e')]);
         assert_eq!(config.normal.commit, vec![KeyBinding::Char('c')]);
         assert_eq!(config.normal.describe, vec![KeyBinding::Char('D')]);
         assert_eq!(config.normal.bookmark_set, vec![KeyBinding::Char('b')]);
@@ -428,6 +452,9 @@ mod tests {
         assert!(!config.normal.rebase_main.is_empty());
         assert!(!config.normal.rebase_trunk.is_empty());
         assert!(!config.normal.new.is_empty());
+        assert!(!config.normal.next.is_empty());
+        assert!(!config.normal.prev.is_empty());
+        assert!(!config.normal.edit.is_empty());
         assert!(!config.normal.commit.is_empty());
         assert!(!config.normal.describe.is_empty());
         assert!(!config.normal.bookmark_set.is_empty());

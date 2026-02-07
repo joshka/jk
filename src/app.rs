@@ -234,6 +234,21 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.next, key) {
+            self.execute_command_line("next")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.prev, key) {
+            self.execute_command_line("prev")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.edit, key) {
+            self.execute_command_line("edit")?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.commit, key) {
             self.execute_command_line("commit")?;
             return Ok(());
@@ -1003,6 +1018,12 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("show") => render_show_view(output),
         Some("diff") => render_diff_view(output),
         Some("root") => render_root_view(output),
+        Some("bookmark") if matches!(command.get(1).map(String::as_str), Some("list")) => {
+            render_bookmark_list_view(output)
+        }
+        Some("operation") if matches!(command.get(1).map(String::as_str), Some("log")) => {
+            render_operation_log_view(output)
+        }
         _ => output,
     }
 }
@@ -1108,6 +1129,38 @@ fn render_root_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut rendered = vec![
+        "Bookmark List".to_string(),
+        "=============".to_string(),
+        String::new(),
+    ];
+    rendered.extend(lines);
+    rendered.push(String::new());
+    rendered.push("Tip: use `bookmark set/move/track` flows from normal mode or `:`".to_string());
+    rendered
+}
+
+fn render_operation_log_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut rendered = vec![
+        "Operation Log".to_string(),
+        "=============".to_string(),
+        String::new(),
+    ];
+    rendered.extend(lines);
+    rendered.push(String::new());
+    rendered.push("Tip: restore/revert operations stay confirm-gated with previews".to_string());
+    rendered
+}
+
 struct TerminalSession {
     stdout: Stdout,
 }
@@ -1148,8 +1201,8 @@ mod tests {
     use super::{
         App, Mode, build_row_revision_map, confirmation_preview_tokens, extract_revision,
         is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
-        render_diff_view, render_root_view, render_show_view, render_status_view, startup_action,
-        toggle_patch_flag,
+        render_bookmark_list_view, render_diff_view, render_operation_log_view, render_root_view,
+        render_show_view, render_status_view, startup_action, toggle_patch_flag,
     };
 
     #[test]
@@ -1641,6 +1694,42 @@ mod tests {
         assert_eq!(rendered.first(), Some(&"Workspace Root".to_string()));
         assert!(rendered.iter().any(|line| line == "/Users/joshka/local/jk"));
         assert!(rendered.iter().any(|line| line.contains("jjrt/jk root")));
+    }
+
+    #[test]
+    fn renders_bookmark_list_view_with_header_and_tip() {
+        let rendered = render_bookmark_list_view(vec![
+            "main: abcdef12".to_string(),
+            "feature: 0123abcd".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Bookmark List".to_string()));
+        assert!(rendered.iter().any(|line| line == "main: abcdef12"));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("bookmark set/move/track"))
+        );
+    }
+
+    #[test]
+    fn renders_operation_log_view_with_header_and_tip() {
+        let rendered = render_operation_log_view(vec![
+            "@  fac974146f86 user 5 seconds ago".to_string(),
+            "│  snapshot working copy".to_string(),
+        ]);
+
+        assert_eq!(rendered.first(), Some(&"Operation Log".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line == "@  fac974146f86 user 5 seconds ago")
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("restore/revert operations"))
+        );
     }
 
     #[test]

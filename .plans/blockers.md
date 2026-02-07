@@ -6,6 +6,16 @@ None currently.
 
 ## Resolved blockers
 
+### 2. Mutation-prone shortcut tests triggered real `jj` moves
+
+- Symptom: adding `next`/`prev` assertions to the normal-mode app shortcut test executed real
+  `jj next`/`jj prev` commands and moved the working copy commit during `cargo test`.
+- Impact: test run changed active revision context and could hide/unhide in-progress changes.
+- Workaround used:
+  - removed direct app-level execution assertions for mutation-prone shortcuts;
+  - added flow-planner coverage (`plan_command`) for `next`/`prev` behavior instead;
+  - restored working copy to the intended change with `jj --no-pager edit <change-id>`.
+
 ### 1Password signing popup during `jj` rewrites
 
 - Symptom: `jj describe`/rewrite operations failed with SSH signing error from 1Password.

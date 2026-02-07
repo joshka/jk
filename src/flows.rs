@@ -694,6 +694,13 @@ mod tests {
         Some("abc12345".to_string())
     }
 
+    fn assert_prompt_kind(action: FlowAction, expected: PromptKind) {
+        match action {
+            FlowAction::Prompt(request) => assert_eq!(request.kind, expected),
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
     #[test]
     fn plans_show_diff_edit_and_abandon_with_selected_revision() {
         assert_eq!(
@@ -871,6 +878,125 @@ mod tests {
                 "-d".to_string(),
                 "release".to_string()
             ])
+        );
+    }
+
+    #[test]
+    fn covers_gold_command_flow_contract() {
+        assert_eq!(
+            plan_command("log", selected()),
+            FlowAction::Execute(vec!["log".to_string()])
+        );
+        assert_eq!(
+            plan_command("status", selected()),
+            FlowAction::Execute(vec!["status".to_string()])
+        );
+        assert_eq!(
+            plan_command("show", selected()),
+            FlowAction::Execute(vec!["show".to_string(), "abc12345".to_string()])
+        );
+        assert_eq!(
+            plan_command("diff", selected()),
+            FlowAction::Execute(vec![
+                "diff".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+
+        assert_prompt_kind(plan_command("new", selected()), PromptKind::NewMessage);
+        assert_prompt_kind(
+            plan_command("describe", selected()),
+            PromptKind::DescribeMessage {
+                revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("commit", selected()),
+            PromptKind::CommitMessage,
+        );
+        assert_eq!(
+            plan_command("next", selected()),
+            FlowAction::Execute(vec!["next".to_string()])
+        );
+        assert_eq!(
+            plan_command("prev", selected()),
+            FlowAction::Execute(vec!["prev".to_string()])
+        );
+        assert_eq!(
+            plan_command("edit", selected()),
+            FlowAction::Execute(vec!["edit".to_string(), "abc12345".to_string()])
+        );
+
+        assert_prompt_kind(
+            plan_command("rebase", selected()),
+            PromptKind::RebaseDestination {
+                source_revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("squash", selected()),
+            PromptKind::SquashInto {
+                from_revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("split", selected()),
+            PromptKind::SplitFileset {
+                revision: "abc12345".to_string(),
+            },
+        );
+        assert_eq!(
+            plan_command("abandon", selected()),
+            FlowAction::Execute(vec!["abandon".to_string(), "abc12345".to_string()])
+        );
+        assert_eq!(
+            plan_command("undo", selected()),
+            FlowAction::Execute(vec!["undo".to_string()])
+        );
+        assert_eq!(
+            plan_command("redo", selected()),
+            FlowAction::Execute(vec!["redo".to_string()])
+        );
+
+        assert_eq!(
+            plan_command("bookmark", selected()),
+            FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
+        );
+        assert_prompt_kind(
+            plan_command("bookmark create", selected()),
+            PromptKind::BookmarkCreate {
+                target_revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("bookmark set", selected()),
+            PromptKind::BookmarkSet {
+                target_revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("bookmark move", selected()),
+            PromptKind::BookmarkMove {
+                target_revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("bookmark track", selected()),
+            PromptKind::BookmarkTrack,
+        );
+        assert_prompt_kind(
+            plan_command("bookmark untrack", selected()),
+            PromptKind::BookmarkUntrack,
+        );
+
+        assert_prompt_kind(
+            plan_command("git fetch", selected()),
+            PromptKind::GitFetchRemote,
+        );
+        assert_prompt_kind(
+            plan_command("git push", selected()),
+            PromptKind::GitPushBookmark,
         );
     }
 
@@ -1191,6 +1317,18 @@ mod tests {
         assert_eq!(
             plan_command("redo", selected()),
             FlowAction::Execute(vec!["redo".to_string()])
+        );
+    }
+
+    #[test]
+    fn next_and_prev_execute_directly() {
+        assert_eq!(
+            plan_command("next", selected()),
+            FlowAction::Execute(vec!["next".to_string()])
+        );
+        assert_eq!(
+            plan_command("prev", selected()),
+            FlowAction::Execute(vec!["prev".to_string()])
         );
     }
 
