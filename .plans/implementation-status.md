@@ -102,6 +102,7 @@
   - added normal-mode `?` shortcut that opens the in-app command registry/help view
   - added command-mode history navigation (`Up`/`Down`) with draft restoration
   - added normal-mode `.` shortcut to re-run the last executed command
+  - added native wrapper view for `root` output with workspace-path-focused presentation
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

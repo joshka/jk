@@ -43,6 +43,7 @@ This repository is in active development. The current baseline includes:
 - Unfiltered command registry output also includes a high-frequency alias hint line.
 - `status`, `show`, and `diff` use lightweight in-app view headers/shortcuts while preserving
   command output content.
+- `root` uses a native path-focused wrapper view for quick workspace inspection.
 
 ## Implemented Flow Coverage (Baseline)
 

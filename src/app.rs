@@ -1002,6 +1002,7 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("status") => render_status_view(output),
         Some("show") => render_show_view(output),
         Some("diff") => render_diff_view(output),
+        Some("root") => render_root_view(output),
         _ => output,
     }
 }
@@ -1083,6 +1084,30 @@ fn render_diff_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+fn render_root_view(lines: Vec<String>) -> Vec<String> {
+    if lines.is_empty() || lines == ["(no output)"] {
+        return lines;
+    }
+
+    let mut rendered = vec![
+        "Workspace Root".to_string(),
+        "==============".to_string(),
+        String::new(),
+    ];
+
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        rendered.push(trimmed.to_string());
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: use jjrt/jk root to inspect current workspace path".to_string());
+    rendered
+}
+
 struct TerminalSession {
     stdout: Stdout,
 }
@@ -1123,7 +1148,8 @@ mod tests {
     use super::{
         App, Mode, build_row_revision_map, confirmation_preview_tokens, extract_revision,
         is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
-        render_diff_view, render_show_view, render_status_view, startup_action, toggle_patch_flag,
+        render_diff_view, render_root_view, render_show_view, render_status_view, startup_action,
+        toggle_patch_flag,
     };
 
     #[test]
@@ -1606,6 +1632,15 @@ mod tests {
                 .iter()
                 .any(|line| line.contains("Shortcuts: d diff selected"))
         );
+    }
+
+    #[test]
+    fn renders_root_view_with_header_and_tip() {
+        let rendered = render_root_view(vec!["/Users/joshka/local/jk".to_string()]);
+
+        assert_eq!(rendered.first(), Some(&"Workspace Root".to_string()));
+        assert!(rendered.iter().any(|line| line == "/Users/joshka/local/jk"));
+        assert!(rendered.iter().any(|line| line.contains("jjrt/jk root")));
     }
 
     #[test]
