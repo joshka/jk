@@ -21,7 +21,7 @@
 - CLI entrypoint (`jk` == `jk log`): `done`
 - Alt-screen + raw mode runtime loop: `done`
 - Keybinding system + TOML defaults: `done`
-- Command registry and alias normalization: `done` (includes OMZ alias baseline)
+- Command registry and alias normalization: `done` (includes OMZ alias baseline + 44-command registry)
 - Log view rendering/parsing bridge: `in-progress`
 
 ### Core command flows (Phase 1 target)
@@ -58,6 +58,7 @@
   - added guided flows for rewrite/recovery, bookmark, and remote commands in `src/flows.rs`
   - retained confirmation gating in `src/app.rs` for Tier C commands
   - added explicit test coverage for dangerous-command gating and alias argument fidelity
+  - added explicit top-level `jj` command registry and safety-tier lookup in `src/commands.rs`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

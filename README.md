@@ -38,6 +38,9 @@ This repository is in active development. The current baseline includes:
 
 Mutating high-risk commands run through confirmation guards.
 
+`jk` also keeps an explicit top-level command registry aligned to the current `jj` command surface so
+new flow work can evolve without ambiguity.
+
 ## Alias Coverage
 
 Native aliases:

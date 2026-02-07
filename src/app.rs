@@ -11,6 +11,7 @@ use crossterm::terminal::{
 use crossterm::{execute, queue};
 use regex::Regex;
 
+use crate::commands::{SafetyTier, command_safety};
 use crate::config::KeybindConfig;
 use crate::error::JkError;
 use crate::flows::{FlowAction, PromptKind, PromptRequest, plan_command};
@@ -444,19 +445,7 @@ fn matches_any(bindings: &[KeyBinding], key: KeyEvent) -> bool {
 }
 
 fn is_dangerous(tokens: &[String]) -> bool {
-    let Some(first) = tokens.first().map(String::as_str) else {
-        return false;
-    };
-
-    match first {
-        "rebase" | "squash" | "split" | "abandon" | "undo" | "redo" | "revert" | "restore" => true,
-        "git" => matches!(tokens.get(1).map(String::as_str), Some("push")),
-        "bookmark" => matches!(
-            tokens.get(1).map(String::as_str),
-            Some("set" | "move" | "delete" | "forget" | "rename")
-        ),
-        _ => false,
-    }
+    command_safety(tokens) == SafetyTier::C
 }
 
 struct TerminalSession {
