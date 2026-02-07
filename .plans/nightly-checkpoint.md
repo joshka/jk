@@ -41,6 +41,8 @@
   - rewrite flow `diffedit` now renders via native mutation wrapper.
   - command output now preserves `jj` color styling in TUI views by forcing `jj --color=always`
     for interactive command execution.
+  - render loop now resets terminal color after every row so truncated ANSI-styled lines do not
+    leak style into following rows.
 - Shortcut coverage:
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`

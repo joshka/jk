@@ -308,3 +308,7 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (218 passed), and strict `cargo clippy`.
+- Latest pass:
+  - reset terminal color after each rendered row to prevent ANSI style bleed when long colorized
+    lines are width-trimmed in the TUI.
+  - reran `cargo fmt`, `cargo check`, focused ANSI regression tests, and strict `cargo clippy`.

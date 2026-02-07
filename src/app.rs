@@ -10,7 +10,7 @@ use crate::jj;
 use crate::keys::KeyBinding;
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
-use crossterm::style::Print;
+use crossterm::style::{Print, ResetColor};
 use crossterm::terminal::{
     self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
     enable_raw_mode,
@@ -690,7 +690,7 @@ impl App {
         queue!(stdout, MoveTo(0, 0), Clear(ClearType::All))?;
 
         for (index, line) in frame.into_iter().enumerate() {
-            queue!(stdout, MoveTo(0, index as u16), Print(line))?;
+            queue!(stdout, MoveTo(0, index as u16), Print(line), ResetColor)?;
         }
 
         stdout.flush()?;
