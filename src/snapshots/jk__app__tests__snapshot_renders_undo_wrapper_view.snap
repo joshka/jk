@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Undo Result
+===========
+
+Summary: Undid operation 67d547b627fb
+
+Undid operation 67d547b627fb
+
+Tip: run `operation log` to inspect operation history

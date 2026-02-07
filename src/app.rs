@@ -4331,6 +4331,40 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_new_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "new",
+            vec!["Working copy now at: abcdef12 new change".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_undo_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "undo",
+            vec!["Undid operation 67d547b627fb".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_abandon_wrapper_view() {
+        let rendered =
+            render_top_level_mutation_view("abandon", vec!["Abandoned 1 commits.".to_string()]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_restore_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "restore",
+            vec!["Restored 2 paths from revision abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_rebase_wrapper_view() {
         let rendered = render_top_level_mutation_view(
             "rebase",
