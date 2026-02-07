@@ -28,6 +28,7 @@ This repository is in active development. The current baseline includes:
 - `jk <command> [args...]` starts in the same TUI and runs/plans that command.
 - Commands entered with `:` use the same normalization and safety rules.
 - `:commands` renders an in-app command registry with mode/tier coverage.
+- `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).
 
 ## Implemented Flow Coverage (Baseline)
 

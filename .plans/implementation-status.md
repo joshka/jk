@@ -71,6 +71,7 @@
   - routed startup `jk <command>` through the same flow planner used by command mode
   - added startup regression tests for confirm-gated and render-only startup actions
   - added confirmation preview rendering with `git push --dry-run` support
+  - added filtered command registry lookup via `:commands <query>` and `:help <query>`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

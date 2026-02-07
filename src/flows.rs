@@ -1,5 +1,5 @@
 use crate::alias::normalize_alias;
-use crate::commands::command_overview_lines;
+use crate::commands::{command_overview_lines, command_overview_lines_with_query};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowAction {
@@ -230,7 +230,20 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
     let selected = selected_revision.unwrap_or_else(|| "@".to_string());
 
     match tokens.as_slice() {
+        [command, tail @ ..]
+            if (command == "commands" || command == "help") && !tail.is_empty() =>
+        {
+            let query = tail.join(" ");
+            FlowAction::Render {
+                lines: command_overview_lines_with_query(Some(&query)),
+                status: format!("Showing command registry for `{query}`"),
+            }
+        }
         [command] if command == "commands" || command == "?" => FlowAction::Render {
+            lines: command_overview_lines(),
+            status: "Showing command registry".to_string(),
+        },
+        [command] if command == "help" => FlowAction::Render {
             lines: command_overview_lines(),
             status: "Showing command registry".to_string(),
         },
@@ -844,5 +857,17 @@ mod tests {
             plan_command("workspace", selected()),
             FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
         );
+    }
+
+    #[test]
+    fn filters_command_registry_with_query() {
+        match plan_command("commands work", selected()) {
+            FlowAction::Render { lines, status } => {
+                assert_eq!(status, "Showing command registry for `work`".to_string());
+                assert!(lines.iter().any(|line| line.starts_with("workspace")));
+                assert!(!lines.iter().any(|line| line.starts_with("rebase")));
+            }
+            other => panic!("expected render action, got {other:?}"),
+        }
     }
 }

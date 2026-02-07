@@ -272,12 +272,27 @@ pub fn lookup_top_level(command: &str) -> Option<CommandSpec> {
 }
 
 pub fn command_overview_lines() -> Vec<String> {
+    command_overview_lines_with_query(None)
+}
+
+pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
+    let filter = query
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase);
+
     let mut lines = Vec::with_capacity(TOP_LEVEL_SPECS.len() + 3);
     lines.push("jk command registry (jj top-level coverage)".to_string());
     lines.push(format!("{:<18} {:<12} {}", "command", "mode", "tier"));
     lines.push("-".repeat(40));
 
     for spec in TOP_LEVEL_SPECS {
+        if let Some(filter) = &filter
+            && !spec.name.to_ascii_lowercase().contains(filter)
+        {
+            continue;
+        }
+
         lines.push(format!(
             "{:<18} {:<12} {}",
             spec.name,
@@ -318,8 +333,8 @@ mod tests {
     use std::collections::HashSet;
 
     use super::{
-        ExecutionMode, SafetyTier, TOP_LEVEL_SPECS, command_overview_lines, command_safety,
-        lookup_top_level,
+        ExecutionMode, SafetyTier, TOP_LEVEL_SPECS, command_overview_lines,
+        command_overview_lines_with_query, command_safety, lookup_top_level,
     };
 
     fn to_vec(values: &[&str]) -> Vec<String> {
@@ -380,5 +395,12 @@ mod tests {
         );
         assert!(lines.iter().any(|line| line.starts_with("log")));
         assert!(lines.iter().any(|line| line.starts_with("workspace")));
+    }
+
+    #[test]
+    fn filters_overview_lines_by_query() {
+        let lines = command_overview_lines_with_query(Some("work"));
+        assert!(lines.iter().any(|line| line.starts_with("workspace")));
+        assert!(!lines.iter().any(|line| line.starts_with("rebase")));
     }
 }
