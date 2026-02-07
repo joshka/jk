@@ -127,8 +127,11 @@ fn has_destination_flag(tokens: &[String]) -> bool {
 
 fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
     match alias {
+        "b" => Some(&["bookmark"]),
+        "ci" => Some(&["commit"]),
         "desc" | "jjds" => Some(&["describe"]),
         "jjdmsg" => Some(&["describe", "--message"]),
+        "op" => Some(&["operation"]),
         "st" | "jjst" => Some(&["status"]),
         "gf" | "jjgf" => Some(&["git", "fetch"]),
         "gfa" | "jjgfa" => Some(&["git", "fetch", "--all-remotes"]),
@@ -180,6 +183,9 @@ mod tests {
 
     #[test]
     fn maps_core_short_aliases() {
+        assert_eq!(normalize_alias(&to_vec(&["b"])), to_vec(&["bookmark"]));
+        assert_eq!(normalize_alias(&to_vec(&["ci"])), to_vec(&["commit"]));
+        assert_eq!(normalize_alias(&to_vec(&["op"])), to_vec(&["operation"]));
         assert_eq!(normalize_alias(&to_vec(&["gf"])), to_vec(&["git", "fetch"]));
         assert_eq!(normalize_alias(&to_vec(&["gp"])), to_vec(&["git", "push"]));
         assert_eq!(

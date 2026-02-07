@@ -49,6 +49,8 @@
   - added guided prompts for `file track`, `file untrack`, and `file chmod`.
   - added guided prompts for `tag set` and `tag delete` while keeping list-first `tag` default.
 - Alias behavior:
+  - core `jj` default aliases `b`, `ci`, and `op` now canonicalize to `bookmark`, `commit`, and
+    `operation` so native `jj` shorthand paths use the same guided/native wrappers.
   - `rbm`/`rbt` now preserve explicit destination flags (`-d`/`--destination`/`--to`/`--into`)
     so explicit user intent wins over alias defaults.
   - alias catalog now includes the full installed OMZ plugin set (including `jjbc`, `jjbd`,
@@ -98,6 +100,7 @@
 
 ## Recent commit stack
 
+- `fix(alias): canonicalize core jj shorthands` (`change: rklkwyoyqlsp`)
 - `test(view): add mutation wrapper routing matrix` (`change: xluyuvkxnqsn`)
 - `test(view): snapshot remaining top-level mutations` (`change: nuvpwspkpwzx`)
 - `test(view): snapshot top-level mutation variants` (`change: umvnxkynouzz`)

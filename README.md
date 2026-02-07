@@ -116,6 +116,7 @@ Log-row selection uses metadata-backed revision mapping to stay stable across mu
 Native aliases:
 
 - `gf`, `gp`, `rbm`, `rbt`
+- core `jj` defaults: `b`, `ci`, `op`, `st`, `desc`
 - `rbm` defaults to `main` and accepts an optional destination override (for example `rbm release`).
 - `rbm`/`rbt` preserve explicit destination flags (for example `rbm -d release` or
   `rbt --to main`) instead of forcing default destinations.

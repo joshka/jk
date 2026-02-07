@@ -214,3 +214,6 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (182 passed), and strict `cargo clippy`.
+- Latest pass:
+  - aligned alias normalization with core `jj` defaults so `b`, `ci`, and `op` canonicalize to
+    `bookmark`, `commit`, and `operation` for consistent in-app flow routing.
