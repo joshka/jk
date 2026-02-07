@@ -18,18 +18,42 @@ pub struct PromptRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptKind {
     NewMessage,
-    DescribeMessage { revision: String },
+    DescribeMessage {
+        revision: String,
+    },
     CommitMessage,
     GitFetchRemote,
     GitPushBookmark,
-    BookmarkCreate { target_revision: String },
-    BookmarkSet { target_revision: String },
-    BookmarkMove { target_revision: String },
+    BookmarkCreate {
+        target_revision: String,
+    },
+    BookmarkSet {
+        target_revision: String,
+    },
+    BookmarkMove {
+        target_revision: String,
+    },
+    BookmarkDelete,
+    BookmarkForget,
+    BookmarkRename,
     BookmarkTrack,
     BookmarkUntrack,
-    RebaseDestination { source_revision: String },
-    SquashInto { from_revision: String },
-    SplitFileset { revision: String },
+    RebaseDestination {
+        source_revision: String,
+    },
+    SquashInto {
+        from_revision: String,
+    },
+    SplitFileset {
+        revision: String,
+    },
+    RestoreFrom {
+        target_revision: String,
+    },
+    RevertRevisions {
+        default_revisions: String,
+        onto_revision: String,
+    },
 }
 
 impl PromptKind {
@@ -109,6 +133,9 @@ impl PromptKind {
                 "bookmark name required",
                 "--to",
             ),
+            Self::BookmarkDelete => build_bookmark_names_command("delete", input),
+            Self::BookmarkForget => build_bookmark_names_command("forget", input),
+            Self::BookmarkRename => build_bookmark_rename_command(input),
             Self::BookmarkTrack => build_track_command("track", input),
             Self::BookmarkUntrack => build_track_command("untrack", input),
             Self::RebaseDestination { source_revision } => {
@@ -145,6 +172,33 @@ impl PromptKind {
                         input.to_string(),
                     ])
                 }
+            }
+            Self::RestoreFrom { target_revision } => {
+                let from = if input.is_empty() { "@-" } else { input };
+                Ok(vec![
+                    "restore".to_string(),
+                    "--from".to_string(),
+                    from.to_string(),
+                    "--to".to_string(),
+                    target_revision.to_string(),
+                ])
+            }
+            Self::RevertRevisions {
+                default_revisions,
+                onto_revision,
+            } => {
+                let revisions = if input.is_empty() {
+                    default_revisions
+                } else {
+                    input
+                };
+                Ok(vec![
+                    "revert".to_string(),
+                    "-r".to_string(),
+                    revisions.to_string(),
+                    "-o".to_string(),
+                    onto_revision.to_string(),
+                ])
             }
         }
     }
@@ -201,6 +255,21 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         }
         [command] if command == "undo" => FlowAction::Execute(vec!["undo".to_string()]),
         [command] if command == "redo" => FlowAction::Execute(vec!["redo".to_string()]),
+        [command] if command == "restore" => FlowAction::Prompt(PromptRequest {
+            label: format!("restore from revset into {selected} (blank = @-)"),
+            allow_empty: true,
+            kind: PromptKind::RestoreFrom {
+                target_revision: selected,
+            },
+        }),
+        [command] if command == "revert" => FlowAction::Prompt(PromptRequest {
+            label: format!("revert revset (blank = {selected})"),
+            allow_empty: true,
+            kind: PromptKind::RevertRevisions {
+                default_revisions: selected,
+                onto_revision: "@".to_string(),
+            },
+        }),
         [command] if command == "bookmark" => {
             FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
         }
@@ -229,6 +298,27 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
                 kind: PromptKind::BookmarkMove {
                     target_revision: selected,
                 },
+            })
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "delete" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "delete bookmarks (space-separated names)".to_string(),
+                allow_empty: false,
+                kind: PromptKind::BookmarkDelete,
+            })
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "forget" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "forget bookmarks (space-separated names)".to_string(),
+                allow_empty: false,
+                kind: PromptKind::BookmarkForget,
+            })
+        }
+        [command, subcommand] if command == "bookmark" && subcommand == "rename" => {
+            FlowAction::Prompt(PromptRequest {
+                label: "rename bookmark: <old> <new>".to_string(),
+                allow_empty: false,
+                kind: PromptKind::BookmarkRename,
             })
         }
         [command, subcommand] if command == "bookmark" && subcommand == "track" => {
@@ -361,6 +451,31 @@ fn build_track_command(subcommand: &str, input: &str) -> Result<Vec<String>, Str
     }
 
     Ok(tokens)
+}
+
+fn build_bookmark_names_command(subcommand: &str, input: &str) -> Result<Vec<String>, String> {
+    let names: Vec<&str> = input.split_whitespace().collect();
+    if names.is_empty() {
+        return Err("at least one bookmark name is required".to_string());
+    }
+
+    let mut tokens = vec!["bookmark".to_string(), subcommand.to_string()];
+    tokens.extend(names.into_iter().map(ToString::to_string));
+    Ok(tokens)
+}
+
+fn build_bookmark_rename_command(input: &str) -> Result<Vec<String>, String> {
+    let names: Vec<&str> = input.split_whitespace().collect();
+    if names.len() != 2 {
+        return Err("use format: <old> <new>".to_string());
+    }
+
+    Ok(vec![
+        "bookmark".to_string(),
+        "rename".to_string(),
+        names[0].to_string(),
+        names[1].to_string(),
+    ])
 }
 
 #[cfg(test)]
@@ -518,6 +633,58 @@ mod tests {
     }
 
     #[test]
+    fn adds_guided_restore_and_revert_flows() {
+        match plan_command("restore", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::RestoreFrom {
+                        target_revision: "abc12345".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("revert", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(
+                    request.kind,
+                    PromptKind::RevertRevisions {
+                        default_revisions: "abc12345".to_string(),
+                        onto_revision: "@".to_string()
+                    }
+                );
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn adds_guided_delete_forget_and_rename_flows() {
+        match plan_command("bookmark delete", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::BookmarkDelete);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("bookmark forget", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::BookmarkForget);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+
+        match plan_command("bookmark rename", selected()) {
+            FlowAction::Prompt(request) => {
+                assert_eq!(request.kind, PromptKind::BookmarkRename);
+            }
+            other => panic!("expected prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn prompt_kind_builds_tokens() {
         let bookmark = PromptKind::BookmarkSet {
             target_revision: "abc12345".to_string(),
@@ -570,6 +737,57 @@ mod tests {
                 "abc12345".to_string(),
                 "--into".to_string(),
                 "@-".to_string()
+            ])
+        );
+
+        let bookmark_delete = PromptKind::BookmarkDelete;
+        assert_eq!(
+            bookmark_delete.to_tokens("feature hotfix"),
+            Ok(vec![
+                "bookmark".to_string(),
+                "delete".to_string(),
+                "feature".to_string(),
+                "hotfix".to_string()
+            ])
+        );
+
+        let bookmark_rename = PromptKind::BookmarkRename;
+        assert_eq!(
+            bookmark_rename.to_tokens("old-name new-name"),
+            Ok(vec![
+                "bookmark".to_string(),
+                "rename".to_string(),
+                "old-name".to_string(),
+                "new-name".to_string()
+            ])
+        );
+
+        let restore = PromptKind::RestoreFrom {
+            target_revision: "@".to_string(),
+        };
+        assert_eq!(
+            restore.to_tokens(""),
+            Ok(vec![
+                "restore".to_string(),
+                "--from".to_string(),
+                "@-".to_string(),
+                "--to".to_string(),
+                "@".to_string()
+            ])
+        );
+
+        let revert = PromptKind::RevertRevisions {
+            default_revisions: "abc12345".to_string(),
+            onto_revision: "@".to_string(),
+        };
+        assert_eq!(
+            revert.to_tokens(""),
+            Ok(vec![
+                "revert".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string(),
+                "-o".to_string(),
+                "@".to_string()
             ])
         );
     }

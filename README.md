@@ -33,7 +33,8 @@ This repository is in active development. The current baseline includes:
 - Read: `log`, `status`, `show`, `diff`.
 - Daily mutation: `new`, `describe`, `commit`, `next`, `prev`, `edit`.
 - Rewrite/recovery: `rebase`, `squash`, `split`, `abandon`, `undo`, `redo`.
-- Bookmarks: `bookmark list/create/set/move/track/untrack`.
+- Recovery extras: `restore`, `revert`.
+- Bookmarks: `bookmark list/create/set/move/delete/forget/rename/track/untrack`.
 - Remote: `git fetch`, `git push`.
 
 Mutating high-risk commands run through confirmation guards.

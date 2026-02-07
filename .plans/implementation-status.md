@@ -32,6 +32,11 @@
 - `bookmark` core subset: `done` (list/create/set/move/track/untrack prompts wired)
 - `git fetch`, `git push`: `done` (guided prompts + alias coverage + push confirmation)
 
+### Extended guided flows (Phase 2 seed)
+
+- `restore`, `revert`: `done` (guided prompt defaults wired)
+- `bookmark rename`, `bookmark delete`, `bookmark forget`: `done` (guided prompts wired)
+
 ### Testing baseline
 
 - Unit test harness for parsing/alias normalization: `done`
@@ -59,6 +64,7 @@
   - retained confirmation gating in `src/app.rs` for Tier C commands
   - added explicit test coverage for dangerous-command gating and alias argument fidelity
   - added explicit top-level `jj` command registry and safety-tier lookup in `src/commands.rs`
+  - expanded guided prompts for `restore`, `revert`, and additional bookmark mutations
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
