@@ -23,6 +23,7 @@ This repository is in active development. The current baseline includes:
 - Configurable keybinds from `config/keybinds.default.toml` and optional user override.
 - High-frequency normal-mode shortcuts: `s` status, `F` fetch, `P` push, `M` rebase to main,
   `T` rebase to trunk.
+- Help shortcut: `?` opens the command registry directly from normal mode.
 - Log shortcut: `p` toggles `--patch` for the active log command arguments.
 - Action shortcuts in normal mode: `n` new, `c` commit, `D` describe selected change, `b` bookmark
   set for selected change, `a` abandon selected change.

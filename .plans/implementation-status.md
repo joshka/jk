@@ -99,6 +99,7 @@
   - surfaced high-frequency alias hints directly in unfiltered `:commands`/`:help` output
   - switched `:` command parsing to shell-style tokenization with invalid-quote status feedback
   - added native header/shortcut wrappers for `show` and `diff` outputs to improve scanability
+  - added normal-mode `?` shortcut that opens the in-app command registry/help view
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

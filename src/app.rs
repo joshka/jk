@@ -121,6 +121,11 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.help, key) {
+            self.execute_command_line("commands")?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.up, key) {
             self.move_cursor_up();
             return Ok(());
@@ -1748,6 +1753,19 @@ mod tests {
                 .lines
                 .iter()
                 .any(|line| line.contains("Status Overview"))
+        );
+
+        let mut help_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        help_app
+            .handle_key(KeyEvent::from(KeyCode::Char('?')))
+            .expect("help shortcut should be handled");
+        assert_eq!(help_app.mode, Mode::Normal);
+        assert_eq!(help_app.status_line, "Showing command registry".to_string());
+        assert!(
+            help_app
+                .lines
+                .iter()
+                .any(|line| line.contains("jj top-level coverage"))
         );
     }
 }
