@@ -492,7 +492,7 @@ impl Drop for TerminalSession {
 mod tests {
     use crate::config::KeybindConfig;
 
-    use super::{App, extract_revision};
+    use super::{App, extract_revision, is_dangerous};
 
     #[test]
     fn extracts_change_id_from_log_line() {
@@ -515,5 +515,49 @@ mod tests {
         ];
         app.status_line = "Ready".to_string();
         insta::assert_snapshot!(app.render_for_snapshot(60, 6));
+    }
+
+    #[test]
+    fn marks_tier_c_commands_as_dangerous() {
+        assert!(is_dangerous(&["rebase".to_string()]));
+        assert!(is_dangerous(&["squash".to_string()]));
+        assert!(is_dangerous(&["split".to_string()]));
+        assert!(is_dangerous(&["abandon".to_string()]));
+        assert!(is_dangerous(&["undo".to_string()]));
+        assert!(is_dangerous(&["redo".to_string()]));
+        assert!(is_dangerous(&["restore".to_string()]));
+        assert!(is_dangerous(&["revert".to_string()]));
+        assert!(is_dangerous(&["git".to_string(), "push".to_string()]));
+        assert!(is_dangerous(&["bookmark".to_string(), "set".to_string()]));
+        assert!(is_dangerous(&["bookmark".to_string(), "move".to_string()]));
+        assert!(is_dangerous(&[
+            "bookmark".to_string(),
+            "delete".to_string()
+        ]));
+        assert!(is_dangerous(&[
+            "bookmark".to_string(),
+            "forget".to_string()
+        ]));
+        assert!(is_dangerous(&[
+            "bookmark".to_string(),
+            "rename".to_string()
+        ]));
+    }
+
+    #[test]
+    fn leaves_read_and_low_risk_commands_unguarded() {
+        assert!(!is_dangerous(&["log".to_string()]));
+        assert!(!is_dangerous(&["status".to_string()]));
+        assert!(!is_dangerous(&["show".to_string()]));
+        assert!(!is_dangerous(&["diff".to_string()]));
+        assert!(!is_dangerous(&["git".to_string(), "fetch".to_string()]));
+        assert!(!is_dangerous(&["bookmark".to_string(), "list".to_string()]));
+        assert!(!is_dangerous(&[
+            "bookmark".to_string(),
+            "create".to_string()
+        ]));
+        assert!(!is_dangerous(&["next".to_string()]));
+        assert!(!is_dangerous(&["prev".to_string()]));
+        assert!(!is_dangerous(&["edit".to_string()]));
     }
 }

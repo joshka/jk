@@ -474,6 +474,27 @@ mod tests {
     }
 
     #[test]
+    fn maps_rebase_aliases_to_expected_destinations() {
+        assert_eq!(
+            plan_command("rbm", selected()),
+            FlowAction::Execute(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "main".to_string()
+            ])
+        );
+
+        assert_eq!(
+            plan_command("rbt", selected()),
+            FlowAction::Execute(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "trunk()".to_string()
+            ])
+        );
+    }
+
+    #[test]
     fn bookmark_without_subcommand_lists() {
         assert_eq!(
             plan_command("bookmark", selected()),

@@ -37,7 +37,7 @@
 - Unit test harness for parsing/alias normalization: `done`
 - `insta` visual snapshots for main screens: `done`
 - Command assembly tests (`FlowAction`/`PromptKind`): `done`
-- Safety-guard tests for Tier C commands: `in-progress`
+- Safety-guard tests for Tier C commands: `done`
 
 ## Implementation checklist
 
@@ -57,6 +57,7 @@
   - expanded OMZ alias support and `rbm` default-to-`main` behavior
   - added guided flows for rewrite/recovery, bookmark, and remote commands in `src/flows.rs`
   - retained confirmation gating in `src/app.rs` for Tier C commands
+  - added explicit test coverage for dangerous-command gating and alias argument fidelity
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

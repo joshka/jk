@@ -15,7 +15,8 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
 
 fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
     match alias {
-        "desc" | "jjds" | "jjdmsg" => Some(&["describe"]),
+        "desc" | "jjds" => Some(&["describe"]),
+        "jjdmsg" => Some(&["describe", "--message"]),
         "st" | "jjst" => Some(&["status"]),
         "gf" | "jjgf" => Some(&["git", "fetch"]),
         "gfa" | "jjgfa" => Some(&["git", "fetch", "--all-remotes"]),
@@ -29,7 +30,8 @@ fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
         "jjl" => Some(&["log"]),
         "jjla" => Some(&["log", "-r", "all()"]),
         "jjd" => Some(&["diff"]),
-        "jjc" | "jjcmsg" => Some(&["commit"]),
+        "jjc" => Some(&["commit"]),
+        "jjcmsg" => Some(&["commit", "--message"]),
         "jjn" => Some(&["new"]),
         "jjnt" => Some(&["new", "trunk()"]),
         "jje" => Some(&["edit"]),
@@ -104,7 +106,14 @@ mod tests {
             to_vec(&["bookmark", "track"])
         );
         assert_eq!(normalize_alias(&to_vec(&["jjds"])), to_vec(&["describe"]));
-        assert_eq!(normalize_alias(&to_vec(&["jjcmsg"])), to_vec(&["commit"]));
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjdmsg", "fix", "msg"])),
+            to_vec(&["describe", "--message", "fix", "msg"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjcmsg", "ship", "it"])),
+            to_vec(&["commit", "--message", "ship", "it"])
+        );
         assert_eq!(
             normalize_alias(&to_vec(&["jjla"])),
             to_vec(&["log", "-r", "all()"])
