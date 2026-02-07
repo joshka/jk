@@ -21,14 +21,23 @@ This repository is in active development. The current baseline includes:
 - Command mode (`:`), confirmation mode, and prompt mode.
 - `jj` subprocess execution via `jj --no-pager ...`.
 - Configurable keybinds from `config/keybinds.default.toml` and optional user override.
+- High-frequency normal-mode shortcuts: `F` fetch, `P` push, `M` rebase to main, `T` rebase to
+  trunk.
+- Log shortcut: `p` toggles `--patch` for the active log command arguments.
+- Action shortcuts in normal mode: `n` new, `c` commit, `D` describe selected change, `b` bookmark
+  set for selected change, `a` abandon selected change.
+- Rewrite/recovery shortcuts in normal mode: `B` rebase selected, `S` squash selected, `X` split
+  selected, `O` restore into selected, `R` revert selected, `u` undo, `U` redo.
 
 ## Command Entry Model
 
 - `jk` defaults to `log`.
 - `jk <command> [args...]` starts in the same TUI and runs/plans that command.
 - Commands entered with `:` use the same normalization and safety rules.
+- `:` command parsing supports shell-style quoting for multi-word arguments.
 - `:commands` renders an in-app command registry with mode/tier coverage.
 - `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).
+- Unfiltered command registry output also includes a high-frequency alias hint line.
 
 ## Implemented Flow Coverage (Baseline)
 
@@ -47,6 +56,9 @@ This repository is in active development. The current baseline includes:
 Mutating high-risk commands run through confirmation guards.
 `git push` confirmation now includes a best-effort `--dry-run` preview in-app when available.
 `operation restore`/`operation revert` confirmation includes an operation summary preview.
+Rewrite, recovery, and bookmark Tier `C` flows also render targeted log/show previews before
+confirmation when enough command context is available.
+Unhandled Tier `C` commands fall back to a short `operation log` preview.
 
 `jk` also keeps an explicit top-level command registry aligned to the current `jj` command surface so
 new flow work can evolve without ambiguity.
@@ -57,6 +69,7 @@ Log-row selection uses metadata-backed revision mapping to stay stable across mu
 Native aliases:
 
 - `gf`, `gp`, `rbm`, `rbt`
+- `rbm` defaults to `main` and accepts an optional destination override (for example `rbm release`).
 
 Oh My Zsh `jj` plugin compatibility is included for common aliases such as:
 

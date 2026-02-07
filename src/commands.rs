@@ -301,6 +301,13 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
         ));
     }
 
+    if filter.is_none() {
+        lines.push(String::new());
+        lines.push(
+            "high-frequency aliases: gf, gp, rbm, rbt, jjgf, jjgp, jjrbm, jjst, jjl".to_string(),
+        );
+    }
+
     lines
 }
 
@@ -424,6 +431,11 @@ mod tests {
         );
         assert!(lines.iter().any(|line| line.starts_with("log")));
         assert!(lines.iter().any(|line| line.starts_with("workspace")));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("high-frequency aliases"))
+        );
     }
 
     #[test]

@@ -286,10 +286,9 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         return FlowAction::Quit;
     }
 
-    let raw_tokens: Vec<String> = trimmed
-        .split_whitespace()
-        .map(ToString::to_string)
-        .collect();
+    let Some(raw_tokens) = shlex::split(trimmed) else {
+        return FlowAction::Status("Invalid command quoting".to_string());
+    };
     let mut tokens = normalize_alias(&raw_tokens);
     tokens = canonicalize_tokens(tokens);
 
@@ -1232,5 +1231,26 @@ mod tests {
             }
             other => panic!("expected render action, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn parses_quoted_arguments_in_command_mode() {
+        assert_eq!(
+            plan_command(r#"git push --bookmark "team feature""#, selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--bookmark".to_string(),
+                "team feature".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn reports_invalid_quoted_command_input() {
+        assert_eq!(
+            plan_command(r#"git push --bookmark "unterminated"#, selected()),
+            FlowAction::Status("Invalid command quoting".to_string())
+        );
     }
 }

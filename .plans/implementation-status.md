@@ -83,6 +83,20 @@
   - expanded alias and flow tests for OMZ high-frequency variants (`jjgfa`, `jjgpt`, `jjgpa`,
     `jjgpd`, `jjst`, `jjl`)
   - documented command-registry parity and safety routing in `docs/adr/0003-command-registry-parity.md`
+  - broadened Tier C confirmation previews to cover rebase/squash/split/abandon/restore/revert,
+    bookmark mutations, and undo/redo operation context
+  - added Tier C fallback preview to operation log when a command has no custom preview renderer
+  - improved `rbm`/`rbt` alias normalization to support optional destination overrides without
+    duplicate destination args
+  - added default normal-mode shortcuts for high-frequency remote/rebase flows (`F`, `P`, `M`,
+    `T`)
+  - added default normal-mode action shortcuts (`n`, `c`, `D`, `b`, `a`) for new/commit/describe,
+    bookmark set, and abandon flows
+  - added log patch toggle shortcut (`p`) with argument-preserving `log` patch on/off behavior
+  - added normal-mode rewrite/recovery shortcuts (`B`, `S`, `X`, `O`, `R`, `u`, `U`) that route
+    through existing prompt/confirm safety flows
+  - surfaced high-frequency alias hints directly in unfiltered `:commands`/`:help` output
+  - switched `:` command parsing to shell-style tokenization with invalid-quote status feedback
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

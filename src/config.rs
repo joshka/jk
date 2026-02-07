@@ -27,6 +27,23 @@ pub struct NormalKeys {
     pub command_mode: Vec<KeyBinding>,
     pub show: Vec<KeyBinding>,
     pub diff: Vec<KeyBinding>,
+    pub toggle_patch: Vec<KeyBinding>,
+    pub fetch: Vec<KeyBinding>,
+    pub push: Vec<KeyBinding>,
+    pub rebase_main: Vec<KeyBinding>,
+    pub rebase_trunk: Vec<KeyBinding>,
+    pub new: Vec<KeyBinding>,
+    pub commit: Vec<KeyBinding>,
+    pub describe: Vec<KeyBinding>,
+    pub bookmark_set: Vec<KeyBinding>,
+    pub abandon: Vec<KeyBinding>,
+    pub rebase: Vec<KeyBinding>,
+    pub squash: Vec<KeyBinding>,
+    pub split: Vec<KeyBinding>,
+    pub restore: Vec<KeyBinding>,
+    pub revert: Vec<KeyBinding>,
+    pub undo: Vec<KeyBinding>,
+    pub redo: Vec<KeyBinding>,
 }
 
 #[derive(Debug, Clone)]
@@ -60,6 +77,23 @@ struct RawNormal {
     command_mode: Vec<String>,
     show: Vec<String>,
     diff: Vec<String>,
+    toggle_patch: Vec<String>,
+    fetch: Vec<String>,
+    push: Vec<String>,
+    rebase_main: Vec<String>,
+    rebase_trunk: Vec<String>,
+    new: Vec<String>,
+    commit: Vec<String>,
+    describe: Vec<String>,
+    bookmark_set: Vec<String>,
+    abandon: Vec<String>,
+    rebase: Vec<String>,
+    squash: Vec<String>,
+    split: Vec<String>,
+    restore: Vec<String>,
+    revert: Vec<String>,
+    undo: Vec<String>,
+    redo: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,6 +127,23 @@ struct PartialNormal {
     command_mode: Option<Vec<String>>,
     show: Option<Vec<String>>,
     diff: Option<Vec<String>>,
+    toggle_patch: Option<Vec<String>>,
+    fetch: Option<Vec<String>>,
+    push: Option<Vec<String>>,
+    rebase_main: Option<Vec<String>>,
+    rebase_trunk: Option<Vec<String>>,
+    new: Option<Vec<String>>,
+    commit: Option<Vec<String>>,
+    describe: Option<Vec<String>>,
+    bookmark_set: Option<Vec<String>>,
+    abandon: Option<Vec<String>>,
+    rebase: Option<Vec<String>>,
+    squash: Option<Vec<String>>,
+    split: Option<Vec<String>>,
+    restore: Option<Vec<String>>,
+    revert: Option<Vec<String>>,
+    undo: Option<Vec<String>>,
+    redo: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -141,6 +192,23 @@ impl RawConfig {
                 command_mode: parse_bindings(&self.normal.command_mode)?,
                 show: parse_bindings(&self.normal.show)?,
                 diff: parse_bindings(&self.normal.diff)?,
+                toggle_patch: parse_bindings(&self.normal.toggle_patch)?,
+                fetch: parse_bindings(&self.normal.fetch)?,
+                push: parse_bindings(&self.normal.push)?,
+                rebase_main: parse_bindings(&self.normal.rebase_main)?,
+                rebase_trunk: parse_bindings(&self.normal.rebase_trunk)?,
+                new: parse_bindings(&self.normal.new)?,
+                commit: parse_bindings(&self.normal.commit)?,
+                describe: parse_bindings(&self.normal.describe)?,
+                bookmark_set: parse_bindings(&self.normal.bookmark_set)?,
+                abandon: parse_bindings(&self.normal.abandon)?,
+                rebase: parse_bindings(&self.normal.rebase)?,
+                squash: parse_bindings(&self.normal.squash)?,
+                split: parse_bindings(&self.normal.split)?,
+                restore: parse_bindings(&self.normal.restore)?,
+                revert: parse_bindings(&self.normal.revert)?,
+                undo: parse_bindings(&self.normal.undo)?,
+                redo: parse_bindings(&self.normal.redo)?,
             },
             command: CommandKeys {
                 submit: parse_bindings(&self.command.submit)?,
@@ -205,6 +273,57 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         if let Some(value) = normal.diff {
             base.normal.diff = value;
         }
+        if let Some(value) = normal.toggle_patch {
+            base.normal.toggle_patch = value;
+        }
+        if let Some(value) = normal.fetch {
+            base.normal.fetch = value;
+        }
+        if let Some(value) = normal.push {
+            base.normal.push = value;
+        }
+        if let Some(value) = normal.rebase_main {
+            base.normal.rebase_main = value;
+        }
+        if let Some(value) = normal.rebase_trunk {
+            base.normal.rebase_trunk = value;
+        }
+        if let Some(value) = normal.new {
+            base.normal.new = value;
+        }
+        if let Some(value) = normal.commit {
+            base.normal.commit = value;
+        }
+        if let Some(value) = normal.describe {
+            base.normal.describe = value;
+        }
+        if let Some(value) = normal.bookmark_set {
+            base.normal.bookmark_set = value;
+        }
+        if let Some(value) = normal.abandon {
+            base.normal.abandon = value;
+        }
+        if let Some(value) = normal.rebase {
+            base.normal.rebase = value;
+        }
+        if let Some(value) = normal.squash {
+            base.normal.squash = value;
+        }
+        if let Some(value) = normal.split {
+            base.normal.split = value;
+        }
+        if let Some(value) = normal.restore {
+            base.normal.restore = value;
+        }
+        if let Some(value) = normal.revert {
+            base.normal.revert = value;
+        }
+        if let Some(value) = normal.undo {
+            base.normal.undo = value;
+        }
+        if let Some(value) = normal.redo {
+            base.normal.redo = value;
+        }
     }
 
     if let Some(command) = user.command {
@@ -226,5 +345,60 @@ fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         if let Some(value) = confirm.reject {
             base.confirm.reject = value;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DEFAULT_KEYBINDS, KeybindConfig, RawConfig};
+    use crate::keys::KeyBinding;
+
+    #[test]
+    fn default_keybinds_include_high_frequency_shortcuts() {
+        let raw: RawConfig =
+            toml::from_str(DEFAULT_KEYBINDS).expect("default keybinds should parse");
+        let config = raw
+            .into_config()
+            .expect("default keybinds should convert into runtime config");
+
+        assert_eq!(config.normal.fetch, vec![KeyBinding::Char('F')]);
+        assert_eq!(config.normal.push, vec![KeyBinding::Char('P')]);
+        assert_eq!(config.normal.rebase_main, vec![KeyBinding::Char('M')]);
+        assert_eq!(config.normal.rebase_trunk, vec![KeyBinding::Char('T')]);
+        assert_eq!(config.normal.new, vec![KeyBinding::Char('n')]);
+        assert_eq!(config.normal.commit, vec![KeyBinding::Char('c')]);
+        assert_eq!(config.normal.describe, vec![KeyBinding::Char('D')]);
+        assert_eq!(config.normal.bookmark_set, vec![KeyBinding::Char('b')]);
+        assert_eq!(config.normal.abandon, vec![KeyBinding::Char('a')]);
+        assert_eq!(config.normal.toggle_patch, vec![KeyBinding::Char('p')]);
+        assert_eq!(config.normal.rebase, vec![KeyBinding::Char('B')]);
+        assert_eq!(config.normal.squash, vec![KeyBinding::Char('S')]);
+        assert_eq!(config.normal.split, vec![KeyBinding::Char('X')]);
+        assert_eq!(config.normal.restore, vec![KeyBinding::Char('O')]);
+        assert_eq!(config.normal.revert, vec![KeyBinding::Char('R')]);
+        assert_eq!(config.normal.undo, vec![KeyBinding::Char('u')]);
+        assert_eq!(config.normal.redo, vec![KeyBinding::Char('U')]);
+    }
+
+    #[test]
+    fn load_keeps_keybind_configuration_valid() {
+        let config = KeybindConfig::load().expect("keybind config should load");
+        assert!(!config.normal.fetch.is_empty());
+        assert!(!config.normal.push.is_empty());
+        assert!(!config.normal.rebase_main.is_empty());
+        assert!(!config.normal.rebase_trunk.is_empty());
+        assert!(!config.normal.new.is_empty());
+        assert!(!config.normal.commit.is_empty());
+        assert!(!config.normal.describe.is_empty());
+        assert!(!config.normal.bookmark_set.is_empty());
+        assert!(!config.normal.abandon.is_empty());
+        assert!(!config.normal.toggle_patch.is_empty());
+        assert!(!config.normal.rebase.is_empty());
+        assert!(!config.normal.squash.is_empty());
+        assert!(!config.normal.split.is_empty());
+        assert!(!config.normal.restore.is_empty());
+        assert!(!config.normal.revert.is_empty());
+        assert!(!config.normal.undo.is_empty());
+        assert!(!config.normal.redo.is_empty());
     }
 }

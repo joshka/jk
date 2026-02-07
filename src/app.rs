@@ -37,6 +37,7 @@ pub struct App {
     pending_confirm: Option<Vec<String>>,
     pending_prompt: Option<PromptState>,
     last_command: Vec<String>,
+    last_log_tokens: Vec<String>,
     should_quit: bool,
 }
 
@@ -62,6 +63,7 @@ impl App {
             pending_confirm: None,
             pending_prompt: None,
             last_command: vec!["log".to_string()],
+            last_log_tokens: vec!["log".to_string()],
             should_quit: false,
         }
     }
@@ -104,7 +106,12 @@ impl App {
         }
 
         if matches_any(&self.keybinds.normal.refresh, key) {
-            self.execute_tokens(vec!["log".to_string()])?;
+            let tokens = if self.last_command.is_empty() {
+                vec!["log".to_string()]
+            } else {
+                self.last_command.clone()
+            };
+            self.execute_tokens(tokens)?;
             return Ok(());
         }
 
@@ -157,6 +164,100 @@ impl App {
             } else {
                 self.status_line = "No revision selected on this line".to_string();
             }
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.toggle_patch, key) {
+            if !matches!(
+                self.last_log_tokens.first().map(String::as_str),
+                Some("log")
+            ) {
+                self.status_line = "Patch toggle is available after running log".to_string();
+                return Ok(());
+            }
+
+            let tokens = toggle_patch_flag(&self.last_log_tokens);
+            self.execute_tokens(tokens)?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.fetch, key) {
+            self.execute_command_line("gf")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.push, key) {
+            self.execute_command_line("gp")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.rebase_main, key) {
+            self.execute_command_line("rbm")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.rebase_trunk, key) {
+            self.execute_command_line("rbt")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.new, key) {
+            self.execute_command_line("new")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.commit, key) {
+            self.execute_command_line("commit")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.describe, key) {
+            self.execute_command_line("describe")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.bookmark_set, key) {
+            self.execute_command_line("bookmark set")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.abandon, key) {
+            self.execute_command_line("abandon")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.rebase, key) {
+            self.execute_command_line("rebase")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.squash, key) {
+            self.execute_command_line("squash")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.split, key) {
+            self.execute_command_line("split")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.restore, key) {
+            self.execute_command_line("restore")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.revert, key) {
+            self.execute_command_line("revert")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.undo, key) {
+            self.execute_command_line("undo")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.redo, key) {
+            self.execute_command_line("redo")?;
             return Ok(());
         }
 
@@ -337,6 +438,9 @@ impl App {
 
     fn execute_tokens(&mut self, tokens: Vec<String>) -> Result<(), JkError> {
         let result = jj::run(&tokens)?;
+        if matches!(result.command.first().map(String::as_str), Some("log")) {
+            self.last_log_tokens = result.command.clone();
+        }
         self.row_revision_map = derive_row_revision_map(&result.command, &result.output);
         self.lines = result.output;
         self.cursor = 0;
@@ -694,7 +798,113 @@ fn confirmation_preview_tokens(tokens: &[String]) -> Option<Vec<String>> {
         ]);
     }
 
+    match tokens.first().map(String::as_str) {
+        Some("rebase") => {
+            let source = find_flag_value(tokens, &["-r", "--revision", "-b", "--branch"])
+                .unwrap_or_else(|| "@".to_string());
+            let destination = find_flag_value(tokens, &["-d", "--destination", "--onto"])?;
+            Some(log_preview_tokens(&format!("{source} | {destination}")))
+        }
+        Some("squash") => {
+            let from = find_flag_value(tokens, &["--from"]).unwrap_or_else(|| "@".to_string());
+            let into = find_flag_value(tokens, &["--into"]).unwrap_or_else(|| "@-".to_string());
+            Some(log_preview_tokens(&format!("{from} | {into}")))
+        }
+        Some("split") => {
+            let revision =
+                find_flag_value(tokens, &["-r", "--revision"]).unwrap_or_else(|| "@".to_string());
+            Some(vec!["show".to_string(), revision])
+        }
+        Some("abandon") => {
+            let revision = tokens.get(1).cloned().unwrap_or_else(|| "@".to_string());
+            Some(log_preview_tokens(&revision))
+        }
+        Some("restore") => {
+            let from = find_flag_value(tokens, &["--from"]).unwrap_or_else(|| "@-".to_string());
+            let to = find_flag_value(tokens, &["--to"]).unwrap_or_else(|| "@".to_string());
+            Some(log_preview_tokens(&format!("{from} | {to}")))
+        }
+        Some("revert") => {
+            let revisions =
+                find_flag_value(tokens, &["-r", "--revisions"]).unwrap_or_else(|| "@".to_string());
+            let onto =
+                find_flag_value(tokens, &["-o", "--onto"]).unwrap_or_else(|| "@".to_string());
+            Some(log_preview_tokens(&format!("{revisions} | {onto}")))
+        }
+        Some("bookmark")
+            if matches!(
+                tokens.get(1).map(String::as_str),
+                Some("set" | "move" | "delete" | "forget" | "rename")
+            ) =>
+        {
+            Some(vec![
+                "bookmark".to_string(),
+                "list".to_string(),
+                "--all".to_string(),
+            ])
+        }
+        Some("git") if matches!(tokens.get(1).map(String::as_str), Some("push")) => None,
+        Some("undo" | "redo") => Some(operation_log_preview_tokens()),
+        _ if is_dangerous(tokens) => Some(operation_log_preview_tokens()),
+        _ => None,
+    }
+}
+
+fn find_flag_value(tokens: &[String], flags: &[&str]) -> Option<String> {
+    let mut index = 0usize;
+    while index < tokens.len() {
+        let token = &tokens[index];
+        for flag in flags {
+            if token == flag {
+                if let Some(value) = tokens.get(index + 1) {
+                    return Some(value.clone());
+                }
+            } else if let Some(value) = token.strip_prefix(&format!("{flag}=")) {
+                return Some(value.to_string());
+            }
+        }
+        index += 1;
+    }
+
     None
+}
+
+fn log_preview_tokens(revset: &str) -> Vec<String> {
+    vec![
+        "log".to_string(),
+        "-r".to_string(),
+        revset.to_string(),
+        "-n".to_string(),
+        "20".to_string(),
+    ]
+}
+
+fn toggle_patch_flag(tokens: &[String]) -> Vec<String> {
+    let mut result = Vec::with_capacity(tokens.len() + 1);
+    let mut has_patch = false;
+
+    for token in tokens {
+        if token == "-p" || token == "--patch" {
+            has_patch = true;
+            continue;
+        }
+        result.push(token.clone());
+    }
+
+    if !has_patch {
+        result.push("--patch".to_string());
+    }
+
+    result
+}
+
+fn operation_log_preview_tokens() -> Vec<String> {
+    vec![
+        "operation".to_string(),
+        "log".to_string(),
+        "-n".to_string(),
+        "5".to_string(),
+    ]
 }
 
 struct TerminalSession {
@@ -728,6 +938,8 @@ impl Drop for TerminalSession {
 
 #[cfg(test)]
 mod tests {
+    use crossterm::event::{KeyCode, KeyEvent};
+
     use crate::config::KeybindConfig;
 
     use crate::flows::{FlowAction, PromptKind};
@@ -735,7 +947,7 @@ mod tests {
     use super::{
         App, Mode, build_row_revision_map, confirmation_preview_tokens, extract_revision,
         is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
-        startup_action,
+        startup_action, toggle_patch_flag,
     };
 
     #[test]
@@ -958,6 +1170,153 @@ mod tests {
     }
 
     #[test]
+    fn builds_rebase_and_squash_preview_revsets() {
+        let rebase = confirmation_preview_tokens(&[
+            "rebase".to_string(),
+            "-d".to_string(),
+            "main".to_string(),
+        ]);
+        assert_eq!(
+            rebase,
+            Some(vec![
+                "log".to_string(),
+                "-r".to_string(),
+                "@ | main".to_string(),
+                "-n".to_string(),
+                "20".to_string()
+            ])
+        );
+
+        let squash = confirmation_preview_tokens(&[
+            "squash".to_string(),
+            "--from".to_string(),
+            "abc123".to_string(),
+            "--into".to_string(),
+            "@-".to_string(),
+        ]);
+        assert_eq!(
+            squash,
+            Some(vec![
+                "log".to_string(),
+                "-r".to_string(),
+                "abc123 | @-".to_string(),
+                "-n".to_string(),
+                "20".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn builds_split_and_abandon_preview_commands() {
+        let split = confirmation_preview_tokens(&[
+            "split".to_string(),
+            "-r".to_string(),
+            "abc123".to_string(),
+            "src/main.rs".to_string(),
+        ]);
+        assert_eq!(split, Some(vec!["show".to_string(), "abc123".to_string()]));
+
+        let abandon = confirmation_preview_tokens(&["abandon".to_string(), "abc123".to_string()]);
+        assert_eq!(
+            abandon,
+            Some(vec![
+                "log".to_string(),
+                "-r".to_string(),
+                "abc123".to_string(),
+                "-n".to_string(),
+                "20".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn builds_restore_revert_bookmark_and_operation_log_previews() {
+        let restore = confirmation_preview_tokens(&[
+            "restore".to_string(),
+            "--from".to_string(),
+            "@-".to_string(),
+            "--to".to_string(),
+            "@".to_string(),
+        ]);
+        assert_eq!(
+            restore,
+            Some(vec![
+                "log".to_string(),
+                "-r".to_string(),
+                "@- | @".to_string(),
+                "-n".to_string(),
+                "20".to_string()
+            ])
+        );
+
+        let revert = confirmation_preview_tokens(&[
+            "revert".to_string(),
+            "-r".to_string(),
+            "abc123".to_string(),
+            "-o".to_string(),
+            "@".to_string(),
+        ]);
+        assert_eq!(
+            revert,
+            Some(vec![
+                "log".to_string(),
+                "-r".to_string(),
+                "abc123 | @".to_string(),
+                "-n".to_string(),
+                "20".to_string()
+            ])
+        );
+
+        let bookmark = confirmation_preview_tokens(&[
+            "bookmark".to_string(),
+            "set".to_string(),
+            "feature".to_string(),
+            "-r".to_string(),
+            "@".to_string(),
+        ]);
+        assert_eq!(
+            bookmark,
+            Some(vec![
+                "bookmark".to_string(),
+                "list".to_string(),
+                "--all".to_string()
+            ])
+        );
+
+        let undo = confirmation_preview_tokens(&["undo".to_string()]);
+        assert_eq!(
+            undo,
+            Some(vec![
+                "operation".to_string(),
+                "log".to_string(),
+                "-n".to_string(),
+                "5".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn falls_back_to_operation_log_for_unknown_tier_c_commands() {
+        let preview = confirmation_preview_tokens(&[
+            "simplify-parents".to_string(),
+            "-r".to_string(),
+            "@".to_string(),
+        ]);
+        assert_eq!(
+            preview,
+            Some(vec![
+                "operation".to_string(),
+                "log".to_string(),
+                "-n".to_string(),
+                "5".to_string()
+            ])
+        );
+
+        let safe = confirmation_preview_tokens(&["status".to_string()]);
+        assert_eq!(safe, None);
+    }
+
+    #[test]
     fn metadata_log_tokens_strip_template_and_patch_options() {
         let tokens = vec![
             "log".to_string(),
@@ -1007,5 +1366,220 @@ mod tests {
                 Some("hgfedcba".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn toggles_patch_flag_for_log_commands() {
+        assert_eq!(
+            toggle_patch_flag(&["log".to_string(), "-r".to_string(), "all()".to_string()]),
+            vec![
+                "log".to_string(),
+                "-r".to_string(),
+                "all()".to_string(),
+                "--patch".to_string()
+            ]
+        );
+
+        assert_eq!(
+            toggle_patch_flag(&[
+                "log".to_string(),
+                "--patch".to_string(),
+                "-r".to_string(),
+                "all()".to_string()
+            ]),
+            vec!["log".to_string(), "-r".to_string(), "all()".to_string()]
+        );
+    }
+
+    #[test]
+    fn normal_mode_shortcuts_route_to_expected_flows() {
+        let mut fetch_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        fetch_app
+            .handle_key(KeyEvent::from(KeyCode::Char('F')))
+            .expect("fetch shortcut should be handled");
+        assert_eq!(fetch_app.mode, Mode::Prompt);
+        assert_eq!(
+            fetch_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::GitFetchRemote)
+        );
+
+        let mut push_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        push_app
+            .handle_key(KeyEvent::from(KeyCode::Char('P')))
+            .expect("push shortcut should be handled");
+        assert_eq!(push_app.mode, Mode::Prompt);
+        assert_eq!(
+            push_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::GitPushBookmark)
+        );
+
+        let mut rebase_main_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        rebase_main_app
+            .handle_key(KeyEvent::from(KeyCode::Char('M')))
+            .expect("rebase-main shortcut should be handled");
+        assert_eq!(rebase_main_app.mode, Mode::Confirm);
+        assert_eq!(
+            rebase_main_app.pending_confirm,
+            Some(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "main".to_string()
+            ])
+        );
+
+        let mut rebase_trunk_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        rebase_trunk_app
+            .handle_key(KeyEvent::from(KeyCode::Char('T')))
+            .expect("rebase-trunk shortcut should be handled");
+        assert_eq!(rebase_trunk_app.mode, Mode::Confirm);
+        assert_eq!(
+            rebase_trunk_app.pending_confirm,
+            Some(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "trunk()".to_string()
+            ])
+        );
+
+        let mut new_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        new_app
+            .handle_key(KeyEvent::from(KeyCode::Char('n')))
+            .expect("new shortcut should be handled");
+        assert_eq!(new_app.mode, Mode::Prompt);
+        assert_eq!(
+            new_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::NewMessage)
+        );
+
+        let mut commit_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        commit_app
+            .handle_key(KeyEvent::from(KeyCode::Char('c')))
+            .expect("commit shortcut should be handled");
+        assert_eq!(commit_app.mode, Mode::Prompt);
+        assert_eq!(
+            commit_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::CommitMessage)
+        );
+
+        let mut describe_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        describe_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        describe_app
+            .handle_key(KeyEvent::from(KeyCode::Char('D')))
+            .expect("describe shortcut should be handled");
+        assert_eq!(describe_app.mode, Mode::Prompt);
+        assert_eq!(
+            describe_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::DescribeMessage {
+                revision: "abcdefgh".to_string()
+            })
+        );
+
+        let mut bookmark_set_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        bookmark_set_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        bookmark_set_app
+            .handle_key(KeyEvent::from(KeyCode::Char('b')))
+            .expect("bookmark-set shortcut should be handled");
+        assert_eq!(bookmark_set_app.mode, Mode::Prompt);
+        assert_eq!(
+            bookmark_set_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::BookmarkSet {
+                target_revision: "abcdefgh".to_string()
+            })
+        );
+
+        let mut abandon_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        abandon_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        abandon_app
+            .handle_key(KeyEvent::from(KeyCode::Char('a')))
+            .expect("abandon shortcut should be handled");
+        assert_eq!(abandon_app.mode, Mode::Confirm);
+        assert_eq!(
+            abandon_app.pending_confirm,
+            Some(vec!["abandon".to_string(), "abcdefgh".to_string()])
+        );
+
+        let mut rebase_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        rebase_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        rebase_app
+            .handle_key(KeyEvent::from(KeyCode::Char('B')))
+            .expect("rebase shortcut should be handled");
+        assert_eq!(rebase_app.mode, Mode::Prompt);
+        assert_eq!(
+            rebase_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::RebaseDestination {
+                source_revision: "abcdefgh".to_string()
+            })
+        );
+
+        let mut squash_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        squash_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        squash_app
+            .handle_key(KeyEvent::from(KeyCode::Char('S')))
+            .expect("squash shortcut should be handled");
+        assert_eq!(squash_app.mode, Mode::Prompt);
+        assert_eq!(
+            squash_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::SquashInto {
+                from_revision: "abcdefgh".to_string()
+            })
+        );
+
+        let mut split_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        split_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        split_app
+            .handle_key(KeyEvent::from(KeyCode::Char('X')))
+            .expect("split shortcut should be handled");
+        assert_eq!(split_app.mode, Mode::Prompt);
+        assert_eq!(
+            split_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::SplitFileset {
+                revision: "abcdefgh".to_string()
+            })
+        );
+
+        let mut restore_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        restore_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        restore_app
+            .handle_key(KeyEvent::from(KeyCode::Char('O')))
+            .expect("restore shortcut should be handled");
+        assert_eq!(restore_app.mode, Mode::Prompt);
+        assert_eq!(
+            restore_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::RestoreFrom {
+                target_revision: "abcdefgh".to_string()
+            })
+        );
+
+        let mut revert_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        revert_app.lines = vec!["@  abcdefgh 0123abcd message".to_string()];
+        revert_app
+            .handle_key(KeyEvent::from(KeyCode::Char('R')))
+            .expect("revert shortcut should be handled");
+        assert_eq!(revert_app.mode, Mode::Prompt);
+        assert_eq!(
+            revert_app.pending_prompt.map(|prompt| prompt.kind),
+            Some(PromptKind::RevertRevisions {
+                default_revisions: "abcdefgh".to_string(),
+                onto_revision: "@".to_string()
+            })
+        );
+
+        let mut undo_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        undo_app
+            .handle_key(KeyEvent::from(KeyCode::Char('u')))
+            .expect("undo shortcut should be handled");
+        assert_eq!(undo_app.mode, Mode::Confirm);
+        assert_eq!(undo_app.pending_confirm, Some(vec!["undo".to_string()]));
+
+        let mut redo_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        redo_app
+            .handle_key(KeyEvent::from(KeyCode::Char('U')))
+            .expect("redo shortcut should be handled");
+        assert_eq!(redo_app.mode, Mode::Confirm);
+        assert_eq!(redo_app.pending_confirm, Some(vec!["redo".to_string()]));
     }
 }
