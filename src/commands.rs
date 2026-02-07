@@ -353,6 +353,14 @@ pub fn command_safety(tokens: &[String]) -> SafetyTier {
             Some("create" | "track" | "untrack") => SafetyTier::B,
             _ => SafetyTier::A,
         },
+        "file" => match tokens.get(1).map(String::as_str) {
+            Some("annotate" | "list" | "search" | "show") => SafetyTier::A,
+            _ => SafetyTier::B,
+        },
+        "tag" => match tokens.get(1).map(String::as_str) {
+            Some("list") => SafetyTier::A,
+            _ => SafetyTier::B,
+        },
         value => lookup_top_level(value)
             .map(|spec| spec.tier)
             .unwrap_or(SafetyTier::B),
@@ -428,6 +436,11 @@ mod tests {
             command_safety(&to_vec(&["bookmark", "track", "feature"])),
             SafetyTier::B
         );
+        assert_eq!(command_safety(&to_vec(&["file", "list"])), SafetyTier::A);
+        assert_eq!(command_safety(&to_vec(&["file", "show"])), SafetyTier::A);
+        assert_eq!(command_safety(&to_vec(&["file", "track"])), SafetyTier::B);
+        assert_eq!(command_safety(&to_vec(&["tag", "list"])), SafetyTier::A);
+        assert_eq!(command_safety(&to_vec(&["tag", "set"])), SafetyTier::B);
     }
 
     #[test]

@@ -365,6 +365,12 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         [command] if command == "workspace" => {
             FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
         }
+        [command] if command == "file" => {
+            FlowAction::Execute(vec!["file".to_string(), "list".to_string()])
+        }
+        [command] if command == "tag" => {
+            FlowAction::Execute(vec!["tag".to_string(), "list".to_string()])
+        }
         [command, subcommand] if command == "workspace" && subcommand == "root" => {
             FlowAction::Execute(vec!["workspace".to_string(), "root".to_string()])
         }
@@ -546,6 +552,9 @@ fn canonicalize_tokens(mut tokens: Vec<String>) -> Vec<String> {
     if tokens[0] == "bookmark" && tokens.len() > 1 {
         tokens[1] = canonical_bookmark_subcommand(&tokens[1]);
     }
+    if tokens[0] == "tag" && tokens.len() > 1 {
+        tokens[1] = canonical_tag_subcommand(&tokens[1]);
+    }
 
     tokens
 }
@@ -572,6 +581,15 @@ fn canonical_bookmark_subcommand(command: &str) -> String {
         "s" => "set".to_string(),
         "t" => "track".to_string(),
         "u" => "untrack".to_string(),
+        value => value.to_string(),
+    }
+}
+
+fn canonical_tag_subcommand(command: &str) -> String {
+    match command {
+        "d" => "delete".to_string(),
+        "l" => "list".to_string(),
+        "s" => "set".to_string(),
         value => value.to_string(),
     }
 }
@@ -1498,7 +1516,7 @@ mod tests {
     }
 
     #[test]
-    fn defaults_operation_and_workspace_to_list_views() {
+    fn defaults_operation_workspace_file_and_tag_to_list_views() {
         assert_eq!(
             plan_command("op", selected()),
             FlowAction::Execute(vec!["operation".to_string(), "log".to_string()])
@@ -1506,6 +1524,38 @@ mod tests {
         assert_eq!(
             plan_command("workspace", selected()),
             FlowAction::Execute(vec!["workspace".to_string(), "list".to_string()])
+        );
+        assert_eq!(
+            plan_command("file", selected()),
+            FlowAction::Execute(vec!["file".to_string(), "list".to_string()])
+        );
+        assert_eq!(
+            plan_command("tag", selected()),
+            FlowAction::Execute(vec!["tag".to_string(), "list".to_string()])
+        );
+    }
+
+    #[test]
+    fn canonicalizes_tag_short_subcommands() {
+        assert_eq!(
+            plan_command("tag l", selected()),
+            FlowAction::Execute(vec!["tag".to_string(), "list".to_string()])
+        );
+        assert_eq!(
+            plan_command("tag s v0.1.0", selected()),
+            FlowAction::Execute(vec![
+                "tag".to_string(),
+                "set".to_string(),
+                "v0.1.0".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("tag d v0.1.0", selected()),
+            FlowAction::Execute(vec![
+                "tag".to_string(),
+                "delete".to_string(),
+                "v0.1.0".to_string()
+            ])
         );
     }
 
