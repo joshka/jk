@@ -62,6 +62,7 @@
   - added `insta` snapshots for `file track`, `file untrack`, and `file chmod` wrappers
   - added `insta` snapshots for `bookmark set`, `workspace add`, and `operation restore` wrappers
   - added `insta` snapshots for top-level `commit` and `rebase` wrapper views
+  - added broad top-level mutation wrapper regression coverage plus command-specific tip assertions
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing
@@ -102,7 +103,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (151 passed)
+  - `cargo test` (153 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

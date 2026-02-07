@@ -3633,6 +3633,88 @@ mod tests {
     }
 
     #[test]
+    fn decorates_all_top_level_mutation_commands_with_wrappers() {
+        let cases = [
+            ("new", "New Result"),
+            ("describe", "Describe Result"),
+            ("commit", "Commit Result"),
+            ("edit", "Edit Result"),
+            ("next", "Next Result"),
+            ("prev", "Prev Result"),
+            ("rebase", "Rebase Result"),
+            ("squash", "Squash Result"),
+            ("split", "Split Result"),
+            ("abandon", "Abandon Result"),
+            ("undo", "Undo Result"),
+            ("redo", "Redo Result"),
+            ("restore", "Restore Result"),
+            ("revert", "Revert Result"),
+        ];
+
+        for (command, expected_header) in cases {
+            let rendered = decorate_command_output(
+                &[command.to_string()],
+                vec![format!("{command} output line")],
+            );
+
+            assert_eq!(
+                rendered.first(),
+                Some(&expected_header.to_string()),
+                "expected wrapper header for command `{command}`",
+            );
+            assert!(
+                rendered
+                    .iter()
+                    .any(|line| line.contains("Summary: 1 output line")),
+                "expected summary line for command `{command}`",
+            );
+        }
+    }
+
+    #[test]
+    fn top_level_mutation_wrappers_use_command_specific_tips() {
+        let commit_rendered = render_top_level_mutation_view(
+            "commit",
+            vec!["Working copy now at: abcdef12 commit message".to_string()],
+        );
+        assert!(
+            commit_rendered
+                .iter()
+                .any(|line| line.contains("show` or `log"))
+        );
+
+        let undo_rendered = render_top_level_mutation_view(
+            "undo",
+            vec!["Undid operation 67d547b627fb".to_string()],
+        );
+        assert!(
+            undo_rendered
+                .iter()
+                .any(|line| line.contains("operation log"))
+        );
+
+        let rebase_rendered = render_top_level_mutation_view(
+            "rebase",
+            vec!["Rebased 3 commits onto main".to_string()],
+        );
+        assert!(
+            rebase_rendered
+                .iter()
+                .any(|line| line.contains("log`, `status`, or `diff`"))
+        );
+
+        let next_rendered = render_top_level_mutation_view(
+            "next",
+            vec!["Working copy now at: abcdef12 next change".to_string()],
+        );
+        assert!(
+            next_rendered
+                .iter()
+                .any(|line| line.contains("show` or `diff"))
+        );
+    }
+
+    #[test]
     fn renders_operation_log_view_with_header_and_tip() {
         let rendered = render_operation_log_view(vec![
             "@  fac974146f86 user 5 seconds ago".to_string(),
