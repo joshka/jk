@@ -290,3 +290,11 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (215 passed), and strict `cargo clippy`.
+- Latest pass:
+  - lifted `diffedit` from passthrough to a selection-aware guided default:
+    `diffedit -r <selected>`.
+  - aligned command metadata and safety tier so `diffedit` is confirm-gated as a rewrite flow.
+  - added native top-level mutation wrapper coverage (including snapshot) for `diffedit` output.
+- Latest pass:
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (216 passed), and strict `cargo clippy`.

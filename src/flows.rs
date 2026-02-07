@@ -480,6 +480,9 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
             "--to".to_string(),
             selected,
         ]),
+        [command] if command == "diffedit" => {
+            FlowAction::Execute(vec!["diffedit".to_string(), "-r".to_string(), selected])
+        }
         [command] if command == "fix" => {
             FlowAction::Execute(vec!["fix".to_string(), "-s".to_string(), selected])
         }
@@ -1379,6 +1382,14 @@ mod tests {
             FlowAction::Execute(vec![
                 "fix".to_string(),
                 "-s".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("diffedit", selected()),
+            FlowAction::Execute(vec![
+                "diffedit".to_string(),
+                "-r".to_string(),
                 "abc12345".to_string()
             ])
         );

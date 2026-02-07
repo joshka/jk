@@ -82,8 +82,8 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "diffedit",
-        mode: ExecutionMode::Passthrough,
-        tier: SafetyTier::B,
+        mode: ExecutionMode::Guided,
+        tier: SafetyTier::C,
     },
     CommandSpec {
         name: "duplicate",
@@ -477,6 +477,10 @@ mod tests {
             lookup_top_level("resolve").map(|spec| spec.mode),
             Some(ExecutionMode::Guided)
         );
+        assert_eq!(
+            lookup_top_level("diffedit").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
     }
 
     #[test]
@@ -518,6 +522,7 @@ mod tests {
         assert_eq!(command_safety(&to_vec(&["rebase"])), SafetyTier::C);
         assert_eq!(command_safety(&to_vec(&["new"])), SafetyTier::B);
         assert_eq!(command_safety(&to_vec(&["fix"])), SafetyTier::C);
+        assert_eq!(command_safety(&to_vec(&["diffedit"])), SafetyTier::C);
     }
 
     #[test]

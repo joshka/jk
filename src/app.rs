@@ -1094,6 +1094,7 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("status") => render_status_view(output),
         Some("show") => render_show_view(output),
         Some("diff") => render_diff_view(output),
+        Some("diffedit") => render_top_level_mutation_view("diffedit", output),
         Some("interdiff") => render_interdiff_view(output),
         Some("evolog") => render_evolog_view(output),
         Some("new") => render_top_level_mutation_view("new", output),
@@ -2198,7 +2199,9 @@ fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
         }
         "undo" => trimmed.starts_with("Undid operation"),
         "redo" => trimmed.starts_with("Redid operation"),
-        "rebase" | "squash" | "split" | "simplify-parents" => trimmed.starts_with("Rebased "),
+        "rebase" | "squash" | "split" | "simplify-parents" | "diffedit" => {
+            trimmed.starts_with("Rebased ")
+        }
         "fix" => trimmed.starts_with("Fixed ") || trimmed.starts_with("Rebased "),
         "abandon" => trimmed.starts_with("Abandoned "),
         "restore" => trimmed.starts_with("Restored "),
@@ -2217,8 +2220,8 @@ fn top_level_mutation_tip(command_name: &str) -> &'static str {
         }
         "edit" | "next" | "prev" => "Tip: run `show` or `diff` to inspect the selected revision",
         "undo" | "redo" => "Tip: run `operation log` to inspect operation history",
-        "rebase" | "squash" | "split" | "simplify-parents" | "fix" | "abandon" | "restore"
-        | "revert" | "absorb" | "duplicate" | "parallelize" => {
+        "rebase" | "squash" | "split" | "simplify-parents" | "diffedit" | "fix" | "abandon"
+        | "restore" | "revert" | "absorb" | "duplicate" | "parallelize" => {
             "Tip: run `log`, `status`, or `diff` to verify the resulting history"
         }
         _ => "Tip: run `log` and `status` to verify repository state",
@@ -2679,6 +2682,7 @@ mod tests {
         assert!(is_dangerous(&["rebase".to_string()]));
         assert!(is_dangerous(&["squash".to_string()]));
         assert!(is_dangerous(&["split".to_string()]));
+        assert!(is_dangerous(&["diffedit".to_string()]));
         assert!(is_dangerous(&["fix".to_string()]));
         assert!(is_dangerous(&["abandon".to_string()]));
         assert!(is_dangerous(&["undo".to_string()]));
@@ -4294,6 +4298,7 @@ mod tests {
             ("rebase", "Rebase Result"),
             ("squash", "Squash Result"),
             ("split", "Split Result"),
+            ("diffedit", "Diffedit Result"),
             ("simplify-parents", "Simplify-parents Result"),
             ("fix", "Fix Result"),
             ("abandon", "Abandon Result"),
@@ -4477,6 +4482,11 @@ mod tests {
                 vec!["split", "-r", "abc12345"],
                 vec!["Rebased 1 commits onto abc12345"],
                 "Split Result",
+            ),
+            (
+                vec!["diffedit", "-r", "abc12345"],
+                vec!["Rebased 1 descendant commits after diff edit"],
+                "Diffedit Result",
             ),
             (
                 vec!["simplify-parents", "abc12345"],
@@ -5166,6 +5176,15 @@ mod tests {
         let rendered = render_top_level_mutation_view(
             "split",
             vec!["Rebased 1 commits onto abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_diffedit_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "diffedit",
+            vec!["Rebased 1 descendant commits after diff edit".to_string()],
         );
         insta::assert_snapshot!(rendered.join("\n"));
     }

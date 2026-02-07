@@ -66,7 +66,7 @@ Each command has a mode, safety tier, and explicit test target.
 ### Common advanced commands
 
 - `restore`, `revert`, `absorb`, `duplicate`, `parallelize`, `interdiff`, `evolog`, `metaedit`,
-  `fix`, `resolve`
+  `fix`, `resolve`, `diffedit`
   - Mode/Tier: `guided` / mostly `B`, `restore` and `revert` are `C`.
   - Tests: flow assembly tests and safety tests where tier is `C`.
 
@@ -110,6 +110,10 @@ Each command has a mode, safety tier, and explicit test target.
   - Mode/Tier: `guided` / `B` (list mode remains `A` by safety override).
   - Default flow: `resolve` stays list-first (`resolve -l`) with command-level safety overrides.
   - Presentation: list and mutation-style output both render with native wrappers.
+- `diffedit`
+  - Mode/Tier: `guided` / `C`
+  - Default flow: selection-aware execute as `diffedit -r <selected>`.
+  - Presentation: render with native top-level mutation wrapper.
 
 ### Operation log workflows
 
@@ -130,7 +134,7 @@ Each command has a mode, safety tier, and explicit test target.
 
 ### Passthrough-first commands
 
-- `diffedit`, `sparse *`, `file *`, `tag *`, `sign`, `unsign`
+- `sparse *`, `file *`, `tag *`, `sign`, `unsign`
   - Mode/Tier: `passthrough` / mixed `A`, `B`, `C` by command risk.
 - `git clone`, `git import`, `git export`, `git init`, `git remote *`, `git colocation`,
   `git root`
