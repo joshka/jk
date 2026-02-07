@@ -3,102 +3,54 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
         return vec!["log".to_string()];
     }
 
-    let mut result = Vec::new();
     let first = tokens[0].as_str();
+    let Some(prefix) = alias_prefix(first) else {
+        return tokens.to_vec();
+    };
 
-    match first {
-        "gf" | "jjgf" => {
-            result.extend(["git", "fetch"].into_iter().map(ToString::to_string));
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "gfa" | "jjgfa" => {
-            result.extend(
-                ["git", "fetch", "--all-remotes"]
-                    .into_iter()
-                    .map(ToString::to_string),
-            );
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "gp" | "jjgp" => {
-            result.extend(["git", "push"].into_iter().map(ToString::to_string));
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "gpt" | "jjgpt" => {
-            result.extend(
-                ["git", "push", "--tracked"]
-                    .into_iter()
-                    .map(ToString::to_string),
-            );
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "gpa" | "jjgpa" => {
-            result.extend(
-                ["git", "push", "--all"]
-                    .into_iter()
-                    .map(ToString::to_string),
-            );
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "gpd" | "jjgpd" => {
-            result.extend(
-                ["git", "push", "--deleted"]
-                    .into_iter()
-                    .map(ToString::to_string),
-            );
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "rbm" => {
-            result.extend(
-                ["rebase", "-d", "main"]
-                    .into_iter()
-                    .map(ToString::to_string),
-            );
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "rbt" | "jjrbm" => {
-            result.extend(
-                ["rebase", "-d", "trunk()"]
-                    .into_iter()
-                    .map(ToString::to_string),
-            );
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jjrb" => {
-            result.push("rebase".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jjst" => {
-            result.push("status".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jjl" => {
-            result.push("log".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jjd" => {
-            result.push("diff".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jjc" => {
-            result.push("commit".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jjrs" => {
-            result.push("restore".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jja" => {
-            result.push("abandon".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        "jjrt" => {
-            result.push("root".to_string());
-            result.extend_from_slice(&tokens[1..]);
-        }
-        _ => return tokens.to_vec(),
-    }
-
+    let mut result = prefix.iter().map(ToString::to_string).collect::<Vec<_>>();
+    result.extend_from_slice(&tokens[1..]);
     result
+}
+
+fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
+    match alias {
+        "desc" | "jjds" | "jjdmsg" => Some(&["describe"]),
+        "st" | "jjst" => Some(&["status"]),
+        "gf" | "jjgf" => Some(&["git", "fetch"]),
+        "gfa" | "jjgfa" => Some(&["git", "fetch", "--all-remotes"]),
+        "gp" | "jjgp" => Some(&["git", "push"]),
+        "gpt" | "jjgpt" => Some(&["git", "push", "--tracked"]),
+        "gpa" | "jjgpa" => Some(&["git", "push", "--all"]),
+        "gpd" | "jjgpd" => Some(&["git", "push", "--deleted"]),
+        "rbm" => Some(&["rebase", "-d", "main"]),
+        "rbt" | "jjrbm" => Some(&["rebase", "-d", "trunk()"]),
+        "jjrb" => Some(&["rebase"]),
+        "jjl" => Some(&["log"]),
+        "jjla" => Some(&["log", "-r", "all()"]),
+        "jjd" => Some(&["diff"]),
+        "jjc" | "jjcmsg" => Some(&["commit"]),
+        "jjn" => Some(&["new"]),
+        "jjnt" => Some(&["new", "trunk()"]),
+        "jje" => Some(&["edit"]),
+        "jjsp" => Some(&["split"]),
+        "jjsq" => Some(&["squash"]),
+        "jjrs" => Some(&["restore"]),
+        "jja" => Some(&["abandon"]),
+        "jjgcl" => Some(&["git", "clone"]),
+        "jjb" => Some(&["bookmark"]),
+        "jjbc" => Some(&["bookmark", "create"]),
+        "jjbd" => Some(&["bookmark", "delete"]),
+        "jjbf" => Some(&["bookmark", "forget"]),
+        "jjbl" => Some(&["bookmark", "list"]),
+        "jjbm" => Some(&["bookmark", "move"]),
+        "jjbr" => Some(&["bookmark", "rename"]),
+        "jjbs" => Some(&["bookmark", "set"]),
+        "jjbt" => Some(&["bookmark", "track"]),
+        "jjbu" => Some(&["bookmark", "untrack"]),
+        "jjrt" => Some(&["root"]),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -143,6 +95,33 @@ mod tests {
             to_vec(&["rebase", "-d", "trunk()"])
         );
         assert_eq!(normalize_alias(&to_vec(&["jjrt"])), to_vec(&["root"]));
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjbl"])),
+            to_vec(&["bookmark", "list"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjbt"])),
+            to_vec(&["bookmark", "track"])
+        );
+        assert_eq!(normalize_alias(&to_vec(&["jjds"])), to_vec(&["describe"]));
+        assert_eq!(normalize_alias(&to_vec(&["jjcmsg"])), to_vec(&["commit"]));
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjla"])),
+            to_vec(&["log", "-r", "all()"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjnt"])),
+            to_vec(&["new", "trunk()"])
+        );
+        assert_eq!(normalize_alias(&to_vec(&["jjsq"])), to_vec(&["squash"]));
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjbr"])),
+            to_vec(&["bookmark", "rename"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjgcl"])),
+            to_vec(&["git", "clone"])
+        );
     }
 
     #[test]
