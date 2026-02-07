@@ -21,22 +21,22 @@
 - CLI entrypoint (`jk` == `jk log`): `done`
 - Alt-screen + raw mode runtime loop: `done`
 - Keybinding system + TOML defaults: `done`
-- Command registry and alias normalization: `in-progress`
+- Command registry and alias normalization: `done` (includes OMZ alias baseline)
 - Log view rendering/parsing bridge: `in-progress`
 
 ### Core command flows (Phase 1 target)
 
-- `log`, `status`, `show`, `diff`: `in-progress` (baseline implemented; richer views pending).
-- `new`, `describe`, `commit`, `next`, `prev`, `edit`: `in-progress` (dedicated flows pending).
-- `rebase`, `squash`, `split`, `abandon`, `undo`, `redo`: `in-progress` (Tier C gate in place).
-- `bookmark` core subset: `in-progress` (routing works; dedicated UI pending).
-- `git fetch`, `git push`: `in-progress` (aliases + push confirmation baseline implemented).
+- `log`, `status`, `show`, `diff`: `in-progress` (log-first baseline implemented; richer views pending)
+- `new`, `describe`, `commit`, `next`, `prev`, `edit`: `done` (selection-aware planning wired)
+- `rebase`, `squash`, `split`, `abandon`, `undo`, `redo`: `done` (guided flows + danger confirms)
+- `bookmark` core subset: `done` (list/create/set/move/track/untrack prompts wired)
+- `git fetch`, `git push`: `done` (guided prompts + alias coverage + push confirmation)
 
 ### Testing baseline
 
 - Unit test harness for parsing/alias normalization: `done`
 - `insta` visual snapshots for main screens: `done`
-- Command assembly tests (`CommandSpec`): `not-started`
+- Command assembly tests (`FlowAction`/`PromptKind`): `done`
 - Safety-guard tests for Tier C commands: `in-progress`
 
 ## Implementation checklist
@@ -53,6 +53,10 @@
 
 - Keep this file updated after each meaningful implementation step.
 - Every status transition should include tests or clear rationale in commit/body text.
+- Latest checkpoint:
+  - expanded OMZ alias support and `rbm` default-to-`main` behavior
+  - added guided flows for rewrite/recovery, bookmark, and remote commands in `src/flows.rs`
+  - retained confirmation gating in `src/app.rs` for Tier C commands
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

@@ -1,90 +1,77 @@
 # jk
 
-`jk` is a pager-driven TUI for `jj` workflows. It starts from the familiar `jj log` experience and
-turns that screen into the command hub for day-to-day repository navigation and actions.
+`jk` is a log-first TUI for `jj`.
 
-## Status
+The default entrypoint is `jk`, which behaves like `jk log`: it opens a full-screen, pager-style
+view and keeps you in one interface for inspect, rewrite, bookmark, and remote flows.
 
-This repository is in early development. The TUI behavior described here is the intended design
-target, not a complete implementation yet.
+## Goals
 
-## Vision
+- Keep `jj log` as the visual and mental baseline.
+- Reuse `jj` config and command semantics wherever possible.
+- Avoid box-heavy dashboard UIs; favor focused, command-line-pager interaction.
+- Let users stay inside `jk` for common daily workflows.
 
-- Default view matches `jj log` output and config as closely as possible.
-- TUI commands are thin, interactive wrappers around existing `jk` command behavior and flags.
-- Interaction stays terminal-native: minimal chrome, minimal panes, minimal visual noise.
-- The log is not just output; it is the jumping-off point for inspect, diff, rebase, bookmark, and
-  workflow actions.
+## Current State
 
-## Design Principles
+This repository is in active development. The current baseline includes:
 
-### 1. Zero-surprise defaults
+- Alt-screen + raw-mode runtime loop.
+- Log-first rendering with cursor selection.
+- Command mode (`:`), confirmation mode, and prompt mode.
+- `jj` subprocess execution via `jj --no-pager ...`.
+- Configurable keybinds from `config/keybinds.default.toml` and optional user override.
 
-If you already know `jj log`, you should recognize `jk` immediately. Templates, colors, and revset
-semantics should come from the same config sources by default.
+## Command Entry Model
 
-### 2. Pager-first interaction
+- `jk` defaults to `log`.
+- `jk <command> [args...]` starts in the same TUI and runs/plans that command.
+- Commands entered with `:` use the same normalization and safety rules.
 
-The UI should feel closer to a powerful pager than a dashboard app. Prefer focused prompts and
-transient overlays over persistent multi-panel layouts.
+## Implemented Flow Coverage (Baseline)
 
-### 3. Command parity
+- Read: `log`, `status`, `show`, `diff`.
+- Daily mutation: `new`, `describe`, `commit`, `next`, `prev`, `edit`.
+- Rewrite/recovery: `rebase`, `squash`, `split`, `abandon`, `undo`, `redo`.
+- Bookmarks: `bookmark list/create/set/move/track/untrack`.
+- Remote: `git fetch`, `git push`.
 
-For each `jk` command, the TUI variant should keep parameter names and meanings aligned whenever
-possible. Interactive affordances should reduce typing, not change command semantics.
+Mutating high-risk commands run through confirmation guards.
 
-### 4. Shared design language
+## Alias Coverage
 
-CLI and TUI should read as one tool: same naming, same mental model, same defaults, same outcomes.
+Native aliases:
 
-## Command Model
+- `gf`, `gp`, `rbm`, `rbt`
 
-The expected interaction model is:
+Oh My Zsh `jj` plugin compatibility is included for common aliases such as:
 
-1. Open a log-centric screen that behaves like `jj log`.
-2. Move selection through commits and operations.
-3. Trigger command actions from the current selection.
-4. Pass through familiar flags/revsets/options where applicable.
-
-Planned convention:
-
-- Non-interactive command: `jk <command> [flags...]`
-- Interactive command: `jk tui <command> [flags...]`
-- In-session actions use the same command names as the CLI variants.
-
-## Configuration
-
-By default, `jk` should inherit relevant `jj` config for:
-
-- log templates
-- color and style behavior
-- revset aliases
-- user/repo defaults that affect command results
-
-`jk`-specific config should be additive and scoped to interaction behavior (keys, prompts, and
-layout density), not semantic differences in command results.
-
-## First Milestone (Draft)
-
-- Build a log view that matches `jj log` content and ordering.
-- Add keyboard navigation and selection state.
-- Add action dispatch from the selected change/operation.
-- Implement a first set of TUI command wrappers with shared parameters.
-- Confirm config compatibility with common `jj` setups.
+- `jjgf`, `jjgp`, `jjrb`, `jjrbm`, `jjst`, `jjl`, `jjd`, `jjc`, `jjsp`, `jjsq`,
+  `jjb`, `jjbl`, `jjbs`, `jjbm`, `jjbt`, `jjbu`, `jja`, `jjrt`
 
 ## Development
 
-### Build
-
-```bash
-cargo build
-```
-
-### Run
+Build and run:
 
 ```bash
 cargo run
 ```
 
-As implementation grows, this README will be updated with concrete key bindings, command matrices,
-and end-to-end usage examples.
+Quality checks:
+
+```bash
+cargo fmt --all
+cargo check
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+markdownlint-cli2 "*.md" ".plans/*.md" "docs/**/*.md"
+```
+
+## Project Docs
+
+Planning and ADR files live in:
+
+- `.plans/`
+- `docs/adr/`
+
+These files are maintained alongside code so implementation context is not lost during long runs.
