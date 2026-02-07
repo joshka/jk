@@ -4340,6 +4340,42 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_describe_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "describe",
+            vec!["Working copy now at: abcdef12 updated description".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_edit_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "edit",
+            vec!["Working copy now at: abcdef12 edit target".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_next_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "next",
+            vec!["Working copy now at: abcdef12 next revision".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_prev_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "prev",
+            vec!["Working copy now at: abcdef12 previous revision".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_undo_wrapper_view() {
         let rendered = render_top_level_mutation_view(
             "undo",
@@ -4365,10 +4401,46 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_redo_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "redo",
+            vec!["Redid operation 67d547b627fb".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_revert_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "revert",
+            vec!["Reverted 2 paths from revision abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_rebase_wrapper_view() {
         let rendered = render_top_level_mutation_view(
             "rebase",
             vec!["Rebased 3 commits onto 0123abcd".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_squash_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "squash",
+            vec!["Rebased 1 commits onto abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_split_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "split",
+            vec!["Rebased 1 commits onto abcdef12".to_string()],
         );
         insta::assert_snapshot!(rendered.join("\n"));
     }

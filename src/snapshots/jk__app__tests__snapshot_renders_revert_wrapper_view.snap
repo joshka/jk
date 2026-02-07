@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Revert Result
+=============
+
+Summary: Reverted 2 paths from revision abcdef12
+
+Reverted 2 paths from revision abcdef12
+
+Tip: run `log`, `status`, or `diff` to verify the resulting history

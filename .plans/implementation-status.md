@@ -164,7 +164,7 @@
   - expanded alias-catalog parity with the installed OMZ `jj` plugin aliases (`jjbc`, `jjbd`,
     `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) and added direct catalog coverage tests
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
-    `cargo test` (171 passed), and strict `cargo clippy`
+    `cargo test` (179 passed), and strict `cargo clippy`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
@@ -205,3 +205,6 @@
 - Latest pass:
   - added snapshot coverage for additional top-level mutation wrappers:
     `new`, `undo`, `abandon`, and `restore`.
+- Latest pass:
+  - added snapshot coverage for the remaining top-level mutation wrappers:
+    `describe`, `edit`, `next`, `prev`, `squash`, `split`, `redo`, and `revert`.

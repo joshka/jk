@@ -70,6 +70,8 @@
     `bookmark delete`, `bookmark forget`, and `bookmark rename`
   - added `insta` snapshots for additional top-level mutation wrappers:
     `new`, `undo`, `abandon`, and `restore`
+  - added `insta` snapshots for the remaining top-level mutation wrappers:
+    `describe`, `edit`, `next`, `prev`, `squash`, `split`, `redo`, and `revert`
   - added broad top-level mutation wrapper regression coverage plus command-specific tip assertions
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
 - Rendering polish:
@@ -94,6 +96,7 @@
 
 ## Recent commit stack
 
+- `test(view): snapshot remaining top-level mutations` (`change: nuvpwspkpwzx`)
 - `test(view): snapshot top-level mutation variants` (`change: umvnxkynouzz`)
 - `test(view): snapshot remaining bookmark mutations` (`change: xsovkmssrwnt`)
 - `test(view): snapshot mutation wrapper variants` (`change: qkonnpzvwtor`)
@@ -120,7 +123,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (171 passed)
+  - `cargo test` (179 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

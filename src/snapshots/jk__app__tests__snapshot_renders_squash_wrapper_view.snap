@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Squash Result
+=============
+
+Summary: Rebased 1 commits onto abcdef12
+
+Rebased 1 commits onto abcdef12
+
+Tip: run `log`, `status`, or `diff` to verify the resulting history

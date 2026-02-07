@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Next Result
+===========
+
+Summary: Working copy now at: abcdef12 next revision
+
+Working copy now at: abcdef12 next revision
+
+Tip: run `show` or `diff` to inspect the selected revision

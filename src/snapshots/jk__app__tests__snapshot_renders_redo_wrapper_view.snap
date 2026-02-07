@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Redo Result
+===========
+
+Summary: Redid operation 67d547b627fb
+
+Redid operation 67d547b627fb
+
+Tip: run `operation log` to inspect operation history
