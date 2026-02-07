@@ -282,3 +282,11 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (213 passed), and strict `cargo clippy`.
+- Latest pass:
+  - lifted `resolve` metadata to `guided` to match the existing list-first flow behavior.
+  - added native wrapper presentation for non-list `resolve` output, while preserving the
+    `resolve -l` list wrapper behavior.
+  - added decorator and snapshot coverage for resolve action wrapper rendering.
+- Latest pass:
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (215 passed), and strict `cargo clippy`.

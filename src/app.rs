@@ -1119,6 +1119,7 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("root") => render_root_view(output),
         Some("version") => render_version_view(output),
         Some("resolve") if has_resolve_list_flag(command) => render_resolve_list_view(output),
+        Some("resolve") => render_resolve_action_view(output),
         Some("file") if matches!(command.get(1).map(String::as_str), Some("list")) => {
             render_file_list_view(output)
         }
@@ -1657,6 +1658,48 @@ fn render_resolve_list_view(lines: Vec<String>) -> Vec<String> {
     rendered.push(String::new());
     rendered
         .push("Tip: run `resolve <path>` to open a merge tool for specific conflicts".to_string());
+    rendered
+}
+
+fn render_resolve_action_view(lines: Vec<String>) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let detail_count = detail_lines.len();
+
+    let summary = if let Some(signal) = detail_lines
+        .iter()
+        .find(|line| line.trim().starts_with("Resolved "))
+    {
+        format!("Summary: {}", signal.trim())
+    } else if detail_count == 0 {
+        "Summary: resolve command completed with no output".to_string()
+    } else {
+        format!(
+            "Summary: {detail_count} output line{}",
+            plural_suffix(detail_count)
+        )
+    };
+
+    let mut rendered = vec![
+        "Resolve".to_string(),
+        "=======".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered
+        .push("Tip: use `resolve -l` to verify remaining conflicts after resolution".to_string());
     rendered
 }
 
@@ -3343,6 +3386,21 @@ mod tests {
     }
 
     #[test]
+    fn decorates_resolve_action_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["resolve".to_string(), "src/app.rs".to_string()],
+            vec!["Resolved conflict in src/app.rs".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Resolve".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: Resolved conflict in src/app.rs"))
+        );
+    }
+
+    #[test]
     fn renders_file_list_view_with_summary_and_tip() {
         let rendered =
             render_file_list_view(vec!["src/app.rs".to_string(), "src/flows.rs".to_string()]);
@@ -4786,6 +4844,15 @@ mod tests {
         let rendered = render_resolve_list_view(vec![
             "Error: No conflicts found at this revision".to_string(),
         ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_resolve_action_wrapper_view() {
+        let rendered = decorate_command_output(
+            &["resolve".to_string(), "src/app.rs".to_string()],
+            vec!["Resolved conflict in src/app.rs".to_string()],
+        );
         insta::assert_snapshot!(rendered.join("\n"));
     }
 

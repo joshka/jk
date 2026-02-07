@@ -177,7 +177,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "resolve",
-        mode: ExecutionMode::Passthrough,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::B,
     },
     CommandSpec {
@@ -471,6 +471,10 @@ mod tests {
         );
         assert_eq!(
             lookup_top_level("fix").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("resolve").map(|spec| spec.mode),
             Some(ExecutionMode::Guided)
         );
     }

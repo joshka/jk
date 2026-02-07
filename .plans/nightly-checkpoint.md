@@ -37,6 +37,7 @@
     `interdiff`, `evolog`, and `metaedit`.
   - rewrite flow `simplify-parents` now renders via native mutation wrapper.
   - rewrite flow `fix` now renders via native mutation wrapper.
+  - resolve flow now has full wrapper parity for both `resolve -l` and direct resolve actions.
 - Shortcut coverage:
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`
@@ -105,11 +106,13 @@
   - added command-registry tests asserting `interdiff`/`evolog`/`metaedit` are `guided`
   - added command-registry and flow-planner coverage for guided `simplify-parents` defaults
   - added command-registry and flow-planner coverage for guided `fix` defaults
+  - added command-registry coverage for guided `resolve` mode
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
   - added `insta` snapshots for top-level `absorb`, `duplicate`, and `parallelize` wrappers
   - added `insta` snapshots for `interdiff`, `evolog`, and top-level `metaedit` wrappers
   - added `insta` snapshot for top-level `simplify-parents` wrapper
   - added `insta` snapshot for top-level `fix` wrapper
+  - added `insta` snapshot for resolve action wrapper output
   - refreshed `insta` snapshots for bookmark/workspace/operation mutation wrappers to lock in
     signal-first summary behavior
   - refreshed `insta` snapshot for `git push` wrapper signal-first summary behavior
@@ -140,6 +143,7 @@
     (`Rebased ...` output lines)
   - top-level mutation wrappers now include rewrite-signal support for `fix`
     (`Fixed ...` and `Rebased ...` output lines)
+  - resolve output now renders through native wrappers for both list and action forms
   - top-level mutation wrappers now include signal-first summary support for
     `absorb`/`duplicate`/`parallelize` when command output includes explicit action lines
   - command-safety mapping now marks read-only `file`/`tag` subcommands as Tier `A`
@@ -182,7 +186,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (213 passed)
+  - `cargo test` (215 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers
