@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Workspace Update-stale
+=================
+
+Summary: 1 output line
+
+Updated 2 stale workspaces
+
+Tip: run `workspace list` to inspect workspace state

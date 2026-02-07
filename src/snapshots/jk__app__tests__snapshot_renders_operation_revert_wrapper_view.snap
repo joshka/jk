@@ -1,0 +1,13 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Operation Revert
+=================
+
+Summary: 2 output lines
+
+Reverted operation 7699d9773e37
+Created undo operation 89abcdef0123
+
+Tip: run `operation log` and `status` to validate repository state

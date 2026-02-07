@@ -4048,6 +4048,42 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_bookmark_create_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("create"),
+            vec!["Created bookmark feature at abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_bookmark_move_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("move"),
+            vec!["Moved bookmark main to abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_bookmark_track_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("track"),
+            vec!["Started tracking bookmark main@origin".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_bookmark_untrack_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("untrack"),
+            vec!["Stopped tracking bookmark main@origin".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_file_list_wrapper_view() {
         let rendered = render_file_list_view(vec![
             "src/app.rs".to_string(),
@@ -4136,6 +4172,33 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_workspace_forget_wrapper_view() {
+        let rendered = render_workspace_mutation_view(
+            Some("forget"),
+            vec!["Forgot workspace docs".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_workspace_rename_wrapper_view() {
+        let rendered = render_workspace_mutation_view(
+            Some("rename"),
+            vec!["Renamed workspace docs to docs-v2".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_workspace_update_stale_wrapper_view() {
+        let rendered = render_workspace_mutation_view(
+            Some("update-stale"),
+            vec!["Updated 2 stale workspaces".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_status_wrapper_view() {
         let rendered = render_status_view(vec![
             "Working copy changes:".to_string(),
@@ -4179,6 +4242,18 @@ mod tests {
             vec![
                 "Restored to operation 7699d9773e37".to_string(),
                 "Working copy now matches restored operation".to_string(),
+            ],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_operation_revert_wrapper_view() {
+        let rendered = render_operation_mutation_view(
+            "revert",
+            vec![
+                "Reverted operation 7699d9773e37".to_string(),
+                "Created undo operation 89abcdef0123".to_string(),
             ],
         );
         insta::assert_snapshot!(rendered.join("\n"));
