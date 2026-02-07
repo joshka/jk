@@ -1108,6 +1108,9 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("redo") => render_top_level_mutation_view("redo", output),
         Some("restore") => render_top_level_mutation_view("restore", output),
         Some("revert") => render_top_level_mutation_view("revert", output),
+        Some("absorb") => render_top_level_mutation_view("absorb", output),
+        Some("duplicate") => render_top_level_mutation_view("duplicate", output),
+        Some("parallelize") => render_top_level_mutation_view("parallelize", output),
         Some("root") => render_root_view(output),
         Some("version") => render_version_view(output),
         Some("resolve") if has_resolve_list_flag(command) => render_resolve_list_view(output),
@@ -2084,6 +2087,9 @@ fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
         "abandon" => trimmed.starts_with("Abandoned "),
         "restore" => trimmed.starts_with("Restored "),
         "revert" => trimmed.starts_with("Reverted "),
+        "absorb" => trimmed.starts_with("Absorbed "),
+        "duplicate" => trimmed.starts_with("Duplicated "),
+        "parallelize" => trimmed.starts_with("Parallelized "),
         _ => false,
     }
 }
@@ -2093,7 +2099,8 @@ fn top_level_mutation_tip(command_name: &str) -> &'static str {
         "new" | "describe" | "commit" => "Tip: run `show` or `log` to inspect the updated revision",
         "edit" | "next" | "prev" => "Tip: run `show` or `diff` to inspect the selected revision",
         "undo" | "redo" => "Tip: run `operation log` to inspect operation history",
-        "rebase" | "squash" | "split" | "abandon" | "restore" | "revert" => {
+        "rebase" | "squash" | "split" | "abandon" | "restore" | "revert" | "absorb"
+        | "duplicate" | "parallelize" => {
             "Tip: run `log`, `status`, or `diff` to verify the resulting history"
         }
         _ => "Tip: run `log` and `status` to verify repository state",
@@ -4017,6 +4024,33 @@ mod tests {
     }
 
     #[test]
+    fn mutation_summary_detects_signal_lines_for_lifted_rewrite_commands() {
+        assert_eq!(
+            top_level_mutation_summary(
+                "absorb",
+                &[String::from("Absorbed changes into 2 destination commits")]
+            ),
+            "Summary: Absorbed changes into 2 destination commits"
+        );
+        assert_eq!(
+            top_level_mutation_summary(
+                "duplicate",
+                &[String::from("Duplicated 1 commits onto 0123abcd")]
+            ),
+            "Summary: Duplicated 1 commits onto 0123abcd"
+        );
+        assert_eq!(
+            top_level_mutation_summary(
+                "parallelize",
+                &[String::from(
+                    "Parallelized 3 revisions by making them siblings"
+                )]
+            ),
+            "Summary: Parallelized 3 revisions by making them siblings"
+        );
+    }
+
+    #[test]
     fn mutation_summary_falls_back_to_line_count() {
         let summary = top_level_mutation_summary(
             "abandon",
@@ -4126,6 +4160,9 @@ mod tests {
             ("redo", "Redo Result"),
             ("restore", "Restore Result"),
             ("revert", "Revert Result"),
+            ("absorb", "Absorb Result"),
+            ("duplicate", "Duplicate Result"),
+            ("parallelize", "Parallelize Result"),
         ];
 
         for (command, expected_header) in cases {
@@ -4880,6 +4917,33 @@ mod tests {
         let rendered = render_top_level_mutation_view(
             "split",
             vec!["Rebased 1 commits onto abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_absorb_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "absorb",
+            vec!["Absorbed changes into 2 destination commits".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_duplicate_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "duplicate",
+            vec!["Duplicated 1 commits onto 0123abcd".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_parallelize_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "parallelize",
+            vec!["Parallelized 3 revisions by making them siblings".to_string()],
         );
         insta::assert_snapshot!(rendered.join("\n"));
     }

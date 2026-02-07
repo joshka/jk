@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Parallelize Result
+==================
+
+Summary: Parallelized 3 revisions by making them siblings
+
+Parallelized 3 revisions by making them siblings
+
+Tip: run `log`, `status`, or `diff` to verify the resulting history

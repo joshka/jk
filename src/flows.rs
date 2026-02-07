@@ -470,6 +470,15 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
                 onto_revision: "@".to_string(),
             },
         }),
+        [command] if command == "absorb" => {
+            FlowAction::Execute(vec!["absorb".to_string(), "--from".to_string(), selected])
+        }
+        [command] if command == "duplicate" => {
+            FlowAction::Execute(vec!["duplicate".to_string(), selected])
+        }
+        [command] if command == "parallelize" => {
+            FlowAction::Execute(vec!["parallelize".to_string(), selected])
+        }
         [command] if command == "bookmark" => {
             FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
         }
@@ -1276,6 +1285,26 @@ mod tests {
         assert_prompt_kind(
             plan_command("git push", selected()),
             PromptKind::GitPushBookmark,
+        );
+    }
+
+    #[test]
+    fn adds_selection_aware_absorb_duplicate_and_parallelize_flows() {
+        assert_eq!(
+            plan_command("absorb", selected()),
+            FlowAction::Execute(vec![
+                "absorb".to_string(),
+                "--from".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("duplicate", selected()),
+            FlowAction::Execute(vec!["duplicate".to_string(), "abc12345".to_string()])
+        );
+        assert_eq!(
+            plan_command("parallelize", selected()),
+            FlowAction::Execute(vec!["parallelize".to_string(), "abc12345".to_string()])
         );
     }
 

@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Absorb Result
+=============
+
+Summary: Absorbed changes into 2 destination commits
+
+Absorbed changes into 2 destination commits
+
+Tip: run `log`, `status`, or `diff` to verify the resulting history

@@ -31,6 +31,8 @@
   - top-level daily/rewrite mutation flows now render via native wrappers:
     `new`, `describe`, `commit`, `edit`, `next`, `prev`, `rebase`, `squash`, `split`, `abandon`,
     `undo`, `redo`, `restore`, `revert`.
+  - lifted rewrite-adjacent flows now also render via native wrappers:
+    `absorb`, `duplicate`, and `parallelize`.
 - Shortcut coverage:
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`
@@ -92,7 +94,10 @@
   - added explicit summary-heuristic tests for bookmark/workspace/operation mutation wrappers
   - added explicit summary-heuristic tests for `git fetch`/`git push` wrapper summaries
   - added explicit wrapper render/decorator tests for `version` output
+  - added flow-planner tests for selection-aware `absorb`/`duplicate`/`parallelize` defaults
+  - added command-registry tests asserting `absorb`/`duplicate`/`parallelize` are `guided`
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
+  - added `insta` snapshots for top-level `absorb`, `duplicate`, and `parallelize` wrappers
   - refreshed `insta` snapshots for bookmark/workspace/operation mutation wrappers to lock in
     signal-first summary behavior
   - refreshed `insta` snapshot for `git push` wrapper signal-first summary behavior
@@ -117,6 +122,8 @@
   - top-level daily/rewrite mutation wrappers now include command-specific follow-up tips
   - top-level mutation wrappers now prefer signal-first summary lines (for example rebase/undo
     action output) before falling back to generic output counts
+  - top-level mutation wrappers now include signal-first summary support for
+    `absorb`/`duplicate`/`parallelize` when command output includes explicit action lines
   - command-safety mapping now marks read-only `file`/`tag` subcommands as Tier `A`
   - command-safety mapping now marks `resolve -l` as Tier `A`
 
@@ -157,7 +164,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (199 passed)
+  - `cargo test` (205 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

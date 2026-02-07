@@ -3,7 +3,6 @@ pub enum ExecutionMode {
     Native,
     Guided,
     Passthrough,
-    Defer,
 }
 
 impl ExecutionMode {
@@ -12,7 +11,6 @@ impl ExecutionMode {
             Self::Native => "native",
             Self::Guided => "guided",
             Self::Passthrough => "passthrough",
-            Self::Defer => "defer",
         }
     }
 }
@@ -49,7 +47,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "absorb",
-        mode: ExecutionMode::Defer,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::C,
     },
     CommandSpec {
@@ -89,7 +87,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "duplicate",
-        mode: ExecutionMode::Defer,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::B,
     },
     CommandSpec {
@@ -159,7 +157,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "parallelize",
-        mode: ExecutionMode::Defer,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::C,
     },
     CommandSpec {
@@ -441,6 +439,18 @@ mod tests {
         );
         assert_eq!(
             lookup_top_level("restore").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("absorb").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("duplicate").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("parallelize").map(|spec| spec.mode),
             Some(ExecutionMode::Guided)
         );
     }

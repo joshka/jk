@@ -8,7 +8,6 @@ Each command has a mode, safety tier, and explicit test target.
 - `native`: purpose-built TUI flow.
 - `guided`: TUI flow with prompts and previews.
 - `passthrough`: run `jj` in-app and capture output.
-- `defer`: documented now, implemented later.
 
 ## Safety tiers
 
@@ -66,9 +65,25 @@ Each command has a mode, safety tier, and explicit test target.
 
 ### Common advanced commands
 
-- `restore`, `revert`, `duplicate`, `parallelize`, `interdiff`, `evolog`, `metaedit`
+- `restore`, `revert`, `absorb`, `duplicate`, `parallelize`, `interdiff`, `evolog`, `metaedit`
   - Mode/Tier: `guided` / mostly `B`, `restore` and `revert` are `C`.
   - Tests: flow assembly tests and safety tests where tier is `C`.
+
+### Defer-lift focus (current implementation pass)
+
+- `absorb`
+  - Mode/Tier: `guided` / `C`
+  - Default flow: selection-aware execute as `absorb --from <selected>` so startup and `:` command
+    mode follow the selected revision model.
+  - Presentation: render with native top-level mutation wrapper.
+- `duplicate`
+  - Mode/Tier: `guided` / `B`
+  - Default flow: selection-aware execute as `duplicate <selected>`.
+  - Presentation: render with native top-level mutation wrapper.
+- `parallelize`
+  - Mode/Tier: `guided` / `C`
+  - Default flow: selection-aware execute as `parallelize <selected>`.
+  - Presentation: render with native top-level mutation wrapper.
 
 ### Operation log workflows
 

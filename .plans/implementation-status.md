@@ -246,3 +246,13 @@
 - Latest pass:
   - added startup-action regression coverage for high-frequency OMZ aliases
     (`jk jjst`, `jk jjl`, `jk jjd`, `jk jjgf`, `jk jjgp`, `jk jjrbm`, `jk jjc`, `jk jjds`).
+- Latest pass:
+  - lifted `absorb`, `duplicate`, and `parallelize` from deferred behavior to selection-aware
+    guided flows in the planner (`absorb --from <selected>`, `duplicate <selected>`,
+    `parallelize <selected>`).
+  - aligned command-registry execution modes so all three now report `guided` coverage.
+  - added native top-level mutation wrappers plus summary-signal coverage and `insta` snapshots
+    for `absorb`, `duplicate`, and `parallelize`.
+- Latest pass:
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (205 passed), and strict `cargo clippy`.
