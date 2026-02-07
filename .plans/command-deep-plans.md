@@ -84,6 +84,10 @@ Each command has a mode, safety tier, and explicit test target.
   - Mode/Tier: `guided` / `C`
   - Default flow: selection-aware execute as `parallelize <selected>`.
   - Presentation: render with native top-level mutation wrapper.
+- `simplify-parents`
+  - Mode/Tier: `guided` / `C`
+  - Default flow: selection-aware execute as `simplify-parents <selected>`.
+  - Presentation: render with native top-level mutation wrapper.
 - `interdiff`
   - Mode/Tier: `guided` / `A`
   - Default flow: selection-aware execute as `interdiff --from @- --to <selected>`.

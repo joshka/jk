@@ -509,6 +509,9 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
         [command] if command == "parallelize" => {
             FlowAction::Execute(vec!["parallelize".to_string(), selected])
         }
+        [command] if command == "simplify-parents" => {
+            FlowAction::Execute(vec!["simplify-parents".to_string(), selected])
+        }
         [command] if command == "bookmark" => {
             FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
         }
@@ -1363,6 +1366,10 @@ mod tests {
             PromptKind::MetaeditMessage {
                 revision: "abc12345".to_string(),
             },
+        );
+        assert_eq!(
+            plan_command("simplify-parents", selected()),
+            FlowAction::Execute(vec!["simplify-parents".to_string(), "abc12345".to_string()])
         );
     }
 

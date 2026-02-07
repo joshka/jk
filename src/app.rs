@@ -1106,6 +1106,7 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("rebase") => render_top_level_mutation_view("rebase", output),
         Some("squash") => render_top_level_mutation_view("squash", output),
         Some("split") => render_top_level_mutation_view("split", output),
+        Some("simplify-parents") => render_top_level_mutation_view("simplify-parents", output),
         Some("abandon") => render_top_level_mutation_view("abandon", output),
         Some("undo") => render_top_level_mutation_view("undo", output),
         Some("redo") => render_top_level_mutation_view("redo", output),
@@ -2153,7 +2154,7 @@ fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
         }
         "undo" => trimmed.starts_with("Undid operation"),
         "redo" => trimmed.starts_with("Redid operation"),
-        "rebase" | "squash" | "split" => trimmed.starts_with("Rebased "),
+        "rebase" | "squash" | "split" | "simplify-parents" => trimmed.starts_with("Rebased "),
         "abandon" => trimmed.starts_with("Abandoned "),
         "restore" => trimmed.starts_with("Restored "),
         "revert" => trimmed.starts_with("Reverted "),
@@ -2171,8 +2172,8 @@ fn top_level_mutation_tip(command_name: &str) -> &'static str {
         }
         "edit" | "next" | "prev" => "Tip: run `show` or `diff` to inspect the selected revision",
         "undo" | "redo" => "Tip: run `operation log` to inspect operation history",
-        "rebase" | "squash" | "split" | "abandon" | "restore" | "revert" | "absorb"
-        | "duplicate" | "parallelize" => {
+        "rebase" | "squash" | "split" | "simplify-parents" | "abandon" | "restore" | "revert"
+        | "absorb" | "duplicate" | "parallelize" => {
             "Tip: run `log`, `status`, or `diff` to verify the resulting history"
         }
         _ => "Tip: run `log` and `status` to verify repository state",
@@ -4228,6 +4229,7 @@ mod tests {
             ("rebase", "Rebase Result"),
             ("squash", "Squash Result"),
             ("split", "Split Result"),
+            ("simplify-parents", "Simplify-parents Result"),
             ("abandon", "Abandon Result"),
             ("undo", "Undo Result"),
             ("redo", "Redo Result"),
@@ -4409,6 +4411,11 @@ mod tests {
                 vec!["split", "-r", "abc12345"],
                 vec!["Rebased 1 commits onto abc12345"],
                 "Split Result",
+            ),
+            (
+                vec!["simplify-parents", "abc12345"],
+                vec!["Rebased 2 commits onto simplified parent set"],
+                "Simplify-parents Result",
             ),
             (
                 vec!["abandon", "abc12345"],
@@ -5079,6 +5086,15 @@ mod tests {
         let rendered = render_top_level_mutation_view(
             "split",
             vec!["Rebased 1 commits onto abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_simplify_parents_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "simplify-parents",
+            vec!["Rebased 2 commits onto simplified parent set".to_string()],
         );
         insta::assert_snapshot!(rendered.join("\n"));
     }

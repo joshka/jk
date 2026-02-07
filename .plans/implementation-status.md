@@ -266,3 +266,11 @@
 - Latest pass:
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
     `cargo test` (211 passed), and strict `cargo clippy`.
+- Latest pass:
+  - lifted `simplify-parents` from passthrough to a selection-aware guided default:
+    `simplify-parents <selected>`.
+  - added native top-level mutation wrapper coverage (including snapshot) for
+    `simplify-parents` output so rewrite flows stay presentation-consistent.
+- Latest pass:
+  - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
+    `cargo test` (212 passed), and strict `cargo clippy`.

@@ -207,7 +207,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "simplify-parents",
-        mode: ExecutionMode::Passthrough,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::C,
     },
     CommandSpec {
@@ -463,6 +463,10 @@ mod tests {
         );
         assert_eq!(
             lookup_top_level("metaedit").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("simplify-parents").map(|spec| spec.mode),
             Some(ExecutionMode::Guided)
         );
     }

@@ -1,0 +1,12 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Simplify-parents Result
+=======================
+
+Summary: Rebased 2 commits onto simplified parent set
+
+Rebased 2 commits onto simplified parent set
+
+Tip: run `log`, `status`, or `diff` to verify the resulting history
