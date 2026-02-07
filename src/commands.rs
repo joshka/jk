@@ -154,7 +154,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "operation",
-        mode: ExecutionMode::Defer,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::B,
     },
     CommandSpec {
@@ -184,12 +184,12 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "restore",
-        mode: ExecutionMode::Defer,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::C,
     },
     CommandSpec {
         name: "revert",
-        mode: ExecutionMode::Defer,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::C,
     },
     CommandSpec {
@@ -259,7 +259,7 @@ const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
     CommandSpec {
         name: "workspace",
-        mode: ExecutionMode::Defer,
+        mode: ExecutionMode::Guided,
         tier: SafetyTier::B,
     },
 ];
@@ -370,7 +370,15 @@ mod tests {
         );
         assert_eq!(
             lookup_top_level("workspace").map(|spec| spec.mode),
-            Some(ExecutionMode::Defer)
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("operation").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
+        );
+        assert_eq!(
+            lookup_top_level("restore").map(|spec| spec.mode),
+            Some(ExecutionMode::Guided)
         );
     }
 

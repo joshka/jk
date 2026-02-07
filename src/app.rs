@@ -274,7 +274,7 @@ impl App {
     fn render_confirmation_preview(&mut self, tokens: &[String]) {
         let mut lines = vec![format!("Confirm: jj {}", tokens.join(" "))];
 
-        if let Some(preview_tokens) = dry_run_preview_tokens(tokens)
+        if let Some(preview_tokens) = confirmation_preview_tokens(tokens)
             && let Ok(preview) = jj::run(&preview_tokens)
         {
             lines.push(String::new());
@@ -660,7 +660,7 @@ fn is_dangerous(tokens: &[String]) -> bool {
     command_safety(tokens) == SafetyTier::C
 }
 
-fn dry_run_preview_tokens(tokens: &[String]) -> Option<Vec<String>> {
+fn confirmation_preview_tokens(tokens: &[String]) -> Option<Vec<String>> {
     if matches!(
         (
             tokens.first().map(String::as_str),
@@ -672,6 +672,26 @@ fn dry_run_preview_tokens(tokens: &[String]) -> Option<Vec<String>> {
         let mut preview = tokens.to_vec();
         preview.push("--dry-run".to_string());
         return Some(preview);
+    }
+
+    if matches!(
+        (
+            tokens.first().map(String::as_str),
+            tokens.get(1).map(String::as_str)
+        ),
+        (Some("operation"), Some("restore" | "revert"))
+    ) {
+        let operation = tokens
+            .get(2)
+            .filter(|value| !value.starts_with('-'))
+            .cloned()
+            .unwrap_or_else(|| "@".to_string());
+        return Some(vec![
+            "operation".to_string(),
+            "show".to_string(),
+            operation,
+            "--no-op-diff".to_string(),
+        ]);
     }
 
     None
@@ -713,8 +733,8 @@ mod tests {
     use crate::flows::{FlowAction, PromptKind};
 
     use super::{
-        App, Mode, build_row_revision_map, dry_run_preview_tokens, extract_revision, is_change_id,
-        is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
+        App, Mode, build_row_revision_map, confirmation_preview_tokens, extract_revision,
+        is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
         startup_action,
     };
 
@@ -889,7 +909,7 @@ mod tests {
 
     #[test]
     fn builds_dry_run_preview_for_git_push() {
-        let preview = dry_run_preview_tokens(&["git".to_string(), "push".to_string()]);
+        let preview = confirmation_preview_tokens(&["git".to_string(), "push".to_string()]);
         assert_eq!(
             preview,
             Some(vec![
@@ -899,12 +919,42 @@ mod tests {
             ])
         );
 
-        let existing = dry_run_preview_tokens(&[
+        let existing = confirmation_preview_tokens(&[
             "git".to_string(),
             "push".to_string(),
             "--dry-run".to_string(),
         ]);
         assert_eq!(existing, None);
+    }
+
+    #[test]
+    fn builds_operation_preview_for_restore_and_revert() {
+        let restore = confirmation_preview_tokens(&[
+            "operation".to_string(),
+            "restore".to_string(),
+            "abc123".to_string(),
+        ]);
+        assert_eq!(
+            restore,
+            Some(vec![
+                "operation".to_string(),
+                "show".to_string(),
+                "abc123".to_string(),
+                "--no-op-diff".to_string()
+            ])
+        );
+
+        let revert_default =
+            confirmation_preview_tokens(&["operation".to_string(), "revert".to_string()]);
+        assert_eq!(
+            revert_default,
+            Some(vec![
+                "operation".to_string(),
+                "show".to_string(),
+                "@".to_string(),
+                "--no-op-diff".to_string()
+            ])
+        );
     }
 
     #[test]

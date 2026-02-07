@@ -89,13 +89,27 @@ mod tests {
             to_vec(&["git", "fetch"])
         );
         assert_eq!(
+            normalize_alias(&to_vec(&["jjgfa"])),
+            to_vec(&["git", "fetch", "--all-remotes"])
+        );
+        assert_eq!(
             normalize_alias(&to_vec(&["jjgpt"])),
             to_vec(&["git", "push", "--tracked"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjgpa"])),
+            to_vec(&["git", "push", "--all"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjgpd"])),
+            to_vec(&["git", "push", "--deleted"])
         );
         assert_eq!(
             normalize_alias(&to_vec(&["jjrbm"])),
             to_vec(&["rebase", "-d", "trunk()"])
         );
+        assert_eq!(normalize_alias(&to_vec(&["jjst"])), to_vec(&["status"]));
+        assert_eq!(normalize_alias(&to_vec(&["jjl"])), to_vec(&["log"]));
         assert_eq!(normalize_alias(&to_vec(&["jjrt"])), to_vec(&["root"]));
         assert_eq!(
             normalize_alias(&to_vec(&["jjbl"])),

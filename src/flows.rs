@@ -798,6 +798,54 @@ mod tests {
     }
 
     #[test]
+    fn maps_fetch_push_variant_aliases() {
+        assert_eq!(
+            plan_command("jjgfa", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "fetch".to_string(),
+                "--all-remotes".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("jjgpt", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--tracked".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("jjgpa", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--all".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("jjgpd", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--deleted".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn maps_log_and_status_aliases() {
+        assert_eq!(
+            plan_command("jjst", selected()),
+            FlowAction::Execute(vec!["status".to_string()])
+        );
+        assert_eq!(
+            plan_command("jjl", selected()),
+            FlowAction::Execute(vec!["log".to_string()])
+        );
+    }
+
+    #[test]
     fn maps_rebase_aliases_to_expected_destinations() {
         assert_eq!(
             plan_command("rbm", selected()),
