@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{self, Stdout, Write};
 use std::time::Duration;
 
@@ -32,6 +33,7 @@ pub struct App {
     scroll: usize,
     status_line: String,
     command_input: String,
+    row_revision_map: Vec<Option<String>>,
     pending_confirm: Option<Vec<String>>,
     pending_prompt: Option<PromptState>,
     last_command: Vec<String>,
@@ -56,6 +58,7 @@ impl App {
             scroll: 0,
             status_line: "Press : for commands, q to quit".to_string(),
             command_input: String::new(),
+            row_revision_map: Vec::new(),
             pending_confirm: None,
             pending_prompt: None,
             last_command: vec!["log".to_string()],
@@ -280,6 +283,7 @@ impl App {
         }
 
         self.lines = lines;
+        self.row_revision_map = vec![None; self.lines.len()];
         self.cursor = 0;
         self.scroll = 0;
     }
@@ -313,6 +317,7 @@ impl App {
             }
             FlowAction::Render { lines, status } => {
                 self.lines = lines;
+                self.row_revision_map = vec![None; self.lines.len()];
                 self.cursor = 0;
                 self.scroll = 0;
                 self.status_line = status;
@@ -332,6 +337,7 @@ impl App {
 
     fn execute_tokens(&mut self, tokens: Vec<String>) -> Result<(), JkError> {
         let result = jj::run(&tokens)?;
+        self.row_revision_map = derive_row_revision_map(&result.command, &result.output);
         self.lines = result.output;
         self.cursor = 0;
         self.scroll = 0;
@@ -370,6 +376,14 @@ impl App {
     }
 
     fn selected_revision(&self) -> Option<String> {
+        if !self.row_revision_map.is_empty() {
+            for line_index in (0..=self.cursor).rev() {
+                if let Some(Some(revision)) = self.row_revision_map.get(line_index) {
+                    return Some(revision.clone());
+                }
+            }
+        }
+
         for line_index in (0..=self.cursor).rev() {
             if let Some(line) = self.lines.get(line_index)
                 && let Some(revision) = extract_revision(line)
@@ -467,6 +481,127 @@ fn startup_action(startup_tokens: &[String]) -> FlowAction {
         let startup_command = startup_tokens.join(" ");
         plan_command(&startup_command, None)
     }
+}
+
+fn derive_row_revision_map(tokens: &[String], lines: &[String]) -> Vec<Option<String>> {
+    if !matches!(tokens.first().map(String::as_str), Some("log")) {
+        return vec![None; lines.len()];
+    }
+
+    let Some(metadata_tokens) = metadata_log_tokens(tokens) else {
+        return vec![None; lines.len()];
+    };
+
+    let revisions = match jj::run(&metadata_tokens) {
+        Ok(result) if result.success => parse_log_revisions(&result.output),
+        _ => Vec::new(),
+    };
+
+    build_row_revision_map(lines, &revisions)
+}
+
+fn metadata_log_tokens(tokens: &[String]) -> Option<Vec<String>> {
+    if !matches!(tokens.first().map(String::as_str), Some("log")) {
+        return None;
+    }
+
+    let mut metadata_tokens = vec![
+        "log".to_string(),
+        "--no-graph".to_string(),
+        "-T".to_string(),
+        "change_id.short() ++ \" \" ++ commit_id.short()".to_string(),
+    ];
+
+    let mut skip_next_value = false;
+    for token in tokens.iter().skip(1) {
+        if skip_next_value {
+            skip_next_value = false;
+            continue;
+        }
+
+        match token.as_str() {
+            "-T" | "--template" => {
+                skip_next_value = true;
+            }
+            "--graph" | "--no-graph" | "-p" | "--patch" => {}
+            value => metadata_tokens.push(value.to_string()),
+        }
+    }
+
+    Some(metadata_tokens)
+}
+
+fn parse_log_revisions(lines: &[String]) -> Vec<String> {
+    let mut revisions = Vec::new();
+    for line in lines {
+        let Some(token) = line.split_whitespace().next().map(trim_revision_token) else {
+            continue;
+        };
+        if is_change_id(token) || is_commit_id(token) {
+            revisions.push(token.to_string());
+        }
+    }
+    revisions
+}
+
+fn build_row_revision_map(lines: &[String], ordered_revisions: &[String]) -> Vec<Option<String>> {
+    let mut revision_positions = HashMap::new();
+    for (index, revision) in ordered_revisions.iter().enumerate() {
+        revision_positions.insert(revision.clone(), index);
+    }
+
+    let mut map = Vec::with_capacity(lines.len());
+    let mut current: Option<String> = None;
+    let mut next_ordinal = 0usize;
+
+    for line in lines {
+        if let Some(explicit) = extract_revision(line) {
+            if let Some(position) = revision_positions.get(&explicit) {
+                current = Some(explicit);
+                next_ordinal = (*position + 1).max(next_ordinal);
+            } else if ordered_revisions.is_empty() {
+                current = Some(explicit);
+            }
+        } else if looks_like_graph_commit_row(line) && next_ordinal < ordered_revisions.len() {
+            current = ordered_revisions.get(next_ordinal).cloned();
+            next_ordinal += 1;
+        }
+
+        map.push(current.clone());
+    }
+
+    map
+}
+
+fn looks_like_graph_commit_row(line: &str) -> bool {
+    for ch in line.chars() {
+        if ch.is_whitespace()
+            || matches!(
+                ch,
+                '│' | '┃'
+                    | '┆'
+                    | '┊'
+                    | '┄'
+                    | '┈'
+                    | '─'
+                    | '┬'
+                    | '┴'
+                    | '┼'
+                    | '╭'
+                    | '╮'
+                    | '╯'
+                    | '╰'
+                    | '|'
+                    | '/'
+                    | '\\'
+            )
+        {
+            continue;
+        }
+        return matches!(ch, '@' | '○' | '◉' | '●' | '◆' | '◌' | 'x' | 'X' | '*');
+    }
+
+    false
 }
 
 fn trim_to_width(text: &str, width: usize) -> String {
@@ -578,8 +713,9 @@ mod tests {
     use crate::flows::{FlowAction, PromptKind};
 
     use super::{
-        App, Mode, dry_run_preview_tokens, extract_revision, is_change_id, is_commit_id,
-        is_dangerous, startup_action,
+        App, Mode, build_row_revision_map, dry_run_preview_tokens, extract_revision, is_change_id,
+        is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
+        startup_action,
     };
 
     #[test]
@@ -769,5 +905,57 @@ mod tests {
             "--dry-run".to_string(),
         ]);
         assert_eq!(existing, None);
+    }
+
+    #[test]
+    fn metadata_log_tokens_strip_template_and_patch_options() {
+        let tokens = vec![
+            "log".to_string(),
+            "-r".to_string(),
+            "all()".to_string(),
+            "-T".to_string(),
+            "user_template".to_string(),
+            "--patch".to_string(),
+        ];
+        assert_eq!(
+            metadata_log_tokens(&tokens),
+            Some(vec![
+                "log".to_string(),
+                "--no-graph".to_string(),
+                "-T".to_string(),
+                "change_id.short() ++ \" \" ++ commit_id.short()".to_string(),
+                "-r".to_string(),
+                "all()".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn graph_row_detection_handles_connectors() {
+        assert!(looks_like_graph_commit_row("@  abcdefgh 0123abcd message"));
+        assert!(looks_like_graph_commit_row("│ ○ hgfedcba 89abcdef parent"));
+        assert!(!looks_like_graph_commit_row("│ detailed message line"));
+    }
+
+    #[test]
+    fn row_revision_map_falls_back_to_metadata_order() {
+        let lines = vec![
+            "@  no explicit ids".to_string(),
+            "│ detail row".to_string(),
+            "○ also missing ids".to_string(),
+            "│ detail row two".to_string(),
+        ];
+        let metadata = vec!["abcdefgh".to_string(), "hgfedcba".to_string()];
+        let map = build_row_revision_map(&lines, &metadata);
+
+        assert_eq!(
+            map,
+            vec![
+                Some("abcdefgh".to_string()),
+                Some("abcdefgh".to_string()),
+                Some("hgfedcba".to_string()),
+                Some("hgfedcba".to_string()),
+            ]
+        );
     }
 }

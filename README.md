@@ -44,6 +44,7 @@ Mutating high-risk commands run through confirmation guards.
 
 `jk` also keeps an explicit top-level command registry aligned to the current `jj` command surface so
 new flow work can evolve without ambiguity.
+Log-row selection uses metadata-backed revision mapping to stay stable across multi-line log views.
 
 ## Alias Coverage
 

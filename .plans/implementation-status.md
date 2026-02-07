@@ -66,7 +66,7 @@
   - added explicit test coverage for dangerous-command gating and alias argument fidelity
   - added explicit top-level `jj` command registry and safety-tier lookup in `src/commands.rs`
   - expanded guided prompts for `restore`, `revert`, and additional bookmark mutations
-  - improved revision selection by resolving detail rows to the nearest prior revision line
+  - improved revision selection with metadata-backed row mapping for `jj log` output
   - added in-app `:commands` registry view from command metadata
   - routed startup `jk <command>` through the same flow planner used by command mode
   - added startup regression tests for confirm-gated and render-only startup actions
