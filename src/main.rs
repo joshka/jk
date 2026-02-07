@@ -4,7 +4,7 @@ mod cli;
 mod commands;
 mod config;
 mod error;
-mod flows;
+mod flow;
 mod jj;
 mod keys;
 

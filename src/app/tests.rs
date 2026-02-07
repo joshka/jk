@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::KeybindConfig;
 
-use crate::flows::{FlowAction, PromptKind};
+use crate::flow::{FlowAction, PromptKind};
 
 use super::preview::{confirmation_preview_tokens, is_dangerous, toggle_patch_flag};
 use super::selection::{

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::flows::{FlowAction, plan_command};
+use crate::flow::{FlowAction, plan_command};
 use crate::jj;
 use crate::keys::KeyBinding;
 use crossterm::event::KeyEvent;
