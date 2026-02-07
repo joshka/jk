@@ -12,6 +12,77 @@ view and keeps you in one interface for inspect, rewrite, bookmark, and remote f
 - Avoid box-heavy dashboard UIs; favor focused, command-line-pager interaction.
 - Let users stay inside `jk` for common daily workflows.
 
+## How `jk` Works (If You Know `jj`)
+
+In `jj`, you run a command, inspect output, then run the next command from your shell.
+
+In `jk`, you stay in one full-screen session and switch views by running commands in-place.
+`status`, `log`, `show`, and `help` are not separate apps or tabs; each is just the current view.
+
+That means there is no dedicated "back" action yet. To leave any view, run the next command you
+want (usually `:log`, `:status`, or `:operation log`).
+
+## Getting Unstuck Quickly
+
+- Go from `status` back to `log`: press `:` then type `log` and press `Enter`.
+- Dismiss help (`?` / `:commands`): run another command, usually `:log`.
+- Cancel command entry: press `Esc` in command mode.
+- Cancel prompts: press `Esc` in prompt mode.
+- Reject dangerous command confirmation: press `n` or `Esc`.
+- Quit `jk`: press `q`.
+
+## `jj` CLI Flow vs `jk` Flow
+
+- Check history:
+  - `jj log`
+  - `jk` (default) or `:log`
+- Check current working state:
+  - `jj st`
+  - `s` or `:status`
+- Inspect a specific revision:
+  - `jj show <rev>`
+  - Move cursor to revision and press `Enter`, or run `:show <rev>`
+- Inspect patch for a revision:
+  - `jj diff -r <rev>`
+  - Move cursor to revision and press `d`, or run `:diff -r <rev>`
+- Write/update change description:
+  - `jj describe -m "message" <rev>`
+  - Move cursor to revision, press `D`, type message, press `Enter`
+- Create a new change:
+  - `jj new -m "message"`
+  - Press `n`, enter message (or blank), press `Enter`
+- Sync with remote:
+  - `jj git fetch` / `jj git push`
+  - Press `F` / `P`, then fill optional prompt input
+- Rebase to main/trunk defaults:
+  - `jj rebase -d main` / `jj rebase -d trunk()`
+  - Press `M` / `T`, or run `:rbm` / `:rbt`
+- Recover from mistakes:
+  - `jj op log`, `jj undo`, `jj redo`
+  - `o`, `u`, `U`
+
+## Day-One Workflow
+
+1. Start with `jk` and stay on `log` as your home view.
+2. Use `j`/`k` to select revisions, then `Enter` (`show`) and `d` (`diff`) to inspect.
+3. Use fast mutate keys (`n`, `c`, `D`, `b`, `a`, `B`, `S`, `X`) when you already selected a row.
+4. Use `:` for exact `jj` commands whenever you need precision.
+5. Return to `:log` between tasks so you keep a clear "home" state.
+
+## Real-Work Usability Today
+
+- Good fit today: daily inspect/edit/rewrite/bookmark/remote loops centered on `log`.
+- Safety: high-risk flows are confirm-gated with in-app previews.
+- Escape hatch: any supported `jj` command can be run directly via `:...`.
+- Current limitation: view switching is command-driven; there is no dedicated "close this view"
+  action yet.
+
+## References
+
+- Jujutsu tutorial: <https://docs.jj-vcs.dev/latest/tutorial/>
+- Jujutsu command docs (`log`): <https://docs.jj-vcs.dev/latest/cli-reference/#jj-log>
+- Steve Klabnik's tutorial: <https://steveklabnik.github.io/jujutsu-tutorial/>
+
 ## Current State
 
 This repository is in active development. The current baseline includes:
