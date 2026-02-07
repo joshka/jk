@@ -334,3 +334,17 @@
     helpers.
   - added durable refactor execution plan file:
     `.plans/module-refactor-execution-plan.md`.
+- Latest pass:
+  - completed `flow` module split into `src/flow/mod.rs`, `planner.rs`, `prompt_kind.rs`,
+    `builders.rs`, and `tests.rs`; rewired app/main imports from `crate::flows` to `crate::flow`.
+  - split `commands` into `src/commands/spec.rs` and `src/commands/overview.rs` with a thin
+    `src/commands/mod.rs` facade.
+  - split `alias` into `src/alias/normalize.rs` and `src/alias/catalog.rs` with a thin
+    `src/alias/mod.rs` facade.
+  - reran `cargo fmt --all`, `cargo check`, and focused `flow`, `alias`, and `commands` tests.
+- Latest pass:
+  - split `src/app/mod.rs` into focused state-only `mod.rs` plus `runtime.rs`, `input.rs`, and
+    `history.rs` impl modules, preserving `App::new` and `App::run`.
+  - split `src/app/view.rs` into command-aligned modules under `src/app/view/` while keeping the
+    same `super::view::*` function surface used by app logic and tests.
+  - reran `cargo fmt --all`, `cargo check`, and full `app::tests::` coverage (167 passed).

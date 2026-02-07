@@ -3,9 +3,13 @@
 ## Project Structure & Module Organization
 
 - Core runtime lives in `src/`.
-- Keep modules focused by responsibility (for example: `app.rs` for TUI state/event loop,
-  `flows.rs` for command planning, `alias.rs` for alias normalization, `commands.rs` for command
-  metadata and safety tiers).
+- Keep modules focused by responsibility:
+  `src/app/` (runtime/input/history + rendering), `src/flow/` (command planning + prompts),
+  `src/alias/` (alias normalization + catalog), and `src/commands/` (registry + safety/overview).
+- Keep rendering command-aligned under `src/app/view/` (for example status/diff, file/tag,
+  workspace/git/top-level mutation, and operation views).
+- Prefer command-aligned files and co-located tests; avoid catch-all files.
+- Follow size targets for maintainability: soft 300 LOC, hard 500 LOC (tests excluded).
 - Default keybindings are in `config/keybinds.default.toml`.
 - Planning and delivery context belongs in `.plans/`.
 - ADRs and architecture notes belong in `docs/adr/`.

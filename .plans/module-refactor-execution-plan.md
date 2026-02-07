@@ -20,10 +20,18 @@ src/
   app/
     mod.rs
     runtime.rs
+    history.rs
     input.rs
     selection.rs
     preview.rs
-    view.rs
+    view/
+      mod.rs
+      status_diff.rs
+      root_resolve.rs
+      file_tag.rs
+      workspace_git_top.rs
+      operation.rs
+      common.rs
     tests.rs
   flow/
     mod.rs
@@ -45,7 +53,8 @@ src/
 1. App split (structural, no behavior changes)
    - Move `src/app.rs` to `src/app/mod.rs`.
    - Extract `tests` to `src/app/tests.rs`.
-   - Extract runtime/input/selection/preview/view helpers into dedicated files.
+   - Extract runtime/input/history/selection/preview helpers into dedicated files.
+   - Split `src/app/view.rs` into command-aligned submodules under `src/app/view/`.
    - Keep `App` public surface stable (`App::new`, `App::run`).
 
 2. Flow split
