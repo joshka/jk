@@ -109,6 +109,7 @@
   - added explicit OMZ gold-alias flow contract test matrix for high-frequency compatibility
   - added `insta` snapshot coverage for bookmark-list and operation-log wrapper views
   - added quick read-mode shortcuts (`o`, `L`, `w`) for operation log/bookmark list/root views
+  - aligned `workspace root` rendering with the native root wrapper presentation
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

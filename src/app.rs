@@ -1033,6 +1033,9 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("show") => render_show_view(output),
         Some("diff") => render_diff_view(output),
         Some("root") => render_root_view(output),
+        Some("workspace") if matches!(command.get(1).map(String::as_str), Some("root")) => {
+            render_root_view(output)
+        }
         Some("bookmark") if matches!(command.get(1).map(String::as_str), Some("list")) => {
             render_bookmark_list_view(output)
         }
@@ -1214,10 +1217,11 @@ mod tests {
     use crate::flows::{FlowAction, PromptKind};
 
     use super::{
-        App, Mode, build_row_revision_map, confirmation_preview_tokens, extract_revision,
-        is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row, metadata_log_tokens,
-        render_bookmark_list_view, render_diff_view, render_operation_log_view, render_root_view,
-        render_show_view, render_status_view, startup_action, toggle_patch_flag,
+        App, Mode, build_row_revision_map, confirmation_preview_tokens, decorate_command_output,
+        extract_revision, is_change_id, is_commit_id, is_dangerous, looks_like_graph_commit_row,
+        metadata_log_tokens, render_bookmark_list_view, render_diff_view,
+        render_operation_log_view, render_root_view, render_show_view, render_status_view,
+        startup_action, toggle_patch_flag,
     };
 
     #[test]
@@ -1709,6 +1713,17 @@ mod tests {
         assert_eq!(rendered.first(), Some(&"Workspace Root".to_string()));
         assert!(rendered.iter().any(|line| line == "/Users/joshka/local/jk"));
         assert!(rendered.iter().any(|line| line.contains("jjrt/jk root")));
+    }
+
+    #[test]
+    fn decorates_workspace_root_output_with_root_wrapper() {
+        let rendered = decorate_command_output(
+            &["workspace".to_string(), "root".to_string()],
+            vec!["/Users/joshka/local/jk".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Workspace Root".to_string()));
+        assert!(rendered.iter().any(|line| line == "/Users/joshka/local/jk"));
     }
 
     #[test]
