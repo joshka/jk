@@ -17,38 +17,46 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
     result
 }
 
-const ALIAS_CATALOG: [(&str, &str); 31] = [
+const ALIAS_CATALOG: [(&str, &str); 39] = [
     ("gf", "git fetch"),
     ("gp", "git push"),
     ("rbm", "rebase -d main"),
     ("rbt", "rebase -d trunk()"),
+    ("jja", "abandon"),
+    ("jjb", "bookmark (defaults to list in jk)"),
+    ("jjbc", "bookmark create"),
+    ("jjbd", "bookmark delete"),
+    ("jjbf", "bookmark forget"),
+    ("jjbl", "bookmark list"),
+    ("jjbm", "bookmark move"),
+    ("jjbr", "bookmark rename"),
+    ("jjbs", "bookmark set"),
+    ("jjbt", "bookmark track"),
+    ("jjbu", "bookmark untrack"),
+    ("jjc", "commit"),
+    ("jjcmsg", "commit --message"),
+    ("jjd", "diff"),
+    ("jjdmsg", "describe --message"),
+    ("jjds", "describe"),
+    ("jje", "edit"),
+    ("jjgcl", "git clone"),
     ("jjgf", "git fetch"),
     ("jjgfa", "git fetch --all-remotes"),
     ("jjgp", "git push"),
-    ("jjgpt", "git push --tracked"),
     ("jjgpa", "git push --all"),
     ("jjgpd", "git push --deleted"),
-    ("jjrb", "rebase"),
-    ("jjrbm", "rebase -d trunk()"),
-    ("jjst", "status"),
+    ("jjgpt", "git push --tracked"),
     ("jjl", "log"),
-    ("jjd", "diff"),
-    ("jjc", "commit"),
-    ("jjds", "describe"),
-    ("jje", "edit"),
+    ("jjla", "log -r all()"),
     ("jjn", "new"),
     ("jjnt", "new trunk()"),
+    ("jjrb", "rebase"),
+    ("jjrbm", "rebase -d trunk()"),
+    ("jjrs", "restore"),
+    ("jjrt", "root (in-app equivalent of plugin cd alias)"),
     ("jjsp", "split"),
     ("jjsq", "squash"),
-    ("jjb", "bookmark list"),
-    ("jjbl", "bookmark list"),
-    ("jjbs", "bookmark set"),
-    ("jjbm", "bookmark move"),
-    ("jjbt", "bookmark track"),
-    ("jjbu", "bookmark untrack"),
-    ("jjrs", "restore"),
-    ("jja", "abandon"),
-    ("jjrt", "root (in-app equivalent of plugin cd alias)"),
+    ("jjst", "status"),
 ];
 
 pub fn alias_overview_lines() -> Vec<String> {
@@ -88,6 +96,12 @@ fn normalize_destination_alias(alias: &str, tokens: &[String]) -> Option<Vec<Str
     };
 
     let remainder = &tokens[1..];
+    if has_destination_flag(remainder) {
+        let mut result = vec!["rebase".to_string()];
+        result.extend(remainder.iter().cloned());
+        return Some(result);
+    }
+
     let (destination, tail) = match remainder.first() {
         Some(value) if !value.starts_with('-') => (value.clone(), &remainder[1..]),
         _ => (default_destination.to_string(), remainder),
@@ -96,6 +110,19 @@ fn normalize_destination_alias(alias: &str, tokens: &[String]) -> Option<Vec<Str
     let mut result = vec!["rebase".to_string(), "-d".to_string(), destination];
     result.extend(tail.iter().cloned());
     Some(result)
+}
+
+fn has_destination_flag(tokens: &[String]) -> bool {
+    tokens.iter().any(|token| {
+        matches!(
+            token.as_str(),
+            "-d" | "-t" | "--destination" | "--to" | "--into"
+        ) || token.starts_with("-d=")
+            || token.starts_with("-t=")
+            || token.starts_with("--destination=")
+            || token.starts_with("--to=")
+            || token.starts_with("--into=")
+    })
 }
 
 fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
@@ -194,6 +221,26 @@ mod tests {
     }
 
     #[test]
+    fn respects_explicit_destination_flags_for_rebase_shortcuts() {
+        assert_eq!(
+            normalize_alias(&to_vec(&["rbm", "-d", "release"])),
+            to_vec(&["rebase", "-d", "release"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["rbm", "--destination", "release"])),
+            to_vec(&["rebase", "--destination", "release"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["rbt", "--to", "main"])),
+            to_vec(&["rebase", "--to", "main"])
+        );
+        assert_eq!(
+            normalize_alias(&to_vec(&["jjrbm", "--into=release"])),
+            to_vec(&["rebase", "--into=release"])
+        );
+    }
+
+    #[test]
     fn maps_oh_my_zsh_aliases() {
         assert_eq!(
             normalize_alias(&to_vec(&["jjgf"])),
@@ -277,5 +324,21 @@ mod tests {
         let lines = alias_overview_lines_with_query(Some("push"));
         assert!(lines.iter().any(|line| line.contains("jjgp")));
         assert!(!lines.iter().any(|line| line.contains("jjrbm")));
+    }
+
+    #[test]
+    fn catalog_includes_oh_my_zsh_plugin_aliases() {
+        let lines = alias_overview_lines();
+        for alias in [
+            "jja", "jjb", "jjbc", "jjbd", "jjbf", "jjbl", "jjbm", "jjbr", "jjbs", "jjbt", "jjbu",
+            "jjc", "jjcmsg", "jjd", "jjdmsg", "jjds", "jje", "jjgcl", "jjgf", "jjgfa", "jjgp",
+            "jjgpa", "jjgpd", "jjgpt", "jjl", "jjla", "jjn", "jjnt", "jjrb", "jjrbm", "jjrs",
+            "jjrt", "jjsp", "jjsq", "jjst",
+        ] {
+            assert!(
+                lines.iter().any(|line| line.contains(alias)),
+                "expected alias {alias} in catalog"
+            );
+        }
     }
 }
