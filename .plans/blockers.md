@@ -18,3 +18,10 @@ None currently.
 - List unresolved blockers and impact.
 - Confirm fallback behavior exists for partially implemented flows.
 - Confirm gold command set coverage level with concrete status notes.
+
+## Latest completion review (2026-02-07)
+
+- Gold command set coverage: implemented in TUI flow planner and guarded execution path.
+- High-frequency aliases (`gf`, `gp`, `rbm`, `rbt` + OMZ variants) are normalized and tested.
+- Remaining work is quality and depth expansion (richer native `status/show/diff` views and
+  long-tail command UX), not baseline command availability.

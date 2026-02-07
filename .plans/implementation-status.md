@@ -14,6 +14,7 @@
 - Master plan (`.plans/jk-tui-command-plan.md`): `done`
 - Research context (`.plans/research-context.md`): `done`
 - Per-command deep plan (`.plans/command-deep-plans.md`): `done`
+- Gold command detail matrix (`.plans/gold-command-details.md`): `done`
 - ADR scaffolding: `done`
 
 ### Foundation implementation
@@ -22,11 +23,11 @@
 - Alt-screen + raw mode runtime loop: `done`
 - Keybinding system + TOML defaults: `done`
 - Command registry and alias normalization: `done` (includes OMZ alias baseline + 44-command registry)
-- Log view rendering/parsing bridge: `in-progress`
+- Log view rendering/parsing bridge: `done` (metadata-backed row mapping + fallback parsing)
 
 ### Core command flows (Phase 1 target)
 
-- `log`, `status`, `show`, `diff`: `in-progress` (log-first baseline implemented; richer views pending)
+- `log`, `status`, `show`, `diff`: `done` (log-first baseline + selection-aware show/diff)
 - `new`, `describe`, `commit`, `next`, `prev`, `edit`: `done` (selection-aware planning wired)
 - `rebase`, `squash`, `split`, `abandon`, `undo`, `redo`: `done` (guided flows + danger confirms)
 - `bookmark` core subset: `done` (list/create/set/move/track/untrack prompts wired)
@@ -76,6 +77,12 @@
   - added filtered command registry lookup via `:commands <query>` and `:help <query>`
   - added guided operation subcommand prompts and operation/workspace safety overrides
   - added guided workspace prompts with direct handling for `workspace root` and `update-stale`
+  - added confirmation previews for `operation restore` and `operation revert`
+  - aligned command registry modes so `operation`/`workspace`/`restore`/`revert` report guided
+    coverage
+  - expanded alias and flow tests for OMZ high-frequency variants (`jjgfa`, `jjgpt`, `jjgpa`,
+    `jjgpd`, `jjst`, `jjl`)
+  - documented command-registry parity and safety routing in `docs/adr/0003-command-registry-parity.md`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

@@ -46,6 +46,7 @@ This repository is in active development. The current baseline includes:
 
 Mutating high-risk commands run through confirmation guards.
 `git push` confirmation now includes a best-effort `--dry-run` preview in-app when available.
+`operation restore`/`operation revert` confirmation includes an operation summary preview.
 
 `jk` also keeps an explicit top-level command registry aligned to the current `jj` command surface so
 new flow work can evolve without ambiguity.
@@ -59,8 +60,9 @@ Native aliases:
 
 Oh My Zsh `jj` plugin compatibility is included for common aliases such as:
 
-- `jjgf`, `jjgp`, `jjrb`, `jjrbm`, `jjst`, `jjl`, `jjd`, `jjc`, `jjsp`, `jjsq`,
-  `jjb`, `jjbl`, `jjbs`, `jjbm`, `jjbt`, `jjbu`, `jja`, `jjrt`
+- `jjgf`, `jjgfa`, `jjgp`, `jjgpt`, `jjgpa`, `jjgpd`
+- `jjrb`, `jjrbm`, `jjst`, `jjl`, `jjd`, `jjc`, `jjsp`, `jjsq`, `jjrs`, `jja`
+- `jjb`, `jjbl`, `jjbs`, `jjbm`, `jjbt`, `jjbu`, `jjrt`
 
 ## Development
 

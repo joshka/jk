@@ -59,7 +59,8 @@ Oh My Zsh compatibility aliases (high-frequency focus):
 When implementation drifts or context gets compacted, re-read these files:
 
 1. `.plans/gold-command-set.md`
-2. `.plans/jk-tui-command-plan.md`
-3. `.plans/command-deep-plans.md`
-4. `.plans/implementation-status.md`
-5. `.plans/blockers.md`
+2. `.plans/gold-command-details.md`
+3. `.plans/jk-tui-command-plan.md`
+4. `.plans/command-deep-plans.md`
+5. `.plans/implementation-status.md`
+6. `.plans/blockers.md`
