@@ -69,6 +69,7 @@
   - improved revision selection by resolving detail rows to the nearest prior revision line
   - added in-app `:commands` registry view from command metadata
   - routed startup `jk <command>` through the same flow planner used by command mode
+  - added startup regression tests for confirm-gated and render-only startup actions
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
