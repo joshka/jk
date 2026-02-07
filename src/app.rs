@@ -1094,6 +1094,20 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("status") => render_status_view(output),
         Some("show") => render_show_view(output),
         Some("diff") => render_diff_view(output),
+        Some("new") => render_top_level_mutation_view("new", output),
+        Some("describe") => render_top_level_mutation_view("describe", output),
+        Some("commit") => render_top_level_mutation_view("commit", output),
+        Some("edit") => render_top_level_mutation_view("edit", output),
+        Some("next") => render_top_level_mutation_view("next", output),
+        Some("prev") => render_top_level_mutation_view("prev", output),
+        Some("rebase") => render_top_level_mutation_view("rebase", output),
+        Some("squash") => render_top_level_mutation_view("squash", output),
+        Some("split") => render_top_level_mutation_view("split", output),
+        Some("abandon") => render_top_level_mutation_view("abandon", output),
+        Some("undo") => render_top_level_mutation_view("undo", output),
+        Some("redo") => render_top_level_mutation_view("redo", output),
+        Some("restore") => render_top_level_mutation_view("restore", output),
+        Some("revert") => render_top_level_mutation_view("revert", output),
         Some("root") => render_root_view(output),
         Some("resolve") if has_resolve_list_flag(command) => render_resolve_list_view(output),
         Some("file") if matches!(command.get(1).map(String::as_str), Some("list")) => {
@@ -1141,11 +1155,42 @@ fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<Strin
         Some("bookmark") if matches!(command.get(1).map(String::as_str), Some("list")) => {
             render_bookmark_list_view(output)
         }
+        Some("bookmark")
+            if matches!(
+                command.get(1).map(String::as_str),
+                Some(
+                    "create"
+                        | "set"
+                        | "move"
+                        | "track"
+                        | "untrack"
+                        | "delete"
+                        | "forget"
+                        | "rename"
+                )
+            ) =>
+        {
+            render_bookmark_mutation_view(command.get(1).map(String::as_str), output)
+        }
+        Some("workspace")
+            if matches!(
+                command.get(1).map(String::as_str),
+                Some("add" | "forget" | "rename" | "update-stale")
+            ) =>
+        {
+            render_workspace_mutation_view(command.get(1).map(String::as_str), output)
+        }
         Some("operation") if matches!(command.get(1).map(String::as_str), Some("diff")) => {
             render_operation_diff_view(output)
         }
         Some("operation") if matches!(command.get(1).map(String::as_str), Some("show")) => {
             render_operation_show_view(output)
+        }
+        Some("operation") if matches!(command.get(1).map(String::as_str), Some("restore")) => {
+            render_operation_mutation_view("restore", output)
+        }
+        Some("operation") if matches!(command.get(1).map(String::as_str), Some("revert")) => {
+            render_operation_mutation_view("revert", output)
         }
         Some("operation") if matches!(command.get(1).map(String::as_str), Some("log")) => {
             render_operation_log_view(output)
@@ -1919,6 +1964,89 @@ fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+fn render_top_level_mutation_view(command_name: &str, lines: Vec<String>) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let summary = if detail_lines.is_empty() {
+        format!("Summary: `{command_name}` completed with no output")
+    } else {
+        format!(
+            "Summary: {} output line{}",
+            detail_lines.len(),
+            plural_suffix(detail_lines.len())
+        )
+    };
+    let title = format!("{} Result", capitalize_word(command_name));
+    let mut rendered = vec![
+        title.clone(),
+        "=".repeat(title.len()),
+        String::new(),
+        summary,
+    ];
+    rendered.push(String::new());
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push(top_level_mutation_tip(command_name).to_string());
+    rendered
+}
+
+fn top_level_mutation_tip(command_name: &str) -> &'static str {
+    match command_name {
+        "new" | "describe" | "commit" => "Tip: run `show` or `log` to inspect the updated revision",
+        "edit" | "next" | "prev" => "Tip: run `show` or `diff` to inspect the selected revision",
+        "undo" | "redo" => "Tip: run `operation log` to inspect operation history",
+        "rebase" | "squash" | "split" | "abandon" | "restore" | "revert" => {
+            "Tip: run `log`, `status`, or `diff` to verify the resulting history"
+        }
+        _ => "Tip: run `log` and `status` to verify repository state",
+    }
+}
+
+fn render_bookmark_mutation_view(subcommand: Option<&str>, lines: Vec<String>) -> Vec<String> {
+    let subcommand = subcommand.unwrap_or("update");
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let summary = if detail_lines.is_empty() {
+        format!("Summary: bookmark {subcommand} completed with no output")
+    } else {
+        format!(
+            "Summary: {} output line{}",
+            detail_lines.len(),
+            plural_suffix(detail_lines.len())
+        )
+    };
+
+    let mut rendered = vec![
+        format!("Bookmark {}", capitalize_word(subcommand)),
+        "================".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: run `bookmark list` to verify bookmark state".to_string());
+    rendered
+}
+
 fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -1932,6 +2060,42 @@ fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
     rendered.extend(lines);
     rendered.push(String::new());
     rendered.push("Tip: use `bookmark set/move/track` flows from normal mode or `:`".to_string());
+    rendered
+}
+
+fn render_workspace_mutation_view(subcommand: Option<&str>, lines: Vec<String>) -> Vec<String> {
+    let subcommand = subcommand.unwrap_or("update");
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let summary = if detail_lines.is_empty() {
+        format!("Summary: workspace {subcommand} completed with no output")
+    } else {
+        format!(
+            "Summary: {} output line{}",
+            detail_lines.len(),
+            plural_suffix(detail_lines.len())
+        )
+    };
+
+    let mut rendered = vec![
+        format!("Workspace {}", capitalize_word(subcommand)),
+        "=================".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: run `workspace list` to inspect workspace state".to_string());
     rendered
 }
 
@@ -1975,6 +2139,41 @@ fn render_operation_show_view(lines: Vec<String>) -> Vec<String> {
     rendered.extend(detail_lines);
     rendered.push(String::new());
     rendered.push("Tip: operation restore/revert remain confirm-gated with previews".to_string());
+    rendered
+}
+
+fn render_operation_mutation_view(subcommand: &str, lines: Vec<String>) -> Vec<String> {
+    let detail_lines: Vec<String> = lines
+        .into_iter()
+        .map(|line| line.trim_end().to_string())
+        .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
+        .collect();
+    let summary = if detail_lines.is_empty() {
+        format!("Summary: operation {subcommand} completed with no output")
+    } else {
+        format!(
+            "Summary: {} output line{}",
+            detail_lines.len(),
+            plural_suffix(detail_lines.len())
+        )
+    };
+
+    let mut rendered = vec![
+        format!("Operation {}", capitalize_word(subcommand)),
+        "=================".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+
+    if detail_lines.is_empty() {
+        rendered.push("(no output)".to_string());
+    } else {
+        rendered.extend(detail_lines);
+    }
+
+    rendered.push(String::new());
+    rendered.push("Tip: run `operation log` and `status` to validate repository state".to_string());
     rendered
 }
 
@@ -2081,6 +2280,14 @@ fn is_operation_entry_header(line: &str) -> bool {
     trimmed.starts_with('@') || trimmed.starts_with('○')
 }
 
+fn capitalize_word(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str()),
+        None => String::new(),
+    }
+}
+
 fn plural_suffix(count: usize) -> &'static str {
     if count == 1 { "" } else { "s" }
 }
@@ -2134,13 +2341,15 @@ mod tests {
         App, Mode, build_row_revision_map, confirmation_preview_tokens, decorate_command_output,
         extract_revision, is_change_id, is_commit_id, is_dangerous, keymap_overview_lines,
         looks_like_graph_commit_row, metadata_log_tokens, render_bookmark_list_view,
-        render_diff_view, render_file_annotate_view, render_file_chmod_view, render_file_list_view,
-        render_file_search_view, render_file_show_view, render_file_track_view,
-        render_file_untrack_view, render_git_fetch_view, render_git_push_view,
-        render_operation_diff_view, render_operation_log_view, render_operation_show_view,
+        render_bookmark_mutation_view, render_diff_view, render_file_annotate_view,
+        render_file_chmod_view, render_file_list_view, render_file_search_view,
+        render_file_show_view, render_file_track_view, render_file_untrack_view,
+        render_git_fetch_view, render_git_push_view, render_operation_diff_view,
+        render_operation_log_view, render_operation_mutation_view, render_operation_show_view,
         render_resolve_list_view, render_root_view, render_show_view, render_status_view,
         render_tag_delete_view, render_tag_list_view, render_tag_set_view,
-        render_workspace_list_view, startup_action, toggle_patch_flag,
+        render_top_level_mutation_view, render_workspace_list_view, render_workspace_mutation_view,
+        startup_action, toggle_patch_flag,
     };
 
     #[test]
@@ -3247,6 +3456,183 @@ mod tests {
     }
 
     #[test]
+    fn renders_bookmark_mutation_view_with_summary_and_tip() {
+        let rendered = render_bookmark_mutation_view(
+            Some("set"),
+            vec!["Moved bookmark main to abcdef12".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Bookmark Set".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line == "Moved bookmark main to abcdef12")
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("run `bookmark list`"))
+        );
+    }
+
+    #[test]
+    fn decorates_bookmark_set_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &[
+                "bookmark".to_string(),
+                "set".to_string(),
+                "main".to_string(),
+            ],
+            vec!["Moved bookmark main to abcdef12".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Bookmark Set".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn renders_workspace_mutation_view_with_summary_and_tip() {
+        let rendered = render_workspace_mutation_view(
+            Some("add"),
+            vec!["Created workspace docs at ../jk-docs".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Workspace Add".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("run `workspace list`"))
+        );
+    }
+
+    #[test]
+    fn decorates_workspace_add_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &[
+                "workspace".to_string(),
+                "add".to_string(),
+                "../jk-docs".to_string(),
+            ],
+            vec!["Created workspace docs at ../jk-docs".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Workspace Add".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn renders_operation_restore_view_with_summary_and_tip() {
+        let rendered = render_operation_mutation_view(
+            "restore",
+            vec!["Restored to operation 7699d9773e37".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Operation Restore".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("operation log` and `status"))
+        );
+    }
+
+    #[test]
+    fn decorates_operation_restore_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &[
+                "operation".to_string(),
+                "restore".to_string(),
+                "7699d9773e37".to_string(),
+            ],
+            vec!["Restored to operation 7699d9773e37".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Operation Restore".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn renders_top_level_mutation_view_with_summary_and_tip() {
+        let rendered = render_top_level_mutation_view(
+            "commit",
+            vec!["Working copy now at: abcdef12 commit message".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Commit Result".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(rendered.iter().any(|line| line.contains("show` or `log")));
+    }
+
+    #[test]
+    fn decorates_commit_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &[
+                "commit".to_string(),
+                "-m".to_string(),
+                "message".to_string(),
+            ],
+            vec!["Working copy now at: abcdef12 commit message".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Commit Result".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+    }
+
+    #[test]
+    fn decorates_rebase_output_with_wrapper() {
+        let rendered = decorate_command_output(
+            &["rebase".to_string(), "-d".to_string(), "main".to_string()],
+            vec!["Rebased 3 commits onto main".to_string()],
+        );
+
+        assert_eq!(rendered.first(), Some(&"Rebase Result".to_string()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 1 output line"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("log`, `status`, or `diff`"))
+        );
+    }
+
+    #[test]
     fn renders_operation_log_view_with_header_and_tip() {
         let rendered = render_operation_log_view(vec![
             "@  fac974146f86 user 5 seconds ago".to_string(),
@@ -3387,6 +3773,15 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_bookmark_set_wrapper_view() {
+        let rendered = render_bookmark_mutation_view(
+            Some("set"),
+            vec!["Moved bookmark main to abcdef12".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_file_list_wrapper_view() {
         let rendered = render_file_list_view(vec![
             "src/app.rs".to_string(),
@@ -3466,6 +3861,15 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_workspace_add_wrapper_view() {
+        let rendered = render_workspace_mutation_view(
+            Some("add"),
+            vec!["Created workspace docs at ../jk-docs".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_status_wrapper_view() {
         let rendered = render_status_view(vec![
             "Working copy changes:".to_string(),
@@ -3503,6 +3907,18 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_operation_restore_wrapper_view() {
+        let rendered = render_operation_mutation_view(
+            "restore",
+            vec![
+                "Restored to operation 7699d9773e37".to_string(),
+                "Working copy now matches restored operation".to_string(),
+            ],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn snapshot_renders_operation_diff_wrapper_view() {
         let rendered = render_operation_diff_view(vec![
             "From operation: 67d547b627fb (2026-02-07) describe commit old".to_string(),
@@ -3534,6 +3950,24 @@ mod tests {
             "Pushed bookmark main to origin".to_string(),
             "Done.".to_string(),
         ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_commit_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "commit",
+            vec!["Working copy now at: abcdef12 commit message".to_string()],
+        );
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_rebase_wrapper_view() {
+        let rendered = render_top_level_mutation_view(
+            "rebase",
+            vec!["Rebased 3 commits onto 0123abcd".to_string()],
+        );
         insta::assert_snapshot!(rendered.join("\n"));
     }
 

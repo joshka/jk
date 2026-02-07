@@ -22,6 +22,15 @@
     `file annotate`.
   - additional `file` mutation flows now render via native wrappers: `file track`,
     `file untrack`, `file chmod`.
+  - bookmark mutation flows now render via native wrappers:
+    `bookmark create/set/move/track/untrack/delete/forget/rename`.
+  - workspace mutation flows now render via native wrappers:
+    `workspace add/forget/rename/update-stale`.
+  - operation mutation flows now render via native wrappers:
+    `operation restore` and `operation revert`.
+  - top-level daily/rewrite mutation flows now render via native wrappers:
+    `new`, `describe`, `commit`, `edit`, `next`, `prev`, `rebase`, `squash`, `split`, `abandon`,
+    `undo`, `redo`, `restore`, `revert`.
 - Shortcut coverage:
   - added `]`/`[`/`e` for `next`/`prev`/`edit`
   - added `o`/`L`/`w` for `operation log`/`bookmark list`/`root`
@@ -51,6 +60,8 @@
   - added `insta` snapshots for `git fetch` and `git push` wrapper views
   - added `insta` snapshots for `file show`, `file search`, and `file annotate` wrappers
   - added `insta` snapshots for `file track`, `file untrack`, and `file chmod` wrappers
+  - added `insta` snapshots for `bookmark set`, `workspace add`, and `operation restore` wrappers
+  - added `insta` snapshots for top-level `commit` and `rebase` wrapper views
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing
@@ -63,12 +74,16 @@
     direct follow-up tips
   - `file track`, `file untrack`, and `file chmod` wrappers now include mutation-focused summaries
     and follow-up tips
+  - `bookmark`, `workspace`, and `operation restore/revert` mutation wrappers now include compact
+    summaries and follow-up verification tips
+  - top-level daily/rewrite mutation wrappers now include command-specific follow-up tips
   - command-safety mapping now marks read-only `file`/`tag` subcommands as Tier `A`
   - command-safety mapping now marks `resolve -l` as Tier `A`
 
 ## Recent commit stack
 
-- `feat(ux): expand read-mode wrappers and shortcuts` (`change: qtswpusnskwp`)
+- `feat(view): wrap mutation outputs` (`change: tpqrulwsxpvr`)
+- `feat(ux): expand read-mode wrappers and shortcuts` (`change: srzlwxtxtkll`)
 - `fix(alias): preserve explicit destinations and parity` (`change: uxqqtlkqotxq`)
 - `feat(flow): default list-first command groups` (`change: pmzoznlxuulu`)
 - `feat(flow): default file and tag list views` (`change: qulmnqullnpn`)
@@ -87,7 +102,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (137 passed)
+  - `cargo test` (151 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers
@@ -98,6 +113,6 @@
 
 ## Suggested first task tomorrow
 
-- Start Phase 3 passthrough hardening:
-  - improve structured wrappers for additional passthrough command families (`file`, `tag`,
-    `resolve`) while keeping pager-first layout and minimal chrome.
+- Continue Phase 3 passthrough hardening:
+  - tune and refine wrapper summaries for command-specific signal (for example, parsing rebase and
+    bookmark mutation output into richer compact counts) without losing the pager-first style.

@@ -1,0 +1,13 @@
+---
+source: src/app.rs
+expression: "rendered.join(\"\\n\")"
+---
+Operation Restore
+=================
+
+Summary: 2 output lines
+
+Restored to operation 7699d9773e37
+Working copy now matches restored operation
+
+Tip: run `operation log` and `status` to validate repository state

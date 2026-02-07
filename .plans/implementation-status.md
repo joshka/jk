@@ -147,12 +147,24 @@
   - added guided prompt flows for `tag set` and `tag delete` with selected-revision defaults
     for tag set
   - aligned command-registry metadata so `file` and `tag` now report `guided` mode
+  - added native wrapper views for `bookmark` mutation flows
+    (`create/set/move/track/untrack/delete/forget/rename`)
+  - added native wrapper views for `workspace` mutation flows
+    (`add/forget/rename/update-stale`)
+  - added native wrapper views for `operation restore` and `operation revert`
+  - added native wrapper views for top-level mutation commands:
+    `new`, `describe`, `commit`, `edit`, `next`, `prev`, `rebase`, `squash`, `split`, `abandon`,
+    `undo`, `redo`, `restore`, `revert`
+  - added targeted decorator/render tests and snapshots for
+    `bookmark set`, `workspace add`, and `operation restore`
+  - added targeted decorator/render tests and snapshots for
+    top-level `commit` and `rebase` wrapper rendering
   - refined `rbm`/`rbt` alias normalization to preserve explicit destination flags (`-d`/`--to`)
     without forcing default destinations
   - expanded alias-catalog parity with the installed OMZ `jj` plugin aliases (`jjbc`, `jjbd`,
     `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`, `jjgcl`, `jjla`) and added direct catalog coverage tests
   - reran full validation checkpoint with green `markdownlint-cli2`, `cargo fmt`, `cargo check`,
-    `cargo test` (137 passed), and strict `cargo clippy`
+    `cargo test` (151 passed), and strict `cargo clippy`
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
@@ -161,3 +173,11 @@
   5. run targeted tests for changed behavior.
 - At each larger checkpoint, run full `cargo test` and
   `cargo clippy --all-targets --all-features -- -D warnings`.
+- Latest pass:
+  - added native wrapper views for high-frequency mutation outputs:
+    `bookmark` mutations, `workspace` mutations, and `operation restore/revert`.
+  - added targeted decorator/render tests and `insta` snapshots for:
+    `bookmark set`, `workspace add`, and `operation restore` wrapper rendering.
+- Latest pass:
+  - added native wrappers for top-level daily/rewrite mutation commands so command results stay in
+    the same scannable in-app format as the rest of the gold command set.

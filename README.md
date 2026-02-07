@@ -63,8 +63,17 @@ This repository is in active development. The current baseline includes:
 - `file show`, `file search`, and `file annotate` now use native wrappers with concise summaries.
 - `file track`, `file untrack`, and `file chmod` now use native wrappers with mutation-focused
   summaries and follow-up tips.
+- `bookmark` mutation subcommands (`create/set/move/track/untrack/delete/forget/rename`) now
+  render with native mutation wrappers and verification tips.
+- `workspace` mutation subcommands (`add/forget/rename/update-stale`) now render with native
+  mutation wrappers and follow-up tips.
+- Top-level mutation commands (`new`, `describe`, `commit`, `edit`, `next`, `prev`, `rebase`,
+  `squash`, `split`, `abandon`, `undo`, `redo`, `restore`, `revert`) now render with native
+  post-action wrappers and command-specific follow-up tips.
 - `resolve -l` now uses a native wrapper with conflict-count or no-conflicts summary.
 - `operation diff` now uses a native wrapper with compact changed-commit summary.
+- `operation restore` and `operation revert` now render with native mutation wrappers after
+  confirmation.
 - `git fetch` and `git push` now use native wrappers with compact summaries and follow-up tips.
 
 ## Implemented Flow Coverage (Baseline)
