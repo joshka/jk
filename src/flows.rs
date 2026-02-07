@@ -852,6 +852,145 @@ mod tests {
     }
 
     #[test]
+    fn covers_oh_my_zsh_gold_alias_flow_contract() {
+        assert_prompt_kind(plan_command("jjgf", selected()), PromptKind::GitFetchRemote);
+        assert_prompt_kind(
+            plan_command("jjgp", selected()),
+            PromptKind::GitPushBookmark,
+        );
+        assert_eq!(
+            plan_command("jjgfa", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "fetch".to_string(),
+                "--all-remotes".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("jjgpt", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--tracked".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("jjgpa", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--all".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("jjgpd", selected()),
+            FlowAction::Execute(vec![
+                "git".to_string(),
+                "push".to_string(),
+                "--deleted".to_string()
+            ])
+        );
+
+        assert_prompt_kind(
+            plan_command("jjrb", selected()),
+            PromptKind::RebaseDestination {
+                source_revision: "abc12345".to_string(),
+            },
+        );
+        assert_eq!(
+            plan_command("jjrbm", selected()),
+            FlowAction::Execute(vec![
+                "rebase".to_string(),
+                "-d".to_string(),
+                "trunk()".to_string()
+            ])
+        );
+        assert_eq!(
+            plan_command("jjst", selected()),
+            FlowAction::Execute(vec!["status".to_string()])
+        );
+        assert_eq!(
+            plan_command("jjl", selected()),
+            FlowAction::Execute(vec!["log".to_string()])
+        );
+        assert_eq!(
+            plan_command("jjd", selected()),
+            FlowAction::Execute(vec![
+                "diff".to_string(),
+                "-r".to_string(),
+                "abc12345".to_string()
+            ])
+        );
+        assert_prompt_kind(plan_command("jjc", selected()), PromptKind::CommitMessage);
+        assert_prompt_kind(
+            plan_command("jjds", selected()),
+            PromptKind::DescribeMessage {
+                revision: "abc12345".to_string(),
+            },
+        );
+        assert_eq!(
+            plan_command("jje", selected()),
+            FlowAction::Execute(vec!["edit".to_string(), "abc12345".to_string()])
+        );
+        assert_prompt_kind(plan_command("jjn", selected()), PromptKind::NewMessage);
+        assert_eq!(
+            plan_command("jjnt", selected()),
+            FlowAction::Execute(vec!["new".to_string(), "trunk()".to_string()])
+        );
+        assert_prompt_kind(
+            plan_command("jjsp", selected()),
+            PromptKind::SplitFileset {
+                revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("jjsq", selected()),
+            PromptKind::SquashInto {
+                from_revision: "abc12345".to_string(),
+            },
+        );
+        assert_eq!(
+            plan_command("jjb", selected()),
+            FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
+        );
+        assert_eq!(
+            plan_command("jjbl", selected()),
+            FlowAction::Execute(vec!["bookmark".to_string(), "list".to_string()])
+        );
+        assert_prompt_kind(
+            plan_command("jjbs", selected()),
+            PromptKind::BookmarkSet {
+                target_revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(
+            plan_command("jjbm", selected()),
+            PromptKind::BookmarkMove {
+                target_revision: "abc12345".to_string(),
+            },
+        );
+        assert_prompt_kind(plan_command("jjbt", selected()), PromptKind::BookmarkTrack);
+        assert_prompt_kind(
+            plan_command("jjbu", selected()),
+            PromptKind::BookmarkUntrack,
+        );
+        assert_prompt_kind(
+            plan_command("jjrs", selected()),
+            PromptKind::RestoreFrom {
+                target_revision: "abc12345".to_string(),
+            },
+        );
+        assert_eq!(
+            plan_command("jja", selected()),
+            FlowAction::Execute(vec!["abandon".to_string(), "abc12345".to_string()])
+        );
+        assert_eq!(
+            plan_command("jjrt", selected()),
+            FlowAction::Execute(vec!["root".to_string()])
+        );
+    }
+
+    #[test]
     fn maps_rebase_aliases_to_expected_destinations() {
         assert_eq!(
             plan_command("rbm", selected()),

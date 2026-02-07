@@ -1733,6 +1733,24 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_renders_bookmark_list_wrapper_view() {
+        let rendered = render_bookmark_list_view(vec![
+            "main: abcdef12".to_string(),
+            "feature: 0123abcd".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_operation_log_wrapper_view() {
+        let rendered = render_operation_log_view(vec![
+            "@  fac974146f86 user 5 seconds ago".to_string(),
+            "│  snapshot working copy".to_string(),
+        ]);
+        insta::assert_snapshot!(rendered.join("\n"));
+    }
+
+    #[test]
     fn toggles_patch_flag_for_log_commands() {
         assert_eq!(
             toggle_patch_flag(&["log".to_string(), "-r".to_string(), "all()".to_string()]),

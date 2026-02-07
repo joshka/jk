@@ -106,6 +106,8 @@
   - added native wrapper views for `bookmark list` and `operation log` outputs
   - added normal-mode `]`/`[`/`e` shortcuts for `next`/`prev`/`edit` revision actions
   - added explicit gold-set flow contract test covering all core commands in one matrix
+  - added explicit OMZ gold-alias flow contract test matrix for high-frequency compatibility
+  - added `insta` snapshot coverage for bookmark-list and operation-log wrapper views
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;
