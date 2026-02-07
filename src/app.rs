@@ -195,6 +195,21 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.operation_log, key) {
+            self.execute_command_line("operation log")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.bookmark_list, key) {
+            self.execute_command_line("bookmark list")?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.root, key) {
+            self.execute_command_line("root")?;
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.toggle_patch, key) {
             if !matches!(
                 self.last_log_tokens.first().map(String::as_str),
@@ -1975,6 +1990,54 @@ mod tests {
                 .lines
                 .iter()
                 .any(|line| line.contains("Status Overview"))
+        );
+
+        let mut operation_log_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        operation_log_app
+            .handle_key(KeyEvent::from(KeyCode::Char('o')))
+            .expect("operation-log shortcut should be handled");
+        assert_eq!(operation_log_app.mode, Mode::Normal);
+        assert_eq!(
+            operation_log_app.last_command,
+            vec!["operation".to_string(), "log".to_string()]
+        );
+        assert!(
+            operation_log_app
+                .lines
+                .iter()
+                .any(|line| line.contains("Operation Log"))
+        );
+
+        let mut bookmark_list_app =
+            App::new(KeybindConfig::load().expect("keybind config should parse"));
+        bookmark_list_app
+            .handle_key(KeyEvent::from(KeyCode::Char('L')))
+            .expect("bookmark-list shortcut should be handled");
+        assert_eq!(bookmark_list_app.mode, Mode::Normal);
+        assert_eq!(
+            bookmark_list_app.last_command,
+            vec!["bookmark".to_string(), "list".to_string()]
+        );
+        assert!(
+            bookmark_list_app
+                .lines
+                .iter()
+                .any(|line| line.contains("Bookmark List"))
+                || bookmark_list_app.lines == vec!["(no output)".to_string()]
+        );
+
+        let mut root_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        root_app
+            .handle_key(KeyEvent::from(KeyCode::Char('w')))
+            .expect("root shortcut should be handled");
+        assert_eq!(root_app.mode, Mode::Normal);
+        assert_eq!(root_app.last_command, vec!["root".to_string()]);
+        assert!(
+            root_app
+                .lines
+                .iter()
+                .any(|line| line.contains("Workspace Root"))
         );
 
         let mut help_app = App::new(KeybindConfig::load().expect("keybind config should parse"));
