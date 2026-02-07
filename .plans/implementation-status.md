@@ -116,6 +116,7 @@
   - added normal-mode `K` shortcut for direct keymap access
   - added `:commands` tips that point to `:aliases` and `:keys` discovery views
   - added normal-mode `A` shortcut for direct alias-catalog access
+  - refined `status`/`operation log` wrappers with compact summaries and section-spacing rules
 - Workflow order for each change:
   1. write/update docs first when design context changes;
   2. lint Markdown immediately;

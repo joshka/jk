@@ -5,6 +5,8 @@ expression: "rendered.join(\"\\n\")"
 Operation Log
 =============
 
+Summary: 1 operation entry shown
+
 @  fac974146f86 user 5 seconds ago
 │  snapshot working copy
 

@@ -1098,41 +1098,87 @@ fn render_status_view(lines: Vec<String>) -> Vec<String> {
         return lines;
     }
 
-    let mut rendered = vec![
-        "Status Overview".to_string(),
-        "===============".to_string(),
-        String::new(),
-    ];
+    let mut section_lines: Vec<String> = Vec::new();
+    let mut current_section: Option<String> = None;
+    let mut has_working_copy_section = false;
+    let mut has_conflicted_section = false;
+    let mut working_copy_changes = 0usize;
+    let mut conflicted_bookmarks = 0usize;
 
-    let mut section_has_items = false;
-    for line in lines {
-        let trimmed = line.trim();
+    for raw_line in lines {
+        let trimmed = raw_line.trim();
         if trimmed.is_empty() {
             continue;
         }
 
         if trimmed.ends_with(':') {
-            if section_has_items {
-                rendered.push(String::new());
+            if matches!(section_lines.last(), Some(previous) if !previous.is_empty()) {
+                section_lines.push(String::new());
             }
-            rendered.push(trimmed.to_string());
-            section_has_items = false;
+
+            current_section = Some(trimmed.to_string());
+            if trimmed == "Working copy changes:" {
+                has_working_copy_section = true;
+            }
+            if trimmed == "Conflicted bookmarks:" {
+                has_conflicted_section = true;
+            }
+            section_lines.push(trimmed.to_string());
             continue;
         }
 
-        if matches!(
-            rendered.last().map(String::as_str),
-            Some("Working copy changes:")
-        ) {
-            rendered.push(format!("  {trimmed}"));
-            section_has_items = true;
-            continue;
+        match current_section.as_deref() {
+            Some("Working copy changes:") => {
+                if is_working_copy_change_line(trimmed) {
+                    section_lines.push(format!("  {trimmed}"));
+                    working_copy_changes += 1;
+                } else {
+                    current_section = None;
+                    section_lines.push(trimmed.to_string());
+                }
+            }
+            Some("Conflicted bookmarks:") => {
+                section_lines.push(trimmed.to_string());
+                conflicted_bookmarks += 1;
+            }
+            _ => {
+                section_lines.push(trimmed.to_string());
+            }
         }
-
-        rendered.push(trimmed.to_string());
-        section_has_items = true;
     }
 
+    while matches!(section_lines.last(), Some(previous) if previous.is_empty()) {
+        section_lines.pop();
+    }
+
+    let mut summary_parts = Vec::new();
+    if has_working_copy_section {
+        summary_parts.push(format!(
+            "{working_copy_changes} working-copy change{}",
+            plural_suffix(working_copy_changes)
+        ));
+    }
+    if has_conflicted_section {
+        summary_parts.push(format!(
+            "{conflicted_bookmarks} conflicted bookmark{}",
+            plural_suffix(conflicted_bookmarks)
+        ));
+    }
+
+    let summary = if summary_parts.is_empty() {
+        "Summary: status captured".to_string()
+    } else {
+        format!("Summary: {}", summary_parts.join(", "))
+    };
+
+    let mut rendered = vec![
+        "Status Overview".to_string(),
+        "===============".to_string(),
+        String::new(),
+        summary,
+        String::new(),
+    ];
+    rendered.extend(section_lines);
     rendered.push(String::new());
     rendered.push("Shortcuts: s status, F fetch, P push, B rebase, :commands".to_string());
     rendered
@@ -1366,15 +1412,60 @@ fn render_operation_log_view(lines: Vec<String>) -> Vec<String> {
         return lines;
     }
 
+    let mut operation_lines: Vec<String> = Vec::new();
+    let mut operation_count = 0usize;
+
+    for raw_line in lines {
+        let line = raw_line.trim_end().to_string();
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        if is_operation_entry_header(&line) {
+            if matches!(operation_lines.last(), Some(previous) if !previous.is_empty()) {
+                operation_lines.push(String::new());
+            }
+            operation_count += 1;
+        }
+
+        operation_lines.push(line);
+    }
+
+    while matches!(operation_lines.last(), Some(previous) if previous.is_empty()) {
+        operation_lines.pop();
+    }
+
     let mut rendered = vec![
         "Operation Log".to_string(),
         "=============".to_string(),
         String::new(),
+        format!(
+            "Summary: {operation_count} operation entr{} shown",
+            if operation_count == 1 { "y" } else { "ies" }
+        ),
+        String::new(),
     ];
-    rendered.extend(lines);
+    rendered.extend(operation_lines);
     rendered.push(String::new());
     rendered.push("Tip: restore/revert operations stay confirm-gated with previews".to_string());
     rendered
+}
+
+fn is_operation_entry_header(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with('@') || trimmed.starts_with('○')
+}
+
+fn plural_suffix(count: usize) -> &'static str {
+    if count == 1 { "" } else { "s" }
+}
+
+fn is_working_copy_change_line(line: &str) -> bool {
+    let mut chars = line.chars();
+    match (chars.next(), chars.next()) {
+        (Some(status), Some(' ')) => matches!(status, 'M' | 'A' | 'D' | 'R' | 'C' | '?' | 'U'),
+        _ => false,
+    }
 }
 
 struct TerminalSession {
@@ -1893,6 +1984,16 @@ mod tests {
         assert!(
             rendered
                 .iter()
+                .any(|line| line.contains("Summary: 2 working-copy changes"))
+        );
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("1 conflicted bookmark"))
+        );
+        assert!(
+            rendered
+                .iter()
                 .any(|line| line.contains("Shortcuts: s status"))
         );
     }
@@ -2024,7 +2125,33 @@ mod tests {
         assert!(
             rendered
                 .iter()
+                .any(|line| line.contains("Summary: 1 operation entry shown"))
+        );
+        assert!(
+            rendered
+                .iter()
                 .any(|line| line.contains("restore/revert operations"))
+        );
+    }
+
+    #[test]
+    fn inserts_spacing_between_operation_entries() {
+        let rendered = render_operation_log_view(vec![
+            "@  fac974146f86 user 5 seconds ago".to_string(),
+            "│  snapshot working copy".to_string(),
+            "○  4a8a95e95f6f user 22 seconds ago".to_string(),
+            "│  snapshot working copy".to_string(),
+        ]);
+
+        let second_entry_index = rendered
+            .iter()
+            .position(|line| line == "○  4a8a95e95f6f user 22 seconds ago")
+            .expect("second operation entry should exist");
+        assert_eq!(rendered.get(second_entry_index - 1), Some(&String::new()));
+        assert!(
+            rendered
+                .iter()
+                .any(|line| line.contains("Summary: 2 operation entries shown"))
         );
     }
 
