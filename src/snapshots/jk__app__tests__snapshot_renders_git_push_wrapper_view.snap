@@ -5,7 +5,7 @@ expression: "rendered.join(\"\\n\")"
 Git Push
 ========
 
-Summary: 2 output lines
+Summary: Pushed bookmark main to origin
 
 Pushed bookmark main to origin
 Done.

@@ -1888,20 +1888,7 @@ fn render_git_fetch_view(lines: Vec<String>) -> Vec<String> {
         .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
         .collect();
 
-    let summary = if detail_lines
-        .iter()
-        .any(|line| line.contains("Nothing changed"))
-    {
-        "Summary: no remote updates fetched".to_string()
-    } else if detail_lines.is_empty() {
-        "Summary: fetch completed with no output".to_string()
-    } else {
-        format!(
-            "Summary: {} output line{}",
-            detail_lines.len(),
-            plural_suffix(detail_lines.len())
-        )
-    };
+    let summary = git_fetch_summary(&detail_lines);
 
     let mut rendered = vec![
         "Git Fetch".to_string(),
@@ -1929,20 +1916,7 @@ fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
         .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
         .collect();
 
-    let summary = if detail_lines
-        .iter()
-        .any(|line| line.contains("Nothing changed"))
-    {
-        "Summary: no bookmark updates pushed".to_string()
-    } else if detail_lines.is_empty() {
-        "Summary: push completed with no output".to_string()
-    } else {
-        format!(
-            "Summary: {} output line{}",
-            detail_lines.len(),
-            plural_suffix(detail_lines.len())
-        )
-    };
+    let summary = git_push_summary(&detail_lines);
 
     let mut rendered = vec![
         "Git Push".to_string(),
@@ -1962,6 +1936,60 @@ fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
     rendered
         .push("Tip: push stays confirm-gated with a dry-run preview when available".to_string());
     rendered
+}
+
+fn git_fetch_summary(detail_lines: &[String]) -> String {
+    if detail_lines
+        .iter()
+        .any(|line| line.contains("Nothing changed"))
+    {
+        return "Summary: no remote updates fetched".to_string();
+    }
+    if detail_lines.is_empty() {
+        return "Summary: fetch completed with no output".to_string();
+    }
+    if let Some(signal) = detail_lines.iter().find(|line| is_git_fetch_signal(line)) {
+        return format!("Summary: {}", signal.trim());
+    }
+
+    format!(
+        "Summary: {} output line{}",
+        detail_lines.len(),
+        plural_suffix(detail_lines.len())
+    )
+}
+
+fn is_git_fetch_signal(line: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed.starts_with("Fetched ")
+        || trimmed.starts_with("From ")
+        || trimmed.starts_with("Updated bookmark ")
+}
+
+fn git_push_summary(detail_lines: &[String]) -> String {
+    if detail_lines
+        .iter()
+        .any(|line| line.contains("Nothing changed"))
+    {
+        return "Summary: no bookmark updates pushed".to_string();
+    }
+    if detail_lines.is_empty() {
+        return "Summary: push completed with no output".to_string();
+    }
+    if let Some(signal) = detail_lines.iter().find(|line| is_git_push_signal(line)) {
+        return format!("Summary: {}", signal.trim());
+    }
+
+    format!(
+        "Summary: {} output line{}",
+        detail_lines.len(),
+        plural_suffix(detail_lines.len())
+    )
+}
+
+fn is_git_push_signal(line: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed.starts_with("Pushed bookmark ") || trimmed.starts_with("Pushed ")
 }
 
 fn render_top_level_mutation_view(command_name: &str, lines: Vec<String>) -> Vec<String> {
@@ -2450,10 +2478,11 @@ mod tests {
 
     use super::{
         App, Mode, bookmark_mutation_summary, build_row_revision_map, confirmation_preview_tokens,
-        decorate_command_output, extract_revision, is_change_id, is_commit_id, is_dangerous,
-        keymap_overview_lines, looks_like_graph_commit_row, metadata_log_tokens,
-        operation_mutation_summary, render_bookmark_list_view, render_bookmark_mutation_view,
-        render_diff_view, render_file_annotate_view, render_file_chmod_view, render_file_list_view,
+        decorate_command_output, extract_revision, git_fetch_summary, git_push_summary,
+        is_change_id, is_commit_id, is_dangerous, keymap_overview_lines,
+        looks_like_graph_commit_row, metadata_log_tokens, operation_mutation_summary,
+        render_bookmark_list_view, render_bookmark_mutation_view, render_diff_view,
+        render_file_annotate_view, render_file_chmod_view, render_file_list_view,
         render_file_search_view, render_file_show_view, render_file_track_view,
         render_file_untrack_view, render_git_fetch_view, render_git_push_view,
         render_operation_diff_view, render_operation_log_view, render_operation_mutation_view,
@@ -3544,7 +3573,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 2 output lines"))
+                .any(|line| line.contains("Summary: Pushed bookmark main to origin"))
         );
         assert!(
             rendered
@@ -3579,7 +3608,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Pushed bookmark main to origin"))
         );
     }
 
@@ -3938,6 +3967,30 @@ mod tests {
                 String::from("done"),
             ],
         );
+        assert_eq!(summary, "Summary: 2 output lines");
+    }
+
+    #[test]
+    fn git_fetch_summary_uses_signal_line_when_available() {
+        let summary = git_fetch_summary(&[String::from("Fetched 3 bookmarks from origin")]);
+        assert_eq!(summary, "Summary: Fetched 3 bookmarks from origin");
+    }
+
+    #[test]
+    fn git_fetch_summary_falls_back_to_line_count() {
+        let summary = git_fetch_summary(&[String::from("fetch output"), String::from("done")]);
+        assert_eq!(summary, "Summary: 2 output lines");
+    }
+
+    #[test]
+    fn git_push_summary_uses_signal_line_when_available() {
+        let summary = git_push_summary(&[String::from("Pushed bookmark main to origin")]);
+        assert_eq!(summary, "Summary: Pushed bookmark main to origin");
+    }
+
+    #[test]
+    fn git_push_summary_falls_back_to_line_count() {
+        let summary = git_push_summary(&[String::from("push output"), String::from("done")]);
         assert_eq!(summary, "Summary: 2 output lines");
     }
 

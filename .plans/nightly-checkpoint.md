@@ -86,9 +86,11 @@
   - added startup-action regression test coverage for core `jj` default aliases
     (`jk st`, `jk ci`, `jk desc`, `jk b`, `jk op`)
   - added explicit summary-heuristic tests for bookmark/workspace/operation mutation wrappers
+  - added explicit summary-heuristic tests for `git fetch`/`git push` wrapper summaries
   - updated top-level `commit` and `rebase` snapshots for signal-first summary rendering
   - refreshed `insta` snapshots for bookmark/workspace/operation mutation wrappers to lock in
     signal-first summary behavior
+  - refreshed `insta` snapshot for `git push` wrapper signal-first summary behavior
 - Rendering polish:
   - `show`/`diff` wrappers now add section spacing between top-level file blocks
   - `status`/`operation log` wrappers now include compact summaries and clearer section spacing
@@ -105,6 +107,7 @@
     summaries and follow-up verification tips
   - bookmark/workspace/operation mutation wrappers now prefer signal-first summary lines when
     command output includes a clear action line, and fall back to output-count summaries otherwise
+  - `git fetch`/`git push` wrappers now also prefer signal-first action summaries when available
   - top-level daily/rewrite mutation wrappers now include command-specific follow-up tips
   - top-level mutation wrappers now prefer signal-first summary lines (for example rebase/undo
     action output) before falling back to generic output counts
@@ -113,6 +116,7 @@
 
 ## Recent commit stack
 
+- `feat(view): add signal summaries for remote wrappers` (`change: kkuqnwpqzmks`)
 - `feat(view): prefer signal summaries in mutation wrappers` (`change: mmookzxkmqos`)
 - `test(startup): cover core jj alias routing` (`change: ywvronpkrvxs`)
 - `feat(commands): annotate default aliases in registry` (`change: ywqkqkkxuruv`)
@@ -146,7 +150,7 @@
   - `markdownlint-cli2 README.md AGENTS.md .plans/*.md docs/**/*.md`
   - `cargo fmt --all`
   - `cargo check`
-  - `cargo test` (192 passed)
+  - `cargo test` (196 passed)
   - `cargo clippy --all-targets --all-features -- -D warnings`
 
 ## Blockers

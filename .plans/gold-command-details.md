@@ -93,11 +93,13 @@ It is intentionally concrete and should be re-read during implementation checkpo
   - Mode: guided prompt (optional remote).
   - Safety: `B`.
   - Aliases: `gf`, `jjgf`, `jjgfa`.
+  - Presentation: prefer signal-first summaries (for example fetched-change lines) when present.
 - `git push`
   - Mode: guided prompt (optional bookmark) plus preview.
   - Safety: `C`.
   - Aliases: `gp`, `jjgp`, `jjgpt`, `jjgpa`, `jjgpd`.
   - Acceptance: confirmation includes `--dry-run` preview when available.
+  - Presentation: prefer signal-first summaries (for example `Pushed bookmark ...`) when present.
 
 ## Alias defaults
 
@@ -120,6 +122,8 @@ It is intentionally concrete and should be re-read during implementation checkpo
 - Flow planner tests for prompt-vs-execute behavior of every gold command.
 - Wrapper summary tests proving bookmark/workspace/operation mutations prefer signal lines when
   present and fall back to output counts otherwise.
+- Wrapper summary tests proving `git fetch`/`git push` prefer signal lines when present and fall
+  back to output counts otherwise.
 - Safety tests proving all Tier `C` commands require confirmation.
 - Snapshot smoke test for log-first default frame.
 - Gold command wrapper matrix test validating native header rendering for core
