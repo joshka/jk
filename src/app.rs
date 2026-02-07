@@ -2046,15 +2046,7 @@ fn render_bookmark_mutation_view(subcommand: Option<&str>, lines: Vec<String>) -
         .map(|line| line.trim_end().to_string())
         .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
         .collect();
-    let summary = if detail_lines.is_empty() {
-        format!("Summary: bookmark {subcommand} completed with no output")
-    } else {
-        format!(
-            "Summary: {} output line{}",
-            detail_lines.len(),
-            plural_suffix(detail_lines.len())
-        )
-    };
+    let summary = bookmark_mutation_summary(subcommand, &detail_lines);
 
     let mut rendered = vec![
         format!("Bookmark {}", capitalize_word(subcommand)),
@@ -2073,6 +2065,47 @@ fn render_bookmark_mutation_view(subcommand: Option<&str>, lines: Vec<String>) -
     rendered.push(String::new());
     rendered.push("Tip: run `bookmark list` to verify bookmark state".to_string());
     rendered
+}
+
+fn bookmark_mutation_summary(subcommand: &str, detail_lines: &[String]) -> String {
+    if detail_lines.is_empty() {
+        return format!("Summary: bookmark {subcommand} completed with no output");
+    }
+
+    if let Some(signal) = detail_lines
+        .iter()
+        .find(|line| is_bookmark_mutation_signal(subcommand, line))
+    {
+        return format!("Summary: {}", signal.trim());
+    }
+
+    format!(
+        "Summary: {} output line{}",
+        detail_lines.len(),
+        plural_suffix(detail_lines.len())
+    )
+}
+
+fn is_bookmark_mutation_signal(subcommand: &str, line: &str) -> bool {
+    let trimmed = line.trim();
+    match subcommand {
+        "create" => trimmed.starts_with("Created bookmark "),
+        "set" | "move" => trimmed.starts_with("Moved bookmark "),
+        "track" => trimmed.starts_with("Started tracking bookmark "),
+        "untrack" => trimmed.starts_with("Stopped tracking bookmark "),
+        "delete" => trimmed.starts_with("Deleted bookmark "),
+        "forget" => trimmed.starts_with("Forgot bookmark "),
+        "rename" => trimmed.starts_with("Renamed bookmark "),
+        _ => {
+            trimmed.starts_with("Created bookmark ")
+                || trimmed.starts_with("Moved bookmark ")
+                || trimmed.starts_with("Started tracking bookmark ")
+                || trimmed.starts_with("Stopped tracking bookmark ")
+                || trimmed.starts_with("Deleted bookmark ")
+                || trimmed.starts_with("Forgot bookmark ")
+                || trimmed.starts_with("Renamed bookmark ")
+        }
+    }
 }
 
 fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
@@ -2098,15 +2131,7 @@ fn render_workspace_mutation_view(subcommand: Option<&str>, lines: Vec<String>) 
         .map(|line| line.trim_end().to_string())
         .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
         .collect();
-    let summary = if detail_lines.is_empty() {
-        format!("Summary: workspace {subcommand} completed with no output")
-    } else {
-        format!(
-            "Summary: {} output line{}",
-            detail_lines.len(),
-            plural_suffix(detail_lines.len())
-        )
-    };
+    let summary = workspace_mutation_summary(subcommand, &detail_lines);
 
     let mut rendered = vec![
         format!("Workspace {}", capitalize_word(subcommand)),
@@ -2125,6 +2150,41 @@ fn render_workspace_mutation_view(subcommand: Option<&str>, lines: Vec<String>) 
     rendered.push(String::new());
     rendered.push("Tip: run `workspace list` to inspect workspace state".to_string());
     rendered
+}
+
+fn workspace_mutation_summary(subcommand: &str, detail_lines: &[String]) -> String {
+    if detail_lines.is_empty() {
+        return format!("Summary: workspace {subcommand} completed with no output");
+    }
+
+    if let Some(signal) = detail_lines
+        .iter()
+        .find(|line| is_workspace_mutation_signal(subcommand, line))
+    {
+        return format!("Summary: {}", signal.trim());
+    }
+
+    format!(
+        "Summary: {} output line{}",
+        detail_lines.len(),
+        plural_suffix(detail_lines.len())
+    )
+}
+
+fn is_workspace_mutation_signal(subcommand: &str, line: &str) -> bool {
+    let trimmed = line.trim();
+    match subcommand {
+        "add" => trimmed.starts_with("Created workspace "),
+        "forget" => trimmed.starts_with("Forgot workspace "),
+        "rename" => trimmed.starts_with("Renamed workspace "),
+        "update-stale" => trimmed.starts_with("Updated ") && trimmed.contains("stale workspace"),
+        _ => {
+            trimmed.starts_with("Created workspace ")
+                || trimmed.starts_with("Forgot workspace ")
+                || trimmed.starts_with("Renamed workspace ")
+                || (trimmed.starts_with("Updated ") && trimmed.contains("stale workspace"))
+        }
+    }
 }
 
 fn render_operation_show_view(lines: Vec<String>) -> Vec<String> {
@@ -2176,15 +2236,7 @@ fn render_operation_mutation_view(subcommand: &str, lines: Vec<String>) -> Vec<S
         .map(|line| line.trim_end().to_string())
         .filter(|line| !line.trim().is_empty() && line.trim() != "(no output)")
         .collect();
-    let summary = if detail_lines.is_empty() {
-        format!("Summary: operation {subcommand} completed with no output")
-    } else {
-        format!(
-            "Summary: {} output line{}",
-            detail_lines.len(),
-            plural_suffix(detail_lines.len())
-        )
-    };
+    let summary = operation_mutation_summary(subcommand, &detail_lines);
 
     let mut rendered = vec![
         format!("Operation {}", capitalize_word(subcommand)),
@@ -2203,6 +2255,37 @@ fn render_operation_mutation_view(subcommand: &str, lines: Vec<String>) -> Vec<S
     rendered.push(String::new());
     rendered.push("Tip: run `operation log` and `status` to validate repository state".to_string());
     rendered
+}
+
+fn operation_mutation_summary(subcommand: &str, detail_lines: &[String]) -> String {
+    if detail_lines.is_empty() {
+        return format!("Summary: operation {subcommand} completed with no output");
+    }
+
+    if let Some(signal) = detail_lines
+        .iter()
+        .find(|line| is_operation_mutation_signal(subcommand, line))
+    {
+        return format!("Summary: {}", signal.trim());
+    }
+
+    format!(
+        "Summary: {} output line{}",
+        detail_lines.len(),
+        plural_suffix(detail_lines.len())
+    )
+}
+
+fn is_operation_mutation_signal(subcommand: &str, line: &str) -> bool {
+    let trimmed = line.trim();
+    match subcommand {
+        "restore" => trimmed.starts_with("Restored to operation "),
+        "revert" => trimmed.starts_with("Reverted operation "),
+        _ => {
+            trimmed.starts_with("Restored to operation ")
+                || trimmed.starts_with("Reverted operation ")
+        }
+    }
 }
 
 fn render_operation_diff_view(lines: Vec<String>) -> Vec<String> {
@@ -2366,18 +2449,18 @@ mod tests {
     use crate::flows::{FlowAction, PromptKind};
 
     use super::{
-        App, Mode, build_row_revision_map, confirmation_preview_tokens, decorate_command_output,
-        extract_revision, is_change_id, is_commit_id, is_dangerous, keymap_overview_lines,
-        looks_like_graph_commit_row, metadata_log_tokens, render_bookmark_list_view,
-        render_bookmark_mutation_view, render_diff_view, render_file_annotate_view,
-        render_file_chmod_view, render_file_list_view, render_file_search_view,
-        render_file_show_view, render_file_track_view, render_file_untrack_view,
-        render_git_fetch_view, render_git_push_view, render_operation_diff_view,
-        render_operation_log_view, render_operation_mutation_view, render_operation_show_view,
-        render_resolve_list_view, render_root_view, render_show_view, render_status_view,
-        render_tag_delete_view, render_tag_list_view, render_tag_set_view,
+        App, Mode, bookmark_mutation_summary, build_row_revision_map, confirmation_preview_tokens,
+        decorate_command_output, extract_revision, is_change_id, is_commit_id, is_dangerous,
+        keymap_overview_lines, looks_like_graph_commit_row, metadata_log_tokens,
+        operation_mutation_summary, render_bookmark_list_view, render_bookmark_mutation_view,
+        render_diff_view, render_file_annotate_view, render_file_chmod_view, render_file_list_view,
+        render_file_search_view, render_file_show_view, render_file_track_view,
+        render_file_untrack_view, render_git_fetch_view, render_git_push_view,
+        render_operation_diff_view, render_operation_log_view, render_operation_mutation_view,
+        render_operation_show_view, render_resolve_list_view, render_root_view, render_show_view,
+        render_status_view, render_tag_delete_view, render_tag_list_view, render_tag_set_view,
         render_top_level_mutation_view, render_workspace_list_view, render_workspace_mutation_view,
-        startup_action, toggle_patch_flag, top_level_mutation_summary,
+        startup_action, toggle_patch_flag, top_level_mutation_summary, workspace_mutation_summary,
     };
 
     #[test]
@@ -3527,7 +3610,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Moved bookmark main to abcdef12"))
         );
         assert!(
             rendered
@@ -3556,7 +3639,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Moved bookmark main to abcdef12"))
         );
     }
 
@@ -3608,7 +3691,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Created workspace docs at ../jk-docs"))
         );
         assert!(
             rendered
@@ -3632,7 +3715,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Created workspace docs at ../jk-docs"))
         );
     }
 
@@ -3680,7 +3763,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Restored to operation 7699d9773e37"))
         );
         assert!(
             rendered
@@ -3704,7 +3787,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Restored to operation 7699d9773e37"))
         );
     }
 
@@ -3723,7 +3806,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Summary: 1 output line"))
+                .any(|line| line.contains("Summary: Reverted operation 7699d9773e37"))
         );
     }
 
@@ -3794,6 +3877,66 @@ mod tests {
         let summary = top_level_mutation_summary(
             "abandon",
             &[String::from("Random line"), String::from("Second line")],
+        );
+        assert_eq!(summary, "Summary: 2 output lines");
+    }
+
+    #[test]
+    fn bookmark_mutation_summary_uses_signal_line_when_available() {
+        let summary = bookmark_mutation_summary(
+            "rename",
+            &[String::from("Renamed bookmark main to primary")],
+        );
+        assert_eq!(summary, "Summary: Renamed bookmark main to primary");
+    }
+
+    #[test]
+    fn bookmark_mutation_summary_falls_back_to_line_count() {
+        let summary = bookmark_mutation_summary(
+            "set",
+            &[String::from("bookmark set output"), String::from("done")],
+        );
+        assert_eq!(summary, "Summary: 2 output lines");
+    }
+
+    #[test]
+    fn workspace_mutation_summary_uses_signal_line_when_available() {
+        let summary = workspace_mutation_summary(
+            "update-stale",
+            &[String::from("Updated 2 stale workspaces")],
+        );
+        assert_eq!(summary, "Summary: Updated 2 stale workspaces");
+    }
+
+    #[test]
+    fn workspace_mutation_summary_falls_back_to_line_count() {
+        let summary = workspace_mutation_summary(
+            "rename",
+            &[
+                String::from("workspace rename output"),
+                String::from("done"),
+            ],
+        );
+        assert_eq!(summary, "Summary: 2 output lines");
+    }
+
+    #[test]
+    fn operation_mutation_summary_uses_signal_line_when_available() {
+        let summary = operation_mutation_summary(
+            "restore",
+            &[String::from("Restored to operation 7699d9773e37")],
+        );
+        assert_eq!(summary, "Summary: Restored to operation 7699d9773e37");
+    }
+
+    #[test]
+    fn operation_mutation_summary_falls_back_to_line_count() {
+        let summary = operation_mutation_summary(
+            "restore",
+            &[
+                String::from("operation restore output"),
+                String::from("done"),
+            ],
         );
         assert_eq!(summary, "Summary: 2 output lines");
     }

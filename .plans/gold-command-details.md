@@ -84,6 +84,8 @@ It is intentionally concrete and should be re-read during implementation checkpo
 - `bookmark untrack`
   - Mode: guided prompt (`<name> [remote]`).
   - Safety: `B`.
+  - Presentation: prefer signal-first summaries (for example `Created/Moved/Renamed bookmark ...`)
+    over generic output-line counts.
 
 ## Remote workflows
 
@@ -116,6 +118,8 @@ It is intentionally concrete and should be re-read during implementation checkpo
 - Startup-action tests for core `jj` default aliases (`jk st/ci/desc/b/op`).
 - Command-registry tests for default alias annotation/filtering in `:commands`.
 - Flow planner tests for prompt-vs-execute behavior of every gold command.
+- Wrapper summary tests proving bookmark/workspace/operation mutations prefer signal lines when
+  present and fall back to output counts otherwise.
 - Safety tests proving all Tier `C` commands require confirmation.
 - Snapshot smoke test for log-first default frame.
 - Gold command wrapper matrix test validating native header rendering for core

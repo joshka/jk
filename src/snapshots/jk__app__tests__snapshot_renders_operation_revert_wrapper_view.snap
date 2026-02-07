@@ -5,7 +5,7 @@ expression: "rendered.join(\"\\n\")"
 Operation Revert
 =================
 
-Summary: 2 output lines
+Summary: Reverted operation 7699d9773e37
 
 Reverted operation 7699d9773e37
 Created undo operation 89abcdef0123
