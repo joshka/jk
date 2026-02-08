@@ -136,6 +136,11 @@ impl App {
 
     /// Move selection cursor up and keep viewport aligned.
     pub(super) fn move_cursor_up(&mut self) {
+        if self.is_scroll_only_view() {
+            self.scroll_view_up(1);
+            return;
+        }
+
         if self.has_item_navigation() {
             let _ = self.move_cursor_to_previous_item();
         } else if self.cursor > 0 {
@@ -146,6 +151,11 @@ impl App {
 
     /// Move selection cursor down and keep viewport aligned.
     pub(super) fn move_cursor_down(&mut self) {
+        if self.is_scroll_only_view() {
+            self.scroll_view_down(1);
+            return;
+        }
+
         if self.has_item_navigation() {
             let _ = self.move_cursor_to_next_item();
         } else if self.cursor + 1 < self.lines.len() {
@@ -157,6 +167,11 @@ impl App {
     /// Move cursor one page up using viewport-aware step size.
     pub(super) fn page_up(&mut self) {
         let step = self.viewport_rows.saturating_sub(1).max(1);
+
+        if self.is_scroll_only_view() {
+            self.scroll_view_up(step);
+            return;
+        }
 
         if self.has_item_navigation() {
             let starts = self.selectable_indices();
@@ -181,6 +196,11 @@ impl App {
     pub(super) fn page_down(&mut self) {
         let step = self.viewport_rows.saturating_sub(1).max(1);
 
+        if self.is_scroll_only_view() {
+            self.scroll_view_down(step);
+            return;
+        }
+
         if self.has_item_navigation() {
             let starts = self.selectable_indices();
             if starts.is_empty() {
@@ -202,12 +222,25 @@ impl App {
 
     /// Jump cursor to top row (or first selectable item) and reset scroll.
     pub(super) fn move_cursor_top(&mut self) {
+        if self.is_scroll_only_view() {
+            self.scroll = 0;
+            self.cursor = 0;
+            return;
+        }
+
         self.cursor = self.first_selectable_index().unwrap_or(0);
         self.scroll = 0;
     }
 
     /// Jump cursor to bottom row (or last selectable item) and align viewport.
     pub(super) fn move_cursor_bottom(&mut self) {
+        if self.is_scroll_only_view() {
+            let content_height = self.viewport_rows.max(1);
+            self.scroll = self.max_scroll(content_height);
+            self.cursor = self.scroll.min(self.lines.len().saturating_sub(1));
+            return;
+        }
+
         if self.lines.is_empty() {
             self.cursor = 0;
             self.scroll = 0;
@@ -223,6 +256,34 @@ impl App {
     /// Return whether current rendered content supports item-oriented revision navigation.
     fn has_item_navigation(&self) -> bool {
         !self.selectable_indices().is_empty()
+    }
+
+    /// Return whether current view should use viewport scrolling instead of row selection.
+    fn is_scroll_only_view(&self) -> bool {
+        let command = self.current_view_command.as_str();
+        command.starts_with("commands")
+            || command.starts_with("help")
+            || command.starts_with("keys")
+            || command.starts_with("aliases")
+    }
+
+    /// Return maximum scroll offset for current lines and content height.
+    fn max_scroll(&self, content_height: usize) -> usize {
+        self.lines.len().saturating_sub(content_height)
+    }
+
+    /// Scroll current view upward by line count.
+    fn scroll_view_up(&mut self, lines: usize) {
+        self.scroll = self.scroll.saturating_sub(lines);
+        self.cursor = self.scroll.min(self.lines.len().saturating_sub(1));
+    }
+
+    /// Scroll current view downward by line count.
+    fn scroll_view_down(&mut self, lines: usize) {
+        let content_height = self.viewport_rows.max(1);
+        let max_scroll = self.max_scroll(content_height);
+        self.scroll = self.scroll.saturating_add(lines).min(max_scroll);
+        self.cursor = self.scroll.min(self.lines.len().saturating_sub(1));
     }
 
     /// Return whether log-like graph rows can be navigated even without metadata map entries.
@@ -392,7 +453,14 @@ impl App {
 
             let content_height = layout[1].height as usize;
             self.viewport_rows = content_height.max(1);
-            self.ensure_cursor_visible(content_height.max(1));
+            if self.is_scroll_only_view() {
+                self.scroll = self.scroll.min(self.max_scroll(content_height.max(1)));
+                self.cursor = self
+                    .scroll
+                    .min(self.lines.len().saturating_sub(1));
+            } else {
+                self.ensure_cursor_visible(content_height.max(1));
+            }
 
             let mut body_lines = Vec::with_capacity(content_height);
             for idx in 0..content_height {
@@ -405,7 +473,9 @@ impl App {
                     .unwrap_or("");
                 let mut content = self.display_line_for_tui(raw_line);
                 let section_heading = self.is_legacy_underline(next_line);
-                let selected = line_index == self.cursor && self.mode == Mode::Normal;
+                let selected = line_index == self.cursor
+                    && self.mode == Mode::Normal
+                    && !self.is_scroll_only_view();
 
                 if section_heading {
                     content = content.patch_style(
@@ -537,7 +607,12 @@ impl App {
         let header = format!("jk [{}]", self.mode_label());
 
         let content_height = height.saturating_sub(2);
-        self.ensure_cursor_visible(content_height.max(1));
+        if self.is_scroll_only_view() {
+            self.scroll = self.scroll.min(self.max_scroll(content_height.max(1)));
+            self.cursor = self.scroll.min(self.lines.len().saturating_sub(1));
+        } else {
+            self.ensure_cursor_visible(content_height.max(1));
+        }
 
         let mut rows = Vec::with_capacity(height.max(1));
         rows.push(trim_to_width(&header, width));
@@ -545,7 +620,10 @@ impl App {
         for idx in 0..content_height {
             let line_index = self.scroll + idx;
             let content = if let Some(line) = self.lines.get(line_index) {
-                let marker = if line_index == self.cursor && self.mode == Mode::Normal {
+                let marker = if line_index == self.cursor
+                    && self.mode == Mode::Normal
+                    && !self.is_scroll_only_view()
+                {
                     ">"
                 } else {
                     " "

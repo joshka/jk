@@ -9,35 +9,35 @@ common flows (grouped, condensed)
 Navigation:
 key          action                   notes
 ------------------------------------------------
-j/k, Up/Down move by item             selection   PgUp/PgDn    page by viewport         navigation
-Ctrl+u/d     page up/down             navigation  g/G, Home/End jump top/bottom          navigation
+j/k, Up/Down move by item             selection     PgUp/PgDn    page by viewport         navigation
+Ctrl+u/d     page up/down             navigation    g/G, Home/End jump top/bottom          navigation
 Left/Right   screen history           back/forward  Ctrl+o/i     back/forward             history
 :            run exact command        jj-style
 
 Views:
 key          action                   notes
 ------------------------------------------------
-l            log history              home        s            status working copy      triage
-Enter        show selected revision   inspect     d            diff selected revision   inspect
-o            operation log            jj op log   L            bookmark list            jj bookmark list
+l            log history              home           s            status working copy      triage
+Enter        show selected revision   inspect        d            diff selected revision   inspect
+o            operation log            jj op log      L            bookmark list            jj bookmark list
 v            resolve list             jj resolve -l  f            file list                jj file list
-t            tag list                 jj tag list  w            workspace root           jj root
-?            commands help            discover    K            keys keymap              discover
+t            tag list                 jj tag list    w            workspace root           jj root
+?            commands help            discover       K            keys keymap              discover
 
 Actions:
 key          action                   notes
 ------------------------------------------------
-n            new change               opens prompt  c            commit                   opens prompt
-D            describe selected        opens prompt  b            bookmark set             prompt + confirm
+n            new change               opens prompt           c            commit                   opens prompt
+D            describe selected        opens prompt           b            bookmark set             prompt + confirm
 F / P        git fetch / push         prompt; push confirms  B/S/X        rebase/squash/split      confirm
-a            abandon selected         confirm     u/U          undo / redo              confirm
+a            abandon selected         confirm                u/U          undo / redo              confirm
 p            toggle log patch         view detail
 
 Safety:
 key          action                   notes
 ------------------------------------------------
 y            accept confirmation      run command  n / Esc      reject or cancel         safe exit
-Esc          cancel command mode      safe exit   high-risk actions always ask confirmation  before mutate
+Esc          cancel command mode      safe exit    high-risk actions always ask confirmation  before mutate
 
 
 all top-level commands (common first, condensed)

@@ -9,8 +9,8 @@ common flows (grouped, condensed)
 Actions:
 key          action                   notes
 ------------------------------------------------
-n            new change               opens prompt  c            commit                   opens prompt
-D            describe selected        opens prompt  b            bookmark set             prompt + confirm
+n            new change               opens prompt           c            commit                   opens prompt
+D            describe selected        opens prompt           b            bookmark set             prompt + confirm
 F / P        git fetch / push         prompt; push confirms
 
 

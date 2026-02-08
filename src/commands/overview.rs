@@ -324,8 +324,15 @@ fn top_level_default_alias(name: &str) -> Option<&'static str> {
 }
 
 /// Pack one-column entry lines into compact two-column output.
-fn compact_two_column(entries: &[String], width: usize) -> Vec<String> {
+fn compact_two_column(entries: &[String], min_width: usize) -> Vec<String> {
     let mut lines = Vec::new();
+    let first_column_width = entries
+        .iter()
+        .step_by(2)
+        .map(|entry| entry.len())
+        .max()
+        .unwrap_or(min_width)
+        .max(min_width);
 
     for pair in entries.chunks(2) {
         if pair.len() == 1 {
@@ -333,7 +340,12 @@ fn compact_two_column(entries: &[String], width: usize) -> Vec<String> {
             continue;
         }
 
-        lines.push(format!("{:<width$}  {}", pair[0], pair[1], width = width));
+        lines.push(format!(
+            "{:<width$}  {}",
+            pair[0],
+            pair[1],
+            width = first_column_width
+        ));
     }
 
     lines

@@ -9,7 +9,7 @@ story: Apply safe rewrite operations with explicit confirmation where needed.
 key        action                               why
 ------------------------------------------------------------
 D          describe selected revision           edit metadata  B/S/X      rebase, squash, split                rewrite
-a          abandon selected revision            drop          y / n      accept or reject confirm             safety
+a          abandon selected revision            drop           y / n      accept or reject confirm             safety
 o          inspect operation log                audit
 
 docs: docs/workflows.md

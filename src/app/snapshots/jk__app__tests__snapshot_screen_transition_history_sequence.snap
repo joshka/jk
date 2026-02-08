@@ -5,7 +5,7 @@ expression: "captures.join(\"\\n\\n---\\n\\n\")"
 commands
 status: Showing command registry
 jk [normal]
-> jk command registry
+  jk command registry
   
   common flows (grouped, condensed)
   
@@ -18,7 +18,7 @@ onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  
 keys
 status: Showing keymap
 jk [normal]
-> jk keymap
+  jk keymap
   
   grouped bindings (common first)
   
@@ -31,7 +31,7 @@ onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: ba
 aliases
 status: Showing alias catalog
 jk [normal]
-> jk alias catalog
+  jk alias catalog
   alias    expands to
   ----------------------------------------
   b        bookmark
@@ -44,7 +44,7 @@ onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: ba
 help-inspect
 status: Showing workflow help for `inspect`
 jk [normal]
-> jk workflow help: inspect
+  jk workflow help: inspect
   
   story: Scan history, inspect details, and return to context quickly.
   
@@ -57,7 +57,7 @@ onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  
 back-1
 status: back: aliases
 jk [normal]
-> jk alias catalog
+  jk alias catalog
   alias    expands to
   ----------------------------------------
   b        bookmark
@@ -70,7 +70,7 @@ onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: ba
 back-2
 status: back: keys
 jk [normal]
-> jk keymap
+  jk keymap
   
   grouped bindings (common first)
   
@@ -83,7 +83,7 @@ onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: ba
 forward-1
 status: forward: aliases
 jk [normal]
-> jk alias catalog
+  jk alias catalog
   alias    expands to
   ----------------------------------------
   b        bookmark
@@ -96,7 +96,7 @@ onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: ba
 forward-2
 status: forward: help inspect
 jk [normal]
-> jk workflow help: inspect
+  jk workflow help: inspect
   
   story: Scan history, inspect details, and return to context quickly.
   

@@ -414,6 +414,32 @@ fn view_history_moves_back_and_forward_between_screens() {
 }
 
 #[test]
+fn help_views_scroll_without_selection_cursor() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.execute_command_line("commands")
+        .expect("commands screen should render");
+    app.viewport_rows = 5;
+
+    let start_top = app.lines[app.scroll].clone();
+    let rendered_start = app.render_for_snapshot(90, 8);
+    assert!(
+        !rendered_start.contains("\n> "),
+        "help should not render a row cursor"
+    );
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should scroll help");
+    assert_eq!(app.scroll, 1);
+    assert_eq!(app.cursor, 1);
+    assert_ne!(app.lines[app.scroll], start_top);
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should scroll help back");
+    assert_eq!(app.scroll, 0);
+    assert_eq!(app.cursor, 0);
+}
+
+#[test]
 fn snapshot_screen_transition_history_sequence() {
     let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
     let mut captures = Vec::new();
@@ -465,6 +491,31 @@ fn snapshot_screen_transition_history_sequence() {
     let status = app.status_line.clone();
     let frame = app.render_for_snapshot(90, 8);
     captures.push(format!("forward-2\nstatus: {status}\n{frame}"));
+
+    insta::assert_snapshot!(captures.join("\n\n---\n\n"));
+}
+
+#[test]
+fn snapshot_help_scroll_sequence() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.execute_command_line("commands")
+        .expect("commands screen should render");
+    app.viewport_rows = 5;
+
+    let mut captures = Vec::new();
+    captures.push(format!("start\n{}", app.render_for_snapshot(90, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should scroll help");
+    captures.push(format!("down-1\n{}", app.render_for_snapshot(90, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should scroll help again");
+    captures.push(format!("down-2\n{}", app.render_for_snapshot(90, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should scroll help back");
+    captures.push(format!("up-1\n{}", app.render_for_snapshot(90, 8)));
 
     insta::assert_snapshot!(captures.join("\n\n---\n\n"));
 }

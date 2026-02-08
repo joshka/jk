@@ -504,3 +504,11 @@
     - screen-transition snapshot sequence for commands/keys/aliases/help with back/forward history.
   - reran validation checkpoint (`cargo fmt --all`, `cargo test` 245 passed, `cargo check`, strict
     clippy).
+- Latest pass:
+  - made help/catalog screens (`commands`, `help`, `keys`, `aliases`) scroll-only in normal mode:
+    `Up/Down` now scroll the viewport and no row-selection cursor is shown.
+  - stabilized command/help two-column alignment by auto-sizing first-column width from content
+    before packing paired rows.
+  - added explicit regression coverage for help scrolling semantics and a new help-scroll snapshot.
+  - expanded transition snapshots to reflect scroll-only help behavior and reran validation
+    (`cargo fmt --all`, `cargo test` 247 passed, `cargo check`, strict clippy, markdownlint).

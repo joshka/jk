@@ -1,0 +1,49 @@
+---
+source: src/app/tests.rs
+expression: "captures.join(\"\\n\\n---\\n\\n\")"
+---
+start
+jk [normal]
+  jk command registry
+  
+  common flows (grouped, condensed)
+  
+  Navigation:
+  key          action                   notes
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history
+
+---
+
+down-1
+jk [normal]
+  
+  common flows (grouped, condensed)
+  
+  Navigation:
+  key          action                   notes
+  ------------------------------------------------
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history
+
+---
+
+down-2
+jk [normal]
+  common flows (grouped, condensed)
+  
+  Navigation:
+  key          action                   notes
+  ------------------------------------------------
+  j/k, Up/Down move by item             selection     PgUp/PgDn    page by viewport       
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history
+
+---
+
+up-1
+jk [normal]
+  
+  common flows (grouped, condensed)
+  
+  Navigation:
+  key          action                   notes
+  ------------------------------------------------
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history
