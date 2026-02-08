@@ -11,34 +11,12 @@ pub enum ExecutionMode {
     Passthrough,
 }
 
-impl ExecutionMode {
-    /// Stable display label used in command registry output.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Native => "native",
-            Self::Guided => "guided",
-            Self::Passthrough => "passthrough",
-        }
-    }
-}
-
 /// Safety tier used for confirmation policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafetyTier {
     A,
     B,
     C,
-}
-
-impl SafetyTier {
-    /// Stable display label used in command registry output.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::A => "A",
-            Self::B => "B",
-            Self::C => "C",
-        }
-    }
 }
 
 /// Static metadata for one top-level `jj` command.

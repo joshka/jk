@@ -7,66 +7,66 @@ jk command registry
 common flows (grouped, condensed)
 
 Navigation:
-key          flow                   mode       tier
---------------------------------------------------
-j/k, Up/Down move by item           native     A    PgUp/PgDn    page by viewport       native     A
-Ctrl+u/d     page up/down           native     A    g/G, Home/End jump top/bottom        native     A
-Left/Right   screen history         native     A    Ctrl+o/i     back/forward           native     A
-:            run exact command      native     A
+key          action                   notes
+------------------------------------------------
+j/k, Up/Down move by item             selection   PgUp/PgDn    page by viewport         navigation
+Ctrl+u/d     page up/down             navigation  g/G, Home/End jump top/bottom          navigation
+Left/Right   screen history           back/forward  Ctrl+o/i     back/forward             history
+:            run exact command        jj-style
 
 Views:
-key          flow                   mode       tier
---------------------------------------------------
-l            log history            native     A    s            status working copy    native     A
-Enter        show selected revision native     A    d            diff selected revision native     A
-o            operation log          guided     B    L            bookmark list          guided     B
-v            resolve list           guided     B    f            file list              guided     B
-t            tag list               guided     B    w            workspace root         passthrough A
-?            commands help          native     A    K            keys keymap            native     A
+key          action                   notes
+------------------------------------------------
+l            log history              home        s            status working copy      triage
+Enter        show selected revision   inspect     d            diff selected revision   inspect
+o            operation log            jj op log   L            bookmark list            jj bookmark list
+v            resolve list             jj resolve -l  f            file list                jj file list
+t            tag list                 jj tag list  w            workspace root           jj root
+?            commands help            discover    K            keys keymap              discover
 
 Actions:
-key          flow                   mode       tier
---------------------------------------------------
-n            new change             guided     B    c            commit                 guided     B
-D            describe selected      guided     B    b            bookmark set           guided     C
-F / P        git fetch / push       guided     B/C  B/S/X        rebase/squash/split    guided     C
-a            abandon selected       guided     C    u/U          undo / redo            guided     C
-p            toggle log patch       native     A
+key          action                   notes
+------------------------------------------------
+n            new change               opens prompt  c            commit                   opens prompt
+D            describe selected        opens prompt  b            bookmark set             prompt + confirm
+F / P        git fetch / push         prompt; push confirms  B/S/X        rebase/squash/split      confirm
+a            abandon selected         confirm     u/U          undo / redo              confirm
+p            toggle log patch         view detail
 
 Safety:
-key          flow                   mode       tier
---------------------------------------------------
-y            accept confirm prompt  native     C    n / Esc      reject or cancel       native     A
-Esc          cancel command mode    native     A    Tier C       explicit confirmation  native     C
+key          action                   notes
+------------------------------------------------
+y            accept confirmation      run command  n / Esc      reject or cancel         safe exit
+Esc          cancel command mode      safe exit   high-risk actions always ask confirmation  before mutate
 
 
 all top-level commands (common first, condensed)
-command            mode       tier
---------------------------------
-abandon            guided     C           bookmark (b)       guided     B
-commit (ci)        guided     B           describe (desc)    guided     B
-diff               native     A           file               guided     B
-git                guided     B           help               passthrough A
-log                native     A           new                guided     B
-operation (op)     guided     B           rebase             guided     C
-redo               guided     C           resolve            guided     B
-root               passthrough A          show               native     A
-split              guided     C           squash             guided     C
-status (st)        native     A           tag                guided     B
-undo               guided     C           absorb             guided     C
-bisect             passthrough B          config             passthrough B
-diffedit           guided     C           duplicate          guided     B
-edit               guided     B           evolog             guided     A
-fix                guided     C           gerrit             passthrough B
-interdiff          guided     A           metaedit           guided     B
-next               guided     B           parallelize        guided     C
-prev               guided     B           restore            guided     C
-revert             guided     C           sign               passthrough B
-simplify-parents   guided     C           sparse             passthrough B
-unsign             passthrough B          util               passthrough A
-version            passthrough A          workspace          guided     B
-aliases (local)    native     A           keys (local)       native     A
-keymap (local)     native     A
+command            behavior
+----------------------------------------------------
+abandon            opens prompt + asks confirmation   bookmark (b)       opens prompt
+commit (ci)        opens prompt                       describe (desc)    opens prompt
+diff               runs now                           file               opens prompt
+git                opens prompt                       help               runs as jj
+log                runs now                           new                opens prompt
+operation (op)     opens prompt                       rebase             opens prompt + asks confirmation
+redo               opens prompt + asks confirmation   resolve            opens prompt
+root               runs as jj                         show               runs now
+split              opens prompt + asks confirmation   squash             opens prompt + asks confirmation
+status (st)        runs now                           tag                opens prompt
+undo               opens prompt + asks confirmation   absorb             opens prompt + asks confirmation
+bisect             runs as jj                         config             runs as jj
+diffedit           opens prompt + asks confirmation   duplicate          opens prompt
+edit               opens prompt                       evolog             opens prompt
+fix                opens prompt + asks confirmation   gerrit             runs as jj
+interdiff          opens prompt                       metaedit           opens prompt
+next               opens prompt                       parallelize        opens prompt + asks confirmation
+prev               opens prompt                       restore            opens prompt + asks confirmation
+revert             opens prompt + asks confirmation   sign               runs as jj
+simplify-parents   opens prompt + asks confirmation   sparse             runs as jj
+unsign             runs as jj                         util               runs as jj
+version            runs as jj                         workspace          opens prompt
+aliases (local)    local view                         keys (local)       local view
+keymap (local)     local view
 
 aliases: b ci desc op st gf gp rbm rbt jjgf jjgp jjrbm jjst jjl
 tips: :aliases shows mappings, :keys shows active keybinds

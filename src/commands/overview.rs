@@ -137,13 +137,13 @@ fn push_grouped_help_sections(lines: &mut Vec<String>, filter: Option<&str>) {
         lines,
         "Navigation",
         &[
-            ("j/k, Up/Down", "move by item", "native", "A"),
-            ("PgUp/PgDn", "page by viewport", "native", "A"),
-            ("Ctrl+u/d", "page up/down", "native", "A"),
-            ("g/G, Home/End", "jump top/bottom", "native", "A"),
-            ("Left/Right", "screen history", "native", "A"),
-            ("Ctrl+o/i", "back/forward", "native", "A"),
-            (":", "run exact command", "native", "A"),
+            ("j/k, Up/Down", "move by item", "selection"),
+            ("PgUp/PgDn", "page by viewport", "navigation"),
+            ("Ctrl+u/d", "page up/down", "navigation"),
+            ("g/G, Home/End", "jump top/bottom", "navigation"),
+            ("Left/Right", "screen history", "back/forward"),
+            ("Ctrl+o/i", "back/forward", "history"),
+            (":", "run exact command", "jj-style"),
         ],
         filter,
     );
@@ -151,18 +151,18 @@ fn push_grouped_help_sections(lines: &mut Vec<String>, filter: Option<&str>) {
         lines,
         "Views",
         &[
-            ("l", "log history", "native", "A"),
-            ("s", "status working copy", "native", "A"),
-            ("Enter", "show selected revision", "native", "A"),
-            ("d", "diff selected revision", "native", "A"),
-            ("o", "operation log", "guided", "B"),
-            ("L", "bookmark list", "guided", "B"),
-            ("v", "resolve list", "guided", "B"),
-            ("f", "file list", "guided", "B"),
-            ("t", "tag list", "guided", "B"),
-            ("w", "workspace root", "passthrough", "A"),
-            ("?", "commands help", "native", "A"),
-            ("K", "keys keymap", "native", "A"),
+            ("l", "log history", "home"),
+            ("s", "status working copy", "triage"),
+            ("Enter", "show selected revision", "inspect"),
+            ("d", "diff selected revision", "inspect"),
+            ("o", "operation log", "jj op log"),
+            ("L", "bookmark list", "jj bookmark list"),
+            ("v", "resolve list", "jj resolve -l"),
+            ("f", "file list", "jj file list"),
+            ("t", "tag list", "jj tag list"),
+            ("w", "workspace root", "jj root"),
+            ("?", "commands help", "discover"),
+            ("K", "keys keymap", "discover"),
         ],
         filter,
     );
@@ -170,15 +170,15 @@ fn push_grouped_help_sections(lines: &mut Vec<String>, filter: Option<&str>) {
         lines,
         "Actions",
         &[
-            ("n", "new change", "guided", "B"),
-            ("c", "commit", "guided", "B"),
-            ("D", "describe selected", "guided", "B"),
-            ("b", "bookmark set", "guided", "C"),
-            ("F / P", "git fetch / push", "guided", "B/C"),
-            ("B/S/X", "rebase/squash/split", "guided", "C"),
-            ("a", "abandon selected", "guided", "C"),
-            ("u/U", "undo / redo", "guided", "C"),
-            ("p", "toggle log patch", "native", "A"),
+            ("n", "new change", "opens prompt"),
+            ("c", "commit", "opens prompt"),
+            ("D", "describe selected", "opens prompt"),
+            ("b", "bookmark set", "prompt + confirm"),
+            ("F / P", "git fetch / push", "prompt; push confirms"),
+            ("B/S/X", "rebase/squash/split", "confirm"),
+            ("a", "abandon selected", "confirm"),
+            ("u/U", "undo / redo", "confirm"),
+            ("p", "toggle log patch", "view detail"),
         ],
         filter,
     );
@@ -186,10 +186,14 @@ fn push_grouped_help_sections(lines: &mut Vec<String>, filter: Option<&str>) {
         lines,
         "Safety",
         &[
-            ("y", "accept confirm prompt", "native", "C"),
-            ("n / Esc", "reject or cancel", "native", "A"),
-            ("Esc", "cancel command mode", "native", "A"),
-            ("Tier C", "explicit confirmation", "native", "C"),
+            ("y", "accept confirmation", "run command"),
+            ("n / Esc", "reject or cancel", "safe exit"),
+            ("Esc", "cancel command mode", "safe exit"),
+            (
+                "high-risk actions",
+                "always ask confirmation",
+                "before mutate",
+            ),
         ],
         filter,
     );
@@ -203,15 +207,15 @@ fn push_grouped_help_sections(lines: &mut Vec<String>, filter: Option<&str>) {
 fn push_help_group(
     lines: &mut Vec<String>,
     title: &str,
-    entries: &[(&str, &str, &str, &str)],
+    entries: &[(&str, &str, &str)],
     filter: Option<&str>,
 ) -> bool {
     let mut compact = Vec::new();
-    for (key, flow, mode, tier) in entries {
-        if !matches_filter(filter, &[title, key, flow, mode, tier]) {
+    for (key, flow, note) in entries {
+        if !matches_filter(filter, &[title, key, flow, note]) {
             continue;
         }
-        compact.push(format!("{:<12} {:<22} {:<10} {}", key, flow, mode, tier));
+        compact.push(format!("{:<12} {:<24} {}", key, flow, note));
     }
 
     if compact.is_empty() {
@@ -219,12 +223,9 @@ fn push_help_group(
     }
 
     lines.push(format!("{title}:"));
-    lines.push(format!(
-        "{:<12} {:<22} {:<10} {}",
-        "key", "flow", "mode", "tier"
-    ));
-    lines.push("-".repeat(50));
-    lines.extend(compact_two_column(&compact, 50));
+    lines.push(format!("{:<12} {:<24} {}", "key", "action", "notes"));
+    lines.push("-".repeat(48));
+    lines.extend(compact_two_column(&compact, 48));
     lines.push(String::new());
     true
 }
@@ -239,24 +240,23 @@ fn push_registry_section(lines: &mut Vec<String>, filter: Option<&str>) {
     let mut entries = Vec::new();
     for spec in specs {
         let display_name = command_display_name(spec);
-        let mode = spec.mode.as_str();
-        let tier = spec.tier.as_str();
-        if !matches_filter(filter, &[&display_name, mode, tier]) {
+        let behavior = command_behavior_label(spec);
+        if !matches_filter(filter, &[&display_name, behavior]) {
             continue;
         }
 
-        entries.push(format!("{:<18} {:<10} {}", display_name, mode, tier));
+        entries.push(format!("{:<18} {}", display_name, behavior));
     }
 
-    for (name, mode, tier) in [
-        ("aliases (local)", "native", "A"),
-        ("keys (local)", "native", "A"),
-        ("keymap (local)", "native", "A"),
+    for (name, behavior) in [
+        ("aliases (local)", "local view"),
+        ("keys (local)", "local view"),
+        ("keymap (local)", "local view"),
     ] {
-        if !matches_filter(filter, &[name, mode, tier]) {
+        if !matches_filter(filter, &[name, behavior]) {
             continue;
         }
-        entries.push(format!("{:<18} {:<10} {}", name, mode, tier));
+        entries.push(format!("{:<18} {}", name, behavior));
     }
 
     if entries.is_empty() {
@@ -264,9 +264,23 @@ fn push_registry_section(lines: &mut Vec<String>, filter: Option<&str>) {
         return;
     }
 
-    lines.push(format!("{:<18} {:<10} {}", "command", "mode", "tier"));
-    lines.push("-".repeat(32));
-    lines.extend(compact_two_column(&entries, 40));
+    lines.push(format!("{:<18} {}", "command", "behavior"));
+    lines.push("-".repeat(52));
+    lines.extend(compact_two_column(&entries, 52));
+}
+
+/// Convert internal execution/safety metadata to plain user-facing behavior labels.
+fn command_behavior_label(spec: CommandSpec) -> &'static str {
+    use super::spec::{ExecutionMode, SafetyTier};
+
+    match (spec.mode, spec.tier) {
+        (ExecutionMode::Guided, SafetyTier::C) => "opens prompt + asks confirmation",
+        (ExecutionMode::Guided, _) => "opens prompt",
+        (ExecutionMode::Passthrough, SafetyTier::C) => "runs as jj + asks confirmation",
+        (ExecutionMode::Passthrough, _) => "runs as jj",
+        (ExecutionMode::Native, SafetyTier::C) => "runs now + asks confirmation",
+        (ExecutionMode::Native, _) => "runs now",
+    }
 }
 
 /// Return whether any candidate text matches optional filter.
@@ -385,7 +399,7 @@ mod tests {
 
     #[test]
     fn snapshot_renders_filtered_overview_spacing() {
-        insta::assert_snapshot!(command_overview_lines_with_query(Some("flow")).join("\n"));
+        insta::assert_snapshot!(command_overview_lines_with_query(Some("prompt")).join("\n"));
     }
 
     #[test]

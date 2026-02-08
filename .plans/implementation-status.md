@@ -484,3 +484,12 @@
     `docs/architecture.md`.
   - reran full validation checkpoint (`cargo fmt`, `cargo check`, `cargo test` 228 passed,
     strict clippy, markdownlint) and regenerated all VHS gifs/screenshots.
+- Latest pass:
+  - simplified user-facing command terminology by replacing `mode/tier` columns in `:commands`
+    with behavior labels (`runs now`, `opens prompt`, `runs as jj`, `asks confirmation`).
+  - rewrote `docs/glossary.md` to behavior-first language and removed remaining tier wording from
+    `README.md` and `docs/screens.md`.
+  - captured the next simplification backlog in
+    `.plans/improvements/2026-02-08-022120-jj-aligned-simplification-ideas.md`.
+  - reran validation checkpoint (`cargo fmt --all`, `cargo test` 239 passed, strict clippy, and
+    markdownlint).

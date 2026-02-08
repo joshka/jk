@@ -1,7 +1,6 @@
 //! Command registry metadata and safety classification.
 //!
-//! Terminology reference for execution modes and safety tiers:
-//! `docs/glossary.md`.
+//! User-facing behavior labels are documented in `docs/glossary.md`.
 
 mod overview;
 mod spec;

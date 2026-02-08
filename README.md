@@ -138,7 +138,7 @@ Scenario authoring rules: `docs/vhs/scenarios.md`.
 
 ## Safety Model
 
-- Tier-C rewrite/mutation commands require explicit confirmation.
+- High-impact rewrite/mutation commands require explicit confirmation.
 - `git push` preview is shown when available.
 - Dangerous tutorial captures use cancel/reject paths by default.
 

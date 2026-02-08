@@ -1,49 +1,26 @@
 # Glossary
 
-## guided
+This glossary keeps `jk` terms close to normal `jj` behavior.
 
-A command flow where `jk` asks for extra input before execution (for example via prompt mode), then
-builds final `jj` tokens.
+## runs now
 
-Examples:
+`jk` executes immediately from the current context without asking extra questions.
 
-- `rebase` asks for a destination revset.
-- `bookmark set` asks for a bookmark name tied to the selected revision.
+Examples: `log`, `status`, `show`, `diff`.
 
-## native
+## opens prompt
 
-A command flow where `jk` executes directly and renders output with an in-app wrapper view
-(header/summary/tips) instead of showing raw passthrough output.
+`jk` asks for one or more inputs first, then runs the equivalent `jj` command.
 
-Examples:
+Examples: `new`, `commit`, `describe`, `bookmark set`.
 
-- `status`, `show`, `diff`
-- wrapper-rendered read views such as `operation log` and `file list`
+## asks confirmation
 
-## tier A
+`jk` requires an explicit `y` before running a high-impact command.
 
-Read-only or low-risk commands that do not require confirmation in normal operation.
+Examples: `rebase`, `squash`, `split`, `git push`, `operation restore`.
 
-Examples:
+## runs as jj
 
-- `log`, `show`, `status`
-- `operation log`, `resolve -l`
-
-## tier B
-
-Commands that can mutate state but are generally not considered high-risk destructive operations.
-
-Examples:
-
-- `new`, `commit`, `bookmark track`, `git fetch`
-
-## tier C
-
-High-risk mutation commands that require explicit confirmation in `jk` before execution. `jk` shows
-best-effort preview output when possible before the user confirms.
-
-Examples:
-
-- `git push`
-- `rebase`, `squash`, `split`
-- `operation restore`, `operation revert`
+For some commands, `jk` runs the direct `jj` command path and shows the output in the app.
+This is mostly used for long-tail commands that do not yet have a dedicated flow.

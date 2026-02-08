@@ -45,10 +45,10 @@ docs/vhs/render.sh
 | `File Annotate` | `:file annotate <path>` | Line-level blame/annotate view | `Left` back |
 | `Tag List` | `t`, `:tag list` | Inspect tags | `:tag set`, `:tag delete` |
 | `Workspace Root` | `w`, `:root` | Confirm current workspace path | `l` log, `s` status |
-| `Command Registry` | `?`, `:commands` | Discover commands and flow tiers | `PgUp/PgDn`, query |
+| `Command Registry` | `?`, `:commands` | Discover commands and run behavior | `PgUp/PgDn`, query |
 | `Keymap` | `K`, `:keys` | Discover active key bindings | filter by action/key |
 | `Alias Catalog` | `A`, `:aliases` | Discover alias mappings | filter by alias/expansion |
-| `Prompt Mode` | guided flows | Collect command input | `Enter` submit, `Esc` cancel |
+| `Prompt Mode` | prompt-based actions | Collect command input | `Enter` submit, `Esc` cancel |
 | `Confirm Mode` | dangerous flows | Confirm risky mutation | `y` accept, `n`/`Esc` reject |
 
 ## Per-Screen Behavior

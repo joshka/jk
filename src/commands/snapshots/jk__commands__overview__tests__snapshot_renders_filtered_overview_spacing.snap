@@ -1,12 +1,34 @@
 ---
 source: src/commands/overview.rs
-expression: "command_overview_lines_with_query(Some(\"flow\")).join(\"\\n\")"
+expression: "command_overview_lines_with_query(Some(\"prompt\")).join(\"\\n\")"
 ---
 jk command registry
 
 common flows (grouped, condensed)
 
-(no matching flows)
+Actions:
+key          action                   notes
+------------------------------------------------
+n            new change               opens prompt  c            commit                   opens prompt
+D            describe selected        opens prompt  b            bookmark set             prompt + confirm
+F / P        git fetch / push         prompt; push confirms
+
 
 all top-level commands (common first, condensed)
-(no matching commands)
+command            behavior
+----------------------------------------------------
+abandon            opens prompt + asks confirmation   bookmark (b)       opens prompt
+commit (ci)        opens prompt                       describe (desc)    opens prompt
+file               opens prompt                       git                opens prompt
+new                opens prompt                       operation (op)     opens prompt
+rebase             opens prompt + asks confirmation   redo               opens prompt + asks confirmation
+resolve            opens prompt                       split              opens prompt + asks confirmation
+squash             opens prompt + asks confirmation   tag                opens prompt
+undo               opens prompt + asks confirmation   absorb             opens prompt + asks confirmation
+diffedit           opens prompt + asks confirmation   duplicate          opens prompt
+edit               opens prompt                       evolog             opens prompt
+fix                opens prompt + asks confirmation   interdiff          opens prompt
+metaedit           opens prompt                       next               opens prompt
+parallelize        opens prompt + asks confirmation   prev               opens prompt
+restore            opens prompt + asks confirmation   revert             opens prompt + asks confirmation
+simplify-parents   opens prompt + asks confirmation   workspace          opens prompt
