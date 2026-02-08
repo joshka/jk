@@ -4,7 +4,9 @@
 //! execution.
 
 use crate::alias::{alias_overview_lines, alias_overview_lines_with_query, normalize_alias};
-use crate::commands::{command_overview_lines, command_overview_lines_with_query};
+use crate::commands::{
+    command_overview_lines, command_overview_lines_with_query, command_workflow_lines,
+};
 
 use super::{FlowAction, PromptKind, PromptRequest};
 
@@ -54,6 +56,20 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
     let selected = selected_revision.unwrap_or_else(|| "@".to_string());
 
     match tokens.as_slice() {
+        [command, workflow]
+            if (command == "commands" || command == "help")
+                && matches!(
+                    workflow.as_str(),
+                    "inspect" | "rewrite" | "sync" | "recover"
+                ) =>
+        {
+            let lines =
+                command_workflow_lines(workflow, &[]).expect("known workflow should always render");
+            FlowAction::Render {
+                lines,
+                status: format!("Showing workflow help for `{workflow}`"),
+            }
+        }
         [command, tail @ ..]
             if (command == "commands" || command == "help") && !tail.is_empty() =>
         {

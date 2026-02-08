@@ -4,11 +4,24 @@ use super::spec::{CommandSpec, TOP_LEVEL_SPECS};
 
 /// Render command registry lines without filtering.
 pub fn command_overview_lines() -> Vec<String> {
-    command_overview_lines_with_query(None)
+    command_overview_lines_with_query_and_recent(None, &[])
+}
+
+/// Render command registry lines including recent intents.
+pub fn command_overview_lines_with_recent(recent_intents: &[String]) -> Vec<String> {
+    command_overview_lines_with_query_and_recent(None, recent_intents)
 }
 
 /// Render command registry lines filtered by command/alias query.
 pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
+    command_overview_lines_with_query_and_recent(query, &[])
+}
+
+/// Render command registry lines filtered by query and augmented with recent intents.
+pub fn command_overview_lines_with_query_and_recent(
+    query: Option<&str>,
+    recent_intents: &[String],
+) -> Vec<String> {
     let filter = query
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -34,8 +47,87 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
                 .to_string(),
         );
     }
+    if filter.is_none() && !recent_intents.is_empty() {
+        lines.push(String::new());
+        lines.push(format!("recent intents: {}", recent_intents.join(", ")));
+    }
 
     lines
+}
+
+/// Render workflow-scoped help lines for high-frequency intent families.
+pub fn command_workflow_lines(workflow: &str, recent_intents: &[String]) -> Option<Vec<String>> {
+    let workflow = workflow.trim().to_ascii_lowercase();
+    let (title, narrative, entries): (&str, &str, Vec<(&str, &str, &str)>) = match workflow.as_str()
+    {
+        "inspect" => (
+            "inspect",
+            "Scan history, inspect details, and return to context quickly.",
+            vec![
+                ("l", "open log home", "start"),
+                ("j/k", "move by revision item", "select"),
+                ("Enter", "show selected revision", "inspect"),
+                ("d", "diff selected revision", "inspect"),
+                ("Left", "return to previous screen", "continue"),
+            ],
+        ),
+        "rewrite" => (
+            "rewrite",
+            "Apply safe rewrite operations with explicit confirmation where needed.",
+            vec![
+                ("D", "describe selected revision", "edit metadata"),
+                ("B/S/X", "rebase, squash, split", "rewrite"),
+                ("a", "abandon selected revision", "drop"),
+                ("y / n", "accept or reject confirm", "safety"),
+                ("o", "inspect operation log", "audit"),
+            ],
+        ),
+        "sync" => (
+            "sync",
+            "Verify state first, then fetch/push with guarded flows.",
+            vec![
+                ("s", "check working copy status", "verify"),
+                ("F", "run fetch prompt flow", "sync"),
+                ("P", "run push prompt flow", "sync"),
+                ("d", "review selected diff before push", "verify"),
+                ("Left", "return to prior context", "continue"),
+            ],
+        ),
+        "recover" => (
+            "recover",
+            "Use operation history and undo/redo loop to recover confidently.",
+            vec![
+                ("o", "open operation log", "inspect"),
+                ("Enter", "show operation details", "inspect"),
+                ("u / U", "undo or redo latest op", "recover"),
+                ("status", "verify working copy state", "verify"),
+                ("log", "confirm resulting history", "verify"),
+            ],
+        ),
+        _ => return None,
+    };
+
+    let mut lines = vec![
+        format!("jk workflow help: {title}"),
+        String::new(),
+        format!("story: {narrative}"),
+        String::new(),
+        format!("{:<10} {:<36} {}", "key", "action", "why"),
+        "-".repeat(60),
+    ];
+
+    let compact: Vec<String> = entries
+        .iter()
+        .map(|(key, action, why)| format!("{:<10} {:<36} {}", key, action, why))
+        .collect();
+    lines.extend(compact_two_column(&compact, 60));
+    lines.push(String::new());
+    lines.push("docs: docs/workflows.md".to_string());
+    if !recent_intents.is_empty() {
+        lines.push(format!("recent intents: {}", recent_intents.join(", ")));
+    }
+
+    Some(lines)
 }
 
 /// Add grouped day-one help sections with compact two-column rendering.
@@ -235,7 +327,10 @@ fn compact_two_column(entries: &[String], width: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{command_overview_lines, command_overview_lines_with_query};
+    use super::{
+        command_overview_lines, command_overview_lines_with_query,
+        command_overview_lines_with_recent, command_workflow_lines,
+    };
 
     #[test]
     fn renders_overview_lines_with_headers() {
@@ -291,5 +386,48 @@ mod tests {
     #[test]
     fn snapshot_renders_filtered_overview_spacing() {
         insta::assert_snapshot!(command_overview_lines_with_query(Some("flow")).join("\n"));
+    }
+
+    #[test]
+    fn renders_recent_intents_in_unfiltered_overview() {
+        let lines = command_overview_lines_with_recent(&[
+            ":status".to_string(),
+            ":log".to_string(),
+            ":git push".to_string(),
+        ]);
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("recent intents: :status, :log, :git push"))
+        );
+    }
+
+    #[test]
+    fn renders_workflow_help_presets() {
+        let inspect = command_workflow_lines("inspect", &[":status".to_string()])
+            .expect("inspect workflow should render");
+        assert_eq!(
+            inspect.first(),
+            Some(&"jk workflow help: inspect".to_string())
+        );
+        assert!(
+            inspect
+                .iter()
+                .any(|line| line.contains("recent intents: :status"))
+        );
+    }
+
+    #[test]
+    fn snapshot_renders_inspect_workflow_help() {
+        let lines = command_workflow_lines("inspect", &[":status".to_string(), ":log".to_string()])
+            .expect("inspect workflow should render");
+        insta::assert_snapshot!(lines.join("\n"));
+    }
+
+    #[test]
+    fn snapshot_renders_rewrite_workflow_help() {
+        let lines = command_workflow_lines("rewrite", &[":rebase".to_string()])
+            .expect("rewrite workflow should render");
+        insta::assert_snapshot!(lines.join("\n"));
     }
 }

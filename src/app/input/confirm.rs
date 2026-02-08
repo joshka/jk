@@ -1,8 +1,9 @@
 //! Confirmation-mode key handling.
 
 use crate::error::JkError;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 
+use super::super::preview::confirmation_preview_tokens;
 use super::super::selection::matches_any;
 use super::{App, Mode};
 
@@ -21,6 +22,17 @@ impl App {
         {
             self.mode = Mode::Normal;
             self.execute_tokens(tokens)?;
+        }
+
+        if matches!(key.code, KeyCode::Char('d'))
+            && let Some(tokens) = self.pending_confirm.clone()
+            && let Some(preview_tokens) = confirmation_preview_tokens(&tokens)
+        {
+            self.status_line = format!("Previewed: jj {}", preview_tokens.join(" "));
+            self.execute_tokens(preview_tokens)?;
+            self.mode = Mode::Confirm;
+            self.pending_confirm = Some(tokens.clone());
+            self.render_confirmation_preview(&tokens);
         }
 
         Ok(())

@@ -11,6 +11,8 @@ mod selection;
 mod terminal;
 mod view;
 
+use std::collections::HashMap;
+
 use crate::config::KeybindConfig;
 use crate::flow::PromptKind;
 
@@ -40,11 +42,15 @@ pub struct App {
     command_history: Vec<String>,
     command_history_index: Option<usize>,
     command_history_draft: String,
+    recent_intents: Vec<String>,
+    intent_counts: HashMap<String, usize>,
+    intent_recency: Vec<String>,
     row_revision_map: Vec<Option<String>>,
     pending_confirm: Option<Vec<String>>,
     pending_prompt: Option<PromptState>,
     last_command: Vec<String>,
     last_log_tokens: Vec<String>,
+    onboarding: OnboardingProgress,
     should_quit: bool,
 }
 
@@ -55,6 +61,16 @@ struct PromptState {
     label: String,
     allow_empty: bool,
     input: String,
+}
+
+/// Progress tracker for the first-run inspect/act/verify/recover loop.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OnboardingProgress {
+    inspect: bool,
+    act: bool,
+    verify: bool,
+    recover: bool,
+    complete: bool,
 }
 
 impl App {
@@ -78,11 +94,21 @@ impl App {
             command_history: Vec::new(),
             command_history_index: None,
             command_history_draft: String::new(),
+            recent_intents: Vec::new(),
+            intent_counts: HashMap::new(),
+            intent_recency: Vec::new(),
             row_revision_map: Vec::new(),
             pending_confirm: None,
             pending_prompt: None,
             last_command: vec!["log".to_string()],
             last_log_tokens: vec!["log".to_string()],
+            onboarding: OnboardingProgress {
+                inspect: false,
+                act: false,
+                verify: false,
+                recover: false,
+                complete: false,
+            },
             should_quit: false,
         }
     }

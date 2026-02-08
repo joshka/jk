@@ -12,6 +12,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::Paragraph;
 
+use super::preview::confirmation_preview_tokens;
 #[cfg(test)]
 use super::selection::trim_to_width;
 use super::selection::{
@@ -51,11 +52,26 @@ impl App {
         if !startup_tokens.is_empty() {
             let startup_command = startup_tokens.join(" ");
             if let Some(action) = self.local_view_action(&startup_command) {
+                let intent = startup_command
+                    .split_whitespace()
+                    .take(2)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                self.record_intent(&intent);
                 return self.apply_flow_action(action);
             }
         }
 
         let action = startup_action(&startup_tokens);
+        if !startup_tokens.is_empty() {
+            let intent = startup_tokens
+                .iter()
+                .take(2)
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(" ");
+            self.record_intent(&intent);
+        }
         self.apply_flow_action(action)
     }
 
@@ -100,6 +116,8 @@ impl App {
         if Self::is_navigable_view_tokens(&result.command) {
             self.record_view_visit(&result.command.join(" "));
         }
+        self.record_intent_from_tokens(&result.command);
+        self.update_onboarding_progress(&result.command);
         if matches!(result.command.first().map(String::as_str), Some("log")) {
             self.last_log_tokens = result.command.clone();
         }
@@ -409,21 +427,56 @@ impl App {
 
             let footer = match self.mode {
                 Mode::Normal => {
-                    let hints =
-                        "nav j/k ↑/↓ PgUp/PgDn Ctrl+u/d  |  back/forward ←/→ Ctrl+o/i  |  views l s o L v f t w  |  ? help";
+                    let mut segments = Vec::new();
+                    if !self.onboarding.complete {
+                        segments.push(format!(
+                            "onboarding: {}",
+                            self.onboarding_next_step_hint()
+                        ));
+                    }
+                    segments.push(format!("next: {}", self.primary_next_action_hint()));
+                    if let Some(actions) = self.log_quick_actions_hint() {
+                        segments.push(actions);
+                    }
+                    if let Some(history) = self.view_history_hint() {
+                        segments.push(history);
+                    }
+                    segments.push(
+                        "nav j/k ↑/↓ PgUp/PgDn Ctrl+u/d  |  back/forward ←/→ Ctrl+o/i  |  views l s o L v f t w  |  ? help"
+                            .to_string(),
+                    );
+                    let hints = segments.join("  |  ");
                     if self.show_status_line_in_footer() {
                         format!("{}  |  {hints}", self.status_line)
                     } else {
                         hints.to_string()
                     }
                 }
-                Mode::Command => format!(
-                    ":{}  (Enter run, Esc cancel, Up/Down history)",
-                    self.command_input
-                ),
+                Mode::Command => {
+                    let suggestions = self.ranked_command_suggestions(&self.command_input, 3);
+                    let suggestions_label = if suggestions.is_empty() {
+                        "suggest: (none)".to_string()
+                    } else {
+                        format!("suggest: {}", suggestions.join(", "))
+                    };
+                    let recent = self.recent_intent_labels(3);
+                    let recent_label = if recent.is_empty() {
+                        String::new()
+                    } else {
+                        format!("  |  recent: {}", recent.join(", "))
+                    };
+                    format!(
+                        ":{}  (Enter run, Esc cancel, Up/Down history)  |  {}{}",
+                        self.command_input, suggestions_label, recent_label
+                    )
+                }
                 Mode::Confirm => {
                     let pending = self.pending_confirm.clone().unwrap_or_default();
-                    format!("Run `jj {}` ? [y/n/Esc]", pending.join(" "))
+                    if confirmation_preview_tokens(&pending).is_some() {
+                        format!("Run `jj {}` ? [y/n/Esc/d dry-run]", pending.join(" "))
+                    } else {
+                        format!("Run `jj {}` ? [y/n/Esc]", pending.join(" "))
+                    }
                 }
                 Mode::Prompt => {
                     if let Some(prompt) = &self.pending_prompt {
@@ -492,11 +545,48 @@ impl App {
         }
 
         let footer = match self.mode {
-            Mode::Normal => self.status_line.clone(),
-            Mode::Command => format!(":{}", self.command_input),
+            Mode::Normal => {
+                let mut segments = Vec::new();
+                if !self.onboarding.complete {
+                    segments.push(format!("onboarding: {}", self.onboarding_next_step_hint()));
+                }
+                segments.push(format!("next: {}", self.primary_next_action_hint()));
+                if let Some(actions) = self.log_quick_actions_hint() {
+                    segments.push(actions);
+                }
+                if let Some(history) = self.view_history_hint() {
+                    segments.push(history);
+                }
+                segments.push(
+                    "nav j/k ↑/↓ PgUp/PgDn Ctrl+u/d  |  back/forward ←/→ Ctrl+o/i  |  views l s o L v f t w  |  ? help"
+                        .to_string(),
+                );
+                let hints = segments.join("  |  ");
+                if self.show_status_line_in_footer() {
+                    format!("{}  |  {hints}", self.status_line)
+                } else {
+                    hints
+                }
+            }
+            Mode::Command => {
+                let suggestions = self.ranked_command_suggestions(&self.command_input, 2);
+                if suggestions.is_empty() {
+                    format!(":{} (suggest: none)", self.command_input)
+                } else {
+                    format!(
+                        ":{} (suggest: {})",
+                        self.command_input,
+                        suggestions.join(", ")
+                    )
+                }
+            }
             Mode::Confirm => {
                 let pending = self.pending_confirm.clone().unwrap_or_default();
-                format!("Run `jj {}` ? [y/n]", pending.join(" "))
+                if confirmation_preview_tokens(&pending).is_some() {
+                    format!("Run `jj {}` ? [y/n/d]", pending.join(" "))
+                } else {
+                    format!("Run `jj {}` ? [y/n]", pending.join(" "))
+                }
             }
             Mode::Prompt => {
                 if let Some(prompt) = &self.pending_prompt {
@@ -528,6 +618,121 @@ impl App {
             || self.status_line.contains("canceled")
             || self.status_line.contains("required")
             || self.status_line.contains("unavailable")
+    }
+
+    /// Update first-run onboarding progress from executed command tokens.
+    fn update_onboarding_progress(&mut self, tokens: &[String]) {
+        let head = tokens.first().map(String::as_str).unwrap_or_default();
+        let sub = tokens.get(1).map(String::as_str).unwrap_or_default();
+
+        if matches!(head, "log" | "show" | "diff" | "evolog" | "interdiff") {
+            self.onboarding.inspect = true;
+        }
+
+        if matches!(
+            head,
+            "new"
+                | "describe"
+                | "commit"
+                | "rebase"
+                | "squash"
+                | "split"
+                | "abandon"
+                | "restore"
+                | "revert"
+                | "bookmark"
+        ) || (head == "git" && sub == "push")
+        {
+            self.onboarding.act = true;
+        }
+
+        if matches!(head, "status" | "log" | "show" | "diff")
+            || (head == "git" && matches!(sub, "fetch" | "push"))
+        {
+            self.onboarding.verify = true;
+        }
+
+        if matches!(head, "undo" | "redo") || (head == "operation" && sub == "log") {
+            self.onboarding.recover = true;
+        }
+
+        if !self.onboarding.complete
+            && self.onboarding.inspect
+            && self.onboarding.act
+            && self.onboarding.verify
+            && self.onboarding.recover
+        {
+            self.onboarding.complete = true;
+            self.status_line =
+                "Onboarding complete: inspect -> act -> verify -> recover".to_string();
+        }
+    }
+
+    /// Return next required onboarding step hint.
+    fn onboarding_next_step_hint(&self) -> &'static str {
+        if !self.onboarding.inspect {
+            "inspect (`Enter`/`d`)"
+        } else if !self.onboarding.act {
+            "act (`D`/`B`/`S`/`X`/`a`)"
+        } else if !self.onboarding.verify {
+            "verify (`s`/`log`)"
+        } else if !self.onboarding.recover {
+            "recover (`o` then `u`/`U`)"
+        } else {
+            "complete"
+        }
+    }
+
+    /// Return primary next action hint for the active view.
+    fn primary_next_action_hint(&self) -> &'static str {
+        let command = self.current_view_command.as_str();
+        if command.starts_with("commands") || command.starts_with("help") {
+            return ":help inspect|rewrite|sync|recover";
+        }
+        if command.starts_with("status") {
+            return "F fetch or P push";
+        }
+        if command.starts_with("show") || command.starts_with("diff") {
+            return "Left back to prior screen";
+        }
+        if command.starts_with("operation") {
+            return "u/U undo or redo from op context";
+        }
+        if command.starts_with("log")
+            || (command.is_empty()
+                && matches!(self.last_command.first().map(String::as_str), Some("log")))
+        {
+            return "Enter show selected revision";
+        }
+        "l return to log home"
+    }
+
+    /// Return quick actions for log-like screens when a revision is selected.
+    fn log_quick_actions_hint(&self) -> Option<String> {
+        if !matches!(self.last_command.first().map(String::as_str), Some("log")) {
+            return None;
+        }
+        self.selected_revision().map(|revision| {
+            format!("quick ({revision}): Enter show, d diff, D describe, a abandon")
+        })
+    }
+
+    /// Return back/forward context hint when view history exists.
+    fn view_history_hint(&self) -> Option<String> {
+        if self.view_back_stack.is_empty() && self.view_forward_stack.is_empty() {
+            return None;
+        }
+        let back = self
+            .view_back_stack
+            .last()
+            .cloned()
+            .unwrap_or_else(|| "-".to_string());
+        let forward = self
+            .view_forward_stack
+            .last()
+            .cloned()
+            .unwrap_or_else(|| "-".to_string());
+        Some(format!("history: back {back} | fwd {forward}"))
     }
 
     #[cfg(test)]

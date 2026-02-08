@@ -1,0 +1,16 @@
+---
+source: src/commands/overview.rs
+expression: "lines.join(\"\\n\")"
+---
+jk workflow help: inspect
+
+story: Scan history, inspect details, and return to context quickly.
+
+key        action                               why
+------------------------------------------------------------
+l          open log home                        start         j/k        move by revision item                select
+Enter      show selected revision               inspect       d          diff selected revision               inspect
+Left       return to previous screen            continue
+
+docs: docs/workflows.md
+recent intents: :status, :log

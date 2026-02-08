@@ -11,6 +11,13 @@ mod prompt;
 use crate::error::JkError;
 use crate::flow::{FlowAction, PromptRequest, plan_command};
 use crate::jj;
+use crate::{
+    alias::{alias_overview_lines, alias_overview_lines_with_query},
+    commands::{
+        command_overview_lines_with_query_and_recent, command_overview_lines_with_recent,
+        command_workflow_lines,
+    },
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::preview::{confirmation_preview_tokens, is_dangerous};
@@ -79,12 +86,26 @@ impl App {
             if matches!(action, FlowAction::Render { .. }) {
                 self.record_view_visit(trimmed);
             }
+            let intent = trimmed
+                .split_whitespace()
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(" ");
+            self.record_intent(&intent);
             return self.apply_flow_action(action);
         }
 
         let action = plan_command(command, self.selected_revision());
         if matches!(action, FlowAction::Render { .. }) && !trimmed.is_empty() {
             self.record_view_visit(trimmed);
+        }
+        if !trimmed.is_empty() {
+            let intent = trimmed
+                .split_whitespace()
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(" ");
+            self.record_intent(&intent);
         }
         self.apply_flow_action(action)
     }
@@ -98,21 +119,67 @@ impl App {
 
         let mut parts = trimmed.split_whitespace();
         let head = parts.next()?;
-        if head != "keys" && head != "keymap" {
-            return None;
-        }
+        let tail = parts.collect::<Vec<_>>();
+        let query = tail.join(" ");
 
-        let query = parts.collect::<Vec<_>>().join(" ");
-        if query.is_empty() {
-            Some(FlowAction::Render {
-                lines: keymap_overview_lines(&self.keybinds, None),
-                status: "Showing keymap".to_string(),
-            })
-        } else {
-            Some(FlowAction::Render {
-                lines: keymap_overview_lines(&self.keybinds, Some(&query)),
-                status: format!("Showing keymap for `{query}`"),
-            })
+        match head {
+            "keys" | "keymap" => {
+                if query.is_empty() {
+                    Some(FlowAction::Render {
+                        lines: keymap_overview_lines(&self.keybinds, None),
+                        status: "Showing keymap".to_string(),
+                    })
+                } else {
+                    Some(FlowAction::Render {
+                        lines: keymap_overview_lines(&self.keybinds, Some(&query)),
+                        status: format!("Showing keymap for `{query}`"),
+                    })
+                }
+            }
+            "aliases" => {
+                if query.is_empty() {
+                    Some(FlowAction::Render {
+                        lines: alias_overview_lines(),
+                        status: "Showing alias catalog".to_string(),
+                    })
+                } else {
+                    Some(FlowAction::Render {
+                        lines: alias_overview_lines_with_query(Some(&query)),
+                        status: format!("Showing alias catalog for `{query}`"),
+                    })
+                }
+            }
+            "commands" | "help" | "?" => {
+                if matches!(
+                    tail.first().copied(),
+                    Some("inspect" | "rewrite" | "sync" | "recover")
+                ) && tail.len() == 1
+                {
+                    let workflow = tail[0];
+                    return command_workflow_lines(workflow, &self.recent_intent_labels(4)).map(
+                        |lines| FlowAction::Render {
+                            lines,
+                            status: format!("Showing workflow help for `{workflow}`"),
+                        },
+                    );
+                }
+
+                if query.is_empty() {
+                    Some(FlowAction::Render {
+                        lines: command_overview_lines_with_recent(&self.recent_intent_labels(4)),
+                        status: "Showing command registry".to_string(),
+                    })
+                } else {
+                    Some(FlowAction::Render {
+                        lines: command_overview_lines_with_query_and_recent(
+                            Some(&query),
+                            &self.recent_intent_labels(4),
+                        ),
+                        status: format!("Showing command registry for `{query}`"),
+                    })
+                }
+            }
+            _ => None,
         }
     }
 

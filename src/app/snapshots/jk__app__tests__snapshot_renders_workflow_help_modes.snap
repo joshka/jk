@@ -1,0 +1,57 @@
+---
+source: src/app/tests.rs
+expression: "captures.join(\"\\n\\n---\\n\\n\")"
+---
+inspect
+jk [normal]
+> jk workflow help: inspect
+  
+  story: Scan history, inspect details, and return to context quickly.
+  
+  key        action                               why
+  ------------------------------------------------------------
+  l          open log home                        start         j/k        move by revision item    
+  Enter      show selected revision               inspect       d          diff selected revision   
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history: back log
+
+---
+
+rewrite
+jk [normal]
+> jk workflow help: rewrite
+  
+  story: Apply safe rewrite operations with explicit confirmation where needed.
+  
+  key        action                               why
+  ------------------------------------------------------------
+  D          describe selected revision           edit metadata  B/S/X      rebase, squash, split   
+  a          abandon selected revision            drop          y / n      accept or reject confirm 
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history: back hel
+
+---
+
+sync
+jk [normal]
+> jk workflow help: sync
+  
+  story: Verify state first, then fetch/push with guarded flows.
+  
+  key        action                               why
+  ------------------------------------------------------------
+  s          check working copy status            verify        F          run fetch prompt flow    
+  P          run push prompt flow                 sync          d          review selected diff befo
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history: back hel
+
+---
+
+recover
+jk [normal]
+> jk workflow help: recover
+  
+  story: Use operation history and undo/redo loop to recover confidently.
+  
+  key        action                               why
+  ------------------------------------------------------------
+  o          open operation log                   inspect       Enter      show operation details   
+  u / U      undo or redo latest op               recover       status     verify working copy state
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history: back hel

@@ -10,7 +10,7 @@ jk [normal]
   ○  bbbbbbbb 22222222 two
   │  detail two
   ○  cccccccc 33333333 three
-ok: jj log
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selec
 
 ---
 
@@ -22,7 +22,7 @@ jk [normal]
 > ○  bbbbbbbb 22222222 two
   │  detail two
   ○  cccccccc 33333333 three
-ok: jj log
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selec
 
 ---
 
@@ -34,7 +34,7 @@ jk [normal]
   ○  cccccccc 33333333 three
   │  detail three
 > ○  dddddddd 44444444 four
-ok: jj log
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selec
 
 ---
 
@@ -46,4 +46,4 @@ jk [normal]
   ○  bbbbbbbb 22222222 two
   │  detail two
   ○  cccccccc 33333333 three
-ok: jj log
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selec

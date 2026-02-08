@@ -3253,3 +3253,94 @@ fn command_history_restores_draft_after_navigation() {
         .expect("history next should restore draft");
     assert_eq!(app.command_input, "boo".to_string());
 }
+
+#[test]
+fn command_mode_ranks_suggestions_by_usage_and_recency() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.record_intent("status");
+    app.record_intent("status");
+    app.record_intent("show");
+    app.record_intent("status");
+    app.mode = Mode::Command;
+    app.command_input = "s".to_string();
+
+    let rendered = app.render_for_snapshot(120, 6);
+    assert!(rendered.contains("suggest: status"));
+}
+
+#[test]
+fn confirm_mode_supports_dry_run_preview_key() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.execute_with_confirmation(vec!["git".to_string(), "push".to_string()])
+        .expect("confirm setup should succeed");
+    assert_eq!(app.mode, Mode::Confirm);
+
+    app.handle_key(KeyEvent::from(KeyCode::Char('d')))
+        .expect("dry-run preview key should succeed");
+
+    assert_eq!(app.mode, Mode::Confirm);
+    assert_eq!(
+        app.pending_confirm,
+        Some(vec!["git".to_string(), "push".to_string()])
+    );
+    assert!(
+        app.lines
+            .iter()
+            .any(|line| line.contains("Preview: jj git push --dry-run"))
+    );
+}
+
+#[test]
+fn help_workflow_render_includes_recent_intents() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.record_intent("status");
+    app.record_intent("log");
+
+    app.execute_command_line("help inspect")
+        .expect("workflow help should render");
+
+    assert_eq!(
+        app.status_line,
+        "Showing workflow help for `inspect`".to_string()
+    );
+    assert!(
+        app.lines
+            .iter()
+            .any(|line| line.contains("recent intents: :log, :status"))
+    );
+}
+
+#[test]
+fn footer_shows_onboarding_and_history_hints_until_complete() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.lines = vec![
+        "@  abcdefgh 0123abcd message".to_string(),
+        "○  hgfedcba 89abcdef parent".to_string(),
+    ];
+    app.last_command = vec!["log".to_string()];
+    app.view_back_stack = vec!["status".to_string()];
+    let rendered = app.render_for_snapshot(260, 6);
+    assert!(rendered.contains("onboarding:"));
+    assert!(rendered.contains("history: back status"));
+    assert!(rendered.contains("quick (abcdefgh)"));
+
+    app.onboarding.complete = true;
+    let completed = app.render_for_snapshot(260, 6);
+    assert!(!completed.contains("onboarding:"));
+}
+
+#[test]
+fn snapshot_renders_workflow_help_modes() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.record_intent("status");
+    app.record_intent("log");
+
+    let mut captures = Vec::new();
+    for workflow in ["inspect", "rewrite", "sync", "recover"] {
+        app.execute_command_line(&format!("help {workflow}"))
+            .expect("workflow help should render");
+        captures.push(format!("{workflow}\n{}", app.render_for_snapshot(100, 10)));
+    }
+
+    insta::assert_snapshot!(captures.join("\n\n---\n\n"));
+}

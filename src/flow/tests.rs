@@ -1104,6 +1104,28 @@ fn filters_command_registry_with_query() {
 }
 
 #[test]
+fn renders_workflow_scoped_help_presets() {
+    match plan_command("help inspect", selected()) {
+        FlowAction::Render { lines, status } => {
+            assert_eq!(status, "Showing workflow help for `inspect`".to_string());
+            assert_eq!(
+                lines.first(),
+                Some(&"jk workflow help: inspect".to_string())
+            );
+        }
+        other => panic!("expected render action, got {other:?}"),
+    }
+
+    match plan_command("commands sync", selected()) {
+        FlowAction::Render { lines, status } => {
+            assert_eq!(status, "Showing workflow help for `sync`".to_string());
+            assert_eq!(lines.first(), Some(&"jk workflow help: sync".to_string()));
+        }
+        other => panic!("expected render action, got {other:?}"),
+    }
+}
+
+#[test]
 fn renders_alias_catalog_in_app() {
     match plan_command("aliases", selected()) {
         FlowAction::Render { lines, status } => {
