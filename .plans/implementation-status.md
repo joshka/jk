@@ -365,3 +365,10 @@
   - kept `KeybindConfig::load()` and runtime keybinding structs stable for existing call sites.
   - moved config tests to `src/config/tests.rs` and reran `cargo fmt`, `cargo check`,
     `cargo test`, and strict `cargo clippy`.
+- Latest pass:
+  - continued vertical-slice refactoring by converting `src/app/input.rs` into
+    `src/app/input/` with mode-focused modules:
+    `mod.rs`, `normal.rs`, `command.rs`, `prompt.rs`, and `confirm.rs`.
+  - kept command execution/planning and confirmation flows behavior-identical while reducing
+    per-file complexity in the input subsystem.
+  - reran `cargo fmt`, `cargo check`, full `cargo test` (218 passed), and strict `cargo clippy`.
