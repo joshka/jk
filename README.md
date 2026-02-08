@@ -56,6 +56,15 @@ Override files are partial overlays. Omitted keys keep default bindings.
 - Test and snapshot workflow: `docs/contributing-tests.md`
 - Shared terminology (`guided`, `native`, `tier A/B/C`): `docs/glossary.md`
 - Release readiness audit: `docs/release-readiness-audit-2026-02-08.md`
+- Security policy: `SECURITY.md`
+- Changelog: `CHANGELOG.md`
+
+## License
+
+Dual-licensed under either:
+
+- Apache License, Version 2.0 (`LICENSE-APACHE`)
+- MIT license (`LICENSE-MIT`)
 
 ## How `jk` Works (If You Know `jj`)
 
@@ -273,6 +282,7 @@ cargo check
 cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 markdownlint-cli2 "*.md" ".plans/*.md" "docs/**/*.md"
+git-cliff --unreleased --tag v0.1.0 --output CHANGELOG.md
 ```
 
 ## Project Docs

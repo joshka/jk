@@ -8,6 +8,7 @@ readme = "README.md"
 repository = "https://github.com/joshka/jk"
 homepage = "https://github.com/joshka/jk"
 documentation = "https://github.com/joshka/jk"
+license = "MIT OR Apache-2.0"
 keywords = ["jj", "jujutsu", "tui", "vcs"]
 categories = ["command-line-utilities", "development-tools"]
 

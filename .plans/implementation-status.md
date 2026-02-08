@@ -378,3 +378,9 @@
   - enabled weekly dependency automation via `.github/dependabot.yml` for Cargo and GitHub Actions.
   - added release readiness audit document:
     `docs/release-readiness-audit-2026-02-08.md`.
+- Latest pass:
+  - finalized dual-license setup using `MIT OR Apache-2.0` with `LICENSE-MIT` and
+    `LICENSE-APACHE`.
+  - added `SECURITY.md` and generated `CHANGELOG.md` via `git-cliff`.
+  - expanded CI to macOS/Windows matrix coverage and added dependency gates
+    (`cargo audit`, `cargo deny`).

@@ -16,55 +16,50 @@ Validation run in this pass:
 
 ## Current Readiness Summary
 
-`jk` has a strong engineering baseline for development usage, but it is not yet fully release-ready.
-Core functionality and tests are healthy. Main remaining gaps are release governance artifacts and
-explicit policy decisions.
+`jk` now has a strong release baseline for an initial public release. Core functionality, CI, and
+security/reporting basics are in place. Remaining gaps are mostly process hardening.
 
 ## What Is In Place
 
 1. Build and test pipeline is stable locally (format, check, tests, clippy pass).
 1. Packaging verification succeeds (`cargo package --allow-dirty` compiles packaged source).
-1. CI is configured with Rust checks and markdown lint:
+1. CI is configured with Rust checks, markdown lint, cross-platform matrix, and dependency gates:
    - `.github/workflows/ci.yml`
    - `.github/dependabot.yml`
 1. User-facing docs are substantial (`README.md`, ADRs, contributor docs, glossary).
+1. Dual licensing is defined:
+   - `LICENSE-MIT`
+   - `LICENSE-APACHE`
+   - `Cargo.toml` `license = "MIT OR Apache-2.0"`
+1. Security reporting policy exists in `SECURITY.md`.
+1. Changelog was generated using `git-cliff` in `CHANGELOG.md`.
 
-## Release Blockers
+## Resolved In This Pass
 
-1. License is undefined.
-   Evidence: no `LICENSE*` file and no `license` or `license-file` in `Cargo.toml`.
-   Impact: cannot ship a clear open-source/commercial release contract.
-1. Security policy is missing.
-   Evidence: no `SECURITY.md`.
-   Impact: no disclosure channel or response expectations for vulnerabilities.
-1. Changelog/release notes process is missing.
-   Evidence: no `CHANGELOG.md` and no release template/process document.
-   Impact: hard to publish and communicate stable release deltas.
+1. License definition and files.
+1. Security policy file.
+1. Changelog generation baseline.
+1. macOS/Windows CI coverage.
+1. Dependency gates (`cargo audit` + `cargo deny`) in CI.
 
 ## High-Priority Gaps (Non-Blocking But Important)
 
 1. Contributor process document is still partial.
    Evidence: snapshot guidance exists, but no unified `CONTRIBUTING.md` covering dev workflow.
-1. Cross-platform CI confidence is limited.
-   Evidence: CI runs on `ubuntu-latest` only; no macOS/Windows matrix coverage yet.
-1. Dependency/vulnerability policy is implicit.
-   Evidence: no `cargo audit`/`cargo deny` automation in CI.
+1. Release process is not fully codified.
+   Evidence: `CHANGELOG.md` exists, but no documented release checklist/versioning workflow.
+1. Security contact uses a no-reply GitHub email alias.
+   Evidence: `SECURITY.md` currently points to `joshka@users.noreply.github.com`.
+   Recommendation: replace with monitored mailbox or security advisory intake process.
 
 ## Suggested Next Steps
 
-1. Decide and add license:
-   - add `LICENSE` file
-   - set `license` (or `license-file`) in `Cargo.toml`
-1. Add security policy:
-   - create `SECURITY.md` with contact channel and SLA expectations
-1. Add release process docs:
-   - create `CHANGELOG.md`
-   - document versioning and release checklist in `docs/` or `CONTRIBUTING.md`
-1. Expand CI coverage:
-   - add optional OS matrix job for `cargo check` and smoke tests
-   - add scheduled `cargo audit` (or `cargo deny`) job
+1. Add `CONTRIBUTING.md` for complete contributor workflow (dev setup, testing, PR expectations).
+1. Add a release checklist doc (version bump, changelog cut, tag, publish artifacts).
+1. Consider adding branch protection + required status checks for CI jobs.
+1. Replace security contact with a monitored reporting path.
 
 ## Risk If Released Today
 
-Functional risk is moderate-low for developer preview use, but governance/compliance risk is high
-because licensing and security-response policy are not yet defined.
+Functional risk is moderate-low for an initial public release. The main residual risk is operational
+process maturity (release workflow and long-term support policy), not core product correctness.
