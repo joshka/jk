@@ -1,6 +1,9 @@
+//! Wrapper views for workspace, git, bookmark, and top-level mutation commands.
+
 use super::common::{capitalize_word, plural_suffix};
 use super::strip_ansi;
 
+/// Render `workspace list` output with workspace count.
 pub(crate) fn render_workspace_list_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -35,6 +38,7 @@ pub(crate) fn render_workspace_list_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `git fetch` output with summary extraction.
 pub(crate) fn render_git_fetch_view(lines: Vec<String>) -> Vec<String> {
     let detail_lines: Vec<String> = lines
         .into_iter()
@@ -63,6 +67,7 @@ pub(crate) fn render_git_fetch_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `git push` output with summary extraction.
 pub(crate) fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
     let detail_lines: Vec<String> = lines
         .into_iter()
@@ -92,6 +97,7 @@ pub(crate) fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Build summary for fetch output, preferring known signal lines.
 pub(crate) fn git_fetch_summary(detail_lines: &[String]) -> String {
     if detail_lines
         .iter()
@@ -113,6 +119,7 @@ pub(crate) fn git_fetch_summary(detail_lines: &[String]) -> String {
     )
 }
 
+/// Return whether a line is a high-signal fetch status line.
 pub(crate) fn is_git_fetch_signal(line: &str) -> bool {
     let stripped = strip_ansi(line);
     let trimmed = stripped.trim();
@@ -121,6 +128,7 @@ pub(crate) fn is_git_fetch_signal(line: &str) -> bool {
         || trimmed.starts_with("Updated bookmark ")
 }
 
+/// Build summary for push output, preferring known signal lines.
 pub(crate) fn git_push_summary(detail_lines: &[String]) -> String {
     if detail_lines
         .iter()
@@ -142,12 +150,14 @@ pub(crate) fn git_push_summary(detail_lines: &[String]) -> String {
     )
 }
 
+/// Return whether a line is a high-signal push status line.
 pub(crate) fn is_git_push_signal(line: &str) -> bool {
     let stripped = strip_ansi(line);
     let trimmed = stripped.trim();
     trimmed.starts_with("Pushed bookmark ") || trimmed.starts_with("Pushed ")
 }
 
+/// Render wrapper for top-level mutation command output.
 pub(crate) fn render_top_level_mutation_view(
     command_name: &str,
     lines: Vec<String>,
@@ -178,6 +188,7 @@ pub(crate) fn render_top_level_mutation_view(
     rendered
 }
 
+/// Build summary for top-level mutations using command-specific signal detection.
 pub(crate) fn top_level_mutation_summary(command_name: &str, detail_lines: &[String]) -> String {
     if detail_lines.is_empty() {
         return format!("Summary: `{command_name}` completed with no output");
@@ -197,6 +208,7 @@ pub(crate) fn top_level_mutation_summary(command_name: &str, detail_lines: &[Str
     )
 }
 
+/// Return whether a line matches a known mutation signal for the command.
 pub(crate) fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bool {
     let stripped = strip_ansi(line);
     let trimmed = stripped.trim();
@@ -222,6 +234,7 @@ pub(crate) fn is_top_level_mutation_signal(command_name: &str, line: &str) -> bo
     }
 }
 
+/// Return follow-up tip for a top-level mutation command.
 pub(crate) fn top_level_mutation_tip(command_name: &str) -> &'static str {
     match command_name {
         "new" | "describe" | "commit" | "metaedit" => {
@@ -237,6 +250,7 @@ pub(crate) fn top_level_mutation_tip(command_name: &str) -> &'static str {
     }
 }
 
+/// Render bookmark mutation wrapper output.
 pub(crate) fn render_bookmark_mutation_view(
     subcommand: Option<&str>,
     lines: Vec<String>,
@@ -268,6 +282,7 @@ pub(crate) fn render_bookmark_mutation_view(
     rendered
 }
 
+/// Build summary for bookmark mutation output.
 pub(crate) fn bookmark_mutation_summary(subcommand: &str, detail_lines: &[String]) -> String {
     if detail_lines.is_empty() {
         return format!("Summary: bookmark {subcommand} completed with no output");
@@ -287,6 +302,7 @@ pub(crate) fn bookmark_mutation_summary(subcommand: &str, detail_lines: &[String
     )
 }
 
+/// Return whether line is a known bookmark mutation signal.
 pub(crate) fn is_bookmark_mutation_signal(subcommand: &str, line: &str) -> bool {
     let stripped = strip_ansi(line);
     let trimmed = stripped.trim();
@@ -310,6 +326,7 @@ pub(crate) fn is_bookmark_mutation_signal(subcommand: &str, line: &str) -> bool 
     }
 }
 
+/// Render bookmark list output wrapper.
 pub(crate) fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -326,6 +343,7 @@ pub(crate) fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render workspace mutation wrapper output.
 pub(crate) fn render_workspace_mutation_view(
     subcommand: Option<&str>,
     lines: Vec<String>,
@@ -357,6 +375,7 @@ pub(crate) fn render_workspace_mutation_view(
     rendered
 }
 
+/// Build summary for workspace mutation output.
 pub(crate) fn workspace_mutation_summary(subcommand: &str, detail_lines: &[String]) -> String {
     if detail_lines.is_empty() {
         return format!("Summary: workspace {subcommand} completed with no output");
@@ -376,6 +395,7 @@ pub(crate) fn workspace_mutation_summary(subcommand: &str, detail_lines: &[Strin
     )
 }
 
+/// Return whether line is a known workspace mutation signal.
 pub(crate) fn is_workspace_mutation_signal(subcommand: &str, line: &str) -> bool {
     let stripped = strip_ansi(line);
     let trimmed = stripped.trim();

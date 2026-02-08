@@ -1,5 +1,8 @@
+//! Wrapper views for `file` and `tag` command outputs.
+
 use super::common::plural_suffix;
 
+/// Render `file list` output with file-count summary.
 pub(crate) fn render_file_list_view(lines: Vec<String>) -> Vec<String> {
     let file_lines: Vec<String> = lines
         .into_iter()
@@ -34,6 +37,7 @@ pub(crate) fn render_file_list_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `file show` output with content-line summary.
 pub(crate) fn render_file_show_view(lines: Vec<String>) -> Vec<String> {
     let mut content_lines: Vec<String> = lines
         .into_iter()
@@ -67,6 +71,7 @@ pub(crate) fn render_file_show_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `file search` output with match-count summary.
 pub(crate) fn render_file_search_view(lines: Vec<String>) -> Vec<String> {
     let match_lines: Vec<String> = lines
         .into_iter()
@@ -97,6 +102,7 @@ pub(crate) fn render_file_search_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `file annotate` output with annotation-count summary.
 pub(crate) fn render_file_annotate_view(lines: Vec<String>) -> Vec<String> {
     let annotation_lines: Vec<String> = lines
         .into_iter()
@@ -127,6 +133,7 @@ pub(crate) fn render_file_annotate_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `file track` mutation output.
 pub(crate) fn render_file_track_view(lines: Vec<String>) -> Vec<String> {
     render_file_mutation_view(
         "File Track",
@@ -136,6 +143,7 @@ pub(crate) fn render_file_track_view(lines: Vec<String>) -> Vec<String> {
     )
 }
 
+/// Render `file untrack` mutation output.
 pub(crate) fn render_file_untrack_view(lines: Vec<String>) -> Vec<String> {
     render_file_mutation_view(
         "File Untrack",
@@ -145,6 +153,7 @@ pub(crate) fn render_file_untrack_view(lines: Vec<String>) -> Vec<String> {
     )
 }
 
+/// Render `file chmod` mutation output.
 pub(crate) fn render_file_chmod_view(lines: Vec<String>) -> Vec<String> {
     render_file_mutation_view(
         "File Chmod",
@@ -154,6 +163,7 @@ pub(crate) fn render_file_chmod_view(lines: Vec<String>) -> Vec<String> {
     )
 }
 
+/// Shared renderer for file mutation wrappers.
 pub(crate) fn render_file_mutation_view(
     title: &str,
     underline: &str,
@@ -195,6 +205,7 @@ pub(crate) fn render_file_mutation_view(
     rendered
 }
 
+/// Render `tag list` output with count summary.
 pub(crate) fn render_tag_list_view(lines: Vec<String>) -> Vec<String> {
     let tag_lines: Vec<String> = lines
         .into_iter()
@@ -229,6 +240,7 @@ pub(crate) fn render_tag_list_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `tag set` mutation output.
 pub(crate) fn render_tag_set_view(lines: Vec<String>) -> Vec<String> {
     render_tag_mutation_view(
         "Tag Set",
@@ -238,6 +250,7 @@ pub(crate) fn render_tag_set_view(lines: Vec<String>) -> Vec<String> {
     )
 }
 
+/// Render `tag delete` mutation output.
 pub(crate) fn render_tag_delete_view(lines: Vec<String>) -> Vec<String> {
     render_tag_mutation_view(
         "Tag Delete",
@@ -247,6 +260,7 @@ pub(crate) fn render_tag_delete_view(lines: Vec<String>) -> Vec<String> {
     )
 }
 
+/// Shared renderer for tag mutation wrappers.
 pub(crate) fn render_tag_mutation_view(
     title: &str,
     underline: &str,

@@ -1,3 +1,5 @@
+//! Runtime loop, rendering, and state transitions.
+
 use std::io::{Stdout, Write};
 use std::time::Duration;
 
@@ -16,6 +18,7 @@ use super::view::decorate_command_output;
 use super::{App, Mode};
 
 impl App {
+    /// Enter terminal session, run startup action, then drive draw/input loop until quit.
     pub fn run(&mut self, startup_tokens: Vec<String>) -> Result<(), JkError> {
         let mut terminal = TerminalSession::enter()?;
         self.apply_startup_tokens(startup_tokens)?;
@@ -33,6 +36,9 @@ impl App {
         Ok(())
     }
 
+    /// Execute startup command tokens or default startup flow.
+    ///
+    /// Local view commands are handled without invoking `jj`.
     pub(super) fn apply_startup_tokens(
         &mut self,
         startup_tokens: Vec<String>,
@@ -48,6 +54,11 @@ impl App {
         self.apply_flow_action(action)
     }
 
+    /// Apply a planned action and enforce mode/state transition invariants.
+    ///
+    /// Render actions reset cursor/scroll and clear row metadata so selection cannot reference stale
+    /// rows. Prompt actions enter prompt mode without side effects. Execute actions are routed
+    /// through confirmation policy before subprocess execution.
     pub(super) fn apply_flow_action(&mut self, action: FlowAction) -> Result<(), JkError> {
         match action {
             FlowAction::Quit => {
@@ -74,6 +85,11 @@ impl App {
         }
     }
 
+    /// Execute a concrete `jj` command and replace rendered output state.
+    ///
+    /// Successful `log` runs refresh `last_log_tokens` so patch toggle can re-run with the same
+    /// base arguments. This path also rebuilds row-revision metadata so selection-based shortcuts
+    /// stay aligned with decorated output.
     pub(super) fn execute_tokens(&mut self, tokens: Vec<String>) -> Result<(), JkError> {
         let result = jj::run(&tokens)?;
         if matches!(result.command.first().map(String::as_str), Some("log")) {
@@ -92,6 +108,7 @@ impl App {
         Ok(())
     }
 
+    /// Move selection cursor up and keep viewport aligned.
     pub(super) fn move_cursor_up(&mut self) {
         if self.cursor > 0 {
             self.cursor -= 1;
@@ -99,6 +116,7 @@ impl App {
         self.ensure_cursor_visible(20);
     }
 
+    /// Move selection cursor down and keep viewport aligned.
     pub(super) fn move_cursor_down(&mut self) {
         if self.cursor + 1 < self.lines.len() {
             self.cursor += 1;
@@ -106,6 +124,7 @@ impl App {
         self.ensure_cursor_visible(20);
     }
 
+    /// Adjust scroll so selected row stays within the visible content window.
     pub(super) fn ensure_cursor_visible(&mut self, content_height: usize) {
         if self.cursor < self.scroll {
             self.scroll = self.cursor;
@@ -117,6 +136,9 @@ impl App {
         }
     }
 
+    /// Resolve selected revision nearest to cursor.
+    ///
+    /// Metadata row mapping is preferred and plain-text parsing is used as a fallback.
     pub(super) fn selected_revision(&self) -> Option<String> {
         if !self.row_revision_map.is_empty() {
             for line_index in (0..=self.cursor).rev() {
@@ -137,6 +159,7 @@ impl App {
         None
     }
 
+    /// Draw one frame into the terminal alternate screen.
     fn draw(&mut self, stdout: &mut Stdout) -> Result<(), JkError> {
         let (width, height) = size()?;
         let width = width as usize;
@@ -153,6 +176,7 @@ impl App {
         Ok(())
     }
 
+    /// Build current frame rows including header, visible content slice, and mode-specific footer.
     fn render_for_display(&mut self, width: usize, height: usize) -> Vec<String> {
         let header = format!(
             "jk [{}] :: jj {}",
@@ -201,6 +225,7 @@ impl App {
         rows
     }
 
+    /// Return short label used in header for current input mode.
     fn mode_label(&self) -> &'static str {
         match self.mode {
             Mode::Normal => "normal",
@@ -211,6 +236,7 @@ impl App {
     }
 
     #[cfg(test)]
+    /// Render deterministic frame text for snapshot tests.
     pub fn render_for_snapshot(&mut self, width: usize, height: usize) -> String {
         self.render_for_display(width, height).join("\n")
     }

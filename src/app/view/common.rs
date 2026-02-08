@@ -1,3 +1,6 @@
+//! Shared view-formatting helpers.
+
+/// Capitalize first character for simple title rendering.
 pub(crate) fn capitalize_word(word: &str) -> String {
     let mut chars = word.chars();
     match chars.next() {
@@ -6,10 +9,12 @@ pub(crate) fn capitalize_word(word: &str) -> String {
     }
 }
 
+/// Return plural suffix based on count.
 pub(crate) fn plural_suffix(count: usize) -> &'static str {
     if count == 1 { "" } else { "s" }
 }
 
+/// Return whether a status line looks like a working-copy file change entry.
 pub(crate) fn is_working_copy_change_line(line: &str) -> bool {
     let stripped = super::strip_ansi(line);
     let mut chars = stripped.chars();

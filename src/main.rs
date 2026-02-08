@@ -1,3 +1,8 @@
+//! Entrypoint for the `jk` TUI binary.
+//!
+//! This module is intentionally small: parse CLI arguments, load keybind configuration, decide the
+//! startup command, then hand off to `App`.
+
 mod alias;
 mod app;
 mod cli;
@@ -15,6 +20,7 @@ use cli::Cli;
 use config::KeybindConfig;
 use error::JkError;
 
+/// Parse arguments, load runtime configuration, and run the interactive TUI session.
 fn main() -> Result<(), JkError> {
     let cli = Cli::parse();
     let keybinds = KeybindConfig::load()?;
@@ -25,6 +31,9 @@ fn main() -> Result<(), JkError> {
     app.run(startup_tokens)
 }
 
+/// Translate optional startup CLI tokens into an initial in-app command.
+///
+/// An empty result means "start in default `log` flow" and is handled by `App` startup logic.
 fn startup_command(cli: Cli) -> Vec<String> {
     let mut tokens = Vec::new();
     if let Some(command) = cli.command {

@@ -1,6 +1,9 @@
+//! Wrapper views for operation-related commands.
+
 use super::common::{capitalize_word, plural_suffix};
 use super::strip_ansi;
 
+/// Render `operation show` output with summary and section spacing.
 pub(crate) fn render_operation_show_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -44,6 +47,7 @@ pub(crate) fn render_operation_show_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render mutation wrappers for `operation restore`/`operation revert`.
 pub(crate) fn render_operation_mutation_view(subcommand: &str, lines: Vec<String>) -> Vec<String> {
     let detail_lines: Vec<String> = lines
         .into_iter()
@@ -71,6 +75,7 @@ pub(crate) fn render_operation_mutation_view(subcommand: &str, lines: Vec<String
     rendered
 }
 
+/// Build a concise mutation summary using known signal lines when available.
 pub(crate) fn operation_mutation_summary(subcommand: &str, detail_lines: &[String]) -> String {
     if detail_lines.is_empty() {
         return format!("Summary: operation {subcommand} completed with no output");
@@ -90,6 +95,7 @@ pub(crate) fn operation_mutation_summary(subcommand: &str, detail_lines: &[Strin
     )
 }
 
+/// Return whether line matches a high-signal mutation confirmation.
 pub(crate) fn is_operation_mutation_signal(subcommand: &str, line: &str) -> bool {
     let stripped = strip_ansi(line);
     let trimmed = stripped.trim();
@@ -103,6 +109,7 @@ pub(crate) fn is_operation_mutation_signal(subcommand: &str, line: &str) -> bool
     }
 }
 
+/// Render `operation diff` output with changed-entry summary.
 pub(crate) fn render_operation_diff_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -157,6 +164,7 @@ pub(crate) fn render_operation_diff_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `operation log` output with operation counting and spacing.
 pub(crate) fn render_operation_log_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -201,6 +209,7 @@ pub(crate) fn render_operation_log_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Return whether a line starts a new operation entry.
 pub(crate) fn is_operation_entry_header(line: &str) -> bool {
     let stripped = strip_ansi(line);
     let trimmed = stripped.trim_start();

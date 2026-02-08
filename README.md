@@ -12,6 +12,50 @@ view and keeps you in one interface for inspect, rewrite, bookmark, and remote f
 - Avoid box-heavy dashboard UIs; favor focused, command-line-pager interaction.
 - Let users stay inside `jk` for common daily workflows.
 
+## Prerequisites
+
+- Rust toolchain with `cargo` available in `PATH`
+- `jj` binary available in `PATH`
+- A terminal that supports alternate-screen mode and ANSI color output
+
+## Quick Start
+
+1. Run `cargo run`.
+1. The app starts in a full-screen log-first view (equivalent to `jk log`).
+1. Press `:` then `status` and press `Enter` to switch views.
+1. Press `q` to quit.
+
+Expected success signals:
+
+- Header shows `jk [normal] :: jj log` on initial launch.
+- Footer shows `ok: jj log` after initial command execution succeeds.
+- Running `:status` updates footer to `ok: jj status`.
+
+## Configuration
+
+`jk` always loads the embedded default keymap from `config/keybinds.default.toml`.
+
+Optional user overrides:
+
+- `JK_KEYBINDS=/path/to/keybinds.toml`
+- `$HOME/.config/jk/keybinds.toml`
+
+Override files are partial overlays. Omitted keys keep default bindings.
+
+## Architecture Snapshot
+
+- `src/app/`: runtime state machine, input mode handling, terminal lifecycle, and wrapper rendering
+- `src/flow/`: command planning, prompt contracts, and prompt-to-token builders
+- `src/commands/`: command registry metadata and safety tier classification
+- `src/alias/`: alias normalization and alias catalog rendering
+- `src/config/`: keybinding parsing, validation, and default/user merge behavior
+- `src/jj.rs`: centralized `jj --no-pager` subprocess execution
+
+## Contributor Docs
+
+- Test and snapshot workflow: `docs/contributing-tests.md`
+- Shared terminology (`guided`, `native`, `tier A/B/C`): `docs/glossary.md`
+
 ## How `jk` Works (If You Know `jj`)
 
 In `jj`, you run a command, inspect output, then run the next command from your shell.
@@ -30,6 +74,15 @@ want (usually `:log`, `:status`, or `:operation log`), or use the `l` shortcut t
 - Cancel prompts: press `Esc` in prompt mode.
 - Reject dangerous command confirmation: press `n` or `Esc`.
 - Quit `jk`: press `q`.
+
+## Troubleshooting
+
+1. `jk` exits with `failed to run jj command`.
+   Confirm `jj` is installed and accessible: `jj --no-pager version`.
+1. `jk` exits with configuration parse/read errors.
+   Validate `JK_KEYBINDS` path and TOML syntax, then retry with defaults by unsetting the variable.
+1. Key presses do not match expected bindings.
+   Run `:keys` in-app to inspect resolved bindings and confirm your override file merged correctly.
 
 ## `jj` CLI Flow vs `jk` Flow
 
@@ -115,6 +168,7 @@ This repository is in active development. The current baseline includes:
 - `:` command parsing supports shell-style quoting for multi-word arguments.
 - Command mode supports history navigation with `Up`/`Down`.
 - `:commands` renders an in-app command registry with mode/tier coverage.
+- Mode/tier terminology is defined in `docs/glossary.md`.
 - `:commands` also annotates top-level `jj` default aliases
   (`bookmark (b)`, `commit (ci)`, `describe (desc)`, `operation (op)`, `status (st)`).
 - `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).

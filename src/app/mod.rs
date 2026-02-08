@@ -1,3 +1,8 @@
+//! Interactive TUI application runtime.
+//!
+//! `App` owns UI state, input mode transitions, and rendered output lines while delegating command
+//! planning to `flow` and subprocess execution to `jj`.
+
 mod history;
 mod input;
 mod preview;
@@ -9,6 +14,7 @@ mod view;
 use crate::config::KeybindConfig;
 use crate::flow::PromptKind;
 
+/// Current input mode for the footer interaction model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Normal,
@@ -17,6 +23,7 @@ enum Mode {
     Prompt,
 }
 
+/// Mutable runtime state for one `jk` session.
 pub struct App {
     keybinds: KeybindConfig,
     mode: Mode,
@@ -36,6 +43,7 @@ pub struct App {
     should_quit: bool,
 }
 
+/// Active prompt state while in [`Mode::Prompt`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PromptState {
     kind: PromptKind,
@@ -45,6 +53,9 @@ struct PromptState {
 }
 
 impl App {
+    /// Construct a new app with default state and provided keybindings.
+    ///
+    /// The initial screen is placeholder content until startup command execution populates lines.
     pub fn new(keybinds: KeybindConfig) -> Self {
         Self {
             keybinds,

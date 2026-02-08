@@ -1,8 +1,36 @@
+//! Command planner from command-line text to runtime actions.
+//!
+//! Planning prioritizes local render views and guided prompts before falling back to direct command
+//! execution.
+
 use crate::alias::{alias_overview_lines, alias_overview_lines_with_query, normalize_alias};
 use crate::commands::{command_overview_lines, command_overview_lines_with_query};
 
 use super::{FlowAction, PromptKind, PromptRequest};
 
+/// Plan a command-mode line into an executable runtime action.
+///
+/// Decision order is:
+/// 1. empty/quit fast-path handling,
+/// 1. shell-like tokenization and alias normalization,
+/// 1. local render actions (`commands`, `help`, `aliases`),
+/// 1. guided prompt entrypoints for mutation flows,
+/// 1. default direct execution.
+///
+/// Selected revision defaults to `@` when no row mapping is available, so selection-driven flows
+/// remain executable even outside `log`-like views.
+///
+/// # Examples
+///
+/// ```text
+/// input: "rebase", selected_revision: Some("qpvuntsm")
+/// output: prompt for destination, source revision = "qpvuntsm"
+/// ```
+///
+/// ```text
+/// input: "operation", selected_revision: None
+/// output: execute ["operation", "log"]
+/// ```
 pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> FlowAction {
     let trimmed = raw_command.trim();
     if trimmed.is_empty() {
@@ -338,6 +366,7 @@ pub fn plan_command(raw_command: &str, selected_revision: Option<String>) -> Flo
     }
 }
 
+/// Canonicalize command and selected subcommands after alias expansion.
 fn canonicalize_tokens(mut tokens: Vec<String>) -> Vec<String> {
     if tokens.is_empty() {
         return tokens;
@@ -355,6 +384,7 @@ fn canonicalize_tokens(mut tokens: Vec<String>) -> Vec<String> {
     tokens
 }
 
+/// Canonicalize top-level shorthand command aliases.
 fn canonical_command_name(command: &str) -> String {
     match command {
         "desc" => "describe".to_string(),
@@ -366,6 +396,7 @@ fn canonical_command_name(command: &str) -> String {
     }
 }
 
+/// Canonicalize bookmark subcommand shorthands.
 fn canonical_bookmark_subcommand(command: &str) -> String {
     match command {
         "c" => "create".to_string(),
@@ -381,6 +412,7 @@ fn canonical_bookmark_subcommand(command: &str) -> String {
     }
 }
 
+/// Canonicalize tag subcommand shorthands.
 fn canonical_tag_subcommand(command: &str) -> String {
     match command {
         "d" => "delete".to_string(),

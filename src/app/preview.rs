@@ -1,9 +1,16 @@
+//! Safety classification and read-only preview planning for confirmation mode.
+
 use crate::commands::{SafetyTier, command_safety};
 
+/// Return whether command tokens require confirmation gating.
 pub(crate) fn is_dangerous(tokens: &[String]) -> bool {
     command_safety(tokens) == SafetyTier::C
 }
 
+/// Derive best-effort read-only preview tokens for dangerous commands.
+///
+/// Returning `None` means no safe preview strategy is known. Callers must still enforce explicit
+/// confirmation before execution.
 pub(crate) fn confirmation_preview_tokens(tokens: &[String]) -> Option<Vec<String>> {
     if matches!(
         (
@@ -90,6 +97,7 @@ pub(crate) fn confirmation_preview_tokens(tokens: &[String]) -> Option<Vec<Strin
     }
 }
 
+/// Find the first value associated with one of the supported flags.
 pub(crate) fn find_flag_value(tokens: &[String], flags: &[&str]) -> Option<String> {
     let mut index = 0usize;
     while index < tokens.len() {
@@ -109,6 +117,7 @@ pub(crate) fn find_flag_value(tokens: &[String], flags: &[&str]) -> Option<Strin
     None
 }
 
+/// Build a compact log preview command for a revset expression.
 pub(crate) fn log_preview_tokens(revset: &str) -> Vec<String> {
     vec![
         "log".to_string(),
@@ -119,6 +128,7 @@ pub(crate) fn log_preview_tokens(revset: &str) -> Vec<String> {
     ]
 }
 
+/// Toggle `--patch`/`-p` on command tokens by removing existing patch flags or appending one.
 pub(crate) fn toggle_patch_flag(tokens: &[String]) -> Vec<String> {
     let mut result = Vec::with_capacity(tokens.len() + 1);
     let mut has_patch = false;
@@ -138,6 +148,7 @@ pub(crate) fn toggle_patch_flag(tokens: &[String]) -> Vec<String> {
     result
 }
 
+/// Build operation-log preview tokens used as a generic dangerous-command fallback.
 pub(crate) fn operation_log_preview_tokens() -> Vec<String> {
     vec![
         "operation".to_string(),

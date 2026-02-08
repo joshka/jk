@@ -1,3 +1,8 @@
+//! In-app alias catalog used by `:aliases`.
+//!
+//! Entries mirror supported `jk` aliases plus common Oh My Zsh `jj` plugin aliases so users can
+//! discover equivalent commands without leaving the TUI.
+
 const ALIAS_CATALOG: [(&str, &str); 44] = [
     ("b", "bookmark"),
     ("ci", "commit"),
@@ -45,10 +50,14 @@ const ALIAS_CATALOG: [(&str, &str); 44] = [
     ("jjst", "status"),
 ];
 
+/// Render the full alias catalog view.
 pub fn alias_overview_lines() -> Vec<String> {
     alias_overview_lines_with_query(None)
 }
 
+/// Render alias catalog lines filtered by case-insensitive query.
+///
+/// Filtering matches both alias token and expansion text.
 pub fn alias_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
     let filter = query
         .map(str::trim)

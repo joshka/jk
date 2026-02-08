@@ -1,3 +1,9 @@
+//! Prompt input builders for guided commands.
+//!
+//! Builders enforce minimal argument contracts and normalize shorthand prompt formats before
+//! converting to concrete command tokens.
+
+/// Build bookmark mutation commands that target a specific revision.
 pub(super) fn build_bookmark_target_command(
     subcommand: &str,
     input: &str,
@@ -18,6 +24,16 @@ pub(super) fn build_bookmark_target_command(
     ])
 }
 
+/// Build `bookmark track/untrack` with optional remote input.
+///
+/// Input must be `<bookmark> [remote]`.
+///
+/// # Examples
+///
+/// ```text
+/// subcommand="track", input="feature origin"
+/// => ["bookmark", "track", "feature", "--remote", "origin"]
+/// ```
 pub(super) fn build_track_command(subcommand: &str, input: &str) -> Result<Vec<String>, String> {
     if input.is_empty() {
         return Err("bookmark name is required".to_string());
@@ -42,6 +58,7 @@ pub(super) fn build_track_command(subcommand: &str, input: &str) -> Result<Vec<S
     Ok(tokens)
 }
 
+/// Build bookmark commands that accept one or more bookmark names.
 pub(super) fn build_bookmark_names_command(
     subcommand: &str,
     input: &str,
@@ -56,6 +73,7 @@ pub(super) fn build_bookmark_names_command(
     Ok(tokens)
 }
 
+/// Build `bookmark rename` requiring exactly `<old> <new>`.
 pub(super) fn build_bookmark_rename_command(input: &str) -> Result<Vec<String>, String> {
     let names: Vec<&str> = input.split_whitespace().collect();
     if names.len() != 2 {
@@ -70,6 +88,7 @@ pub(super) fn build_bookmark_rename_command(input: &str) -> Result<Vec<String>, 
     ])
 }
 
+/// Return whether tokens already specify a revision-like destination flag.
 fn has_revision_flag(tokens: &[String]) -> bool {
     tokens.iter().any(|token| {
         matches!(token.as_str(), "-r" | "--revision" | "--to")
@@ -79,6 +98,19 @@ fn has_revision_flag(tokens: &[String]) -> bool {
     })
 }
 
+/// Build `tag set` and inject default revision when none is supplied.
+///
+/// # Examples
+///
+/// ```text
+/// input="v1", default_revision="@"
+/// => ["tag", "set", "v1", "--revision", "@"]
+/// ```
+///
+/// ```text
+/// input="v1 release", default_revision="@"
+/// => ["tag", "set", "v1", "--revision", "release"]
+/// ```
 pub(super) fn build_tag_set_command(
     input: &str,
     default_revision: &str,
@@ -105,6 +137,7 @@ pub(super) fn build_tag_set_command(
     Ok(tokens)
 }
 
+/// Build `tag delete` for one or more tag names.
 pub(super) fn build_tag_delete_command(input: &str) -> Result<Vec<String>, String> {
     let names: Vec<&str> = input.split_whitespace().collect();
     if names.is_empty() {
@@ -116,6 +149,14 @@ pub(super) fn build_tag_delete_command(input: &str) -> Result<Vec<String>, Strin
     Ok(tokens)
 }
 
+/// Build `workspace add` from `<destination> [name]`.
+///
+/// # Examples
+///
+/// ```text
+/// input="../repo-copy feature-workspace"
+/// => ["workspace", "add", "--name", "feature-workspace", "../repo-copy"]
+/// ```
 pub(super) fn build_workspace_add_command(input: &str) -> Result<Vec<String>, String> {
     let segments: Vec<&str> = input.split_whitespace().collect();
     match segments.as_slice() {
@@ -135,6 +176,7 @@ pub(super) fn build_workspace_add_command(input: &str) -> Result<Vec<String>, St
     }
 }
 
+/// Build `workspace forget` from optional whitespace-separated workspace names.
 pub(super) fn build_workspace_forget_command(input: &str) -> Result<Vec<String>, String> {
     let mut tokens = vec!["workspace".to_string(), "forget".to_string()];
     tokens.extend(
@@ -146,6 +188,7 @@ pub(super) fn build_workspace_forget_command(input: &str) -> Result<Vec<String>,
     Ok(tokens)
 }
 
+/// Build `file track` requiring at least one path/fileset.
 pub(super) fn build_file_track_command(input: &str) -> Result<Vec<String>, String> {
     let paths: Vec<&str> = input.split_whitespace().collect();
     if paths.is_empty() {
@@ -157,6 +200,7 @@ pub(super) fn build_file_track_command(input: &str) -> Result<Vec<String>, Strin
     Ok(tokens)
 }
 
+/// Build `file untrack` requiring at least one path/fileset.
 pub(super) fn build_file_untrack_command(input: &str) -> Result<Vec<String>, String> {
     let paths: Vec<&str> = input.split_whitespace().collect();
     if paths.is_empty() {
@@ -168,6 +212,7 @@ pub(super) fn build_file_untrack_command(input: &str) -> Result<Vec<String>, Str
     Ok(tokens)
 }
 
+/// Build `file chmod` and inject default revision when unspecified.
 pub(super) fn build_file_chmod_command(
     input: &str,
     default_revision: &str,

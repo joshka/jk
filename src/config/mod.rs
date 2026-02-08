@@ -1,3 +1,8 @@
+//! Keybinding configuration loading and validation.
+//!
+//! Config is loaded from embedded defaults and optionally overlaid by user settings from
+//! `JK_KEYBINDS` or `~/.config/jk/keybinds.toml`.
+
 mod raw;
 
 use std::env;
@@ -9,8 +14,10 @@ use crate::keys::KeyBinding;
 
 use self::raw::{PartialConfig, RawConfig, apply_partial};
 
+/// Embedded default keymap shipped with the binary.
 pub(super) const DEFAULT_KEYBINDS: &str = include_str!("../../config/keybinds.default.toml");
 
+/// Fully-resolved keybinding configuration for all runtime modes.
 #[derive(Debug, Clone)]
 pub struct KeybindConfig {
     pub normal: NormalKeys,
@@ -18,6 +25,7 @@ pub struct KeybindConfig {
     pub confirm: ConfirmKeys,
 }
 
+/// Normal-mode bindings (navigation, command launchers, and high-frequency mutations).
 #[derive(Debug, Clone)]
 pub struct NormalKeys {
     pub quit: Vec<KeyBinding>,
@@ -63,6 +71,7 @@ pub struct NormalKeys {
     pub redo: Vec<KeyBinding>,
 }
 
+/// Command-mode and prompt-mode editing bindings.
 #[derive(Debug, Clone)]
 pub struct CommandKeys {
     pub submit: Vec<KeyBinding>,
@@ -72,6 +81,7 @@ pub struct CommandKeys {
     pub history_next: Vec<KeyBinding>,
 }
 
+/// Confirmation-mode bindings for dangerous command approval/rejection.
 #[derive(Debug, Clone)]
 pub struct ConfirmKeys {
     pub accept: Vec<KeyBinding>,
@@ -79,6 +89,9 @@ pub struct ConfirmKeys {
 }
 
 impl KeybindConfig {
+    /// Load keybinds from defaults plus optional user overrides.
+    ///
+    /// Parse/validation failures include path context when sourced from user config.
     pub fn load() -> Result<Self, JkError> {
         let mut raw: RawConfig = toml::from_str(DEFAULT_KEYBINDS)
             .map_err(|err| JkError::ConfigParse(format!("default keybind parse error: {err}")))?;
@@ -98,6 +111,9 @@ impl KeybindConfig {
     }
 }
 
+/// Resolve user override path from environment.
+///
+/// `JK_KEYBINDS` has precedence over the default `$HOME/.config/jk/keybinds.toml` location.
 fn user_keybind_path() -> Option<PathBuf> {
     if let Ok(path) = env::var("JK_KEYBINDS") {
         return Some(PathBuf::from(path));
@@ -108,6 +124,7 @@ fn user_keybind_path() -> Option<PathBuf> {
         .map(|home| PathBuf::from(home).join(".config/jk/keybinds.toml"))
 }
 
+/// Parse configured key token strings into runtime [`KeyBinding`] values.
 pub(super) fn parse_bindings(values: &[String]) -> Result<Vec<KeyBinding>, JkError> {
     values
         .iter()

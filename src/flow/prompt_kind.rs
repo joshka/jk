@@ -1,3 +1,7 @@
+//! Prompt kinds and prompt-to-command translation.
+//!
+//! Each prompt kind encodes input validation and token assembly for a guided command flow.
+
 use super::builders::{
     build_bookmark_names_command, build_bookmark_rename_command, build_bookmark_target_command,
     build_file_chmod_command, build_file_track_command, build_file_untrack_command,
@@ -5,13 +9,18 @@ use super::builders::{
     build_workspace_add_command, build_workspace_forget_command,
 };
 
+/// Prompt metadata required to enter prompt mode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PromptRequest {
+    /// Footer label rendered before prompt input.
     pub label: String,
+    /// Whether empty submission is accepted.
     pub allow_empty: bool,
+    /// Prompt behavior used to convert input into command tokens.
     pub kind: PromptKind,
 }
 
+/// Supported guided prompt flows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptKind {
     NewMessage,
@@ -73,6 +82,10 @@ pub enum PromptKind {
 }
 
 impl PromptKind {
+    /// Convert submitted prompt input into executable command tokens.
+    ///
+    /// Returns a validation message when required input is missing or malformed. Empty-input
+    /// behavior is prompt-kind specific and encodes defaults such as `@`, `@-`, or "no message".
     pub fn to_tokens(&self, input: &str) -> Result<Vec<String>, String> {
         match self {
             Self::NewMessage => {

@@ -1,9 +1,13 @@
+//! In-app command registry rendering.
+
 use super::spec::{CommandSpec, TOP_LEVEL_SPECS};
 
+/// Render command registry lines without filtering.
 pub fn command_overview_lines() -> Vec<String> {
     command_overview_lines_with_query(None)
 }
 
+/// Render command registry lines filtered by command/alias query.
 pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
     let filter = query
         .map(str::trim)
@@ -63,6 +67,7 @@ pub fn command_overview_lines_with_query(query: Option<&str>) -> Vec<String> {
     lines
 }
 
+/// Build display name with optional top-level alias annotation.
 fn command_display_name(spec: CommandSpec) -> String {
     match top_level_default_alias(spec.name) {
         Some(alias) => format!("{} ({alias})", spec.name),
@@ -70,6 +75,7 @@ fn command_display_name(spec: CommandSpec) -> String {
     }
 }
 
+/// Return top-level `jj` aliases that should be surfaced in registry output.
 fn top_level_default_alias(name: &str) -> Option<&'static str> {
     match name {
         "bookmark" => Some("b"),

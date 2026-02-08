@@ -1,5 +1,8 @@
+//! Keybinding primitives used by configuration parsing and runtime input handling.
+
 use crossterm::event::{KeyCode, KeyEvent};
 
+/// Supported key tokens in config files and rendered keymap output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyBinding {
     Char(char),
@@ -15,6 +18,9 @@ pub enum KeyBinding {
 }
 
 impl KeyBinding {
+    /// Parse one configured key token from TOML.
+    ///
+    /// Single-character values map to [`Self::Char`]; named values map to non-character keys.
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "Enter" => Some(Self::Enter),
@@ -31,6 +37,9 @@ impl KeyBinding {
         }
     }
 
+    /// Return whether this binding matches an incoming key event.
+    ///
+    /// Matching is exact on character code and does not currently model modifiers.
     pub fn matches(&self, event: KeyEvent) -> bool {
         match self {
             Self::Char(expected) => {

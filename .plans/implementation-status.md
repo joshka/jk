@@ -258,6 +258,17 @@
     guided flows in the planner (`absorb --from <selected>`, `duplicate <selected>`,
     `parallelize <selected>`).
   - aligned command-registry execution modes so all three now report `guided` coverage.
+- Latest pass:
+  - completed a greenfield documentation coverage pass for `README.md` and non-test Rust modules.
+  - added module docs and item-level contract docs across `src/` with full non-test coverage.
+  - recorded remediation backlog and coverage ledger in
+    `.plans/docs-greenfield-coverage-2026-02-08.md`.
+- Latest pass:
+  - completed follow-up docs work in the same change: added `docs/contributing-tests.md`, added
+    `docs/glossary.md`, linked both from `README.md`, and linked glossary terminology from command
+    docs.
+  - added compact rustdoc examples for planner and builder entrypoints in
+    `src/flow/planner.rs` and `src/flow/builders.rs`.
   - added native top-level mutation wrappers plus summary-signal coverage and `insta` snapshots
     for `absorb`, `duplicate`, and `parallelize`.
 - Latest pass:

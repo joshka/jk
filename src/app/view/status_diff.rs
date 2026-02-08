@@ -1,9 +1,12 @@
+//! Wrappers for `status`, `show`, `diff`, and keymap views.
+
 use crate::config::KeybindConfig;
 use crate::keys::KeyBinding;
 
 use super::common::{is_working_copy_change_line, plural_suffix};
 use super::{looks_like_graph_commit_row, strip_ansi};
 
+/// Render a structured status view with section spacing and summary line.
 pub(crate) fn render_status_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -98,6 +101,7 @@ pub(crate) fn render_status_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `show` output with section spacing and shortcut hints.
 pub(crate) fn render_show_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -114,6 +118,7 @@ pub(crate) fn render_show_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `diff` output with normalized spacing and shortcut hints.
 pub(crate) fn render_diff_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -130,6 +135,7 @@ pub(crate) fn render_diff_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `interdiff` output with normalized spacing.
 pub(crate) fn render_interdiff_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -146,6 +152,7 @@ pub(crate) fn render_interdiff_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render `evolog` output with entry counting and readable spacing.
 pub(crate) fn render_evolog_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -196,6 +203,7 @@ pub(crate) fn render_evolog_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Normalize `show` output by collapsing repeated blank lines and spacing top-level sections.
 pub(crate) fn normalize_show_lines(lines: Vec<String>) -> Vec<String> {
     let mut rendered: Vec<String> = Vec::new();
 
@@ -224,6 +232,7 @@ pub(crate) fn normalize_show_lines(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Normalize diff-like output by spacing top-level section headers.
 pub(crate) fn normalize_diff_lines(lines: Vec<String>) -> Vec<String> {
     let mut rendered: Vec<String> = Vec::new();
 
@@ -246,11 +255,13 @@ pub(crate) fn normalize_diff_lines(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Return whether a line is a top-level section header in `jj` output.
 pub(crate) fn is_top_level_section_header(line: &str) -> bool {
     let stripped = strip_ansi(line);
     !stripped.starts_with(' ') && stripped.ends_with(':')
 }
 
+/// Render keymap catalog lines, optionally filtered by action/key label query.
 pub(crate) fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>) -> Vec<String> {
     let filter = query
         .map(str::trim)
@@ -329,6 +340,7 @@ pub(crate) fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>)
     lines
 }
 
+/// Render comma-separated labels for a set of bindings.
 pub(crate) fn key_binding_labels(bindings: &[KeyBinding]) -> String {
     bindings
         .iter()
@@ -337,6 +349,7 @@ pub(crate) fn key_binding_labels(bindings: &[KeyBinding]) -> String {
         .join(", ")
 }
 
+/// Render human-readable label for one keybinding.
 pub(crate) fn key_binding_label(binding: &KeyBinding) -> String {
     match binding {
         KeyBinding::Char(value) => value.to_string(),

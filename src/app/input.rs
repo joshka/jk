@@ -1,3 +1,8 @@
+//! Input handling and mode transitions.
+//!
+//! Key events are dispatched by mode and can trigger navigation, local view rendering, planning,
+//! prompting, confirmation gating, or direct execution.
+
 use crate::error::JkError;
 use crate::flow::{FlowAction, PromptRequest, plan_command};
 use crate::jj;
@@ -9,6 +14,9 @@ use super::view::keymap_overview_lines;
 use super::{App, Mode, PromptState};
 
 impl App {
+    /// Dispatch one key event according to the current mode.
+    ///
+    /// `Ctrl+C` always exits immediately regardless of mode.
     pub(super) fn handle_key(&mut self, key: KeyEvent) -> Result<(), JkError> {
         if matches!(key.code, KeyCode::Char('c')) && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.should_quit = true;
@@ -23,6 +31,11 @@ impl App {
         }
     }
 
+    /// Handle normal-mode keybindings in priority order.
+    ///
+    /// Branch order defines precedence when bindings overlap. Most branches short-circuit after
+    /// mutating selection or dispatching a command, so exactly one action is applied per key event.
+    /// Dangerous commands are still funneled through confirmation gating via downstream execution.
     fn handle_normal_key(&mut self, key: KeyEvent) -> Result<(), JkError> {
         if matches_any(&self.keybinds.normal.quit, key) {
             self.should_quit = true;
@@ -270,6 +283,10 @@ impl App {
         Ok(())
     }
 
+    /// Handle command-mode editing and submission behavior.
+    ///
+    /// Submitting records history, exits command mode, clears editing state, then executes the
+    /// captured command line.
     fn handle_command_key(&mut self, key: KeyEvent) -> Result<(), JkError> {
         if matches_any(&self.keybinds.command.cancel, key) {
             self.mode = Mode::Normal;
@@ -312,6 +329,10 @@ impl App {
         Ok(())
     }
 
+    /// Handle prompt-mode editing, validation, and submission.
+    ///
+    /// Prompt submission validates required input and keeps prompt state active on validation
+    /// errors so users can correct input without losing context.
     fn handle_prompt_key(&mut self, key: KeyEvent) -> Result<(), JkError> {
         if matches_any(&self.keybinds.command.cancel, key) {
             self.pending_prompt = None;
@@ -363,6 +384,7 @@ impl App {
         Ok(())
     }
 
+    /// Handle confirmation-mode accept/reject flows for dangerous commands.
     fn handle_confirm_key(&mut self, key: KeyEvent) -> Result<(), JkError> {
         if matches_any(&self.keybinds.confirm.reject, key) {
             self.pending_confirm = None;
@@ -381,6 +403,10 @@ impl App {
         Ok(())
     }
 
+    /// Execute tokens directly or enter confirmation mode when command tier is dangerous.
+    ///
+    /// Confirmation mode stores pending tokens and renders best-effort preview output without
+    /// performing mutations.
     pub(super) fn execute_with_confirmation(&mut self, tokens: Vec<String>) -> Result<(), JkError> {
         if is_dangerous(&tokens) {
             self.pending_confirm = Some(tokens.clone());
@@ -393,6 +419,10 @@ impl App {
         self.execute_tokens(tokens)
     }
 
+    /// Render preview lines shown while confirmation is pending.
+    ///
+    /// Preview failures are intentionally ignored so lack of preview does not block explicit user
+    /// confirmation for the underlying command.
     fn render_confirmation_preview(&mut self, tokens: &[String]) {
         let mut lines = vec![format!("Confirm: jj {}", tokens.join(" "))];
 
@@ -410,6 +440,7 @@ impl App {
         self.scroll = 0;
     }
 
+    /// Execute a raw command line by resolving local view actions or planner actions.
     pub(super) fn execute_command_line(&mut self, command: &str) -> Result<(), JkError> {
         if let Some(action) = self.local_view_action(command) {
             return self.apply_flow_action(action);
@@ -419,6 +450,7 @@ impl App {
         self.apply_flow_action(action)
     }
 
+    /// Return a local render action for keymap views when command should not hit `jj`.
     pub(super) fn local_view_action(&self, command: &str) -> Option<FlowAction> {
         let trimmed = command.trim();
         if trimmed.is_empty() {
@@ -445,6 +477,7 @@ impl App {
         }
     }
 
+    /// Enter prompt mode with empty prompt input and request metadata.
     pub(super) fn start_prompt(&mut self, request: PromptRequest) {
         self.pending_prompt = Some(PromptState {
             kind: request.kind,

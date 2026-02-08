@@ -1,3 +1,8 @@
+//! Alias normalization from user-entered tokens to canonical `jj` command tokens.
+
+/// Normalize startup/command-mode tokens into canonical planner input.
+///
+/// Empty input defaults to `log` so runtime always starts from a stable home view.
 pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
     if tokens.is_empty() {
         return vec!["log".to_string()];
@@ -17,6 +22,9 @@ pub fn normalize_alias(tokens: &[String]) -> Vec<String> {
     result
 }
 
+/// Resolve destination-aware rebase aliases with explicit-flag precedence.
+///
+/// If caller already passes destination flags, this preserves them instead of appending defaults.
 fn normalize_destination_alias(alias: &str, tokens: &[String]) -> Option<Vec<String>> {
     let default_destination = match alias {
         "rbm" => "main",
@@ -41,6 +49,7 @@ fn normalize_destination_alias(alias: &str, tokens: &[String]) -> Option<Vec<Str
     Some(result)
 }
 
+/// Return whether tokens already include an explicit destination selector.
 fn has_destination_flag(tokens: &[String]) -> bool {
     tokens.iter().any(|token| {
         matches!(
@@ -54,6 +63,9 @@ fn has_destination_flag(tokens: &[String]) -> bool {
     })
 }
 
+/// Resolve single-token aliases to prefix command segments.
+///
+/// The remainder of input arguments is appended unchanged by the caller.
 fn alias_prefix(alias: &str) -> Option<&'static [&'static str]> {
     match alias {
         "b" => Some(&["bookmark"]),

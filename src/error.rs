@@ -1,7 +1,13 @@
+//! Error types shared across configuration loading, subprocess execution, and terminal runtime.
+
 use std::io;
 
 use thiserror::Error;
 
+/// Top-level error type for `jk`.
+///
+/// Variants preserve enough context to render user-facing failure messages with the originating
+/// path or subsystem.
 #[derive(Debug, Error)]
 pub enum JkError {
     #[error("failed to read configuration file `{path}`: {source}")]

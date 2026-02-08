@@ -1,9 +1,12 @@
+//! Raw TOML schema and merge logic for keybinding configuration.
+
 use serde::Deserialize;
 
 use crate::error::JkError;
 
 use super::{CommandKeys, ConfirmKeys, KeybindConfig, NormalKeys, parse_bindings};
 
+/// Fully-materialized config shape used for embedded defaults.
 #[derive(Debug, Deserialize)]
 pub(super) struct RawConfig {
     normal: RawNormal,
@@ -11,6 +14,7 @@ pub(super) struct RawConfig {
     confirm: RawConfirm,
 }
 
+/// Raw normal-mode keybinding fields parsed directly from TOML.
 #[derive(Debug, Deserialize)]
 struct RawNormal {
     quit: Vec<String>,
@@ -56,6 +60,7 @@ struct RawNormal {
     redo: Vec<String>,
 }
 
+/// Raw command-mode keybinding fields parsed directly from TOML.
 #[derive(Debug, Deserialize)]
 struct RawCommand {
     submit: Vec<String>,
@@ -65,12 +70,14 @@ struct RawCommand {
     history_next: Vec<String>,
 }
 
+/// Raw confirmation-mode keybinding fields parsed directly from TOML.
 #[derive(Debug, Deserialize)]
 struct RawConfirm {
     accept: Vec<String>,
     reject: Vec<String>,
 }
 
+/// Optional override config used for user keybind files.
 #[derive(Debug, Deserialize)]
 pub(super) struct PartialConfig {
     normal: Option<PartialNormal>,
@@ -78,6 +85,7 @@ pub(super) struct PartialConfig {
     confirm: Option<PartialConfirm>,
 }
 
+/// Optional normal-mode override fields.
 #[derive(Debug, Deserialize)]
 struct PartialNormal {
     quit: Option<Vec<String>>,
@@ -123,6 +131,7 @@ struct PartialNormal {
     redo: Option<Vec<String>>,
 }
 
+/// Optional command-mode override fields.
 #[derive(Debug, Deserialize)]
 struct PartialCommand {
     submit: Option<Vec<String>>,
@@ -132,6 +141,7 @@ struct PartialCommand {
     history_next: Option<Vec<String>>,
 }
 
+/// Optional confirmation-mode override fields.
 #[derive(Debug, Deserialize)]
 struct PartialConfirm {
     accept: Option<Vec<String>>,
@@ -139,6 +149,7 @@ struct PartialConfirm {
 }
 
 impl RawConfig {
+    /// Convert raw string lists into validated runtime keybinding structures.
     pub(super) fn into_config(self) -> Result<KeybindConfig, JkError> {
         Ok(KeybindConfig {
             normal: NormalKeys {
@@ -199,6 +210,9 @@ impl RawConfig {
     }
 }
 
+/// Overlay optional user values onto the base config in-place.
+///
+/// Missing user fields keep their default values so partial keymaps remain valid.
 pub(super) fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
     if let Some(normal) = user.normal {
         if let Some(value) = normal.quit {

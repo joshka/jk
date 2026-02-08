@@ -1,3 +1,5 @@
+//! Alias normalization and alias-catalog rendering.
+
 mod catalog;
 mod normalize;
 

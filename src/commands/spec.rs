@@ -1,3 +1,9 @@
+//! Command execution and safety metadata.
+//!
+//! The planner/runtime consult this module to decide wrapper style and whether confirmation gating
+//! is required for a command.
+
+/// Rendering/execution strategy used for a top-level command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionMode {
     Native,
@@ -6,6 +12,7 @@ pub enum ExecutionMode {
 }
 
 impl ExecutionMode {
+    /// Stable display label used in command registry output.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Native => "native",
@@ -15,6 +22,7 @@ impl ExecutionMode {
     }
 }
 
+/// Safety tier used for confirmation policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafetyTier {
     A,
@@ -23,6 +31,7 @@ pub enum SafetyTier {
 }
 
 impl SafetyTier {
+    /// Stable display label used in command registry output.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::A => "A",
@@ -32,10 +41,14 @@ impl SafetyTier {
     }
 }
 
+/// Static metadata for one top-level `jj` command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CommandSpec {
+    /// Command token as typed after `jj`.
     pub name: &'static str,
+    /// Execution/rendering mode selected for this command.
     pub mode: ExecutionMode,
+    /// Default safety tier for this command.
     pub tier: SafetyTier,
 }
 
@@ -262,6 +275,7 @@ pub(super) const TOP_LEVEL_SPECS: [CommandSpec; 44] = [
     },
 ];
 
+/// Return metadata for a known top-level command name.
 pub fn lookup_top_level(command: &str) -> Option<CommandSpec> {
     TOP_LEVEL_SPECS
         .iter()
@@ -269,6 +283,11 @@ pub fn lookup_top_level(command: &str) -> Option<CommandSpec> {
         .find(|spec| spec.name == command)
 }
 
+/// Classify command safety with subcommand-aware overrides.
+///
+/// Defaults are optimistic for empty input (`A`) and conservative for unknown commands (`B`).
+/// Subcommand overrides intentionally escalate potentially destructive operations (for example
+/// `git push` and `operation restore`) to tier `C`.
 pub fn command_safety(tokens: &[String]) -> SafetyTier {
     let Some(first) = tokens.first().map(String::as_str) else {
         return SafetyTier::A;

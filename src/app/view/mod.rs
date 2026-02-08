@@ -1,3 +1,8 @@
+//! Command-output wrapper rendering.
+//!
+//! Wrapper functions add concise headings, summaries, and follow-up tips while preserving original
+//! command output lines for detailed inspection.
+
 mod common;
 mod file_tag;
 mod operation;
@@ -37,6 +42,7 @@ pub(crate) use workspace_git_top::{
     top_level_mutation_summary, workspace_mutation_summary,
 };
 
+/// Decorate raw command output with command-specific wrapper views when available.
 pub(crate) fn decorate_command_output(command: &[String], output: Vec<String>) -> Vec<String> {
     match command.first().map(String::as_str) {
         Some("status") => render_status_view(output),

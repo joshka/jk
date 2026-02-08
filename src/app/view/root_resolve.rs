@@ -1,6 +1,9 @@
+//! Wrapper views for root/version/resolve command outputs.
+
 use super::common::plural_suffix;
 use super::strip_ansi;
 
+/// Render workspace root path output.
 pub(crate) fn render_root_view(lines: Vec<String>) -> Vec<String> {
     if lines.is_empty() || lines == ["(no output)"] {
         return lines;
@@ -28,6 +31,7 @@ pub(crate) fn render_root_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render version output with first-line summary.
 pub(crate) fn render_version_view(lines: Vec<String>) -> Vec<String> {
     let detail_lines: Vec<String> = lines
         .into_iter()
@@ -60,6 +64,7 @@ pub(crate) fn render_version_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render resolve list output with conflict-count summary.
 pub(crate) fn render_resolve_list_view(lines: Vec<String>) -> Vec<String> {
     let mut body_lines = Vec::new();
     let mut conflict_count = 0usize;
@@ -116,6 +121,7 @@ pub(crate) fn render_resolve_list_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Render resolve action output with signal-line summary when available.
 pub(crate) fn render_resolve_action_view(lines: Vec<String>) -> Vec<String> {
     let detail_lines: Vec<String> = lines
         .into_iter()
@@ -158,6 +164,7 @@ pub(crate) fn render_resolve_action_view(lines: Vec<String>) -> Vec<String> {
     rendered
 }
 
+/// Return whether command tokens request resolve list mode.
 pub(crate) fn has_resolve_list_flag(command: &[String]) -> bool {
     command
         .iter()
