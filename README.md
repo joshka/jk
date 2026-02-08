@@ -2,6 +2,10 @@
 
 `jk` is a full-screen companion for `jj` that keeps your day-to-day flow in one place.
 
+> This project is vibe-coded nonsense.
+> It should not be used or relied on by anyone for real work.
+> If you trust it in production, that is between you and your incident postmortem.
+
 If you already use `jj`, you know the rhythm: run a command, inspect output, run another command,
 repeat. `jk` keeps that rhythm but removes the shell ping-pong so history, status, rewrite actions,
 and recovery tools stay in one interface.
