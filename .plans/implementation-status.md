@@ -259,6 +259,17 @@
     `parallelize <selected>`).
   - aligned command-registry execution modes so all three now report `guided` coverage.
 - Latest pass:
+  - grouped in-app help and keymap output into intent-first sections
+    (`Navigation`, `Views`, `Actions`, `Safety`) while preserving compact two-column density.
+  - removed legacy ASCII underline heading rows from wrapper-rendered views for cleaner text-only
+    presentation.
+  - simplified the header to `jk [MODE]` with a muted mode badge and removed duplicated
+    command-context noise.
+  - added a concrete "First 5 Minutes in `jk`" walkthrough to `README.md`.
+  - updated `docs/tutorial-vhs.md` to embed dynamic GIFs directly with narrative descriptions.
+  - refreshed all affected `insta` snapshots and reran full validation checkpoint:
+    `cargo test`, strict `cargo clippy`, and `markdownlint-cli2`.
+- Latest pass:
   - completed a greenfield documentation coverage pass for `README.md` and non-test Rust modules.
   - added module docs and item-level contract docs across `src/` with full non-test coverage.
   - recorded remediation backlog and coverage ledger in
@@ -389,3 +400,75 @@
   - introduced a styled top header bar and mode-aware footer/status bar in the TUI.
   - kept command/view behavior and snapshots stable while removing legacy ASCII underline rows in
     live rendering.
+- Latest pass:
+  - switched log selection navigation from raw line stepping to revision-item stepping so
+    `j`/`k` and arrow movement lands on the next logical revision entry.
+  - added viewport paging controls (`PageUp`/`PageDown`, plus `Ctrl+u/d` and `Ctrl+b/f`) and
+    surfaced these in the footer/help output.
+  - reorganized command help with a common-screens-first section and added
+    `docs/navigation-behavior-checklist.md` for terminal/readline/vim UX expectations.
+- Latest pass:
+  - tightened log selection so graph rows without explicit commit hashes still resolve revision
+    anchors and preserve item-based movement.
+  - added explicit screen history traversal with back/forward bindings
+    (`Left`/`Right`, `Ctrl+o`/`Ctrl+i`) and visible footer discoverability.
+  - reordered command help around day-one tutorial flows and kept full command coverage below.
+- Latest pass:
+  - added command-help spacing snapshots for the new day-one-first `:commands` layout and checked
+    in `src/commands/snapshots/` coverage for default and filtered help output.
+  - added canonical UX docs: `docs/screens.md` and flow-validation checklist updates in
+    `docs/navigation-behavior-checklist.md`.
+  - added VHS tapes under `docs/vhs/` and rendered flow GIFs to `target/vhs/`.
+- Latest pass:
+  - codified UX/navigation guardrails in `AGENTS.md`, including terminal navigation parity,
+    log item-based movement requirements, help ordering expectations, and vertical-slice execution
+    guidance.
+  - reran full validation checkpoint with green `cargo fmt --all`, `cargo check`, `cargo test`
+    (226 passed), strict `cargo clippy`, and `markdownlint-cli2`.
+- Latest pass:
+  - expanded VHS coverage so every documented tutorial flow has a dedicated tape under `docs/vhs/`
+    and generated GIF in `target/vhs/`.
+  - added `docs/tutorial-vhs.md` as a single tutorial-to-GIF index and linked it from
+    `README.md`.
+- Latest pass:
+  - added a compact tutorial gallery section to `README.md` with embedded local previews for
+    key day-one flows and a direct link to full coverage in `docs/tutorial-vhs.md`.
+- Latest pass:
+  - replaced short per-key tutorial GIFs with a mixed capture strategy:
+    static screenshots (`static-*.png`) plus longer dynamic scenario GIFs.
+  - switched all VHS tapes to the `Aardvark Blue` theme for stronger visual contrast and clearer
+    color differentiation.
+  - added scenario documentation in `docs/vhs/scenarios.md` and rewrote
+    `docs/tutorial-vhs.md` to map tutorial behaviors to static/dynamic assets.
+  - rerendered all tapes with the new scenario set and verified docs lint is green.
+- Latest pass:
+  - hardened color behavior for captured runs by forcing color-friendly subprocess env in `jj`
+    execution (`NO_COLOR` removed, `CLICOLOR_FORCE=1`, `COLORTERM=truecolor`,
+    `TERM=xterm-256color`) and in VHS startup commands.
+  - slowed tape pacing across all scenarios (longer sleeps and slower typing speed) to avoid
+    flicker and make transitions readable.
+  - added `docs/vhs/tutorial-full-catalog.tape` and generated a full 25-item screenshot catalog
+    (`tutorial-01-*.png` through `tutorial-25-*.png`) so no tutorial item is missing.
+  - expanded tutorial docs narrative to include both story-level GIF scenarios and per-item
+    catalog mapping.
+- Latest pass:
+  - fixed log selection/paging semantics to operate on explicit item-start boundaries rather than
+    stepping by repeated item count per page.
+  - added focused regression tests for viewport-based log paging and a snapshot sequence that locks
+    item navigation markers across `Down`, `PageDown`, and `PageUp`.
+  - rerendered all VHS assets and tutorial screenshots after the selection fix.
+- Latest pass:
+  - added durable compaction plan:
+    `.plans/readme-ui-compaction-2026-02-08.md`.
+  - muted chrome styling in live TUI rendering by unifying header/footer palettes to
+    dark-gray background + white foreground and switching selection emphasis to
+    marker/foreground highlight (no dark full-row selection fill).
+  - reduced footer duplication by hiding routine status messages when they repeat header context.
+  - condensed `:commands` and `:keys` into compact two-column layouts with reduced label
+    repetition and updated snapshot/test coverage.
+  - added a dedicated keymap layout snapshot:
+    `src/app/snapshots/jk__app__tests__snapshot_renders_condensed_keymap_layout.snap`.
+  - rewrote `README.md` around a workflow-first narrative and moved implementation-heavy details to
+    `docs/architecture.md`.
+  - reran full validation checkpoint (`cargo fmt`, `cargo check`, `cargo test` 228 passed,
+    strict clippy, markdownlint) and regenerated all VHS gifs/screenshots.
