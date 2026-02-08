@@ -270,6 +270,18 @@
   - refreshed all affected `insta` snapshots and reran full validation checkpoint:
     `cargo test`, strict `cargo clippy`, and `markdownlint-cli2`.
 - Latest pass:
+  - implemented directional UX improvements from
+    `.plans/improvements/2026-02-08-015556-directional-ux-docs-summary.md`.
+  - added normal-mode footer signals for onboarding progress, primary next action, log quick
+    actions, and back/forward history context.
+  - added workflow-scoped help presets (`:help inspect|rewrite|sync|recover`) with in-app
+    narratives and recent-intent context.
+  - added command-mode ranked suggestions using session-local frequency + recency scoring.
+  - added confirm-mode dry-run key (`d`) for dangerous commands when preview strategies exist.
+  - added `docs/workflows.md` with inspect/rewrite/sync/recover narratives linked to screenshots
+    and GIFs.
+  - added workflow-focused snapshot coverage for app and command-workflow help rendering.
+- Latest pass:
   - completed a greenfield documentation coverage pass for `README.md` and non-test Rust modules.
   - added module docs and item-level contract docs across `src/` with full non-test coverage.
   - recorded remediation backlog and coverage ledger in
