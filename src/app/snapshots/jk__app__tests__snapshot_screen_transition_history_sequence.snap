@@ -1,0 +1,105 @@
+---
+source: src/app/tests.rs
+expression: "captures.join(\"\\n\\n---\\n\\n\")"
+---
+commands
+status: Showing command registry
+jk [normal]
+> jk command registry
+  
+  common flows (grouped, condensed)
+  
+  Navigation:
+  key          action                   notes
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history
+
+---
+
+keys
+status: Showing keymap
+jk [normal]
+> jk keymap
+  
+  grouped bindings (common first)
+  
+  Navigation:
+  quit             q                          refresh          r
+onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: back command
+
+---
+
+aliases
+status: Showing alias catalog
+jk [normal]
+> jk alias catalog
+  alias    expands to
+  ----------------------------------------
+  b        bookmark
+  ci       commit
+  desc     describe
+onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: back keys | 
+
+---
+
+help-inspect
+status: Showing workflow help for `inspect`
+jk [normal]
+> jk workflow help: inspect
+  
+  story: Scan history, inspect details, and return to context quickly.
+  
+  key        action                               why
+  ------------------------------------------------------------
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history
+
+---
+
+back-1
+status: back: aliases
+jk [normal]
+> jk alias catalog
+  alias    expands to
+  ----------------------------------------
+  b        bookmark
+  ci       commit
+  desc     describe
+onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: back keys | 
+
+---
+
+back-2
+status: back: keys
+jk [normal]
+> jk keymap
+  
+  grouped bindings (common first)
+  
+  Navigation:
+  quit             q                          refresh          r
+onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: back command
+
+---
+
+forward-1
+status: forward: aliases
+jk [normal]
+> jk alias catalog
+  alias    expands to
+  ----------------------------------------
+  b        bookmark
+  ci       commit
+  desc     describe
+onboarding: inspect (`Enter`/`d`)  |  next: l return to log home  |  history: back keys | 
+
+---
+
+forward-2
+status: forward: help inspect
+jk [normal]
+> jk workflow help: inspect
+  
+  story: Scan history, inspect details, and return to context quickly.
+  
+  key        action                               why
+  ------------------------------------------------------------
+onboarding: inspect (`Enter`/`d`)  |  next: :help inspect|rewrite|sync|recover  |  history

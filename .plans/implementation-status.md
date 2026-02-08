@@ -493,3 +493,14 @@
     `.plans/improvements/2026-02-08-022120-jj-aligned-simplification-ideas.md`.
   - reran validation checkpoint (`cargo fmt --all`, `cargo test` 239 passed, strict clippy, and
     markdownlint).
+- Latest pass:
+  - fixed log item navigation to prioritize visible graph commit rows for selection movement,
+    preventing collapsed movement when metadata revision ids repeat.
+  - hardened graph-row detection for ANSI-colored log output by stripping ANSI codes before
+    commit-row symbol detection.
+  - added critical navigation regression coverage:
+    - three-entry up/down command-history traversal and snapshot sequence.
+    - three-item log down/down/up/up round-trip assertions and snapshot sequence.
+    - screen-transition snapshot sequence for commands/keys/aliases/help with back/forward history.
+  - reran validation checkpoint (`cargo fmt --all`, `cargo test` 245 passed, `cargo check`, strict
+    clippy).

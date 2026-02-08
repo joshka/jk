@@ -1,0 +1,61 @@
+---
+source: src/app/tests.rs
+expression: "frames.join(\"\\n\\n---\\n\\n\")"
+---
+start
+jk [normal]
+> @  aaaaaaaa 11111111 first
+  │  detail first
+  ○  bbbbbbbb 22222222 second
+  │  detail second
+  ○  cccccccc 33333333 third
+
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selected 
+
+---
+
+down-1
+jk [normal]
+  @  aaaaaaaa 11111111 first
+  │  detail first
+> ○  bbbbbbbb 22222222 second
+  │  detail second
+  ○  cccccccc 33333333 third
+
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selected 
+
+---
+
+down-2
+jk [normal]
+  @  aaaaaaaa 11111111 first
+  │  detail first
+  ○  bbbbbbbb 22222222 second
+  │  detail second
+> ○  cccccccc 33333333 third
+
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selected 
+
+---
+
+up-1
+jk [normal]
+  @  aaaaaaaa 11111111 first
+  │  detail first
+> ○  bbbbbbbb 22222222 second
+  │  detail second
+  ○  cccccccc 33333333 third
+
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selected 
+
+---
+
+up-2
+jk [normal]
+> @  aaaaaaaa 11111111 first
+  │  detail first
+  ○  bbbbbbbb 22222222 second
+  │  detail second
+  ○  cccccccc 33333333 third
+
+onboarding: inspect (`Enter`/`d`)  |  next: Enter show selected

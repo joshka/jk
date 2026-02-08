@@ -1,0 +1,71 @@
+---
+source: src/app/tests.rs
+expression: "captures.join(\"\\n\\n---\\n\\n\")"
+---
+start
+jk [command]
+  Initializing jk...
+
+
+
+: (suggest: abandon, aliases)
+
+---
+
+up-1
+jk [command]
+  Initializing jk...
+
+
+
+:show @ (suggest: show @)
+
+---
+
+up-2
+jk [command]
+  Initializing jk...
+
+
+
+:log -n 5 (suggest: log -n 5)
+
+---
+
+up-3
+jk [command]
+  Initializing jk...
+
+
+
+:status (suggest: status)
+
+---
+
+down-1
+jk [command]
+  Initializing jk...
+
+
+
+:log -n 5 (suggest: log -n 5)
+
+---
+
+down-2
+jk [command]
+  Initializing jk...
+
+
+
+:show @ (suggest: show @)
+
+---
+
+down-3
+jk [command]
+  Initializing jk...
+
+
+
+: (suggest: abandon, aliases)

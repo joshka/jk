@@ -42,6 +42,12 @@ fn extracts_revision_from_ansi_colored_log_line() {
 }
 
 #[test]
+fn detects_ansi_colored_graph_commit_rows() {
+    let line = "\u{1b}[32m@\u{1b}[0m  \u{1b}[36mabcdefgh\u{1b}[0m user message";
+    assert!(looks_like_graph_commit_row(line));
+}
+
+#[test]
 fn extracts_revision_from_graph_row_without_commit_hash() {
     let line = "@  abcdefgh joshka 2026-02-07 add feature";
     assert_eq!(extract_revision(line), Some("abcdefgh".to_string()));
@@ -158,6 +164,45 @@ fn log_navigation_moves_by_revision_item_not_rendered_line() {
         .expect("up should move to previous item");
     assert_eq!(app.cursor, 3);
     assert_eq!(app.selected_revision(), Some("bbbbbbbb".to_string()));
+}
+
+#[test]
+fn log_navigation_uses_visible_graph_rows_when_revision_ids_repeat() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.last_command = vec!["log".to_string()];
+    app.lines = vec![
+        "@  aaaaaaaa 11111111 first".to_string(),
+        "│  detail first".to_string(),
+        "○  bbbbbbbb 22222222 second".to_string(),
+        "│  detail second".to_string(),
+        "○  cccccccc 33333333 third".to_string(),
+    ];
+    // Simulate metadata ambiguity where adjacent visible items resolve to repeated revision ids.
+    app.row_revision_map = vec![
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("bbbbbbbb".to_string()),
+    ];
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("first down should move to second visible item");
+    assert_eq!(app.cursor, 2);
+    assert_eq!(app.selected_revision(), Some("aaaaaaaa".to_string()));
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("second down should move to third visible item");
+    assert_eq!(app.cursor, 4);
+    assert_eq!(app.selected_revision(), Some("bbbbbbbb".to_string()));
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should return to second visible item");
+    assert_eq!(app.cursor, 2);
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should return to first visible item");
+    assert_eq!(app.cursor, 0);
 }
 
 #[test]
@@ -304,6 +349,48 @@ fn snapshot_log_item_navigation_and_paging_sequence() {
 }
 
 #[test]
+fn snapshot_log_navigation_round_trip_three_items() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.status_line = "ok: jj log".to_string();
+    app.last_command = vec!["log".to_string()];
+    app.lines = vec![
+        "@  aaaaaaaa 11111111 first".to_string(),
+        "│  detail first".to_string(),
+        "○  bbbbbbbb 22222222 second".to_string(),
+        "│  detail second".to_string(),
+        "○  cccccccc 33333333 third".to_string(),
+    ];
+    app.row_revision_map = vec![
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("bbbbbbbb".to_string()),
+    ];
+
+    let mut frames = Vec::new();
+    frames.push(format!("start\n{}", app.render_for_snapshot(64, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move to second visible item");
+    frames.push(format!("down-1\n{}", app.render_for_snapshot(64, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move to third visible item");
+    frames.push(format!("down-2\n{}", app.render_for_snapshot(64, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should move to second visible item");
+    frames.push(format!("up-1\n{}", app.render_for_snapshot(64, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should move to first visible item");
+    frames.push(format!("up-2\n{}", app.render_for_snapshot(64, 8)));
+
+    insta::assert_snapshot!(frames.join("\n\n---\n\n"));
+}
+
+#[test]
 fn view_history_moves_back_and_forward_between_screens() {
     let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
     app.execute_command_line("commands")
@@ -324,6 +411,62 @@ fn view_history_moves_back_and_forward_between_screens() {
         .expect("right should navigate forward");
     assert!(app.lines.iter().any(|line| line.contains("jk keymap")));
     assert!(app.status_line.contains("forward: keys"));
+}
+
+#[test]
+fn snapshot_screen_transition_history_sequence() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    let mut captures = Vec::new();
+
+    app.execute_command_line("commands")
+        .expect("commands screen should render");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("commands\nstatus: {status}\n{frame}"));
+
+    app.execute_command_line("keys")
+        .expect("keys screen should render");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("keys\nstatus: {status}\n{frame}"));
+
+    app.execute_command_line("aliases")
+        .expect("aliases screen should render");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("aliases\nstatus: {status}\n{frame}"));
+
+    app.execute_command_line("help inspect")
+        .expect("workflow help should render");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("help-inspect\nstatus: {status}\n{frame}"));
+
+    app.handle_key(KeyEvent::from(KeyCode::Left))
+        .expect("left should go back to aliases");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("back-1\nstatus: {status}\n{frame}"));
+
+    app.handle_key(KeyEvent::from(KeyCode::Left))
+        .expect("left should go back to keys");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("back-2\nstatus: {status}\n{frame}"));
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::CONTROL))
+        .expect("ctrl+i should go forward to aliases");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("forward-1\nstatus: {status}\n{frame}"));
+
+    app.handle_key(KeyEvent::from(KeyCode::Right))
+        .expect("right should go forward to help-inspect");
+    let status = app.status_line.clone();
+    let frame = app.render_for_snapshot(90, 8);
+    captures.push(format!("forward-2\nstatus: {status}\n{frame}"));
+
+    insta::assert_snapshot!(captures.join("\n\n---\n\n"));
 }
 
 #[test]
@@ -3236,6 +3379,70 @@ fn command_history_navigates_previous_and_next_entries() {
     app.handle_key(KeyEvent::from(KeyCode::Down))
         .expect("history next should succeed");
     assert_eq!(app.command_input, "log -n 5".to_string());
+}
+
+#[test]
+fn command_history_traverses_three_entries_both_directions() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.mode = Mode::Command;
+    app.command_history = vec![
+        "status".to_string(),
+        "log -n 5".to_string(),
+        "show @".to_string(),
+    ];
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should select newest history entry");
+    assert_eq!(app.command_input, "show @");
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should select second entry");
+    assert_eq!(app.command_input, "log -n 5");
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should select first entry");
+    assert_eq!(app.command_input, "status");
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should return to second entry");
+    assert_eq!(app.command_input, "log -n 5");
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should return to third entry");
+    assert_eq!(app.command_input, "show @");
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move past newest entry to draft");
+    assert_eq!(app.command_input, String::new());
+}
+
+#[test]
+fn snapshot_command_history_three_entry_navigation() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.mode = Mode::Command;
+    app.command_history = vec![
+        "status".to_string(),
+        "log -n 5".to_string(),
+        "show @".to_string(),
+    ];
+
+    let mut captures = Vec::new();
+    captures.push(format!("start\n{}", app.render_for_snapshot(80, 6)));
+
+    for (label, key) in [
+        ("up-1", KeyEvent::from(KeyCode::Up)),
+        ("up-2", KeyEvent::from(KeyCode::Up)),
+        ("up-3", KeyEvent::from(KeyCode::Up)),
+        ("down-1", KeyEvent::from(KeyCode::Down)),
+        ("down-2", KeyEvent::from(KeyCode::Down)),
+        ("down-3", KeyEvent::from(KeyCode::Down)),
+    ] {
+        app.handle_key(key)
+            .expect("command history navigation should succeed");
+        captures.push(format!("{label}\n{}", app.render_for_snapshot(80, 6)));
+    }
+
+    insta::assert_snapshot!(captures.join("\n\n---\n\n"));
 }
 
 #[test]

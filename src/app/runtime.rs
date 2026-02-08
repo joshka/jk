@@ -246,9 +246,22 @@ impl App {
 
     /// Return row indices for selectable revision items.
     ///
-    /// For metadata-backed maps, this returns item-start boundaries (first row where revision
-    /// changes). If metadata is unavailable, graph-row starts are used as a fallback.
+    /// For `log`, visible graph commit rows are preferred so each rendered revision row remains
+    /// directly selectable. For metadata-backed maps, this returns item-start boundaries (first row
+    /// where revision changes). If metadata is unavailable, graph-row starts are used as fallback.
     fn selectable_indices(&self) -> Vec<usize> {
+        if matches!(self.last_command.first().map(String::as_str), Some("log")) {
+            let graph_rows: Vec<usize> = self
+                .lines
+                .iter()
+                .enumerate()
+                .filter_map(|(index, line)| looks_like_graph_commit_row(line).then_some(index))
+                .collect();
+            if !graph_rows.is_empty() {
+                return graph_rows;
+            }
+        }
+
         if self.row_revision_map.len() == self.lines.len() {
             let mut starts = Vec::new();
             let mut previous: Option<&str> = None;

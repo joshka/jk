@@ -128,7 +128,8 @@ pub(crate) fn build_row_revision_map(
 
 /// Heuristic for lines that visually represent graph commit rows.
 pub(crate) fn looks_like_graph_commit_row(line: &str) -> bool {
-    for ch in line.chars() {
+    let stripped = strip_ansi(line);
+    for ch in stripped.chars() {
         if ch.is_whitespace()
             || matches!(
                 ch,
