@@ -1,61 +1,160 @@
 # jk
 
-`jk` is a log-first TUI for `jj`.
+`jk` is a full-screen companion for `jj` that keeps your day-to-day flow in one place.
 
-The default entrypoint is `jk`, which behaves like `jk log`: it opens a full-screen, pager-style
-view and keeps you in one interface for inspect, rewrite, bookmark, and remote flows.
+If you already use `jj`, you know the rhythm: run a command, inspect output, run another command,
+repeat. `jk` keeps that rhythm but removes the shell ping-pong so history, status, rewrite actions,
+and recovery tools stay in one interface.
 
-## Goals
+## Why This Exists
 
-- Keep `jj log` as the visual and mental baseline.
-- Reuse `jj` config and command semantics wherever possible.
-- Avoid box-heavy dashboard UIs; favor focused, command-line-pager interaction.
-- Let users stay inside `jk` for common daily workflows.
+`jj` is powerful, but context-switching between many small commands can slow down common work.
+`jk` gives you a log-first home screen where you can inspect, act, and verify without losing
+context.
 
-## Prerequisites
+## What You Get
 
-- Rust toolchain with `cargo` available in `PATH`
-- `jj` binary available in `PATH`
-- A terminal that supports alternate-screen mode and ANSI color output
+- A log-first home view that behaves like `jj log`.
+- Item-based navigation for commit rows, not line-by-line noise.
+- Fast key-driven workflows for inspect, rewrite, sync, and recovery.
+- Confirmation gates for high-risk actions.
+- Exact-command escape hatch with `:` when you want raw precision.
 
 ## Quick Start
 
-1. Run `cargo run`.
-1. The app starts in a full-screen log-first view (equivalent to `jk log`).
-1. Press `:` then `status` and press `Enter` to switch views.
+Prerequisites:
+
+- Rust + `cargo` in `PATH`
+- `jj` in `PATH`
+- Terminal with alt-screen and ANSI color support
+
+Run:
+
+```bash
+cargo run
+```
+
+Then:
+
+1. Move through revisions with `j/k` (or arrows).
+1. Press `Enter` for `show` and `d` for `diff`.
+1. Press `:` and run `status`.
 1. Press `q` to quit.
 
-Expected success signals:
+## First 5 Minutes In `jk`
 
-- Header shows `jk [normal] :: jj log` on initial launch.
-- Footer shows `ok: jj log` after initial command execution succeeds.
-- Running `:status` updates footer to `ok: jj status`.
+Concrete example: review your current stack, inspect one revision, then prep a safe push.
 
-## Configuration
+1. Press `l` to ensure you are on log home.
+1. Use `j`/`k` to select the revision you want to inspect.
+1. Press `Enter` for `show`, then press `d` for `diff`.
+1. Press `Left` to go back to your previous screen.
+1. Press `s` for status and confirm your working copy is clean.
+1. Press `P` to start push flow and review the confirmation preview before accepting.
 
-`jk` always loads the embedded default keymap from `config/keybinds.default.toml`.
+If you only remember one loop, make it this one:
+`log -> inspect -> back -> status -> push preview`.
 
-Optional user overrides:
+## A Day With `jk`
 
-- `JK_KEYBINDS=/path/to/keybinds.toml`
-- `$HOME/.config/jk/keybinds.toml`
+1. Start in `log` and scan your stack quickly.
+1. Jump into details with `show`/`diff`.
+1. Apply rewrite actions (`D`, `B`, `S`, `X`, `a`) with safety prompts.
+1. Check `status`, run `F`/`P` for remote sync, and verify.
+1. If needed, inspect `operation log` and recover with `undo`/`redo`.
 
-Override files are partial overlays. Omitted keys keep default bindings.
+This keeps the feedback loop tight: inspect -> act -> verify.
 
-## Architecture Snapshot
+## Workflow Guide
 
-- `src/app/`: runtime state machine, input mode handling, terminal lifecycle, and wrapper rendering
-- `src/flow/`: command planning, prompt contracts, and prompt-to-token builders
-- `src/commands/`: command registry metadata and safety tier classification
-- `src/alias/`: alias normalization and alias catalog rendering
-- `src/config/`: keybinding parsing, validation, and default/user merge behavior
-- `src/jj.rs`: centralized `jj --no-pager` subprocess execution
+### Inspect History Fast
 
-## Contributor Docs
+- `l` / `:log`: home timeline
+- `Enter` / `:show <rev>`: inspect one revision
+- `d` / `:diff -r <rev>`: inspect patch
+- `PageUp`/`PageDown` and `Ctrl+u/d`: move by viewport
 
-- Test and snapshot workflow: `docs/contributing-tests.md`
-- Shared terminology (`guided`, `native`, `tier A/B/C`): `docs/glossary.md`
+### Rewrite With Safety
+
+- `n`, `c`, `D`: create/commit/describe flows
+- `B`, `S`, `X`, `a`: rebase/squash/split/abandon flows
+- High-risk commands are confirmation-gated and previewed
+
+### Sync and Recover
+
+- `s`: working-copy status
+- `F` / `P`: fetch/push prompt flows
+- `o`, `u`, `U`: operation log and undo/redo loop
+
+## Tutorial Gallery
+
+These media files are generated locally into `target/vhs/`:
+
+```bash
+docs/vhs/render.sh
+```
+
+### Static Screens (What The App Looks Like)
+
+Log home, where most work starts:
+
+![log](target/vhs/static-log.png)
+
+Status view, for working-copy triage:
+
+![status](target/vhs/static-status.png)
+
+Help/command registry, for discoverability:
+
+![help](target/vhs/static-help.png)
+
+Keymap view, for exact binding lookup:
+
+![keys](target/vhs/static-keys.png)
+
+### Dynamic Flows (How Work Moves)
+
+Revision navigation -> show/diff -> return:
+
+![navigation](target/vhs/tutorial-dynamic-navigation.gif)
+
+Command mode + paging + history traversal:
+
+![command/history](target/vhs/tutorial-dynamic-command-history.gif)
+
+Prompt and confirm safety behavior:
+
+![safety](target/vhs/tutorial-dynamic-safety.gif)
+
+Remote sync + operation follow-through:
+
+![remote/ops](target/vhs/tutorial-dynamic-remote-ops.gif)
+
+Full 25-item tutorial catalog: `docs/tutorial-vhs.md`.
+Scenario authoring rules: `docs/vhs/scenarios.md`.
+
+## Safety Model
+
+- Tier-C rewrite/mutation commands require explicit confirmation.
+- `git push` preview is shown when available.
+- Dangerous tutorial captures use cancel/reject paths by default.
+
+## Current Limits
+
+- View switching is command/key driven, not tab/window driven.
+- This project is still evolving; some long-tail `jj` flows are intentionally passthrough.
+
+## Learn More
+
+- Screen behavior reference: `docs/screens.md`
+- Navigation checklist: `docs/navigation-behavior-checklist.md`
+- Terminology: `docs/glossary.md`
 - Release readiness audit: `docs/release-readiness-audit-2026-02-08.md`
+
+## For Contributors
+
+- Tests and snapshots: `docs/contributing-tests.md`
+- Architecture and internals: `docs/architecture.md`
 - Security policy: `SECURITY.md`
 - Changelog: `CHANGELOG.md`
 
@@ -65,232 +164,3 @@ Dual-licensed under either:
 
 - Apache License, Version 2.0 (`LICENSE-APACHE`)
 - MIT license (`LICENSE-MIT`)
-
-## How `jk` Works (If You Know `jj`)
-
-In `jj`, you run a command, inspect output, then run the next command from your shell.
-
-In `jk`, you stay in one full-screen session and switch views by running commands in-place.
-`status`, `log`, `show`, and `help` are not separate apps or tabs; each is just the current view.
-
-That means there is no dedicated "back" action yet. To leave any view, run the next command you
-want (usually `:log`, `:status`, or `:operation log`), or use the `l` shortcut to jump to `log`.
-
-## Getting Unstuck Quickly
-
-- Go from `status` back to `log`: press `l` (or `:` then `log` + `Enter`).
-- Dismiss help (`?` / `:commands`): run another command, usually `:log`.
-- Cancel command entry: press `Esc` in command mode.
-- Cancel prompts: press `Esc` in prompt mode.
-- Reject dangerous command confirmation: press `n` or `Esc`.
-- Quit `jk`: press `q`.
-
-## Troubleshooting
-
-1. `jk` exits with `failed to run jj command`.
-   Confirm `jj` is installed and accessible: `jj --no-pager version`.
-1. `jk` exits with configuration parse/read errors.
-   Validate `JK_KEYBINDS` path and TOML syntax, then retry with defaults by unsetting the variable.
-1. Key presses do not match expected bindings.
-   Run `:keys` in-app to inspect resolved bindings and confirm your override file merged correctly.
-
-## `jj` CLI Flow vs `jk` Flow
-
-- Check history:
-  - `jj log`
-  - `jk` (default) or `:log`
-- Check current working state:
-  - `jj st`
-  - `s` or `:status`
-- Inspect a specific revision:
-  - `jj show <rev>`
-  - Move cursor to revision and press `Enter`, or run `:show <rev>`
-- Inspect patch for a revision:
-  - `jj diff -r <rev>`
-  - Move cursor to revision and press `d`, or run `:diff -r <rev>`
-- Write/update change description:
-  - `jj describe -m "message" <rev>`
-  - Move cursor to revision, press `D`, type message, press `Enter`
-- Create a new change:
-  - `jj new -m "message"`
-  - Press `n`, enter message (or blank), press `Enter`
-- Sync with remote:
-  - `jj git fetch` / `jj git push`
-  - Press `F` / `P`, then fill optional prompt input
-- Rebase to main/trunk defaults:
-  - `jj rebase -d main` / `jj rebase -d trunk()`
-  - Press `M` / `T`, or run `:rbm` / `:rbt`
-- Recover from mistakes:
-  - `jj op log`, `jj undo`, `jj redo`
-  - `o`, `u`, `U`
-
-## Day-One Workflow
-
-1. Start with `jk` and stay on `log` as your home view.
-2. Use `j`/`k` to select revisions, then `Enter` (`show`) and `d` (`diff`) to inspect.
-3. Use fast mutate keys (`n`, `c`, `D`, `b`, `a`, `B`, `S`, `X`) when you already selected a row.
-4. Use `:` for exact `jj` commands whenever you need precision.
-5. Return to `:log` between tasks so you keep a clear "home" state.
-
-## Real-Work Usability Today
-
-- Good fit today: daily inspect/edit/rewrite/bookmark/remote loops centered on `log`.
-- Safety: high-risk flows are confirm-gated with in-app previews.
-- Escape hatch: any supported `jj` command can be run directly via `:...`.
-- Current limitation: view switching is command-driven; there is no dedicated "close this view"
-  action yet.
-
-## References
-
-- Jujutsu tutorial: <https://docs.jj-vcs.dev/latest/tutorial/>
-- Jujutsu command docs (`log`): <https://docs.jj-vcs.dev/latest/cli-reference/#jj-log>
-- Steve Klabnik's tutorial: <https://steveklabnik.github.io/jujutsu-tutorial/>
-
-## Current State
-
-This repository is in active development. The current baseline includes:
-
-- Alt-screen + raw-mode runtime loop.
-- Ratatui-based frame rendering with a styled top header bar and mode-aware status/footer bar.
-- Log-first rendering with cursor selection.
-- Command mode (`:`), confirmation mode, and prompt mode.
-- `jj` subprocess execution via `jj --no-pager ...`.
-- Configurable keybinds from `config/keybinds.default.toml` and optional user override.
-- High-frequency normal-mode shortcuts: `s` status, `F` fetch, `P` push, `M` rebase to main,
-  `T` rebase to trunk.
-- Quick read shortcuts in normal mode: `l` log (home), `o` operation log, `L` bookmark list,
-  `v` resolve list, `f` file list, `t` tag list, `w` workspace root.
-- Help shortcut: `?` opens the command registry directly from normal mode.
-- Keymap shortcut: `K` opens the in-app keymap directly from normal mode.
-- Alias shortcut: `A` opens the in-app alias catalog directly from normal mode.
-- Repeat shortcut: `.` re-runs the last executed command in-place.
-- Log shortcut: `p` toggles `--patch` for the active log command arguments.
-- Action shortcuts in normal mode: `n` new, `c` commit, `D` describe selected change, `b` bookmark
-  set for selected change, `a` abandon selected change.
-- Navigation/action shortcuts in normal mode: `]` next, `[` prev, `e` edit selected change.
-- Rewrite/recovery shortcuts in normal mode: `B` rebase selected, `S` squash selected, `X` split
-  selected, `O` restore into selected, `R` revert selected, `u` undo, `U` redo.
-
-## Command Entry Model
-
-- `jk` defaults to `log`.
-- `jk <command> [args...]` starts in the same TUI and runs/plans that command.
-- Commands entered with `:` use the same normalization and safety rules.
-- `:` command parsing supports shell-style quoting for multi-word arguments.
-- Command mode supports history navigation with `Up`/`Down`.
-- `:commands` renders an in-app command registry with mode/tier coverage.
-- Mode/tier terminology is defined in `docs/glossary.md`.
-- `:commands` also annotates top-level `jj` default aliases
-  (`bookmark (b)`, `commit (ci)`, `describe (desc)`, `operation (op)`, `status (st)`).
-- `:help` mirrors `:commands`; both accept an optional filter (for example `:commands work`).
-- The command registry also surfaces local TUI views (`aliases`, `keys`, `keymap`).
-- `:aliases` renders an in-app alias catalog and supports filtering (for example `:aliases push`).
-- `:keys` renders the active keymap and supports filtering (for example `:keys push`).
-- Unfiltered command registry output includes a high-frequency alias hint, discovery tips, and
-  group-default hints (for example `resolve -> resolve -l`, `file -> file list`, and
-  `operation -> operation log`).
-- `status`, `show`, and `diff` use lightweight in-app view headers/shortcuts while preserving
-  command output content.
-- `show`/`diff` wrappers add section spacing for file headers to improve scanability.
-- `status` and `operation log` wrappers include compact summary lines plus section spacing.
-- `root` and `workspace root` use a native path-focused wrapper view for quick workspace
-  inspection.
-- `bookmark list` and `operation log` also use native wrapper headers/tips for faster scanning.
-- `workspace list` and `operation show` now use native wrappers with compact summaries and tips.
-- `file list` and `tag list` now use native wrappers with compact summaries and empty-state hints.
-- `file show`, `file search`, and `file annotate` now use native wrappers with concise summaries.
-- `file track`, `file untrack`, and `file chmod` now use native wrappers with mutation-focused
-  summaries and follow-up tips.
-- `bookmark` mutation subcommands (`create/set/move/track/untrack/delete/forget/rename`) now
-  render with native mutation wrappers and verification tips.
-- `workspace` mutation subcommands (`add/forget/rename/update-stale`) now render with native
-  mutation wrappers and follow-up tips.
-- Top-level mutation commands (`new`, `describe`, `commit`, `edit`, `next`, `prev`, `rebase`,
-  `squash`, `split`, `abandon`, `undo`, `redo`, `restore`, `revert`) now render with native
-  post-action wrappers and command-specific follow-up tips.
-  - these wrappers now prefer signal-first summaries (for example `Rebased N commits` or
-    `Undid operation ...`) and fall back to output-line counts when no signal line is present.
-- `resolve -l` now uses a native wrapper with conflict-count or no-conflicts summary.
-- `operation diff` now uses a native wrapper with compact changed-commit summary.
-- `operation restore` and `operation revert` now render with native mutation wrappers after
-  confirmation.
-- `git fetch` and `git push` now use native wrappers with compact summaries and follow-up tips.
-
-## Implemented Flow Coverage (Baseline)
-
-- Read: `log`, `status`, `show`, `diff`.
-- Daily mutation: `new`, `describe`, `commit`, `next`, `prev`, `edit`.
-- Rewrite/recovery: `rebase`, `squash`, `split`, `abandon`, `undo`, `redo`.
-- Recovery extras: `restore`, `revert`.
-- Bookmarks: `bookmark list/create/set/move/delete/forget/rename/track/untrack`.
-- Remote: `git fetch`, `git push`.
-- Command groups: `operation` defaults to `operation log`; `workspace` defaults to
-  `workspace list`; `resolve` defaults to `resolve -l`; `file` defaults to `file list`; `tag`
-  defaults to `tag list`.
-- File read flows: `file list`, `file show`, `file search`, and `file annotate` execute with
-  native wrapper rendering.
-- File mutation flows: `file track`, `file untrack`, and `file chmod` run as guided prompts.
-- Tag mutation flows: `tag set` and `tag delete` are now guided prompts with sensible defaults.
-- Operation read flows: `operation show` and `operation diff` execute directly in-app.
-- Operation guided prompts: `operation restore`, `operation revert`.
-- Workspace guided prompts: `workspace add`, `workspace forget`, `workspace rename`;
-  direct actions for `workspace root` and `workspace update-stale`.
-
-Mutating high-risk commands run through confirmation guards.
-`git push` confirmation now includes a best-effort `--dry-run` preview in-app when available.
-`git fetch` and `git push` output now render through native wrappers instead of raw passthrough
-lines.
-`operation restore`/`operation revert` confirmation includes an operation summary preview.
-Rewrite, recovery, and bookmark Tier `C` flows also render targeted log/show previews before
-confirmation when enough command context is available.
-Unhandled Tier `C` commands fall back to a short `operation log` preview.
-
-`jk` also keeps an explicit top-level command registry aligned to the current `jj` command surface so
-new flow work can evolve without ambiguity.
-Log-row selection uses metadata-backed revision mapping to stay stable across multi-line log views.
-
-## Alias Coverage
-
-Native aliases:
-
-- `gf`, `gp`, `rbm`, `rbt`
-- core `jj` defaults: `b`, `ci`, `op`, `st`, `desc`
-- `rbm` defaults to `main` and accepts an optional destination override (for example `rbm release`).
-- `rbm`/`rbt` preserve explicit destination flags (for example `rbm -d release` or
-  `rbt --to main`) instead of forcing default destinations.
-
-Oh My Zsh `jj` plugin compatibility is included for common aliases such as:
-
-- `jjgf`, `jjgfa`, `jjgp`, `jjgpt`, `jjgpa`, `jjgpd`
-- `jjrb`, `jjrbm`, `jjst`, `jjl`, `jjd`, `jjc`, `jjsp`, `jjsq`, `jjrs`, `jja`
-- `jjb`, `jjbl`, `jjbs`, `jjbm`, `jjbt`, `jjbu`, `jjrt`
-- plus plugin parity aliases including `jjbc`, `jjbd`, `jjbf`, `jjbr`, `jjcmsg`, `jjdmsg`,
-  `jjgcl`, and `jjla`.
-
-## Development
-
-Build and run:
-
-```bash
-cargo run
-```
-
-Quality checks:
-
-```bash
-cargo fmt --all
-cargo check
-cargo test
-cargo clippy --all-targets --all-features -- -D warnings
-markdownlint-cli2 "*.md" ".plans/*.md" "docs/**/*.md"
-git-cliff --unreleased --tag v0.1.0 --output CHANGELOG.md
-```
-
-## Project Docs
-
-Planning and ADR files live in:
-
-- `.plans/`
-- `docs/adr/`
-
-These files are maintained alongside code so implementation context is not lost during long runs.
