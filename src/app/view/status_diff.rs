@@ -90,7 +90,6 @@ pub(crate) fn render_status_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Status Overview".to_string(),
-        "===============".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -107,11 +106,7 @@ pub(crate) fn render_show_view(lines: Vec<String>) -> Vec<String> {
         return lines;
     }
 
-    let mut rendered = vec![
-        "Show View".to_string(),
-        "=========".to_string(),
-        String::new(),
-    ];
+    let mut rendered = vec!["Show View".to_string(), String::new()];
     rendered.extend(normalize_show_lines(lines));
     rendered.push(String::new());
     rendered.push("Shortcuts: Enter show selected, d diff selected, s status".to_string());
@@ -124,11 +119,7 @@ pub(crate) fn render_diff_view(lines: Vec<String>) -> Vec<String> {
         return lines;
     }
 
-    let mut rendered = vec![
-        "Diff View".to_string(),
-        "=========".to_string(),
-        String::new(),
-    ];
+    let mut rendered = vec!["Diff View".to_string(), String::new()];
     rendered.extend(normalize_diff_lines(lines));
     rendered.push(String::new());
     rendered.push("Shortcuts: d diff selected, Enter show selected, s status".to_string());
@@ -141,11 +132,7 @@ pub(crate) fn render_interdiff_view(lines: Vec<String>) -> Vec<String> {
         return lines;
     }
 
-    let mut rendered = vec![
-        "Interdiff View".to_string(),
-        "==============".to_string(),
-        String::new(),
-    ];
+    let mut rendered = vec!["Interdiff View".to_string(), String::new()];
     rendered.extend(normalize_diff_lines(lines));
     rendered.push(String::new());
     rendered.push("Tip: compare patch intent with `interdiff --from ... --to ...`".to_string());
@@ -192,7 +179,6 @@ pub(crate) fn render_evolog_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Evolution Log".to_string(),
-        "=============".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -268,76 +254,133 @@ pub(crate) fn keymap_overview_lines(config: &KeybindConfig, query: Option<&str>)
         .filter(|value| !value.is_empty())
         .map(str::to_ascii_lowercase);
 
-    let entries: [(&str, &Vec<KeyBinding>); 48] = [
-        ("normal.quit", &config.normal.quit),
-        ("normal.refresh", &config.normal.refresh),
-        ("normal.up", &config.normal.up),
-        ("normal.down", &config.normal.down),
-        ("normal.top", &config.normal.top),
-        ("normal.bottom", &config.normal.bottom),
-        ("normal.command_mode", &config.normal.command_mode),
-        ("normal.help", &config.normal.help),
-        ("normal.keymap", &config.normal.keymap),
-        ("normal.aliases", &config.normal.aliases),
-        ("normal.show", &config.normal.show),
-        ("normal.diff", &config.normal.diff),
-        ("normal.status", &config.normal.status),
-        ("normal.log", &config.normal.log),
-        ("normal.operation_log", &config.normal.operation_log),
-        ("normal.bookmark_list", &config.normal.bookmark_list),
-        ("normal.resolve_list", &config.normal.resolve_list),
-        ("normal.file_list", &config.normal.file_list),
-        ("normal.tag_list", &config.normal.tag_list),
-        ("normal.root", &config.normal.root),
-        ("normal.repeat_last", &config.normal.repeat_last),
-        ("normal.toggle_patch", &config.normal.toggle_patch),
-        ("normal.fetch", &config.normal.fetch),
-        ("normal.push", &config.normal.push),
-        ("normal.rebase_main", &config.normal.rebase_main),
-        ("normal.rebase_trunk", &config.normal.rebase_trunk),
-        ("normal.new", &config.normal.new),
-        ("normal.next", &config.normal.next),
-        ("normal.prev", &config.normal.prev),
-        ("normal.edit", &config.normal.edit),
-        ("normal.commit", &config.normal.commit),
-        ("normal.describe", &config.normal.describe),
-        ("normal.bookmark_set", &config.normal.bookmark_set),
-        ("normal.abandon", &config.normal.abandon),
-        ("normal.rebase", &config.normal.rebase),
-        ("normal.squash", &config.normal.squash),
-        ("normal.split", &config.normal.split),
-        ("normal.restore", &config.normal.restore),
-        ("normal.revert", &config.normal.revert),
-        ("normal.undo", &config.normal.undo),
-        ("normal.redo", &config.normal.redo),
-        ("command.submit", &config.command.submit),
-        ("command.cancel", &config.command.cancel),
-        ("command.backspace", &config.command.backspace),
-        ("command.history_prev", &config.command.history_prev),
-        ("command.history_next", &config.command.history_next),
-        ("confirm.accept", &config.confirm.accept),
-        ("confirm.reject", &config.confirm.reject),
-    ];
-
     let mut lines = vec![
         "jk keymap".to_string(),
-        format!("{:<24} {}", "action", "keys"),
-        "-".repeat(44),
+        String::new(),
+        "grouped bindings (common first)".to_string(),
+        String::new(),
     ];
 
+    let mut matched_any = false;
+    matched_any |= push_keymap_group(
+        &mut lines,
+        "Navigation",
+        &[
+            ("quit", &config.normal.quit),
+            ("refresh", &config.normal.refresh),
+            ("up", &config.normal.up),
+            ("down", &config.normal.down),
+            ("page up", &config.normal.page_up),
+            ("page down", &config.normal.page_down),
+            ("back", &config.normal.back),
+            ("forward", &config.normal.forward),
+            ("top", &config.normal.top),
+            ("bottom", &config.normal.bottom),
+            ("repeat", &config.normal.repeat_last),
+        ],
+        filter.as_deref(),
+    );
+    matched_any |= push_keymap_group(
+        &mut lines,
+        "Views",
+        &[
+            ("command mode", &config.normal.command_mode),
+            ("help", &config.normal.help),
+            ("keymap", &config.normal.keymap),
+            ("aliases", &config.normal.aliases),
+            ("show", &config.normal.show),
+            ("diff", &config.normal.diff),
+            ("status", &config.normal.status),
+            ("log", &config.normal.log),
+            ("operation log", &config.normal.operation_log),
+            ("bookmark list", &config.normal.bookmark_list),
+            ("resolve list", &config.normal.resolve_list),
+            ("file list", &config.normal.file_list),
+            ("tag list", &config.normal.tag_list),
+            ("workspace root", &config.normal.root),
+        ],
+        filter.as_deref(),
+    );
+    matched_any |= push_keymap_group(
+        &mut lines,
+        "Actions",
+        &[
+            ("toggle patch", &config.normal.toggle_patch),
+            ("fetch", &config.normal.fetch),
+            ("push", &config.normal.push),
+            ("rebase main", &config.normal.rebase_main),
+            ("rebase trunk", &config.normal.rebase_trunk),
+            ("new", &config.normal.new),
+            ("next", &config.normal.next),
+            ("prev", &config.normal.prev),
+            ("edit", &config.normal.edit),
+            ("commit", &config.normal.commit),
+            ("describe", &config.normal.describe),
+            ("bookmark set", &config.normal.bookmark_set),
+            ("abandon", &config.normal.abandon),
+            ("rebase", &config.normal.rebase),
+            ("squash", &config.normal.squash),
+            ("split", &config.normal.split),
+            ("restore", &config.normal.restore),
+            ("revert", &config.normal.revert),
+            ("undo", &config.normal.undo),
+            ("redo", &config.normal.redo),
+            ("cmd submit", &config.command.submit),
+            ("cmd backspace", &config.command.backspace),
+            ("cmd history prev", &config.command.history_prev),
+            ("cmd history next", &config.command.history_next),
+        ],
+        filter.as_deref(),
+    );
+    matched_any |= push_keymap_group(
+        &mut lines,
+        "Safety",
+        &[
+            ("cmd cancel", &config.command.cancel),
+            ("confirm yes", &config.confirm.accept),
+            ("confirm no", &config.confirm.reject),
+        ],
+        filter.as_deref(),
+    );
+
+    if !matched_any {
+        lines.push("(no matching keybinds)".to_string());
+        return lines;
+    }
+
+    lines.push("tip: use :keys <query> to narrow the list (for example :keys rebase)".to_string());
+    lines
+}
+
+/// Append one named keymap group and return whether any entry matched.
+fn push_keymap_group(
+    lines: &mut Vec<String>,
+    title: &str,
+    entries: &[(&str, &Vec<KeyBinding>)],
+    filter: Option<&str>,
+) -> bool {
+    let mut compact = Vec::new();
     for (action, bindings) in entries {
         let labels = key_binding_labels(bindings);
-        if let Some(filter) = &filter
+        if let Some(filter) = filter
             && !action.to_ascii_lowercase().contains(filter)
             && !labels.to_ascii_lowercase().contains(filter)
+            && !title.to_ascii_lowercase().contains(filter)
         {
             continue;
         }
 
-        lines.push(format!("{:<24} {}", action, labels));
+        compact.push(format!("{:<16} {}", action, labels));
     }
 
-    lines
+    if compact.is_empty() {
+        return false;
+    }
+
+    lines.push(format!("{title}:"));
+    lines.extend(compact_two_column(&compact, 42));
+    lines.push(String::new());
+    true
 }
 
 /// Render comma-separated labels for a set of bindings.
@@ -358,9 +401,27 @@ pub(crate) fn key_binding_label(binding: &KeyBinding) -> String {
         KeyBinding::Backspace => "Backspace".to_string(),
         KeyBinding::Up => "Up".to_string(),
         KeyBinding::Down => "Down".to_string(),
+        KeyBinding::PageUp => "PageUp".to_string(),
+        KeyBinding::PageDown => "PageDown".to_string(),
         KeyBinding::Left => "Left".to_string(),
         KeyBinding::Right => "Right".to_string(),
         KeyBinding::Home => "Home".to_string(),
         KeyBinding::End => "End".to_string(),
     }
+}
+
+/// Pack one-column entry lines into compact two-column output.
+fn compact_two_column(entries: &[String], width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    for pair in entries.chunks(2) {
+        if pair.len() == 1 {
+            lines.push(pair[0].clone());
+            continue;
+        }
+
+        lines.push(format!("{:<width$}  {}", pair[0], pair[1], width = width));
+    }
+
+    lines
 }

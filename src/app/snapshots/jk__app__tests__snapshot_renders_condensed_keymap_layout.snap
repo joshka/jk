@@ -1,0 +1,44 @@
+---
+source: src/app/tests.rs
+expression: "lines.join(\"\\n\")"
+---
+jk keymap
+
+grouped bindings (common first)
+
+Navigation:
+quit             q                          refresh          r
+up               k, Up                      down             j, Down
+page up          PageUp                     page down        PageDown
+back             Left, h                    forward          Right
+top              g, Home                    bottom           G, End
+repeat           .
+
+Views:
+command mode     :                          help             ?
+keymap           K                          aliases          A
+show             Enter                      diff             d
+status           s                          log              l
+operation log    o                          bookmark list    L
+resolve list     v                          file list        f
+tag list         t                          workspace root   w
+
+Actions:
+toggle patch     p                          fetch            F
+push             P                          rebase main      M
+rebase trunk     T                          new              n
+next             ]                          prev             [
+edit             e                          commit           c
+describe         D                          bookmark set     b
+abandon          a                          rebase           B
+squash           S                          split            X
+restore          O                          revert           R
+undo             u                          redo             U
+cmd submit       Enter                      cmd backspace    Backspace
+cmd history prev Up                         cmd history next Down
+
+Safety:
+cmd cancel       Esc                        confirm yes      y
+confirm no       n, Esc
+
+tip: use :keys <query> to narrow the list (for example :keys rebase)

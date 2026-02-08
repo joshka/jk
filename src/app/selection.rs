@@ -111,6 +111,9 @@ pub(crate) fn build_row_revision_map(
                 next_ordinal = (*position + 1).max(next_ordinal);
             } else if ordered_revisions.is_empty() {
                 current = Some(explicit);
+            } else if looks_like_graph_commit_row(line) && next_ordinal < ordered_revisions.len() {
+                current = ordered_revisions.get(next_ordinal).cloned();
+                next_ordinal += 1;
             }
         } else if looks_like_graph_commit_row(line) && next_ordinal < ordered_revisions.len() {
             current = ordered_revisions.get(next_ordinal).cloned();
@@ -251,15 +254,27 @@ pub(crate) fn extract_revision(line: &str) -> Option<String> {
         .filter(|token| !token.is_empty())
         .collect();
 
-    let commit_index = tokens.iter().position(|token| is_commit_id(token))?;
+    if let Some(commit_index) = tokens.iter().position(|token| is_commit_id(token)) {
+        for token in &tokens[..commit_index] {
+            if is_change_id(token) {
+                return Some((*token).to_string());
+            }
+        }
 
-    for token in &tokens[..commit_index] {
-        if is_change_id(token) {
-            return Some((*token).to_string());
+        return tokens.get(commit_index).map(|token| (*token).to_string());
+    }
+
+    // Newer/default `jj log` templates can omit explicit commit ids. When the line is a graph row,
+    // accept a standalone change id token as the selected revision anchor.
+    if looks_like_graph_commit_row(line) {
+        for token in tokens {
+            if is_change_id(token) {
+                return Some(token.to_string());
+            }
         }
     }
 
-    tokens.get(commit_index).map(|token| (*token).to_string())
+    None
 }
 
 /// Trim punctuation around a candidate revision token.

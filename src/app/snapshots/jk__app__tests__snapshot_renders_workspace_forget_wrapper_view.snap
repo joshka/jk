@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Workspace Forget
-=================
 
 Summary: Forgot workspace docs
 

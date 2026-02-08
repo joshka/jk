@@ -33,6 +33,13 @@ fn default_keybinds_include_high_frequency_shortcuts() {
     assert_eq!(config.normal.file_list, vec![KeyBinding::Char('f')]);
     assert_eq!(config.normal.tag_list, vec![KeyBinding::Char('t')]);
     assert_eq!(config.normal.root, vec![KeyBinding::Char('w')]);
+    assert_eq!(config.normal.page_up, vec![KeyBinding::PageUp]);
+    assert_eq!(config.normal.page_down, vec![KeyBinding::PageDown]);
+    assert_eq!(
+        config.normal.back,
+        vec![KeyBinding::Left, KeyBinding::Char('h')]
+    );
+    assert_eq!(config.normal.forward, vec![KeyBinding::Right]);
     assert_eq!(config.normal.repeat_last, vec![KeyBinding::Char('.')]);
     assert_eq!(config.normal.toggle_patch, vec![KeyBinding::Char('p')]);
     assert_eq!(config.normal.rebase, vec![KeyBinding::Char('B')]);
@@ -72,6 +79,10 @@ fn load_keeps_keybind_configuration_valid() {
     assert!(!config.normal.file_list.is_empty());
     assert!(!config.normal.tag_list.is_empty());
     assert!(!config.normal.root.is_empty());
+    assert!(!config.normal.page_up.is_empty());
+    assert!(!config.normal.page_down.is_empty());
+    assert!(!config.normal.back.is_empty());
+    assert!(!config.normal.forward.is_empty());
     assert!(!config.normal.repeat_last.is_empty());
     assert!(!config.normal.toggle_patch.is_empty());
     assert!(!config.normal.rebase.is_empty());

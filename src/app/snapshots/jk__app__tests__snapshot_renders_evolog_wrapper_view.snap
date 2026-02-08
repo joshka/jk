@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Evolution Log
-=============
 
 Summary: 1 evolution entry shown
 

@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Duplicate Result
-================
 
 Summary: Duplicated 1 commits onto 0123abcd
 

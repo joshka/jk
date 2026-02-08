@@ -1,10 +1,8 @@
 ---
-source: src/app.rs
-assertion_line: 2338
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Workspace List
-==============
 
 Summary: 2 workspaces listed
 

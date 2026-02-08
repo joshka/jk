@@ -36,7 +36,6 @@ pub(crate) fn render_operation_show_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Operation Details".to_string(),
-        "=================".to_string(),
         String::new(),
         format!("Summary: operation {operation_id}"),
         String::new(),
@@ -58,7 +57,6 @@ pub(crate) fn render_operation_mutation_view(subcommand: &str, lines: Vec<String
 
     let mut rendered = vec![
         format!("Operation {}", capitalize_word(subcommand)),
-        "=================".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -152,7 +150,6 @@ pub(crate) fn render_operation_diff_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Operation Diff".to_string(),
-        "==============".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -195,7 +192,6 @@ pub(crate) fn render_operation_log_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Operation Log".to_string(),
-        "=============".to_string(),
         String::new(),
         format!(
             "Summary: {operation_count} operation entr{} shown",

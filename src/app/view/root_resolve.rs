@@ -9,11 +9,7 @@ pub(crate) fn render_root_view(lines: Vec<String>) -> Vec<String> {
         return lines;
     }
 
-    let mut rendered = vec![
-        "Workspace Root".to_string(),
-        "==============".to_string(),
-        String::new(),
-    ];
+    let mut rendered = vec!["Workspace Root".to_string(), String::new()];
 
     for line in lines {
         let display_line = line.trim_end().to_string();
@@ -45,13 +41,7 @@ pub(crate) fn render_version_view(lines: Vec<String>) -> Vec<String> {
         "Summary: version command completed with no output".to_string()
     };
 
-    let mut rendered = vec![
-        "Version".to_string(),
-        "=======".to_string(),
-        String::new(),
-        summary,
-        String::new(),
-    ];
+    let mut rendered = vec!["Version".to_string(), String::new(), summary, String::new()];
 
     if detail_lines.is_empty() {
         rendered.push("(no output)".to_string());
@@ -103,7 +93,6 @@ pub(crate) fn render_resolve_list_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Resolve List".to_string(),
-        "============".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -144,13 +133,7 @@ pub(crate) fn render_resolve_action_view(lines: Vec<String>) -> Vec<String> {
         )
     };
 
-    let mut rendered = vec![
-        "Resolve".to_string(),
-        "=======".to_string(),
-        String::new(),
-        summary,
-        String::new(),
-    ];
+    let mut rendered = vec!["Resolve".to_string(), String::new(), summary, String::new()];
 
     if detail_lines.is_empty() {
         rendered.push("(no output)".to_string());

@@ -1,0 +1,12 @@
+---
+source: src/commands/overview.rs
+expression: "command_overview_lines_with_query(Some(\"flow\")).join(\"\\n\")"
+---
+jk command registry
+
+common flows (grouped, condensed)
+
+(no matching flows)
+
+all top-level commands (common first, condensed)
+(no matching commands)

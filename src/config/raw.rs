@@ -21,6 +21,10 @@ struct RawNormal {
     refresh: Vec<String>,
     up: Vec<String>,
     down: Vec<String>,
+    page_up: Vec<String>,
+    page_down: Vec<String>,
+    back: Vec<String>,
+    forward: Vec<String>,
     top: Vec<String>,
     bottom: Vec<String>,
     command_mode: Vec<String>,
@@ -92,6 +96,10 @@ struct PartialNormal {
     refresh: Option<Vec<String>>,
     up: Option<Vec<String>>,
     down: Option<Vec<String>>,
+    page_up: Option<Vec<String>>,
+    page_down: Option<Vec<String>>,
+    back: Option<Vec<String>>,
+    forward: Option<Vec<String>>,
     top: Option<Vec<String>>,
     bottom: Option<Vec<String>>,
     command_mode: Option<Vec<String>>,
@@ -157,6 +165,10 @@ impl RawConfig {
                 refresh: parse_bindings(&self.normal.refresh)?,
                 up: parse_bindings(&self.normal.up)?,
                 down: parse_bindings(&self.normal.down)?,
+                page_up: parse_bindings(&self.normal.page_up)?,
+                page_down: parse_bindings(&self.normal.page_down)?,
+                back: parse_bindings(&self.normal.back)?,
+                forward: parse_bindings(&self.normal.forward)?,
                 top: parse_bindings(&self.normal.top)?,
                 bottom: parse_bindings(&self.normal.bottom)?,
                 command_mode: parse_bindings(&self.normal.command_mode)?,
@@ -226,6 +238,18 @@ pub(super) fn apply_partial(base: &mut RawConfig, user: PartialConfig) {
         }
         if let Some(value) = normal.down {
             base.normal.down = value;
+        }
+        if let Some(value) = normal.page_up {
+            base.normal.page_up = value;
+        }
+        if let Some(value) = normal.page_down {
+            base.normal.page_down = value;
+        }
+        if let Some(value) = normal.back {
+            base.normal.back = value;
+        }
+        if let Some(value) = normal.forward {
+            base.normal.forward = value;
         }
         if let Some(value) = normal.top {
             base.normal.top = value;

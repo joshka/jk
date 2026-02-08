@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Interdiff View
-==============
 
 Modified regular file src/app.rs:
     1      1: use std::collections::HashMap;

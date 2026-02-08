@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Revert Result
-=============
 
 Summary: Reverted 2 paths from revision abcdef12
 

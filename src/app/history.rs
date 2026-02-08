@@ -1,5 +1,7 @@
 //! Command history storage and navigation for command mode.
 
+use crate::error::JkError;
+
 use super::App;
 
 impl App {
@@ -53,5 +55,83 @@ impl App {
 
         self.command_history_index = None;
         self.command_input = self.command_history_draft.clone();
+    }
+
+    /// Record navigable screen command for back/forward traversal.
+    pub(super) fn record_view_visit(&mut self, command: &str) {
+        let trimmed = command.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+
+        if self.navigating_view_stack {
+            self.current_view_command = trimmed.to_string();
+            return;
+        }
+
+        if self.current_view_command == trimmed {
+            return;
+        }
+
+        if !self.current_view_command.is_empty() {
+            self.view_back_stack.push(self.current_view_command.clone());
+        }
+        self.current_view_command = trimmed.to_string();
+        self.view_forward_stack.clear();
+    }
+
+    /// Navigate to previous screen command if available.
+    pub(super) fn navigate_view_back(&mut self) -> Result<(), JkError> {
+        let Some(previous) = self.view_back_stack.pop() else {
+            self.status_line = "No previous screen".to_string();
+            return Ok(());
+        };
+
+        if !self.current_view_command.is_empty() {
+            self.view_forward_stack
+                .push(self.current_view_command.clone());
+        }
+
+        self.navigating_view_stack = true;
+        let result = self.execute_command_line(&previous);
+        self.navigating_view_stack = false;
+
+        if result.is_err() {
+            if let Some(current) = self.view_forward_stack.pop() {
+                self.current_view_command = current;
+            }
+            self.view_back_stack.push(previous);
+            return result;
+        }
+
+        self.status_line = format!("back: {}", self.current_view_command);
+        Ok(())
+    }
+
+    /// Navigate to next screen command if available.
+    pub(super) fn navigate_view_forward(&mut self) -> Result<(), JkError> {
+        let Some(next) = self.view_forward_stack.pop() else {
+            self.status_line = "No next screen".to_string();
+            return Ok(());
+        };
+
+        if !self.current_view_command.is_empty() {
+            self.view_back_stack.push(self.current_view_command.clone());
+        }
+
+        self.navigating_view_stack = true;
+        let result = self.execute_command_line(&next);
+        self.navigating_view_stack = false;
+
+        if result.is_err() {
+            if let Some(current) = self.view_back_stack.pop() {
+                self.current_view_command = current;
+            }
+            self.view_forward_stack.push(next);
+            return result;
+        }
+
+        self.status_line = format!("forward: {}", self.current_view_command);
+        Ok(())
     }
 }

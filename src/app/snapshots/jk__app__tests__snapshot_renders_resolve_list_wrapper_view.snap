@@ -1,10 +1,8 @@
 ---
-source: src/app.rs
-assertion_line: 2610
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Resolve List
-============
 
 Summary: no conflicts listed
 

@@ -38,6 +38,11 @@ fn run_with_color(tokens: &[String], color: &str) -> Result<CommandResult, JkErr
     command.arg("--color");
     command.arg(color);
     command.args(tokens);
+    // Keep color output deterministic in non-interactive capture contexts (for example VHS).
+    command.env_remove("NO_COLOR");
+    command.env("CLICOLOR_FORCE", "1");
+    command.env("COLORTERM", "truecolor");
+    command.env("TERM", "xterm-256color");
 
     let output = command
         .output()

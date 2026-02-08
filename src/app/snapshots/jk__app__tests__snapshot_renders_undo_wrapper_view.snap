@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Undo Result
-===========
 
 Summary: Undid operation 67d547b627fb
 

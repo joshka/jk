@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Bookmark Set
-================
 
 Summary: Moved bookmark main to abcdef12
 

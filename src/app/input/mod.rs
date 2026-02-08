@@ -74,11 +74,18 @@ impl App {
 
     /// Execute a raw command line by resolving local view actions or planner actions.
     pub(super) fn execute_command_line(&mut self, command: &str) -> Result<(), JkError> {
+        let trimmed = command.trim();
         if let Some(action) = self.local_view_action(command) {
+            if matches!(action, FlowAction::Render { .. }) {
+                self.record_view_visit(trimmed);
+            }
             return self.apply_flow_action(action);
         }
 
         let action = plan_command(command, self.selected_revision());
+        if matches!(action, FlowAction::Render { .. }) && !trimmed.is_empty() {
+            self.record_view_visit(trimmed);
+        }
         self.apply_flow_action(action)
     }
 
@@ -119,5 +126,45 @@ impl App {
         });
         self.mode = Mode::Prompt;
         self.status_line = format!("Prompt: {}", request.label);
+    }
+
+    /// Return whether canonical command tokens represent a navigable read-only screen.
+    pub(super) fn is_navigable_view_tokens(tokens: &[String]) -> bool {
+        match tokens.first().map(String::as_str) {
+            Some(
+                "log" | "status" | "show" | "diff" | "root" | "version" | "evolog" | "interdiff",
+            ) => true,
+            Some("operation")
+                if matches!(
+                    tokens.get(1).map(String::as_str),
+                    Some("log" | "show" | "diff")
+                ) =>
+            {
+                true
+            }
+            Some("bookmark") if matches!(tokens.get(1).map(String::as_str), Some("list")) => true,
+            Some("resolve")
+                if tokens
+                    .iter()
+                    .any(|token| token == "-l" || token == "--list") =>
+            {
+                true
+            }
+            Some("file")
+                if matches!(
+                    tokens.get(1).map(String::as_str),
+                    Some("list" | "show" | "search" | "annotate")
+                ) =>
+            {
+                true
+            }
+            Some("tag") if matches!(tokens.get(1).map(String::as_str), Some("list")) => true,
+            Some("workspace")
+                if matches!(tokens.get(1).map(String::as_str), Some("list" | "root")) =>
+            {
+                true
+            }
+            _ => false,
+        }
     }
 }

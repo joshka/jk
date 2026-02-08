@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::config::KeybindConfig;
 
@@ -38,6 +38,12 @@ fn extracts_commit_id_when_change_missing() {
 #[test]
 fn extracts_revision_from_ansi_colored_log_line() {
     let line = "\u{1b}[32m@\u{1b}[0m  \u{1b}[36mabcdefgh\u{1b}[0m user 2026-02-07 0123abcd";
+    assert_eq!(extract_revision(line), Some("abcdefgh".to_string()));
+}
+
+#[test]
+fn extracts_revision_from_graph_row_without_commit_hash() {
+    let line = "@  abcdefgh joshka 2026-02-07 add feature";
     assert_eq!(extract_revision(line), Some("abcdefgh".to_string()));
 }
 
@@ -116,6 +122,208 @@ fn selected_revision_falls_back_to_previous_revision_line() {
     app.cursor = 1;
 
     assert_eq!(app.selected_revision(), Some("abcdefgh".to_string()));
+}
+
+#[test]
+fn log_navigation_moves_by_revision_item_not_rendered_line() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.lines = vec![
+        "@  aaaaaaaa 11111111 top".to_string(),
+        "│  detail line one".to_string(),
+        "│  detail line two".to_string(),
+        "○  bbbbbbbb 22222222 middle".to_string(),
+        "│  middle detail".to_string(),
+        "○  cccccccc 33333333 bottom".to_string(),
+    ];
+    app.row_revision_map = vec![
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("bbbbbbbb".to_string()),
+        Some("bbbbbbbb".to_string()),
+        Some("cccccccc".to_string()),
+    ];
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move to next item");
+    assert_eq!(app.cursor, 3);
+    assert_eq!(app.selected_revision(), Some("bbbbbbbb".to_string()));
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move to third item");
+    assert_eq!(app.cursor, 5);
+    assert_eq!(app.selected_revision(), Some("cccccccc".to_string()));
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should move to previous item");
+    assert_eq!(app.cursor, 3);
+    assert_eq!(app.selected_revision(), Some("bbbbbbbb".to_string()));
+}
+
+#[test]
+fn page_navigation_supports_page_keys_and_ctrl_bindings() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.viewport_rows = 6;
+    app.lines = (0..40).map(|index| format!("line {index}")).collect();
+
+    app.handle_key(KeyEvent::from(KeyCode::PageDown))
+        .expect("pagedown should move cursor by one viewport");
+    assert_eq!(app.cursor, 5);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL))
+        .expect("ctrl+d should page down");
+    assert_eq!(app.cursor, 10);
+
+    app.handle_key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL))
+        .expect("ctrl+u should page up");
+    assert_eq!(app.cursor, 5);
+
+    app.handle_key(KeyEvent::from(KeyCode::PageUp))
+        .expect("pageup should move cursor by one viewport");
+    assert_eq!(app.cursor, 0);
+}
+
+#[test]
+fn log_page_navigation_moves_by_viewport_rows_not_item_count() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.viewport_rows = 6;
+    app.lines = vec![
+        "@  aaaaaaaa 11111111 one".to_string(),
+        "│  detail one".to_string(),
+        "○  bbbbbbbb 22222222 two".to_string(),
+        "│  detail two".to_string(),
+        "○  cccccccc 33333333 three".to_string(),
+        "│  detail three".to_string(),
+        "○  dddddddd 44444444 four".to_string(),
+        "│  detail four".to_string(),
+        "○  eeeeeeee 55555555 five".to_string(),
+        "│  detail five".to_string(),
+        "○  ffffffff 66666666 six".to_string(),
+        "│  detail six".to_string(),
+    ];
+    app.row_revision_map = vec![
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("bbbbbbbb".to_string()),
+        Some("bbbbbbbb".to_string()),
+        Some("cccccccc".to_string()),
+        Some("cccccccc".to_string()),
+        Some("dddddddd".to_string()),
+        Some("dddddddd".to_string()),
+        Some("eeeeeeee".to_string()),
+        Some("eeeeeeee".to_string()),
+        Some("ffffffff".to_string()),
+        Some("ffffffff".to_string()),
+    ];
+
+    app.handle_key(KeyEvent::from(KeyCode::PageDown))
+        .expect("pagedown should target next item near viewport boundary");
+    assert_eq!(app.cursor, 6);
+    assert_eq!(app.selected_revision(), Some("dddddddd".to_string()));
+
+    app.handle_key(KeyEvent::from(KeyCode::PageDown))
+        .expect("pagedown should clamp to last item start");
+    assert_eq!(app.cursor, 10);
+    assert_eq!(app.selected_revision(), Some("ffffffff".to_string()));
+
+    app.handle_key(KeyEvent::from(KeyCode::PageUp))
+        .expect("pageup should target prior item near viewport boundary");
+    assert_eq!(app.cursor, 4);
+    assert_eq!(app.selected_revision(), Some("cccccccc".to_string()));
+}
+
+#[test]
+fn log_navigation_uses_graph_rows_when_metadata_map_is_missing() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.last_command = vec!["log".to_string()];
+    app.lines = vec![
+        "@  abcdefgh top".to_string(),
+        "│  detail".to_string(),
+        "○  hgfedcba parent".to_string(),
+        "│  parent detail".to_string(),
+        "○  qwertyui root".to_string(),
+    ];
+    app.row_revision_map = vec![None; app.lines.len()];
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move to next graph row");
+    assert_eq!(app.cursor, 2);
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move to third graph row");
+    assert_eq!(app.cursor, 4);
+
+    app.handle_key(KeyEvent::from(KeyCode::Up))
+        .expect("up should move to previous graph row");
+    assert_eq!(app.cursor, 2);
+}
+
+#[test]
+fn snapshot_log_item_navigation_and_paging_sequence() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.viewport_rows = 6;
+    app.status_line = "ok: jj log".to_string();
+    app.last_command = vec!["log".to_string()];
+    app.lines = vec![
+        "@  aaaaaaaa 11111111 one".to_string(),
+        "│  detail one".to_string(),
+        "│  detail one-b".to_string(),
+        "○  bbbbbbbb 22222222 two".to_string(),
+        "│  detail two".to_string(),
+        "○  cccccccc 33333333 three".to_string(),
+        "│  detail three".to_string(),
+        "○  dddddddd 44444444 four".to_string(),
+    ];
+    app.row_revision_map = vec![
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("aaaaaaaa".to_string()),
+        Some("bbbbbbbb".to_string()),
+        Some("bbbbbbbb".to_string()),
+        Some("cccccccc".to_string()),
+        Some("cccccccc".to_string()),
+        Some("dddddddd".to_string()),
+    ];
+
+    let mut frames = Vec::new();
+    frames.push(format!("start\n{}", app.render_for_snapshot(60, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::Down))
+        .expect("down should move to next item start");
+    frames.push(format!("down\n{}", app.render_for_snapshot(60, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::PageDown))
+        .expect("pagedown should move by viewport target");
+    frames.push(format!("pagedown\n{}", app.render_for_snapshot(60, 8)));
+
+    app.handle_key(KeyEvent::from(KeyCode::PageUp))
+        .expect("pageup should move by viewport target");
+    frames.push(format!("pageup\n{}", app.render_for_snapshot(60, 8)));
+
+    insta::assert_snapshot!(frames.join("\n\n---\n\n"));
+}
+
+#[test]
+fn view_history_moves_back_and_forward_between_screens() {
+    let mut app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+    app.execute_command_line("commands")
+        .expect("commands screen should render");
+    app.execute_command_line("keys")
+        .expect("keys screen should render");
+
+    app.handle_key(KeyEvent::from(KeyCode::Left))
+        .expect("left should navigate back");
+    assert!(
+        app.lines
+            .iter()
+            .any(|line| line.contains("jk command registry"))
+    );
+    assert!(app.status_line.contains("back: commands"));
+
+    app.handle_key(KeyEvent::from(KeyCode::Right))
+        .expect("right should navigate forward");
+    assert!(app.lines.iter().any(|line| line.contains("jk keymap")));
+    assert!(app.status_line.contains("forward: keys"));
 }
 
 #[test]
@@ -269,7 +477,7 @@ fn startup_commands_view_renders_without_running_jj() {
     assert!(
         app.lines
             .iter()
-            .any(|line| line.contains("jj top-level coverage"))
+            .any(|line| line.contains("jk command registry"))
     );
 }
 
@@ -282,22 +490,10 @@ fn startup_keys_view_renders_without_running_jj() {
     assert_eq!(app.mode, Mode::Normal);
     assert_eq!(app.status_line, "Showing keymap".to_string());
     assert!(app.lines.iter().any(|line| line.contains("jk keymap")));
-    assert!(app.lines.iter().any(|line| line.contains("normal.push")));
-    assert!(
-        app.lines
-            .iter()
-            .any(|line| line.contains("normal.file_list"))
-    );
-    assert!(
-        app.lines
-            .iter()
-            .any(|line| line.contains("normal.resolve_list"))
-    );
-    assert!(
-        app.lines
-            .iter()
-            .any(|line| line.contains("normal.tag_list"))
-    );
+    assert!(app.lines.iter().any(|line| line.contains("push")));
+    assert!(app.lines.iter().any(|line| line.contains("file list")));
+    assert!(app.lines.iter().any(|line| line.contains("resolve list")));
+    assert!(app.lines.iter().any(|line| line.contains("tag list")));
 }
 
 #[test]
@@ -307,8 +503,8 @@ fn filters_keymap_view_by_query() {
         Some("push"),
     );
 
-    assert!(lines.iter().any(|line| line.contains("normal.push")));
-    assert!(!lines.iter().any(|line| line.contains("normal.quit")));
+    assert!(lines.iter().any(|line| line.contains("push")));
+    assert!(!lines.iter().any(|line| line.contains("quit")));
 }
 
 #[test]
@@ -318,8 +514,18 @@ fn command_keys_view_renders_and_filters() {
         .expect("keys command should render");
 
     assert_eq!(app.status_line, "Showing keymap for `push`".to_string());
-    assert!(app.lines.iter().any(|line| line.contains("normal.push")));
-    assert!(!app.lines.iter().any(|line| line.contains("normal.quit")));
+    assert!(app.lines.iter().any(|line| line.contains("push")));
+    assert!(!app.lines.iter().any(|line| line.contains("quit")));
+}
+
+#[test]
+fn snapshot_renders_condensed_keymap_layout() {
+    let lines = keymap_overview_lines(
+        &KeybindConfig::load().expect("keybind config should parse"),
+        None,
+    );
+
+    insta::assert_snapshot!(lines.join("\n"));
 }
 
 #[test]
@@ -2969,7 +3175,7 @@ fn normal_mode_shortcuts_route_to_expected_flows() {
         help_app
             .lines
             .iter()
-            .any(|line| line.contains("jj top-level coverage"))
+            .any(|line| line.contains("jk command registry"))
     );
 
     let mut keymap_app = App::new(KeybindConfig::load().expect("keybind config should parse"));

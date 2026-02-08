@@ -1,9 +1,8 @@
 ---
-source: src/app.rs
+source: src/app/tests.rs
 expression: "rendered.join(\"\\n\")"
 ---
 Workspace Add
-=================
 
 Summary: Created workspace docs at ../jk-docs
 

@@ -14,7 +14,10 @@ use ratatui::widgets::Paragraph;
 
 #[cfg(test)]
 use super::selection::trim_to_width;
-use super::selection::{derive_row_revision_map, extract_revision, startup_action, strip_ansi};
+use super::selection::{
+    derive_row_revision_map, extract_revision, looks_like_graph_commit_row, startup_action,
+    strip_ansi,
+};
 use super::terminal::{AppTerminal, TerminalSession};
 use super::view::decorate_command_output;
 use super::{App, Mode};
@@ -94,6 +97,9 @@ impl App {
     /// stay aligned with decorated output.
     pub(super) fn execute_tokens(&mut self, tokens: Vec<String>) -> Result<(), JkError> {
         let result = jj::run(&tokens)?;
+        if Self::is_navigable_view_tokens(&result.command) {
+            self.record_view_visit(&result.command.join(" "));
+        }
         if matches!(result.command.first().map(String::as_str), Some("log")) {
             self.last_log_tokens = result.command.clone();
         }
@@ -112,18 +118,179 @@ impl App {
 
     /// Move selection cursor up and keep viewport aligned.
     pub(super) fn move_cursor_up(&mut self) {
-        if self.cursor > 0 {
+        if self.has_item_navigation() {
+            let _ = self.move_cursor_to_previous_item();
+        } else if self.cursor > 0 {
             self.cursor -= 1;
         }
-        self.ensure_cursor_visible(20);
+        self.ensure_cursor_visible(self.viewport_rows.max(1));
     }
 
     /// Move selection cursor down and keep viewport aligned.
     pub(super) fn move_cursor_down(&mut self) {
-        if self.cursor + 1 < self.lines.len() {
+        if self.has_item_navigation() {
+            let _ = self.move_cursor_to_next_item();
+        } else if self.cursor + 1 < self.lines.len() {
             self.cursor += 1;
         }
-        self.ensure_cursor_visible(20);
+        self.ensure_cursor_visible(self.viewport_rows.max(1));
+    }
+
+    /// Move cursor one page up using viewport-aware step size.
+    pub(super) fn page_up(&mut self) {
+        let step = self.viewport_rows.saturating_sub(1).max(1);
+
+        if self.has_item_navigation() {
+            let starts = self.selectable_indices();
+            if starts.is_empty() {
+                return;
+            }
+            let target = self.cursor.saturating_sub(step);
+            self.cursor = starts
+                .iter()
+                .copied()
+                .rev()
+                .find(|index| *index <= target)
+                .unwrap_or(starts[0]);
+        } else {
+            self.cursor = self.cursor.saturating_sub(step);
+        }
+
+        self.ensure_cursor_visible(self.viewport_rows.max(1));
+    }
+
+    /// Move cursor one page down using viewport-aware step size.
+    pub(super) fn page_down(&mut self) {
+        let step = self.viewport_rows.saturating_sub(1).max(1);
+
+        if self.has_item_navigation() {
+            let starts = self.selectable_indices();
+            if starts.is_empty() {
+                return;
+            }
+            let last_row = self.lines.len().saturating_sub(1);
+            let target = self.cursor.saturating_add(step).min(last_row);
+            self.cursor = starts
+                .iter()
+                .copied()
+                .find(|index| *index >= target)
+                .unwrap_or_else(|| *starts.last().expect("starts cannot be empty"));
+        } else if !self.lines.is_empty() {
+            self.cursor = (self.cursor + step).min(self.lines.len().saturating_sub(1));
+        }
+
+        self.ensure_cursor_visible(self.viewport_rows.max(1));
+    }
+
+    /// Jump cursor to top row (or first selectable item) and reset scroll.
+    pub(super) fn move_cursor_top(&mut self) {
+        self.cursor = self.first_selectable_index().unwrap_or(0);
+        self.scroll = 0;
+    }
+
+    /// Jump cursor to bottom row (or last selectable item) and align viewport.
+    pub(super) fn move_cursor_bottom(&mut self) {
+        if self.lines.is_empty() {
+            self.cursor = 0;
+            self.scroll = 0;
+            return;
+        }
+
+        self.cursor = self
+            .last_selectable_index()
+            .unwrap_or_else(|| self.lines.len().saturating_sub(1));
+        self.ensure_cursor_visible(self.viewport_rows.max(1));
+    }
+
+    /// Return whether current rendered content supports item-oriented revision navigation.
+    fn has_item_navigation(&self) -> bool {
+        !self.selectable_indices().is_empty()
+    }
+
+    /// Return whether log-like graph rows can be navigated even without metadata map entries.
+    fn has_graph_row_navigation(&self) -> bool {
+        matches!(self.last_command.first().map(String::as_str), Some("log"))
+            && self
+                .lines
+                .iter()
+                .any(|line| looks_like_graph_commit_row(line))
+    }
+
+    /// Return first selectable row index for item-based views.
+    fn first_selectable_index(&self) -> Option<usize> {
+        self.selectable_indices().first().copied()
+    }
+
+    /// Return last selectable row index for item-based views at item boundary.
+    fn last_selectable_index(&self) -> Option<usize> {
+        self.selectable_indices().last().copied()
+    }
+
+    /// Return row indices for selectable revision items.
+    ///
+    /// For metadata-backed maps, this returns item-start boundaries (first row where revision
+    /// changes). If metadata is unavailable, graph-row starts are used as a fallback.
+    fn selectable_indices(&self) -> Vec<usize> {
+        if self.row_revision_map.len() == self.lines.len() {
+            let mut starts = Vec::new();
+            let mut previous: Option<&str> = None;
+
+            for (index, revision) in self.row_revision_map.iter().enumerate() {
+                let current = revision.as_deref();
+                if let Some(revision) = current
+                    && previous != Some(revision)
+                {
+                    starts.push(index);
+                }
+                previous = current;
+            }
+
+            if !starts.is_empty() {
+                return starts;
+            }
+        }
+
+        if self.has_graph_row_navigation() {
+            return self
+                .lines
+                .iter()
+                .enumerate()
+                .filter_map(|(index, line)| looks_like_graph_commit_row(line).then_some(index))
+                .collect();
+        }
+
+        Vec::new()
+    }
+
+    /// Move cursor to previous revision item. Returns true when movement occurs.
+    fn move_cursor_to_previous_item(&mut self) -> bool {
+        if self.cursor == 0 || !self.has_item_navigation() {
+            return false;
+        }
+        let starts = self.selectable_indices();
+        if let Some(target) = starts
+            .iter()
+            .copied()
+            .rev()
+            .find(|index| *index < self.cursor)
+        {
+            self.cursor = target;
+            return true;
+        }
+        false
+    }
+
+    /// Move cursor to next revision item. Returns true when movement occurs.
+    fn move_cursor_to_next_item(&mut self) -> bool {
+        if self.cursor + 1 >= self.lines.len() || !self.has_item_navigation() {
+            return false;
+        }
+        let starts = self.selectable_indices();
+        if let Some(target) = starts.iter().copied().find(|index| *index > self.cursor) {
+            self.cursor = target;
+            return true;
+        }
+        false
     }
 
     /// Adjust scroll so selected row stays within the visible content window.
@@ -174,20 +341,26 @@ impl App {
                 ])
                 .split(area);
 
-            let header = format!(
-                " jk [{}]  jj {} ",
-                self.mode_label().to_ascii_uppercase(),
-                self.last_command.join(" ")
-            );
-            let header_widget = Paragraph::new(header).style(
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            );
+            let chrome_style = Style::default()
+                .fg(Color::White)
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD);
+            let mode_badge_style = Style::default()
+                .fg(Color::White)
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD);
+            let header_widget = Paragraph::new(Line::from(vec![
+                Span::styled(" jk ", chrome_style),
+                Span::styled(
+                    format!("[{}]", self.mode_label().to_ascii_uppercase()),
+                    mode_badge_style,
+                ),
+                Span::styled(" ", chrome_style),
+            ]));
             frame.render_widget(header_widget, layout[0]);
 
             let content_height = layout[1].height as usize;
+            self.viewport_rows = content_height.max(1);
             self.ensure_cursor_visible(content_height.max(1));
 
             let mut body_lines = Vec::with_capacity(content_height);
@@ -213,15 +386,13 @@ impl App {
                 if selected {
                     content = content.patch_style(
                         Style::default()
-                            .bg(Color::DarkGray)
+                            .fg(Color::Yellow)
                             .add_modifier(Modifier::BOLD),
                     );
                 }
 
                 let prefix_style = if selected {
-                    Style::default()
-                        .bg(Color::DarkGray)
-                        .add_modifier(Modifier::BOLD)
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 };
@@ -237,29 +408,37 @@ impl App {
             frame.render_widget(Paragraph::new(Text::from(body_lines)), layout[1]);
 
             let footer = match self.mode {
-                Mode::Normal => self.status_line.clone(),
-                Mode::Command => format!(":{}", self.command_input),
+                Mode::Normal => {
+                    let hints =
+                        "nav j/k ↑/↓ PgUp/PgDn Ctrl+u/d  |  back/forward ←/→ Ctrl+o/i  |  views l s o L v f t w  |  ? help";
+                    if self.show_status_line_in_footer() {
+                        format!("{}  |  {hints}", self.status_line)
+                    } else {
+                        hints.to_string()
+                    }
+                }
+                Mode::Command => format!(
+                    ":{}  (Enter run, Esc cancel, Up/Down history)",
+                    self.command_input
+                ),
                 Mode::Confirm => {
                     let pending = self.pending_confirm.clone().unwrap_or_default();
-                    format!("Run `jj {}` ? [y/n]", pending.join(" "))
+                    format!("Run `jj {}` ? [y/n/Esc]", pending.join(" "))
                 }
                 Mode::Prompt => {
                     if let Some(prompt) = &self.pending_prompt {
-                        format!("{} > {}", prompt.label, prompt.input)
+                        format!(
+                            "{} > {}  (Enter submit, Esc cancel)",
+                            prompt.label, prompt.input
+                        )
                     } else {
                         "prompt unavailable".to_string()
                     }
                 }
             };
 
-            let footer_style = match self.mode {
-                Mode::Normal => Style::default().fg(Color::Black).bg(Color::Green),
-                Mode::Command => Style::default().fg(Color::Black).bg(Color::Yellow),
-                Mode::Confirm => Style::default().fg(Color::White).bg(Color::Red),
-                Mode::Prompt => Style::default().fg(Color::Black).bg(Color::Magenta),
-            };
             frame.render_widget(
-                Paragraph::new(format!(" {footer} ")).style(footer_style),
+                Paragraph::new(format!(" {footer} ")).style(chrome_style),
                 layout[2],
             );
         })?;
@@ -289,11 +468,7 @@ impl App {
     /// Build current frame rows including header, visible content slice, and mode-specific footer.
     #[cfg(test)]
     fn render_for_display(&mut self, width: usize, height: usize) -> Vec<String> {
-        let header = format!(
-            "jk [{}] :: jj {}",
-            self.mode_label(),
-            self.last_command.join(" ")
-        );
+        let header = format!("jk [{}]", self.mode_label());
 
         let content_height = height.saturating_sub(2);
         self.ensure_cursor_visible(content_height.max(1));
@@ -344,6 +519,15 @@ impl App {
             Mode::Confirm => "confirm",
             Mode::Prompt => "prompt",
         }
+    }
+
+    /// Return whether status line adds meaningful context beyond header/footer hints.
+    fn show_status_line_in_footer(&self) -> bool {
+        self.status_line.starts_with("error:")
+            || self.status_line.starts_with("No ")
+            || self.status_line.contains("canceled")
+            || self.status_line.contains("required")
+            || self.status_line.contains("unavailable")
     }
 
     #[cfg(test)]

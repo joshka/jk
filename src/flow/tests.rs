@@ -966,7 +966,7 @@ fn renders_command_registry_in_app() {
             assert!(
                 lines
                     .iter()
-                    .any(|line| line.contains("jj top-level coverage"))
+                    .any(|line| line.contains("jk command registry"))
             );
         }
         other => panic!("expected render action, got {other:?}"),

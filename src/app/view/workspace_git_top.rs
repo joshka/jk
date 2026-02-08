@@ -23,7 +23,6 @@ pub(crate) fn render_workspace_list_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Workspace List".to_string(),
-        "==============".to_string(),
         String::new(),
         format!(
             "Summary: {workspace_count} workspace{} listed",
@@ -50,7 +49,6 @@ pub(crate) fn render_git_fetch_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Git Fetch".to_string(),
-        "=========".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -79,7 +77,6 @@ pub(crate) fn render_git_push_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Git Push".to_string(),
-        "========".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -169,12 +166,7 @@ pub(crate) fn render_top_level_mutation_view(
         .collect();
     let summary = top_level_mutation_summary(command_name, &detail_lines);
     let title = format!("{} Result", capitalize_word(command_name));
-    let mut rendered = vec![
-        title.clone(),
-        "=".repeat(title.len()),
-        String::new(),
-        summary,
-    ];
+    let mut rendered = vec![title, String::new(), summary];
     rendered.push(String::new());
 
     if detail_lines.is_empty() {
@@ -265,7 +257,6 @@ pub(crate) fn render_bookmark_mutation_view(
 
     let mut rendered = vec![
         format!("Bookmark {}", capitalize_word(subcommand)),
-        "================".to_string(),
         String::new(),
         summary,
         String::new(),
@@ -332,11 +323,7 @@ pub(crate) fn render_bookmark_list_view(lines: Vec<String>) -> Vec<String> {
         return lines;
     }
 
-    let mut rendered = vec![
-        "Bookmark List".to_string(),
-        "=============".to_string(),
-        String::new(),
-    ];
+    let mut rendered = vec!["Bookmark List".to_string(), String::new()];
     rendered.extend(lines);
     rendered.push(String::new());
     rendered.push("Tip: use `bookmark set/move/track` flows from normal mode or `:`".to_string());
@@ -358,7 +345,6 @@ pub(crate) fn render_workspace_mutation_view(
 
     let mut rendered = vec![
         format!("Workspace {}", capitalize_word(subcommand)),
-        "=================".to_string(),
         String::new(),
         summary,
         String::new(),

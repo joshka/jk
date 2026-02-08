@@ -1,0 +1,49 @@
+---
+source: src/app/tests.rs
+expression: "frames.join(\"\\n\\n---\\n\\n\")"
+---
+start
+jk [normal]
+> @  aaaaaaaa 11111111 one
+  │  detail one
+  │  detail one-b
+  ○  bbbbbbbb 22222222 two
+  │  detail two
+  ○  cccccccc 33333333 three
+ok: jj log
+
+---
+
+down
+jk [normal]
+  @  aaaaaaaa 11111111 one
+  │  detail one
+  │  detail one-b
+> ○  bbbbbbbb 22222222 two
+  │  detail two
+  ○  cccccccc 33333333 three
+ok: jj log
+
+---
+
+pagedown
+jk [normal]
+  │  detail one-b
+  ○  bbbbbbbb 22222222 two
+  │  detail two
+  ○  cccccccc 33333333 three
+  │  detail three
+> ○  dddddddd 44444444 four
+ok: jj log
+
+---
+
+pageup
+jk [normal]
+> @  aaaaaaaa 11111111 one
+  │  detail one
+  │  detail one-b
+  ○  bbbbbbbb 22222222 two
+  │  detail two
+  ○  cccccccc 33333333 three
+ok: jj log

@@ -15,7 +15,6 @@ pub(crate) fn render_file_list_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "File List".to_string(),
-        "=========".to_string(),
         String::new(),
         format!(
             "Summary: {file_count} file{} listed",
@@ -50,7 +49,6 @@ pub(crate) fn render_file_show_view(lines: Vec<String>) -> Vec<String> {
     let line_count = content_lines.len();
     let mut rendered = vec![
         "File Show".to_string(),
-        "=========".to_string(),
         String::new(),
         format!(
             "Summary: {line_count} content line{}",
@@ -82,7 +80,6 @@ pub(crate) fn render_file_search_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "File Search".to_string(),
-        "===========".to_string(),
         String::new(),
         format!(
             "Summary: {match_count} match line{}",
@@ -113,7 +110,6 @@ pub(crate) fn render_file_annotate_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "File Annotate".to_string(),
-        "=============".to_string(),
         String::new(),
         format!(
             "Summary: {annotation_count} annotated line{}",
@@ -137,7 +133,6 @@ pub(crate) fn render_file_annotate_view(lines: Vec<String>) -> Vec<String> {
 pub(crate) fn render_file_track_view(lines: Vec<String>) -> Vec<String> {
     render_file_mutation_view(
         "File Track",
-        "==========",
         lines,
         "Tip: review tracked paths with `file list` and verify with `status`",
     )
@@ -147,7 +142,6 @@ pub(crate) fn render_file_track_view(lines: Vec<String>) -> Vec<String> {
 pub(crate) fn render_file_untrack_view(lines: Vec<String>) -> Vec<String> {
     render_file_mutation_view(
         "File Untrack",
-        "============",
         lines,
         "Tip: ensure paths are ignored before untracking and confirm with `status`",
     )
@@ -157,19 +151,13 @@ pub(crate) fn render_file_untrack_view(lines: Vec<String>) -> Vec<String> {
 pub(crate) fn render_file_chmod_view(lines: Vec<String>) -> Vec<String> {
     render_file_mutation_view(
         "File Chmod",
-        "==========",
         lines,
         "Tip: run `file show` or `diff` to verify executable-bit updates",
     )
 }
 
 /// Shared renderer for file mutation wrappers.
-pub(crate) fn render_file_mutation_view(
-    title: &str,
-    underline: &str,
-    lines: Vec<String>,
-    tip: &str,
-) -> Vec<String> {
+pub(crate) fn render_file_mutation_view(title: &str, lines: Vec<String>, tip: &str) -> Vec<String> {
     let detail_lines: Vec<String> = lines
         .into_iter()
         .map(|line| line.trim_end().to_string())
@@ -186,13 +174,7 @@ pub(crate) fn render_file_mutation_view(
         )
     };
 
-    let mut rendered = vec![
-        title.to_string(),
-        underline.to_string(),
-        String::new(),
-        summary,
-        String::new(),
-    ];
+    let mut rendered = vec![title.to_string(), String::new(), summary, String::new()];
 
     if detail_lines.is_empty() {
         rendered.push("(no output)".to_string());
@@ -218,7 +200,6 @@ pub(crate) fn render_tag_list_view(lines: Vec<String>) -> Vec<String> {
 
     let mut rendered = vec![
         "Tag List".to_string(),
-        "========".to_string(),
         String::new(),
         format!(
             "Summary: {tag_count} tag{} listed",
@@ -244,7 +225,6 @@ pub(crate) fn render_tag_list_view(lines: Vec<String>) -> Vec<String> {
 pub(crate) fn render_tag_set_view(lines: Vec<String>) -> Vec<String> {
     render_tag_mutation_view(
         "Tag Set",
-        "=======",
         lines,
         "Tip: run `tag list` to confirm updated tag targets",
     )
@@ -254,19 +234,13 @@ pub(crate) fn render_tag_set_view(lines: Vec<String>) -> Vec<String> {
 pub(crate) fn render_tag_delete_view(lines: Vec<String>) -> Vec<String> {
     render_tag_mutation_view(
         "Tag Delete",
-        "==========",
         lines,
         "Tip: run `tag list` to confirm removed tags",
     )
 }
 
 /// Shared renderer for tag mutation wrappers.
-pub(crate) fn render_tag_mutation_view(
-    title: &str,
-    underline: &str,
-    lines: Vec<String>,
-    tip: &str,
-) -> Vec<String> {
+pub(crate) fn render_tag_mutation_view(title: &str, lines: Vec<String>, tip: &str) -> Vec<String> {
     let detail_lines: Vec<String> = lines
         .into_iter()
         .map(|line| line.trim_end().to_string())
@@ -283,13 +257,7 @@ pub(crate) fn render_tag_mutation_view(
         )
     };
 
-    let mut rendered = vec![
-        title.to_string(),
-        underline.to_string(),
-        String::new(),
-        summary,
-        String::new(),
-    ];
+    let mut rendered = vec![title.to_string(), String::new(), summary, String::new()];
 
     if detail_lines.is_empty() {
         rendered.push("(no output)".to_string());

@@ -1,7 +1,7 @@
 //! Normal-mode key handling.
 
 use crate::error::JkError;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::super::preview::toggle_patch_flag;
 use super::super::selection::matches_any;
@@ -62,6 +62,42 @@ impl App {
             return Ok(());
         }
 
+        if matches_any(&self.keybinds.normal.back, key)
+            || matches!(key.code, KeyCode::Left)
+            || (key.modifiers.contains(KeyModifiers::CONTROL)
+                && matches!(key.code, KeyCode::Char('o')))
+        {
+            self.navigate_view_back()?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.forward, key)
+            || matches!(key.code, KeyCode::Right)
+            || (key.modifiers.contains(KeyModifiers::CONTROL)
+                && matches!(key.code, KeyCode::Char('i')))
+        {
+            self.navigate_view_forward()?;
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.page_up, key)
+            || matches!(key.code, KeyCode::PageUp)
+            || (key.modifiers.contains(KeyModifiers::CONTROL)
+                && matches!(key.code, KeyCode::Char('u') | KeyCode::Char('b')))
+        {
+            self.page_up();
+            return Ok(());
+        }
+
+        if matches_any(&self.keybinds.normal.page_down, key)
+            || matches!(key.code, KeyCode::PageDown)
+            || (key.modifiers.contains(KeyModifiers::CONTROL)
+                && matches!(key.code, KeyCode::Char('d') | KeyCode::Char('f')))
+        {
+            self.page_down();
+            return Ok(());
+        }
+
         if matches_any(&self.keybinds.normal.up, key) {
             self.move_cursor_up();
             return Ok(());
@@ -73,16 +109,12 @@ impl App {
         }
 
         if matches_any(&self.keybinds.normal.top, key) {
-            self.cursor = 0;
-            self.scroll = 0;
+            self.move_cursor_top();
             return Ok(());
         }
 
         if matches_any(&self.keybinds.normal.bottom, key) {
-            if !self.lines.is_empty() {
-                self.cursor = self.lines.len() - 1;
-                self.ensure_cursor_visible(20);
-            }
+            self.move_cursor_bottom();
             return Ok(());
         }
 
