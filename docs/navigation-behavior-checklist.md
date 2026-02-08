@@ -7,8 +7,9 @@ It targets expectations from people who use readline, vim, and terminal pagers d
 
 - [x] `q` quits immediately from normal mode.
 - [x] `Ctrl+c` exits immediately from any mode.
-- [x] Header always shows current mode and active command context.
+- [x] Header shows current mode badge with stable muted chrome.
 - [x] Footer always shows actionable mode-specific hints.
+- [x] Footer includes back/forward stack context when available.
 
 ## Normal-Mode Movement (Vim + Arrow Parity)
 
@@ -36,6 +37,7 @@ It targets expectations from people who use readline, vim, and terminal pagers d
 - [x] `Left`/`Right` and `Ctrl+o`/`Ctrl+i` navigate back/forward screen history.
 - [x] Help lists common screens before full command coverage.
 - [x] Help includes explicit navigation keys and paging keys.
+- [x] Help supports workflow presets (`:help inspect/rewrite/sync/recover`).
 
 ## Readline-Like Command Entry
 
@@ -43,11 +45,13 @@ It targets expectations from people who use readline, vim, and terminal pagers d
 - [x] `Enter` submits command mode input.
 - [x] `Up` and `Down` navigate command history.
 - [x] Command history restores draft input when returning from history traversal.
+- [x] Command mode shows ranked suggestions based on frequency + recency.
 
 ## Prompt and Confirmation Modes
 
 - [x] `Esc` cancels prompts.
 - [x] `Esc` or `n` rejects confirmations.
+- [x] `d` runs dry-run preview where preview strategy exists.
 - [x] Confirmation state clearly indicates the command being approved.
 - [x] Prompt state clearly indicates label and current input.
 
@@ -56,3 +60,4 @@ It targets expectations from people who use readline, vim, and terminal pagers d
 - [x] ANSI colors from `jj` output remain visible in the content body.
 - [x] Selected row has a clear marker and highlight.
 - [x] Header/footer palette is stable and mode-aware.
+- [x] Log footer shows compact quick actions for selected revision.

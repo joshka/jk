@@ -91,6 +91,7 @@ docs/vhs/render.sh
 ### Command Registry, Keymap, Alias
 
 - `:commands` / `?`: intent-first help with day-one flows first.
+- `:help inspect|rewrite|sync|recover`: workflow-scoped help presets.
 - `:keys`: exact, runtime-resolved bindings for normal/command/confirm modes.
 - `:aliases`: discover normalization behavior from short aliases to canonical commands.
 

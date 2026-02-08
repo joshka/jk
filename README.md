@@ -67,6 +67,9 @@ This keeps the feedback loop tight: inspect -> act -> verify.
 
 ## Workflow Guide
 
+You can open scoped in-app workflow help with:
+`:help inspect`, `:help rewrite`, `:help sync`, `:help recover`.
+
 ### Inspect History Fast
 
 - `l` / `:log`: home timeline
@@ -146,6 +149,7 @@ Scenario authoring rules: `docs/vhs/scenarios.md`.
 
 ## Learn More
 
+- Workflow narratives: `docs/workflows.md`
 - Screen behavior reference: `docs/screens.md`
 - Navigation checklist: `docs/navigation-behavior-checklist.md`
 - Terminology: `docs/glossary.md`
