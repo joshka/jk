@@ -372,3 +372,9 @@
   - kept command execution/planning and confirmation flows behavior-identical while reducing
     per-file complexity in the input subsystem.
   - reran `cargo fmt`, `cargo check`, full `cargo test` (218 passed), and strict `cargo clippy`.
+- Latest pass:
+  - added baseline GitHub CI in `.github/workflows/ci.yml` with format, check, test, clippy, and
+    markdown lint jobs.
+  - enabled weekly dependency automation via `.github/dependabot.yml` for Cargo and GitHub Actions.
+  - added release readiness audit document:
+    `docs/release-readiness-audit-2026-02-08.md`.

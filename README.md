@@ -55,6 +55,7 @@ Override files are partial overlays. Omitted keys keep default bindings.
 
 - Test and snapshot workflow: `docs/contributing-tests.md`
 - Shared terminology (`guided`, `native`, `tier A/B/C`): `docs/glossary.md`
+- Release readiness audit: `docs/release-readiness-audit-2026-02-08.md`
 
 ## How `jk` Works (If You Know `jj`)
 
