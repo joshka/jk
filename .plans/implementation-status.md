@@ -384,3 +384,8 @@
   - added `SECURITY.md` and generated `CHANGELOG.md` via `git-cliff`.
   - expanded CI to macOS/Windows matrix coverage and added dependency gates
     (`cargo audit`, `cargo deny`).
+- Latest pass:
+  - migrated runtime rendering from raw crossterm line drawing to ratatui frame rendering.
+  - introduced a styled top header bar and mode-aware footer/status bar in the TUI.
+  - kept command/view behavior and snapshots stable while removing legacy ASCII underline rows in
+    live rendering.

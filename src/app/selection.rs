@@ -156,6 +156,7 @@ pub(crate) fn looks_like_graph_commit_row(line: &str) -> bool {
 }
 
 /// Trim a string to terminal width while preserving ANSI escape integrity.
+#[cfg(test)]
 pub(crate) fn trim_to_width(text: &str, width: usize) -> String {
     if width == 0 {
         return String::new();

@@ -10,10 +10,14 @@ use crossterm::execute;
 use crossterm::terminal::{
     Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
+use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
+
+pub(crate) type AppTerminal = Terminal<CrosstermBackend<Stdout>>;
 
 /// RAII guard for terminal session state.
 pub(crate) struct TerminalSession {
-    stdout: Stdout,
+    terminal: AppTerminal,
 }
 
 impl TerminalSession {
@@ -22,12 +26,15 @@ impl TerminalSession {
         let mut stdout = io::stdout();
         enable_raw_mode()?;
         execute!(stdout, EnterAlternateScreen, Hide)?;
-        Ok(Self { stdout })
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
+        terminal.clear()?;
+        Ok(Self { terminal })
     }
 
-    /// Return mutable stdout handle used by frame rendering.
-    pub(crate) fn stdout_mut(&mut self) -> &mut Stdout {
-        &mut self.stdout
+    /// Return mutable ratatui terminal used by frame rendering.
+    pub(crate) fn terminal_mut(&mut self) -> &mut AppTerminal {
+        &mut self.terminal
     }
 }
 
@@ -35,7 +42,7 @@ impl Drop for TerminalSession {
     /// Best-effort terminal restoration on shutdown.
     fn drop(&mut self) {
         let _ = execute!(
-            self.stdout,
+            self.terminal.backend_mut(),
             Show,
             LeaveAlternateScreen,
             Clear(ClearType::All)

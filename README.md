@@ -151,6 +151,7 @@ want (usually `:log`, `:status`, or `:operation log`), or use the `l` shortcut t
 This repository is in active development. The current baseline includes:
 
 - Alt-screen + raw-mode runtime loop.
+- Ratatui-based frame rendering with a styled top header bar and mode-aware status/footer bar.
 - Log-first rendering with cursor selection.
 - Command mode (`:`), confirmation mode, and prompt mode.
 - `jj` subprocess execution via `jj --no-pager ...`.

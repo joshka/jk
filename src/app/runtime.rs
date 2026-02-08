@@ -1,19 +1,21 @@
 //! Runtime loop, rendering, and state transitions.
 
-use std::io::{Stdout, Write};
 use std::time::Duration;
 
 use crate::error::JkError;
 use crate::flow::FlowAction;
 use crate::jj;
-use crossterm::cursor::MoveTo;
+use ansi_to_tui::IntoText as _;
 use crossterm::event::{self, Event};
-use crossterm::queue;
-use crossterm::style::{Print, ResetColor};
-use crossterm::terminal::{Clear, ClearType, size};
+use ratatui::layout::{Constraint, Layout};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::Paragraph;
 
-use super::selection::{derive_row_revision_map, extract_revision, startup_action, trim_to_width};
-use super::terminal::TerminalSession;
+#[cfg(test)]
+use super::selection::trim_to_width;
+use super::selection::{derive_row_revision_map, extract_revision, startup_action, strip_ansi};
+use super::terminal::{AppTerminal, TerminalSession};
 use super::view::decorate_command_output;
 use super::{App, Mode};
 
@@ -24,7 +26,7 @@ impl App {
         self.apply_startup_tokens(startup_tokens)?;
 
         while !self.should_quit {
-            self.draw(terminal.stdout_mut())?;
+            self.draw(terminal.terminal_mut())?;
 
             if event::poll(Duration::from_millis(120))?
                 && let Event::Key(key) = event::read()?
@@ -159,24 +161,133 @@ impl App {
         None
     }
 
-    /// Draw one frame into the terminal alternate screen.
-    fn draw(&mut self, stdout: &mut Stdout) -> Result<(), JkError> {
-        let (width, height) = size()?;
-        let width = width as usize;
-        let height = height as usize;
+    /// Draw one frame using ratatui widgets.
+    fn draw(&mut self, terminal: &mut AppTerminal) -> Result<(), JkError> {
+        terminal.draw(|frame| {
+            let area = frame.area();
+            let layout = Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ])
+                .split(area);
 
-        let frame = self.render_for_display(width, height);
-        queue!(stdout, MoveTo(0, 0), Clear(ClearType::All))?;
+            let header = format!(
+                " jk [{}]  jj {} ",
+                self.mode_label().to_ascii_uppercase(),
+                self.last_command.join(" ")
+            );
+            let header_widget = Paragraph::new(header).style(
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            );
+            frame.render_widget(header_widget, layout[0]);
 
-        for (index, line) in frame.into_iter().enumerate() {
-            queue!(stdout, MoveTo(0, index as u16), Print(line), ResetColor)?;
-        }
+            let content_height = layout[1].height as usize;
+            self.ensure_cursor_visible(content_height.max(1));
 
-        stdout.flush()?;
+            let mut body_lines = Vec::with_capacity(content_height);
+            for idx in 0..content_height {
+                let line_index = self.scroll + idx;
+                let raw_line = self.lines.get(line_index).map(String::as_str).unwrap_or("");
+                let next_line = self
+                    .lines
+                    .get(line_index + 1)
+                    .map(String::as_str)
+                    .unwrap_or("");
+                let mut content = self.display_line_for_tui(raw_line);
+                let section_heading = self.is_legacy_underline(next_line);
+                let selected = line_index == self.cursor && self.mode == Mode::Normal;
+
+                if section_heading {
+                    content = content.patch_style(
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    );
+                }
+                if selected {
+                    content = content.patch_style(
+                        Style::default()
+                            .bg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    );
+                }
+
+                let prefix_style = if selected {
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+
+                let prefix = if selected { "▸ " } else { "  " };
+                let mut spans = Vec::with_capacity(content.spans.len() + 1);
+                spans.push(Span::styled(prefix, prefix_style));
+                spans.extend(content.spans);
+                content.spans = spans;
+                body_lines.push(content);
+            }
+
+            frame.render_widget(Paragraph::new(Text::from(body_lines)), layout[1]);
+
+            let footer = match self.mode {
+                Mode::Normal => self.status_line.clone(),
+                Mode::Command => format!(":{}", self.command_input),
+                Mode::Confirm => {
+                    let pending = self.pending_confirm.clone().unwrap_or_default();
+                    format!("Run `jj {}` ? [y/n]", pending.join(" "))
+                }
+                Mode::Prompt => {
+                    if let Some(prompt) = &self.pending_prompt {
+                        format!("{} > {}", prompt.label, prompt.input)
+                    } else {
+                        "prompt unavailable".to_string()
+                    }
+                }
+            };
+
+            let footer_style = match self.mode {
+                Mode::Normal => Style::default().fg(Color::Black).bg(Color::Green),
+                Mode::Command => Style::default().fg(Color::Black).bg(Color::Yellow),
+                Mode::Confirm => Style::default().fg(Color::White).bg(Color::Red),
+                Mode::Prompt => Style::default().fg(Color::Black).bg(Color::Magenta),
+            };
+            frame.render_widget(
+                Paragraph::new(format!(" {footer} ")).style(footer_style),
+                layout[2],
+            );
+        })?;
         Ok(())
     }
 
+    /// Convert legacy content lines into cleaner TUI display lines.
+    ///
+    /// ANSI styling from command output is preserved using `ansi-to-tui`.
+    fn display_line_for_tui(&self, line: &str) -> Line<'static> {
+        if self.is_legacy_underline(line) {
+            return Line::default();
+        }
+
+        line.into_text()
+            .ok()
+            .and_then(|text| text.lines.into_iter().next())
+            .unwrap_or_else(|| Line::raw(strip_ansi(line)))
+    }
+
+    /// Return whether a line is a legacy ASCII underline separator.
+    fn is_legacy_underline(&self, line: &str) -> bool {
+        let trimmed = strip_ansi(line).trim().to_string();
+        trimmed.len() > 2 && trimmed.chars().all(|ch| ch == '=' || ch == '-')
+    }
+
     /// Build current frame rows including header, visible content slice, and mode-specific footer.
+    #[cfg(test)]
     fn render_for_display(&mut self, width: usize, height: usize) -> Vec<String> {
         let header = format!(
             "jk [{}] :: jj {}",
@@ -239,5 +350,27 @@ impl App {
     /// Render deterministic frame text for snapshot tests.
     pub fn render_for_snapshot(&mut self, width: usize, height: usize) -> String {
         self.render_for_display(width, height).join("\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::style::Color;
+
+    use crate::config::KeybindConfig;
+
+    use super::App;
+
+    #[test]
+    fn display_line_for_tui_preserves_ansi_colors() {
+        let app = App::new(KeybindConfig::load().expect("keybind config should parse"));
+        let rendered = app.display_line_for_tui("\u{1b}[31mred\u{1b}[0m plain");
+        let colored_span = rendered
+            .spans
+            .iter()
+            .find(|span| span.content == "red")
+            .expect("red span should exist");
+
+        assert_eq!(colored_span.style.fg, Some(Color::Red));
     }
 }
