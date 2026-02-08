@@ -2,7 +2,7 @@
 name = "jk"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.88"
 description = "Log-first TUI for Jujutsu (jj)"
 readme = "README.md"
 repository = "https://github.com/joshka/jk"

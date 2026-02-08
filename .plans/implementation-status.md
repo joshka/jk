@@ -512,3 +512,10 @@
   - added explicit regression coverage for help scrolling semantics and a new help-scroll snapshot.
   - expanded transition snapshots to reflect scroll-only help behavior and reran validation
     (`cargo fmt --all`, `cargo test` 247 passed, `cargo check`, strict clippy, markdownlint).
+- Latest pass:
+  - bumped project MSRV from Rust `1.86` to `1.88` in `Cargo.toml` to allow the newer `time`
+    dependency line.
+  - refreshed lockfile under the new MSRV gate; `time` updated from `0.3.45` to `0.3.47` along
+    with compatible transitive updates.
+  - confirmed dependency graph now resolves `time v0.3.47` via `ratatui-widgets`.
+  - reran validation checkpoint (`cargo check`, strict clippy, dependency tree check).
