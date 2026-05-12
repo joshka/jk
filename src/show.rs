@@ -17,100 +17,60 @@ use crate::search::SearchQuery;
 use crate::sticky_file_view::{self, StickyFileDocument};
 
 pub const BINDINGS: &[Binding] = &[
+    Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
     Binding::new(
-        KeyPattern::char('j', "j"),
+        KeyPattern::code(crossterm::event::KeyCode::Down),
         Command::View(ViewCommand::MoveDown),
-        "scroll",
     ),
+    Binding::new(KeyPattern::char('k'), Command::View(ViewCommand::MoveUp)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::Down, "Down"),
-        Command::View(ViewCommand::MoveDown),
-        "scroll",
-    ),
-    Binding::new(
-        KeyPattern::char('k', "k"),
+        KeyPattern::code(crossterm::event::KeyCode::Up),
         Command::View(ViewCommand::MoveUp),
-        "scroll",
     ),
+    Binding::new(KeyPattern::char(' '), Command::View(ViewCommand::PageDown)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::Up, "Up"),
-        Command::View(ViewCommand::MoveUp),
-        "scroll",
-    ),
-    Binding::new(
-        KeyPattern::char(' ', "Space"),
+        KeyPattern::code(crossterm::event::KeyCode::PageDown),
         Command::View(ViewCommand::PageDown),
-        "page",
     ),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::PageDown, "PageDown"),
+        KeyPattern::modified_char('f', crossterm::event::KeyModifiers::CONTROL),
         Command::View(ViewCommand::PageDown),
-        "page",
     ),
     Binding::new(
-        KeyPattern::modified_char('f', crossterm::event::KeyModifiers::CONTROL, "C-f"),
-        Command::View(ViewCommand::PageDown),
-        "page",
-    ),
-    Binding::new(
-        KeyPattern::modified_char(' ', crossterm::event::KeyModifiers::SHIFT, "S-Space"),
+        KeyPattern::modified_char(' ', crossterm::event::KeyModifiers::SHIFT),
         Command::View(ViewCommand::PageUp),
-        "page",
     ),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::PageUp, "PageUp"),
+        KeyPattern::code(crossterm::event::KeyCode::PageUp),
         Command::View(ViewCommand::PageUp),
-        "page",
     ),
     Binding::new(
-        KeyPattern::modified_char('b', crossterm::event::KeyModifiers::CONTROL, "C-b"),
+        KeyPattern::modified_char('b', crossterm::event::KeyModifiers::CONTROL),
         Command::View(ViewCommand::PageUp),
-        "page",
     ),
+    Binding::new(KeyPattern::char('g'), Command::View(ViewCommand::MoveFirst)),
     Binding::new(
-        KeyPattern::char('g', "g"),
+        KeyPattern::code(crossterm::event::KeyCode::Home),
         Command::View(ViewCommand::MoveFirst),
-        "ends",
     ),
+    Binding::new(KeyPattern::char('G'), Command::View(ViewCommand::MoveLast)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::Home, "Home"),
-        Command::View(ViewCommand::MoveFirst),
-        "ends",
-    ),
-    Binding::new(
-        KeyPattern::char('G', "G"),
+        KeyPattern::code(crossterm::event::KeyCode::End),
         Command::View(ViewCommand::MoveLast),
-        "ends",
     ),
+    Binding::new(KeyPattern::char(']'), Command::View(ViewCommand::NextFile)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::End, "End"),
-        Command::View(ViewCommand::MoveLast),
-        "ends",
-    ),
-    Binding::new(
-        KeyPattern::char(']', "]"),
-        Command::View(ViewCommand::NextFile),
-        "file",
-    ),
-    Binding::new(
-        KeyPattern::char('[', "["),
+        KeyPattern::char('['),
         Command::View(ViewCommand::PreviousFile),
-        "file",
     ),
+    Binding::new(KeyPattern::char('d'), Command::View(ViewCommand::OpenDiff)),
     Binding::new(
-        KeyPattern::char('d', "d"),
-        Command::View(ViewCommand::OpenDiff),
-        "diff",
-    ),
-    Binding::new(
-        KeyPattern::char('n', "n"),
+        KeyPattern::char('n'),
         Command::View(ViewCommand::NextSearchMatch),
-        "search",
     ),
     Binding::new(
-        KeyPattern::char('N', "N"),
+        KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
-        "search",
     ),
 ];
 
@@ -428,6 +388,25 @@ mod tests {
             view.execute(ViewCommand::OpenDiff, context(None)),
             ViewEffect::OpenDetail(JjCommand::Diff, "main".to_owned())
         );
+    }
+
+    #[test]
+    fn copy_options_use_plain_file_label() {
+        let view = show_view(
+            vec![
+                line!("Added regular file Cargo.toml:"),
+                line!("        1: [package]"),
+            ],
+            0,
+        );
+
+        let file = view
+            .copy_options()
+            .into_iter()
+            .find(|option| option.label() == "file path")
+            .unwrap();
+
+        assert_eq!(file.value(), "Cargo.toml");
     }
 
     fn show_view(lines: Vec<Line<'static>>, scroll_offset: usize) -> ShowView {

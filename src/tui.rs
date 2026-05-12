@@ -75,13 +75,13 @@ pub enum Overlay<'a> {
     },
 }
 
-pub fn title_bar(status: &StatusLine) -> Paragraph<'_> {
+fn title_bar(status: &StatusLine) -> Paragraph<'_> {
     Paragraph::new(line![
         span!(Style::default().fg(Color::DarkGray); "{title}", title = status.title())
     ])
 }
 
-pub fn status_line(status: &StatusLine) -> Paragraph<'_> {
+fn status_line(status: &StatusLine) -> Paragraph<'_> {
     let line = match status.hints() {
         StatusHints::Graph => line![
             key("q"),

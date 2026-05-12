@@ -36,3 +36,33 @@ impl Selection {
         self.set(self.index, len);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selection_stays_at_zero_for_empty_content() {
+        let mut selection = Selection::default();
+
+        selection.next(0);
+        assert_eq!(selection.index(), 0);
+
+        selection.last(0);
+        assert_eq!(selection.index(), 0);
+
+        selection.set(10, 0);
+        assert_eq!(selection.index(), 0);
+    }
+
+    #[test]
+    fn selection_clamps_to_last_available_item() {
+        let mut selection = Selection::default();
+
+        selection.set(10, 3);
+        assert_eq!(selection.index(), 2);
+
+        selection.clamp(2);
+        assert_eq!(selection.index(), 1);
+    }
+}

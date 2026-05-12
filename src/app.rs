@@ -54,21 +54,17 @@ enum InteractionMode {
 }
 
 const APP_BINDINGS: &[Binding] = &[
-    Binding::new(KeyPattern::char('q', "q"), Command::Quit, "quit"),
-    Binding::new(KeyPattern::code(KeyCode::Esc, "Esc"), Command::Quit, "quit"),
-    Binding::new(KeyPattern::char('?', "?"), Command::Help, "help"),
-    Binding::new(KeyPattern::char('/', "/"), Command::SearchPrompt, "search"),
-    Binding::new(KeyPattern::char('y', "y"), Command::Copy, "copy"),
-    Binding::new(KeyPattern::char('v', "v"), Command::ViewFormat, "view"),
-    Binding::new(KeyPattern::char('r', "r"), Command::Refresh, "refresh"),
-    Binding::new(KeyPattern::char('h', "h"), Command::Back, "back"),
-    Binding::new(
-        KeyPattern::code(KeyCode::Left, "Left"),
-        Command::Back,
-        "back",
-    ),
-    Binding::new(KeyPattern::char('L', "L"), Command::SwitchLog, "log"),
-    Binding::new(KeyPattern::char('J', "J"), Command::SwitchDefault, "jj"),
+    Binding::new(KeyPattern::char('q'), Command::Quit),
+    Binding::new(KeyPattern::code(KeyCode::Esc), Command::Quit),
+    Binding::new(KeyPattern::char('?'), Command::Help),
+    Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
+    Binding::new(KeyPattern::char('y'), Command::Copy),
+    Binding::new(KeyPattern::char('v'), Command::ViewFormat),
+    Binding::new(KeyPattern::char('r'), Command::Refresh),
+    Binding::new(KeyPattern::char('h'), Command::Back),
+    Binding::new(KeyPattern::code(KeyCode::Left), Command::Back),
+    Binding::new(KeyPattern::char('L'), Command::SwitchLog),
+    Binding::new(KeyPattern::char('J'), Command::SwitchDefault),
 ];
 
 impl App {
@@ -142,7 +138,6 @@ impl App {
         else {
             return Ok(true);
         };
-        let _hint = (binding.key(), binding.label());
 
         match binding.command() {
             Command::Quit => {
@@ -158,7 +153,7 @@ impl App {
                 Ok(true)
             }
             Command::Copy => {
-                self.open_copy_menu(viewport_height)?;
+                self.open_copy_menu(viewport_height);
                 Ok(true)
             }
             Command::ViewFormat => {
@@ -239,10 +234,8 @@ impl App {
             InteractionMode::CopyMenu { options, selected } => {
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down => {
-                        if *selected + 1 < options.len() {
-                            *selected += 1;
-                        }
+                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < options.len() => {
+                        *selected += 1;
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
                         *selected = selected.saturating_sub(1);
@@ -290,7 +283,7 @@ impl App {
         }
     }
 
-    fn open_copy_menu(&mut self, viewport_height: u16) -> Result<()> {
+    fn open_copy_menu(&mut self, viewport_height: u16) {
         let options = match self.execute_view(ViewCommand::Copy, viewport_height) {
             ViewEffect::CopyOptions(options) => options,
             _ => Vec::new(),
@@ -303,7 +296,6 @@ impl App {
                 selected: 0,
             };
         }
-        Ok(())
     }
 
     fn execute_view(&mut self, command: ViewCommand, viewport_height: u16) -> ViewEffect {
@@ -572,6 +564,23 @@ mod tests {
 
         assert_eq!(spec.command(), JjCommand::Log);
         assert_eq!(spec.args(), ["-r", "::"]);
+    }
+
+    #[test]
+    fn parses_show_startup_view() {
+        let spec = initial_view(vec!["show".into(), "--git".into(), "main".into()]).unwrap();
+
+        assert_eq!(spec.command(), JjCommand::Show);
+        assert_eq!(spec.args(), ["--git", "main"]);
+        assert_eq!(spec.diff_format(), DiffFormat::Git);
+    }
+
+    #[test]
+    fn parses_diff_startup_view() {
+        let spec = initial_view(vec!["diff".into(), "-r".into(), "main".into()]).unwrap();
+
+        assert_eq!(spec.command(), JjCommand::Diff);
+        assert_eq!(spec.args(), ["-r", "main"]);
     }
 
     #[test]

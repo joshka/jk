@@ -17,75 +17,40 @@ use crate::search::{SearchQuery, entry_matches, highlight_line, line_text};
 use crate::selection::Selection;
 
 pub const BINDINGS: &[Binding] = &[
+    Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
     Binding::new(
-        KeyPattern::char('j', "j"),
+        KeyPattern::code(crossterm::event::KeyCode::Down),
         Command::View(ViewCommand::MoveDown),
-        "move",
     ),
+    Binding::new(KeyPattern::char('k'), Command::View(ViewCommand::MoveUp)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::Down, "Down"),
-        Command::View(ViewCommand::MoveDown),
-        "move",
-    ),
-    Binding::new(
-        KeyPattern::char('k', "k"),
+        KeyPattern::code(crossterm::event::KeyCode::Up),
         Command::View(ViewCommand::MoveUp),
-        "move",
     ),
+    Binding::new(KeyPattern::char('g'), Command::View(ViewCommand::MoveFirst)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::Up, "Up"),
-        Command::View(ViewCommand::MoveUp),
-        "move",
-    ),
-    Binding::new(
-        KeyPattern::char('g', "g"),
+        KeyPattern::code(crossterm::event::KeyCode::Home),
         Command::View(ViewCommand::MoveFirst),
-        "ends",
     ),
+    Binding::new(KeyPattern::char('G'), Command::View(ViewCommand::MoveLast)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::Home, "Home"),
-        Command::View(ViewCommand::MoveFirst),
-        "ends",
-    ),
-    Binding::new(
-        KeyPattern::char('G', "G"),
+        KeyPattern::code(crossterm::event::KeyCode::End),
         Command::View(ViewCommand::MoveLast),
-        "ends",
     ),
+    Binding::new(KeyPattern::char('s'), Command::View(ViewCommand::OpenShow)),
+    Binding::new(KeyPattern::char('l'), Command::View(ViewCommand::OpenShow)),
     Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::End, "End"),
-        Command::View(ViewCommand::MoveLast),
-        "ends",
-    ),
-    Binding::new(
-        KeyPattern::char('s', "s"),
+        KeyPattern::code(crossterm::event::KeyCode::Right),
         Command::View(ViewCommand::OpenShow),
-        "show",
     ),
+    Binding::new(KeyPattern::char('d'), Command::View(ViewCommand::OpenDiff)),
     Binding::new(
-        KeyPattern::char('l', "l"),
-        Command::View(ViewCommand::OpenShow),
-        "show",
-    ),
-    Binding::new(
-        KeyPattern::code(crossterm::event::KeyCode::Right, "Right"),
-        Command::View(ViewCommand::OpenShow),
-        "show",
-    ),
-    Binding::new(
-        KeyPattern::char('d', "d"),
-        Command::View(ViewCommand::OpenDiff),
-        "diff",
-    ),
-    Binding::new(
-        KeyPattern::char('n', "n"),
+        KeyPattern::char('n'),
         Command::View(ViewCommand::NextSearchMatch),
-        "search",
     ),
     Binding::new(
-        KeyPattern::char('N', "N"),
+        KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
-        "search",
     ),
 ];
 

@@ -1,8 +1,7 @@
 //! Key binding metadata and command effects.
 //!
-//! Bindings are static Rust data for now. The shape mirrors a command/key/when
-//! model without introducing user-configurable keymaps before the app needs
-//! them.
+//! Bindings are static Rust data. Help and status text live in `tui.rs`, so
+//! this module only owns the key-to-command mapping used by dispatch.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -46,16 +45,11 @@ pub enum ViewCommand {
 pub struct Binding {
     key: KeyPattern,
     command: Command,
-    label: &'static str,
 }
 
 impl Binding {
-    pub const fn new(key: KeyPattern, command: Command, label: &'static str) -> Self {
-        Self {
-            key,
-            command,
-            label,
-        }
+    pub const fn new(key: KeyPattern, command: Command) -> Self {
+        Self { key, command }
     }
 
     pub fn matches(self, key: KeyEvent) -> bool {
@@ -65,54 +59,33 @@ impl Binding {
     pub fn command(self) -> Command {
         self.command
     }
-
-    pub fn key(self) -> &'static str {
-        self.key.label()
-    }
-
-    pub fn label(self) -> &'static str {
-        self.label
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct KeyPattern {
     code: KeyCode,
     modifiers: KeyModifiers,
-    label: &'static str,
 }
 
 impl KeyPattern {
-    pub const fn new(code: KeyCode, modifiers: KeyModifiers, label: &'static str) -> Self {
-        Self {
-            code,
-            modifiers,
-            label,
-        }
+    pub const fn new(code: KeyCode, modifiers: KeyModifiers) -> Self {
+        Self { code, modifiers }
     }
 
-    pub const fn char(character: char, label: &'static str) -> Self {
-        Self::new(KeyCode::Char(character), KeyModifiers::NONE, label)
+    pub const fn char(character: char) -> Self {
+        Self::new(KeyCode::Char(character), KeyModifiers::NONE)
     }
 
-    pub const fn modified_char(
-        character: char,
-        modifiers: KeyModifiers,
-        label: &'static str,
-    ) -> Self {
-        Self::new(KeyCode::Char(character), modifiers, label)
+    pub const fn modified_char(character: char, modifiers: KeyModifiers) -> Self {
+        Self::new(KeyCode::Char(character), modifiers)
     }
 
-    pub const fn code(code: KeyCode, label: &'static str) -> Self {
-        Self::new(code, KeyModifiers::NONE, label)
+    pub const fn code(code: KeyCode) -> Self {
+        Self::new(code, KeyModifiers::NONE)
     }
 
     fn matches(self, key: KeyEvent) -> bool {
         key.code == self.code && key.modifiers == self.modifiers
-    }
-
-    fn label(self) -> &'static str {
-        self.label
     }
 }
 
@@ -153,9 +126,8 @@ mod tests {
     #[test]
     fn binding_matches_key_code_and_modifiers() {
         let binding = Binding::new(
-            KeyPattern::modified_char('f', KeyModifiers::CONTROL, "C-f"),
+            KeyPattern::modified_char('f', KeyModifiers::CONTROL),
             Command::View(ViewCommand::PageDown),
-            "page",
         );
 
         assert!(binding.matches(key(KeyCode::Char('f'), KeyModifiers::CONTROL)));
@@ -165,12 +137,8 @@ mod tests {
     #[test]
     fn find_binding_returns_first_matching_command() {
         let bindings = [
-            Binding::new(
-                KeyPattern::char('j', "j"),
-                Command::View(ViewCommand::MoveDown),
-                "move",
-            ),
-            Binding::new(KeyPattern::char('q', "q"), Command::Quit, "quit"),
+            Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
+            Binding::new(KeyPattern::char('q'), Command::Quit),
         ];
 
         assert_eq!(

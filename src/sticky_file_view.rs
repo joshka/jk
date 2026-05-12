@@ -14,6 +14,11 @@ use crate::jj::{ViewSpec, load_entries};
 use crate::rendered_jj::{DocumentLines, FileAnchor, PinnedDocument, project_with_active_file};
 use crate::search::{SearchQuery, highlight_line, line_matches};
 
+/// Rendered show/diff text plus file anchors and scroll state.
+///
+/// This type owns document navigation for both detail views. It reloads from
+/// `jj` through `load_document`, then keeps scroll offsets clamped to the
+/// rendered lines rather than to a reconstructed repository model.
 pub struct StickyFileDocument {
     lines: DocumentLines,
     anchors: Vec<FileAnchor>,
@@ -59,7 +64,7 @@ impl StickyFileDocument {
     }
 
     pub fn scroll_to_top(&mut self) {
-        self.scroll.to_top();
+        self.scroll.move_to_top();
     }
 
     pub fn scroll_to_bottom(
@@ -71,7 +76,7 @@ impl StickyFileDocument {
         let lines = &self.lines;
         let anchors = &self.anchors;
         self.scroll
-            .to_bottom(max_offset, viewport_height, |offset| {
+            .move_to_bottom(max_offset, viewport_height, |offset| {
                 project_with_active_file(lines, anchors, offset, prefix())
             });
     }
@@ -176,11 +181,11 @@ impl StickyScroll {
         self.offset = offset.min(max_offset);
     }
 
-    fn to_top(&mut self) {
+    fn move_to_top(&mut self) {
         self.offset = 0;
     }
 
-    fn to_bottom(
+    fn move_to_bottom(
         &mut self,
         max_offset: usize,
         viewport_height: u16,

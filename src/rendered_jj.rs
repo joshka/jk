@@ -190,21 +190,36 @@ fn file_heading(line: &Line<'static>) -> Option<FileHeading> {
 
 fn default_file_heading(line: &Line<'static>, text: &str) -> Option<FileHeading> {
     let trimmed = text.trim_end();
-    (trimmed.ends_with(':')
-        && [
-            "Added ",
-            "Modified ",
-            "Removed ",
-            "Deleted ",
-            "Renamed ",
-            "Copied ",
-        ]
-        .iter()
-        .any(|prefix| trimmed.starts_with(prefix)))
-    .then(|| FileHeading {
+    let label = default_file_label(trimmed)?;
+    Some(FileHeading {
         heading: styled_subline(line, 0, trimmed.len()),
-        label: trimmed.to_owned(),
+        label,
     })
+}
+
+fn default_file_label(heading: &str) -> Option<String> {
+    let body = heading.strip_suffix(':')?;
+    let file = [
+        "Added ",
+        "Modified ",
+        "Removed ",
+        "Deleted ",
+        "Renamed ",
+        "Copied ",
+    ]
+    .into_iter()
+    .find_map(|prefix| body.strip_prefix(prefix))?;
+    let file = file
+        .strip_prefix("regular file ")
+        .or_else(|| file.strip_prefix("executable file "))
+        .or_else(|| file.strip_prefix("symlink "))
+        .unwrap_or(file);
+    Some(
+        file.rsplit_once(" => ")
+            .map(|(_, destination)| destination)
+            .unwrap_or(file)
+            .to_owned(),
+    )
 }
 
 fn git_file_heading(line: &Line<'static>, text: &str) -> Option<FileHeading> {
@@ -239,16 +254,15 @@ fn styled_subline(line: &Line<'static>, start: usize, end: usize) -> Line<'stati
         let span_end = span_start + content.len();
         let overlap_start = start.max(span_start);
         let overlap_end = end.min(span_end);
-        if overlap_start < overlap_end {
-            if let Some(content) =
+        if overlap_start < overlap_end
+            && let Some(content) =
                 content.get((overlap_start - span_start)..(overlap_end - span_start))
-            {
-                // Sticky file headers should look like the original jj line,
-                // including colors from default jj output or `--git` output.
-                let mut span = Span::from(content.to_owned());
-                span.style = source_span.style;
-                spans.push(span);
-            }
+        {
+            // Sticky file headers should look like the original jj line,
+            // including colors from default jj output or `--git` output.
+            let mut span = Span::from(content.to_owned());
+            span.style = source_span.style;
+            spans.push(span);
         }
         span_start = span_end;
     }
@@ -288,7 +302,9 @@ mod tests {
             line_text(&anchors[0].heading()),
             "Added regular file Cargo.toml:"
         );
+        assert_eq!(anchors[0].label(), "Cargo.toml");
         assert_eq!(anchors[1].line_index(), 3);
+        assert_eq!(anchors[1].label(), "src/main.rs");
     }
 
     #[test]
@@ -307,6 +323,26 @@ mod tests {
         assert_eq!(anchors[0].line_index(), 0);
         assert_eq!(anchors[0].label(), "src/main.rs");
         assert_eq!(line_text(&anchors[0].heading()), "src/main.rs");
+    }
+
+    #[test]
+    fn default_file_heading_labels_remove_status_and_file_kind() {
+        assert_eq!(
+            default_file_label("Added regular file Cargo.toml:").as_deref(),
+            Some("Cargo.toml")
+        );
+        assert_eq!(
+            default_file_label("Modified executable file scripts/run:").as_deref(),
+            Some("scripts/run")
+        );
+        assert_eq!(
+            default_file_label("Removed symlink docs/current:").as_deref(),
+            Some("docs/current")
+        );
+        assert_eq!(
+            default_file_label("Renamed regular file src/old.rs => src/new.rs:").as_deref(),
+            Some("src/new.rs")
+        );
     }
 
     #[test]

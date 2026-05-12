@@ -152,12 +152,15 @@ impl ViewSpec {
     /// Returns the revset to use when opening another detail view from this one.
     ///
     /// Navigated views already know their change id target. Direct startup views
-    /// such as `jk show main` do not, so this falls back to parsing the first
-    /// positional revset from the original args.
+    /// such as `jk show main` do not, so this falls back to command-specific
+    /// jj argument parsing. Diff views intentionally ignore filesets here; when
+    /// jj diff receives only paths, the revision still defaults to `@`.
     pub fn navigation_revset(&self) -> Option<String> {
-        self.target
-            .clone()
-            .or_else(|| show_revset_arg(&self.args).map(str::to_owned))
+        self.target.clone().or_else(|| match self.command {
+            JjCommand::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
+            JjCommand::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
+            JjCommand::Default | JjCommand::Log => None,
+        })
     }
 
     pub fn diff_format(&self) -> DiffFormat {
@@ -463,6 +466,33 @@ fn show_option_takes_value(arg: &str) -> bool {
     .any(|prefix| arg.starts_with(prefix))
 }
 
+fn diff_revset_arg(args: &[String]) -> Option<&str> {
+    option_value(args, &["-r", "--revisions"], &["--revisions="])
+        .or_else(|| option_value(args, &["-t", "--to"], &["--to="]))
+}
+
+fn option_value<'a>(
+    args: &'a [String],
+    value_options: &[&str],
+    value_prefixes: &[&str],
+) -> Option<&'a str> {
+    let mut args = args.iter();
+
+    while let Some(arg) = args.next() {
+        if value_options.contains(&arg.as_str()) {
+            return args.next().map(String::as_str);
+        }
+        if let Some(value) = value_prefixes
+            .iter()
+            .find_map(|prefix| arg.strip_prefix(prefix))
+        {
+            return Some(value);
+        }
+    }
+
+    None
+}
+
 fn is_full_commit_id(token: &str) -> bool {
     token.len() == 40 && token.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -700,10 +730,54 @@ mod tests {
     }
 
     #[test]
+    fn navigation_revset_defaults_direct_show_to_current_revision() {
+        let spec = ViewSpec::new(JjCommand::Show, Vec::new());
+
+        assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+    }
+
+    #[test]
     fn navigation_revset_uses_direct_diff_startup_revset() {
         let spec = ViewSpec::new(
             JjCommand::Diff,
             vec!["--git".to_owned(), "-r".to_owned(), "main".to_owned()],
+        );
+
+        assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
+    }
+
+    #[test]
+    fn navigation_revset_ignores_direct_diff_filesets() {
+        let spec = ViewSpec::new(JjCommand::Diff, vec!["src/main.rs".to_owned()]);
+
+        assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+    }
+
+    #[test]
+    fn navigation_revset_uses_direct_diff_to_revision() {
+        let spec = ViewSpec::new(
+            JjCommand::Diff,
+            vec!["--from".to_owned(), "main".to_owned(), "--to=@".to_owned()],
+        );
+
+        assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+    }
+
+    #[test]
+    fn navigation_revset_defaults_direct_diff_from_revision_to_current_revision() {
+        let spec = ViewSpec::new(
+            JjCommand::Diff,
+            vec!["--from".to_owned(), "main".to_owned()],
+        );
+
+        assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+    }
+
+    #[test]
+    fn navigation_revset_uses_long_direct_diff_revision_option() {
+        let spec = ViewSpec::new(
+            JjCommand::Diff,
+            vec!["--revisions=main".to_owned(), "src/main.rs".to_owned()],
         );
 
         assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
