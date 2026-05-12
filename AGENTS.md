@@ -35,6 +35,19 @@ Avoid comments that restate simple code. Keep visibility narrow. Do not
 introduce `pub(crate)`, `pub(super)`, or `pub(in ...)` unless there is a
 concrete need and no cleaner local structure.
 
+Use the deeper agent guidance when the change touches the relevant area:
+
+- [`docs/agent/architecture.md`](docs/agent/architecture.md) for app shape,
+  view ownership, jj command boundaries, and rendering assumptions.
+- [`docs/agent/rust-style.md`](docs/agent/rust-style.md) for local Rust style,
+  API shape, visibility, naming, and abstraction choices.
+- [`docs/agent/documentation.md`](docs/agent/documentation.md) for Rustdoc,
+  comments, README-style prose, and truthfulness about current behavior.
+- [`docs/agent/testing.md`](docs/agent/testing.md) for unit tests, snapshots,
+  command parsing tests, and validation expectations.
+- [`docs/agent/workflow.md`](docs/agent/workflow.md) for agent workflow,
+  review posture, and handoff notes.
+
 ## Testing Guidelines
 
 Use Rust unit tests colocated with the module they describe. Prefer
