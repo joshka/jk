@@ -1,17 +1,16 @@
 # Agent Workflow Guidance
 
-Load this document when planning non-trivial changes, reviewing code, preparing
-handoff notes, or deciding how much validation is needed.
+Load this document when planning non-trivial changes, reviewing code, preparing handoff notes, or
+deciding how much validation is needed.
 
 ## Start With The Existing Shape
 
-Read the owning module before editing. Identify the concept that owns the
-change, the adjacent modules it depends on, and the test style already used for
-that behavior.
+Read the owning module before editing. Identify the concept that owns the change, the adjacent
+modules it depends on, and the test style already used for that behavior.
 
-Prefer the existing style when it is coherent. Improve local structure when the
-existing shape is actively making the change harder to understand, but keep
-that improvement scoped to the same concept.
+Prefer the existing style when it is coherent. Improve local structure when the existing shape is
+actively making the change harder to understand, but keep that improvement scoped to the same
+concept.
 
 ## Scope Control
 
@@ -23,13 +22,12 @@ Keep changes atomic:
 - no broad module moves unless the reader path genuinely improves;
 - no speculative public API for future features.
 
-If a change reveals a separate cleanup, note it or make a separate `jj` change
-rather than folding it into unrelated work.
+If a change reveals a separate cleanup, note it or make a separate `jj` change rather than folding
+it into unrelated work.
 
 ## Review Posture
 
-Review from the perspective of a future maintainer who did not write the code.
-Prioritize:
+Review from the perspective of a future maintainer who did not write the code. Prioritize:
 
 - correctness and edge cases;
 - jj CLI compatibility;
@@ -38,8 +36,8 @@ Prioritize:
 - rendering and terminal-state behavior;
 - focused tests for the contract.
 
-When code is hard to read, identify the reason precisely: concept mixing, poor
-ordering, hidden state, vague names, too much abstraction, or missing tests.
+When code is hard to read, identify the reason precisely: concept mixing, poor ordering, hidden
+state, vague names, too much abstraction, or missing tests.
 
 ## Implementation Checklist
 
@@ -61,7 +59,7 @@ Before handoff:
 
 - run focused tests for the touched behavior;
 - run `just check` when practical;
-- run Markdown linting for Markdown-only or doc-heavy changes;
+- run Panache format and lint checks for Markdown-only or doc-heavy changes;
 - report any validation gap directly.
 
 ## Handoff Notes
@@ -74,13 +72,12 @@ Final notes should be concise and concrete:
 - what did not run, if anything;
 - any residual risk or follow-up that matters.
 
-Do not include long implementation diaries. The user shares the workspace and
-can inspect files directly.
+Do not include long implementation diaries. The user shares the workspace and can inspect files
+directly.
 
 ## Jujutsu Workflow
 
-This repo uses `jj`. Prefer `jj --no-pager` for inspection and keep source of
-truth in jj, not Git.
+This repo uses `jj`. Prefer `jj --no-pager` for inspection and keep source of truth in jj, not Git.
 
 For separable work, start a new working-copy change before editing:
 
@@ -93,5 +90,4 @@ project architecture, Rust style, documentation posture, testing habits,
 and review workflow expected for jk."
 ```
 
-Use imperative, concise descriptions. Keep unrelated changes separate, and do
-not rewrite user work.
+Use imperative, concise descriptions. Keep unrelated changes separate, and do not rewrite user work.
