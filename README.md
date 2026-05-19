@@ -4,10 +4,10 @@
 interface for keeping `jj` visible while work happens in an editor, another terminal, or an agent
 session, then refreshing in place instead of repeatedly quitting and rerunning `jj log`.
 
-The current implementation shells out to `jj` and treats rendered `jj` output as canonical. It
-preserves user colors, templates, graph symbols, wording, and diff style wherever possible. The
-long-term direction is a Rust-based jj interface that feels close to the existing CLI UI while
-making it cheap to navigate between related jj concepts.
+The current implementation shells out to `jj` and uses rendered `jj` output as the default
+presentation source. It preserves user colors, templates, graph symbols, wording, and diff style
+wherever possible. The long-term direction is a Rust-based jj interface that feels close to the
+existing CLI UI while making it cheap to navigate between related jj concepts.
 
 ## Direction
 
@@ -124,4 +124,4 @@ just check
 
 The architecture notes in [`docs/agent/architecture.md`](docs/agent/architecture.md) describe the
 current internal boundaries. The most important rule is that `jk` should stay close to jj rather
-than quietly becoming a second implementation of jj repository logic.
+than quietly becoming a separate repository model.

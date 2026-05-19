@@ -6,19 +6,61 @@ execution, view behavior, rendering, navigation, search, copying, or terminal li
 ## Product Boundary
 
 `jk` is a Ratatui TUI over the `jj` command-line interface. It should feel like an interactive
-wrapper around the user's configured `jj`, not like a second implementation of jj repository logic.
+wrapper around the user's configured `jj`, not like a separate repository model.
 
-The most important architecture rule is that rendered `jj` output is canonical:
+The most important architecture rule is that rendered `jj` output is the default presentation
+source:
 
 - Preserve user templates, colors, graph symbols, diff styles, and jj wording.
-- Shell out to `jj` for repository information instead of reconstructing repo state through a
-  lower-level model.
+- Shell out to `jj` for rendered views and command behavior instead of reconstructing repo state
+  through a lower-level model.
 - Parse only the small amount of structure required for selection, navigation, sticky file context,
   search, and copy actions.
+- Prefer code or structured contracts over parsed CLI output for semantic state.
 - Prefer honest pass-through behavior over silently normalizing or reformatting jj output.
 
 If a change would make `jk` disagree with the `jj` CLI, treat that as a design problem unless the
 user explicitly asked for an app-level behavior that differs.
+
+## Integration Contracts
+
+Rendered `jj` output is the default presentation source, but it is not the preferred source of
+semantic data. When a feature depends on underspecified output shape, reconstructed terminal output,
+or duplicated `jj` behavior, treat that as an explicit integration choice.
+
+Use [`../plan/integration-strategy.md`](../plan/integration-strategy.md) when deciding between:
+
+- rendered output as-is;
+- rendered output plus a narrow parser;
+- structured output or a purpose-built template;
+- shared semantic, rendering, config, template, graph, or style APIs;
+- `jj_cli` or `jj_lib`;
+- a future UI/RPC API;
+- upstream extraction or in-tree work.
+
+Use [`../plan/fragility-register.md`](../plan/fragility-register.md) to record parser assumptions,
+inferred structure, duplicated semantics, and the preferred mitigation. Favor contracts that fail
+loudly when `jj` changes: compile errors, schema failures, focused parser tests, or snapshot diffs.
+
+Also consider pipeline fragility. The path from `jj` semantics to stdout, ANSI parsing, intermediate
+spans, and Ratatui items can lose information even when the rendered output looks correct. A direct
+code path that shares `jj` template, config, graph, and styling behavior can be less fragile, but
+only if that behavior is actually shared rather than locally copied.
+
+When a feature needs semantic meaning that `jj` already has internally, do not make rendered CLI
+output the first design choice. Prefer structured output, narrow machine-oriented templates, shared
+semantic/rendering/config APIs, `jj_cli`, `jj_lib`, or an upstream API. Use rendered-output parsing
+for semantic state only when the scope is narrow, tested, and recorded as a soft agreement.
+
+The strongest API shape exposes both semantic and view information. A rendered row often contains
+interactive pieces such as change id, commit id, graph position, labels, and styled template output.
+`jk` should avoid recomputing those same display decisions when `jj` can expose them through shared
+code.
+
+Before duplicating template parsing, config interpretation, revset/fileset semantics, graph layout,
+transaction behavior, conflict modeling, or bookmark tracking behavior, check whether rendered
+output, shared semantic/rendering APIs, `jj_cli`, `jj_lib`, structured output, or an upstream API
+would be more honest and maintainable.
 
 ## Module Ownership
 

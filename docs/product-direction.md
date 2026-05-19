@@ -16,7 +16,7 @@ The core shape is:
 - vimish movement;
 - fast navigation between jj concepts;
 - refresh-in-place after external changes;
-- rendered `jj` output remains canonical.
+- rendered `jj` output remains the default presentation source.
 
 The default experience should be a focused `jj` session, not a repository dashboard. Panes,
 previews, overlays, and split layouts may be useful as local presentation choices, but they should
@@ -35,9 +35,37 @@ not become the main mental model.
 - diff formats;
 - revset behavior.
 
-When `jk` has to parse output, it should parse only enough structure for navigation, sticky context,
-search, and copy actions. It should degrade honestly when rendered output changes instead of
-pretending to own a complete repository model.
+The goal is not to invent one correct TUI view of history or status. `jj` has defaults, and users
+change those defaults to match what they consider useful. `jk` should respect that configurability
+while adding interaction.
+
+Rendered output should be treated as presentation first, not as the preferred source of semantic
+data. When `jk` has to parse output, it should parse only enough structure for presentation-adjacent
+behavior such as row selection, sticky context, search, and copy actions. For semantic information,
+prefer code or structured contracts that preserve meaning before it is flattened into terminal text.
+`jk` should degrade honestly when rendered output changes instead of pretending to own a complete
+repository model.
+
+### Treat Integration As Theory Testing
+
+`jk` should make the external-tool versus upstream-integration tradeoff concrete through
+implementation. The project should not assume in advance that a TUI must live inside `jj`, or that a
+separate tool can always reproduce the parts of `jj` it needs.
+
+The working hypothesis is:
+
+- use rendered `jj` output as the default presentation source;
+- keep non-essential structure opaque;
+- identify every soft agreement, such as parsing underspecified output;
+- distinguish data fragility from rendering-pipeline fragility;
+- seek APIs that expose both semantic data and renderable view information;
+- prefer code or structured APIs over parsing CLI output for semantic state;
+- prefer harder contracts when a feature needs exact semantics;
+- treat repeated duplication as evidence for better upstream APIs or extracted libraries.
+
+This keeps the debate practical. If rendered output plus narrow parsing is enough for
+presentation-adjacent flows, that is a useful result. If the tool repeatedly needs `jj_cli`,
+`jj_lib`, a future RPC API, or code extracted from `jj`, that is also useful evidence.
 
 ### Prefer Depth Over Panes
 
@@ -144,7 +172,8 @@ Use this filter for new product ideas:
 1. Does it preserve `jj` output and behavior rather than replacing it?
 1. Does it make the log -> inspect -> return loop faster or clearer?
 1. Can it work as one active view, a drill-down view, or a temporary overlay?
-1. Does it avoid introducing a second repository model?
+1. Does it avoid introducing a separate repository model?
 1. Can it fail honestly when `jj` output or config differs?
+1. Does it make fragile integration assumptions visible?
 
 If the answer is mostly no, the idea probably belongs outside `jk` for now.

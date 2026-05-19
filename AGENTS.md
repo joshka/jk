@@ -12,9 +12,15 @@ navigation model, command coverage, or visual direction. Load
 [`docs/agent/architecture.md`](docs/agent/architecture.md) when work touches command execution, view
 behavior, rendering, navigation, search, copying, or terminal lifecycle.
 
-Rendered `jj` output is canonical. Preserve user templates, colors, graph symbols, diff style,
-wording, and command behavior wherever practical. Parse only the small amount of structure needed
-for navigation, sticky file context, search, and copy actions.
+Rendered `jj` output is the default presentation source. Preserve user templates, colors, graph
+symbols, diff style, wording, and command behavior wherever practical. Parse the minimum structure
+needed for presentation-adjacent navigation, sticky file context, search, and copy actions, and keep
+the rest opaque. Prefer code or structured contracts over parsed CLI output for semantic state.
+Treat stdout -> ANSI -> styled spans -> Ratatui items as a fragile pipeline when the feature needs
+semantics that could be represented directly in code. When work depends on underspecified output,
+pipeline reconstruction, semantic inference from rendered text, or duplicated `jj` behavior, load
+[`docs/plan/integration-strategy.md`](docs/plan/integration-strategy.md) and record assumptions in
+[`docs/plan/fragility-register.md`](docs/plan/fragility-register.md).
 
 ## Project Structure & Module Organization
 
@@ -127,9 +133,19 @@ screenshots only for meaningful TUI rendering changes.
 
 ## Product And Architecture Notes
 
-`jk` intentionally shells out to `jj` and treats rendered jj output as canonical. This preserves
-user config, templates, colors, graph symbols, and jj CLI behavior. Navigation should prefer change
-ids from graph rows; commit ids are exposed for copying.
+`jk` intentionally starts from shelling out to `jj` and presenting rendered jj output. This
+preserves user config, templates, colors, graph symbols, and jj CLI behavior. Navigation should
+prefer change ids from graph rows; commit ids are exposed for copying.
+
+Treat integration choices as theory testing. Rendered output is preferred first for presentation,
+but semantic state should prefer structured or code contracts. Fragile parser assumptions, repeated
+duplication, or workflows that need exact transaction semantics are evidence for stronger contracts
+such as structured output, `jj_cli`, `jj_lib`, future RPC APIs, upstream extraction, or in-tree
+work.
+
+Prefer APIs that expose both semantic fields and renderable view information when possible. `jk`
+should preserve jj-like defaults and user-configured templates/colors without reparsing terminal
+output or duplicating jj's display decisions.
 
 Keep the product focused on the core loop before expanding command coverage:
 

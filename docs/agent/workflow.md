@@ -44,7 +44,8 @@ state, vague names, too much abstraction, or missing tests.
 Before editing:
 
 - identify the owning module;
-- identify whether rendered jj output must remain canonical;
+- identify whether rendered jj output should remain the presentation source;
+- identify whether the change introduces a soft agreement that belongs in the fragility register;
 - check existing tests for the behavior;
 - decide the narrowest useful validation command.
 
