@@ -1,25 +1,62 @@
 # Repository Guidelines
 
+## Current State
+
+This is the cleaned-up `main` line for `jk`, a Rust 2024 binary crate for a ratatui-based TUI over
+`jj`. The old broad prototype line is preserved as the `prototype` branch locally and on GitHub;
+mine it for product ideas and visual references, not for code architecture.
+
+The current product direction is log-first, single-active-view, vimish, and `jj`-shaped. Load
+[`docs/product-direction.md`](docs/product-direction.md) when work affects user-visible scope,
+navigation model, command coverage, or visual direction. Load
+[`docs/agent/architecture.md`](docs/agent/architecture.md) when work touches command execution, view
+behavior, rendering, navigation, search, copying, or terminal lifecycle.
+
+Rendered `jj` output is canonical. Preserve user templates, colors, graph symbols, diff style,
+wording, and command behavior wherever practical. Parse only the small amount of structure needed
+for navigation, sticky file context, search, and copy actions.
+
 ## Project Structure & Module Organization
 
-This is a Rust 2024 binary crate for `jk`, a ratatui-based TUI for `jj`. Source lives in `src/`;
-tests are colocated in each module under `#[cfg(test)]`. The code is organized by vertical slices
-where practical:
+Source lives in `src/`; tests are colocated in each module under `#[cfg(test)]`. The code is
+organized by vertical slices where practical:
 
-- `app.rs` owns the terminal event loop, key dispatch, modal state, and view stack.
-- `graph.rs`, `show.rs`, and `diff.rs` own their view behavior, rendering, and tests.
-- `jj.rs` builds `jj` commands and parses rendered CLI output.
-- `rendered_jj.rs` and `sticky_file_view.rs` handle rendered jj output and sticky file context.
-- `tui.rs` contains shared title/status/modal chrome only.
+- `app.rs` owns the terminal event loop, key dispatch, modal state, view stack, refresh, and
+  cross-view transitions.
+- `view_state.rs` routes app-level view operations to graph, show, and diff view implementations.
+- `command.rs` owns key binding metadata and the command/effect vocabulary shared between app
+  dispatch and individual views.
+- `jj.rs` builds `jj` commands, owns `ViewSpec`, loads rendered CLI output, and parses only the
+  minimal graph/revset metadata `jk` needs.
+- `graph.rs` owns the default/log graph view, graph-row selection, graph search, and graph-to-detail
+  navigation.
+- `show.rs` and `diff.rs` own their view policy and should stay distinct even when they share
+  document mechanics.
+- `sticky_file_view.rs` owns shared show/diff document scrolling, file jumping, sticky heading
+  projection, and document search.
+- `rendered_jj.rs` owns lightweight structure over rendered jj lines, including file heading
+  detection and sticky projection inputs.
+- `search.rs`, `selection.rs`, `copy.rs`, and `clipboard.rs` own narrow support concepts and should
+  not accumulate view policy.
+- `tui.rs` owns shared chrome only: layout, status/header rendering, overlays, and modal
+  presentation.
 
-## Build, Test, and Development Commands
+Add a module only when it gives a real concept a local home. Avoid broad reorganization unless it
+improves the reader path for a concrete change.
 
-- `just check`: format with nightly rustfmt, then run `cargo check` and `cargo test`.
+## Build, Test, And Development Commands
+
+Use the repository `just` commands:
+
+- `just check`: run nightly rustfmt, Panache Markdown checks, `cargo check`, and `cargo test`.
 - `just fmt`: run `cargo +nightly fmt`.
+- `just md-fmt`: run `panache format README.md AGENTS.md docs`.
+- `just md-check`: run Panache format and lint checks for Markdown.
 - `just test`: run `cargo test`.
 - `just run`: run the TUI with `cargo run`.
 
-Use `cargo +nightly fmt` before finishing changes. The project uses `rustfmt.toml` from this repo.
+Use `cargo +nightly fmt` before finishing Rust changes. Markdown is formatted with Panache,
+configured in [`panache.toml`](panache.toml) for GFM, 100-column reflow.
 
 ## Coding Style & Naming Conventions
 
@@ -30,6 +67,15 @@ Write Rustdoc/module comments for durable intent: jj CLI compatibility, navigati
 scroll behavior, and other non-obvious constraints. Avoid comments that restate simple code. Keep
 visibility narrow. Do not introduce `pub(crate)`, `pub(super)`, or `pub(in ...)` unless there is a
 concrete need and no cleaner local structure.
+
+When writing Rust, prefer idiomatic readability:
+
+- inline `format!` arguments when possible;
+- collapse nested `if` statements when that improves clarity;
+- use method references over redundant closures when practical;
+- avoid boolean or ambiguous `Option` parameters that make call sites opaque;
+- prefer exhaustive `match` statements where the domain is known;
+- avoid helper functions or abstractions that are used once and do not name a real concept.
 
 Use the deeper agent guidance when the change touches the relevant area:
 
@@ -49,19 +95,54 @@ Use the deeper agent guidance when the change touches the relevant area:
 Use Rust unit tests colocated with the module they describe. Prefer behavior-oriented test names,
 for example `document_search_wraps_without_reselecting_current_line`.
 
-Use inline insta snapshots for multi-line rendered/projection transitions. Run `cargo test` for
-focused validation and `just check` before handing off.
+Use inline insta snapshots for multi-line rendered/projection transitions. Run focused tests while
+working and `just check` before handing off when practical.
 
-## Commit & Pull Request Guidelines
+For Markdown-only changes, run `just md-check`. For Rust formatting-only validation, run `just fmt`.
 
-This repository uses jujutsu. Prefer `jj --no-pager` commands for version-control inspection. Commit
-descriptions should be imperative and concise, for example `Scaffold jj TUI`.
+## Commit, Branch, And Pull Request Guidelines
 
-Pull requests should summarize user-visible behavior, note jj command/config assumptions, and list
-the validation run. Include terminal screenshots only for meaningful TUI rendering changes.
+This repository uses jujutsu. Prefer `jj --no-pager` commands for version-control inspection. Do not
+use Git for normal source-control workflows in this repo unless the operation is transport-level and
+jj does not cover it.
 
-## Architecture Notes
+Current branch topology:
+
+- `main` is the cleaned-up implementation line and GitHub default branch.
+- `prototype` preserves the old broad prototype branch for context mining.
+
+For separable work, start from a fresh jj working-copy change and describe it early:
+
+```sh
+jj --no-pager new
+jj --no-pager desc --message "Update agent repository guidance
+
+Refresh the repo-local AGENTS guidance so future work starts from the
+current product direction, tooling, branch topology, and module ownership."
+```
+
+Commit descriptions should be imperative and concise. Pull requests should summarize user-visible
+behavior, note jj command/config assumptions, and list the validation run. Include terminal
+screenshots only for meaningful TUI rendering changes.
+
+## Product And Architecture Notes
 
 `jk` intentionally shells out to `jj` and treats rendered jj output as canonical. This preserves
 user config, templates, colors, graph symbols, and jj CLI behavior. Navigation should prefer change
 ids from graph rows; commit ids are exposed for copying.
+
+Keep the product focused on the core loop before expanding command coverage:
+
+1. Graph navigation.
+1. `show` and `diff` drill-down.
+1. Back/forward history.
+1. Refresh-in-place.
+1. Search and copy.
+1. Sticky file context.
+1. Compact help/keymap discovery.
+1. Focused status and operation-log views.
+
+When mining the `prototype` branch or `target/vhs` artifacts, preserve useful interaction ideas such
+as item-based navigation, low chrome, safety prompts, and compact keymap/help views. Avoid
+inheriting pane-first layout, command launcher scope, generated tutorial scope as roadmap, or old
+module boundaries.
