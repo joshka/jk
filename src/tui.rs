@@ -11,6 +11,7 @@ use ratatui::widgets::{Block, Clear, List, ListItem, Paragraph};
 use ratatui_macros::{line, span, vertical};
 
 use crate::action_menu::{ActionMenu, RolePrompt};
+use crate::action_output::ActionOutput;
 use crate::app::{StatusKind, StatusLine, ViewFormatOption};
 use crate::command::HelpSection;
 use crate::copy::CopyOption;
@@ -77,44 +78,22 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             frame.render_widget(push_remote_prompt(remotes, selected), area);
         }
-        Overlay::RebasePreview {
-            command_label,
-            preview_output,
-            status_context,
-            completed,
-        } => {
-            let lines = preview_lines(
-                "Rebase preview",
-                command_label,
-                preview_output,
-                status_context,
-                completed,
-            );
-            let area = preview_area(frame.area(), &lines);
+        Overlay::RebasePreview { output } => {
+            let title = action_output_title("Rebase", output);
+            let area = action_output_area(frame.area(), &title, output);
             frame.render_widget(Clear, area);
-            frame.render_widget(preview_panel("Rebase preview", &lines), area);
+            render_action_output(frame, area, &title, output);
         }
         Overlay::RolePrompt { prompt, selected } => {
             let area = centered_area(frame.area(), 54, prompt.options().len() as u16 + 4);
             frame.render_widget(Clear, area);
             frame.render_widget(role_prompt(prompt, selected), area);
         }
-        Overlay::PushPreview {
-            command_label,
-            preview_output,
-            status_context,
-            completed,
-        } => {
-            let lines = preview_lines(
-                "Push preview",
-                command_label,
-                preview_output,
-                status_context,
-                completed,
-            );
-            let area = preview_area(frame.area(), &lines);
+        Overlay::PushPreview { output } => {
+            let title = action_output_title("Push", output);
+            let area = action_output_area(frame.area(), &title, output);
             frame.render_widget(Clear, area);
-            frame.render_widget(preview_panel("Push preview", &lines), area);
+            render_action_output(frame, area, &title, output);
         }
     }
 }
@@ -141,16 +120,10 @@ pub enum Overlay<'a> {
         selected: usize,
     },
     PushPreview {
-        command_label: &'a str,
-        preview_output: &'a str,
-        status_context: Option<&'a String>,
-        completed: bool,
+        output: &'a ActionOutput,
     },
     RebasePreview {
-        command_label: &'a str,
-        preview_output: &'a str,
-        status_context: Option<&'a String>,
-        completed: bool,
+        output: &'a ActionOutput,
     },
     RolePrompt {
         prompt: &'a RolePrompt,
@@ -498,54 +471,95 @@ fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
     List::new(items).block(Block::bordered().title("Push remote"))
 }
 
-fn preview_lines(
-    title: &str,
-    command_label: &str,
-    preview_output: &str,
-    status_context: Option<&String>,
-    completed: bool,
-) -> Vec<String> {
-    let mut lines = vec![format!("{title}"), format!("command: {command_label}")];
-    if let Some(context) = status_context {
-        lines.push(format!("context: {context}"));
-    }
-    if preview_output.is_empty() {
-        lines.push("preview output unavailable".to_owned());
+fn action_output_title(action: &str, output: &ActionOutput) -> String {
+    if output.completed() {
+        format!("{action} result")
     } else {
-        lines.push("output:".to_owned());
-        lines.extend(
-            preview_output
-                .lines()
-                .map(|line| format!("  {line}"))
-                .collect::<Vec<_>>(),
+        format!("{action} preview")
+    }
+}
+
+fn render_action_output(frame: &mut Frame<'_>, area: Rect, title: &str, output: &ActionOutput) {
+    let block = Block::bordered().title(title.to_owned());
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 {
+        return;
+    }
+
+    let footer_height = u16::from(inner.height > 1);
+    let body_area = Rect {
+        x: inner.x,
+        y: inner.y,
+        width: inner.width,
+        height: inner.height.saturating_sub(footer_height),
+    };
+    if body_area.height > 0 {
+        let scroll = output.scroll().min(usize::from(u16::MAX)) as u16;
+        frame.render_widget(
+            Paragraph::new(output.body_lines().join("\n")).scroll((scroll, 0)),
+            body_area,
         );
     }
-    if completed {
-        lines.push("Enter: close".to_owned());
-    } else {
-        lines.push("Enter: confirm".to_owned());
+
+    if footer_height > 0 {
+        let footer_area = Rect {
+            x: inner.x,
+            y: inner.y + inner.height - 1,
+            width: inner.width,
+            height: 1,
+        };
+        frame.render_widget(action_output_footer(output.completed()), footer_area);
     }
-    lines.push("Esc/q: close".to_owned());
-    lines
 }
 
-fn preview_panel<'a>(title: &'a str, lines: &'a [String]) -> Paragraph<'a> {
-    Paragraph::new(lines.join("\n")).block(Block::bordered().title(title))
+fn action_output_footer(completed: bool) -> Paragraph<'static> {
+    let primary = if completed {
+        line![key("Enter"), " close  "]
+    } else {
+        line![key("Enter"), " confirm  "]
+    };
+    let mut spans = primary.spans;
+    if completed {
+        spans.extend(line![key("Esc/q"), " close  "].spans);
+    } else {
+        spans.extend(line![key("Esc/q"), " cancel  "].spans);
+    }
+    spans.extend(line![key("j/k"), " scroll  "].spans);
+    spans.extend(line![key("PgUp/PgDn"), " page  "].spans);
+    spans.extend(line![key("g/G"), " ends"].spans);
+
+    Paragraph::new(Line::from(spans)).style(Style::default().fg(Color::Gray))
 }
 
-fn preview_area(area: Rect, lines: &[String]) -> Rect {
+fn action_output_area(area: Rect, title: &str, output: &ActionOutput) -> Rect {
+    let lines = output.body_lines();
+    let footer = action_output_footer_text(output.completed());
     let width = lines
         .iter()
-        .map(|line| line.len())
+        .map(|line| line_width(line))
+        .chain([line_width(&footer), line_width(title)])
         .max()
         .unwrap_or(0)
         .max(44)
         .min(usize::from(area.width)) as u16;
-    let height = lines
-        .len()
-        .min(usize::from(area.height))
-        .min(usize::from(area.height)) as u16;
+    let available_body_height = area.height.saturating_sub(3);
+    let body_height = lines.len().min(usize::from(available_body_height)).max(1) as u16;
+    let height = body_height.saturating_add(3).min(area.height);
     centered_area(area, width, height)
+}
+
+fn action_output_footer_text(completed: bool) -> String {
+    if completed {
+        "Enter close  Esc/q close  j/k scroll  PgUp/PgDn page  g/G ends".to_owned()
+    } else {
+        "Enter confirm  Esc/q cancel  j/k scroll  PgUp/PgDn page  g/G ends".to_owned()
+    }
+}
+
+fn line_width(line: &str) -> usize {
+    line.chars().count()
 }
 
 fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
@@ -599,6 +613,10 @@ fn status_style(status: &StatusLine) -> Style {
 
 #[cfg(test)]
 mod tests {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    use crate::action_output::ActionOutput;
     use crate::command::{HelpRow, HelpSectionKind};
 
     use super::*;
@@ -639,6 +657,57 @@ mod tests {
         Direct Actions
         w  cycle view mode
         -  none yet
+        ");
+    }
+
+    #[test]
+    fn action_output_render_keeps_footer_visible_while_body_scrolls() {
+        let mut output = ActionOutput::pending(
+            "jj action --preview".to_owned(),
+            (0..8)
+                .map(|line| format!("line {line}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            None,
+        );
+        output.scroll_down(5);
+        output.scroll_down(5);
+
+        let mut terminal = Terminal::new(TestBackend::new(36, 8)).unwrap();
+        terminal
+            .draw(|frame| {
+                render_action_output(
+                    frame,
+                    Rect {
+                        x: 0,
+                        y: 0,
+                        width: 36,
+                        height: 8,
+                    },
+                    "Push preview",
+                    &output,
+                );
+            })
+            .unwrap();
+
+        let rendered = (1..7)
+            .map(|y| {
+                (1..35)
+                    .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+                    .collect::<String>()
+                    .trim_end()
+                    .to_owned()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        insta::assert_snapshot!(rendered, @r"
+          line 0
+          line 1
+          line 2
+          line 3
+          line 4
+        Enter confirm  Esc/q cancel  j/k s
         ");
     }
 }

@@ -14,6 +14,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::DefaultTerminal;
 
 use crate::action_menu::{ActionKind, ActionMenu, FollowUp, RolePrompt};
+use crate::action_output::ActionOutput;
 use crate::clipboard;
 use crate::command::{
     Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect, find_binding,
@@ -27,6 +28,13 @@ use crate::jj::{
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
 use crate::view_state::ViewState;
+
+#[cfg(test)]
+type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
+#[cfg(test)]
+type RefreshView = fn(&mut ViewState) -> Result<()>;
+#[cfg(test)]
+type RevealGraphChange = fn(&mut ViewState, &str, LogViewMode) -> Result<bool>;
 
 pub fn run() -> Result<()> {
     let mut app = App::load(env::args_os().skip(1).collect())?;
@@ -43,6 +51,12 @@ struct App {
     mode: InteractionMode,
     search: Option<SearchQuery>,
     should_quit: bool,
+    #[cfg(test)]
+    rebase_run: RebaseRun,
+    #[cfg(test)]
+    refresh_view: RefreshView,
+    #[cfg(test)]
+    reveal_graph_change: RevealGraphChange,
 }
 
 enum InteractionMode {
@@ -68,10 +82,7 @@ enum InteractionMode {
     },
     RebasePreview {
         rebase: JjRebasePlan,
-        command_label: String,
-        preview_output: String,
-        status_context: Option<String>,
-        completed: bool,
+        output: ActionOutput,
     },
     PushRemotePrompt {
         target: JjGitPushTarget,
@@ -80,10 +91,7 @@ enum InteractionMode {
     },
     PushPreview {
         push: JjGitPush,
-        command_label: String,
-        preview_output: String,
-        status_context: Option<String>,
-        completed: bool,
+        output: ActionOutput,
     },
 }
 
@@ -107,6 +115,25 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('J'), Command::SwitchDefault),
 ];
 
+#[cfg(test)]
+fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {
+    rebase.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_refresh_view(view: &mut ViewState) -> Result<()> {
+    view.refresh()
+}
+
+#[cfg(test)]
+fn default_reveal_graph_change(
+    view: &mut ViewState,
+    change_id: &str,
+    fallback_mode: LogViewMode,
+) -> Result<bool> {
+    view.reveal_graph_change(change_id, fallback_mode)
+}
+
 impl App {
     fn load(args: Vec<OsString>) -> Result<Self> {
         let initial_spec = initial_view(args)?;
@@ -125,7 +152,51 @@ impl App {
             mode: InteractionMode::Normal,
             search: None,
             should_quit: false,
+            #[cfg(test)]
+            rebase_run: default_rebase_run,
+            #[cfg(test)]
+            refresh_view: default_refresh_view,
+            #[cfg(test)]
+            reveal_graph_change: default_reveal_graph_change,
         })
+    }
+
+    #[cfg(test)]
+    fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
+        (self.rebase_run)(rebase)
+    }
+
+    #[cfg(not(test))]
+    fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
+        rebase.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn refresh_view_state(&mut self) -> Result<()> {
+        (self.refresh_view)(&mut self.view)
+    }
+
+    #[cfg(not(test))]
+    fn refresh_view_state(&mut self) -> Result<()> {
+        self.view.refresh()
+    }
+
+    #[cfg(test)]
+    fn reveal_graph_change_for_rebase(
+        &mut self,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        (self.reveal_graph_change)(&mut self.view, change_id, fallback_mode)
+    }
+
+    #[cfg(not(test))]
+    fn reveal_graph_change_for_rebase(
+        &mut self,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        self.view.reveal_graph_change(change_id, fallback_mode)
     }
 
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
@@ -457,15 +528,15 @@ impl App {
                 }
                 Ok(true)
             }
-            InteractionMode::RebasePreview {
-                rebase,
-                command_label: _,
-                preview_output: _,
-                status_context,
-                completed,
-            } => {
-                let (rebase, status_context, completed) =
-                    { (rebase.clone(), status_context.clone(), *completed) };
+            InteractionMode::RebasePreview { rebase, output } => {
+                let (rebase, status_context, completed) = {
+                    (
+                        rebase.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => {
                         self.mode = InteractionMode::Normal;
@@ -482,6 +553,12 @@ impl App {
 
                         self.confirm_rebase(rebase, status_context, viewport_height);
                     }
+                    KeyCode::Char('j') | KeyCode::Down => output.scroll_down(visible_lines),
+                    KeyCode::Char('k') | KeyCode::Up => output.scroll_up(),
+                    KeyCode::Char(' ') | KeyCode::PageDown => output.page_down(visible_lines),
+                    KeyCode::Char('b') | KeyCode::PageUp => output.page_up(visible_lines),
+                    KeyCode::Char('g') | KeyCode::Home => output.scroll_to_top(),
+                    KeyCode::Char('G') | KeyCode::End => output.scroll_to_bottom(visible_lines),
                     _ => {}
                 }
                 Ok(true)
@@ -519,15 +596,15 @@ impl App {
                 }
                 Ok(true)
             }
-            InteractionMode::PushPreview {
-                push,
-                command_label: _,
-                preview_output: _,
-                status_context,
-                completed,
-            } => {
-                let (push, status_context, completed) =
-                    { (push.clone(), status_context.clone(), *completed) };
+            InteractionMode::PushPreview { push, output } => {
+                let (push, status_context, completed) = {
+                    (
+                        push.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => {
                         self.mode = InteractionMode::Normal;
@@ -544,6 +621,12 @@ impl App {
 
                         self.confirm_push(push, status_context, viewport_height);
                     }
+                    KeyCode::Char('j') | KeyCode::Down => output.scroll_down(visible_lines),
+                    KeyCode::Char('k') | KeyCode::Up => output.scroll_up(),
+                    KeyCode::Char(' ') | KeyCode::PageDown => output.page_down(visible_lines),
+                    KeyCode::Char('b') | KeyCode::PageUp => output.page_up(visible_lines),
+                    KeyCode::Char('g') | KeyCode::Home => output.scroll_to_top(),
+                    KeyCode::Char('G') | KeyCode::End => output.scroll_to_bottom(visible_lines),
                     _ => {}
                 }
                 Ok(true)
@@ -630,15 +713,21 @@ impl App {
                 let command_label = push.command_label(true);
                 self.mode = InteractionMode::PushPreview {
                     push,
-                    command_label,
-                    preview_output: output.message().to_owned(),
-                    status_context,
-                    completed: false,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
                 };
             }
             Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                self.mode = InteractionMode::Normal;
+                let message = error.to_string();
+                let command_label = push.command_label(true);
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::PushPreview {
+                    push,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
             }
         }
     }
@@ -668,15 +757,21 @@ impl App {
                 let command_label = rebase.command_label(true);
                 self.mode = InteractionMode::RebasePreview {
                     rebase,
-                    command_label,
-                    preview_output: output.message().to_owned(),
-                    status_context,
-                    completed: false,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
                 };
             }
             Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                self.mode = InteractionMode::Normal;
+                let message = error.to_string();
+                let command_label = rebase.command_label(true);
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::RebasePreview {
+                    rebase,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
             }
         }
     }
@@ -709,10 +804,7 @@ impl App {
 
         self.mode = InteractionMode::PushPreview {
             push,
-            command_label,
-            preview_output: result_message,
-            status_context,
-            completed: true,
+            output: ActionOutput::finished(command_label, result_message, status_context),
         }
     }
 
@@ -786,35 +878,48 @@ impl App {
     ) {
         let command_label = rebase.command_label(false);
         let primary_source = rebase.sources().first().cloned();
-        let result_message = match rebase.run() {
-            Ok(output) => match self.view.refresh() {
+        let result_message = match self.run_rebase(&rebase) {
+            Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
                     self.view.clamp(viewport_height);
+                    let mut reveal_error = None;
                     let revealed_in_recent = match primary_source.as_deref() {
                         Some(change_id) => match self
-                            .view
-                            .reveal_graph_change(change_id, LogViewMode::Recent)
+                            .reveal_graph_change_for_rebase(change_id, LogViewMode::Recent)
                         {
                             Ok(switched_modes) => {
                                 self.view.clamp(viewport_height);
-                                switched_modes
+                                Some(switched_modes)
                             }
                             Err(error) => {
                                 self.status = StatusLine::error(&self.view, error.to_string());
-                                return;
+                                reveal_error = Some(format!(
+                                    "{} | reveal failed: {} | jj undo",
+                                    output.trim(),
+                                    error
+                                ));
+                                None
                             }
                         },
-                        None => false,
+                        None => None,
                     };
-                    let message = if revealed_in_recent {
-                        format!(
-                            "{} | showing recent work | jj undo",
-                            output.message().trim()
-                        )
-                    } else {
-                        format!("{} | jj undo", output.message().trim())
+
+                    let message = match revealed_in_recent {
+                        Some(switched_modes) => {
+                            if switched_modes {
+                                format!("{} | showing recent work | jj undo", output.trim())
+                            } else {
+                                format!("{} | jj undo", output.trim())
+                            }
+                        }
+                        None => match reveal_error.as_deref() {
+                            Some(message) => message.to_owned(),
+                            None => format!("{} | jj undo", output.trim()),
+                        },
                     };
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    if reveal_error.is_none() {
+                        self.status = StatusLine::with_message(&self.view, message.as_str());
+                    }
                     message
                 }
                 Err(error) => {
@@ -830,10 +935,7 @@ impl App {
 
         self.mode = InteractionMode::RebasePreview {
             rebase,
-            command_label,
-            preview_output: result_message,
-            status_context,
-            completed: true,
+            output: ActionOutput::finished(command_label, result_message, status_context),
         };
     }
 
@@ -957,36 +1059,14 @@ impl App {
                 prompt,
                 selected: *selected,
             },
-            InteractionMode::RebasePreview {
-                command_label,
-                preview_output,
-                status_context,
-                completed,
-                ..
-            } => Overlay::RebasePreview {
-                command_label: command_label.as_str(),
-                preview_output: preview_output.as_str(),
-                status_context: status_context.as_ref(),
-                completed: *completed,
-            },
+            InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
             InteractionMode::PushRemotePrompt {
                 remotes, selected, ..
             } => Overlay::PushRemotePrompt {
                 remotes,
                 selected: *selected,
             },
-            InteractionMode::PushPreview {
-                command_label,
-                preview_output,
-                status_context,
-                completed,
-                ..
-            } => Overlay::PushPreview {
-                command_label: command_label.as_str(),
-                preview_output: preview_output.as_str(),
-                status_context: status_context.as_ref(),
-                completed: *completed,
-            },
+            InteractionMode::PushPreview { output, .. } => Overlay::PushPreview { output },
             InteractionMode::Normal
             | InteractionMode::SearchPrompt(_)
             | InteractionMode::LogRevsetPrompt(_) => Overlay::None,
@@ -1221,6 +1301,10 @@ fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }
 
+fn action_output_visible_lines(viewport_height: u16) -> u16 {
+    viewport_height.saturating_sub(1).max(1)
+}
+
 #[derive(Clone, Debug)]
 pub enum StatusKind {
     Ready,
@@ -1232,6 +1316,24 @@ mod tests {
     use super::*;
     use crate::action_menu::RolePromptOption;
 
+    fn mock_rebase_success(_: &JjRebasePlan) -> Result<String> {
+        Ok("rebased".to_owned())
+    }
+
+    fn mock_refresh_ok(_view: &mut ViewState) -> Result<()> {
+        Ok(())
+    }
+
+    fn mock_reveal_graph_change_error(
+        _view: &mut ViewState,
+        _change_id: &str,
+        _fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        Err(eyre!(
+            "refreshed graph did not include the new working-copy change"
+        ))
+    }
+
     fn test_app(view: ViewState) -> App {
         App {
             status: StatusLine::ready(&view),
@@ -1242,6 +1344,12 @@ mod tests {
             mode: InteractionMode::Normal,
             search: None,
             should_quit: false,
+            #[cfg(test)]
+            rebase_run: mock_rebase_success,
+            #[cfg(test)]
+            refresh_view: mock_refresh_ok,
+            #[cfg(test)]
+            reveal_graph_change: default_reveal_graph_change,
         }
     }
 
@@ -1337,10 +1445,11 @@ mod tests {
         ])));
         app.mode = InteractionMode::PushPreview {
             push: JjGitPush::for_status().with_remote("origin"),
-            command_label: "jj git push --remote origin --revision abcdef".to_owned(),
-            preview_output: "preview only".to_owned(),
-            status_context: None,
-            completed: false,
+            output: ActionOutput::pending(
+                "jj git push --remote origin --revision abcdef".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
         };
 
         assert!(
@@ -1358,10 +1467,11 @@ mod tests {
         ])));
         app.mode = InteractionMode::PushPreview {
             push: JjGitPush::for_status().with_remote("origin"),
-            command_label: "jj git push --remote origin".to_owned(),
-            preview_output: "pushed".to_owned(),
-            status_context: Some("status push uses jj default target for remote origin".to_owned()),
-            completed: true,
+            output: ActionOutput::finished(
+                "jj git push --remote origin".to_owned(),
+                "pushed".to_owned(),
+                Some("status push uses jj default target for remote origin".to_owned()),
+            ),
         };
         app.status = StatusLine::with_message(&app.view, "pushed");
 
@@ -1371,6 +1481,88 @@ mod tests {
         );
         assert!(matches!(app.mode, InteractionMode::Normal));
         assert_eq!(app.status.message(), "pushed");
+    }
+
+    #[test]
+    fn action_output_scroll_keys_clamp_to_visible_body() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::PushPreview {
+            push: JjGitPush::for_status().with_remote("origin"),
+            output: ActionOutput::pending(
+                "jj git push --preview --remote origin".to_owned(),
+                (0..8)
+                    .map(|line| format!("line {line}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Char('j'), 4)
+            .unwrap();
+        app.handle_mode_key(crossterm::event::KeyCode::PageDown, 4)
+            .unwrap();
+        app.handle_mode_key(crossterm::event::KeyCode::PageDown, 4)
+            .unwrap();
+        app.handle_mode_key(crossterm::event::KeyCode::PageDown, 4)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::PushPreview { output, .. } => output,
+            _ => panic!("expected push preview mode"),
+        };
+        assert_eq!(
+            output.scroll(),
+            output.max_scroll(action_output_visible_lines(4))
+        );
+
+        app.handle_mode_key(crossterm::event::KeyCode::PageUp, 4)
+            .unwrap();
+        app.handle_mode_key(crossterm::event::KeyCode::Char('k'), 4)
+            .unwrap();
+        app.handle_mode_key(crossterm::event::KeyCode::Char('g'), 4)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::PushPreview { output, .. } => output,
+            _ => panic!("expected push preview mode"),
+        };
+        assert_eq!(output.scroll(), 0);
+    }
+
+    #[test]
+    fn closing_action_output_preserves_graph_selection() {
+        let mut graph = crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+            crate::jj::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+        ]);
+        graph.execute(
+            ViewCommand::MoveDown,
+            CommandContext {
+                viewport_height: 12,
+                search: None,
+            },
+        );
+        let mut app = test_app(ViewState::Graph(graph));
+        app.mode = InteractionMode::PushPreview {
+            push: JjGitPush::for_status().with_remote("origin"),
+            output: ActionOutput::pending(
+                "jj git push --preview --remote origin".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+            .unwrap();
+
+        let ViewState::Graph(graph) = &app.view else {
+            panic!("expected graph view");
+        };
+        assert_eq!(graph.selected_revision(), Some("second"));
+        assert!(matches!(app.mode, InteractionMode::Normal));
     }
 
     #[test]
@@ -1408,10 +1600,11 @@ mod tests {
         ])));
         app.mode = InteractionMode::RebasePreview {
             rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-            command_label: "jj rebase -r source-a -o dest".to_owned(),
-            preview_output: "preview only".to_owned(),
-            status_context: Some("rebase preview context".to_owned()),
-            completed: false,
+            output: ActionOutput::pending(
+                "jj rebase -r source-a -o dest".to_owned(),
+                "preview only".to_owned(),
+                Some("rebase preview context".to_owned()),
+            ),
         };
 
         assert!(
@@ -1429,10 +1622,11 @@ mod tests {
         ])));
         app.mode = InteractionMode::RebasePreview {
             rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-            command_label: "jj rebase -r source-a -o dest".to_owned(),
-            preview_output: "rebased".to_owned(),
-            status_context: None,
-            completed: true,
+            output: ActionOutput::finished(
+                "jj rebase -r source-a -o dest".to_owned(),
+                "rebased".to_owned(),
+                None,
+            ),
         };
         app.status = StatusLine::with_message(&app.view, "rebased");
 
@@ -1442,6 +1636,58 @@ mod tests {
         );
         assert!(matches!(app.mode, InteractionMode::Normal));
         assert_eq!(app.status.message(), "rebased");
+    }
+
+    #[test]
+    fn rebase_confirm_success_with_reveal_failure_stays_completed() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.rebase_run = mock_rebase_success;
+        app.refresh_view = mock_refresh_ok;
+        app.reveal_graph_change = mock_reveal_graph_change_error;
+        app.mode = InteractionMode::RebasePreview {
+            rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            output: ActionOutput::pending(
+                "jj rebase -r source-a -o dest".to_owned(),
+                "preview only".to_owned(),
+                Some("rebase preview context".to_owned()),
+            ),
+        };
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+                .is_ok()
+        );
+
+        let output = match app.mode {
+            InteractionMode::RebasePreview { ref output, .. } => output,
+            _ => panic!("expected rebase preview mode"),
+        };
+        assert_eq!(output.command_label(), "jj rebase -r source-a -o dest");
+        assert_eq!(
+            output.status_context().map(String::as_str),
+            Some("rebase preview context")
+        );
+        assert!(output.completed());
+        assert!(output.body_lines().join("\n").contains(
+            "reveal failed: refreshed graph did not include the new working-copy change"
+        ));
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+        assert_eq!(
+            app.status.message(),
+            "refreshed graph did not include the new working-copy change"
+        );
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+                .is_ok()
+        );
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "refreshed graph did not include the new working-copy change"
+        );
     }
 
     #[test]
@@ -1466,15 +1712,10 @@ mod tests {
         let result = app.handle_mode_key(crossterm::event::KeyCode::Enter, 12);
         assert!(result.is_ok());
         let (command_label, status_context, preview_output) = match app.mode {
-            InteractionMode::RebasePreview {
-                ref command_label,
-                ref status_context,
-                ref preview_output,
-                ..
-            } => (
-                command_label.clone(),
-                status_context.clone(),
-                preview_output.clone(),
+            InteractionMode::RebasePreview { ref output, .. } => (
+                output.command_label().to_owned(),
+                output.status_context().cloned(),
+                output.body_lines().join("\n"),
             ),
             _ => panic!("expected rebase preview mode"),
         };
@@ -1485,7 +1726,7 @@ mod tests {
         );
         assert_eq!(
             preview_output,
-            "command: jj rebase -r source-a -o dest\n\nsource: source-a\n\ndestination: dest\n\ngraph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n\nundo path: jj undo"
+            "command: jj rebase -r source-a -o dest\ncontext: rebase from 1 source(s) into dest from jk | source(s): source-a\noutput:\n  command: jj rebase -r source-a -o dest\n  \n  source: source-a\n  \n  destination: dest\n  \n  graph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n  \n  undo path: jj undo"
         );
     }
 

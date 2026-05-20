@@ -1,4 +1,5 @@
 mod action_menu;
+mod action_output;
 mod app;
 mod bookmarks;
 mod clipboard;

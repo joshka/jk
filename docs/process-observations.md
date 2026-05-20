@@ -5,6 +5,59 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-19 (Packet 13 action output overlay)
+
+- Slice / task: Implement Packet 13 scrollable action output overlay.
+
+- Worker / model: `gpt-5.5` (high reasoning). Main thread orchestrated/reviewed.
+
+- Scope given: keep the write set bounded to the action output surface, avoid jj/git commands,
+  preserve other workers' edits, make push and rebase preview/result/error output readable in small
+  terminals, and update progress and process notes after validation.
+
+- Observable outcome: added a small `ActionOutput` modal-state type, routed push and rebase
+  previews/results/errors through the shared scrollable overlay, kept footer keys visible while the
+  body scrolls, and added focused app, state, and rendering tests for scroll bounds, close behavior,
+  selection preservation, and existing push/rebase completion behavior.
+
+- Evidence basis:
+  - Thread: `019e43ee-31d3-78e2-91d9-6d87a434c31f`
+  - Date: `2026-05-19`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `cargo check`
+    - `cargo test action_output`
+    - `cargo test push_preview`
+    - `cargo test rebase_preview`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `just md-check`
+  - Files: `src/action_output.rs`, `src/app.rs`, `src/main.rs`, `src/tui.rs`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet 13 confirm completion repair)
+
+- Scope given: fix the rebase confirm path where reveal failure left the overlay in a `pending`
+  state and close to a second confirm after command success.
+
+- Fix outcome: `confirm_rebase` now always replaces the pending rebase preview with a completed
+  `ActionOutput` after successful `run` + `refresh`, including reveal failure context
+  (`reveal failed: ...`) in the completed output text. Enter now closes that state.
+
+- Evidence basis:
+  - Thread: `019e43f9-63bd-7b91-8d87-078bece5ce8c`
+  - Date: `2026-05-20`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `cargo check`
+    - `cargo test rebase_`
+    - `cargo test action_output`
+    - `cargo test push_preview`
+    - `rustup run nightly cargo fmt`
+  - Files: `src/app.rs`, `docs/process-observations.md`
+
 ### 2026-05-19 (Packet 15 planning follow-up)
 
 - Slice / task: Refine Packet 15 contract language and disposable-repo execution discipline

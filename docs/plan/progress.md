@@ -155,4 +155,15 @@
 - Remaining risk: the preview is honest about explicit roles, command shape, and undo path, but it
   still summarizes graph effect textually instead of rendering a simulated before/after graph, and
   long preview/result output remains unscrollable in a small terminal
-- Next slice: none; implementation slices complete
+- Next slice: Packet 13: Scrollable Action Output Overlay
+
+## Packet 13: Scrollable Action Output Overlay
+
+- Files changed: `src/action_output.rs`, `src/app.rs`, `src/main.rs`, `src/tui.rs`,
+  `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `cargo check`; focused `cargo test action_output`, `cargo test push_preview`, and
+  `cargo test rebase_preview`; full `cargo test`; `rustup run nightly cargo fmt`; `just md-check`
+- Remaining risk: action output is now scrollable for the active push/rebase preview or result, but
+  there is still no persistent output history after the overlay is closed, and direct fetch output
+  remains status-only until a later packet chooses to route direct actions through the same surface
+- Next slice: Packet 14: Declutter Status Bar
