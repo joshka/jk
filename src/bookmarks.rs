@@ -5,13 +5,17 @@
 //! search, refresh, and open-show behavior.
 
 use color_eyre::Result;
+use color_eyre::eyre::eyre;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{BookmarkItem, BookmarkRowState, JjCommand, ViewSpec, load_bookmark_entries};
+use crate::jj::{
+    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, JjBookmarkForgetTarget, JjCommand,
+    LocalBookmarkRemoteState, RemoteBookmarkTrackingState, ViewSpec, load_bookmark_entries,
+};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;
@@ -191,6 +195,33 @@ impl BookmarksView {
             .map(BookmarkItem::bookmark_name)
     }
 
+    pub fn selected_bookmark_forget_target(
+        &self,
+    ) -> Result<Option<(&str, JjBookmarkForgetTarget)>> {
+        let Some(entry) = self.selected_entry() else {
+            return Ok(None);
+        };
+        let name = entry.bookmark_name();
+
+        match entry.state() {
+            BookmarkRowState::Local { tracking } => {
+                let target = local_forget_target(tracking)?;
+                Ok(Some((name, target)))
+            }
+            BookmarkRowState::Remote {
+                remote,
+                tracking,
+                local_peer,
+            } => {
+                let target = self.remote_forget_target(name, remote, tracking, local_peer)?;
+                Ok(Some((name, target)))
+            }
+            BookmarkRowState::Unknown => Err(eyre!(
+                "bookmark forget requires trusted bookmark metadata for the selected row"
+            )),
+        }
+    }
+
     fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
@@ -255,6 +286,109 @@ impl BookmarksView {
             previous_bookmark_name,
         );
         Ok(())
+    }
+
+    fn remote_forget_target(
+        &self,
+        name: &str,
+        remote: &str,
+        tracking: &RemoteBookmarkTrackingState,
+        local_peer: &BookmarkLocalPeerState,
+    ) -> Result<JjBookmarkForgetTarget> {
+        match local_peer {
+            BookmarkLocalPeerState::Present => {
+                return Err(eyre!(
+                    "bookmark forget disabled: selected remote bookmark has a local peer"
+                ));
+            }
+            BookmarkLocalPeerState::Unknown => {
+                return Err(eyre!(
+                    "bookmark forget disabled: selected remote bookmark has unknown local-peer metadata"
+                ));
+            }
+            BookmarkLocalPeerState::Absent => {}
+        }
+
+        if matches!(
+            tracking,
+            RemoteBookmarkTrackingState::Tracked {
+                local_present: true,
+                ..
+            }
+        ) {
+            return Err(eyre!(
+                "bookmark forget disabled: selected remote bookmark tracking metadata says a local peer is present"
+            ));
+        }
+
+        if self.has_local_bookmark_peer(name) {
+            return Err(eyre!(
+                "bookmark forget disabled: selected remote bookmark has a local peer"
+            ));
+        }
+
+        let remote_siblings = self.remote_bookmark_peer_count(name);
+        if remote_siblings != 1 {
+            return Err(eyre!(
+                "bookmark forget disabled: selected remote bookmark is not unique; found {remote_siblings} remote peers named '{name}'"
+            ));
+        }
+
+        Ok(JjBookmarkForgetTarget::remote_only(
+            remote,
+            remote_tracking_summary(tracking),
+        ))
+    }
+
+    fn has_local_bookmark_peer(&self, name: &str) -> bool {
+        self.entries.iter().any(|entry| {
+            entry.bookmark_name() == name && matches!(entry.state(), BookmarkRowState::Local { .. })
+        })
+    }
+
+    fn remote_bookmark_peer_count(&self, name: &str) -> usize {
+        self.entries
+            .iter()
+            .filter(|entry| {
+                entry.bookmark_name() == name
+                    && matches!(entry.state(), BookmarkRowState::Remote { .. })
+            })
+            .count()
+    }
+}
+
+fn local_forget_target(tracking: &LocalBookmarkRemoteState) -> Result<JjBookmarkForgetTarget> {
+    match tracking {
+        LocalBookmarkRemoteState::LocalOnly => Err(eyre!(
+            "bookmark forget disabled: selected local bookmark is local-only"
+        )),
+        LocalBookmarkRemoteState::Tracked {
+            untracked_remote_present,
+        } => Ok(JjBookmarkForgetTarget::local(
+            if *untracked_remote_present {
+                "tracked local bookmark with an untracked remote peer present"
+            } else {
+                "tracked local bookmark"
+            },
+        )),
+        LocalBookmarkRemoteState::UntrackedRemotePresent => Ok(JjBookmarkForgetTarget::local(
+            "local bookmark with an untracked remote peer present",
+        )),
+        LocalBookmarkRemoteState::Ambiguous => Err(eyre!(
+            "bookmark forget disabled: selected local bookmark has ambiguous remote metadata"
+        )),
+    }
+}
+
+fn remote_tracking_summary(tracking: &RemoteBookmarkTrackingState) -> String {
+    match tracking {
+        RemoteBookmarkTrackingState::Tracked {
+            local_present,
+            synced,
+        } => format!("tracked remote bookmark; local present: {local_present}; synced: {synced}"),
+        RemoteBookmarkTrackingState::Untracked { synced } => {
+            format!("untracked remote bookmark; synced: {synced}")
+        }
     }
 }
 
@@ -471,6 +605,143 @@ mod tests {
 
         assert_eq!(view.selected_bookmark_name(), Some("maybe-local"));
         assert_eq!(view.selected_local_bookmark_name(), None);
+    }
+
+    #[test]
+    fn bookmark_forget_target_accepts_tracked_or_remote_backed_local_rows() {
+        let tracked =
+            bookmark_item(&["main: abc"], "main", None, None).with_state(BookmarkRowState::Local {
+                tracking: LocalBookmarkRemoteState::Tracked {
+                    untracked_remote_present: false,
+                },
+            });
+        let view = bookmarks_view(vec![tracked]);
+
+        let (name, target) = view.selected_bookmark_forget_target().unwrap().unwrap();
+
+        assert_eq!(name, "main");
+        assert_eq!(
+            target,
+            JjBookmarkForgetTarget::local("tracked local bookmark")
+        );
+
+        let remote_backed = bookmark_item(&["feature: abc"], "feature", None, None).with_state(
+            BookmarkRowState::Local {
+                tracking: LocalBookmarkRemoteState::UntrackedRemotePresent,
+            },
+        );
+        let view = bookmarks_view(vec![remote_backed]);
+
+        let (name, target) = view.selected_bookmark_forget_target().unwrap().unwrap();
+
+        assert_eq!(name, "feature");
+        assert_eq!(
+            target,
+            JjBookmarkForgetTarget::local("local bookmark with an untracked remote peer present")
+        );
+    }
+
+    #[test]
+    fn bookmark_forget_target_accepts_single_remote_without_local_peer() {
+        let remote = bookmark_item(&["main@origin: abc"], "main", None, None).with_state(
+            BookmarkRowState::Remote {
+                remote: "origin".to_owned(),
+                tracking: RemoteBookmarkTrackingState::Untracked { synced: false },
+                local_peer: BookmarkLocalPeerState::Absent,
+            },
+        );
+        let view = bookmarks_view(vec![remote]);
+
+        let (name, target) = view.selected_bookmark_forget_target().unwrap().unwrap();
+
+        assert_eq!(name, "main");
+        assert_eq!(
+            target,
+            JjBookmarkForgetTarget::remote_only(
+                "origin",
+                "untracked remote bookmark; synced: false"
+            )
+        );
+    }
+
+    #[test]
+    fn bookmark_forget_target_rejects_disabled_metadata_states() {
+        let local_only = bookmark_item(&["scratch: abc"], "scratch", None, None).with_state(
+            BookmarkRowState::Local {
+                tracking: LocalBookmarkRemoteState::LocalOnly,
+            },
+        );
+        let view = bookmarks_view(vec![local_only]);
+        assert_eq!(
+            view.selected_bookmark_forget_target()
+                .unwrap_err()
+                .to_string(),
+            "bookmark forget disabled: selected local bookmark is local-only"
+        );
+
+        let ambiguous =
+            bookmark_item(&["main: abc"], "main", None, None).with_state(BookmarkRowState::Local {
+                tracking: LocalBookmarkRemoteState::Ambiguous,
+            });
+        let view = bookmarks_view(vec![ambiguous]);
+        assert_eq!(
+            view.selected_bookmark_forget_target()
+                .unwrap_err()
+                .to_string(),
+            "bookmark forget disabled: selected local bookmark has ambiguous remote metadata"
+        );
+
+        let unknown = bookmark_item(&["main?: abc"], "main", None, None)
+            .with_state(BookmarkRowState::Unknown);
+        let view = bookmarks_view(vec![unknown]);
+        assert_eq!(
+            view.selected_bookmark_forget_target()
+                .unwrap_err()
+                .to_string(),
+            "bookmark forget requires trusted bookmark metadata for the selected row"
+        );
+    }
+
+    #[test]
+    fn bookmark_forget_target_rejects_remote_rows_with_local_or_nonunique_peers() {
+        let remote_with_local = bookmark_item(&["main@origin: abc"], "main", None, None)
+            .with_state(BookmarkRowState::Remote {
+                remote: "origin".to_owned(),
+                tracking: RemoteBookmarkTrackingState::Tracked {
+                    local_present: true,
+                    synced: true,
+                },
+                local_peer: BookmarkLocalPeerState::Present,
+            });
+        let view = bookmarks_view(vec![remote_with_local]);
+        assert_eq!(
+            view.selected_bookmark_forget_target()
+                .unwrap_err()
+                .to_string(),
+            "bookmark forget disabled: selected remote bookmark has a local peer"
+        );
+
+        let first = bookmark_item(&["main@origin: abc"], "main", None, None).with_state(
+            BookmarkRowState::Remote {
+                remote: "origin".to_owned(),
+                tracking: RemoteBookmarkTrackingState::Untracked { synced: false },
+                local_peer: BookmarkLocalPeerState::Absent,
+            },
+        );
+        let second = bookmark_item(&["main@upstream: abc"], "main", None, None).with_state(
+            BookmarkRowState::Remote {
+                remote: "upstream".to_owned(),
+                tracking: RemoteBookmarkTrackingState::Untracked { synced: false },
+                local_peer: BookmarkLocalPeerState::Absent,
+            },
+        );
+        let view = bookmarks_view(vec![first, second]);
+        assert_eq!(
+            view.selected_bookmark_forget_target()
+                .unwrap_err()
+                .to_string(),
+            "bookmark forget disabled: selected remote bookmark is not unique; found 2 remote peers named 'main'"
+        );
     }
 
     #[test]

@@ -92,10 +92,13 @@ or stay deferred until the exact target, preview, and recovery story is obvious.
   name prompts, with bare `b` kept as a timed fallback while multi-key grammar settles.
 - `bookmark move`: `guided flow`. Shipped from graph exact rows and status (`@`) as bookmark name
   prompts.
-- `bookmark rename`: `planned`. Not a current home.
+- `bookmark rename`: `guided flow`. Shipped from exact local bookmark rows in bookmarks view as
+  `br`, with app-side conservative name validation and jj duplicate-name failures preserved.
 - `bookmark delete`: `guided flow`. Shipped from bookmark rows in bookmarks view; local-only and
   confirmation-worthy.
-- `bookmark forget`: `planned`. Useful, but not shipped.
+- `bookmark forget`: `guided flow`. Shipped from metadata-proven local tracked or remote-backed
+  bookmark rows as `bf`; remote-only forget requires unfiltered `--all-remotes` metadata proving one
+  remote peer and no local peer.
 - `bookmark track`: `planned`. Tracking-state metadata still needs a stronger contract.
 - `bookmark untrack`: `planned`. Same tracking-state gap as track.
 - `bookmark advance`: `passthrough`. Probably not a first-class flow.
@@ -141,11 +144,10 @@ Short version:
   `operation diff`.
 - Shipped guided flows: `edit`, `next`, `prev`, `describe`, `commit`, `rebase`, `squash`, `abandon`,
   `restore`, `revert`, `operation restore`, `operation revert`, `absorb`,
-  `bookmark set/create/move/delete`, `undo`, `redo`, `git push`.
+  `bookmark set/create/move/rename/delete/forget`, `undo`, `redo`, `git push`.
 - Shipped direct actions: `jj git fetch` and `jj new trunk`.
 - Planned utility or guided work: `evolog`, `root`, `workspace`, `split`, `duplicate`,
-  `bookmark rename/forget/track/untrack`, `tag`, `file search`, `file annotate`,
-  `file track/untrack/chmod`.
+  `bookmark track/untrack`, `tag`, `file search`, `file annotate`, `file track/untrack/chmod`.
 - Everything else stays passthrough or deferred until the core loop is strong.
 
 When a command needs native structure, check [`integration-strategy.md`](integration-strategy.md)

@@ -14,7 +14,9 @@ use crate::diff::DiffView;
 use crate::file_list::FileListView;
 use crate::file_show::FileShowView;
 use crate::graph::GraphView;
-use crate::jj::{JjBookmarkTarget, JjCommand, JjGitPushTarget, LogViewMode, ViewSpec};
+use crate::jj::{
+    JjBookmarkForgetTarget, JjBookmarkTarget, JjCommand, JjGitPushTarget, LogViewMode, ViewSpec,
+};
 use crate::operation_detail::OperationDetailView;
 use crate::operation_log::OperationLogView;
 use crate::resolve::ResolveView;
@@ -363,6 +365,23 @@ impl ViewState {
                 },
                 |name| Ok(Some(name)),
             ),
+            Self::Graph(_)
+            | Self::Show(_)
+            | Self::Diff(_)
+            | Self::Status(_)
+            | Self::Resolve(_)
+            | Self::FileList(_)
+            | Self::FileShow(_)
+            | Self::OperationLog(_)
+            | Self::OperationDetail(_) => Ok(None),
+        }
+    }
+
+    pub fn bookmark_forget_target(&self) -> Result<Option<(String, JjBookmarkForgetTarget)>> {
+        match self {
+            Self::Bookmarks(view) => view
+                .selected_bookmark_forget_target()
+                .map(|target| target.map(|(name, forget_target)| (name.to_owned(), forget_target))),
             Self::Graph(_)
             | Self::Show(_)
             | Self::Diff(_)

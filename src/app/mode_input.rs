@@ -691,5 +691,8 @@ fn bookmark_mutation_plan(
             unreachable!("bookmark rename uses the old-name prompt and has no revision target")
         }
         JjBookmarkMutationKind::Delete => JjBookmarkMutationPlan::delete(name),
+        JjBookmarkMutationKind::Forget => {
+            unreachable!("bookmark forget uses the selected bookmark row and has no prompt target")
+        }
     }
 }

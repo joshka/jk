@@ -2,6 +2,43 @@
 
 use super::support::*;
 
+fn bookmark_row_with_state(
+    name: &str,
+    state: crate::jj::BookmarkRowState,
+) -> crate::jj::BookmarkItem {
+    crate::jj::BookmarkItem::new(Vec::new(), name.to_owned(), None, None).with_state(state)
+}
+
+fn tracked_local_bookmark(name: &str) -> crate::jj::BookmarkItem {
+    bookmark_row_with_state(
+        name,
+        crate::jj::BookmarkRowState::Local {
+            tracking: crate::jj::LocalBookmarkRemoteState::Tracked {
+                untracked_remote_present: false,
+            },
+        },
+    )
+}
+
+fn remote_only_bookmark(name: &str, remote: &str) -> crate::jj::BookmarkItem {
+    remote_bookmark_with_local_peer(name, remote, crate::jj::BookmarkLocalPeerState::Absent)
+}
+
+fn remote_bookmark_with_local_peer(
+    name: &str,
+    remote: &str,
+    local_peer: crate::jj::BookmarkLocalPeerState,
+) -> crate::jj::BookmarkItem {
+    bookmark_row_with_state(
+        name,
+        crate::jj::BookmarkRowState::Remote {
+            remote: remote.to_owned(),
+            tracking: crate::jj::RemoteBookmarkTrackingState::Untracked { synced: false },
+            local_peer,
+        },
+    )
+}
+
 #[test]
 fn action_output_scroll_keys_clamp_to_visible_body() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
@@ -276,6 +313,228 @@ fn bookmark_delete_rejects_nonlocal_bookmark_rows() {
         app.status.message(),
         "delete requires a selected exact local bookmark"
     );
+}
+
+#[test]
+fn bookmark_forget_preview_uses_metadata_gated_selected_bookmark() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![tracked_local_bookmark("feature/name")]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+
+    let (mutation, output) = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
+        _ => panic!("expected bookmark forget preview"),
+    };
+    assert_eq!(mutation.kind(), JjBookmarkMutationKind::Forget);
+    assert_eq!(mutation.name(), "feature/name");
+    assert_eq!(
+        output.command_label(),
+        "jj bookmark forget exact:\"feature/name\""
+    );
+    let body = output.body_lines().join("\n");
+    assert!(body.contains("bookmark: feature/name"));
+    assert!(body.contains("target: exact bookmark exact:\"feature/name\""));
+    assert!(body.contains("visible state: local bookmark; tracked local bookmark"));
+    assert!(body.contains("effect: forgets tracking relationship metadata"));
+    assert!(body.contains("confirmation: press Enter to run jj bookmark forget"));
+    assert_eq!(
+        output.status_context().map(String::as_str),
+        Some("bookmark forget 'feature/name' from jk bookmarks")
+    );
+}
+
+#[test]
+fn bookmark_forget_preview_uses_include_remotes_for_single_remote_only_row() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![remote_only_bookmark(
+            "feature/name",
+            "origin",
+        )]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { output, .. } => output,
+        _ => panic!("expected bookmark forget preview"),
+    };
+    assert_eq!(
+        output.command_label(),
+        "jj bookmark forget --include-remotes exact:\"feature/name\""
+    );
+    let body = output.body_lines().join("\n");
+    assert!(body.contains("remote-only bookmark on origin"));
+    assert!(body.contains("scope: one remote peer and no local peer; includes remotes"));
+}
+
+#[test]
+fn bookmark_forget_rejects_remote_only_row_from_filtered_metadata() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![remote_bookmark_with_local_peer(
+            "feature/name",
+            "origin",
+            crate::jj::BookmarkLocalPeerState::Unknown,
+        )]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "bookmark forget disabled: selected remote bookmark has unknown local-peer metadata"
+    );
+}
+
+#[test]
+fn bookmark_forget_cancel_confirm_success_and_failure_are_inspectable() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![tracked_local_bookmark("feature/name")]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(app.status.message(), "bookmark forget cancelled");
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { output, .. } => output,
+        _ => panic!("expected bookmark forget result"),
+    };
+    assert!(
+        output
+            .body_lines()
+            .join("\n")
+            .contains("bookmark forget feature/name | jj undo")
+    );
+    assert_eq!(
+        output.status_context().map(String::as_str),
+        Some("bookmark forget 'feature/name' from jk bookmarks")
+    );
+    assert_eq!(
+        app.status.message(),
+        "bookmark forget feature/name | jj undo"
+    );
+
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![tracked_local_bookmark("feature/name")]),
+    ));
+    app.services.bookmark_mutation_run = mock_bookmark_mutation_failure;
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { output, .. } => output,
+        _ => panic!("expected bookmark forget result"),
+    };
+    assert!(output.body_lines().join("\n").contains("second line"));
+    assert_eq!(
+        app.status.message(),
+        "jj bookmark failed: first line\nsecond line"
+    );
+}
+
+#[test]
+fn bookmark_forget_reports_disabled_rows_without_preview() {
+    let local_only = bookmark_row_with_state(
+        "scratch",
+        crate::jj::BookmarkRowState::Local {
+            tracking: crate::jj::LocalBookmarkRemoteState::LocalOnly,
+        },
+    );
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![local_only]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "bookmark forget disabled: selected local bookmark is local-only"
+    );
+
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![
+            remote_only_bookmark("main", "origin"),
+            remote_only_bookmark("main", "upstream"),
+        ]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "bookmark forget disabled: selected remote bookmark is not unique; found 2 remote peers named 'main'"
+    );
+}
+
+#[test]
+fn bookmark_delete_rename_and_forget_use_distinct_actions() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![tracked_local_bookmark("feature/name")]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
+        .unwrap();
+    assert!(matches!(
+        app.mode,
+        InteractionMode::BookmarkMutationPreview { ref mutation, .. }
+            if mutation.kind() == JjBookmarkMutationKind::Delete
+    ));
+
+    app.mode = InteractionMode::Normal;
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+    assert!(matches!(
+        app.mode,
+        InteractionMode::BookmarkRenamePrompt { .. }
+    ));
+
+    app.mode = InteractionMode::Normal;
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+        .unwrap();
+    assert!(matches!(
+        app.mode,
+        InteractionMode::BookmarkMutationPreview { ref mutation, .. }
+            if mutation.kind() == JjBookmarkMutationKind::Forget
+    ));
 }
 
 #[test]

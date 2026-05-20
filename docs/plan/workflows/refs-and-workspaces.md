@@ -13,13 +13,15 @@ Shipped today:
 - `bookmark set`
 - `bookmark create`
 - `bookmark move`
+- `bookmark rename`
 - `bookmark delete`
+- `bookmark forget`
 - file list/show
 - resolve
 
 Planned follow-ups:
 
-- bookmark rename/forget/track/untrack
+- bookmark track/untrack
 - tag list/set/delete
 - file search/annotate/track/untrack/chmod
 - workspace root/list/add/rename/forget/update-stale

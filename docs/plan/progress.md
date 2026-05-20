@@ -2122,6 +2122,80 @@
   ref-name validation; accepted names and all command execution still use argv values rather than
   display-label inference.
 
+## Packet 38: Bookmark Forget Flow
+
+- Files changed: `src/app.rs`, `src/app/action_lifecycle/entry.rs`, `src/app/mode_input.rs`,
+  `src/app/tests/bookmark_actions.rs`, `src/bookmarks.rs`, `src/command.rs`, `src/jj.rs`,
+  `src/jj_actions.rs`, `src/jj_rows.rs`, `src/tui.rs`, `src/view_state.rs`,
+  `docs/plan/command-inventory.md`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+  `docs/plan/screens/bookmarks.md`, `docs/plan/workflows/refs-and-workspaces.md`, and
+  `docs/process-observations.md`.
+
+- Behavior: the bookmarks view now exposes preview-first bookmark forget through `bf`. The action
+  starts only from typed Packet 36 bookmark metadata. Local tracked rows and local rows with an
+  untracked remote peer open a local forget preview. Remote-only rows open a remote forget preview
+  only when the selected row metadata and same-name sibling scan prove exactly one remote peer and
+  no local peer.
+
+- Disabled states: local-only, ambiguous, unknown, remote-with-local-peer,
+  remote-local-peer-unknown, and non-unique same-name remote rows stay in normal mode and report a
+  specific status message. The flow never infers target state from rendered labels and never targets
+  `name@remote`.
+
+- Command shape: local forget uses `jj bookmark forget exact:"<name>"`. Remote-only forget uses
+  `jj bookmark forget --include-remotes exact:"<name>"` only after metadata loaded from an
+  unfiltered all-remotes view proves that the base name has exactly one remote peer and no local
+  peer. Filtered views such as `--all-remotes --remote origin`, `--tracked`, `--conflicted`,
+  `-r <revset>`, or positional/name filters are classified as visible-only and fail closed for
+  remote-only forget. Exact string-pattern escaping is shared with bookmark move/delete and covered
+  for quote/backslash names.
+
+- Output behavior: preview names the exact bookmark, visible tracking/remote state, command, effect,
+  confirmation, and recovery/review path. Confirmation preserves success and failure output in
+  `ActionOutput`; cancel returns to normal mode with `bookmark forget cancelled`.
+
+- Proof: disposable repo `/tmp/jk-p38-proof` with remote `/tmp/jk-p38-remote.git` verified local
+  tracked forget, remote-only include-remotes forget, and undo. Commands were run with cwd set to
+  `/tmp/jk-p38-proof`: `jj --no-pager bookmark forget 'exact:"feature/name"'` removed the local
+  tracked row and left `feature/name@origin`; `jj --no-pager undo` restored the local tracked row;
+  then `jj --no-pager bookmark forget --include-remotes 'exact:"feature/name"'` removed the
+  remote-only row and `jj --no-pager undo` restored `feature/name@origin`.
+
+- Validation: `cargo check`; `cargo test bookmark_forget -- --test-threads=1`;
+  `cargo test bookmark -- --test-threads=1`; `cargo test jj_rows -- --test-threads=1`; full
+  `cargo test` passed with 470 passed / 2 ignored; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; `just check`; disposable `/tmp` jj proof
+  above.
+
+- Repair note: this packet repaired a partial non-compiling `@` state from an earlier worker. The
+  missing `open_bookmark_forget_preview` entrypoint and exhaustive `JjBookmarkMutationKind::Forget`
+  prompt match were added while preserving the partial command-builder work that already produced
+  exact local and remote-only argv shapes. A later 5.5 review found that `--all-remotes` was treated
+  as globally complete even when additional bookmark-list filters hid same-name peers; this repair
+  now treats only bare `--all-remotes`/`-a` as complete enough for remote-only exactness.
+
+- Remaining risk: remote-only forget is exact only when the bookmark view was loaded from an
+  unfiltered all-remotes metadata stream with matching rendered rows. Filtered bookmark views,
+  row/metadata drift, and unknown peer metadata fail closed instead of guessing. Track/untrack
+  remain non-goals and disabled.
+
+- Next recommended slice: review Packet 38 for metadata-gated target exactness, delete-versus-forget
+  clarity, command construction, disabled states, output preservation, docs/fragility updates,
+  isolated `/tmp` proof coverage, and compile/test health restoration.
+
+## Packet 38 UI/Keybinding Follow-Up
+
+- Status: planned follow-up work, not shipped behavior.
+- Scope: after Packet 38 and before broad Packet 39+ work, address the current log-screen and
+  keybinding bugs: visible space selection on the log, clearer current-row highlighting, PageUp and
+  PageDown scrolling, help-popup arrow-key handling, two-column help, shifted-capital handling for
+  `S` and related keys, status-bar shortcut prioritization, command-menu background/key-label
+  readability, and next-key discovery for multi-key prefixes like `g`.
+- Validation expectation: use focused view-level tests and rendering snapshots for the log, help,
+  status, and command-menu surfaces, plus keybinding dispatch tests for shifted capitals and prefix
+  hints when the implementation lands.
+- Next turn: promote this follow-up before Packet 39 or broader bookmark-tracking work.
+
 ## App Refactor Audit Follow-Up
 
 - Files changed: `docs/plan/progress.md`, `docs/process-observations.md`

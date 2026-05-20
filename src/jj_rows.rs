@@ -555,16 +555,17 @@ fn pair_bookmark_lines(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BookmarkMetadataCoverage {
     VisibleRowsOnly,
-    AllRemotes,
+    UnfilteredAllRemotes,
 }
 
 fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCoverage {
-    if spec
-        .args()
-        .iter()
-        .any(|arg| matches!(arg.as_str(), "--all-remotes" | "-a"))
+    if !spec.args().is_empty()
+        && spec
+            .args()
+            .iter()
+            .all(|arg| matches!(arg.as_str(), "--all-remotes" | "-a"))
     {
-        BookmarkMetadataCoverage::AllRemotes
+        BookmarkMetadataCoverage::UnfilteredAllRemotes
     } else {
         BookmarkMetadataCoverage::VisibleRowsOnly
     }
@@ -701,7 +702,7 @@ fn local_bookmark_remote_state(
         }
     } else if untracked_remote_present {
         LocalBookmarkRemoteState::UntrackedRemotePresent
-    } else if coverage == BookmarkMetadataCoverage::AllRemotes {
+    } else if coverage == BookmarkMetadataCoverage::UnfilteredAllRemotes {
         LocalBookmarkRemoteState::LocalOnly
     } else {
         LocalBookmarkRemoteState::Ambiguous
@@ -728,7 +729,7 @@ fn local_peer_state(
 ) -> BookmarkLocalPeerState {
     if local_names.contains(metadata.name.as_str()) {
         BookmarkLocalPeerState::Present
-    } else if coverage == BookmarkMetadataCoverage::AllRemotes {
+    } else if coverage == BookmarkMetadataCoverage::UnfilteredAllRemotes {
         BookmarkLocalPeerState::Absent
     } else {
         BookmarkLocalPeerState::Unknown
@@ -1131,7 +1132,11 @@ mod tests {
             ),
         ];
 
-        let items = pair_bookmark_lines(lines, metadata, BookmarkMetadataCoverage::AllRemotes);
+        let items = pair_bookmark_lines(
+            lines,
+            metadata,
+            BookmarkMetadataCoverage::UnfilteredAllRemotes,
+        );
 
         assert_eq!(items.len(), 3);
         assert_eq!(items[0].bookmark_name(), "main");
@@ -1203,7 +1208,11 @@ mod tests {
             .with_tracking(false, false, false),
         ];
 
-        let items = pair_bookmark_lines(lines, metadata, BookmarkMetadataCoverage::AllRemotes);
+        let items = pair_bookmark_lines(
+            lines,
+            metadata,
+            BookmarkMetadataCoverage::UnfilteredAllRemotes,
+        );
 
         assert_eq!(
             items[0].state(),
@@ -1273,7 +1282,11 @@ mod tests {
             ),
         ];
 
-        let items = pair_bookmark_lines(lines, metadata, BookmarkMetadataCoverage::AllRemotes);
+        let items = pair_bookmark_lines(
+            lines,
+            metadata,
+            BookmarkMetadataCoverage::UnfilteredAllRemotes,
+        );
 
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].bookmark_name(), "main");
@@ -1309,7 +1322,11 @@ mod tests {
             .with_tracking(false, false, false),
         ];
 
-        let items = pair_bookmark_lines(lines, metadata, BookmarkMetadataCoverage::AllRemotes);
+        let items = pair_bookmark_lines(
+            lines,
+            metadata,
+            BookmarkMetadataCoverage::UnfilteredAllRemotes,
+        );
 
         assert_eq!(
             items[0].state(),
@@ -1339,6 +1356,107 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn bookmark_metadata_coverage_requires_unfiltered_all_remotes_args() {
+        assert_eq!(
+            bookmark_metadata_coverage(&ViewSpec::bookmarks(vec!["--all-remotes".to_owned()])),
+            BookmarkMetadataCoverage::UnfilteredAllRemotes
+        );
+        assert_eq!(
+            bookmark_metadata_coverage(&ViewSpec::bookmarks(vec!["-a".to_owned()])),
+            BookmarkMetadataCoverage::UnfilteredAllRemotes
+        );
+
+        for args in [
+            vec!["--all-remotes", "--remote", "origin"],
+            vec!["--all-remotes", "--remote=origin"],
+            vec!["--all-remotes", "--tracked"],
+            vec!["--all-remotes", "--conflicted"],
+            vec!["--all-remotes", "-r", "main"],
+            vec!["--all-remotes", "feature"],
+        ] {
+            let args = args.into_iter().map(str::to_owned).collect();
+            assert_eq!(
+                bookmark_metadata_coverage(&ViewSpec::bookmarks(args)),
+                BookmarkMetadataCoverage::VisibleRowsOnly
+            );
+        }
+    }
+
+    #[test]
+    fn filtered_all_remote_bookmark_metadata_does_not_prove_remote_only_exactness() {
+        let lines = b"feature@origin: okrnpmzv d10e26b6\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let metadata = vec![
+            remote_bookmark_metadata(
+                "feature",
+                "origin",
+                Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv"),
+                Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6"),
+            )
+            .with_tracking(false, false, false),
+        ];
+
+        let items = pair_bookmark_lines(lines, metadata, BookmarkMetadataCoverage::VisibleRowsOnly);
+
+        assert_eq!(
+            items[0].state(),
+            &BookmarkRowState::Remote {
+                remote: "origin".to_owned(),
+                tracking: RemoteBookmarkTrackingState::Untracked { synced: false },
+                local_peer: BookmarkLocalPeerState::Unknown,
+            }
+        );
+    }
+
+    #[test]
+    fn visible_bookmark_metadata_still_proves_local_rows_with_visible_remote_peers() {
+        let lines = b"feature: okrnpmzv d10e26b6\nfeature@origin: okrnpmzv d10e26b6\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let metadata = vec![
+            bookmark_metadata(
+                "feature",
+                Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv"),
+                Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6"),
+            ),
+            remote_bookmark_metadata(
+                "feature",
+                "origin",
+                Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv"),
+                Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6"),
+            ),
+        ];
+
+        let items = pair_bookmark_lines(lines, metadata, BookmarkMetadataCoverage::VisibleRowsOnly);
+
+        assert_eq!(
+            items[0].state(),
+            &BookmarkRowState::Local {
+                tracking: LocalBookmarkRemoteState::Tracked {
+                    untracked_remote_present: false,
+                }
+            }
+        );
+        assert_eq!(
+            items[1].state(),
+            &BookmarkRowState::Remote {
+                remote: "origin".to_owned(),
+                tracking: RemoteBookmarkTrackingState::Tracked {
+                    local_present: true,
+                    synced: true,
+                },
+                local_peer: BookmarkLocalPeerState::Present,
+            }
+        );
+    }
+
     fn metadata(change_id: &str, commit_id: &str) -> RevisionMetadata {
         RevisionMetadata {
             change_id: change_id.to_owned(),

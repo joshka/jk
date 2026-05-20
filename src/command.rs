@@ -32,6 +32,7 @@ pub enum Command {
     BookmarkMove,
     BookmarkRename,
     BookmarkDelete,
+    BookmarkForget,
     Fetch,
     FetchRemote,
     Push,
@@ -129,6 +130,7 @@ impl Command {
             | Self::BookmarkMove
             | Self::BookmarkRename
             | Self::BookmarkDelete
+            | Self::BookmarkForget
             | Self::Fetch
             | Self::FetchRemote
             | Self::Push
@@ -565,6 +567,13 @@ fn help_metadata(
             HelpContext::Bookmarks => Some((HelpSectionKind::Actions, "delete local bookmark")),
             _ => None,
         },
+        Command::BookmarkForget => match context {
+            HelpContext::Bookmarks => Some((
+                HelpSectionKind::Actions,
+                "forget tracked or single remote-only bookmark",
+            )),
+            _ => None,
+        },
         Command::OperationUndo => (context == HelpContext::OperationLog).then_some((
             HelpSectionKind::Recovery,
             "undo last repo operation (global)",
@@ -945,11 +954,15 @@ mod tests {
 
     #[test]
     fn project_help_exposes_bookmark_mutations_only_in_honest_contexts() {
+        const BOOKMARK_RENAME: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('r')];
+        const BOOKMARK_FORGET: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('f')];
         let global = [
             Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
             Binding::new(KeyPattern::char('='), Command::BookmarkSet),
             Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
+            Binding::sequence(BOOKMARK_RENAME, Command::BookmarkRename),
             Binding::new(KeyPattern::char('x'), Command::BookmarkDelete),
+            Binding::sequence(BOOKMARK_FORGET, Command::BookmarkForget),
         ];
 
         let graph_help = project_help(&global, &[], HelpContext::Graph);
@@ -975,7 +988,11 @@ mod tests {
         );
         assert_eq!(
             bookmarks_help[0].rows(),
-            &[HelpRow::new("x", "delete local bookmark")]
+            &[
+                HelpRow::new("br", "rename local bookmark"),
+                HelpRow::new("x", "delete local bookmark"),
+                HelpRow::new("bf", "forget tracked or single remote-only bookmark"),
+            ]
         );
         assert!(!show_help.iter().any(|section| {
             section

@@ -5,6 +5,101 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 38 UI/keybinding follow-up planning)
+
+- Slice / task: docs-only planning update for the post-Packet-38 UI and keybinding bug list in the
+  current `jk` working copy.
+- Thread id: `019e47ff-b626-75d3-92d2-9e767fc55992`.
+- Observable outcome: `docs/plan/next-implementation-slices.md` now includes a planned Packet 38
+  follow-up section for log-screen selection/highlighting, PageUp/PageDown scrolling, help-popup
+  behavior, two-column help layout, shifted-capital handling, status-bar shortcut prioritization,
+  command-menu readability, and multi-key prefix hints. `docs/plan/progress.md` now records the same
+  follow-up as planned work before Packet 39+.
+- Validation run during update: `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-20 17:46:56 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
+### 2026-05-20 (Packet 38 filtered bookmark forget repair)
+
+- Slice / task: repair the Packet 38 bookmark forget 5.5 review blocker in the current
+  `Add bookmark forget flow` jj working-copy change.
+- Thread id: `019e47f7-f053-75b3-8338-f22e13aeb3b4`.
+- Starting evidence: the review found that bookmark metadata completeness was inferred from the
+  presence of `--all-remotes` even when additional bookmark-list args such as `--remote`,
+  `--tracked`, `--conflicted`, `-r`, or name filters could hide same-name peers. That could enable
+  remote-only `jj bookmark forget --include-remotes exact:"<name>"` from a filtered view without a
+  global proof that no local peer and exactly one remote peer existed.
+- Repair outcome: `src/jj_rows.rs` now treats only bare `--all-remotes`/`-a` bookmark-list args as
+  unfiltered all-remotes metadata. Any additional arg downgrades metadata to visible-only, which
+  leaves remote rows without visible local peers as `BookmarkLocalPeerState::Unknown` and blocks
+  remote-only forget. Local rows can still prove tracked or remote-backed forget when their selected
+  row metadata and visible peers establish that local state.
+- Regression coverage: parser tests cover `--all-remotes --remote origin`, `--remote=origin`,
+  `--tracked`, `--conflicted`, `-r <revset>`, and positional filters failing closed for global
+  remote-only exactness. An app-level test verifies that unknown local-peer metadata reports the
+  disabled status instead of opening a forget preview.
+- Documentation outcome: `docs/plan/fragility-register.md` now records filtered all-remotes views as
+  incomplete for global peer proof, `docs/plan/command-inventory.md` classifies shipped bookmark
+  rename/forget flows truthfully, and `docs/plan/progress.md` records the initial partial
+  non-compiling handoff, the 5.5 filtered-view blocker, and this repair.
+- Validation run during repair:
+  - `cargo check`
+  - `cargo test bookmark_forget -- --test-threads=1`
+  - `cargo test bookmark -- --test-threads=1`
+  - `cargo test jj_rows -- --test-threads=1`
+  - `cargo clippy -- -D warnings`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - full `cargo test`
+  - `just check`
+- Evidence basis:
+  - Date: `2026-05-20 17:41:03 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/jj_rows.rs`, `src/app/tests/bookmark_actions.rs`, `docs/plan/command-inventory.md`,
+    `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`
+
+### 2026-05-20 (Packet 38 bookmark forget repair)
+
+- Slice / task: finish and repair Packet 38 bookmark forget in jj change `Add bookmark forget flow`.
+- Thread id: `019e47ea-7ba0-7df1-ba9d-2f029fa79662`.
+- Starting evidence: user-provided handoff said the first worker left partial edits in `src/app.rs`,
+  `src/command.rs`, `src/jj.rs`, and `src/jj_actions.rs`, with `cargo check` failing because
+  `open_bookmark_forget_preview` was missing and `bookmark_plan_from_prompt` /
+  `bookmark_mutation_plan` did not handle `JjBookmarkMutationKind::Forget`. `jj --no-pager status`
+  in this turn confirmed `@` was `zkwppzvx 6f2913aa Add bookmark forget flow` with those four Rust
+  files modified.
+- Repair outcome: `src/bookmarks.rs` now gates forget targets from typed `BookmarkRowState`
+  metadata, `src/view_state.rs` carries the exact selected forget target to app lifecycle,
+  `src/app/action_lifecycle/entry.rs` opens the missing preview, and `src/app/mode_input.rs` is
+  exhaustive for the non-prompt forget kind. The partial `src/jj_actions.rs` command-builder work
+  was preserved and covered with command-shape tests.
+- Model / process observation: the repair succeeded by treating the partial worker output as owned
+  work-in-progress rather than reverting it. The key missing boundary was not command construction;
+  it was the metadata-gated selection path from bookmarks view to the app preview lifecycle.
+- Validation / proof run during repair:
+  - `cargo check`
+  - `cargo test bookmark -- --test-threads=1`
+  - `cargo clippy -- -D warnings`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - full `cargo test`
+  - `just md-check`
+  - `just check`
+  - disposable proof under `/tmp/jk-p38-proof` with remote `/tmp/jk-p38-remote.git`
+- Disposable proof result: from cwd `/tmp/jk-p38-proof`,
+  `jj --no-pager bookmark forget 'exact:"feature/name"'` removed the local tracked row,
+  `jj --no-pager undo` restored it,
+  `jj --no-pager bookmark forget --include-remotes 'exact:"feature/name"'` removed the remote-only
+  row, and `jj --no-pager undo` restored `feature/name@origin`.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/bookmarks.rs`, `src/view_state.rs`, `src/app/action_lifecycle/entry.rs`,
+    `src/app/mode_input.rs`, `src/app/tests/bookmark_actions.rs`, `src/command.rs`,
+    `src/jj_actions.rs`, `src/tui.rs`, `docs/plan/progress.md`, `docs/plan/fragility-register.md`,
+    `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/screens/bookmarks.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Clippy baseline cleanup)
 
 - Slice / task: remove known baseline clippy blockers (dead_code and collapsible_if) without

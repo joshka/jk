@@ -64,6 +64,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
     Binding::sequence(BOOKMARK_CREATE_KEYS, Command::BookmarkCreate),
     Binding::sequence(BOOKMARK_RENAME_KEYS, Command::BookmarkRename),
+    Binding::sequence(BOOKMARK_FORGET_KEYS, Command::BookmarkForget),
     Binding::new(KeyPattern::char('='), Command::BookmarkSet),
     Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
@@ -80,6 +81,7 @@ const APP_BINDINGS: &[Binding] = &[
 
 const BOOKMARK_CREATE_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('c')];
 const BOOKMARK_RENAME_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('r')];
+const BOOKMARK_FORGET_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('f')];
 const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
 
 fn current_viewport_width() -> u16 {
@@ -379,6 +381,10 @@ impl App {
             }
             Command::BookmarkDelete => {
                 self.open_bookmark_delete_preview();
+                Ok(false)
+            }
+            Command::BookmarkForget => {
+                self.open_bookmark_forget_preview();
                 Ok(false)
             }
             Command::Fetch => {

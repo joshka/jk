@@ -32,7 +32,7 @@ focused ref-state utility surface.
 - move between bookmarks
 - copy bookmark names or targets
 - launch set-related flows
-- launch rename/delete/track/untrack flows
+- launch rename/delete/forget/track/untrack flows
 - refresh
 - go back
 
@@ -50,6 +50,10 @@ focused ref-state utility surface.
 - Set/move/create: flows should accept a selected bookmark and selected revision target when
   launched from graph or bookmark screens.
 - Rename/delete/forget: destructive or confusing ref actions need confirmation.
+- Forget: local tracked rows and local rows with an untracked remote peer use
+  `jj bookmark forget exact:"<name>"`. A remote-only row may use
+  `jj bookmark forget --include-remotes exact:"<name>"` only when typed metadata and sibling
+  scanning prove exactly one remote peer and no local peer.
 - Track/untrack: tracking actions should describe local and remote names explicitly.
 - Refresh: preserve selected bookmark name when possible.
 
@@ -61,6 +65,7 @@ focused ref-state utility surface.
 - `r`: refresh
 - `br`: rename local bookmark flow
 - `x`: delete local bookmark flow
+- `bf`: forget tracked local or single remote-only bookmark flow
 - `t`: track/untrack flow
 - `y`: copy bookmark name or target
 - `h`, `Left`: back

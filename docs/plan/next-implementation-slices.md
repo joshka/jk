@@ -1198,6 +1198,39 @@ Audit result from 2026-05-20:
 - Review prompt: review Packet 38 for metadata-gated target exactness, delete-versus-forget clarity,
   command construction, disabled states, output preservation, and isolated proof coverage.
 
+### Packet 38 Follow-Up: Log Screen And Keybinding Polish
+
+This interruption is planned follow-up work, not shipped behavior. Handle it after Packet 38 and
+before broad Packet 39+ bookmark tracking work resumes.
+
+- Goal: tighten log-screen, help, status-bar, and command-menu ergonomics around the current UI bugs
+  and keybinding gaps.
+- Owner concept: log navigation, help overlay presentation, status-bar hint selection, and command
+  menu keyboard feedback.
+- Expected write set: `src/app.rs`, `src/command.rs`, `src/graph.rs`, `src/tui.rs`, focused view and
+  rendering tests, and `docs/plan/progress.md`.
+- Non-goals: no bookmark mutation work, no broader command-coverage expansion, and no unrelated
+  visual redesign outside the affected log/help/status/menu surfaces.
+- Acceptance criteria: space on the log screen visibly marks or selects the current row; the
+  current-row highlight uses a clearer representation than reverse-video across all text; PageUp and
+  PageDown scroll the log; Up and Down do not dismiss the help popup; help text is compacted into
+  two columns; capital `S` opens status and shifted-key handling is audited for other capitals too;
+  the status bar prefers the most useful shortcuts that fit instead of truncating blindly; the
+  command menu gains a background color and colored key labels for readability; and two-key prefixes
+  show the possible next keys, such as `g` surfacing `p` and `f` for push/fetch.
+- Validation: add focused view-level tests for log selection, scrolling, and help-dismissal
+  behavior; add rendering snapshots for the log, help, status bar, and command menu surfaces; add
+  keybinding dispatch tests for shifted capitals and prefix hints; run `cargo test` and
+  `cargo check` as appropriate for the implementation turn.
+- Docs/fragility updates: update `progress.md` when this follow-up lands; only add fragility entries
+  if the implementation begins to parse or infer new semantics.
+- Suggested agent/model routing: a focused implementation worker is fine, with review centered on
+  terminal ergonomics and keybinding consistency.
+- Review prompt: review the follow-up for log selection feedback, current-row presentation,
+  scrolling behavior, help dismissal, compact help layout, shifted-capital handling, status-bar
+  shortcut selection, command-menu readability, prefix discovery, and whether the tests prove the
+  rendered result instead of only the dispatch path.
+
 ### Packet 39: Bookmark Track/Untrack Flows
 
 - Goal: add bookmark track and untrack flows after Packet 36 proves exact tracking metadata.

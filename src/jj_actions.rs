@@ -482,6 +482,7 @@ pub enum JjBookmarkMutationKind {
     Move,
     Rename,
     Delete,
+    Forget,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -491,11 +492,18 @@ pub enum JjBookmarkTarget {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JjBookmarkForgetTarget {
+    Local { tracking: String },
+    RemoteOnly { remote: String, tracking: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjBookmarkMutationPlan {
     kind: JjBookmarkMutationKind,
     name: String,
     new_name: Option<String>,
     target: Option<JjBookmarkTarget>,
+    forget_target: Option<JjBookmarkForgetTarget>,
 }
 
 impl JjNewPlan {
@@ -1215,6 +1223,7 @@ impl JjBookmarkMutationKind {
             Self::Move => "move",
             Self::Rename => "rename",
             Self::Delete => "delete",
+            Self::Forget => "forget",
         }
     }
 
@@ -1225,6 +1234,7 @@ impl JjBookmarkMutationKind {
             Self::Move => "moved bookmark",
             Self::Rename => "renamed bookmark",
             Self::Delete => "deleted bookmark",
+            Self::Forget => "forgot bookmark",
         }
     }
 }
@@ -1267,6 +1277,7 @@ impl JjBookmarkMutationPlan {
             name: name.into(),
             new_name: None,
             target: Some(target),
+            forget_target: None,
         }
     }
 
@@ -1276,6 +1287,7 @@ impl JjBookmarkMutationPlan {
             name: name.into(),
             new_name: None,
             target: Some(target),
+            forget_target: None,
         }
     }
 
@@ -1285,6 +1297,7 @@ impl JjBookmarkMutationPlan {
             name: name.into(),
             new_name: None,
             target: Some(target),
+            forget_target: None,
         }
     }
 
@@ -1294,6 +1307,7 @@ impl JjBookmarkMutationPlan {
             name: old_name.into(),
             new_name: Some(new_name.into()),
             target: None,
+            forget_target: None,
         }
     }
 
@@ -1303,6 +1317,17 @@ impl JjBookmarkMutationPlan {
             name: name.into(),
             new_name: None,
             target: None,
+            forget_target: None,
+        }
+    }
+
+    pub fn forget(name: impl Into<String>, target: JjBookmarkForgetTarget) -> Self {
+        Self {
+            kind: JjBookmarkMutationKind::Forget,
+            name: name.into(),
+            new_name: None,
+            target: None,
+            forget_target: Some(target),
         }
     }
 
@@ -1366,6 +1391,14 @@ impl JjBookmarkMutationPlan {
                 "delete".to_owned(),
                 exact_string_pattern(&self.name),
             ],
+            JjBookmarkMutationKind::Forget => {
+                let mut argv = vec!["bookmark".to_owned(), "forget".to_owned()];
+                if self.required_forget_target().include_remotes() {
+                    argv.push("--include-remotes".to_owned());
+                }
+                argv.push(exact_string_pattern(&self.name));
+                argv
+            }
         }
     }
 
@@ -1447,6 +1480,22 @@ impl JjBookmarkMutationPlan {
                     "undo path: jj undo".to_owned(),
                 ]);
             }
+            JjBookmarkMutationKind::Forget => {
+                let target = self.required_forget_target();
+                lines.extend([
+                    format!(
+                        "target: exact bookmark {}",
+                        exact_string_pattern(&self.name)
+                    ),
+                    format!("visible state: {}", target.visible_state()),
+                    format!("scope: {}", target.scope_summary()),
+                    "effect: forgets tracking relationship metadata; this is forget, not delete"
+                        .to_owned(),
+                    "output: full jj failure output remains inspectable in this pane".to_owned(),
+                    "confirmation: press Enter to run jj bookmark forget".to_owned(),
+                    "recovery: jj undo; review: jj op show -p".to_owned(),
+                ]);
+            }
         }
 
         lines.join("\n")
@@ -1462,6 +1511,47 @@ impl JjBookmarkMutationPlan {
         self.new_name
             .as_deref()
             .expect("bookmark rename requires new name")
+    }
+
+    fn required_forget_target(&self) -> &JjBookmarkForgetTarget {
+        self.forget_target
+            .as_ref()
+            .expect("bookmark forget requires a forget target")
+    }
+}
+
+impl JjBookmarkForgetTarget {
+    pub fn local(tracking: impl Into<String>) -> Self {
+        Self::Local {
+            tracking: tracking.into(),
+        }
+    }
+
+    pub fn remote_only(remote: impl Into<String>, tracking: impl Into<String>) -> Self {
+        Self::RemoteOnly {
+            remote: remote.into(),
+            tracking: tracking.into(),
+        }
+    }
+
+    fn include_remotes(&self) -> bool {
+        matches!(self, Self::RemoteOnly { .. })
+    }
+
+    fn visible_state(&self) -> String {
+        match self {
+            Self::Local { tracking } => format!("local bookmark; {tracking}"),
+            Self::RemoteOnly { remote, tracking } => {
+                format!("remote-only bookmark on {remote}; {tracking}")
+            }
+        }
+    }
+
+    fn scope_summary(&self) -> &'static str {
+        match self {
+            Self::Local { .. } => "local tracked bookmark or local bookmark with remote peer",
+            Self::RemoteOnly { .. } => "one remote peer and no local peer; includes remotes",
+        }
     }
 }
 
@@ -2365,6 +2455,59 @@ mod tests {
             delete
                 .preview_summary()
                 .contains("track/untrack stay disabled")
+        );
+    }
+
+    #[test]
+    fn bookmark_forget_uses_exact_local_or_include_remote_patterns() {
+        let local = JjBookmarkMutationPlan::forget(
+            "feature/name",
+            JjBookmarkForgetTarget::local("tracked local bookmark"),
+        );
+
+        assert_eq!(
+            local.command_argv(),
+            vec!["bookmark", "forget", "exact:\"feature/name\""]
+        );
+        assert!(local.preview_summary().contains("tracked local bookmark"));
+        assert!(local.preview_summary().contains("forget, not delete"));
+
+        let remote_only = JjBookmarkMutationPlan::forget(
+            "feature/name",
+            JjBookmarkForgetTarget::remote_only("origin", "untracked remote bookmark"),
+        );
+
+        assert_eq!(
+            remote_only.command_argv(),
+            vec![
+                "bookmark",
+                "forget",
+                "--include-remotes",
+                "exact:\"feature/name\""
+            ]
+        );
+        assert!(
+            remote_only
+                .preview_summary()
+                .contains("remote-only bookmark on origin")
+        );
+    }
+
+    #[test]
+    fn bookmark_forget_exact_pattern_quotes_special_characters() {
+        let forget = JjBookmarkMutationPlan::forget(
+            "feature/\"quote\\tab",
+            JjBookmarkForgetTarget::local("tracked local bookmark"),
+        );
+
+        assert_eq!(
+            forget.command_argv(),
+            vec!["bookmark", "forget", "exact:\"feature/\\\"quote\\\\tab\""]
+        );
+        assert!(
+            forget
+                .command_label()
+                .contains("exact:\"feature/\\\"quote\\\\tab\"")
         );
     }
 
