@@ -528,22 +528,382 @@ Ratatui sources for this packet:
 
 ## Packet 32: Strong Command-Coverage Follow-Through
 
-- Goal: close the highest-value gaps found by Packet 31 without turning `jk` into a full CLI clone.
-- Owner concept: to be assigned by the specific promoted command group.
-- Expected write set: one command group at a time, plus tests and planning docs.
-- Non-goals: no mixed grab bag of unrelated commands, no shared-file parallel implementation, and no
-  low-value command promotion just for parity.
-- Acceptance criteria: each promoted command has a screen or guided-flow home, exact command
-  construction, view/result behavior, tests, docs, and a residual-risk note.
-- Validation: same standard as mutation packets: command tests, view tests where relevant,
-  disposable `/tmp` `jj` repo proof for mutations (run from `/tmp` working directory),
-  `cargo check`, focused tests, and `just check` when practical.
-- Docs/fragility updates: update `progress.md`, `command-inventory.md`, and `fragility-register.md`
-  for every soft contract.
-- Suggested agent/model: plan each promoted command as its own packet with model choice based on
-  risk; require stronger review for mutations.
-- Review prompt: review whether the command deserved promotion, whether the implementation stayed
-  bounded, and whether parity pressure caused unsafe or low-value UI.
+Goal: turn Packet 31's command coverage audit into bounded implementation packets. This packet is a
+docs-only follow-through plan, not a claim that any listed behavior is shipped.
+
+The sequence below promotes only command groups where `jk` can add product value through exact
+context, preview, readable result output, or a focused read surface. It intentionally does not
+schedule a generic command mode or broad CLI mirror. Shipped daily flows such as `new`, `edit`,
+`next`, `prev`, `describe`, `commit`, `rebase`, `squash`, `abandon`, `restore`, `revert`, `absorb`,
+`undo`, `redo`, bookmark create/set/move/delete, fetch, and push stay in maintenance mode unless a
+specific regression or polish packet is accepted later.
+
+### Packet 33: Operation Restore/Revert From Operation Log
+
+- Goal: add explicit recovery flows for `jj operation restore` and `jj operation revert` from exact
+  operation-log rows.
+- Owner concept: operation-log guided recovery actions and operation command construction.
+- Expected write set: `src/operation_log.rs`, `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`,
+  `src/tui.rs`, focused tests, `docs/plan/progress.md`, `docs/plan/fragility-register.md`, and
+  `docs/plan/workflows/recover.md` only if shipped wording changes.
+- Non-goals: no `operation abandon`, no `operation integrate`, no transaction graph simulation, and
+  no arbitrary operation id text entry.
+- Acceptance criteria: actions appear only when the selected row has an exact operation id; previews
+  distinguish restore from revert and show the exact operation id and command; confirmation is
+  required; success refreshes operation log and the active repo view where practical; failure and
+  result output remain scrollable; undo/redo recovery wording stays visible without implying the
+  selected row is used by global undo/redo.
+- Validation: command-construction tests for both operation commands; operation-log disabled-state
+  tests for rows without ids; view-level preview, cancel, confirm, and result-output tests; output
+  tests that preserve multiline success/failure text; disposable `/tmp` jj repo proof for restore,
+  revert, failure or disabled behavior, and recovery, with every mutation command run from the proof
+  repo's `cwd`; `cargo check`; focused operation tests; full `cargo test` and `just check` when
+  practical.
+- Docs/fragility updates: add or update operation recovery entries for exact operation-id command
+  semantics and any output assumptions; update `progress.md`.
+- Suggested agent/model routing: gpt-5.5 high implementation plus gpt-5.5 high review, because
+  recovery semantics are easy to overstate and failures must stay inspectable.
+- Review prompt: review Packet 33 for operation id exactness, restore/revert wording, command
+  construction, disabled states, output preservation, `/tmp` proof quality, and whether recovery
+  semantics are claimed only where `jj` proves them.
+
+### Packet 34: Split Guided Flow
+
+- Goal: add a bounded `jj split` flow for the current or exact selected change when the UI can
+  explain the editor handoff and result path honestly.
+- Owner concept: rewrite action planning and editor/process-boundary policy.
+- Expected write set: `src/action_menu.rs`, `src/app.rs`, `src/graph.rs`, `src/jj.rs`, `src/tui.rs`,
+  focused tests, `docs/plan/progress.md`, and `docs/plan/fragility-register.md`.
+- Non-goals: no in-app patch editor, no line-level split UI, no automatic split decisions, no broad
+  `diffedit` support, and no noninteractive fake split.
+- Acceptance criteria: the flow targets an exact change or visible `@` according to launch context;
+  preview shows the exact command and says when `jj` will launch an editor or interactive selector;
+  cancel before execution is supported; post-command success and failure output are readable; the
+  graph refresh reveals the relevant working copy or split result when possible; unsupported
+  noninteractive environments fail through readable `jj` output rather than local guessing.
+- Validation: command-construction tests for supported split shapes; view-level preview, cancel,
+  confirm, and result tests; output/result tests for interactive-editor failure text; disposable
+  `/tmp` jj repo proof for the feasible noninteractive path and failure path, with mutations run
+  from the proof repo's `cwd`; `cargo check`; focused rewrite tests; full `cargo test` and
+  `just check` when practical.
+- Docs/fragility updates: record the editor/process boundary and any command-output assumptions;
+  update `progress.md`.
+- Suggested agent/model routing: exploration with gpt-5.5 high before implementation, then gpt-5.5
+  high implementation and review, because `split` may be blocked by interactive editor semantics.
+- Review prompt: review Packet 34 for honest split/editor semantics, exact target handling,
+  noninteractive failure behavior, output preservation, and evidence that the flow does not pretend
+  to be an in-app patch editor.
+
+### Packet 35: Duplicate Guided Flow
+
+- Goal: add a preview-first `jj duplicate` flow for exact selected changes.
+- Owner concept: graph rewrite command planning.
+- Expected write set: `src/action_menu.rs`, `src/app.rs`, `src/graph.rs`, `src/jj.rs`, `src/tui.rs`,
+  focused tests, `docs/plan/progress.md`, and `docs/plan/fragility-register.md`.
+- Non-goals: no bulk/range duplicate, no duplicate-and-rebase combo, no bookmark movement, and no
+  target guessing from rendered labels.
+- Acceptance criteria: the action is available only for exact graph or detail-view revision targets;
+  preview lists every exact source if multi-source support is deliberately accepted, otherwise it
+  allows one source only; confirmation is required; success refreshes and reveals the duplicated
+  change or a recent-work fallback; failures preserve full `jj` output; `jj undo` is visible.
+- Validation: command-construction tests; view-level preview, cancel, confirm, and result tests;
+  output/result tests for success and failure; disposable `/tmp` jj repo proof for duplicate and
+  undo from the proof repo's `cwd`; `cargo check`; focused rewrite tests; full `cargo test` and
+  `just check` when practical.
+- Docs/fragility updates: record duplicate result-selection assumptions if refresh/reveal depends on
+  rendered output or operation output; update `progress.md`.
+- Suggested agent/model routing: gpt-5.5 high implementation plus review; use a smaller helper only
+  for command-help exploration.
+- Review prompt: review Packet 35 for exact source targeting, bounded source count, refresh/reveal
+  behavior, command construction, output preservation, and `/tmp` undo proof.
+
+### Packet 36: Bookmark Tracking Metadata Contract
+
+- Goal: extend bookmark row state with explicit remote and tracking metadata so later tracking
+  mutations do not infer state from rendered labels.
+- Owner concept: bookmark utility screen metadata contract.
+- Expected write set: `src/bookmarks.rs`, `src/jj.rs`, `src/tui.rs` if row labels need minor
+  metadata presentation, focused parser/view tests, `docs/plan/progress.md`, and
+  `docs/plan/fragility-register.md`.
+- Non-goals: no track/untrack mutation, no bookmark rename/forget, no push behavior change, and no
+  host-specific remote UI.
+- Acceptance criteria: local, remote, tracked, untracked, and ambiguous bookmark rows have explicit
+  internal state where `jj` exposes it; rows with insufficient metadata degrade to non-actionable
+  state; rendered labels remain preserved for presentation; existing create/set/move/delete behavior
+  is unchanged; the contract is documented before write actions depend on it.
+- Validation: bookmark metadata parser tests for local-only, remote-only, tracked, untracked,
+  missing, and extra metadata rows; view tests for disabled action projections; regression tests for
+  existing bookmark delete localness; `cargo check`; focused bookmark tests; full `cargo test` when
+  practical.
+- Docs/fragility updates: update bookmark metadata and tracking-state entries; update `progress.md`.
+- Suggested agent/model routing: gpt-5.5 high exploration and implementation, because this is a
+  semantic contract that gates future mutations; review can be gpt-5.5 high or maintainer-led.
+- Review prompt: review Packet 36 for metadata truthfulness, row-order pairing risk, graceful
+  degradation, preservation of existing local bookmark mutations, and whether tracking actions stay
+  disabled until exact state is known.
+
+### Packet 37: Bookmark Rename Flow
+
+- Goal: add a safe bookmark rename flow for exact local bookmark rows.
+- Owner concept: bookmark utility screen local rename action.
+- Expected write set: `src/bookmarks.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests,
+  `docs/plan/progress.md`, and `docs/plan/fragility-register.md`.
+- Non-goals: no bookmark forget, no track/untrack, no remote deletion, no bookmark advance, no push,
+  and no generic ref editor.
+- Acceptance criteria: rename is offered only for rows with one exact local bookmark name; the
+  prompt collects one new exact bookmark name; empty, unchanged, or invalid names are rejected
+  before execution; preview shows old name, new name, and command; confirmation is required;
+  duplicate-name and command failures preserve full `jj` output; existing delete and future forget
+  wording stay distinct from rename.
+- Validation: command-construction tests for quoted old and new names; prompt, cancel, confirm,
+  invalid-input, duplicate-name failure, and result-output tests; disposable `/tmp` jj repo proof
+  for rename, duplicate-name failure, and undo/recovery where `jj` supports it, with mutations run
+  from the proof repo's `cwd`; `cargo check`; focused bookmark tests; full `cargo test` and
+  `just check` when practical.
+- Docs/fragility updates: update bookmark exact-name and rename entries; update `progress.md` and
+  workflow docs after shipping.
+- Suggested agent/model routing: gpt-5.5 high implementation plus gpt-5.5 high review, because exact
+  ref-name handling and prompt lifecycle are mutation-critical.
+- Review prompt: review Packet 37 for local exact-name targeting, new-name validation, command
+  construction, prompt lifecycle, output preservation, and isolated proof coverage.
+
+### Packet 38: Bookmark Forget Flow
+
+- Goal: add a safe bookmark forget flow after Packet 36 proves exact remote/tracking metadata.
+- Owner concept: bookmark utility screen remote/tracking ref hygiene action.
+- Expected write set: `src/bookmarks.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests,
+  `docs/plan/progress.md`, `docs/plan/fragility-register.md`, and
+  `docs/plan/workflows/refs-and-workspaces.md`.
+- Non-goals: no bookmark rename, no track/untrack, no local bookmark delete replacement, no bookmark
+  advance, no push, and no generic ref editor.
+- Acceptance criteria: forget is offered only where Packet 36 metadata proves the selected row is a
+  forgettable remote or tracking-state target; local-only and ambiguous rows stay disabled; preview
+  names the exact bookmark, remote/tracking state, and command; confirmation is required; failures
+  preserve full `jj` output; existing local delete remains visually and textually distinct from
+  forget.
+- Validation: command-construction tests for exact remote/tracking target shapes; metadata-gated
+  disabled-state tests; view-level preview, cancel, confirm, and result-output tests; disposable
+  `/tmp` jj repo proof for forget where feasible, unsupported-state failure, and recovery where `jj`
+  supports it, with mutations run from the proof repo's `cwd`; `cargo check`; focused bookmark
+  tests; full `cargo test` and `just check` when practical.
+- Docs/fragility updates: update bookmark forget/tracking-state entries; update `progress.md` and
+  refs/workspaces workflow docs after shipping.
+- Suggested agent/model routing: gpt-5.5 high implementation plus gpt-5.5 high review, because
+  delete/forget wording and remote-state exactness are high-risk UX details.
+- Review prompt: review Packet 38 for metadata-gated target exactness, delete-versus-forget clarity,
+  command construction, disabled states, output preservation, and isolated proof coverage.
+
+### Packet 39: Bookmark Track/Untrack Flows
+
+- Goal: add bookmark track and untrack flows after Packet 36 proves exact tracking metadata.
+- Owner concept: bookmark remote-tracking guided actions.
+- Expected write set: `src/bookmarks.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests,
+  `docs/plan/progress.md`, `docs/plan/fragility-register.md`, and `docs/plan/workflows/sync.md`.
+- Non-goals: no host dashboard, no branch protection or credential handling, no force-push, and no
+  inference from rendered `name@remote` text.
+- Acceptance criteria: track/untrack actions are enabled only for rows with exact metadata; preview
+  names local bookmark, remote bookmark, remote, and exact command; confirmation is required for
+  untrack; success refreshes bookmark rows and keeps output readable; unsupported remote states
+  remain disabled with clear status.
+- Validation: command-construction tests for track and untrack shapes; metadata-gated disabled-state
+  tests; view-level preview, cancel, confirm, and result-output tests; disposable `/tmp` jj repo
+  proof with a local disposable remote where feasible, with all mutations run from the proof repo's
+  `cwd`; `cargo check`; focused bookmark/sync tests; full `cargo test` and `just check` when
+  practical.
+- Docs/fragility updates: update bookmark tracking-state and sync-flow entries; update
+  `progress.md`.
+- Suggested agent/model routing: gpt-5.5 high implementation and review; use exploration first if
+  installed `jj` tracking semantics differ from the documented command shapes.
+- Review prompt: review Packet 39 for exact tracking metadata, remote-state gating, command
+  construction, result visibility, disposable remote proof, and whether host-specific behavior stays
+  out.
+
+### Packet 40: File Track/Untrack/Chmod Actions
+
+- Goal: add exact-path file hygiene actions for `jj file track`, `jj file untrack`, and
+  `jj file chmod`.
+- Owner concept: file/status exact-path action planning.
+- Expected write set: `src/file_list.rs`, `src/file_show.rs`, `src/status.rs`, `src/app.rs`,
+  `src/jj.rs`, `src/tui.rs`, focused tests, `docs/plan/progress.md`, and
+  `docs/plan/fragility-register.md`.
+- Non-goals: no broad fileset editor, no recursive glob UI, no path inference from sticky headings
+  alone, no conflict resolver, and no patch editor.
+- Acceptance criteria: actions launch only from contexts that own exact repo-relative paths; preview
+  shows each exact path and command; track/untrack/chmod command shapes are tested for paths with
+  spaces and metacharacters; chmod mode choices are explicit and bounded to supported `jj` modes;
+  result output stays scrollable; refresh preserves or clamps file selection safely.
+- Validation: command-construction tests for track, untrack, executable/non-executable chmod, and
+  unusual paths; parser/path-ownership tests for status and file contexts; view-level preview,
+  cancel, confirm, and result-output tests; disposable `/tmp` jj repo proof for each file mutation
+  and recovery where supported, with mutations run from the proof repo's `cwd`; `cargo check`;
+  focused file/status tests; full `cargo test` and `just check` when practical.
+- Docs/fragility updates: update exact-path and fileset/path quoting entries; update `progress.md`
+  and file workflow docs after shipping.
+- Suggested agent/model routing: gpt-5.5 high implementation plus review because path exactness is
+  mutation-critical.
+- Review prompt: review Packet 40 for exact path ownership, path quoting, chmod mode bounds,
+  disabled ambiguous contexts, output preservation, and `/tmp` file-mutation proof.
+
+### Packet 41: Workspace And Root Utility Surface
+
+- Goal: add a focused read-first workspace/root surface for `jj root` and `jj workspace` context.
+- Owner concept: workspace/root utility view.
+- Expected write set: new `src/workspaces.rs` if warranted, `src/main.rs`, `src/command.rs`,
+  `src/view_state.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests,
+  `docs/plan/screens/workspaces.md`, `docs/plan/progress.md`, and `docs/plan/fragility-register.md`
+  if output is parsed.
+- Non-goals: no workspace add/rename/forget/update-stale mutations in the first packet, no worktree
+  manager dashboard, and no replacement for shell navigation.
+- Acceptance criteria: users can inspect repo root and workspace list/context; startup or global
+  entry opens the view without mutating the repo; exact workspace names are separated from rendered
+  labels if future actions will use them; copy exposes root and workspace names; missing or old `jj`
+  workspace support degrades readably.
+- Validation: command-construction tests for root/workspace read commands; parser tests if row
+  structure is extracted; view navigation/search/copy/refresh tests; `cargo check`; focused
+  workspace tests; full `cargo test` when practical; no `/tmp` mutation proof required unless the
+  packet adds writes, but a disposable read proof is useful.
+- Docs/fragility updates: add root/workspace output assumptions if parsed; update `progress.md` and
+  screen docs.
+- Suggested agent/model routing: gpt-5.5 high or gpt-5.4-mini implementation depending on parser
+  complexity; gpt-5.5 high review if a new screen and parser are introduced.
+- Review prompt: review Packet 41 for read-only scope, workspace/root command compatibility,
+  graceful degradation, copy/search behavior, and whether mutation commands were kept out.
+
+### Packet 42: Tag List Read Surface
+
+- Goal: add a lower-priority read-only tag utility surface with exact tag list rows.
+- Owner concept: refs utility view for tags.
+- Expected write set: new `src/tags.rs` if warranted, `src/main.rs`, `src/command.rs`,
+  `src/view_state.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests,
+  `docs/plan/screens/tags.md`, `docs/plan/progress.md`, and `docs/plan/fragility-register.md`.
+- Non-goals: no tag set, no tag delete, no host release workflow, no signed-tag management, no
+  push/tag sync policy, and no broad ref dashboard.
+- Acceptance criteria: tag list is useful as a read surface before mutations are considered; exact
+  tag names and target ids are carried separately from rendered labels; search, copy, refresh, and
+  back behavior match other utility screens; ambiguous remote or signed-tag behavior stays
+  CLI-first; tag set/delete remain deferred to a future separate packet or parking-lot review.
+- Validation: list command and parser tests; view navigation/search/copy/refresh tests;
+  `cargo check`; focused tag tests; full `cargo test` and `just check` when practical; no `/tmp`
+  mutation proof is required because this packet is read-only.
+- Docs/fragility updates: add tag output and exact-name assumptions if parsed; update `progress.md`
+  and screen docs.
+- Suggested agent/model routing: gpt-5.4-mini implementation is acceptable if the parser is narrow;
+  use gpt-5.5 high review if exact tag identity depends on a new metadata contract.
+- Review prompt: review Packet 42 for read-only scope, exact tag identity, rendered-output
+  preservation, utility-screen behavior, and whether tag mutations stayed out of the packet.
+
+### Packet 43: File Search Utility
+
+- Goal: add a focused file search/read surface when it can improve navigation without replacing
+  shell tools.
+- Owner concept: file utility search and navigation.
+- Expected write set: `src/file_list.rs`, `src/file_show.rs` or a new focused module if needed,
+  `src/command.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests, `docs/plan/progress.md`,
+  and `docs/plan/fragility-register.md` if output is parsed.
+- Non-goals: no full grep replacement, no indexer, no mutation, no fuzzy file manager, and no search
+  over unbounded history unless scoped deliberately.
+- Acceptance criteria: the search scope is explicit; result rows preserve exact paths and useful
+  rendered context; opening a result uses exact path/revision data where known; empty and huge
+  result sets stay readable; copy and refresh behavior match other file utility screens.
+- Validation: command-construction tests for the chosen search command shape; parser tests for
+  paths, line numbers, empty output, and unusual characters if parsed; view navigation/search/copy
+  tests; `cargo check`; focused file tests; full `cargo test` when practical.
+- Docs/fragility updates: record search-output assumptions if any; update `progress.md`.
+- Suggested agent/model routing: gpt-5.5 high exploration to choose scope, then gpt-5.4-mini or
+  gpt-5.5 high implementation based on parser complexity.
+- Review prompt: review Packet 43 for bounded search scope, exact path handling, large-output
+  behavior, navigation correctness, and whether it avoids becoming a general grep UI.
+
+### Packet 44: File Annotate Read Surface
+
+- Goal: add a read-only `jj file annotate` surface for exact file paths.
+- Owner concept: file provenance detail view.
+- Expected write set: new `src/file_annotate.rs` if warranted, `src/file_list.rs`,
+  `src/file_show.rs`, `src/command.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests,
+  `docs/plan/progress.md`, and `docs/plan/fragility-register.md`.
+- Non-goals: no mutation, no blame analytics dashboard, no cross-file provenance browser, and no
+  parsing of annotation semantics beyond navigation/copy needs.
+- Acceptance criteria: annotate opens only when an exact file path is available; rendered `jj`
+  output and styles are preserved; search, scroll, copy, and back behavior match document views;
+  copied ids prefer explicit semantic fields only if a narrow contract proves them, otherwise copy
+  rendered text; missing paths or unsupported output degrade readably.
+- Validation: command-construction tests for exact file paths and revision context if supported;
+  parser tests only for the narrow fields used by navigation/copy; view-level
+  scroll/search/copy/back tests; `cargo check`; focused file annotate tests; full `cargo test` when
+  practical.
+- Docs/fragility updates: record annotate output assumptions if parsed; update `progress.md`.
+- Suggested agent/model routing: gpt-5.4-mini implementation is acceptable for a rendered-document
+  first pass; use gpt-5.5 high review if semantic id extraction is added.
+- Review prompt: review Packet 44 for read-only scope, exact path command construction, rendered
+  output preservation, navigation/copy behavior, and minimal parsing.
+
+### Packet 45: Evolog Utility Screen
+
+- Goal: add a later read-only `jj evolog` utility screen for inspecting change evolution from an
+  exact graph row.
+- Owner concept: change-history detail view.
+- Expected write set: new `src/evolog.rs` if warranted, `src/graph.rs`, `src/command.rs`,
+  `src/app.rs`, `src/jj.rs`, `src/tui.rs`, focused tests, `docs/plan/progress.md`, and
+  `docs/plan/fragility-register.md`.
+- Non-goals: no mutation from evolog, no operation recovery replacement, no semantic reconstruction
+  of evolution edges, and no whole-repo evolog dashboard.
+- Acceptance criteria: evolog opens from an exact selected change; rendered output is preserved;
+  search, scroll, copy, refresh, and back behavior follow existing document/detail views; missing
+  exact targets disable the action; docs explain that operation log remains the recovery anchor.
+- Validation: command-construction tests; view-level open/back/refresh/search/copy tests; parser
+  tests only if semantic fields are extracted; `cargo check`; focused evolog tests; full
+  `cargo test` when practical.
+- Docs/fragility updates: add evolog rendered-output assumptions if parsed; update `progress.md`.
+- Suggested agent/model routing: gpt-5.4-mini implementation with gpt-5.5 high review unless parser
+  or cross-view navigation complexity expands.
+- Review prompt: review Packet 45 for exact change targeting, read-only boundary, rendered-output
+  preservation, operation-log distinction, and bounded parser assumptions.
+
+### Packet 46: Low-Value Command Parking-Lot Review
+
+- Goal: keep low-value commands deliberately passthrough or deferred after the promoted packets are
+  scheduled.
+- Owner concept: command inventory and workflow policy documentation.
+- Expected write set: `docs/plan/command-inventory.md`, `docs/plan/workflows.md`, relevant
+  `docs/plan/workflows/*.md`, `docs/plan/progress.md`, and `docs/process-observations.md`.
+- Non-goals: no code changes, no command implementation, no command mode, and no promotion of a
+  command just because `jj` supports it.
+- Acceptance criteria: passthrough/deferred rationale is explicit for low-frequency or poor-fit
+  commands such as `interdiff`, `metaedit`, `parallelize`, `simplify-parents`, `sparse`, `fix`,
+  `config`, `sign`, `unsign`, `operation integrate`, `bookmark advance`, `diffedit`, `arrange`,
+  `bisect`, `gerrit`, and `util`; dangerous commands have stronger rationale than "later"; planned
+  packets above remain the only near-term promoted work.
+- Validation: `just md-check`; manual consistency check against `command-inventory.md`,
+  `workflows.md`, workflow-specific docs, and `progress.md`; no Rust validation required.
+- Docs/fragility updates: update `progress.md`; leave `fragility-register.md` unchanged unless the
+  review introduces a new planned soft contract.
+- Suggested agent/model routing: gpt-5.5 high documentation/review worker because this is product
+  prioritization, not prose cleanup.
+- Review prompt: review Packet 46 for classification consistency, explicit passthrough/deferred
+  rationale, no overclaiming, and whether the parking lot avoids turning `jk` into a full CLI clone.
+
+### Packet 32 Scheduling Notes
+
+- Immediate next recommended packet: Packet 33, because operation restore/revert extends the shipped
+  operation-log recovery anchor and depends on already-shipped operation ids, operation detail,
+  undo/redo, and scrollable action output.
+- Packets 34 and 35 should stay separate. `split` has editor/process uncertainty, while `duplicate`
+  is a graph rewrite with different target and refresh behavior.
+- Packets 36, 38, and 39 must not be collapsed. Forget and tracking mutations need explicit metadata
+  first; rendered bookmark labels are not a mutation-grade contract.
+- Packet 37 may run after the existing local exact bookmark-name contract is confirmed. It should
+  stay separate from Packet 38 because rename targets a local old name and new name, while forget
+  targets metadata-gated remote/tracking state.
+- Packets 38 and 39 may run only after Packet 36 lands, and they should not be implemented in
+  parallel with other bookmark action work because they share metadata, action routing, and
+  `src/bookmarks.rs`.
+- Packet 40 should wait until an implementor re-reads the exact path contracts from file list, file
+  show, status, and resolve. It is one file-hygiene packet because the commands share path ownership
+  and result refresh behavior.
+- Packets 41 through 45 are read-surface or utility packets. They are valuable, but lower priority
+  than recovery and high-frequency mutation gaps unless user work shows a stronger need.
+- Packet 46 is a policy/doc packet after the next implementation wave or whenever classifications
+  drift. It exists to prevent parity pressure from silently becoming product direction.
 
 ## Documentation And Demo Media Packets
 
@@ -654,8 +1014,9 @@ operation-log flow when `jj` supports that recovery shape.
 
 ### Refs, Tags, Workspaces, And Root Follow-Ups
 
-- Extend beyond Packet 24 with bookmark rename/forget/advance if justified, tag list/set/delete,
-  workspace list/add/rename/forget/update-stale, and a small root/workspace-info surface.
+- Extend beyond Packet 24 with bookmark rename/forget/advance if justified, tag set/delete only
+  after a separate read-only tag list packet proves exact identity, workspace
+  list/add/rename/forget/update-stale, and a small root/workspace-info surface.
 - Prerequisites: bookmark tracking-state contract, exact names separated from rendered labels,
   workspace root detection, and a decision on which low-frequency commands remain passthrough.
 - Promotion evidence: parser or structured-data tests for local/remote/tracking rows, command tests

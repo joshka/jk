@@ -650,6 +650,7 @@
   exact conflict-scoped filesets.
 - Final 5.5 re-review accepted Packet 28 after the default `@` target normalization, with no
   findings.
+- Next slice: Packet 29: Day-To-Day Tutorial Set
 
 ## Packet 29: Day-To-Day Tutorial Set
 
@@ -772,3 +773,32 @@
   `operation restore/revert`, `workspace`, `tag`, and editor-centric passthrough commands still need
   future implementation packets.
 - Next slice: Packet 32: Strong Command-Coverage Follow-Through
+
+## Packet 32: Strong Command-Coverage Follow-Through
+
+- Files changed: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+  `docs/process-observations.md`
+- Behavior: Packet 31's command coverage audit is now translated into bounded follow-through packets
+  instead of a broad parity backlog. The plan schedules Packets 33-46: operation restore/revert,
+  split, duplicate, bookmark metadata, bookmark rename, bookmark forget, bookmark track/untrack,
+  file hygiene actions, workspace/root, a read-only tag list surface, file search, file annotate,
+  evolog, and a later low-value parking-lot review as separate packets with explicit owners, write
+  sets, non-goals, acceptance criteria, validation, docs/fragility expectations, model routing, and
+  review prompts.
+- Product boundary: the plan keeps shipped daily flows in maintenance mode and explicitly avoids a
+  generic command mode or full `jj` CLI clone. Low-frequency or poor-fit commands remain
+  passthrough/deferred unless a later packet proves concrete `jk` value. The 5.5 boundedness repair
+  keeps tag work read-only/list-first and defers tag set/delete to a future packet or parking-lot
+  review; bookmark rename and bookmark forget now have separate target contracts.
+- Validation: `just md-check`; manual consistency check against `docs/plan/command-inventory.md`,
+  `docs/plan/workflows.md`, `docs/plan/workflows/inspect.md`, `docs/plan/workflows/recover.md`,
+  `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/workflows/rewrite.md`,
+  `docs/plan/workflows/sync.md`, and this progress file.
+- Validation note: no Rust validation was run because Packet 32 is docs-only.
+- Docs/fragility updates: `docs/plan/fragility-register.md` unchanged because the packet only plans
+  future soft contracts; each future packet is required to add or update fragility entries if it
+  parses rendered `jj` output, infers semantic state, or duplicates command behavior.
+- Remaining risk: the packets are implementation-ready prompts, but command semantics for `split`,
+  bookmark tracking and forget, the read-only tag list metadata contract, and workspace support
+  still require per-packet exploration before code is written.
+- Next slice: Packet 33: Operation Restore/Revert From Operation Log

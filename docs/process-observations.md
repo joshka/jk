@@ -5,6 +5,69 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 32 progress and process audit)
+
+- Slice / task: audit `docs/plan/progress.md` and `docs/process-observations.md` for the current
+  goal's Packet 13 through Packet 32 documentation state.
+- Scope: docs-only; do not edit Rust; do not run git; verify progress entries include changed files,
+  validation, remaining risk, and next-slice handoff where applicable; verify process notes capture
+  provable model/subagent observations and notable review or repair history, especially for Packets
+  30, 31, and 32.
+- Observable outcome: Packet 13 through Packet 32 progress entries already had coherent changed-file
+  lists, validation, and remaining-risk notes. Packet 28 was missing the explicit handoff to Packet
+  29, so this audit added `Next slice: Packet 29: Day-To-Day Tutorial Set`.
+- Process-note outcome: Packet 30, Packet 31, and Packet 32 already record the requested worker or
+  reviewer routing, review/repair outcomes, validation, evidence basis, and remaining limitations.
+  Older packet process entries are not perfectly uniform; this audit did not backfill missing
+  worker/model details where the current files did not provide enough transcript-backed evidence.
+- Evidence basis:
+  - Date: `2026-05-20` from the session environment.
+  - Commands: `rg` and `sed` reads over `docs/plan/progress.md` and `docs/process-observations.md`;
+    no version-control commands were run.
+  - Files: `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet 32 strong command-coverage follow-through)
+
+- Slice / task: Packet 32 docs planning in jj change `Plan command coverage follow-through`.
+- Worker / model routing: `019e4571-823c-7ea3-97de-22b6a5d89a7e` / `gpt-5.5 high` as requested for
+  ambiguous cross-workflow packet design and prioritization.
+- Scope: docs-only; convert Packet 31's command coverage audit into bounded, subagent-friendly
+  implementation packets; do not touch Rust source; do not run jj/git mutation commands in the
+  project checkout.
+- Observable outcome: `docs/plan/next-implementation-slices.md` now has Packet 32 follow-through
+  packets 33-46. Each promoted packet has a goal, owner concept, expected write set, non-goals,
+  acceptance criteria, validation requirements, docs/fragility expectations, model routing, and a
+  review prompt. Mutation packets require command-construction tests, view-level preview/result
+  tests, output/result tests, and isolated `/tmp` jj repo proof with mutation commands run from the
+  proof repo's `cwd`.
+- 5.5 boundedness repair (pre-repair draft numbering): the review found draft Packet 37 mixed
+  bookmark rename and forget despite different target contracts, and draft Packet 41 mixed tag
+  read-surface work with optional set/delete mutations. The repair split rename and forget into
+  final Packet 37 (rename) and Packet 38 (forget), renumbered the follow-through range to 33-46, and
+  made final Packet 42 tag work read-only/list-first, with tag set/delete deferred to a future
+  packet or parking-lot review.
+- Planning decision: Packet 33 is the recommended immediate next implementation packet because it
+  extends the shipped operation-log recovery anchor without mixing unrelated command families.
+  Bookmark tracking and forget are intentionally split behind a metadata contract, bookmark rename
+  stays local-name/new-name scoped, and low-value parity commands remain passthrough/deferred
+  pending a later parking-lot review.
+- Validation: `just md-check`; manual consistency check against `docs/plan/command-inventory.md`,
+  `docs/plan/workflows.md`, workflow-specific docs, and `docs/plan/progress.md`.
+- Docs / fragility: `docs/plan/fragility-register.md` unchanged because Packet 32 introduced no new
+  parsed or inferred command contract; future packets must update it when they add soft contracts.
+- Intentional non-updates: `docs/plan/command-inventory.md` and workflow docs unchanged because
+  Packet 31 classifications already matched the planned/shipped split; Rust source unchanged by
+  design.
+- Evidence basis:
+  - Thread: `019e4571-823c-7ea3-97de-22b6a5d89a7e`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `printenv CODEX_THREAD_ID`, `date +%F`, `jj --no-pager status`, `just md-fmt`,
+    `just md-check`
+  - Files: `docs/plan/next-implementation-slices.md`, `docs/plan/command-inventory.md`,
+    `docs/plan/workflows.md`, `docs/plan/workflows/inspect.md`, `docs/plan/workflows/recover.md`,
+    `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/workflows/rewrite.md`,
+    `docs/plan/workflows/sync.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 31 command coverage audit and passthrough policy)
 
 - Slice / task: Packet 31 docs audit in jj change `Audit command coverage policy`.
