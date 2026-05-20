@@ -5,6 +5,45 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 31 command coverage audit and passthrough policy)
+
+- Slice / task: Packet 31 docs audit in jj change `Audit command coverage policy`.
+- Worker / model: `019e4557-2616-7390-ba36-bbdc7344966d` / `gpt-5.4-mini` (Codex).
+- Scope: docs-only; verify shipped command homes against `src/command.rs`, `src/app.rs`,
+  `src/jj.rs`, view modules, tutorials, and progress docs; update command inventory, workflow docs,
+  progress notes, and process notes.
+- Observable outcome: command inventory now separates shipped native, utility, guided, direct, and
+  passthrough groups, plus planned and deferred work lists; workflow docs make shipped loops and
+  planned follow-ups explicit so dangerous or unsupported flows are no longer implied as shipped.
+- Rework note (orchestration review): `bookmark set/create/move/delete` were already marked shipped
+  in `Sync` and command inventory but were missing from refs/workspaces shipped lists; Packet 31
+  repaired both shipped refs/workspaces workflow docs so those commands match shipped status.
+  `bookmark rename/forget/track/untrack` remain planned.
+- 5.5 follow-up review findings were then fixed in Packet 31 docs: passthrough policy no longer
+  describes command mode as implemented, sync fetch launch context was updated to global/direct
+  behavior across normal app views (not status/log-only), bookmark set/create/move were corrected to
+  graph-exact-or-status-`@` targets, delete was corrected to shipped local-only rows in the
+  bookmarks view, `metaedit`, `parallelize`, `simplify-parents`, and `bookmark advance` were aligned
+  to passthrough in rewrite/sync workflows, `gerrit` and `util` were aligned to deferred, and
+  `operation integrate` was aligned to passthrough/specialized under recover.
+- Final 5.5 acceptance check found no findings after the fetch wording cleanup and classification
+  repairs; reviewer `019e456f-2154-7ce3-a268-56cd023287ff`.
+- Validation: `just md-check`; manual consistency check against `src/command.rs`, `src/app.rs`,
+  `src/jj.rs`, `docs/plan/progress.md`, and shipped tutorial docs.
+- Docs / fragility: fragility register unchanged because no new parsed or inferred command contracts
+  were introduced.
+- Intentional non-updates: `docs/plan/next-implementation-slices.md` unchanged because Packet 31/32
+  shape was already adequate; `README.md` unchanged because shipped-summary wording still matched
+  the high-level surface.
+- Evidence basis:
+  - Thread: `019e4557-2616-7390-ba36-bbdc7344966d`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `printenv CODEX_THREAD_ID`, `date +%F`, `just md-check`
+  - Files: `src/command.rs`, `src/app.rs`, `src/jj.rs`, `src/diff.rs`, `src/graph.rs`,
+    `src/show.rs`, `src/sticky_file_view.rs`, `docs/plan/progress.md`,
+    `docs/tutorials/daily-loop.md`, `docs/tutorials/bookmarks-and-conflicts.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 30 edit/next/prev navigation flows)
 
 - Slice / task: Implement Packet 30 preview-first graph-guided working-copy navigation for `edit`,

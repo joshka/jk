@@ -7,6 +7,8 @@ model.
 
 ## Likely Commands
 
+Shipped today:
+
 - `new`
 - `edit`
 - `next`
@@ -15,11 +17,28 @@ model.
 - `describe`
 - `rebase`
 - `squash`
-- `split`
 - `abandon`
-- `duplicate`
 - `restore`
 - `revert`
+- `absorb`
+
+Planned follow-ups:
+
+- `split`
+- `duplicate`
+- `operation restore`
+- `operation revert`
+
+Deferred:
+
+- `diffedit`
+- `arrange`
+
+Passthrough commands:
+
+- `metaedit`
+- `parallelize`
+- `simplify-parents`
 
 ## UI Bias
 

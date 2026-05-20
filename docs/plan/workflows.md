@@ -7,14 +7,20 @@ level for deciding what deserves native UI support.
 
 Goal: understand history, change content, file content, and current repo state.
 
-Likely surfaces:
+Shipped today:
 
 - log
 - show
 - diff
 - status
-- file list/show/search/annotate
+- file list/show
 - bookmark list
+- resolve
+- operation log
+
+Planned follow-ups:
+
+- file search/annotate
 - tag list
 - workspace root
 
@@ -28,7 +34,7 @@ Planning bias:
 
 Goal: reshape change history intentionally.
 
-Likely commands:
+Shipped today:
 
 - `new`
 - `edit`
@@ -38,17 +44,34 @@ Likely commands:
 - `describe`
 - `rebase`
 - `squash`
-- `split`
 - `abandon`
-- `duplicate`
 - `restore`
 - `revert`
+- `absorb`
+
+Planned follow-ups:
+
+- `split`
+- `duplicate`
+- `operation restore`
+- `operation revert`
+
+Deferred:
+
+- `diffedit`
+- `arrange`
+
+Passthrough commands:
+
+- `metaedit`
+- `parallelize`
+- `simplify-parents`
 
 Planning bias:
 
 - guided flows, not broad command mirrors
-- `jj new trunk` is common, low-risk, and easy to undo, so it can be more direct than risky rewrite
-  flows
+- `jj new trunk` is common, low-risk, and easy to undo, so it can be more direct than the wider
+  rewrite flows
 - strong previews and confirmations for risky actions
 - graph context should stay visible in the mental model even when the action launches from
   prompt/confirm flows
@@ -57,15 +80,26 @@ Planning bias:
 
 Goal: exchange state with remotes and ref tracking surfaces.
 
-Likely commands:
+Shipped today:
 
 - `git fetch`
 - `git push`
-- bookmark track/untrack/set-related actions
+- `bookmark set`
+- `bookmark create`
+- `bookmark move`
+- `bookmark delete`
+
+Planned follow-ups:
+
+- bookmark track/untrack
+
+Passthrough workflow:
+
+- `bookmark advance`
 
 Planning bias:
 
-- attach to status and bookmark-related surfaces
+- attach sync actions to status and bookmark-related surfaces
 - `jj git fetch` is common and low-risk enough to be a direct action with clear output and refresh
 - previews matter more than command breadth
 - keep host-specific integration out until the generic sync loop feels solid
@@ -74,15 +108,24 @@ Planning bias:
 
 Goal: undo mistakes and inspect repository operation history.
 
-Likely commands:
+Shipped today:
 
 - `op log`
 - `op show`
 - `op diff`
 - `undo`
 - `redo`
+
+Planned follow-ups:
+
 - `op restore`
 - `op revert`
+
+Deferred:
+
+- `operation abandon`
+
+`operation integrate` is classified as passthrough/specialized in command inventory.
 
 Planning bias:
 
@@ -92,21 +135,31 @@ Planning bias:
 
 ## Refs And Workspace Hygiene
 
-Goal: manage bookmarks, tags, files, workspaces, and local repo hygiene tasks.
+Goal: manage bookmarks, tags, files, and workspaces as focused utility tasks rather than as the main
+app model.
 
-Likely commands:
+Shipped today:
 
-- bookmark list/set/create/move/rename/delete/forget/track/untrack
+- bookmark list
+- `bookmark set`
+- `bookmark create`
+- `bookmark move`
+- `bookmark delete`
+- file list/show
+- resolve
+
+Planned follow-ups:
+
+- bookmark rename/forget/track/untrack
 - tag list/set/delete
-- file track/untrack/chmod
+- file search/annotate/track/untrack/chmod
 - workspace root/list/add/rename/forget/update-stale
-- resolve list plus related conflict resolution entry points
 
 Planning bias:
 
-- useful utility surfaces
-- can arrive after the core read/rewrite/recover loop
-- should remain low-chrome and scoped, not become dashboards
+- useful utility screens
+- actions launched from the relevant utility context
+- minimal chrome and no dashboard framing
 
 ## Passthrough Workflow
 
@@ -118,16 +171,20 @@ Likely commands:
 - `metaedit`
 - `parallelize`
 - `simplify-parents`
-- `absorb`
 - `fix`
 - `config`
 - `sparse`
 - `sign`
 - `unsign`
-- `gerrit`
-- `util`
 
 Planning bias:
 
-- supported through command mode only for now
+- supported through regular `jj` CLI invocation outside `jk` for now
 - native promotion requires evidence of frequency and clear `jk` value-add
+
+## Deferred Workflow
+
+Commands deferred for now:
+
+- `gerrit`
+- `util`

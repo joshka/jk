@@ -1,9 +1,8 @@
 # Command Inventory
 
-This document maps the `jj` CLI surface to likely `jk` homes. The goal is not to make every command
-a first-class screen immediately. The goal is to decide, deliberately, which commands deserve
-persistent UI, which deserve guided flows, and which should remain command-mode passthrough until
-proven important.
+This document maps the `jj` CLI surface to current `jk` homes. The goal is not to make every command
+a first-class screen immediately. The goal is to decide, deliberately, which commands are already
+shipped, which deserve guided flows, and which should stay passthrough or deferred.
 
 ## Classification
 
@@ -11,12 +10,14 @@ proven important.
 - `utility screen`: focused list/detail screen that supports a narrower task.
 - `guided flow`: prompt and confirmation-driven flow where `jk` adds context or safety over raw CLI
   use.
-- `passthrough`: command mode only for now.
+- `direct action`: immediate action with clear output and refresh, without a preview/confirm loop.
+- `passthrough`: run with the regular `jj` CLI outside `jk` until a native flow ships.
+- `planned`: intended `jk` home or flow, but not shipped yet.
 - `defer`: intentionally out of near-term scope for `jk`.
 
-These classifications are planning hypotheses. Promote a command from passthrough to native support
-when there is evidence that `jk` can improve the workflow without hiding fragile parsing or
-duplicating too much `jj` behavior.
+`passthrough` is a holding pattern, not a promise to build in-app command mode. Commands stay there
+when `jk` adds little value beyond explicit native flows. `planned` means the workflow is named and
+anticipated, but the home does not exist yet.
 
 ## Prioritization Signals
 
@@ -31,118 +32,118 @@ The first-pass priority order here is informed by three inputs:
 That alias surface is not a perfect usage survey, but it is a useful signal for what experienced
 users consider common enough to shorten aggressively.
 
+## Command Mode Policy
+
+`jk` should not try to mirror the whole `jj` CLI in-app yet. Low-frequency or advanced commands can
+remain passthrough when the app adds no clearer home. Dangerous commands need a stronger guided flow
+or stay deferred until the exact target, preview, and recovery story is obvious.
+
 ## Core Read Surface
 
-  | `jj` command | User goal                              | Likely `jk` home | Notes                                  |
-  | ------------ | -------------------------------------- | ---------------- | -------------------------------------- |
-  | `log`        | inspect history and stack shape        | `native screen`  | the home screen                        |
-  | `show`       | inspect one change                     | `native screen`  | drill-down from graph                  |
-  | `diff`       | inspect patch content                  | `native screen`  | drill-down from graph or show          |
-  | `status`     | inspect working copy state             | `native screen`  | high-frequency triage surface          |
-  | `evolog`     | inspect change evolution               | `utility screen` | likely later than op-log               |
-  | `interdiff`  | compare patch deltas between revisions | `passthrough`    | can become a derived detail view later |
-  | `version`    | inspect tool version                   | `passthrough`    | no dedicated screen needed             |
+- `log`: `native screen`. Current home screen.
+- `show`: `native screen`. Drill-down from graph.
+- `diff`: `native screen`. Drill-down from graph or show.
+- `status`: `native screen`. High-frequency triage surface.
+- `evolog`: `planned`. Likely a later utility screen.
+- `interdiff`: `passthrough`. Can become a derived detail view later.
+- `version`: `passthrough`. No dedicated screen needed.
 
 ## Navigation And Working Copy
 
-  | `jj` command | User goal                             | Likely `jk` home | Notes                                          |
-  | ------------ | ------------------------------------- | ---------------- | ---------------------------------------------- |
-  | `new`        | create a new empty change             | `guided flow`    | likely prompt plus confirmation-free execution |
-  | `edit`       | make another change the working copy  | `guided flow`    | can be shortcut from graph                     |
-  | `next`       | move to child revision                | `guided flow`    | high-value shortcut candidate                  |
-  | `prev`       | move to parent revision               | `guided flow`    | high-value shortcut candidate                  |
-  | `commit`     | finalize current change and advance   | `guided flow`    | likely prompt for description                  |
-  | `describe`   | edit change metadata                  | `guided flow`    | should feel native                             |
-  | `metaedit`   | edit metadata without content changes | `passthrough`    | similar goal, lower frequency                  |
-  | `root`       | inspect workspace root                | `utility screen` | simple informational screen                    |
-  | `workspace`  | manage workspaces                     | `utility screen` | list and focused subflows make sense           |
-  | `sparse`     | manage sparse working copy            | `passthrough`    | likely too advanced for early UI               |
+- `new`: `guided flow`. Exact-parent graph flow is shipped; the trunk shortcut is a separate direct
+  action.
+- `edit`: `guided flow`. Exact-row graph launch.
+- `next`: `guided flow`. Preview-first `--edit` movement relative to `@`.
+- `prev`: `guided flow`. Preview-first `--edit` movement relative to `@`.
+- `commit`: `guided flow`. Targets `@`.
+- `describe`: `guided flow`. Targets exact graph rows or `@` from status.
+- `metaedit`: `passthrough`. No dedicated `jk` home yet.
+- `root`: `planned`. Utility screen when root/workspace context is worth surfacing.
+- `workspace`: `planned`. Focused list and subflows would need a dedicated home.
+- `sparse`: `passthrough`. Advanced CLI-first surface.
 
 ## Rewrite And Recovery
 
-  | `jj` command          | User goal                             | Likely `jk` home | Notes                                  |
-  | --------------------- | ------------------------------------- | ---------------- | -------------------------------------- |
-  | `rebase`              | move revisions                        | `guided flow`    | safety and target preview are valuable |
-  | `squash`              | move changes into another revision    | `guided flow`    | likely graph-driven                    |
-  | `split`               | split one revision                    | `guided flow`    | deserves confirmation and preview      |
-  | `abandon`             | remove a revision from active history | `guided flow`    | high-risk, preview-first               |
-  | `duplicate`           | clone content into a new change       | `guided flow`    | not first-wave, but fits guided model  |
-  | `parallelize`         | make revisions siblings               | `passthrough`    | niche until rewrite model matures      |
-  | `simplify-parents`    | normalize parent edges                | `passthrough`    | niche advanced flow                    |
-  | `absorb`              | move changes into mutable descendants | `passthrough`    | likely too subtle for early UI         |
-  | `restore`             | restore paths from another revision   | `guided flow`    | useful once file flows exist           |
-  | `revert`              | apply reverse changes                 | `guided flow`    | high-risk, preview-first               |
-  | `undo`                | undo last operation                   | `guided flow`    | likely direct action from op-log       |
-  | `redo`                | redo most recently undone operation   | `guided flow`    | likely direct action from op-log       |
-  | `operation log`       | inspect op history                    | `native screen`  | central recovery surface               |
-  | `operation show`      | inspect one operation                 | `utility screen` | drill-down from op-log                 |
-  | `operation diff`      | inspect repo delta for an operation   | `utility screen` | drill-down from op-log                 |
-  | `operation restore`   | restore repo to earlier op            | `guided flow`    | anchored in op-log                     |
-  | `operation revert`    | revert an earlier op                  | `guided flow`    | anchored in op-log                     |
-  | `operation integrate` | integrate non-integrated ops          | `passthrough`    | specialized                            |
-  | `operation abandon`   | drop operation history                | `defer`          | too dangerous for early UI             |
+- `rebase`: `guided flow`. Shipped with preview-first command planning.
+- `squash`: `guided flow`. Shipped with explicit source and destination roles.
+- `split`: `planned`. Good candidate, but not shipped.
+- `abandon`: `guided flow`. Shipped from exact graph targets with strong confirmation.
+- `duplicate`: `planned`. Useful, but not first-wave.
+- `parallelize`: `passthrough`. Niche until the rewrite model matures.
+- `simplify-parents`: `passthrough`. Niche advanced flow.
+- `absorb`: `guided flow`. Shipped, but intentionally narrow.
+- `restore`: `guided flow`. Shipped from exact graph or file contexts.
+- `revert`: `guided flow`. Shipped for exact revisions only.
+- `undo`: `guided flow`. Global repo-cursor recovery from the operation log.
+- `redo`: `guided flow`. Global repo-cursor recovery from the operation log.
+- `operation log`: `native screen`. Central recovery surface.
+- `operation show`: `utility screen`. Drill-down from operation log.
+- `operation diff`: `utility screen`. Drill-down from operation log.
+- `operation restore`: `planned`. Recovery follow-up from the operation log.
+- `operation revert`: `planned`. Recovery follow-up from the operation log.
+- `operation integrate`: `passthrough`. Specialized.
+- `operation abandon`: `defer`. Too dangerous for early UI.
 
 ## Bookmarks, Tags, And Related Refs
 
-  | `jj` command       | User goal                        | Likely `jk` home | Notes                                       |
-  | ------------------ | -------------------------------- | ---------------- | ------------------------------------------- |
-  | `bookmark list`    | inspect bookmark state           | `utility screen` | strong fit from prototype ideas             |
-  | `bookmark set`     | create or retarget bookmark      | `guided flow`    | should launch from bookmark screen or graph |
-  | `bookmark create`  | create bookmark                  | `guided flow`    | may collapse into set                       |
-  | `bookmark move`    | move bookmark                    | `guided flow`    | may collapse into set                       |
-  | `bookmark rename`  | rename bookmark                  | `guided flow`    | utility-level                               |
-  | `bookmark delete`  | delete bookmark                  | `guided flow`    | confirmation-worthy                         |
-  | `bookmark forget`  | forget bookmark without deletion | `guided flow`    | advanced but screen-related                 |
-  | `bookmark track`   | track remote bookmark            | `guided flow`    | belongs with bookmark screen                |
-  | `bookmark untrack` | stop tracking remote bookmark    | `guided flow`    | belongs with bookmark screen                |
-  | `bookmark advance` | advance closest bookmark         | `passthrough`    | probably not a first-class flow             |
-  | `tag`              | manage tags                      | `utility screen` | similar to bookmarks, lower frequency       |
+- `bookmark list`: `utility screen`. Strong fit from prototype ideas.
+- `bookmark set`: `guided flow`. Shipped from graph exact rows and status (`=`) using current `@`.
+- `bookmark create`: `guided flow`. Shipped from graph exact rows and status (`@`) as bookmark name
+  prompts.
+- `bookmark move`: `guided flow`. Shipped from graph exact rows and status (`@`) as bookmark name
+  prompts.
+- `bookmark rename`: `planned`. Not a current home.
+- `bookmark delete`: `guided flow`. Shipped from bookmark rows in bookmarks view; local-only and
+  confirmation-worthy.
+- `bookmark forget`: `planned`. Useful, but not shipped.
+- `bookmark track`: `planned`. Tracking-state metadata still needs a stronger contract.
+- `bookmark untrack`: `planned`. Same tracking-state gap as track.
+- `bookmark advance`: `passthrough`. Probably not a first-class flow.
+- `tag`: `planned`. Lower-frequency utility surface.
 
 ## Files And Resolve
 
-  | `jj` command    | User goal                           | Likely `jk` home | Notes                                          |
-  | --------------- | ----------------------------------- | ---------------- | ---------------------------------------------- |
-  | `file list`     | inspect files in a revision         | `utility screen` | useful companion to show/diff                  |
-  | `file show`     | inspect file contents in a revision | `utility screen` | likely drill-down from file list               |
-  | `file search`   | search file contents in a revision  | `utility screen` | useful if scoped well                          |
-  | `file annotate` | inspect line-level provenance       | `utility screen` | later read-surface                             |
-  | `file track`    | start tracking paths                | `guided flow`    | probably from status/file list                 |
-  | `file untrack`  | stop tracking paths                 | `guided flow`    | probably from status/file list                 |
-  | `file chmod`    | flip executable bit                 | `guided flow`    | lower-frequency file action                    |
-  | `resolve`       | resolve conflicts                   | `utility screen` | list-first view is more useful than a shortcut |
+- `file list`: `utility screen`. Useful companion to show and diff.
+- `file show`: `utility screen`. Drill-down from file list.
+- `file search`: `planned`. Useful if scoped well.
+- `file annotate`: `planned`. Later read surface.
+- `file track`: `planned`. Needs exact path ownership from status or file list.
+- `file untrack`: `planned`. Same exact-path requirement as track.
+- `file chmod`: `planned`. Lower-frequency file action.
+- `resolve`: `utility screen`. List-first conflict surface.
 
 ## Git And Remote Sync
 
-  | `jj` command            | User goal               | Likely `jk` home | Notes                                |
-  | ----------------------- | ----------------------- | ---------------- | ------------------------------------ |
-  | `git fetch`             | update from remotes     | `guided flow`    | strong status-screen action          |
-  | `git push`              | publish changes         | `guided flow`    | preview and confirmation matter      |
-  | other `jj git` commands | lower-level Git interop | `passthrough`    | likely too broad for early native UI |
+- `git fetch`: `direct action`. Common and low-risk enough to stay direct.
+- `git push`: `guided flow`. Preview and confirmation matter.
+- other `jj git` commands: `passthrough`. Likely too broad for early native UI.
 
 ## Inspection But Probably Not Core
 
-  | `jj` command | User goal                           | Likely `jk` home | Notes                                                                      |
-  | ------------ | ----------------------------------- | ---------------- | -------------------------------------------------------------------------- |
-  | `bisect`     | find bad revision by search         | `defer`          | large workflow, later if ever                                              |
-  | `arrange`    | interactively arrange commit graph  | `defer`          | likely incompatible with the current single-view model without more design |
-  | `diffedit`   | interactive patch editing           | `defer`          | editor-centric and high-complexity                                         |
-  | `fix`        | apply formatting or automated fixes | `passthrough`    | can remain CLI-first                                                       |
-  | `config`     | inspect or edit config              | `passthrough`    | not a product-center task                                                  |
-  | `sign`       | sign revisions                      | `passthrough`    | advanced                                                                   |
-  | `unsign`     | drop revision signature             | `passthrough`    | advanced                                                                   |
-  | `gerrit`     | Gerrit integration                  | `defer`          | host-specific                                                              |
-  | `util`       | infrequently used support commands  | `defer`          | explicitly not a first-class surface                                       |
-  | `help`       | inspect CLI help                    | `passthrough`    | `jk` needs its own help, not a full CLI mirror                             |
+- `bisect`: `defer`. Large workflow, later if ever.
+- `arrange`: `defer`. Likely incompatible with the current single-view model without more design.
+- `diffedit`: `defer`. Editor-centric and high-complexity.
+- `fix`: `passthrough`. Can remain CLI-first.
+- `config`: `passthrough`. Not a product-center task.
+- `sign`: `passthrough`. Advanced.
+- `unsign`: `passthrough`. Advanced.
+- `gerrit`: `defer`. Host-specific.
+- `util`: `defer`. Explicitly not a first-class surface.
+- `help`: `passthrough`. `jk` needs its own help, not a full CLI mirror.
 
 ## Current Planning Bias
 
 Short version:
 
-- First-wave native screens: `log`, `show`, `diff`, `status`, `operation log`.
-- First-wave utility screens: bookmarks, files, resolve, tags, workspace root.
-- First-wave guided/direct flows: `jj new trunk`, `new` from selected revision, `describe`,
-  `commit`, `rebase`, `squash`, `split`, `abandon`, `undo`, `redo`, `git fetch`, `git push`,
-  bookmark set.
+- Shipped native screens: `log`, `show`, `diff`, `status`, `operation log`.
+- Shipped utility screens: `bookmarks`, `file list/show`, `resolve`, `operation show`,
+  `operation diff`.
+- Shipped guided flows: `edit`, `next`, `prev`, `describe`, `commit`, `rebase`, `squash`, `abandon`,
+  `restore`, `revert`, `absorb`, `bookmark set/create/move/delete`, `undo`, `redo`, `git push`.
+- Shipped direct actions: `jj git fetch` and `jj new trunk`.
+- Planned utility or guided work: `evolog`, `root`, `workspace`, `split`, `duplicate`,
+  `operation restore/revert`, `bookmark rename/forget/track/untrack`, `tag`, `file search`,
+  `file annotate`, `file track/untrack/chmod`.
 - Everything else stays passthrough or deferred until the core loop is strong.
 
 When a command needs native structure, check [`integration-strategy.md`](integration-strategy.md)

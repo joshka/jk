@@ -740,4 +740,35 @@
   and can fail with interactive ambiguity prompts when multiple editable successors/predecessors
   exist. `jk` now keeps `--edit` explicit and preserves those failures readably, but it still does
   not preview the final graph or resolve ambiguity on the user's behalf.
-- Next slice: Packet 31: follow-on graph-guided rewrite flows
+- Next slice: Packet 31: Command Coverage Audit And Passthrough Policy
+
+## Packet 31: Command Coverage Audit And Passthrough Policy
+
+- Files changed: `docs/plan/command-inventory.md`, `docs/plan/workflows.md`,
+  `docs/plan/workflows/inspect.md`, `docs/plan/workflows/recover.md`,
+  `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/workflows/rewrite.md`,
+  `docs/plan/workflows/sync.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Behavior: the command inventory now separates shipped native screens, utility screens, guided
+  flows, direct actions, planned follow-ups, passthrough commands, and deferred commands. The
+  workflow docs now say which loops are already shipped and which ones still need dedicated homes or
+  stronger command-policy decisions.
+- Docs/fragility updates: `docs/plan/fragility-register.md` unchanged; the audit introduced no new
+  parsed or inferred command contracts.
+- Validation: `just md-check`; manual consistency check against `src/command.rs`, `src/app.rs`,
+  `src/jj.rs`, `docs/plan/progress.md`, and the shipped tutorial docs
+- Validation note: no Rust validation was run because Packet 31 is docs-only.
+- 5.5 follow-up repair notes: passthrough wording no longer implies command-mode support;
+  `jj git fetch` launch context was corrected to global/direct wording (not limited to status/log),
+  bookmark `set/create/move` contexts were corrected to graph-exact-or-status-`@` targets and
+  `delete` to local bookmark rows in bookmarks view; and `operation integrate` is now documented as
+  passthrough/specialized. A final 5.5 follow-up also reclassified `metaedit`, `parallelize`,
+  `simplify-parents`, and `bookmark advance` as passthrough in workflow docs to match
+  `command-inventory.md`. A final Packet 31 repair also moved `gerrit` and `util` from passthrough
+  to deferred in `docs/plan/workflows.md`.
+- Final 5.5 acceptance check found no findings after the fetch wording cleanup and passthrough/
+  classification repairs.
+- Remaining risk: the audit does not implement any new command home, so the planned entries for
+  command families such as `bookmark track/untrack`, `file track/untrack/chmod`,
+  `operation restore/revert`, `workspace`, `tag`, and editor-centric passthrough commands still need
+  future implementation packets.
+- Next slice: Packet 32: Strong Command-Coverage Follow-Through

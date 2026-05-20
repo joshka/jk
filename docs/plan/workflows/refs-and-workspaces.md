@@ -7,11 +7,22 @@ model.
 
 ## Likely Commands
 
-- bookmark list/set/create/move/rename/delete/forget/track/untrack
+Shipped today:
+
+- bookmark list
+- `bookmark set`
+- `bookmark create`
+- `bookmark move`
+- `bookmark delete`
+- file list/show
+- resolve
+
+Planned follow-ups:
+
+- bookmark rename/forget/track/untrack
 - tag list/set/delete
-- file list/show/search/annotate/track/untrack/chmod
-- root and workspace-related commands
-- resolve-related list and action entry points
+- file search/annotate/track/untrack/chmod
+- workspace root/list/add/rename/forget/update-stale
 
 ## UI Bias
 

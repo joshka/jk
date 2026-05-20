@@ -6,13 +6,26 @@ Understand what happened and undo or restore confidently when something goes wro
 
 ## Likely Commands
 
+Shipped today:
+
 - `operation log`
 - `operation show`
 - `operation diff`
 - `undo`
 - `redo`
+
+Planned follow-ups:
+
 - `operation restore`
 - `operation revert`
+
+Passthrough / CLI-first:
+
+- `operation integrate` (specialized recovery-oriented command; executed via regular `jj` for now)
+
+Deferred:
+
+- `operation abandon`
 
 ## UI Bias
 

@@ -6,14 +6,25 @@ Exchange state with remotes and keep bookmark-tracking state understandable.
 
 ## Likely Commands
 
+Shipped today:
+
 - `git fetch`
 - `git push`
-- bookmark track/untrack and related set flows
+- bookmark create/set/move/delete
+
+Planned follow-ups:
+
+- bookmark track/untrack
+
+Passthrough commands:
+
+- bookmark advance
 
 ## UI Bias
 
 - attach sync actions to status and bookmark-related screens
-- make `jj git fetch` direct when the remote/default command shape is clear
+- make `jj git fetch` a direct action from normal app views when the remote/default command shape is
+  clear
 - prefer previews and explicit targeting over broad remote dashboards
 
 ## Common Direct Flow: `jj git fetch`
@@ -23,7 +34,7 @@ shape is clear.
 
 Expected behavior:
 
-- launch from status, log, or command mode;
+- available as a global/direct action from normal app views;
 - show command output or errors clearly;
 - refresh the current screen after completion;
 - avoid confirmation unless the command shape becomes unusual.

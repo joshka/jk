@@ -6,12 +6,21 @@ Inspect history, change content, file content, and current repository state with
 
 ## Primary Surfaces
 
+Shipped today:
+
 - log
 - show
 - diff
 - status
-- file list/show/search/annotate
+- file list/show
 - bookmark list
+- operation log
+- resolve
+
+Planned follow-ups:
+
+- file search
+- file annotate
 - tag list
 - workspace root
 
