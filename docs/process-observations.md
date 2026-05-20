@@ -5,6 +5,84 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 26 rebase preview graph review)
+
+- Slice / task: Implement Packet 26 rebase preview polish and post-action review.
+- Worker / model: `019e44d7-4d07-78f2-9ced-cbb06ca8d3dd` / `gpt-5` (Codex).
+- Scope given: preserve unrelated edits, keep work in the current jj change
+  `Polish rebase preview graph review`, retain the existing
+  `jj rebase -r <source> [-r <source>...] -o <destination>` execution shape, avoid
+  `--no-integrate-operation` and alternate rebase variants, improve preview text as a command
+  summary rather than a simulated graph preview, keep the primary source reveal after refresh, and
+  keep `jj undo | jj op show -p` visible after success.
+- Exploration handoff facts: runtime must not pretend to compute a true before/after graph. The
+  preview should distinguish current graph context from expected command effect and state that
+  listed `-r` sources are rebased, dependencies among listed sources are preserved, descendants
+  outside the selection may be rebased to fill holes, and `-o` does not insert or rebase destination
+  descendants.
+- Observable outcome: `JjRebasePlan::preview_summary()` now lists the exact command, source and
+  destination roles, current graph context, expected `--revision`/`--onto` effect semantics,
+  no-runtime-simulation caveat, Enter confirmation, `jj op show -p` review, and `jj undo` recovery.
+  Successful rebase completion keeps the result overlay scrollable, continues revealing the primary
+  source after refresh, and leaves `jj undo | jj op show -p` in status/result text.
+- Manual proof outcome: disposable repo `/tmp/jk-rebase-proof.4HPKSi` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a base change, sibling destination, and sibling
+  source were created. `jj --no-pager rebase -r vwvwtwqwtypx -o txkwxxok` moved the source onto the
+  destination, `jj --no-pager op show -p --color never` showed the operation patch, and
+  `jj --no-pager undo` restored the sibling graph.
+- 5.5 follow-up: review flagged a medium blocker that this preview's effect block could clip on
+  normal terminal widths; Spark repaired it by splitting `JjRebasePlan::preview_summary()` into
+  short lines while preserving the same rebase semantics wording.
+- Rework / blockers: proof setup first wrote a scratch destination-id file inside the disposable jj
+  repo, and moving the working copy removed it before a command substitution could read it. The
+  failed proof command did not mutate the project repo; the proof was rerun in the same disposable
+  repo with visible change ids and succeeded. `cargo check` still reports the existing dead-code
+  warnings for `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  `just check` still fails immediately at the known `cargo +nightly fmt` wrapper step.
+- Evidence basis:
+  - Thread: `019e44d7-4d07-78f2-9ced-cbb06ca8d3dd`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `jj --no-pager status`
+    - `cargo test jj::tests::rebase -- --test-threads=1`
+    - `cargo test app::tests::rebase -- --test-threads=1`
+    - `cargo test action_menu -- --test-threads=1`
+    - `cargo check`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-fmt`
+    - `just md-check`
+    - `just check`
+  - Manual proof commands, all with cwd `/tmp/jk-rebase-proof.4HPKSi`:
+    - `jj --no-pager git init`
+    - `printf 'base\n' > file.txt`
+    - `jj --no-pager file track file.txt`
+    - `jj --no-pager describe -m 'packet 26 base line'`
+    - `jj --no-pager new -m 'packet 26 destination'`
+    - `printf 'dest\n' > dest.txt`
+    - `jj --no-pager file track dest.txt`
+    - `jj --no-pager new @- -m 'packet 26 source'`
+    - `printf 'source\n' > source.txt`
+    - `jj --no-pager file track source.txt`
+    - `jj --no-pager log --color never`
+    - `jj --no-pager rebase -r vwvwtwqwtypx -o txkwxxok`
+    - `jj --no-pager log --color never`
+    - `jj --no-pager op show -p --color never`
+    - `jj --no-pager undo`
+    - `jj --no-pager log --color never`
+  - Files: `src/app.rs`, `src/jj.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
+### 2026-05-20 (Packet 26 5.5 final acceptance)
+
+- Final 5.5 review: no remaining findings; Packet 26 was accepted.
+- Prior clipping issue: the preview summary clipping was resolved by rewriting the effect block into
+  shorter lines.
+- Residual risk: long `jj rebase -r <source> ... -o <destination>` command lines with many sources
+  can still exceed terminal width.
+- Main-thread validation after repair: full `cargo test` and `just md-check` were run.
+
 ### 2026-05-20 (Packet 25 absorb preview flow)
 
 - Slice / task: Implement Packet 25 bounded graph-only guided `jj absorb` preview flow.

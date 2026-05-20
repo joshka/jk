@@ -2354,7 +2354,7 @@ impl App {
                                 Err(error) => {
                                     self.status = StatusLine::error(&self.view, error.to_string());
                                     reveal_error = Some(format!(
-                                        "{} | reveal failed: {} | jj undo",
+                                        "{} | reveal failed: {} | jj undo | jj op show -p",
                                         output.trim(),
                                         error
                                     ));
@@ -2368,14 +2368,17 @@ impl App {
                     let message = match revealed_in_recent {
                         Some(switched_modes) => {
                             if switched_modes {
-                                format!("{} | showing recent work | jj undo", output.trim())
+                                format!(
+                                    "{} | showing recent work | jj undo | jj op show -p",
+                                    output.trim()
+                                )
                             } else {
-                                format!("{} | jj undo", output.trim())
+                                format!("{} | jj undo | jj op show -p", output.trim())
                             }
                         }
                         None => match reveal_error.as_deref() {
                             Some(message) => message.to_owned(),
-                            None => format!("{} | jj undo", output.trim()),
+                            None => format!("{} | jj undo | jj op show -p", output.trim()),
                         },
                     };
                     if reveal_error.is_none() {
@@ -2385,7 +2388,10 @@ impl App {
                 }
                 Err(error) => {
                     self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("refresh failed: {error}")
+                    format!(
+                        "{} | refresh failed: {error} | jj undo | jj op show -p",
+                        output.trim()
+                    )
                 }
             },
             Err(error) => {
@@ -3051,6 +3057,10 @@ mod tests {
         Ok("rebased".to_owned())
     }
 
+    fn mock_rebase_failure(_: &JjRebasePlan) -> Result<String> {
+        Err(eyre!("jj rebase failed: first line\nsecond line"))
+    }
+
     fn mock_squash_success(_: &JjSquashPlan) -> Result<String> {
         Ok("squashed".to_owned())
     }
@@ -3217,6 +3227,16 @@ mod tests {
         assert_eq!(change_id, "change-a");
         assert_eq!(fallback_mode, LogViewMode::Recent);
         Ok(false)
+    }
+
+    fn mock_reveal_rebased_source_in_recent(
+        _view: &mut ViewState,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        assert_eq!(change_id, "source-a");
+        assert_eq!(fallback_mode, LogViewMode::Recent);
+        Ok(true)
     }
 
     fn mock_reveal_squash_destination_in_recent(
@@ -4603,6 +4623,12 @@ mod tests {
         assert!(output.body_lines().join("\n").contains(
             "reveal failed: refreshed graph did not include the new working-copy change"
         ));
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("jj undo | jj op show -p")
+        );
         assert!(matches!(app.status.kind(), StatusKind::Error));
         assert_eq!(
             app.status.message(),
@@ -4617,6 +4643,72 @@ mod tests {
         assert_eq!(
             app.status.message(),
             "refreshed graph did not include the new working-copy change"
+        );
+    }
+
+    #[test]
+    fn rebase_confirm_success_keeps_review_and_undo_paths_visible() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("source-a".to_owned()), None),
+        ])));
+        app.rebase_run = mock_rebase_success;
+        app.refresh_view = mock_refresh_ok;
+        app.reveal_graph_change = mock_reveal_rebased_source_in_recent;
+        app.mode = InteractionMode::RebasePreview {
+            rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            output: ActionOutput::pending(
+                "jj rebase -r source-a -o dest".to_owned(),
+                "preview only".to_owned(),
+                Some("rebase preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::RebasePreview { output, .. } => output,
+            _ => panic!("expected rebase result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("rebased | showing recent work | jj undo | jj op show -p"));
+        assert_eq!(
+            app.status.message(),
+            "rebased | showing recent work | jj undo | jj op show -p"
+        );
+    }
+
+    #[test]
+    fn rebase_failure_keeps_full_error_output_readable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("source-a".to_owned()), None),
+        ])));
+        app.rebase_run = mock_rebase_failure;
+        app.mode = InteractionMode::RebasePreview {
+            rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            output: ActionOutput::pending(
+                "jj rebase -r source-a -o dest".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::RebasePreview { output, .. } => output,
+            _ => panic!("expected rebase result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(output.command_label(), "jj rebase -r source-a -o dest");
+        assert!(output.completed());
+        assert!(body.contains("jj rebase failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj rebase failed: first line\nsecond line"
         );
     }
 
@@ -4654,10 +4746,21 @@ mod tests {
             status_context.as_deref(),
             Some("rebase from 1 source(s) into dest from jk | source(s): source-a")
         );
-        assert_eq!(
-            preview_output,
-            "command: jj rebase -r source-a -o dest\ncontext: rebase from 1 source(s) into dest from jk | source(s): source-a\noutput:\n  command: jj rebase -r source-a -o dest\n  \n  source: source-a\n  \n  destination: dest\n  \n  graph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n  \n  undo path: jj undo"
+        assert!(preview_output.contains("command: jj rebase -r source-a -o dest"));
+        assert!(preview_output.contains("source revision: source-a"));
+        assert!(preview_output.contains("destination revision: dest"));
+        assert!(preview_output.contains("current graph context:"));
+        assert!(preview_output.contains("source rows are selected in jk"));
+        assert!(preview_output.contains("destination is the current row"));
+        assert!(preview_output.contains("expected jj effect:"));
+        assert!(
+            preview_output
+                .contains("semantics: jj rebase --revision <source> --onto <destination>")
         );
+        assert!(preview_output.contains("not a graph preview"));
+        assert!(preview_output.contains("review after run: jj op show -p"));
+        assert!(preview_output.contains("undo path: jj undo"));
+        assert!(preview_output.contains("confirmation: press Enter to run jj rebase"));
     }
 
     #[test]

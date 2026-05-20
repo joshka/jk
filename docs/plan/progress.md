@@ -523,3 +523,43 @@
   emptying, source abandonment, or final graph shape. Those remain jj semantics visible through the
   preview text, result output, `jj undo`, and rendered `jj op show -p` review path.
 - Next slice: Packet 26: Rebase Polish And Before/After Graph
+
+## Packet 26: Rebase Polish And Before/After Graph
+
+- Files changed: `src/app.rs`, `src/jj.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: the rebase preview is now explicitly a command summary, not a simulated graph preview.
+  It lists the exact `jj rebase -r <source> ... -o <destination>` command, recaps source and
+  destination roles, names the current graph context, and states the expected `--revision`/`--onto`
+  semantics without running `jj` or reconstructing the final graph.
+- Command shape: runtime still uses `jj rebase -r <source> [-r <source>...] -o <destination>`. The
+  flow does not use `--no-integrate-operation`, `--source`, `--branch`, `--insert-after`,
+  `--insert-before`, filesets, or alternate rebase variants.
+- Preview/result behavior: the preview states that only listed `-r` sources are rebased,
+  dependencies among listed sources are preserved, descendants outside the selected set may be
+  rebased to fill holes, and destination descendants are not inserted or rebased by `-o`. Successful
+  rebase results still reveal the primary source after refresh and now keep
+  `jj undo | jj op show -p` visible in both the status line and scrollable result output.
+- Verification: `cargo check`; focused `cargo test jj::tests::rebase -- --test-threads=1`; focused
+  `cargo test app::tests::rebase -- --test-threads=1`; focused
+  `cargo test action_menu -- --test-threads=1`; full `cargo test`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt --check`; `just md-check`
+- Validation note: `just check` was attempted after Packet 26 validation but failed immediately at
+  the known `cargo +nightly fmt` wrapper step. Equivalent checks were run separately: `cargo check`,
+  focused rebase/action-menu tests, full `cargo test`, `rustup run nightly cargo fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Manual proof: disposable repo `/tmp/jk-rebase-proof.4HPKSi` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a base change, sibling destination, and sibling
+  source were created. `jj --no-pager rebase -r vwvwtwqwtypx -o txkwxxok` moved the source onto the
+  destination, `jj --no-pager op show -p --color never` showed the rebase operation patch, and
+  `jj --no-pager undo` restored the sibling graph.
+- Remaining risk: `jk` still does not know or preview the final graph before execution. It delegates
+  graph truth to `jj`, preserves the raw command/result path, and points users to `jj op show -p`
+  and `jj undo` after execution.
+- Final 5.5 repair note: the preview summary text was flagged as clipping in normal terminal widths
+  because the command-effect semantics were one long line. Spark repaired this by splitting the
+  rebase effect section into short, readable lines.
+- Final 5.5 re-review accepted Packet 26 after the clipping repair, with no remaining findings.
+- The re-review ran `cargo test rebase -- --test-threads=1`.
+- Main-thread follow-up validation after the repair used a full `cargo test` and `just md-check`.
+- Next slice: Packet 27: Restore/Revert Guided Flows

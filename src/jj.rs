@@ -809,12 +809,12 @@ impl JjRebasePlan {
         let sources = self
             .sources
             .iter()
-            .map(|source| format!("source: {source}"))
+            .map(|source| format!("source revision: {source}"))
             .collect::<Vec<_>>()
             .join("\n");
 
         format!(
-            "command: {}\n\n{}\n\ndestination: {}\n\ngraph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n\nundo path: jj undo",
+            "command: {}\n\nroles:\n{}\ndestination revision: {}\n\ncurrent graph context:\n- source rows are selected in jk\n- destination is the current row\n\nexpected jj effect:\n- semantics: jj rebase --revision <source> --onto <destination>\n- only listed source revisions are rebased\n- dependencies among listed sources are preserved\n- descendants outside the selected set may be rebased to fill holes\n- destination descendants are not inserted or rebased by -o\n\nnot a graph preview: jk has not run jj and is not simulating the final graph\n\nreview after run: jj op show -p\nundo path: jj undo\nconfirmation: press Enter to run jj rebase",
             self.command_label(false),
             sources,
             self.destination,
@@ -3256,10 +3256,20 @@ mod tests {
         let preview = rebase.preview_summary();
 
         assert!(preview.contains("command: jj rebase -r source-a -o dest"));
-        assert!(preview.contains("source: source-a"));
-        assert!(preview.contains("destination: dest"));
-        assert!(preview.contains("graph effect: rebases the selected revisions"));
+        assert!(preview.contains("source revision: source-a"));
+        assert!(preview.contains("destination revision: dest"));
+        assert!(preview.contains("source rows are selected in jk"));
+        assert!(preview.contains("destination is the current row"));
+        assert!(preview.contains("semantics: jj rebase --revision <source> --onto <destination>"));
+        assert!(preview.contains("only listed source revisions are rebased"));
+        assert!(preview.contains("dependencies among listed sources are preserved"));
+        assert!(preview.contains("descendants outside the selected set may be rebased"));
+        assert!(preview.contains("destination descendants are not inserted or rebased by -o"));
+        assert!(preview.contains("not a graph preview"));
+        assert!(preview.contains("jk has not run jj and is not simulating the final graph"));
+        assert!(preview.contains("review after run: jj op show -p"));
         assert!(preview.contains("undo path: jj undo"));
+        assert!(preview.contains("confirmation: press Enter to run jj rebase"));
     }
 
     #[test]
