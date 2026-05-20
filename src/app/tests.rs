@@ -6,8 +6,13 @@ use crate::action_menu::{ActionKind, RolePrompt};
 use crate::action_output::ActionOutput;
 use crate::action_output::action_output_visible_lines;
 use crate::app::mode_input::{rebase_plan_from_prompt, squash_plan_from_prompt};
+use crate::app_screen::ViewMenuAction;
 use crate::jj::{
-    JjBookmarkTarget, JjDescribeTarget, JjGitFetch, JjGitPushTarget, JjOperationRecoveryKind,
+    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan,
+    JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitFetch,
+    JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind,
+    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
+    JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
 };
 use crate::tui::Overlay;
 use color_eyre::eyre::eyre;

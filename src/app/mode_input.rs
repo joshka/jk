@@ -27,6 +27,21 @@ use crate::search::SearchQuery;
 use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand, binding_key_label};
 
 impl App {
+    pub(super) fn open_copy_menu(&mut self, viewport_height: u16) {
+        let options = match self.execute_view(ViewCommand::Copy, viewport_height) {
+            ViewEffect::CopyOptions(options) => options,
+            _ => Vec::new(),
+        };
+        if options.is_empty() {
+            self.status = StatusLine::with_message(&self.view, "nothing to copy");
+        } else {
+            self.mode = InteractionMode::CopyMenu {
+                options,
+                selected: 0,
+            };
+        }
+    }
+
     #[cfg(test)]
     pub(super) fn handle_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
         self.handle_mode_key_event_with_terminal(

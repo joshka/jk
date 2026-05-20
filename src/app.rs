@@ -1,8 +1,8 @@
 //! Terminal event loop and app-level orchestration.
 //!
 //! Feature slices own their view behavior. The app owns cross-cutting concerns:
-//! key dispatch, mode transitions, the view stack, search state, and the
-//! selected diff format used when opening detail views.
+//! key dispatch, pending key-prefix state, mode handoff, refresh, search state,
+//! and routing view effects to the app submodule that owns the detailed policy.
 
 use std::env;
 use std::time::{Duration, Instant};
@@ -11,20 +11,13 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::DefaultTerminal;
 
-use crate::action_menu::build_action_menu;
-use crate::app_screen::{InteractionMode, ViewMenuAction, view_menu_options};
+use crate::app_screen::InteractionMode;
 use crate::app_status::{StatusKind, StatusLine};
 use crate::command::{
     Binding, BindingMatch, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect,
     match_binding_sequence,
 };
-use crate::jj::{
-    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
-    JjBookmarkMutationPlan, JjCommand, JjCommitPlan, JjDescribePlan, JjGitFetch, JjGitPush,
-    JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
-    LogViewMode, ViewSpec,
-};
+use crate::jj::{DiffFormat, JjBookmarkMutationKind, JjWorkingCopyNavigationKind};
 use crate::search::SearchQuery;
 use crate::tui;
 use crate::view_state::ViewState;
@@ -101,114 +94,6 @@ struct PendingCommand {
 }
 
 impl App {
-    fn run_new_change(&self, new_change: &JjNewPlan) -> Result<String> {
-        self.services.run_new_change(new_change)
-    }
-
-    fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
-        self.services.run_rebase(rebase)
-    }
-
-    fn run_split(
-        &self,
-        terminal: Option<&mut DefaultTerminal>,
-        split: &JjSplitPlan,
-    ) -> Result<String> {
-        self.services.run_split(terminal, split)
-    }
-
-    fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
-        self.services.run_squash(squash)
-    }
-
-    fn run_absorb(&self, absorb: &JjAbsorbPlan) -> Result<String> {
-        self.services.run_absorb(absorb)
-    }
-
-    fn run_restore(&self, restore: &JjRestorePlan) -> Result<String> {
-        self.services.run_restore(restore)
-    }
-
-    fn run_revert(&self, revert: &JjRevertPlan) -> Result<String> {
-        self.services.run_revert(revert)
-    }
-
-    fn load_restore_preview(&self, restore: &JjRestorePlan) -> Result<String> {
-        self.services.load_restore_preview(restore)
-    }
-
-    fn load_revert_preview(&self, revert: &JjRevertPlan) -> Result<String> {
-        self.services.load_revert_preview(revert)
-    }
-
-    fn run_describe(&self, describe: &JjDescribePlan) -> Result<String> {
-        self.services.run_describe(describe)
-    }
-
-    fn run_commit(&self, commit: &JjCommitPlan) -> Result<String> {
-        self.services.run_commit(commit)
-    }
-
-    fn run_bookmark_mutation(&self, mutation: &JjBookmarkMutationPlan) -> Result<String> {
-        self.services.run_bookmark_mutation(mutation)
-    }
-
-    fn load_abandon_preview(&self, abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
-        self.services.load_abandon_preview(abandon)
-    }
-
-    fn run_abandon(&self, abandon: &JjAbandonPlan) -> Result<String> {
-        self.services.run_abandon(abandon)
-    }
-
-    fn run_operation_recovery(&self, recovery: &JjOperationRecovery) -> Result<String> {
-        self.services.run_operation_recovery(recovery)
-    }
-
-    fn run_operation_target(&self, target: &JjOperationTarget) -> Result<String> {
-        self.services.run_operation_target(target)
-    }
-
-    fn run_working_copy_navigation(
-        &self,
-        navigation: &JjWorkingCopyNavigationPlan,
-    ) -> Result<String> {
-        self.services.run_working_copy_navigation(navigation)
-    }
-
-    fn resolve_revision(&self, revset: &str) -> Result<String> {
-        self.services.resolve_revision(revset)
-    }
-
-    fn run_git_fetch(&self, fetch: &JjGitFetch) -> Result<String> {
-        self.services.run_git_fetch(fetch)
-    }
-
-    fn refresh_view_state(&mut self) -> Result<()> {
-        self.services.refresh_view(&mut self.view)
-    }
-
-    fn reveal_graph_change(&mut self, change_id: &str, fallback_mode: LogViewMode) -> Result<bool> {
-        self.services
-            .reveal_graph_change(&mut self.view, change_id, fallback_mode)
-    }
-
-    fn load_view_state(&self, spec: ViewSpec) -> Result<ViewState> {
-        self.services.load_view(spec)
-    }
-
-    fn load_git_remotes(&self) -> Result<Vec<String>> {
-        self.services.load_git_remotes()
-    }
-
-    fn load_push_preview(&self, push: &JjGitPush) -> Result<String> {
-        self.services.load_push_preview(push)
-    }
-
-    fn run_push(&self, push: &JjGitPush) -> Result<String> {
-        self.services.run_push(push)
-    }
-
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.should_quit {
             terminal.draw(|frame| {
@@ -541,104 +426,6 @@ impl App {
         }
     }
 
-    fn fetch(&mut self, viewport_height: u16) {
-        let fetch = JjGitFetch::default_remotes();
-        let command_label = fetch.command_label();
-        let status_context = Some(action_lifecycle::fetch_status_context(&fetch));
-        let result_message = match self.run_git_fetch(&fetch) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    self.status = StatusLine::with_message(
-                        &self.view,
-                        action_lifecycle::fetch_status_message(&fetch, output.as_str()),
-                    );
-                    output
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    if output.is_empty() {
-                        format!("refresh failed: {error}")
-                    } else {
-                        format!("{output}\nrefresh failed: {error}")
-                    }
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
-        };
-
-        self.mode = InteractionMode::FetchPreview {
-            fetch,
-            output: crate::action_output::ActionOutput::finished(
-                command_label,
-                result_message,
-                status_context,
-            ),
-        };
-    }
-
-    fn open_copy_menu(&mut self, viewport_height: u16) {
-        let options = match self.execute_view(ViewCommand::Copy, viewport_height) {
-            ViewEffect::CopyOptions(options) => options,
-            _ => Vec::new(),
-        };
-        if options.is_empty() {
-            self.status = StatusLine::with_message(&self.view, "nothing to copy");
-        } else {
-            self.mode = InteractionMode::CopyMenu {
-                options,
-                selected: 0,
-            };
-        }
-    }
-
-    fn open_log_revset_prompt(&mut self) {
-        if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
-            self.mode = InteractionMode::LogRevsetPrompt(String::new());
-        }
-    }
-
-    fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
-        if matches!(
-            self.view.command(),
-            JjCommand::Default | JjCommand::Log | JjCommand::OperationLog
-        ) {
-            let effect = self.execute_view(ViewCommand::OpenActionMenu, viewport_height);
-            return self.apply_view_effect(effect, viewport_height);
-        }
-
-        let context = match self.view.exact_restore_revert_context() {
-            Ok(Some(context)) => context,
-            Ok(None) => {
-                self.status = StatusLine::error(
-                    &self.view,
-                    "action menu is only available from graph, show, diff, file list, or file show"
-                        .to_owned(),
-                );
-                return Ok(false);
-            }
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                return Ok(false);
-            }
-        };
-
-        let menu = build_action_menu(&context);
-        if menu.is_empty() {
-            self.status = StatusLine::error(
-                &self.view,
-                "no preview actions available for exact restore/revert context".to_owned(),
-            );
-            return Ok(false);
-        }
-
-        self.mode = InteractionMode::ActionMenu { menu, selected: 0 };
-        Ok(false)
-    }
-
     fn execute_view(&mut self, command: ViewCommand, viewport_height: u16) -> ViewEffect {
         self.view.execute(
             command,
@@ -700,129 +487,6 @@ impl App {
                 Ok(false)
             }
         }
-    }
-
-    fn open_view_menu(&mut self) {
-        let selected = view_menu_options()
-            .iter()
-            .position(|option| self.view_menu_option_is_current(option.action()))
-            .unwrap_or(0);
-        self.mode = InteractionMode::ViewMenu { selected };
-    }
-
-    fn view_menu_option_is_current(&self, action: ViewMenuAction) -> bool {
-        match action {
-            ViewMenuAction::Open(command) => self.view.command() == command,
-            ViewMenuAction::DiffFormat(format) => {
-                matches!(self.view.command(), JjCommand::Show | JjCommand::Diff)
-                    && self.diff_format == format
-            }
-        }
-    }
-
-    fn apply_view_menu_action(
-        &mut self,
-        action: ViewMenuAction,
-        viewport_height: u16,
-    ) -> Result<()> {
-        match action {
-            ViewMenuAction::Open(JjCommand::Log) => self.switch_to_log(),
-            ViewMenuAction::Open(JjCommand::Default) => self.switch_to_default(),
-            ViewMenuAction::Open(JjCommand::Status) => self.open_status(),
-            ViewMenuAction::Open(JjCommand::Resolve) => self.open_resolve(),
-            ViewMenuAction::Open(JjCommand::Bookmarks) => self.open_bookmarks(),
-            ViewMenuAction::Open(JjCommand::OperationLog) => self.open_operation_log(),
-            ViewMenuAction::DiffFormat(diff_format) => {
-                self.apply_diff_format(diff_format, viewport_height)
-            }
-            ViewMenuAction::Open(
-                JjCommand::Show
-                | JjCommand::Diff
-                | JjCommand::FileList
-                | JjCommand::FileShow
-                | JjCommand::OperationShow
-                | JjCommand::OperationDiff,
-            ) => {
-                self.status = StatusLine::with_message(
-                    &self.view,
-                    "view menu only opens top-level shipped views",
-                );
-                Ok(())
-            }
-        }
-    }
-
-    fn apply_custom_log_revset(&mut self, revset: String) {
-        if revset.trim().is_empty() {
-            self.status = StatusLine::ready(&self.view);
-            return;
-        }
-
-        match self.view.set_graph_mode(LogViewMode::CustomRevset(revset)) {
-            Ok(()) => self.status = StatusLine::with_message(&self.view, "mode: custom revset"),
-            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
-        }
-    }
-
-    fn run_new_trunk(&mut self, viewport_height: u16) {
-        if let Err(error) = self.resolve_revision("trunk()") {
-            self.status = StatusLine::error(&self.view, error.to_string());
-            return;
-        }
-
-        match self.services.run_new_trunk() {
-            Ok(_) => {
-                let new_change_id = match self.resolve_revision("@") {
-                    Ok(change_id) => change_id,
-                    Err(error) => {
-                        self.status = StatusLine::error(&self.view, error.to_string());
-                        return;
-                    }
-                };
-                match self.refresh_view_state() {
-                    Ok(()) => {
-                        self.view.clamp(viewport_height, current_viewport_width());
-                        let revealed_in_recent =
-                            match self.reveal_graph_change(&new_change_id, LogViewMode::Recent) {
-                                Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height, current_viewport_width());
-                                    switched_modes
-                                }
-                                Err(error) => {
-                                    self.status = StatusLine::error(&self.view, error.to_string());
-                                    return;
-                                }
-                            };
-                        let message = if revealed_in_recent {
-                            "created new change from trunk | showing recent work | jj undo"
-                        } else {
-                            "created new change from trunk | jj undo"
-                        };
-                        self.status = StatusLine::with_message(&self.view, message);
-                    }
-                    Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
-                }
-            }
-            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
-        }
-    }
-
-    fn apply_diff_format(&mut self, diff_format: DiffFormat, viewport_height: u16) -> Result<()> {
-        self.diff_format = diff_format;
-        if !matches!(self.view.command(), JjCommand::Show | JjCommand::Diff) {
-            self.status = StatusLine::with_message(
-                &self.view,
-                format!("show/diff format: {}", diff_format.label()),
-            );
-            return Ok(());
-        }
-
-        let scroll_offset = self.view.scroll_offset();
-        let spec = self.view.spec().with_diff_format(diff_format);
-        self.view = self.load_view_state(spec)?;
-        self.view.set_scroll_offset(viewport_height, scroll_offset);
-        self.status = StatusLine::ready(&self.view);
-        Ok(())
     }
 }
 

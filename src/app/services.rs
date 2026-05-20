@@ -17,6 +17,8 @@ use crate::jj::{
 };
 use crate::view_state::ViewState;
 
+use super::App;
+
 pub(in crate::app) type NewRun = fn(&JjNewPlan) -> Result<String>;
 pub(in crate::app) type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
 pub(in crate::app) type SplitRun = fn(Option<&mut DefaultTerminal>, &JjSplitPlan) -> Result<String>;
@@ -201,6 +203,132 @@ impl AppServices {
 
     pub(in crate::app) fn load_view(&self, spec: ViewSpec) -> Result<ViewState> {
         (self.load_view)(spec)
+    }
+}
+
+impl App {
+    pub(in crate::app) fn run_new_change(&self, new_change: &JjNewPlan) -> Result<String> {
+        self.services.run_new_change(new_change)
+    }
+
+    pub(in crate::app) fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
+        self.services.run_rebase(rebase)
+    }
+
+    pub(in crate::app) fn run_split(
+        &self,
+        terminal: Option<&mut DefaultTerminal>,
+        split: &JjSplitPlan,
+    ) -> Result<String> {
+        self.services.run_split(terminal, split)
+    }
+
+    pub(in crate::app) fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
+        self.services.run_squash(squash)
+    }
+
+    pub(in crate::app) fn run_absorb(&self, absorb: &JjAbsorbPlan) -> Result<String> {
+        self.services.run_absorb(absorb)
+    }
+
+    pub(in crate::app) fn run_restore(&self, restore: &JjRestorePlan) -> Result<String> {
+        self.services.run_restore(restore)
+    }
+
+    pub(in crate::app) fn run_revert(&self, revert: &JjRevertPlan) -> Result<String> {
+        self.services.run_revert(revert)
+    }
+
+    pub(in crate::app) fn load_restore_preview(&self, restore: &JjRestorePlan) -> Result<String> {
+        self.services.load_restore_preview(restore)
+    }
+
+    pub(in crate::app) fn load_revert_preview(&self, revert: &JjRevertPlan) -> Result<String> {
+        self.services.load_revert_preview(revert)
+    }
+
+    pub(in crate::app) fn run_describe(&self, describe: &JjDescribePlan) -> Result<String> {
+        self.services.run_describe(describe)
+    }
+
+    pub(in crate::app) fn run_commit(&self, commit: &JjCommitPlan) -> Result<String> {
+        self.services.run_commit(commit)
+    }
+
+    pub(in crate::app) fn run_bookmark_mutation(
+        &self,
+        mutation: &JjBookmarkMutationPlan,
+    ) -> Result<String> {
+        self.services.run_bookmark_mutation(mutation)
+    }
+
+    pub(in crate::app) fn load_abandon_preview(
+        &self,
+        abandon: &JjAbandonPlan,
+    ) -> Result<JjAbandonPreview> {
+        self.services.load_abandon_preview(abandon)
+    }
+
+    pub(in crate::app) fn run_abandon(&self, abandon: &JjAbandonPlan) -> Result<String> {
+        self.services.run_abandon(abandon)
+    }
+
+    pub(in crate::app) fn run_operation_recovery(
+        &self,
+        recovery: &JjOperationRecovery,
+    ) -> Result<String> {
+        self.services.run_operation_recovery(recovery)
+    }
+
+    pub(in crate::app) fn run_operation_target(
+        &self,
+        target: &JjOperationTarget,
+    ) -> Result<String> {
+        self.services.run_operation_target(target)
+    }
+
+    pub(in crate::app) fn run_working_copy_navigation(
+        &self,
+        navigation: &JjWorkingCopyNavigationPlan,
+    ) -> Result<String> {
+        self.services.run_working_copy_navigation(navigation)
+    }
+
+    pub(in crate::app) fn resolve_revision(&self, revset: &str) -> Result<String> {
+        self.services.resolve_revision(revset)
+    }
+
+    pub(in crate::app) fn run_git_fetch(&self, fetch: &JjGitFetch) -> Result<String> {
+        self.services.run_git_fetch(fetch)
+    }
+
+    pub(in crate::app) fn refresh_view_state(&mut self) -> Result<()> {
+        self.services.refresh_view(&mut self.view)
+    }
+
+    pub(in crate::app) fn reveal_graph_change(
+        &mut self,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        self.services
+            .reveal_graph_change(&mut self.view, change_id, fallback_mode)
+    }
+
+    pub(in crate::app) fn load_view_state(&self, spec: ViewSpec) -> Result<ViewState> {
+        self.services.load_view(spec)
+    }
+
+    pub(in crate::app) fn load_git_remotes(&self) -> Result<Vec<String>> {
+        self.services.load_git_remotes()
+    }
+
+    pub(in crate::app) fn load_push_preview(&self, push: &JjGitPush) -> Result<String> {
+        self.services.load_push_preview(push)
+    }
+
+    pub(in crate::app) fn run_push(&self, push: &JjGitPush) -> Result<String> {
+        self.services.run_push(push)
     }
 }
 

@@ -66,9 +66,19 @@ would be more honest and maintainable.
 
 Keep modules aligned with user-visible concepts:
 
-- `app.rs` owns terminal event loop, app-level key dispatch, mode lifecycle transitions, view stack,
-  refresh, command confirmation/result application, and cross-view transitions. It should route
-  screen and action contracts to their owner modules instead of growing new detailed policy.
+- `app.rs` owns terminal event loop, app-level key dispatch, pending key-prefix state, refresh, and
+  `ViewEffect` routing. It should read as the app orchestration table of contents and route screen,
+  action, service, and view-selection details to their owner modules.
+- `app/navigation.rs` owns startup argument parsing, view-stack transitions, top-level view-menu
+  actions, diff-format application, and custom log revset mode changes.
+- `app/mode_input.rs` owns active modal and prompt key reducers, including copy-menu opening and
+  prompt acceptance/cancellation behavior.
+- `app/action_lifecycle.rs` owns action-menu opening, prompt-to-preview setup, immediate action
+  execution such as default fetch and new-from-trunk, and confirmed action result handling.
+- `app/action_flow.rs` owns common action-preview key flow between pending result panes and action
+  lifecycle confirmation.
+- `app/services.rs` owns the app side-effect seam for tests and forwards app-owned jj/view effects
+  through one narrow service surface instead of scattering runner fields through `App`.
 - `app_screen.rs` owns app-level modal and prompt state, including help, copy, view-format,
   action-menu, role-prompt, text-prompt, action-preview/result, push-remote, operation-action, and
   working-copy navigation screens. It projects the current `InteractionMode` into status-line text
@@ -120,11 +130,12 @@ Every active app screen should have one explicit owner for each part of its cont
 - Status projection: `app_status.rs` constructs durable ready/error status lines from the active
   view; `app_screen.rs` supplies transient prompt status text while a mode is active.
 - Command execution: `jj_actions.rs` owns action-plan command contracts for confirmed mutation
-  flows; `jj.rs` owns the shared `jj` process helpers and view-spec command construction. `app.rs`
-  owns when a command is run, how results refresh or reveal views, and what status/result screen
-  follows.
-- View behavior: view modules execute `ViewCommand` into `ViewEffect`; `app.rs` applies global
-  effects such as opening screens, copying, pushing views, refreshing, or changing search state.
+  flows; `jj.rs` owns the shared `jj` process helpers and view-spec command construction.
+  `app/action_lifecycle.rs` owns when action commands are run, how results refresh or reveal views,
+  and what status/result screen follows.
+- View behavior: view modules execute `ViewCommand` into `ViewEffect`; `app.rs` routes global
+  effects such as opening screens, copying, pushing views, refreshing, or changing search state to
+  the app submodule that owns the detailed policy.
 
 Future UI packets should name the smallest owner that matches the contract. For example, a new
 action-result scroll key belongs in `action_output.rs`; a new modal projection belongs in

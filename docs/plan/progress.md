@@ -1850,3 +1850,64 @@
 - Remaining risk: no Rust refactor was performed in this planning pass. The app refactor should not
   be marked complete until the gate is implemented or a gpt-5.5 high review explicitly records why
   no further extraction is warranted.
+
+## 2026-05-20 Post-Packet-34 App Module Coherence Gate
+
+- Files changed: `src/app.rs`, `src/app/action_lifecycle.rs`, `src/app/mode_input.rs`,
+  `src/app/navigation.rs`, `src/app/services.rs`, `src/app/tests.rs`, `docs/agent/architecture.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`.
+
+- Gate outcome: the app refactor is complete for the current Packet 34 boundary. `src/app.rs` now
+  reads as terminal-loop and app-level routing: drawing, key-prefix dispatch, normal command
+  routing, refresh, view execution, and `ViewEffect` application. No named follow-up packet is
+  required before Packet 35 on app-module coherence grounds.
+
+- Ownership decisions:
+
+  - `src/app/action_lifecycle.rs` now owns action-menu opening, default fetch execution, and
+    new-from-trunk result handling, keeping action preview/result lifecycle outside `src/app.rs`.
+  - `src/app/mode_input.rs` now owns copy-menu opening beside modal key reducers.
+  - `src/app/navigation.rs` now owns log revset prompts, custom log revset application, view-menu
+    selection, and diff-format application as global view-selection policy.
+  - `src/app/services.rs` now owns App service-forwarding methods. The forwarding remains a thin
+    test seam, but it no longer forces `src/app.rs` to import every action-plan type.
+  - Focused app tests remain in `src/app/tests.rs` because they exercise cross-owner app state and
+    service seams; imports are now explicit instead of relying on `src/app.rs` re-exports.
+
+- Line-count evidence:
+
+  ```text
+  Before:
+       841 src/app.rs
+       389 src/app/action_flow.rs
+      1813 src/app/action_lifecycle.rs
+       642 src/app/mode_input.rs
+       193 src/app/navigation.rs
+       362 src/app/services.rs
+      4521 src/app/tests.rs
+
+  After:
+       505 src/app.rs
+       389 src/app/action_flow.rs
+      1929 src/app/action_lifecycle.rs
+       657 src/app/mode_input.rs
+       281 src/app/navigation.rs
+       490 src/app/services.rs
+      4526 src/app/tests.rs
+  ```
+
+- Validation so far: `cargo test app::tests::view_menu -- --test-threads=1`;
+  `cargo test app::tests::fetch -- --test-threads=1`;
+  `cargo test app::tests::split -- --test-threads=1`; `cargo check`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; attempted
+  `cargo clippy -- -D warnings`; `just md-fmt`; `just md-check`.
+
+- Warning / blocker status: `cargo check` passes with the known `ViewSpec::bookmarks` and
+  `FileListItem::row_text` warnings. `cargo clippy -- -D warnings` remains blocked only by the known
+  baseline findings: those two dead-code warnings plus `collapsible_if` in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`.
+
+- Remaining risk: `src/app/action_lifecycle.rs` is still large, but it is large around one concept:
+  app-owned mutation/action preview lifecycle. Future rewrite packets should add behavior there, or
+  split a narrower action owner when a concrete sub-lifecycle becomes independently readable, rather
+  than putting action policy back into `src/app.rs`.

@@ -1,15 +1,17 @@
 //! Action lifecycle orchestration for app-owned mutation screens.
 //!
 //! Modal key dispatch stays in `mode_input`; this module owns what selected action-menu items,
-//! prompt completion, preview opening, and confirmed jj action results do to app state.
+//! prompt completion, preview opening, immediate actions, and confirmed jj action results do to app
+//! state.
 
 use color_eyre::Result;
 use ratatui::DefaultTerminal;
 
-use crate::action_menu::{ActionKind, ActionMenuItem, FollowUp};
+use crate::action_menu::{ActionKind, ActionMenuItem, FollowUp, build_action_menu};
 use crate::action_output::ActionOutput;
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
+use crate::command::ViewCommand;
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
     JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitFetch, JjGitPush,
@@ -22,6 +24,44 @@ use crate::view_state::ViewState;
 use super::{App, current_viewport_width};
 
 impl App {
+    pub(super) fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
+        if matches!(
+            self.view.command(),
+            JjCommand::Default | JjCommand::Log | JjCommand::OperationLog
+        ) {
+            let effect = self.execute_view(ViewCommand::OpenActionMenu, viewport_height);
+            return self.apply_view_effect(effect, viewport_height);
+        }
+
+        let context = match self.view.exact_restore_revert_context() {
+            Ok(Some(context)) => context,
+            Ok(None) => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    "action menu is only available from graph, show, diff, file list, or file show"
+                        .to_owned(),
+                );
+                return Ok(false);
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                return Ok(false);
+            }
+        };
+
+        let menu = build_action_menu(&context);
+        if menu.is_empty() {
+            self.status = StatusLine::error(
+                &self.view,
+                "no preview actions available for exact restore/revert context".to_owned(),
+            );
+            return Ok(false);
+        }
+
+        self.mode = InteractionMode::ActionMenu { menu, selected: 0 };
+        Ok(false)
+    }
+
     pub(super) fn apply_action_menu_item(&mut self, item: ActionMenuItem) {
         match item.follow_up() {
             FollowUp::StatusMessage(message) => {
@@ -346,6 +386,39 @@ impl App {
         }
     }
 
+    pub(super) fn fetch(&mut self, viewport_height: u16) {
+        let fetch = JjGitFetch::default_remotes();
+        let command_label = fetch.command_label();
+        let status_context = Some(fetch_status_context(&fetch));
+        let result_message = match self.run_git_fetch(&fetch) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height, current_viewport_width());
+                    self.status =
+                        StatusLine::with_message(&self.view, fetch_status_message(&fetch, &output));
+                    output
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    if output.is_empty() {
+                        format!("refresh failed: {error}")
+                    } else {
+                        format!("{output}\nrefresh failed: {error}")
+                    }
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::FetchPreview {
+            fetch,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
     pub(super) fn open_push_preview(&mut self, target: JjGitPushTarget, remote: String) {
         let status_context = Some(push_status_context(&target, remote.as_str()));
         let push = match target {
@@ -617,6 +690,49 @@ impl App {
                     output: ActionOutput::finished(command_label, message, status_context),
                 };
             }
+        }
+    }
+
+    pub(super) fn run_new_trunk(&mut self, viewport_height: u16) {
+        if let Err(error) = self.resolve_revision("trunk()") {
+            self.status = StatusLine::error(&self.view, error.to_string());
+            return;
+        }
+
+        match self.services.run_new_trunk() {
+            Ok(_) => {
+                let new_change_id = match self.resolve_revision("@") {
+                    Ok(change_id) => change_id,
+                    Err(error) => {
+                        self.status = StatusLine::error(&self.view, error.to_string());
+                        return;
+                    }
+                };
+                match self.refresh_view_state() {
+                    Ok(()) => {
+                        self.view.clamp(viewport_height, current_viewport_width());
+                        let revealed_in_recent =
+                            match self.reveal_graph_change(&new_change_id, LogViewMode::Recent) {
+                                Ok(switched_modes) => {
+                                    self.view.clamp(viewport_height, current_viewport_width());
+                                    switched_modes
+                                }
+                                Err(error) => {
+                                    self.status = StatusLine::error(&self.view, error.to_string());
+                                    return;
+                                }
+                            };
+                        let message = if revealed_in_recent {
+                            "created new change from trunk | showing recent work | jj undo"
+                        } else {
+                            "created new change from trunk | jj undo"
+                        };
+                        self.status = StatusLine::with_message(&self.view, message);
+                    }
+                    Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+                }
+            }
+            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
         }
     }
 

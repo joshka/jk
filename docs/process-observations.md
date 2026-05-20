@@ -5,6 +5,59 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Post-Packet-34 app coherence gate)
+
+- Slice / task: implement the Post-Packet-34 App Module Coherence Gate in jj change
+  `Refactor app orchestration boundary`.
+- User request: make `src/app.rs` a coherent terminal-loop and thin app-level orchestration owner,
+  preserve Packet 34 split behavior, avoid jj rewrite commands, and record line-count, validation,
+  ownership, and residual-risk evidence.
+- Observable outcome: `src/app.rs` moved from 841 lines to 505 lines. It now keeps the terminal
+  draw/event loop, pending key-prefix dispatch, normal binding routing, refresh, view execution, and
+  `ViewEffect` routing. Detailed policy moved to existing app owners instead of new line-count-only
+  modules.
+- Ownership outcome: `src/app/action_lifecycle.rs` owns action-menu opening, default fetch, and
+  new-from-trunk result handling; `src/app/mode_input.rs` owns copy-menu opening next to modal key
+  reducers; `src/app/navigation.rs` owns log revset, view-menu, and diff-format selection policy;
+  `src/app/services.rs` owns thin App service forwarding as a documented test seam.
+- Test-shape observation: focused app tests stayed in `src/app/tests.rs` because the tested behavior
+  crosses mode, services, view state, and action/result screens. The test module now imports
+  jj/action types explicitly instead of depending on parent-module imports from `src/app.rs`.
+- Model / workflow observation: no subagents were used. A single implementation pass was enough
+  because the work stayed inside the requested app module write set and preserved existing tests.
+- Validation / proof run during implementation:
+  - `wc -l src/app.rs src/app/*.rs`
+  - `cargo test app::tests::view_menu -- --test-threads=1`
+  - `cargo test app::tests::fetch -- --test-threads=1`
+  - `cargo test app::tests::split -- --test-threads=1`
+  - `cargo check`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - attempted `cargo clippy -- -D warnings`
+  - `just md-fmt`
+  - `just md-check`
+- Warning / blocker status: `cargo check` passes with the known dead-code warnings for
+  `ViewSpec::bookmarks` and `FileListItem::row_text`. Clippy remains blocked by those two baseline
+  dead-code warnings plus the known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`,
+  and `src/operation_log.rs`.
+- Residual risk: `src/app/action_lifecycle.rs` remains large at 1,929 lines, but its size is
+  concentrated around one owner concept: app-owned action preview/result lifecycle. Future rewrite
+  packets should avoid adding action policy back to `src/app.rs`.
+- Evidence basis:
+  - Thread: `019e475b-d453-7ee0-96dd-d74393564ae8`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `sed`, `rg`, `wc -l`, `jj --no-pager status`, `cargo check`,
+    `cargo test app::tests::view_menu -- --test-threads=1`,
+    `cargo test app::tests::fetch -- --test-threads=1`,
+    `cargo test app::tests::split -- --test-threads=1`, `cargo test`,
+    `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`,
+    `cargo clippy -- -D warnings`, `just md-fmt`, `just md-check`, `printenv CODEX_THREAD_ID`,
+    `date +%F`
+  - Files: `src/app.rs`, `src/app/action_lifecycle.rs`, `src/app/mode_input.rs`,
+    `src/app/navigation.rs`, `src/app/services.rs`, `src/app/tests.rs`,
+    `docs/agent/architecture.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Interruption Packet H validation discipline)
 
 - Slice / task: docs/tooling packet for warning-free build discipline and commit-message rules in jj
