@@ -1554,3 +1554,32 @@
   live TUI because unit tests cover the state contract rather than an end-to-end terminal session.
 - Next recommended slice: review Packet G for no-wrap ergonomics and consider whether document
   status hints should advertise `zw` after the first user-facing pass.
+
+## Packet 34a: Split Process-Boundary Spike
+
+- Files changed: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+  `docs/plan/fragility-register.md`, and `docs/process-observations.md`.
+- Behavior: Packet 34a is now inserted before Packet 34 as a docs-only prerequisite. It records that
+  split command planning is clear, but interactive editor handoff through the current
+  captured-process runner is not proven.
+- Command contract: the planned command shapes are preserved exactly: bare `jj split` for the
+  visible/current `@`, and `jj split --revision exactly(change_id("<id>"), 1)` for exact graph
+  targets.
+- Process boundary: no-fileset split delegates patch selection to `jj`'s diff editor and may also
+  invoke description editing. `jk` must not present Packet 34 as an in-app patch editor or imply it
+  can choose hunks without handing control to `jj`.
+- Packet 34 dependency: implementation must either add and prove an interactive process or
+  terminal-suspension runner for real editor handoff, or explicitly ship only preview/readable
+  failure semantics with raw output preserved.
+- Evidence: this spike cites the Packet 34 exploration finding from the gpt-5.5 high explorer. No
+  new mutation proof was run, and no command was executed in this repository to prove `jj split`.
+- Validation: `just md-check`.
+- Review outcome: `gpt-5.5` high review `019e470b-9aaf-7981-9204-5db8eedc4fd5` found no findings,
+  checked command shapes against `jj --no-pager split --help`, and passed `just md-check`
+  successfully.
+- Remaining risk: Packet 34 still needs an implementation decision and proof for terminal/editor
+  lifecycle before it can execute split interactively. The docs now make that risk blocking instead
+  of letting implementation infer an unproven runner capability.
+- Next recommended slice: choose and prove the Packet 34 implementation boundary, preferably a
+  bounded interactive process or terminal-suspension runner spike before the product split flow, or
+  an explicit preview/readable-failure boundary if that is the cleaner path.

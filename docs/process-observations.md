@@ -2769,3 +2769,37 @@ belong here.
   horizontal/vertical scroll behavior, search/copy stability, sticky context, generated help
   scoping, parser fragility, and whether document-display ownership stayed in
   `src/sticky_file_view.rs`.
+
+## 2026-05-20 Packet 34a Split Process-Boundary Spike
+
+- Thread id: `019e4708-b247-7cd0-8cc1-d6786700c61e`.
+- Scope given: docs-only split process-boundary spike in `docs/plan/next-implementation-slices.md`,
+  `docs/plan/progress.md`, `docs/plan/fragility-register.md`, and `docs/process-observations.md`; do
+  not touch `AGENTS.md`; do not edit Rust; do not perform any jj operations; and do not mutate this
+  repository through a `jj split` or rewrite proof.
+- Model / subagent evidence: the Packet 34 exploration was performed by a gpt-5.5 high explorer. The
+  explorer found that command shape was clear, but the terminal/editor process boundary was
+  unresolved.
+- Observable outcome: Packet 34a now sits before Packet 34 and records the split boundary decision
+  that must be made before implementation. The planned command shapes stay exact: bare `jj split`
+  for visible/current `@`, and `jj split --revision exactly(change_id("<id>"), 1)` for exact graph
+  targets.
+- Observable outcome: the plan now states that no-fileset split delegates patch selection to `jj`'s
+  diff editor and may also invoke description editing. `jk` must not present the flow as an in-app
+  patch editor.
+- Boundary finding: the current captured output runner is not proven to support real interactive
+  editor handoff. Packet 34 must either add/prove an interactive process or terminal-suspension
+  runner, or explicitly ship only preview/readable failure semantics while preserving raw output.
+- Process value: the gpt-5.5 high explorer finding prevented premature implementation by separating
+  command-shape confidence from terminal/editor lifecycle uncertainty.
+- Review agent / thread id: `019e470b-9aaf-7981-9204-5db8eedc4fd5`.
+- Review outcome: `gpt-5.5` high review found no findings, checked command shapes against
+  `jj --no-pager split --help`, and passed `just md-check` successfully.
+- Validation / proof run:
+  - `just md-check`
+- Validation note: no new mutation proof was run. The spike cites the explorer proof as subagent
+  evidence and records that any future mutation proof must use a disposable `/tmp` jj repo with
+  commands run from that repo's `cwd`.
+- Review expectation: review Packet 34a for command-shape accuracy against `jj split --help`,
+  process-boundary honesty, evidence quality, docs consistency, and whether Packet 34 is now
+  safer/better bounded.

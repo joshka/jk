@@ -934,6 +934,40 @@ Audit result from 2026-05-20:
   commit-message rules, exact blocker reporting, and whether future packets have a mechanical way to
   prove or explicitly skip no-warning behavior.
 
+### Packet 34a: Split Process-Boundary Spike
+
+- Goal: decide the process boundary for `jj split` before implementing a product split flow, because
+  command planning is clear but interactive editor handoff through the current captured-process
+  runner is not proven.
+- Owner concept: rewrite command planning and terminal/editor process lifecycle.
+- Expected write set: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+  `docs/plan/fragility-register.md`, and `docs/process-observations.md`. Rust edits are allowed only
+  for a compile-breaking docs reference, and any mutation proof must use a disposable `/tmp` jj repo
+  with the proof repo as command `cwd`.
+- Non-goals: no product split command, no `JjSplitPlan`, no terminal runner refactor, no in-app
+  patch editor, no generated media, and no mutation proof in this repository.
+- Command contract: preserve the planned command shapes exactly: use bare `jj split` for the
+  visible/current `@` path, and use `jj split --revision exactly(change_id("<id>"), 1)` for an exact
+  graph target.
+- Process boundary: no-fileset split delegates patch selection to `jj`'s diff editor and may also
+  invoke description editing. `jk` must not describe this as an in-app patch editor or imply that it
+  can choose split hunks without handing control to `jj`.
+- Acceptance criteria: Packet 34 records that the current captured output runner is not proven to
+  support real interactive editor handoff; Packet 34 either depends on an interactive
+  process/terminal suspension runner or explicitly ships only preview/readable failure semantics;
+  output preservation remains part of the contract.
+- Validation: `just md-check`; no active-repo mutation proof. If additional proof is needed, create
+  a disposable `/tmp` jj repo and run every mutation with that repo as process `cwd`, then record
+  the exact commands and output summary in progress/process docs.
+- Docs/fragility updates: add or update the split editor/process-boundary entry in
+  `fragility-register.md`; update progress and process observations with the explorer evidence and
+  remaining risk.
+- Suggested agent/model routing: docs implementation can be narrow, but review should use stronger
+  model scrutiny because the decision gates a risky interactive rewrite flow.
+- Review prompt: review Packet 34a for command-shape accuracy against `jj split --help`,
+  process-boundary honesty, evidence quality, docs consistency, and whether Packet 34 is now
+  safer/better bounded.
+
 ### Packet 34: Split Guided Flow
 
 - Goal: add a bounded `jj split` flow for the current or exact selected change when the UI can
@@ -943,20 +977,29 @@ Audit result from 2026-05-20:
   focused tests, `docs/plan/progress.md`, and `docs/plan/fragility-register.md`.
 - Non-goals: no in-app patch editor, no line-level split UI, no automatic split decisions, no broad
   `diffedit` support, and no noninteractive fake split.
+- Prerequisite: Packet 34a must first choose one of two implementation boundaries: add/prove an
+  interactive process or terminal-suspension runner for real editor handoff, or deliberately ship a
+  preview/readable-failure flow that does not attempt to run interactive split in-app.
+- Command contract: preserve the planned command shapes exactly: bare `jj split` for the
+  visible/current `@`, and `jj split --revision exactly(change_id("<id>"), 1)` for exact graph
+  targets.
 - Acceptance criteria: the flow targets an exact change or visible `@` according to launch context;
   preview shows the exact command and says when `jj` will launch an editor or interactive selector;
-  cancel before execution is supported; post-command success and failure output are readable; the
-  graph refresh reveals the relevant working copy or split result when possible; unsupported
-  noninteractive environments fail through readable `jj` output rather than local guessing.
+  no-fileset split is described as delegating patch selection to `jj`'s diff editor and possible
+  description editor, not as an in-app patch editor; cancel before execution is supported;
+  post-command success and failure output are readable; the graph refresh reveals the relevant
+  working copy or split result when possible; unsupported noninteractive environments fail through
+  readable `jj` output rather than local guessing.
 - Validation: command-construction tests for supported split shapes; view-level preview, cancel,
-  confirm, and result tests; output/result tests for interactive-editor failure text; disposable
-  `/tmp` jj repo proof for the feasible noninteractive path and failure path, with mutations run
-  from the proof repo's `cwd`; `cargo check`; focused rewrite tests; full `cargo test` and
-  `just check` when practical.
+  confirm, and result tests; output/result tests for interactive-editor failure text; either
+  terminal/editor handoff proof through the chosen interactive runner or explicit tests proving the
+  preview/readable-failure boundary; disposable `/tmp` jj repo proof for any feasible mutation or
+  failure path, with mutations run from the proof repo's `cwd`; `cargo check`; focused rewrite
+  tests; full `cargo test` and `just check` when practical.
 - Docs/fragility updates: record the editor/process boundary and any command-output assumptions;
   update `progress.md`.
-- Suggested agent/model routing: exploration with gpt-5.5 high before implementation, then gpt-5.5
-  high implementation and review, because `split` may be blocked by interactive editor semantics.
+- Suggested agent/model routing: gpt-5.5 high implementation and review, because Packet 34a showed
+  command shape is clear while interactive editor semantics remain the key risk.
 - Review prompt: review Packet 34 for honest split/editor semantics, exact target handling,
   noninteractive failure behavior, output preservation, and evidence that the flow does not pretend
   to be an in-app patch editor.
