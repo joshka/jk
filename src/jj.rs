@@ -93,7 +93,7 @@ const JJ_GIT_REMOTE_ARGS: [&str; 3] = ["git", "remote", "list"];
 const FETCH_ARGS: [&str; 2] = ["git", "fetch"];
 const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
 const BOOKMARK_COMMAND_WORDS: [&str; 2] = ["bookmark", "list"];
-const BOOKMARK_METADATA_TEMPLATE: &str = r#"name ++ "\t" ++ if(self.normal_target(), self.normal_target().change_id(), "") ++ "\t" ++ if(self.normal_target(), self.normal_target().commit_id(), "") ++ "\n""#;
+const BOOKMARK_METADATA_TEMPLATE: &str = r#"name ++ "\t" ++ if(remote, remote, "") ++ "\t" ++ if(normal_target, normal_target.change_id(), "") ++ "\t" ++ if(normal_target, normal_target.commit_id(), "") ++ "\n""#;
 const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
 const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
@@ -314,6 +314,27 @@ pub struct JjCommitPlan {
     message: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JjBookmarkMutationKind {
+    Create,
+    Set,
+    Move,
+    Delete,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JjBookmarkTarget {
+    ExactChange(String),
+    CurrentWorkingCopy,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjBookmarkMutationPlan {
+    kind: JjBookmarkMutationKind,
+    name: String,
+    target: Option<JjBookmarkTarget>,
+}
+
 impl JjNewPlan {
     pub fn new(parents: Vec<String>) -> Self {
         Self { parents }.normalize()
@@ -506,6 +527,222 @@ impl JjCommitPlan {
             self.command_label(),
             self.message,
         )
+    }
+}
+
+impl JjBookmarkMutationKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Create => "create",
+            Self::Set => "set",
+            Self::Move => "move",
+            Self::Delete => "delete",
+        }
+    }
+
+    fn success_fallback(self) -> &'static str {
+        match self {
+            Self::Create => "created bookmark",
+            Self::Set => "set bookmark",
+            Self::Move => "moved bookmark",
+            Self::Delete => "deleted bookmark",
+        }
+    }
+}
+
+impl JjBookmarkTarget {
+    pub fn exact_change(change_id: impl Into<String>) -> Self {
+        Self::ExactChange(change_id.into())
+    }
+
+    pub fn current_working_copy() -> Self {
+        Self::CurrentWorkingCopy
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            Self::ExactChange(change_id) => change_id,
+            Self::CurrentWorkingCopy => "@",
+        }
+    }
+
+    fn command_arg(&self) -> String {
+        match self {
+            Self::ExactChange(change_id) => exact_change_id_revset(change_id),
+            Self::CurrentWorkingCopy => "@".to_owned(),
+        }
+    }
+
+    fn preview_target(&self) -> String {
+        match self {
+            Self::ExactChange(change_id) => format!("exact selected revision {change_id}"),
+            Self::CurrentWorkingCopy => "current working-copy change (@)".to_owned(),
+        }
+    }
+}
+
+impl JjBookmarkMutationPlan {
+    pub fn create(name: impl Into<String>, target: JjBookmarkTarget) -> Self {
+        Self {
+            kind: JjBookmarkMutationKind::Create,
+            name: name.into(),
+            target: Some(target),
+        }
+    }
+
+    pub fn set(name: impl Into<String>, target: JjBookmarkTarget) -> Self {
+        Self {
+            kind: JjBookmarkMutationKind::Set,
+            name: name.into(),
+            target: Some(target),
+        }
+    }
+
+    pub fn move_to(name: impl Into<String>, target: JjBookmarkTarget) -> Self {
+        Self {
+            kind: JjBookmarkMutationKind::Move,
+            name: name.into(),
+            target: Some(target),
+        }
+    }
+
+    pub fn delete(name: impl Into<String>) -> Self {
+        Self {
+            kind: JjBookmarkMutationKind::Delete,
+            name: name.into(),
+            target: None,
+        }
+    }
+
+    pub fn kind(&self) -> JjBookmarkMutationKind {
+        self.kind
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn target(&self) -> Option<&JjBookmarkTarget> {
+        self.target.as_ref()
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self
+            .command_argv()
+            .iter()
+            .map(|arg| arg.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        match self.kind {
+            JjBookmarkMutationKind::Create => vec![
+                "bookmark".to_owned(),
+                "create".to_owned(),
+                "--revision".to_owned(),
+                self.required_target().command_arg(),
+                self.name.clone(),
+            ],
+            JjBookmarkMutationKind::Set => vec![
+                "bookmark".to_owned(),
+                "set".to_owned(),
+                "--revision".to_owned(),
+                self.required_target().command_arg(),
+                self.name.clone(),
+            ],
+            JjBookmarkMutationKind::Move => vec![
+                "bookmark".to_owned(),
+                "move".to_owned(),
+                "--to".to_owned(),
+                self.required_target().command_arg(),
+                exact_string_pattern(&self.name),
+            ],
+            JjBookmarkMutationKind::Delete => vec![
+                "bookmark".to_owned(),
+                "delete".to_owned(),
+                exact_string_pattern(&self.name),
+            ],
+        }
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(),
+            &self.command_label(),
+            self.kind.success_fallback(),
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        let mut lines = vec![
+            format!("command: {}", self.command_label()),
+            String::new(),
+            format!("bookmark: {}", self.name),
+        ];
+
+        match self.kind {
+            JjBookmarkMutationKind::Create => {
+                lines.extend([
+                    "source/current: new local bookmark name".to_owned(),
+                    format!("destination: {}", self.required_target().preview_target()),
+                    "effect: creates one local bookmark at the exact destination target".to_owned(),
+                    "confirmation: press Enter to run jj bookmark create".to_owned(),
+                    "undo path: jj undo".to_owned(),
+                ]);
+            }
+            JjBookmarkMutationKind::Set => {
+                lines.extend([
+                    "source/current: jj resolves the literal local bookmark name".to_owned(),
+                    format!("destination: {}", self.required_target().preview_target()),
+                    "effect: sets one local bookmark to the exact destination target".to_owned(),
+                    "confirmation: press Enter to run jj bookmark set".to_owned(),
+                    "undo path: jj undo".to_owned(),
+                ]);
+            }
+            JjBookmarkMutationKind::Move => {
+                lines.extend([
+                    format!(
+                        "source/current: exact pattern {}",
+                        exact_string_pattern(&self.name)
+                    ),
+                    format!("destination: {}", self.required_target().preview_target()),
+                    "effect: moves one exactly named local bookmark to the destination target"
+                        .to_owned(),
+                    "confirmation: press Enter to run jj bookmark move".to_owned(),
+                    "undo path: jj undo".to_owned(),
+                ]);
+            }
+            JjBookmarkMutationKind::Delete => {
+                lines.extend([
+                    format!(
+                        "source/current: exact pattern {}",
+                        exact_string_pattern(&self.name)
+                    ),
+                    "destination: none".to_owned(),
+                    "effect: deletes one local bookmark; this is delete, not forget".to_owned(),
+                    "tracking: track/untrack stay disabled until exact tracking metadata exists"
+                        .to_owned(),
+                    "confirmation: press Enter to run jj bookmark delete".to_owned(),
+                    "undo path: jj undo".to_owned(),
+                ]);
+            }
+        }
+
+        lines.join("\n")
+    }
+
+    fn required_target(&self) -> &JjBookmarkTarget {
+        self.target
+            .as_ref()
+            .expect("bookmark mutation kind requires target")
     }
 }
 
@@ -763,6 +1000,10 @@ fn revset_string_literal(value: &str) -> String {
     }
     quoted.push('"');
     quoted
+}
+
+fn exact_string_pattern(value: &str) -> String {
+    format!("exact:{}", revset_string_literal(value))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1333,6 +1574,7 @@ pub struct BookmarkItem {
     name: String,
     target_change_id: Option<String>,
     target_commit_id: Option<String>,
+    local: bool,
 }
 
 impl BookmarkItem {
@@ -1347,6 +1589,7 @@ impl BookmarkItem {
             name,
             target_change_id,
             target_commit_id,
+            local: true,
         }
     }
 
@@ -1368,6 +1611,16 @@ impl BookmarkItem {
 
     pub fn target_commit_id(&self) -> Option<&str> {
         self.target_commit_id.as_deref()
+    }
+
+    pub fn is_local(&self) -> bool {
+        self.local
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_local(mut self, local: bool) -> Self {
+        self.local = local;
+        self
     }
 
     pub fn row_text(&self) -> String {
@@ -1758,14 +2011,12 @@ fn pair_bookmark_lines(
 
     for line in lines {
         let text = line_text(&line);
-        let metadata = starts_local_bookmark_row(&text)
-            .then(|| metadata.next())
-            .flatten();
+        let metadata = metadata.next();
         let bookmark_name = metadata
             .as_ref()
             .map(|metadata| metadata.name.clone())
             .unwrap_or_else(|| bookmark_name_from_rendered_row(&text));
-        items.push(BookmarkItem::new(
+        let mut item = BookmarkItem::new(
             vec![line],
             bookmark_name,
             metadata
@@ -1774,7 +2025,9 @@ fn pair_bookmark_lines(
             metadata
                 .as_ref()
                 .and_then(|metadata| metadata.target_commit_id.clone()),
-        ));
+        );
+        item.local = metadata.as_ref().is_some_and(BookmarkMetadata::is_local);
+        items.push(item);
     }
 
     items
@@ -1821,8 +2074,15 @@ struct RevisionMetadata {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct BookmarkMetadata {
     name: String,
+    remote: Option<String>,
     target_change_id: Option<String>,
     target_commit_id: Option<String>,
+}
+
+impl BookmarkMetadata {
+    fn is_local(&self) -> bool {
+        self.remote.is_none()
+    }
 }
 
 fn parse_metadata_line(line: &str) -> Option<RevisionMetadata> {
@@ -1853,9 +2113,14 @@ fn parse_bookmark_metadata_line(line: &str) -> Option<BookmarkMetadata> {
     if name.is_empty() {
         return None;
     }
+    let remote = fields
+        .next()
+        .filter(|field| !field.is_empty())
+        .map(str::to_owned);
 
     Some(BookmarkMetadata {
         name: name.to_owned(),
+        remote,
         target_change_id: fields
             .next()
             .filter(|field| !field.is_empty())
@@ -1977,12 +2242,6 @@ fn starts_log_item_text(text: &str) -> bool {
 
 fn starts_operation_log_item(line: &Line<'_>) -> bool {
     first_content_char(&line_text(line)).is_some_and(|character| matches!(character, '@' | '○'))
-}
-
-fn starts_local_bookmark_row(text: &str) -> bool {
-    text.chars()
-        .next()
-        .is_some_and(|character| !character.is_whitespace())
 }
 
 fn is_standalone_graph_line(line: &Line<'_>) -> bool {
@@ -2254,6 +2513,73 @@ mod tests {
     }
 
     #[test]
+    fn bookmark_create_and_set_target_exact_changes_or_current_working_copy() {
+        let create = JjBookmarkMutationPlan::create(
+            "feature/name",
+            JjBookmarkTarget::exact_change("abcdefghijklmnopqrstuvwxzyabcdef"),
+        );
+        assert_eq!(
+            create.command_argv(),
+            vec![
+                "bookmark",
+                "create",
+                "--revision",
+                "exactly(change_id(\"abcdefghijklmnopqrstuvwxzyabcdef\"), 1)",
+                "feature/name"
+            ]
+        );
+        assert!(create.preview_summary().contains("exact selected revision"));
+        assert!(create.preview_summary().contains("undo path: jj undo"));
+
+        let set =
+            JjBookmarkMutationPlan::set("feature/name", JjBookmarkTarget::current_working_copy());
+        assert_eq!(
+            set.command_argv(),
+            vec!["bookmark", "set", "--revision", "@", "feature/name"]
+        );
+        assert!(
+            set.preview_summary()
+                .contains("current working-copy change (@)")
+        );
+    }
+
+    #[test]
+    fn bookmark_move_and_delete_use_exact_string_patterns() {
+        let move_plan = JjBookmarkMutationPlan::move_to(
+            "feature/\"quote\\tab",
+            JjBookmarkTarget::exact_change("abcdefghijklmnopqrstuvwxzyabcdef"),
+        );
+
+        assert_eq!(
+            move_plan.command_argv(),
+            vec![
+                "bookmark",
+                "move",
+                "--to",
+                "exactly(change_id(\"abcdefghijklmnopqrstuvwxzyabcdef\"), 1)",
+                "exact:\"feature/\\\"quote\\\\tab\""
+            ]
+        );
+        assert!(
+            move_plan
+                .command_label()
+                .contains("exact:\"feature/\\\"quote\\\\tab\"")
+        );
+
+        let delete = JjBookmarkMutationPlan::delete("feature/name");
+        assert_eq!(
+            delete.command_argv(),
+            vec!["bookmark", "delete", "exact:\"feature/name\""]
+        );
+        assert!(delete.preview_summary().contains("delete, not forget"));
+        assert!(
+            delete
+                .preview_summary()
+                .contains("track/untrack stay disabled")
+        );
+    }
+
+    #[test]
     fn file_list_command_uses_file_words_and_keeps_selected_path_out_of_args() {
         let spec = ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned()));
 
@@ -2322,18 +2648,29 @@ mod tests {
     fn parses_bookmark_metadata_lines() {
         assert_eq!(
             parse_bookmark_metadata_line(
-                "main\twuqolszplkmommqzmxpmmwtwrpuuwkmo\t2f81d8af4234fef19b84d1495383a55999bb37fa"
+                "main\t\twuqolszplkmommqzmxpmmwtwrpuuwkmo\t2f81d8af4234fef19b84d1495383a55999bb37fa"
             ),
             Some(BookmarkMetadata {
                 name: "main".to_owned(),
+                remote: None,
                 target_change_id: Some("wuqolszplkmommqzmxpmmwtwrpuuwkmo".to_owned()),
                 target_commit_id: Some("2f81d8af4234fef19b84d1495383a55999bb37fa".to_owned()),
             })
         );
         assert_eq!(
-            parse_bookmark_metadata_line("main\t\t"),
+            parse_bookmark_metadata_line("main\torigin\t\t"),
             Some(BookmarkMetadata {
                 name: "main".to_owned(),
+                remote: Some("origin".to_owned()),
+                target_change_id: None,
+                target_commit_id: None,
+            })
+        );
+        assert_eq!(
+            parse_bookmark_metadata_line("main\t\t\t"),
+            Some(BookmarkMetadata {
+                name: "main".to_owned(),
+                remote: None,
                 target_change_id: None,
                 target_commit_id: None,
             })
@@ -2378,8 +2715,8 @@ mod tests {
     }
 
     #[test]
-    fn bookmark_rows_allow_missing_and_extra_metadata() {
-        let lines = b"main: okrnpmzv d10e26b6 Update agent repository guidance\n  @origin: okrnpmzv d10e26b6 Update agent repository guidance\nprototype: nqvrkyps f65c4354 docs: add explicit unsupported warning\n"
+    fn remote_bookmark_rows_do_not_advance_local_metadata() {
+        let lines = b"main: okrnpmzv d10e26b6 Update agent repository guidance\nmain@origin: okrnpmzv d10e26b6 Update agent repository guidance\nprototype: nqvrkyps f65c4354 docs: add explicit unsupported warning\n"
             .to_vec()
             .into_text()
             .unwrap()
@@ -2387,6 +2724,12 @@ mod tests {
         let metadata = vec![
             bookmark_metadata(
                 "main",
+                Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv"),
+                Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6"),
+            ),
+            remote_bookmark_metadata(
+                "main",
+                "origin",
                 Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv"),
                 Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6"),
             ),
@@ -2401,10 +2744,34 @@ mod tests {
 
         assert_eq!(items.len(), 3);
         assert_eq!(items[0].bookmark_name(), "main");
-        assert_eq!(items[1].bookmark_name(), "@origin");
-        assert_eq!(items[1].target_change_id(), None);
-        assert_eq!(items[1].target_commit_id(), None);
+        assert!(items[0].is_local());
+        assert_eq!(items[1].bookmark_name(), "main");
+        assert!(!items[1].is_local());
+        assert_eq!(
+            items[1].target_change_id(),
+            Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv")
+        );
+        assert_eq!(
+            items[1].target_commit_id(),
+            Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6")
+        );
         assert_eq!(items[2].bookmark_name(), "prototype");
+        assert!(items[2].is_local());
+    }
+
+    #[test]
+    fn bookmark_rows_without_metadata_are_not_marked_local() {
+        let lines = b"remote-looking-but-not-trusted: okrnpmzv d10e26b6\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+
+        let items = pair_bookmark_lines(lines, Vec::new());
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].bookmark_name(), "remote-looking-but-not-trusted");
+        assert!(!items[0].is_local());
     }
 
     #[test]
@@ -2528,8 +2895,27 @@ mod tests {
         target_change_id: Option<&str>,
         target_commit_id: Option<&str>,
     ) -> BookmarkMetadata {
+        bookmark_metadata_with_remote(name, None, target_change_id, target_commit_id)
+    }
+
+    fn remote_bookmark_metadata(
+        name: &str,
+        remote: &str,
+        target_change_id: Option<&str>,
+        target_commit_id: Option<&str>,
+    ) -> BookmarkMetadata {
+        bookmark_metadata_with_remote(name, Some(remote), target_change_id, target_commit_id)
+    }
+
+    fn bookmark_metadata_with_remote(
+        name: &str,
+        remote: Option<&str>,
+        target_change_id: Option<&str>,
+        target_commit_id: Option<&str>,
+    ) -> BookmarkMetadata {
         BookmarkMetadata {
             name: name.to_owned(),
+            remote: remote.map(str::to_owned),
             target_change_id: target_change_id.map(str::to_owned),
             target_commit_id: target_commit_id.map(str::to_owned),
         }

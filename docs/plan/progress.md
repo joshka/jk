@@ -425,3 +425,62 @@
   time. Commit from graph is deliberately selection-independent and may still surprise users who do
   not read the preview; help and preview text call out that selected graph rows are not arguments.
 - Next slice: Packet 24: Bookmark Mutation Flows
+
+## Packet 24: Bookmark Mutation Flows
+
+- Files changed: `src/app.rs`, `src/bookmarks.rs`, `src/command.rs`, `src/file_list.rs`,
+  `src/jj.rs`, `src/tui.rs`, `src/view_state.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: graph and status views now expose local bookmark create (`b`), set (`=`), and move (`m`)
+  flows. Each flow prompts for one bookmark name, targets the selected exact graph change id or
+  visible status `@`, opens a scrollable `ActionOutput` preview, and requires Enter confirmation
+  before running the `jj bookmark` command.
+- Behavior: the bookmarks view now exposes local bookmark delete (`x`) for the selected exact local
+  bookmark row. The preview uses an exact bookmark string pattern, says this is delete rather than
+  forget, keeps `jj undo` visible, and requires Enter confirmation through `ActionOutput`.
+- Review repair: reviewer `019e44b3-9a26-7402-a577-5247e84ecda2` found that remote rows exposed by
+  args such as `--all-remotes` could drift against the local metadata stream and be treated as
+  deletable, and that file-list hints advertised `x delete` even though global dispatch routed `x`
+  to bookmark delete first. The repair pairs one metadata row to each rendered bookmark row, uses
+  the machine `remote` template field to prove local rows, treats missing metadata as nonlocal,
+  scopes `x` to the bookmarks view, and removes the file-list delete hint.
+- Final repaired 5.5 review `019e44be-0503-7671-93cb-108959581966` (`gpt-5.5`, high) reported no
+  findings and accepted Packet 24 repairs.
+- Command shapes: create and set use `jj bookmark create|set --revision <target> <name>`, move uses
+  `jj bookmark move --to <target> exact:<quoted-name>`, and delete uses
+  `jj bookmark delete exact:<quoted-name>`. Graph targets are represented as
+  `exactly(change_id("<full-change-id>"), 1)`, while status targets remain `@`.
+- Deferred behavior: track and untrack remain unexposed because `BookmarkItem` still does not carry
+  exact remote or tracking metadata. Rendered labels such as `@origin` or `main@origin` are not used
+  to infer tracking state.
+- Verification: `cargo check`; focused `cargo test bookmark`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; disposable-repo proof
+  under `/tmp/jk-packet24-proof.ZCshiQ` for create, set, move, delete, undo, and duplicate-name
+  failure preservation; `just md-check`
+- Review repair validation: `cargo test remote_bookmark_rows_do_not_advance_local_metadata`;
+  `cargo test file_list_x_is_not_bookmark_delete`;
+  `cargo test file_list_status_hints_do_not_advertise_delete`; `cargo test bookmark`; full
+  `cargo test`; `cargo check`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt   --check`; `just md-check`
+- Manual proof: disposable repo `/tmp/jk-packet24-proof.ZCshiQ` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, create and set used
+  `jj --no-pager bookmark create|set --revision 'exactly(change_id("<id>"), 1)' <name>`, move used
+  `jj --no-pager bookmark move --to 'exactly(change_id("<id>"), 1)' 'exact:"packet24-move"'`, delete
+  used `jj --no-pager bookmark delete 'exact:"packet24-delete"'`, and `jj --no-pager undo` restored
+  the deleted bookmark.
+- Manual proof: the duplicate-name failure path was checked from the same repo cwd with
+  `jj --no-pager bookmark create --revision <exact-base-revset> packet24-create`; jj returned
+  `Bookmark already exists: packet24-create`, and the bookmark row was unchanged before and after.
+- Validation note: `just md-check` initially found Panache formatting diffs in
+  `docs/plan/progress.md` and `docs/plan/fragility-register.md`; `just md-fmt` reformatted those
+  files and the rerun passed.
+- Validation note: `just check` was attempted after Packet 24 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused bookmark tests, full `cargo test`, `rustup run nightly cargo fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Remaining risk: create/set/move from status intentionally target jj's dynamic `@` at execution
+  time. Bookmark list rows still depend on row-order pairing between rendered output and a
+  machine-template metadata stream; delete is disabled whenever that stream does not prove an empty
+  remote field, and remote/tracking flows remain deferred until explicit metadata is modeled beyond
+  local delete gating.
+- Next slice: Packet 25: Absorb Preview Flow

@@ -64,6 +64,15 @@ pub struct FileListView {
 }
 
 impl FileListView {
+    #[cfg(test)]
+    pub(crate) fn test_new(entries: Vec<FileListItem>) -> Self {
+        Self {
+            entries,
+            spec: ViewSpec::file_list(None, None),
+            selection: Selection::default(),
+        }
+    }
+
     pub fn load(spec: ViewSpec) -> Result<Self> {
         let mut view = Self {
             entries: load_file_list_entries(&spec)?,

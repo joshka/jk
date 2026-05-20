@@ -23,6 +23,10 @@ pub enum Command {
     OperationRedo,
     Describe,
     Commit,
+    BookmarkCreate,
+    BookmarkSet,
+    BookmarkMove,
+    BookmarkDelete,
     Fetch,
     Push,
     Copy,
@@ -92,6 +96,10 @@ impl Command {
             | Self::OpenOperationLog
             | Self::Describe
             | Self::Commit
+            | Self::BookmarkCreate
+            | Self::BookmarkSet
+            | Self::BookmarkMove
+            | Self::BookmarkDelete
             | Self::Fetch
             | Self::Push
             | Self::Copy
@@ -351,6 +359,25 @@ fn help_metadata(
             }
             _ => None,
         },
+        Command::BookmarkCreate => match context {
+            HelpContext::Graph => Some((HelpSectionKind::Preview, "create bookmark here")),
+            HelpContext::Status => Some((HelpSectionKind::Preview, "create bookmark at @")),
+            _ => None,
+        },
+        Command::BookmarkSet => match context {
+            HelpContext::Graph => Some((HelpSectionKind::Preview, "set bookmark here")),
+            HelpContext::Status => Some((HelpSectionKind::Preview, "set bookmark to @")),
+            _ => None,
+        },
+        Command::BookmarkMove => match context {
+            HelpContext::Graph => Some((HelpSectionKind::Preview, "move bookmark here")),
+            HelpContext::Status => Some((HelpSectionKind::Preview, "move bookmark to @")),
+            _ => None,
+        },
+        Command::BookmarkDelete => match context {
+            HelpContext::Bookmarks => Some((HelpSectionKind::Preview, "delete local bookmark")),
+            _ => None,
+        },
         Command::OperationUndo => (context == HelpContext::OperationLog).then_some((
             HelpSectionKind::Preview,
             "undo last repo operation (global)",
@@ -587,6 +614,48 @@ mod tests {
                 .rows()
                 .iter()
                 .any(|row| row.keys() == "D" || row.keys() == "C")
+        }));
+    }
+
+    #[test]
+    fn project_help_exposes_bookmark_mutations_only_in_honest_contexts() {
+        let global = [
+            Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
+            Binding::new(KeyPattern::char('='), Command::BookmarkSet),
+            Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
+            Binding::new(KeyPattern::char('x'), Command::BookmarkDelete),
+        ];
+
+        let graph_help = project_help(&global, &[], HelpContext::Graph);
+        let status_help = project_help(&global, &[], HelpContext::Status);
+        let bookmarks_help = project_help(&global, &[], HelpContext::Bookmarks);
+        let show_help = project_help(&global, &[], HelpContext::Show);
+
+        assert_eq!(
+            graph_help[0].rows(),
+            &[
+                HelpRow::new("b", "create bookmark here"),
+                HelpRow::new("=", "set bookmark here"),
+                HelpRow::new("m", "move bookmark here"),
+            ]
+        );
+        assert_eq!(
+            status_help[0].rows(),
+            &[
+                HelpRow::new("b", "create bookmark at @"),
+                HelpRow::new("=", "set bookmark to @"),
+                HelpRow::new("m", "move bookmark to @"),
+            ]
+        );
+        assert_eq!(
+            bookmarks_help[0].rows(),
+            &[HelpRow::new("x", "delete local bookmark")]
+        );
+        assert!(!show_help.iter().any(|section| {
+            section
+                .rows()
+                .iter()
+                .any(|row| row.action().contains("bookmark") || row.action().contains("track"))
         }));
     }
 

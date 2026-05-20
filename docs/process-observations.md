@@ -1106,3 +1106,81 @@ belong here.
 - 5.5 review outcome: no blocking findings.
 - Follow-up note: a focused status-view app test was added to cover `D` targeting `@` and previewing
   with `jj describe @ --message <message>`.
+
+## 2026-05-20 Packet 24 Bookmark Mutation Worker
+
+- Thread id: `019e44a7-3491-76d0-a72b-eb89d183d79c`.
+- Worker / model: Codex / GPT-5.
+- Slice / task: Implement Packet 24 local bookmark mutation flows in the current
+  `Add bookmark mutation flows` jj working-copy change.
+- Starting state: `jj --no-pager status` reported a clean working copy at change
+  `rrvyklvz 892d0021 (empty) Add bookmark mutation flows`.
+- Observable outcome: `src/jj.rs` now has a local bookmark mutation plan for create, set, move, and
+  delete. Graph targets use `exactly(change_id("<id>"), 1)`, status targets use `@`, and move/delete
+  bookmark names use exact jj string patterns.
+- Observable outcome: `src/app.rs` now routes graph/status `b`, `=`, and `m` through a typed
+  bookmark-name prompt and scrollable ActionOutput preview/result. `src/bookmarks.rs` and
+  `src/view_state.rs` now distinguish selected local bookmark rows so bookmarks-view `x` deletes
+  only a selected exact local bookmark.
+- Deferred behavior: track and untrack remain unexposed because `BookmarkItem` has no explicit
+  remote/tracking metadata; rendered labels such as `@origin` are recorded as insufficient evidence
+  in `docs/plan/fragility-register.md`.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test bookmark`
+  - full `cargo test`
+  - disposable proof under `/tmp/jk-packet24-proof.ZCshiQ` using `jj --no-pager git init`,
+    `bookmark create`, `bookmark set`, `bookmark move`, `bookmark delete`, `undo`, and duplicate
+    create failure checks with all mutating commands run from that repo cwd
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - attempted `just check`, which stopped at `cargo +nightly fmt` with `no such command: +nightly`
+- Rework status: an initial disposable proof under `/tmp/jk-packet24-proof.weZvTi` used a bad
+  scratch revset lookup and did not exercise the intended bookmark commands successfully; the proof
+  was restarted in `/tmp/jk-packet24-proof.ZCshiQ` with direct change-id variables.
+- Rework status: `just md-check` initially found formatting diffs in `docs/plan/progress.md` and
+  `docs/plan/fragility-register.md`; `just md-fmt` reformatted both and the rerun passed.
+
+## 2026-05-20 Packet 24 Review Repair
+
+- Thread id: `019e44b7-216b-75a2-8729-896836544d2b`.
+- Reviewer id: `019e44b3-9a26-7402-a577-5247e84ecda2`.
+- Final repaired 5.5 review: `019e44be-0503-7671-93cb-108959581966` (`gpt-5.5`, high) reported no
+  findings and accepted Packet 24 repairs.
+- Validation reported by that final review: `cargo check`, focused repair tests,
+  `cargo test bookmark`, full `cargo test`, `rustup run nightly cargo fmt --check`, and
+  `just md-check`; `just check` failed at the known wrapper step `cargo +nightly fmt`.
+- Slice / task: Repair Packet 24 review findings without adding track/untrack behavior or broad
+  remote modeling.
+- Starting state: `jj --no-pager status` reported existing Packet 24 edits in `src/app.rs`,
+  `src/bookmarks.rs`, `src/command.rs`, `src/jj.rs`, `src/tui.rs`, `src/view_state.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`; no
+  jj write commands were run.
+- Review finding: remote/nonlocal bookmark rows exposed by args such as `--all-remotes` could be
+  rendered as unindented rows while the previous pairing advanced metadata only for rendered rows
+  guessed to be local. That could drift and make delete target a local-looking name for a remote
+  row.
+- Review finding: `x` was a global bookmark-delete binding, but file-list status hints advertised
+  `x delete`; because app bindings dispatch before view bindings, `x` in file-list routed to
+  bookmark delete and reported an unsupported bookmark action.
+- Repair approach: `src/jj.rs` now asks the bookmark metadata template for `remote`, consumes one
+  metadata row for each rendered bookmark row, marks a row local only when paired metadata has an
+  empty remote field, and treats missing metadata as nonlocal. `src/bookmarks.rs` now owns the `x`
+  bookmark-delete binding, `src/app.rs` no longer exposes `x` globally, and `src/tui.rs` removes the
+  file-list delete hint while showing delete on the bookmarks screen.
+- Validation / proof run during repair:
+  - `cargo test bookmark`
+  - `cargo test file_list_status_hints_do_not_advertise_delete`
+  - `cargo check`
+  - `rustup run nightly cargo fmt`
+  - `cargo test remote_bookmark_rows_do_not_advance_local_metadata`
+  - `cargo test file_list_x_is_not_bookmark_delete`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+- Rework status: an attempted grouped `cargo test` invocation used invalid cargo syntax for multiple
+  exact test names and did not run tests; the same proof was rerun with valid individual filters.
+- Rework status: `just md-check` initially found Panache formatting diffs in
+  `docs/plan/progress.md`, `docs/plan/fragility-register.md`, and `docs/process-observations.md`;
+  `just md-fmt` reformatted those files and the rerun passed.

@@ -42,6 +42,7 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::code(crossterm::event::KeyCode::Enter),
         Command::View(ViewCommand::OpenShow),
     ),
+    Binding::new(KeyPattern::char('x'), Command::BookmarkDelete),
     Binding::new(
         KeyPattern::char('n'),
         Command::View(ViewCommand::NextSearchMatch),
@@ -174,6 +175,12 @@ impl BookmarksView {
 
     pub fn selected_bookmark_name(&self) -> Option<&str> {
         self.selected_entry().map(BookmarkItem::bookmark_name)
+    }
+
+    pub fn selected_local_bookmark_name(&self) -> Option<&str> {
+        self.selected_entry()
+            .filter(|entry| entry.is_local())
+            .map(BookmarkItem::bookmark_name)
     }
 
     fn search_matches(&self, query: &SearchQuery) -> usize {
@@ -439,6 +446,15 @@ mod tests {
         ]);
 
         assert_eq!(view.selected_bookmark_name(), Some("feature"));
+    }
+
+    #[test]
+    fn selected_local_bookmark_name_ignores_nonlocal_rows() {
+        let remote = bookmark_item(&["  @origin: abc"], "@origin", None, None).with_local(false);
+        let view = bookmarks_view(vec![remote]);
+
+        assert_eq!(view.selected_bookmark_name(), Some("@origin"));
+        assert_eq!(view.selected_local_bookmark_name(), None);
     }
 
     #[test]

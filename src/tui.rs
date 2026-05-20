@@ -97,6 +97,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::BookmarkMutationPreview { output } => {
+            let title = action_output_title("Bookmark", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::RebasePreview { output } => {
             let title = action_output_title("Rebase", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -179,6 +185,9 @@ pub enum Overlay<'a> {
     CommitPreview {
         output: &'a ActionOutput,
     },
+    BookmarkMutationPreview {
+        output: &'a ActionOutput,
+    },
     OperationRecoveryPreview {
         output: &'a ActionOutput,
     },
@@ -253,6 +262,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " action  ",
             key("D/C"),
             " describe/commit  ",
+            key("b/=/m"),
+            " bookmark  ",
             key("f/p/r"),
             " fetch/push/refresh  ",
             key("?"),
@@ -322,6 +333,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " copy  ",
             key("D/C"),
             " describe/commit @  ",
+            key("b/=/m"),
+            " bookmark @  ",
             key("h"),
             " back  ",
             key("?"),
@@ -396,6 +409,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " search  ",
             key("y"),
             " copy  ",
+            key("x"),
+            " delete  ",
             key("?"),
             " help",
         ],
@@ -834,6 +849,21 @@ mod tests {
         assert_snapshot!(render_chrome_snapshot(&status, 120), @r"
         title|jk operation-log
         status|19 operations  q quit  j/k move  u undo  C-r redo  s show  d diff  / search  y copy id  ? help
+        ");
+    }
+
+    #[test]
+    fn file_list_status_hints_do_not_advertise_delete() {
+        let status = StatusLine::test(
+            "jk file list",
+            "1 files",
+            StatusKind::Ready,
+            StatusHints::FileList,
+        );
+
+        assert_snapshot!(render_chrome_snapshot(&status, 100), @r"
+        title|jk file list
+        status|1 files  q quit  j/k move  Enter/l open  / search  y copy  ? help
         ");
     }
 

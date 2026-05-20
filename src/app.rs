@@ -22,10 +22,11 @@ use crate::command::{
 };
 use crate::copy::CopyOption;
 use crate::jj::{
-    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjCommitPlan, JjDescribePlan,
-    JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationRecoveryKind, JjRebasePlan, JjSquashPlan, LogViewMode, ViewSpec, git_fetch,
-    git_remotes, new_trunk, resolve_exact_change_id,
+    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjBookmarkMutationKind, JjBookmarkMutationPlan,
+    JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitPush,
+    JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjRebasePlan,
+    JjSquashPlan, LogViewMode, ViewSpec, git_fetch, git_remotes, new_trunk,
+    resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -41,6 +42,8 @@ type SquashRun = fn(&JjSquashPlan) -> Result<String>;
 type DescribeRun = fn(&JjDescribePlan) -> Result<String>;
 #[cfg(test)]
 type CommitRun = fn(&JjCommitPlan) -> Result<String>;
+#[cfg(test)]
+type BookmarkMutationRun = fn(&JjBookmarkMutationPlan) -> Result<String>;
 #[cfg(test)]
 type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 #[cfg(test)]
@@ -85,6 +88,8 @@ struct App {
     describe_run: DescribeRun,
     #[cfg(test)]
     commit_run: CommitRun,
+    #[cfg(test)]
+    bookmark_mutation_run: BookmarkMutationRun,
     #[cfg(test)]
     abandon_preview_load: AbandonPreviewLoad,
     #[cfg(test)]
@@ -131,12 +136,21 @@ enum InteractionMode {
         input: String,
     },
     CommitPrompt(String),
+    BookmarkNamePrompt {
+        kind: JjBookmarkMutationKind,
+        target: JjBookmarkTarget,
+        input: String,
+    },
     DescribePreview {
         describe: JjDescribePlan,
         output: ActionOutput,
     },
     CommitPreview {
         commit: JjCommitPlan,
+        output: ActionOutput,
+    },
+    BookmarkMutationPreview {
+        mutation: JjBookmarkMutationPlan,
         output: ActionOutput,
     },
     NewPreview {
@@ -187,6 +201,9 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
     Binding::new(KeyPattern::char('D'), Command::Describe),
     Binding::new(KeyPattern::char('C'), Command::Commit),
+    Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
+    Binding::new(KeyPattern::char('='), Command::BookmarkSet),
+    Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
     Binding::new(KeyPattern::char('y'), Command::Copy),
     Binding::new(KeyPattern::char('p'), Command::Push),
@@ -221,6 +238,11 @@ fn default_describe_run(describe: &JjDescribePlan) -> Result<String> {
 #[cfg(test)]
 fn default_commit_run(commit: &JjCommitPlan) -> Result<String> {
     commit.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_bookmark_mutation_run(mutation: &JjBookmarkMutationPlan) -> Result<String> {
+    mutation.run().map(|output| output.message().to_owned())
 }
 
 #[cfg(test)]
@@ -301,6 +323,8 @@ impl App {
             #[cfg(test)]
             commit_run: default_commit_run,
             #[cfg(test)]
+            bookmark_mutation_run: default_bookmark_mutation_run,
+            #[cfg(test)]
             abandon_preview_load: default_abandon_preview_load,
             #[cfg(test)]
             abandon_run: default_abandon_run,
@@ -369,6 +393,16 @@ impl App {
     #[cfg(not(test))]
     fn run_commit(&self, commit: &JjCommitPlan) -> Result<String> {
         commit.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_bookmark_mutation(&self, mutation: &JjBookmarkMutationPlan) -> Result<String> {
+        (self.bookmark_mutation_run)(mutation)
+    }
+
+    #[cfg(not(test))]
+    fn run_bookmark_mutation(&self, mutation: &JjBookmarkMutationPlan) -> Result<String> {
+        mutation.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -553,6 +587,22 @@ impl App {
             }
             Command::Commit => {
                 self.open_commit_prompt();
+                Ok(false)
+            }
+            Command::BookmarkCreate => {
+                self.open_bookmark_name_prompt(JjBookmarkMutationKind::Create);
+                Ok(false)
+            }
+            Command::BookmarkSet => {
+                self.open_bookmark_name_prompt(JjBookmarkMutationKind::Set);
+                Ok(false)
+            }
+            Command::BookmarkMove => {
+                self.open_bookmark_name_prompt(JjBookmarkMutationKind::Move);
+                Ok(false)
+            }
+            Command::BookmarkDelete => {
+                self.open_bookmark_delete_preview();
                 Ok(false)
             }
             Command::Fetch => {
@@ -888,6 +938,44 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::BookmarkNamePrompt {
+                kind,
+                target,
+                input,
+            } => {
+                match code {
+                    KeyCode::Esc => {
+                        let kind = *kind;
+                        self.mode = InteractionMode::Normal;
+                        self.status = StatusLine::with_message(
+                            &self.view,
+                            format!("bookmark {} cancelled", kind.label()),
+                        );
+                    }
+                    KeyCode::Enter => {
+                        let name = input.trim().to_owned();
+                        let kind = *kind;
+                        let target = target.clone();
+                        self.mode = InteractionMode::Normal;
+                        if name.is_empty() {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                format!("bookmark {} cancelled: empty bookmark name", kind.label()),
+                            );
+                        } else {
+                            self.open_bookmark_mutation_preview(bookmark_mutation_plan(
+                                kind, name, target,
+                            ));
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        input.pop();
+                    }
+                    KeyCode::Char(character) => input.push(character),
+                    _ => {}
+                }
+                Ok(true)
+            }
             InteractionMode::DescribePreview { describe, output } => {
                 let (describe, status_context, completed) = {
                     (
@@ -943,6 +1031,37 @@ impl App {
                         }
 
                         self.confirm_commit(commit, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::BookmarkMutationPreview { mutation, output } => {
+                let (mutation, status_context, completed) = {
+                    (
+                        mutation.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                format!("bookmark {} cancelled", mutation.kind().label()),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_bookmark_mutation(mutation, status_context, viewport_height);
                     }
                     ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
                 }
@@ -1293,6 +1412,51 @@ impl App {
         }
     }
 
+    fn open_bookmark_name_prompt(&mut self, kind: JjBookmarkMutationKind) {
+        let target = match self.view.bookmark_target() {
+            Ok(Some(target)) => target,
+            Ok(None) => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    format!(
+                        "bookmark {} is only available from graph or status views",
+                        kind.label()
+                    ),
+                );
+                return;
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                return;
+            }
+        };
+
+        self.mode = InteractionMode::BookmarkNamePrompt {
+            kind,
+            target,
+            input: String::new(),
+        };
+    }
+
+    fn open_bookmark_delete_preview(&mut self) {
+        let name = match self.view.selected_local_bookmark_name() {
+            Ok(Some(name)) => name.to_owned(),
+            Ok(None) => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    "bookmark delete is only available from bookmarks view".to_owned(),
+                );
+                return;
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                return;
+            }
+        };
+
+        self.open_bookmark_mutation_preview(JjBookmarkMutationPlan::delete(name));
+    }
+
     fn open_push_prompt(&mut self) -> Result<bool> {
         let target = match self.view.push_target() {
             Ok(Some(target)) => target,
@@ -1436,6 +1600,36 @@ impl App {
                 self.status = StatusLine::error(&self.view, message.clone());
                 self.mode = InteractionMode::CommitPreview {
                     commit,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
+    fn open_bookmark_mutation_preview(&mut self, mutation: JjBookmarkMutationPlan) {
+        let status_context = Some(bookmark_status_context(
+            &mutation,
+            self.view.spec().app_label().as_str(),
+        ));
+
+        match mutation.run_preview() {
+            Ok(output) => {
+                let command_label = mutation.command_label();
+                self.mode = InteractionMode::BookmarkMutationPreview {
+                    mutation,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = mutation.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::BookmarkMutationPreview {
+                    mutation,
                     output: ActionOutput::finished(command_label, message, status_context),
                 };
             }
@@ -1704,6 +1898,38 @@ impl App {
 
         self.mode = InteractionMode::CommitPreview {
             commit,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    fn confirm_bookmark_mutation(
+        &mut self,
+        mutation: JjBookmarkMutationPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = mutation.command_label();
+        let result_message = match self.run_bookmark_mutation(&mutation) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = format!("{} | jj undo", output.trim());
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("{} | refresh failed: {error} | jj undo", output.trim())
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::BookmarkMutationPreview {
+            mutation,
             output: ActionOutput::finished(command_label, result_message, status_context),
         };
     }
@@ -2218,6 +2444,14 @@ impl App {
             InteractionMode::CommitPrompt(input) => {
                 StatusLine::with_message(&self.view, format!("commit @: {input}"))
             }
+            InteractionMode::BookmarkNamePrompt {
+                kind,
+                target,
+                input,
+            } => StatusLine::with_message(
+                &self.view,
+                format!("bookmark {} {}: {input}", kind.label(), target.label()),
+            ),
             InteractionMode::AbandonConfirm { input, .. } => StatusLine::with_message(
                 &self.view,
                 format!("type exact revision to confirm abandon: {input}"),
@@ -2255,6 +2489,9 @@ impl App {
             },
             InteractionMode::DescribePreview { output, .. } => Overlay::DescribePreview { output },
             InteractionMode::CommitPreview { output, .. } => Overlay::CommitPreview { output },
+            InteractionMode::BookmarkMutationPreview { output, .. } => {
+                Overlay::BookmarkMutationPreview { output }
+            }
             InteractionMode::NewPreview { output, .. } => Overlay::NewPreview { output },
             InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
             InteractionMode::SquashPreview { output, .. } => Overlay::SquashPreview { output },
@@ -2276,7 +2513,8 @@ impl App {
             | InteractionMode::SearchPrompt(_)
             | InteractionMode::LogRevsetPrompt(_)
             | InteractionMode::DescribePrompt { .. }
-            | InteractionMode::CommitPrompt(_) => Overlay::None,
+            | InteractionMode::CommitPrompt(_)
+            | InteractionMode::BookmarkNamePrompt { .. } => Overlay::None,
         }
     }
 
@@ -2553,6 +2791,37 @@ fn push_status_context(target: &JjGitPushTarget, remote: &str) -> String {
     }
 }
 
+fn bookmark_mutation_plan(
+    kind: JjBookmarkMutationKind,
+    name: String,
+    target: JjBookmarkTarget,
+) -> JjBookmarkMutationPlan {
+    match kind {
+        JjBookmarkMutationKind::Create => JjBookmarkMutationPlan::create(name, target),
+        JjBookmarkMutationKind::Set => JjBookmarkMutationPlan::set(name, target),
+        JjBookmarkMutationKind::Move => JjBookmarkMutationPlan::move_to(name, target),
+        JjBookmarkMutationKind::Delete => JjBookmarkMutationPlan::delete(name),
+    }
+}
+
+fn bookmark_status_context(mutation: &JjBookmarkMutationPlan, view_label: &str) -> String {
+    match mutation.target() {
+        Some(target) => format!(
+            "bookmark {} '{}' targets {} from {}",
+            mutation.kind().label(),
+            mutation.name(),
+            target.label(),
+            view_label
+        ),
+        None => format!(
+            "bookmark {} '{}' from {}",
+            mutation.kind().label(),
+            mutation.name(),
+            view_label
+        ),
+    }
+}
+
 fn action_output_visible_lines(viewport_height: u16) -> u16 {
     viewport_height.saturating_sub(1).max(1)
 }
@@ -2651,6 +2920,18 @@ mod tests {
 
     fn mock_commit_failure(_: &JjCommitPlan) -> Result<String> {
         Err(eyre!("jj commit failed: first line\nsecond line"))
+    }
+
+    fn mock_bookmark_mutation_success(mutation: &JjBookmarkMutationPlan) -> Result<String> {
+        Ok(format!(
+            "bookmark {} {}",
+            mutation.kind().label(),
+            mutation.name()
+        ))
+    }
+
+    fn mock_bookmark_mutation_failure(_: &JjBookmarkMutationPlan) -> Result<String> {
+        Err(eyre!("jj bookmark failed: first line\nsecond line"))
     }
 
     fn mock_empty_abandon_preview(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
@@ -2807,6 +3088,8 @@ mod tests {
             describe_run: mock_describe_success,
             #[cfg(test)]
             commit_run: mock_commit_success,
+            #[cfg(test)]
+            bookmark_mutation_run: mock_bookmark_mutation_success,
             #[cfg(test)]
             abandon_preview_load: mock_empty_abandon_preview,
             #[cfg(test)]
@@ -3253,6 +3536,306 @@ mod tests {
         };
         assert_eq!(graph.selected_revision(), Some("second"));
         assert!(matches!(app.mode, InteractionMode::Normal));
+    }
+
+    #[test]
+    fn bookmark_create_prompt_uses_exact_graph_target() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+            .unwrap();
+        for character in "feature/name".chars() {
+            app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        }
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (mutation, output) = match &app.mode {
+            InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
+            _ => panic!("expected bookmark preview"),
+        };
+        assert_eq!(mutation.kind(), JjBookmarkMutationKind::Create);
+        assert_eq!(mutation.name(), "feature/name");
+        assert_eq!(
+            output.command_label(),
+            "jj bookmark create --revision exactly(change_id(\"change-a\"), 1) feature/name"
+        );
+        let body = output.body_lines().join("\n");
+        assert!(body.contains("destination: exact selected revision change-a"));
+        assert!(body.contains("confirmation: press Enter to run jj bookmark create"));
+        assert_eq!(
+            output.status_context().map(String::as_str),
+            Some("bookmark create 'feature/name' targets change-a from jk")
+        );
+    }
+
+    #[test]
+    fn bookmark_set_prompt_uses_status_current_working_copy_target() {
+        let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[
+            "working copy changes:",
+            "M src/app.rs",
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('='), KeyModifiers::NONE), 12)
+            .unwrap();
+        for character in "feature/name".chars() {
+            app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        }
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (mutation, output) = match &app.mode {
+            InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
+            _ => panic!("expected bookmark preview"),
+        };
+        assert_eq!(mutation.kind(), JjBookmarkMutationKind::Set);
+        assert_eq!(
+            output.command_label(),
+            "jj bookmark set --revision @ feature/name"
+        );
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("destination: current working-copy change (@)")
+        );
+    }
+
+    #[test]
+    fn bookmark_move_prompt_uses_exact_pattern_preview() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('m'), KeyModifiers::NONE), 12)
+            .unwrap();
+        for character in "feature/name".chars() {
+            app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        }
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::BookmarkMutationPreview { output, .. } => output,
+            _ => panic!("expected bookmark preview"),
+        };
+        assert_eq!(
+            output.command_label(),
+            "jj bookmark move --to exactly(change_id(\"change-a\"), 1) exact:\"feature/name\""
+        );
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("source/current: exact pattern exact:\"feature/name\"")
+        );
+    }
+
+    #[test]
+    fn bookmark_prompt_cancel_and_empty_input_do_not_open_preview() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "bookmark create cancelled");
+
+        app.handle_normal_key(key(KeyCode::Char('='), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "bookmark set cancelled: empty bookmark name"
+        );
+    }
+
+    #[test]
+    fn bookmark_mutation_rejects_unsupported_and_inexact_contexts() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), None, None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "bookmark mutation from graph requires a selected row with an exact revision"
+        );
+
+        let mut app = test_app(ViewState::OperationLog(
+            crate::operation_log::OperationLogView::test_new(Vec::new()),
+        ));
+        app.handle_normal_key(key(KeyCode::Char('m'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(
+            app.status.message(),
+            "bookmark move is only available from graph or status views"
+        );
+    }
+
+    #[test]
+    fn bookmark_delete_preview_uses_selected_exact_local_bookmark() {
+        let mut app = test_app(ViewState::Bookmarks(
+            crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+                Vec::new(),
+                "feature/name".to_owned(),
+                Some("change-a".to_owned()),
+                None,
+            )]),
+        ));
+
+        app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        let (mutation, output) = match &app.mode {
+            InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
+            _ => panic!("expected bookmark delete preview"),
+        };
+        assert_eq!(mutation.kind(), JjBookmarkMutationKind::Delete);
+        assert_eq!(
+            output.command_label(),
+            "jj bookmark delete exact:\"feature/name\""
+        );
+        let body = output.body_lines().join("\n");
+        assert!(body.contains("effect: deletes one local bookmark; this is delete, not forget"));
+        assert!(body.contains("track/untrack stay disabled"));
+        assert!(body.contains("confirmation: press Enter to run jj bookmark delete"));
+    }
+
+    #[test]
+    fn bookmark_delete_rejects_nonlocal_bookmark_rows() {
+        let remote = crate::jj::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
+            .with_local(false);
+        let mut app = test_app(ViewState::Bookmarks(
+            crate::bookmarks::BookmarksView::test_new(vec![remote]),
+        ));
+
+        app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "delete requires a selected exact local bookmark"
+        );
+    }
+
+    #[test]
+    fn file_list_x_is_not_bookmark_delete() {
+        let mut app = test_app(ViewState::FileList(
+            crate::file_list::FileListView::test_new(vec![crate::jj::FileListItem::new(
+                vec![ratatui::text::Line::from("src/lib.rs")],
+                "src/lib.rs".to_owned(),
+            )]),
+        ));
+
+        app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "1 files");
+    }
+
+    #[test]
+    fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::BookmarkMutationPreview {
+            mutation: JjBookmarkMutationPlan::create(
+                "feature/name",
+                JjBookmarkTarget::exact_change("change-a"),
+            ),
+            output: ActionOutput::pending(
+                "jj bookmark create --revision exactly(change_id(\"change-a\"), 1) feature/name"
+                    .to_owned(),
+                "preview only".to_owned(),
+                Some("bookmark create context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::BookmarkMutationPreview { output, .. } => output,
+            _ => panic!("expected bookmark result"),
+        };
+        assert!(output.completed());
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("bookmark create feature/name | jj undo")
+        );
+        assert_eq!(
+            output.status_context().map(String::as_str),
+            Some("bookmark create context")
+        );
+        assert_eq!(
+            app.status.message(),
+            "bookmark create feature/name | jj undo"
+        );
+
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.bookmark_mutation_run = mock_bookmark_mutation_failure;
+        app.mode = InteractionMode::BookmarkMutationPreview {
+            mutation: JjBookmarkMutationPlan::set(
+                "feature/name",
+                JjBookmarkTarget::exact_change("change-a"),
+            ),
+            output: ActionOutput::pending(
+                "jj bookmark set --revision exactly(change_id(\"change-a\"), 1) feature/name"
+                    .to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::BookmarkMutationPreview { output, .. } => output,
+            _ => panic!("expected bookmark result"),
+        };
+        assert!(output.completed());
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("jj bookmark failed: first line")
+        );
+        assert_eq!(
+            app.status.message(),
+            "jj bookmark failed: first line\nsecond line"
+        );
+
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::BookmarkMutationPreview {
+            mutation: JjBookmarkMutationPlan::move_to(
+                "feature/name",
+                JjBookmarkTarget::exact_change("change-a"),
+            ),
+            output: ActionOutput::pending(
+                "jj bookmark move --to exactly(change_id(\"change-a\"), 1) exact:\"feature/name\""
+                    .to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "bookmark move cancelled");
     }
 
     #[test]

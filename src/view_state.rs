@@ -13,7 +13,7 @@ use crate::diff::DiffView;
 use crate::file_list::FileListView;
 use crate::file_show::FileShowView;
 use crate::graph::GraphView;
-use crate::jj::{JjCommand, JjGitPushTarget, LogViewMode, ViewSpec};
+use crate::jj::{JjBookmarkTarget, JjCommand, JjGitPushTarget, LogViewMode, ViewSpec};
 use crate::operation_detail::OperationDetailView;
 use crate::operation_log::OperationLogView;
 use crate::search::SearchQuery;
@@ -302,6 +302,51 @@ impl ViewState {
             | Self::OperationDetail(_) => Ok(None),
         }
     }
+
+    pub fn bookmark_target(&self) -> Result<Option<JjBookmarkTarget>> {
+        match self {
+            Self::Graph(view) => view
+                .selected_revision()
+                .map(|revision| JjBookmarkTarget::exact_change(revision.to_owned()))
+                .map_or_else(
+                    || {
+                        Err(color_eyre::eyre::eyre!(
+                            "bookmark mutation from graph requires a selected row with an exact revision"
+                        ))
+                    },
+                    |target| Ok(Some(target)),
+                ),
+            Self::Status(_) => Ok(Some(JjBookmarkTarget::current_working_copy())),
+            Self::Show(_)
+            | Self::Diff(_)
+            | Self::FileList(_)
+            | Self::FileShow(_)
+            | Self::Bookmarks(_)
+            | Self::OperationLog(_)
+            | Self::OperationDetail(_) => Ok(None),
+        }
+    }
+
+    pub fn selected_local_bookmark_name(&self) -> Result<Option<&str>> {
+        match self {
+            Self::Bookmarks(view) => view.selected_local_bookmark_name().map_or_else(
+                || {
+                    Err(color_eyre::eyre::eyre!(
+                        "delete requires a selected exact local bookmark"
+                    ))
+                },
+                |name| Ok(Some(name)),
+            ),
+            Self::Graph(_)
+            | Self::Show(_)
+            | Self::Diff(_)
+            | Self::Status(_)
+            | Self::FileList(_)
+            | Self::FileShow(_)
+            | Self::OperationLog(_)
+            | Self::OperationDetail(_) => Ok(None),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -347,6 +392,54 @@ mod tests {
         assert_eq!(
             view.push_target().unwrap(),
             Some(JjGitPushTarget::Bookmark("main".to_owned()))
+        );
+    }
+
+    #[test]
+    fn bookmark_target_from_graph_and_status_is_exact() {
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
+            Vec::new(),
+            Some("abcdefg".to_owned()),
+            None,
+        )]));
+
+        assert_eq!(
+            view.bookmark_target().unwrap(),
+            Some(JjBookmarkTarget::exact_change("abcdefg"))
+        );
+
+        let view = ViewState::Status(crate::status::StatusView::test_new(&[]));
+
+        assert_eq!(
+            view.bookmark_target().unwrap(),
+            Some(JjBookmarkTarget::current_working_copy())
+        );
+    }
+
+    #[test]
+    fn bookmark_target_from_graph_requires_exact_revision() {
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
+            Vec::new(),
+            None,
+            None,
+        )]));
+
+        assert_eq!(
+            view.bookmark_target().unwrap_err().to_string(),
+            "bookmark mutation from graph requires a selected row with an exact revision"
+        );
+    }
+
+    #[test]
+    fn selected_local_bookmark_name_rejects_nonlocal_rows() {
+        let view = ViewState::Bookmarks(bookmarks::BookmarksView::test_new(vec![
+            crate::jj::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
+                .with_local(false),
+        ]));
+
+        assert_eq!(
+            view.selected_local_bookmark_name().unwrap_err().to_string(),
+            "delete requires a selected exact local bookmark"
         );
     }
 }
