@@ -298,6 +298,197 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Files: `docs/development/`, `docs/process-observations.md`, `docs/plan/progress.md`,
     `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`
 
+## Analysis From This Session
+
+This section records process guidance derived from the observations above. It is not active
+`AGENTS.md` policy yet. Treat it as candidate guidance for the next subagent-heavy implementation
+run, with the supporting evidence kept nearby so the rule can be accepted, revised, or rejected
+later.
+
+### Evidence Summary
+
+- The parent session explicitly requested many subagents. Counting explicit `spawn_agent` requests
+  by model and role in the parent session produced:
+  - `gpt-5.4-mini` / worker: 27 requests.
+  - `gpt-5.3-codex-spark` / worker: 19 requests.
+  - `gpt-5.5` / default: 9 requests.
+  - `gpt-5.5` / explorer: 7 requests.
+  - `gpt-5.5` / worker: 9 requests.
+  - inherited-model requests: 11 total across default, explorer, and worker roles.
+- The count above is only a spawn-request count. It is not a cost total, runtime total, quality
+  score, or proof that every spawned worker completed useful work.
+- Slice 11 shows a concrete pattern where a fast validation pass reported the pre-fix push-preview
+  flow as building and testing cleanly, but later `gpt-5.5` review found acceptance-shaping issues:
+  Git-backed remote discovery was wrong for a jj repo, push results were too compressed, and process
+  evidence labels were not durable.
+- Slice 11 also shows a positive bounded-fix pattern: a Spark worker, after review narrowed the
+  target, switched remote discovery to `jj git remote list`, kept push results visible, improved
+  status-context messaging, and ran the relevant checks.
+- Slice 12 shows the risk of broad implementation tasks against overlapping write sets. A mini
+  worker was assigned a full rebase-preview implementation, a Spark worker landed overlapping code
+  in the shared files, and a second Spark worker then had to narrow compile blockers in a broken
+  intermediate state.
+- Slice 12 also shows the value of a deeper acceptance review. The `gpt-5.5` review found that
+  successful rebase did not yet preserve or move selection to the affected stack; the main thread
+  then patched `confirm_rebase()` and a follow-up `gpt-5.5` review confirmed that gap was closed.
+- The final implementation passed the broad local proof target available at the time: `cargo check`,
+  focused rebase tests, full `cargo test`, manual disposable-repo rebase plus undo, formatter check,
+  and Markdown checks. The latest review pass reran full `cargo test` with 162 passing tests.
+
+### Candidate Project Guidance
+
+These are candidate rules for future subagent-heavy work in this repository. They are intentionally
+recorded here instead of `AGENTS.md` until the maintainer decides which should become durable
+instructions.
+
+- Give implementation subagents bounded, well-specified work. A worker task should name the owned
+  files or modules, explicit non-goals, expected behavior, tests to add or run, and handoff format.
+  If that contract cannot be written clearly, run exploration or design review before
+  implementation.
+- Avoid overlapping implementation write sets by default. Parallel agents can inspect or review the
+  same area, but simultaneous code-writing workers should own disjoint files or responsibilities.
+  When the write set is shared, prefer one implementor and one or more read-only reviewers.
+- Route models by risk and task shape. Use faster/smaller workers for docs, narrow local patches,
+  and compile repair. Use stronger workers for cross-module implementation or design-heavy work. Use
+  `gpt-5.5` review for acceptance gates on risky mutation flows and cross-module behavior.
+- Treat Spark as a quick-fix tool unless the task is exceptionally narrow. The observed successful
+  Spark work had explicit concrete fixes; the observed problematic Spark work was broader and landed
+  code that needed compile repair.
+- Do not treat "tests pass" from a fast worker as acceptance for a risky flow. Require review
+  against the slice acceptance criteria, user-visible behavior, module ownership, test gaps, and
+  documented residual risk.
+- Keep the tree compiling during multi-agent implementation. Workers should run `cargo check` early
+  after nontrivial Rust edits. If the tree stops compiling and the fix is not immediate, hand off a
+  narrow compile-repair task with the current compiler error.
+- Define done for each slice as code plus docs plus tests plus recorded residual risk. A handoff
+  should state what passed, what was not run, and what remains risky.
+- Prefer view/app-level tests for TUI behavior when the contract includes both content and
+  presentation. Command construction tests are necessary for `jj` flows, but they are not enough for
+  modal behavior, refresh behavior, or user-visible result presentation.
+- Watch for module-size pressure during slice work. When `app.rs` or another owner starts collecting
+  several different workflow ideas, consider a small concept-owned extraction before adding the next
+  flow.
+- Record model/thread attribution from transcript or spawn records. If the model is unknown, record
+  it as unknown instead of inferring from memory.
+
+### Next-Run Preflight
+
+Use this before launching a subagent-heavy slice:
+
+- Restate the slice goal in one sentence and list the owned files or modules.
+- Decide which work is read-only, which is implementation, and which is review.
+- Mark the non-goals explicitly, especially neighboring features and unrelated refactors.
+- Identify the acceptance evidence up front: tests, manual checks, and review target.
+- Check for existing edits in the owned files and avoid overlapping write sets.
+- Decide whether the first step is exploration, implementation, or compile repair.
+
+### Next Slice-Planning Pass
+
+For the next task-list rewrite, the useful output is not only a new ordered roadmap. Ask the planner
+to produce implementation packets that are ready to delegate:
+
+- Read current product, progress, fragility, and process-observation docs before rewriting the
+  slices.
+- Start by identifying enabling refactors or shared test harness work that would reduce risk in the
+  next several slices.
+- For each proposed slice, name the owning concept, expected write set, explicit non-goals,
+  acceptance criteria, validation plan, and residual-risk doc updates.
+- Mark which slices are safe for small implementation workers and which require stronger
+  implementation or design review.
+- Mark where a read-only explorer should run before implementation because ownership, upstream
+  behavior, or output shape is still unclear.
+- Include a review prompt for each high-risk slice so the acceptance gate is planned before coding
+  starts.
+
+### Subagent Task Template
+
+Use a bounded prompt that includes all of these fields:
+
+```text
+Goal: <one-sentence slice goal>
+Owned files/modules: <specific paths or concepts>
+Behavior to change: <what should be true when done>
+Non-goals: <what to leave alone>
+Constraints: <policy, scope, or compatibility limits>
+Tests/checks: <commands to run or add>
+Handoff evidence: <what files changed, what passed, what remains risky>
+```
+
+Good prompts keep the work local. They name the exact ownership boundary, say what success looks
+like, and make it obvious when the task is too broad for one worker.
+
+### Reviewer Checklist
+
+Use deeper review agents to confirm the slice against the actual acceptance criteria:
+
+- Does the change stay inside the intended files or module boundary?
+- Does the behavior match the requested flow, including edge cases and failure paths?
+- Is the user-visible presentation honest about preview, confirmation, and result state?
+- Are the tests at the right level for the behavior that changed?
+- Did the author report what was run, what passed, what was skipped, and why?
+- Is any residual risk written down plainly enough for the next pass?
+
+### Agent Routing Note
+
+Choose the worker shape from the task shape:
+
+- Exploration: use when the slice is still fuzzy, the ownership boundary is unclear, or the next
+  implementation step depends on understanding existing behavior.
+- Implementation: use when the task can be bounded to files, behavior, and checks, and the tree can
+  stay compiling while the worker edits.
+- Compile repair: use when the tree is already broken and the immediate goal is to restore the
+  current compiler or test failure before broader work resumes.
+
+## Sanitized Guidance Candidate
+
+The following is a project-neutral version that can be reused in another repository or shared in a
+public discussion. It deliberately avoids this project's file names, thread ids, and model-count
+details.
+
+### Multi-Agent Implementation Guidance
+
+Use subagents for parallel work only when their tasks are small enough to specify precisely. A good
+implementation task names:
+
+- the owned files or subsystem;
+- the behavior to implement;
+- explicit non-goals;
+- expected tests or checks;
+- the required handoff evidence.
+
+Avoid assigning multiple code-writing agents to the same files at the same time. If a change needs
+parallelism, split by ownership boundary. If that is not possible, use one implementor and parallel
+read-only reviewers.
+
+Use lighter models for bounded execution: documentation updates, local refactors, test fixes, and
+compile repair. Use stronger models for ambiguous design, cross-module implementation, and final
+review. Fast models can save time, but only when the task shape prevents them from inventing missing
+architecture.
+
+Treat fast compile or test success as evidence, not acceptance. For risky or user-facing behavior,
+review against the actual acceptance criteria: behavior, edge cases, user-visible presentation,
+module ownership, documentation truth, and residual risk.
+
+Keep the repository buildable during multi-agent work. Run a cheap build check early after
+nontrivial edits. If the shared tree stops compiling, stop broad work and issue a narrow
+compile-repair task with the current error.
+
+Define done before implementation starts. For feature work, done usually means:
+
+- code changed in the owning module;
+- tests prove the behavior at the right level;
+- user-facing or maintainer-facing docs are updated when behavior or assumptions changed;
+- validation commands were run and reported;
+- known residual risks are written down.
+
+Keep process notes factual. Record what task was assigned, which worker handled it, what changed,
+what checks ran, what review found, and what rework followed. Separate those facts from later
+opinions about cost effectiveness or model quality.
+
+For planning work, ask for implementation packets, not just a roadmap. Each packet should name the
+owning subsystem, write boundary, non-goals, acceptance criteria, validation, and review needs. This
+makes the next delegation step mechanical and exposes slices that are still too vague to implement.
+
 ## Excluded Evidence
 
 This page excludes speculation about cost, quality, intent, or future outcomes. It also excludes
