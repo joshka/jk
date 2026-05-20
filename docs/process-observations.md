@@ -86,6 +86,34 @@ be supported by the work log, repo state, or direct transcript evidence.
     - `just md-check`
   - Files: `docs/plan/next-implementation-slices.md`, `docs/process-observations.md`
 
+### 2026-05-19 (Packet 14 status-bar declutter)
+
+- Slice / task: Implement Packet 14 status-bar declutter.
+
+- Worker / model: `019e4400-56e3-79c0-81fc-d0c4c93f9d07` / `gpt-5.4-mini` (high reasoning). Main
+  thread orchestrated/reviewed.
+
+- Scope given: keep the status bar calmer by moving exhaustive binding discovery to generated help,
+  keep status focused on current mode, selection/action state, errors, and high-frequency keys,
+  avoid remapping shortcuts, and update only the touched Rust and packet-doc surfaces.
+
+- Observable outcome: replaced the long per-view status hint wall with a message-first status line
+  and a smaller width-aware hint set, kept the generated help overlay as the exhaustive binding
+  source, and added snapshot-style chrome tests for narrow and normal widths.
+
+- Evidence basis:
+  - Thread: `019e4400-56e3-79c0-81fc-d0c4c93f9d07`
+  - Date: `2026-05-19`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `cargo test tui -- --nocapture`
+    - `cargo check`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `just md-check`
+  - Files: `src/app.rs`, `src/tui.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-19 (future follow-up planning expansion)
 
 - Slice / task: Expand the next implementation-slices plan with downstream follow-up waves.

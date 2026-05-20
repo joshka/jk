@@ -1247,6 +1247,21 @@ impl StatusLine {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn test(
+        title: impl Into<String>,
+        message: impl Into<String>,
+        kind: StatusKind,
+        hints: StatusHints,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            message: message.into(),
+            kind,
+            hints,
+        }
+    }
+
     pub fn title(&self) -> &str {
         &self.title
     }

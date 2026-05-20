@@ -46,7 +46,7 @@ pub fn areas(area: Rect) -> Areas {
 
 pub fn render_chrome(frame: &mut Frame<'_>, areas: Areas, status: &StatusLine) {
     frame.render_widget(title_bar(status), areas.title);
-    frame.render_widget(status_line(status), areas.status);
+    frame.render_widget(status_line(status, areas.status.width), areas.status);
 }
 
 pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Overlay<'_>) {
@@ -137,52 +137,68 @@ fn title_bar(status: &StatusLine) -> Paragraph<'_> {
     ])
 }
 
-fn status_line(status: &StatusLine) -> Paragraph<'_> {
-    let line = match status.hints() {
-        StatusHints::Graph => line![
-            key("Space"),
-            " toggle select  ",
+fn status_line(status: &StatusLine, width: u16) -> Paragraph<'_> {
+    Paragraph::new(status_line_text(status, width))
+}
+
+fn status_line_text(status: &StatusLine, width: u16) -> Line<'_> {
+    let mut spans = line![span!(
+        status_style(status);
+        "{message}",
+        message = status.message()
+    )]
+    .spans;
+    let hint_spans = status_hint_spans(status.hints(), width).spans;
+
+    if !hint_spans.is_empty() {
+        spans.extend(line!["  "].spans);
+        spans.extend(hint_spans);
+    }
+
+    Line::from(spans)
+}
+
+fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
+    let compact = width < 60;
+
+    match (hints, compact) {
+        (StatusHints::Graph, true) => line![
             key("q"),
             " quit  ",
-            key("f"),
-            " fetch  ",
-            key("p"),
-            " push  ",
-            key("r"),
-            " refresh  ",
             key("j/k"),
             " move  ",
-            key("h/l"),
-            " back/open  ",
-            key("s"),
-            " show  ",
-            key("d"),
-            " diff  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::Graph, false) => line![
+            key("q"),
+            " quit  ",
+            key("j/k"),
+            " move  ",
+            key("Enter/l"),
+            " open  ",
+            key("Space"),
+            " select  ",
             key("a"),
-            " action menu  ",
-            key("c"),
-            " new/undo  ",
-            key("w"),
-            " mode  ",
-            key("W"),
-            " revset  ",
-            key("L"),
-            " log  ",
-            key("J"),
-            " jj  ",
-            key("v"),
-            " view  ",
+            " action  ",
+            key("f/p/r"),
+            " fetch/push/refresh  ",
             key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
+            " help",
         ],
-        StatusHints::ShowDocument => line![
+        (StatusHints::ShowDocument, true)
+        | (StatusHints::DiffDocument, true)
+        | (StatusHints::FileShowDocument, true) => line![
             key("q"),
             " quit  ",
-            key("f"),
-            " fetch  ",
-            key("r"),
-            " refresh  ",
+            key("j/k"),
+            " scroll  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::ShowDocument, false) => line![
+            key("q"),
+            " quit  ",
             key("j/k"),
             " scroll  ",
             key("Space/C-b"),
@@ -193,21 +209,12 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " file  ",
             key("h"),
             " back  ",
-            key("d"),
-            " diff  ",
-            key("v"),
-            " view  ",
             key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
+            " help",
         ],
-        StatusHints::DiffDocument => line![
+        (StatusHints::DiffDocument, false) => line![
             key("q"),
             " quit  ",
-            key("f"),
-            " fetch  ",
-            key("r"),
-            " refresh  ",
             key("j/k"),
             " scroll  ",
             key("Space/C-b"),
@@ -218,157 +225,116 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " file  ",
             key("h"),
             " back  ",
-            key("s"),
-            " show  ",
-            key("v"),
-            " view  ",
             key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
+            " help",
         ],
-        StatusHints::Status => line![
+        (StatusHints::Status, true) => line![
             key("q"),
             " quit  ",
-            key("f"),
-            " fetch  ",
-            key("p"),
-            " push  ",
-            key("r"),
-            " refresh  ",
+            key("j/k"),
+            " scroll  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::Status, false) => line![
+            key("q"),
+            " quit  ",
             key("j/k"),
             " scroll  ",
             key("Space/C-b"),
             " page  ",
-            key("g/G"),
-            " ends  ",
             key("/"),
             " search  ",
             key("y"),
             " copy  ",
             key("h"),
             " back  ",
-            key("L"),
-            " log  ",
-            key("J"),
-            " jj  ",
             key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
+            " help",
         ],
-        StatusHints::FileList => line![
+        (StatusHints::FileList, true) => line![
             key("q"),
             " quit  ",
-            key("f"),
-            " fetch  ",
-            key("r"),
-            " refresh  ",
             key("j/k"),
             " move  ",
-            key("g/G"),
-            " ends  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::FileList, false) => line![
+            key("q"),
+            " quit  ",
+            key("j/k"),
+            " move  ",
             key("Enter/l"),
             " open  ",
             key("/"),
             " search  ",
             key("y"),
             " copy  ",
-            key("h"),
-            " back  ",
-            key("L"),
-            " log  ",
-            key("J"),
-            " jj  ",
             key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
+            " help",
         ],
-        StatusHints::FileShowDocument => line![
+        (StatusHints::FileShowDocument, false) => line![
             key("q"),
             " quit  ",
-            key("f"),
-            " fetch  ",
-            key("r"),
-            " refresh  ",
             key("j/k"),
             " scroll  ",
             key("Space/C-b"),
             " page  ",
-            key("g/G"),
-            " ends  ",
             key("/"),
             " search  ",
-            key("y"),
-            " copy  ",
             key("h"),
             " back  ",
-            key("L"),
-            " log  ",
-            key("J"),
-            " jj  ",
             key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
+            " help",
         ],
-        StatusHints::Bookmarks => line![
+        (StatusHints::Bookmarks, true) => line![
             key("q"),
             " quit  ",
-            key("f"),
-            " fetch  ",
-            key("p"),
-            " push  ",
-            key("r"),
-            " refresh  ",
             key("j/k"),
             " move  ",
-            key("g/G"),
-            " ends  ",
-            key("/"),
-            " search  ",
-            key("y"),
-            " copy  ",
-            key("s/Enter"),
+            key("?"),
+            " help",
+        ],
+        (StatusHints::Bookmarks, false) => line![
+            key("q"),
+            " quit  ",
+            key("j/k"),
+            " move  ",
+            key("Enter/s"),
             " show  ",
-            key("h"),
-            " back  ",
-            key("L"),
-            " log  ",
-            key("J"),
-            " jj  ",
-            key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
-        ],
-        StatusHints::OperationLog => line![
-            key("q"),
-            " quit  ",
-            key("f"),
-            " fetch  ",
-            key("r"),
-            " refresh  ",
-            key("j/k"),
-            " move  ",
-            key("g/G"),
-            " ends  ",
             key("/"),
             " search  ",
             key("y"),
-            " copy id  ",
+            " copy  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::OperationLog, true) => line![
+            key("q"),
+            " quit  ",
+            key("j/k"),
+            " move  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::OperationLog, false) => line![
+            key("q"),
+            " quit  ",
+            key("j/k"),
+            " move  ",
             key("s"),
             " show  ",
             key("d"),
             " diff  ",
-            key("h"),
-            " back  ",
-            key("L"),
-            " log  ",
-            key("J"),
-            " jj  ",
+            key("/"),
+            " search  ",
+            key("y"),
+            " copy id  ",
             key("?"),
-            " help  ",
-            span!(status_style(status); "{message}", message = status.message()),
+            " help",
         ],
-    };
-    Paragraph::new(line)
+    }
 }
 
 fn help_overlay(content: Text<'static>) -> Paragraph<'static> {
@@ -613,13 +579,38 @@ fn status_style(status: &StatusLine) -> Style {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
     use crate::action_output::ActionOutput;
+    use crate::app::{StatusKind, StatusLine};
     use crate::command::{HelpRow, HelpSectionKind};
 
     use super::*;
+
+    fn render_chrome_snapshot(status: &StatusLine, width: u16) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, 3)).unwrap();
+        terminal
+            .draw(|frame| {
+                let areas = areas(frame.area());
+                render_chrome(frame, areas, status);
+            })
+            .unwrap();
+
+        let title = row_text(terminal.backend().buffer(), 0, width);
+        let status = row_text(terminal.backend().buffer(), 2, width);
+
+        format!("title|{title}\nstatus|{status}")
+    }
+
+    fn row_text(buffer: &ratatui::buffer::Buffer, row: u16, width: u16) -> String {
+        (0..width)
+            .map(|column| buffer[(column, row)].symbol())
+            .collect::<String>()
+            .trim_end()
+            .to_owned()
+    }
 
     #[test]
     fn help_overlay_text_renders_generated_sections() {
@@ -657,6 +648,36 @@ mod tests {
         Direct Actions
         w  cycle view mode
         -  none yet
+        ");
+    }
+
+    #[test]
+    fn status_chrome_renders_compact_hints_on_narrow_width() {
+        let status = StatusLine::test(
+            "jk log",
+            "push cancelled",
+            StatusKind::Error,
+            StatusHints::Graph,
+        );
+
+        assert_snapshot!(render_chrome_snapshot(&status, 48), @r"
+        title|jk log
+        status|push cancelled  q quit  j/k move  ? help
+        ");
+    }
+
+    #[test]
+    fn status_chrome_renders_core_hints_on_normal_width() {
+        let status = StatusLine::test(
+            "jk operation-log",
+            "19 operations",
+            StatusKind::Ready,
+            StatusHints::OperationLog,
+        );
+
+        assert_snapshot!(render_chrome_snapshot(&status, 80), @r"
+        title|jk operation-log
+        status|19 operations  q quit  j/k move  s show  d diff  / search  y copy id  ? help
         ");
     }
 

@@ -167,3 +167,13 @@
   there is still no persistent output history after the overlay is closed, and direct fetch output
   remains status-only until a later packet chooses to route direct actions through the same surface
 - Next slice: Packet 14: Declutter Status Bar
+
+## Packet 14: Declutter Status Bar
+
+- Files changed: `src/app.rs`, `src/tui.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `cargo test`, `cargo test tui -- --nocapture`, `cargo check`,
+  `rustup run nightly cargo fmt`, `just md-check`
+- Remaining risk: the status bar now favors message visibility and a small curated hint set, but the
+  compact hint mix is intentionally conservative and may still need per-view tuning if later
+  terminal work wants a different balance
+- Next slice: Packet 15: General Abandon From Exact Change Targets
