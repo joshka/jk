@@ -5,6 +5,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use crate::action_menu::ActionMenu;
 use crate::copy::CopyOption;
 use crate::jj::JjCommand;
 use crate::search::SearchQuery;
@@ -47,6 +48,8 @@ pub enum ViewCommand {
     StartSearch,
     NextSearchMatch,
     PreviousSearchMatch,
+    ToggleSelect,
+    OpenActionMenu,
     Copy,
 }
 
@@ -220,6 +223,7 @@ pub enum ViewEffect {
     SearchMoved,
     SearchStarted { matches: usize },
     CopyOptions(Vec<CopyOption>),
+    OpenActionMenu(ActionMenu),
 }
 
 pub fn find_binding(bindings: &[Binding], key: KeyEvent) -> Option<Binding> {
@@ -376,6 +380,14 @@ fn view_help_metadata(
         ViewCommand::StartSearch => None,
         ViewCommand::NextSearchMatch => Some((HelpSectionKind::View, "next match")),
         ViewCommand::PreviousSearchMatch => Some((HelpSectionKind::View, "previous match")),
+        ViewCommand::ToggleSelect => (context == HelpContext::Graph).then_some((
+            HelpSectionKind::Preview,
+            "toggle exact revision selection (preview target)",
+        )),
+        ViewCommand::OpenActionMenu => (context == HelpContext::Graph).then_some((
+            HelpSectionKind::Preview,
+            "open action menu (preview required)",
+        )),
         ViewCommand::Copy => None,
     }
 }

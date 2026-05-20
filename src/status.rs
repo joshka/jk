@@ -141,6 +141,7 @@ impl StatusView {
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
+            ViewCommand::ToggleSelect | ViewCommand::OpenActionMenu => ViewEffect::Ignored,
             ViewCommand::OpenItem => ViewEffect::Ignored,
         }
     }

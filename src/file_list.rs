@@ -132,6 +132,7 @@ impl FileListView {
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
+            ViewCommand::ToggleSelect | ViewCommand::OpenActionMenu => ViewEffect::Ignored,
             ViewCommand::CycleMode
             | ViewCommand::NewTrunk
             | ViewCommand::PageDown

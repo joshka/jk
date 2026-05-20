@@ -8,8 +8,10 @@ use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState};
 
+use crate::action_menu::{ExactActionContext, build_action_menu};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{JjCommand, LogItem, LogViewMode, ViewSpec, load_entries};
@@ -54,7 +56,21 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
     ),
+    Binding::new(
+        KeyPattern::char(' '),
+        Command::View(ViewCommand::ToggleSelect),
+    ),
+    Binding::new(
+        KeyPattern::char('a'),
+        Command::View(ViewCommand::OpenActionMenu),
+    ),
 ];
+
+fn explicit_selection_style() -> Style {
+    Style::default()
+        .fg(Color::Green)
+        .add_modifier(Modifier::BOLD)
+}
 
 /// Selectable graph output from `jj` or `jj log`.
 pub struct GraphView {
@@ -63,6 +79,7 @@ pub struct GraphView {
     spec: ViewSpec,
     entries: Vec<LogItem>,
     selection: Selection,
+    selected_change_ids: Vec<String>,
 }
 
 impl GraphView {
@@ -76,12 +93,17 @@ impl GraphView {
             entries: load_entries(&spec)?,
             spec,
             selection: Selection::default(),
+            selected_change_ids: Vec::new(),
         })
     }
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
-        frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
+        frame.render_stateful_widget(
+            entry_list(&self.entries, search, &self.selected_change_ids),
+            area,
+            &mut state,
+        );
     }
 
     pub fn bindings(&self) -> &'static [Binding] {
@@ -139,6 +161,8 @@ impl GraphView {
                 .filter(|query| self.previous_match(query))
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
+            ViewCommand::ToggleSelect => self.toggle_selection(),
+            ViewCommand::OpenActionMenu => self.open_action_menu(),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
             ViewCommand::PageDown
             | ViewCommand::PageUp
@@ -150,6 +174,13 @@ impl GraphView {
     }
 
     pub fn refresh(&mut self) -> Result<()> {
+        self.refresh_with_loader(load_entries)
+    }
+
+    fn refresh_with_loader(
+        &mut self,
+        load: impl Fn(&ViewSpec) -> Result<Vec<LogItem>>,
+    ) -> Result<()> {
         let previous_index = self.selection.index();
         let previous_change_id = self
             .entries
@@ -157,7 +188,8 @@ impl GraphView {
             .and_then(LogItem::action_id)
             .map(str::to_owned);
 
-        self.entries = load_entries(&self.spec)?;
+        self.entries = load(&self.spec)?;
+        retain_selected_change_ids(&mut self.selected_change_ids, &self.entries);
         restore_selection(
             &mut self.selection,
             &self.entries,
@@ -270,6 +302,48 @@ impl GraphView {
         self.selection.last(self.entries.len());
     }
 
+    fn toggle_selection(&mut self) -> ViewEffect {
+        let Some(change_id) = self.current_exact_change_id() else {
+            return ViewEffect::StatusMessage(
+                "selection only works on rows with exact change ids".to_owned(),
+            );
+        };
+        let change_id = change_id.to_owned();
+
+        let Some(position) = self
+            .selected_change_ids
+            .iter()
+            .position(|selected| selected == &change_id)
+        else {
+            self.selected_change_ids.push(change_id.clone());
+            return ViewEffect::StatusMessage(format!("selected {change_id}"));
+        };
+        self.selected_change_ids.remove(position);
+        ViewEffect::StatusMessage(format!("unselected {change_id}"))
+    }
+
+    fn open_action_menu(&mut self) -> ViewEffect {
+        let Some(current_revision) = self.current_exact_change_id() else {
+            return ViewEffect::StatusMessage(
+                "action menu requires current row to have an exact revision id".to_owned(),
+            );
+        };
+        let sources = self
+            .selected_change_ids
+            .iter()
+            .filter(|selected| selected.as_str() != current_revision)
+            .cloned()
+            .collect::<Vec<_>>();
+        let menu = build_action_menu(
+            &ExactActionContext::with_current(current_revision).with_sources(sources),
+        );
+        if menu.is_empty() {
+            ViewEffect::StatusMessage("no preview actions available for selection".to_owned())
+        } else {
+            ViewEffect::OpenActionMenu(menu)
+        }
+    }
+
     pub fn set_mode(&mut self, mode: LogViewMode) -> Result<()> {
         self.switch_mode_with_loader(mode, load_entries)
     }
@@ -278,6 +352,12 @@ impl GraphView {
         let next_mode = self.mode.next();
         self.set_mode(next_mode.clone())?;
         Ok(next_mode)
+    }
+
+    fn current_exact_change_id(&self) -> Option<&str> {
+        self.entries
+            .get(self.selection.index())
+            .and_then(LogItem::action_id)
     }
 
     fn reveal_change_id_with_loader(
@@ -326,6 +406,7 @@ impl GraphView {
         self.spec = spec;
         self.mode = mode;
         self.entries = entries;
+        retain_selected_change_ids(&mut self.selected_change_ids, &self.entries);
         restore_selection(
             &mut self.selection,
             &self.entries,
@@ -336,16 +417,25 @@ impl GraphView {
     }
 }
 
-fn entry_list(entries: &[LogItem], search: Option<&SearchQuery>) -> List<'static> {
+fn entry_list(
+    entries: &[LogItem],
+    search: Option<&SearchQuery>,
+    selected_change_ids: &[String],
+) -> List<'static> {
     let items = entries
         .iter()
         .map(|entry| {
-            let lines = entry
-                .lines()
-                .into_iter()
-                .map(|line| highlight_line(line, search))
-                .collect::<Vec<_>>();
-            ListItem::new(lines)
+            let is_selected = entry.action_id().is_some_and(|action_id| {
+                selected_change_ids
+                    .iter()
+                    .any(|selected| selected == action_id)
+            });
+            let lines = entry_lines(entry, search, is_selected);
+            ListItem::new(lines).style(if is_selected {
+                explicit_selection_style()
+            } else {
+                Style::default()
+            })
         })
         .collect::<Vec<_>>();
 
@@ -354,6 +444,26 @@ fn entry_list(entries: &[LogItem], search: Option<&SearchQuery>) -> List<'static
             .bg(Color::Rgb(52, 54, 62))
             .add_modifier(Modifier::BOLD),
     )
+}
+
+fn entry_lines(
+    entry: &LogItem,
+    search: Option<&SearchQuery>,
+    is_selected: bool,
+) -> Vec<Line<'static>> {
+    let lines = entry
+        .lines()
+        .into_iter()
+        .map(|line| highlight_line(line, search))
+        .collect::<Vec<_>>();
+    if is_selected {
+        lines
+            .into_iter()
+            .map(|line| line.patch_style(explicit_selection_style()))
+            .collect()
+    } else {
+        lines
+    }
 }
 
 fn next_matching_entry(entries: &[LogItem], selected: usize, query: &SearchQuery) -> Option<usize> {
@@ -392,6 +502,19 @@ fn restore_selection(
     selection.set(previous_index, entries.len());
 }
 
+fn retain_selected_change_ids(selected_change_ids: &mut Vec<String>, entries: &[LogItem]) {
+    let retained = selected_change_ids
+        .iter()
+        .filter(|selected| {
+            entries
+                .iter()
+                .any(|entry| entry.action_id() == Some(selected.as_str()))
+        })
+        .cloned()
+        .collect();
+    *selected_change_ids = retained;
+}
+
 #[cfg(test)]
 mod tests {
     use ratatui::text::Line;
@@ -414,6 +537,14 @@ mod tests {
             spec: ViewSpec::new(JjCommand::Log, Vec::new()),
             entries,
             selection: Selection::default(),
+            selected_change_ids: Vec::new(),
+        }
+    }
+
+    fn command_context() -> CommandContext<'static> {
+        CommandContext {
+            viewport_height: 0,
+            search: None,
         }
     }
 
@@ -482,6 +613,41 @@ mod tests {
         assert_eq!(view.selection.index(), 0);
         assert_eq!(view.current_revset(), Some("second"));
         assert_eq!(view.mode_label(), "trunk work");
+    }
+
+    #[test]
+    fn switch_mode_prunes_invisible_selection_ids() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("first"), None),
+            log_item("second", Some("second"), None),
+            log_item("third", Some("third"), None),
+        ]);
+
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected first".to_owned())
+        );
+        view.select_next();
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected second".to_owned())
+        );
+        view.select_next();
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected third".to_owned())
+        );
+
+        view.switch_mode_with_loader(LogViewMode::Trunk, |_| {
+            Ok(vec![
+                log_item("first", Some("first"), None),
+                log_item("third", Some("third"), None),
+            ])
+        })
+        .unwrap();
+
+        assert_eq!(view.mode_label(), "trunk work");
+        assert_eq!(view.selected_change_ids, vec!["first", "third"]);
     }
 
     #[test]
@@ -567,5 +733,193 @@ mod tests {
             "refreshed graph did not include the new working-copy change"
         );
         assert_eq!(view.mode_label(), "recent work");
+    }
+
+    #[test]
+    fn toggle_select_requires_exact_change_id() {
+        let mut view = graph_view(vec![log_item("(elided revisions)", None, None)]);
+
+        let effect = view.execute(ViewCommand::ToggleSelect, command_context());
+
+        assert_eq!(
+            effect,
+            ViewEffect::StatusMessage(
+                "selection only works on rows with exact change ids".to_owned()
+            )
+        );
+        assert!(view.selected_change_ids.is_empty());
+    }
+
+    #[test]
+    fn toggle_select_tracks_exact_change_ids() {
+        let mut view = graph_view(vec![log_item("first", Some("change"), None)]);
+        assert!(view.selected_change_ids.is_empty());
+
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected change".to_owned())
+        );
+        assert_eq!(view.selected_change_ids, vec!["change"]);
+
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("unselected change".to_owned())
+        );
+        assert!(view.selected_change_ids.is_empty());
+    }
+
+    #[test]
+    fn refresh_preserves_exact_selection_ids() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("change"), None),
+            log_item("second", Some("another"), None),
+        ]);
+
+        view.execute(ViewCommand::ToggleSelect, command_context());
+        view.selection.set(1, view.entries.len());
+        view.execute(ViewCommand::ToggleSelect, command_context());
+
+        assert_eq!(view.selected_change_ids, vec!["change", "another"]);
+
+        view.refresh_with_loader(|_| {
+            Ok(vec![
+                log_item("another", Some("another"), None),
+                log_item("first", Some("change"), None),
+            ])
+        })
+        .unwrap();
+
+        assert_eq!(view.selected_change_ids, vec!["change", "another"]);
+    }
+
+    #[test]
+    fn refresh_drops_disappeared_selection_ids() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("change"), None),
+            log_item("second", Some("another"), None),
+            log_item("third", Some("third"), None),
+        ]);
+
+        view.execute(ViewCommand::ToggleSelect, command_context());
+        view.selection.set(1, view.entries.len());
+        view.execute(ViewCommand::ToggleSelect, command_context());
+        view.selection.set(2, view.entries.len());
+        view.execute(ViewCommand::ToggleSelect, command_context());
+
+        assert_eq!(view.selected_change_ids, vec!["change", "another", "third"]);
+
+        view.refresh_with_loader(|_| {
+            Ok(vec![
+                log_item("second", Some("another"), None),
+                log_item("other", None, None),
+                log_item("change", Some("change"), None),
+            ])
+        })
+        .unwrap();
+
+        assert_eq!(view.selected_change_ids, vec!["change", "another"]);
+    }
+
+    #[test]
+    fn open_action_menu_prefers_single_row_context() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("aaaaaaaa"), None),
+            log_item("second", Some("bbbbbbbb"), None),
+        ]);
+
+        let effect = view.execute(ViewCommand::OpenActionMenu, command_context());
+        let action_menu = if let ViewEffect::OpenActionMenu(action_menu) = effect {
+            action_menu
+        } else {
+            panic!("expected action menu");
+        };
+        let labels = action_menu
+            .items()
+            .iter()
+            .map(|item| item.label().to_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            labels,
+            vec![
+                "split selected revision aaaaaaaa",
+                "abandon selected revision aaaaaaaa"
+            ]
+        );
+    }
+
+    #[test]
+    fn open_action_menu_uses_explicit_selections_as_sources() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("aaaaaaaa"), None),
+            log_item("second", Some("bbbbbbbb"), None),
+        ]);
+
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected aaaaaaaa".to_owned())
+        );
+        view.select_next();
+        let effect = view.execute(ViewCommand::OpenActionMenu, command_context());
+        let action_menu = if let ViewEffect::OpenActionMenu(action_menu) = effect {
+            action_menu
+        } else {
+            panic!("expected action menu");
+        };
+        let labels = action_menu
+            .items()
+            .iter()
+            .map(|item| item.label().to_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            labels,
+            vec![
+                "rebase 1 revision into bbbbbbbb",
+                "squash 1 revision into bbbbbbbb"
+            ]
+        );
+    }
+
+    #[test]
+    fn open_action_menu_prefers_single_row_actions_for_self_selection() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("aaaaaaaa"), None),
+            log_item("second", Some("bbbbbbbb"), None),
+        ]);
+
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected aaaaaaaa".to_owned())
+        );
+        let effect = view.execute(ViewCommand::OpenActionMenu, command_context());
+        let action_menu = if let ViewEffect::OpenActionMenu(action_menu) = effect {
+            action_menu
+        } else {
+            panic!("expected action menu");
+        };
+        let labels = action_menu
+            .items()
+            .iter()
+            .map(|item| item.label().to_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            labels,
+            vec![
+                "split selected revision aaaaaaaa",
+                "abandon selected revision aaaaaaaa"
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_lines_apply_explicit_selection_style() {
+        let selected = entry_lines(&log_item("first", Some("change"), None), None, true);
+        let unselected = entry_lines(&log_item("first", Some("change"), None), None, false);
+
+        assert_eq!(selected[0].style, explicit_selection_style());
+        assert_eq!(unselected[0].style, Style::default());
+        assert_ne!(selected[0].style, unselected[0].style);
     }
 }

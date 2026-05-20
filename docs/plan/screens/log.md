@@ -63,6 +63,7 @@ The expansion should still feel like one list, not a second screen crammed into 
 - optional expand/collapse detail for selected item
 - switch between default, trunk-focused, recent, all/repo, and custom revset views
 - launch low-friction `jj new trunk` when trunk is known exactly
+- open the graph action menu from selected items
 
 ## Interaction Details
 
@@ -77,17 +78,18 @@ The expansion should still feel like one list, not a second screen crammed into 
   present. Copy availability should follow row semantics, not brittle text slicing.
 - Expansion: expanded rows replace the compact row inline. Expansion should preserve list position,
   selected revision identity, search highlights, and graph context.
-- Action selection: one selected row is enough for navigation and simple actions. Multi-row
-  selection is needed before graph-attached flows such as rebase, squash, abandon, and future batch
-  operations feel native.
+- Action selection: one selected row is enough for navigation and simple actions. Log screen action
+  flows use exact revision id multiselect controlled by `Space` for graph-style guided operations
+  (`a` menu, with rebase/squash/abandon-style actions).
 - View mode: default view should stay close to built-in `jj` output for current work. Broader view
   modes should be easy to reach when the user needs repository orientation.
 - New trunk: `jj new trunk` should be a low-friction direct action when trunk is known exactly. The
   post-action refresh should make the new working-copy change visible, with `jj undo` as the
   recovery path.
 - Refresh: refresh should preserve selection by stable change id or equivalent semantic identity
-  when possible. If the item disappears, clamp to the nearest reasonable row and explain errors in
-  status chrome rather than mutating selection silently.
+  when possible. The log now stores and reuses exact change ids, prunes disappeared selections on
+  refresh or mode change, and clamps the cursor to the nearest row when needed. Explain any missing
+  selection target in status chrome rather than mutating selection silently.
 
 ## Shortcut Candidates
 
@@ -96,11 +98,12 @@ The expansion should still feel like one list, not a second screen crammed into 
 - `/`, `n`, `N`: search
 - `Enter`, `l`, `s`: open show
 - `d`: open diff
-- `Space`: toggle row selection for action flows once multi-select exists
+- `Space`: toggle exact-id row selection for action flows
 - `x`: expand/collapse selected row
 - `w`: switch work/revset view mode
 - `c`: create a new change from trunk or selected context, if this remains mnemonic after key review
 - `y`: copy menu
+- `a`: open log graph action menu (preview-first, no direct mutation yet)
 - `r`: refresh
 - `?`: help/keymap
 
@@ -110,10 +113,14 @@ clear.
 ## Selection Model
 
 - selection unit: revision item
+- log selection is change-id exact, not row-index based
+- multi-select is available on log only
 - paging should target item boundaries, not raw rendered lines
-- refresh should preserve selection when the row can still be identified honestly
-- action selection should support one or more revision items for guided flows such as `new`,
-  `rebase`, `squash`, or `abandon`
+- refresh should preserve selection when the row can still be identified honestly using exact change
+  ids
+- action selection supports one or more revision items for guided flows such as `new`, `rebase`,
+  `squash`, or `abandon`
+- selected rows are visibly marked in the list so users can tell queued action scope at a glance
 
 ## Row Contract
 
@@ -141,7 +148,8 @@ recorded as integration evidence.
 
 Guided mutation flows should not infer their inputs from visual row text. Selecting a row for `new`,
 `rebase`, or another action should carry the exact revision identity and any required graph
-relationship information through the flow.
+relationship information through the flow. Action flows should run through a preview-first menu and
+role/prompt preparation stage; execute should remain out of scope for this slice.
 
 ## Integration Notes
 

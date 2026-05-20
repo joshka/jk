@@ -133,7 +133,9 @@ impl BookmarksView {
             | ViewCommand::PreviousFile
             | ViewCommand::OpenFiles
             | ViewCommand::OpenItem
-            | ViewCommand::OpenDiff => ViewEffect::Ignored,
+            | ViewCommand::OpenDiff
+            | ViewCommand::ToggleSelect
+            | ViewCommand::OpenActionMenu => ViewEffect::Ignored,
         }
     }
 

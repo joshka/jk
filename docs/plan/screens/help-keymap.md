@@ -25,12 +25,14 @@ The help surface should explain:
 - currently available view-local actions
 - the distinction between read surfaces and guided mutation flows
 - mutation safety tiers: direct, prompted, confirmed, and preview-first
+- graph action menu flow from log (no execute in this slice)
 - common direct workflows such as fetch and new-from-trunk
 
 The keymap surface should explain:
 
 - exact active bindings
 - view-specific differences where relevant
+- action menu (`a`) and current selection contract on log (`Space`)
 
 ## Primary Interactions
 
@@ -49,12 +51,15 @@ The keymap surface should explain:
   search, refresh, copy, open, back, and mutation prefixes or confirmations.
 - Dismissal: closing help returns to the exact prior view state without changing selection or
   scroll.
+- Preview-first flows: help should show that rewrite-like operations require preview output and role
+  prompt preparation before execution.
 
 ## Shortcut Candidates
 
 - `?`: open help/keymap
 - `/`: search within help if help becomes long
 - `j`/`k`, arrows: scroll
+- `a` (log): open the log action menu
 - `Esc`, `q`, `h`: dismiss
 
 ## Acceptance Criteria

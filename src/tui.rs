@@ -10,6 +10,7 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Clear, List, ListItem, Paragraph};
 use ratatui_macros::{line, span, vertical};
 
+use crate::action_menu::{ActionMenu, RolePrompt};
 use crate::app::{StatusKind, StatusLine, ViewFormatOption};
 use crate::command::HelpSection;
 use crate::copy::CopyOption;
@@ -66,6 +67,16 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             frame.render_widget(view_menu(options, selected), area);
         }
+        Overlay::ActionMenu { menu, selected } => {
+            let area = centered_area(frame.area(), 64, menu.items().len() as u16 + 3);
+            frame.render_widget(Clear, area);
+            frame.render_widget(action_menu(menu, selected), area);
+        }
+        Overlay::RolePrompt { prompt, selected } => {
+            let area = centered_area(frame.area(), 54, prompt.options().len() as u16 + 4);
+            frame.render_widget(Clear, area);
+            frame.render_widget(role_prompt(prompt, selected), area);
+        }
     }
 }
 
@@ -82,6 +93,14 @@ pub enum Overlay<'a> {
         options: &'a [ViewFormatOption],
         selected: usize,
     },
+    ActionMenu {
+        menu: &'a ActionMenu,
+        selected: usize,
+    },
+    RolePrompt {
+        prompt: &'a RolePrompt,
+        selected: usize,
+    },
 }
 
 fn title_bar(status: &StatusLine) -> Paragraph<'_> {
@@ -93,6 +112,8 @@ fn title_bar(status: &StatusLine) -> Paragraph<'_> {
 fn status_line(status: &StatusLine) -> Paragraph<'_> {
     let line = match status.hints() {
         StatusHints::Graph => line![
+            key("Space"),
+            " toggle select  ",
             key("q"),
             " quit  ",
             key("f"),
@@ -107,6 +128,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " show  ",
             key("d"),
             " diff  ",
+            key("a"),
+            " action menu  ",
             key("c"),
             " new/undo  ",
             key("w"),
@@ -373,6 +396,52 @@ fn view_menu(options: &[ViewFormatOption], selected: usize) -> List<'static> {
         })
         .collect::<Vec<_>>();
     List::new(items).block(Block::bordered().title("View"))
+}
+
+fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
+    let items = menu
+        .items()
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let style = if index == selected {
+                Style::default().bg(Color::Rgb(52, 54, 62))
+            } else {
+                Style::default()
+            };
+            let label = format!(
+                "{}  ({})",
+                item.label(),
+                item.safety_tier().preview_marker()
+            );
+            ListItem::new(Line::from(label)).style(style)
+        })
+        .collect::<Vec<_>>();
+    List::new(items).block(Block::bordered().title("Action menu"))
+}
+
+fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
+    let mut items: Vec<ListItem<'static>> = prompt
+        .options()
+        .iter()
+        .enumerate()
+        .map(|(index, option)| {
+            let style = if index == selected {
+                Style::default().bg(Color::Rgb(52, 54, 62))
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(option.label())).style(style)
+        })
+        .collect();
+
+    let preview_hint = prompt.status_message();
+    if !preview_hint.is_empty() {
+        items.push(ListItem::new(Line::from(preview_hint)).style(Style::default().fg(Color::Gray)));
+    }
+
+    List::new(items)
+        .block(Block::bordered().title(format!("{} (preview required)", prompt.title())))
 }
 
 fn centered_area(area: ratatui::layout::Rect, width: u16, height: u16) -> ratatui::layout::Rect {

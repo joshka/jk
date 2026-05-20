@@ -13,6 +13,7 @@ use color_eyre::eyre::eyre;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::DefaultTerminal;
 
+use crate::action_menu::{ActionMenu, FollowUp, RolePrompt};
 use crate::clipboard;
 use crate::command::{
     Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect, find_binding,
@@ -53,6 +54,14 @@ enum InteractionMode {
         selected: usize,
     },
     ViewMenu {
+        selected: usize,
+    },
+    ActionMenu {
+        menu: ActionMenu,
+        selected: usize,
+    },
+    RolePrompt {
+        prompt: RolePrompt,
         selected: usize,
     },
 }
@@ -341,6 +350,60 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::ActionMenu { menu, selected } => {
+                match code {
+                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        if *selected + 1 < menu.items().len() {
+                            *selected += 1;
+                        }
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        *selected = selected.saturating_sub(1);
+                    }
+                    KeyCode::Enter => {
+                        if let Some(action) = menu.items().get(*selected) {
+                            match action.follow_up() {
+                                FollowUp::StatusMessage(message) => {
+                                    self.status =
+                                        StatusLine::with_message(&self.view, message.as_str());
+                                    self.mode = InteractionMode::Normal;
+                                }
+                                FollowUp::RolePrompt(prompt) => {
+                                    self.mode = InteractionMode::RolePrompt {
+                                        prompt: prompt.clone(),
+                                        selected: 0,
+                                    };
+                                }
+                            }
+                        } else {
+                            self.mode = InteractionMode::Normal;
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::RolePrompt { prompt, selected } => {
+                match code {
+                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        if *selected + 1 < prompt.options().len() {
+                            *selected += 1;
+                        }
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        *selected = selected.saturating_sub(1);
+                    }
+                    KeyCode::Enter => {
+                        let next_status = prompt.status_message();
+                        self.mode = InteractionMode::Normal;
+                        self.status = StatusLine::with_message(&self.view, next_status);
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            }
         }
     }
 
@@ -407,6 +470,10 @@ impl App {
             }
             ViewEffect::SearchStarted { matches } => {
                 self.status = StatusLine::with_message(&self.view, format!("{matches} matches"));
+                Ok(false)
+            }
+            ViewEffect::OpenActionMenu(menu) => {
+                self.mode = InteractionMode::ActionMenu { menu, selected: 0 };
                 Ok(false)
             }
             ViewEffect::CopyOptions(options) => {
@@ -531,6 +598,14 @@ impl App {
             },
             InteractionMode::ViewMenu { selected } => Overlay::ViewMenu {
                 options: view_formats(),
+                selected: *selected,
+            },
+            InteractionMode::ActionMenu { menu, selected } => Overlay::ActionMenu {
+                menu,
+                selected: *selected,
+            },
+            InteractionMode::RolePrompt { prompt, selected } => Overlay::RolePrompt {
+                prompt,
                 selected: *selected,
             },
             InteractionMode::Normal

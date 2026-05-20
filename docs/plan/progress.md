@@ -121,3 +121,15 @@
   formatting changes can affect exact-path extraction and selection semantics until structured or
   templated output is introduced
 - Next slice: Slice 10: Action Menu And Multi-Select
+
+## Slice 10: Action Menu And Multi-Select
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/command.rs`, `src/graph.rs`,
+  `src/main.rs`, `src/tui.rs`, plus view files updated for exhaustive-match arms and compile-time
+  completeness checks in the new action-flow types
+- Verification: `cargo check` and `cargo test`
+- Remaining risk: action execution is currently preview-only and intentionally excludes mutation
+  commands, so preview/review and explicit-role confirmation flows can be bypassed only by later
+  slices; multi-select state is scoped to graph-based exact-change-id targeting and may still need
+  additional pruning logic if downstream views carry stricter per-mode selection semantics
+- Next slice: Slice 11: Push Preview Flow
