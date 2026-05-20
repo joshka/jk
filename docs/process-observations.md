@@ -1967,3 +1967,36 @@ belong here.
   exact test names and did not run; the same proof was rerun with the valid `operation_` filter.
 - Rework status: `just md-check` initially found Panache formatting diffs in `docs/plan/progress.md`
   and `docs/plan/fragility-register.md`; `just md-fmt` reformatted those files and the rerun passed.
+
+## 2026-05-20 Interruption Packet A2 Rendered Rows
+
+- Thread id: `019e45c6-bae2-7c82-a259-478eb3e67c2e`.
+- Slice / task: Extract rendered `jj` row loading, metadata pairing, grouping, and parsers from
+  `src/jj.rs` into a focused row owner without changing behavior.
+- Starting state: `jj --no-pager status` reported an empty working copy at
+  `tpxlzkvv 25c2ce4b (empty) Extract jj rendered rows` with parent
+  `qsotyvls 02bbf1b3 Extract jj action plans`.
+- Implementation evidence: `src/jj_rows.rs` now owns `LogItem`, `BookmarkItem`, `FileListItem`,
+  `ResolveEntry`, `OperationLogItem`, row loaders, narrow metadata templates, row grouping, bookmark
+  metadata pairing, operation-id pairing, resolve JSON parsing, file-list path preservation, and
+  parser tests. `src/jj.rs` keeps `ViewSpec`, command identity, navigation target provenance, direct
+  process helpers, and compatibility re-exports.
+- Validation / proof run during implementation:
+  - `cargo test jj_rows`
+  - `cargo test jj::tests`
+  - `cargo check`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - attempted `cargo clippy -- -D warnings`
+  - `just md-check`
+- Rework status: the first mechanical copy temporarily carried `ViewSpec` argument helper functions
+  into `src/jj_rows.rs`; focused `cargo test jj_rows` exposed them as dead-code warnings, and they
+  were removed before the full validation run.
+- Rework status: `just md-check` initially found Panache formatting diffs in
+  `docs/agent/architecture.md`, `docs/plan/progress.md`, and `docs/process-observations.md`;
+  `just md-fmt` reformatted those files and the rerun passed.
+- Validation note: clippy remains blocked by the known dead-code warnings for `FileShowView::new`,
+  `ViewSpec::bookmarks`, and `FileListItem::row_text`, plus the known `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Final 5.5 acceptance check found no findings and accepted Packet A2.

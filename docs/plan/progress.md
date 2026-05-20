@@ -972,3 +972,30 @@
   import directly from `jj_actions.rs` once the module boundary is established.
 - Next slice: Interruption Packet A2: Extract `jj` Rendered Row Loading, after Packet A1 review
   confirms command-plan behavior was preserved.
+
+## Interruption Packet A2: Extract `jj` Rendered Row Loading
+
+- Files changed: `src/jj_rows.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: selectable rendered row models, row loaders, metadata-template pairing, row grouping,
+  resolve JSON parsing, file-list path parsing, and row parser tests moved from `src/jj.rs` to
+  `src/jj_rows.rs`. `src/jj.rs` keeps `ViewSpec`, command identity, navigation target provenance,
+  diff-format arguments, direct process helpers, and compatibility re-exports for existing imports.
+- Product boundary: this is a behavior-preserving extraction. Row grouping, bookmark metadata
+  pairing, operation-id pairing, resolve JSON degradation, file-list path preservation, and
+  ANSI-to-Ratatui conversion behavior were moved with their tests rather than redesigned.
+  `docs/plan/fragility-register.md` remains unchanged because no parser assumption or
+  rendered-output contract changed.
+- Verification: focused `cargo test jj_rows`; focused `cargo test jj::tests`; full `cargo test`;
+  `cargo check`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; attempted
+  `cargo clippy -- -D warnings`; `just md-check`.
+- Validation note: `cargo check` still reports pre-existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text` after the move. Clippy
+  remains blocked by those warnings plus pre-existing `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`. Direct nightly formatting reports
+  the existing local rustfmt configuration warnings about unstable options but exits successfully.
+- Remaining risk: row APIs are still compatibility re-exported through `src/jj.rs`, so call sites
+  can continue compiling without a broad import rewrite. Future cleanup can switch imports to
+  `jj_rows.rs` directly if the module boundary remains accepted.
+- Final 5.5 acceptance found no findings for Packet A2.
+- Next slice: Interruption Packet B: Navigation And View Entry Contracts.

@@ -83,10 +83,14 @@ Keep modules aligned with user-visible concepts:
 - `jj_actions.rs` owns preview-first `jj` action and mutation plans, including argv construction,
   labels, preview summaries, exact revset/fileset quoting, direct run methods, and fallback result
   wording for user-confirmed mutation flows.
-- `jj.rs` owns view-spec command construction, direct process helpers, diff-format arguments,
-  rendered row loading, and conversion from rendered CLI output into the minimal structures `jk`
-  needs. It re-exports action-plan types for compatibility, but action-plan behavior should stay in
-  `jj_actions.rs`.
+- `jj.rs` owns view-spec command construction, direct process helpers, diff-format arguments, and
+  command/navigation target provenance. It re-exports action-plan and row-loading types for
+  compatibility, but action-plan behavior should stay in `jj_actions.rs` and rendered-row behavior
+  should stay in `jj_rows.rs`.
+- `jj_rows.rs` owns selectable rendered row models, row loaders, narrow metadata templates, metadata
+  pairing, row grouping, resolve-entry parsing, file-list path preservation, and conversion from
+  rendered ANSI output into Ratatui row items. It may call the `jj.rs` process helpers, but it
+  should not own command identity or navigation provenance.
 - `graph.rs` owns the default/log graph view, graph-row selection, graph search, and graph-to-detail
   navigation.
 - `show.rs` and `diff.rs` own their view behavior and should stay distinct even when they share
