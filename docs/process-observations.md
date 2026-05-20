@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Pre-Packet-34 maintainability interruption)
+
+- Slice / task: docs-only planning update in jj change `Plan maintainability interruption`.
+- User interruption: after Packet 33 shipped operation-log `operation restore` and
+  `operation revert` guided flows, the user asked to interrupt the plan before Packet 34 Split
+  Guided Flow for maintainability and UI repair work.
+- Routing decision: the inserted primary interruption packet routes app decomposition and
+  screen/action contract design to `gpt-5.5 high`, with `gpt-5.5 high` review. The reason is
+  architecture risk rather than prose complexity: `app.rs` is too large, screen behavior contracts
+  are implicit, and the work crosses dispatch, prompts/overlays, action execution, view behavior,
+  and tests.
+- Observable outcome: `docs/plan/next-implementation-slices.md` now inserts a pre-Packet-34
+  interruption wave after accepted Packet 33 and before the existing Split Guided Flow. The wave
+  covers app decomposition, screen/action contracts, navigation/view-entry keys, leader-style help,
+  keyboard-driven action menus and popovers, selection/theme presentation, status file actions,
+  fetch remote selection, file viewing/wrap modes, warning-free validation, and commit-message
+  discipline.
+- Planning boundary: the update preserves historical Packet 33 progress and keeps Packet 34 in the
+  plan as postponed rather than removed or rewritten. No Rust files were edited.
+- Validation: `just md-check`
+- Docs / fragility: `docs/plan/fragility-register.md` was not changed because this interruption only
+  plans future contracts; future implementation packets must update it when they add parser,
+  rendered-output, or command semantic assumptions.
+- Evidence basis:
+  - Thread: `019e45a4-2a88-7342-97c8-929bb63c3623`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `printenv CODEX_THREAD_ID`, `date +%F`, `jj --no-pager status`, `just md-check`
+  - Files: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 32 progress and process audit)
 
 - Slice / task: audit `docs/plan/progress.md` and `docs/process-observations.md` for the current

@@ -567,6 +567,228 @@ specific regression or polish packet is accepted later.
   construction, disabled states, output preservation, `/tmp` proof quality, and whether recovery
   semantics are claimed only where `jj` proves them.
 
+### Pre-Packet-34 Interruption: Maintainability And UI Repair Wave
+
+Packet 33 is accepted. Packet 34 remains the next rewrite-feature packet, but it is intentionally
+postponed behind this interruption wave. The interruption exists because the next work should reduce
+maintainer load before adding another guided rewrite flow: `app.rs` is carrying too many unrelated
+responsibilities, several screen-level contracts are implicit, and small UI regressions now point to
+missing ownership boundaries.
+
+Run interruption packet A first. Later interruption packets should be promoted only after packet A
+defines the owning module and screen/action contract for that area. Do not run two interruption
+packets in parallel when their expected write sets overlap. If packet A introduces narrower modules,
+future prompts should use those new owner files instead of sending unrelated work back through
+`src/app.rs`.
+
+#### Interruption Packet A: App Decomposition And Screen Contracts
+
+- Goal: decompose the oversized app orchestration surface and define screen/action contracts before
+  adding Split Guided Flow.
+- Owner concept: app-level event dispatch, screen ownership, action execution contracts, prompt and
+  overlay lifecycle, and maintainability guidance for future UI work.
+- Expected write set: `src/app.rs`, new focused app/screen/action modules if introduced,
+  `src/view_state.rs`, `src/command.rs` only for contracts that must move with dispatch, focused
+  screen-level tests in touched modules, `docs/agent/architecture.md`,
+  `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Non-goals: no new user-visible commands, no Packet 34 split implementation, no broad visual
+  redesign, no command-key remapping except where required to preserve existing behavior during the
+  extraction, and no cleanup of unrelated parser or `jj` command semantics.
+- Acceptance criteria: each active screen has an explicit home for keys, actions, prompts/overlays,
+  command execution, refresh/back behavior, and tests; app-level dispatch no longer owns detailed
+  policy for every screen; action output, prompts, help/leader behavior, and screen transitions have
+  named contracts; existing shipped Packet 33 behavior and earlier daily flows still pass focused
+  regression tests; future packets can name a non-overlapping owner/write set without defaulting to
+  `src/app.rs`.
+- Validation: focused tests for every moved screen/action contract; screen-level regression tests
+  for graph, status, bookmarks, operation log, action output, and existing guided flows that move;
+  full `cargo test`; `cargo clippy -- -D warnings` or the repository-approved no-warning equivalent;
+  `cargo run` smoke check with no warnings when practical; `rustup run nightly cargo fmt --check`;
+  `just md-check`; `just check` before handoff when the local wrapper is healthy, otherwise report
+  the known wrapper failure and equivalent direct checks.
+- Docs/fragility updates: update architecture docs with the new ownership map and update
+  `progress.md`; update `fragility-register.md` only if extraction changes a parser, rendered-output
+  assumption, or command semantic contract.
+- Suggested agent/model routing: gpt-5.5 high implementation and gpt-5.5 high review. This is
+  cross-module architecture work with high cognitive-load risk, and the user explicitly requested
+  that this refactoring/design pass use a high-capability model rather than a mini model.
+- Review prompt: review Interruption Packet A for concept coherence, reduced cognitive load,
+  behavior preservation, screen/action contract clarity, test ownership, documentation updates,
+  warning discipline, and whether follow-up packets can proceed without broad `src/app.rs` edits.
+
+#### Interruption Packet B: Navigation And View Entry Contracts
+
+- Goal: make view entry and directional navigation coherent before new rewrite flows add more keys.
+- Owner concept: command grammar, generated key metadata, view entry routing, and screen-local
+  navigation contracts.
+- Expected write set: `src/command.rs`, `src/view_state.rs`, screen owner modules identified by
+  packet A, focused tests, `docs/plan/progress.md`, and user-facing docs only if shipped keys
+  change.
+- Non-goals: no Split Guided Flow, no command mode, no broad shortcut redesign, and no mutation
+  command changes.
+- Acceptance criteria: status is selectable from log with `S`; bookmark and operation-log view entry
+  keybinds that are documented or expected by the app work consistently; a view menu can select log,
+  status, bookmarks, operation log, and other shipped views without pretending future screens exist;
+  multi-character command grammar is designed for commands such as `bc` bookmark create and `gf` git
+  fetch; right/`l` expands or opens where a selected item has expandable detail, while left/`h`
+  collapses or backs out according to the screen contract; generated help and dispatch agree.
+- Validation: command metadata tests; generated-help tests; screen-level dispatch tests for `S`,
+  bookmarks, operation log, view menu selection, multi-character prefixes/timeouts/cancel behavior,
+  and `h`/`l` expansion/collapse; `cargo check`; full `cargo test`; warning-free/clippy check when
+  the packet changes Rust.
+- Docs/fragility updates: update `progress.md`; update command inventory or tutorials only after
+  behavior ships; no fragility update unless new rendered-output assumptions are added.
+- Suggested agent/model routing: gpt-5.5 high exploration and implementation if multi-character
+  grammar is included; split out smaller subpackets if the grammar and view-menu work cannot share a
+  single owner after packet A.
+- Review prompt: review navigation contracts for key conflicts, generated-help truthfulness,
+  screen-local ownership, prefix ambiguity, and regression coverage for shipped view entry keys.
+
+#### Interruption Packet C: Help Leader Menu
+
+- Goal: turn help from a passive key listing into a keyboard-driven leader-style command surface.
+- Owner concept: help/leader menu state, command grouping, and dispatch back into existing commands.
+- Expected write set: help/menu owner module from packet A, `src/command.rs`, `src/tui.rs` only for
+  help rendering if it remains the owner, focused tests, and `docs/plan/progress.md`.
+- Non-goals: no generic command palette, no fuzzy search, no new mutation commands, and no free-form
+  command mode.
+- Acceptance criteria: pressing a listed option executes that command and closes the menu; the menu
+  has an explicit close option that closes without executing; entries are grouped by user operation
+  such as navigation, view switching, search/copy, action previews, and recovery rather than sorted
+  only by key; unavailable commands are hidden or disabled according to the screen contract; the
+  help/leader surface remains keyboard-only friendly.
+- Validation: view-level help/leader tests for execute-and-close, close-only, disabled command
+  behavior, grouping text, and selected-screen command availability; generated-help metadata tests;
+  `cargo check`; focused tests and full `cargo test` when practical; warning-free/clippy check for
+  Rust changes.
+- Docs/fragility updates: update `progress.md`; update user docs/tutorials only after the shipped
+  interaction changes.
+- Suggested agent/model routing: gpt-5.5 high implementation if the leader menu executes commands
+  through shared dispatch; smaller implementation is acceptable only if packet A already isolated
+  the menu state cleanly.
+- Review prompt: review the leader menu for command grouping, execute-and-close semantics, close
+  affordance, disabled-state correctness, generated metadata reuse, and keyboard-only usability.
+
+#### Interruption Packet D: Action Menu, Popovers, And Selection Presentation
+
+- Goal: make action and popover surfaces keyboard-driven, themed, and visibly connected to the
+  current selection.
+- Owner concept: action menu interaction, popover rendering, selected-row presentation, and theme
+  fallback policy.
+- Expected write set: `src/action_menu.rs`, popover/rendering owner modules identified by packet A,
+  `src/tui.rs` only where rendering remains centralized, focused rendering and interaction tests,
+  `docs/plan/progress.md`, and `docs/plan/fragility-register.md` only if color/style assumptions
+  depend on rendered `jj` output.
+- Non-goals: no new action commands, no broad theme system, no terminal color configurator, and no
+  rewrite of every screen outside the selection/action/popover surfaces.
+- Acceptance criteria: selected items in lists have a visible highlight or color treatment; the
+  action menu is driven by keys instead of requiring menu-style selection movement for common
+  commands; popovers use colors and fallback styles that fit `jj` output and the active terminal
+  theme better than black-and-white defaults; small terminals keep labels readable; selected context
+  remains clear when action previews, popovers, or overlays open and close.
+- Validation: rendering snapshots or snapshot-style tests for selected rows, action menu, popovers,
+  narrow terminals, and no-color/low-color fallback where practical; interaction tests for
+  key-driven action execution and close/cancel behavior; `cargo check`; full `cargo test`;
+  warning-free/clippy check for Rust changes.
+- Docs/fragility updates: update `progress.md`; add a fragility entry only if style decisions depend
+  on parsing or inferring colors from rendered `jj` output.
+- Suggested agent/model routing: gpt-5.5 high implementation or review because visual state,
+  terminal compatibility, and action routing cross ownership boundaries.
+- Review prompt: review selection visibility, keyboard-driven action behavior, popover theme
+  coherence, small-terminal rendering, no-color fallback, and absence of new command semantics.
+
+#### Interruption Packet E: Status File Actions
+
+- Goal: make status files selectable and action-capable through exact file-path contracts.
+- Owner concept: status screen file selection, exact path ownership, and file-scoped action routing.
+- Expected write set: `src/status.rs`, file action owner modules identified by packet A, `src/jj.rs`
+  only for exact file command construction, focused tests, `docs/plan/progress.md`, and
+  `docs/plan/fragility-register.md`.
+- Non-goals: no patch editor, no broad fileset input, no conflict resolver, and no path inference
+  from rendered sticky headings.
+- Acceptance criteria: status rows support file selection where exact repo-relative paths are known;
+  file-scoped actions are enabled only for exact paths; unsupported or ambiguous status rows degrade
+  to disabled state with readable status; selected file actions preserve full command output and
+  refresh selection safely.
+- Validation: status parser/path ownership tests, screen-level status selection tests, command
+  construction tests for each promoted file action, result-output tests, disposable `/tmp` jj repo
+  proof for any mutation, `cargo check`, full `cargo test`, and warning-free/clippy check.
+- Docs/fragility updates: update exact-path and status-output assumptions in
+  `fragility-register.md`; update `progress.md`.
+- Suggested agent/model routing: gpt-5.5 high implementation and review because exact file paths are
+  mutation-critical.
+- Review prompt: review status file exactness, disabled ambiguous rows, action availability, command
+  construction, refresh behavior, output preservation, and `/tmp` proof quality.
+
+#### Interruption Packet F: Fetch Remote Selection
+
+- Goal: let fetch use the default behavior quickly while also supporting an explicit remote choice.
+- Owner concept: sync/fetch action planning and remote selection UI.
+- Expected write set: sync/fetch owner module from packet A, `src/jj.rs`, `src/command.rs` only for
+  key metadata, focused tests, `docs/plan/progress.md`, and `docs/plan/fragility-register.md` if
+  remote-list parsing changes.
+- Non-goals: no host dashboard, no credential management, no push redesign, and no remote editing.
+- Acceptance criteria: fetch offers an option to fetch from a specific remote; one-remote and
+  default-fetch paths remain low friction; no-remote and credential/error output stay readable;
+  preview/result wording distinguishes default fetch from remote-specific fetch.
+- Validation: command-construction tests for default and remote-specific fetch; remote-list parser
+  or selection tests; view-level preview/result/error tests; disposable `/tmp` or local disposable
+  remote proof where feasible; `cargo check`; full `cargo test`; warning-free/clippy check.
+- Docs/fragility updates: update remote-list/fetch assumptions if they change; update `progress.md`.
+- Suggested agent/model routing: gpt-5.5 high if remote selection shares the same picker/action
+  surface as push; otherwise a narrower implementation with stronger review is acceptable.
+- Review prompt: review fetch target wording, remote-list exactness, default behavior preservation,
+  credential/error output preservation, and remote proof coverage.
+
+#### Interruption Packet G: File Viewing And Wrap Modes
+
+- Goal: improve file viewing with formatting-preserving display and an explicit no-wrap mode.
+- Owner concept: file show/document view rendering, wrap policy, and per-view display mode state.
+- Expected write set: `src/file_show.rs`, `src/sticky_file_view.rs`, `src/rendered_jj.rs` only if
+  formatting preservation needs parser support, focused tests, `docs/plan/progress.md`, and
+  `docs/plan/fragility-register.md` if rendered-output assumptions change.
+- Non-goals: no editor, no syntax-highlighting engine unless separately justified, no mutation, and
+  no global terminal reflow redesign.
+- Acceptance criteria: users can view files with formatting preserved where `jj` output already
+  provides it; a no-wrap view is available for content such as Markdown where wrapping obscures
+  structure; wrap/no-wrap state is discoverable through generated help or the leader menu; scroll,
+  search, sticky file context, and copy continue to behave predictably.
+- Validation: document-view rendering tests for wrapped and no-wrap modes, Markdown-like long-line
+  examples, horizontal/vertical scroll boundaries, search/copy behavior, and sticky context;
+  `cargo check`; full `cargo test`; warning-free/clippy check for Rust changes.
+- Docs/fragility updates: update `progress.md`; update fragility entries if the implementation
+  parses additional file headings, ANSI styles, or rendered formatting markers.
+- Suggested agent/model routing: gpt-5.5 high implementation or review because wrap policy affects
+  document navigation and presentation.
+- Review prompt: review formatting preservation, no-wrap ergonomics, scroll/search/copy behavior,
+  sticky context, generated help, and parser fragility.
+
+#### Interruption Packet H: Validation And Contribution Discipline
+
+- Goal: make warning-free builds and commit-message discipline part of the finished packet contract.
+- Owner concept: repository validation workflow, agent handoff expectations, and contribution
+  guidance.
+- Expected write set: `Justfile`, repo-local agent/process docs, relevant planning docs, and CI or
+  lint config only if the repo already has a clear home for it.
+- Non-goals: no Rust behavior changes, no dependency churn unless required by the chosen lint gate,
+  no Git workflow examples, and no rewrite of historical progress entries that were true at the
+  time.
+- Acceptance criteria: finished implementation packets require `cargo run` to be warning-free when a
+  smoke run is practical; Rust packets include `cargo clippy -- -D warnings` or an explicit
+  repository equivalent; commit descriptions follow the 50-character title and 72-column body
+  guidance already used in the repo's jj workflow; handoffs report validation proof and any skipped
+  no-warning checks.
+- Validation: `just md-check`; run any new or changed validation recipe; no Rust tests required
+  unless validation tooling touches Rust build configuration.
+- Docs/fragility updates: update `progress.md`; no fragility-register update unless validation
+  begins depending on unstable external output.
+- Suggested agent/model routing: documentation/tooling worker with maintainer review; use gpt-5.5
+  high review if the packet changes the standard finished-check contract for all future agents.
+- Review prompt: review validation discipline for command accuracy, jj terminology, warning policy,
+  commit-message rules, and whether future packets have a mechanical way to prove no-warning
+  behavior.
+
 ### Packet 34: Split Guided Flow
 
 - Goal: add a bounded `jj split` flow for the current or exact selected change when the UI can
@@ -884,11 +1106,15 @@ specific regression or polish packet is accepted later.
 
 ### Packet 32 Scheduling Notes
 
-- Immediate next recommended packet: Packet 34, because Packet 33 shipped operation-log recovery for
-  exact operation ids, and packet-shaped flows now use the same exactness and preview conventions
-  for subsequent rewrite work.
+- Immediate next recommended packet: Pre-Packet-34 Interruption Packet A, because Packet 33 shipped
+  operation-log recovery for exact operation ids and the user requested a maintainability/UI
+  interruption before Split Guided Flow. Packet 34 is postponed until the interruption wave either
+  lands or is explicitly reprioritized.
 - Packets 34 and 35 should stay separate. `split` has editor/process uncertainty, while `duplicate`
   is a graph rewrite with different target and refresh behavior.
+- The interruption packets should not be treated as command-coverage parity work. Their purpose is
+  maintainability, screen-level contracts, keyboard/UI coherence, and validation discipline before
+  more rewrite features are added.
 - Packets 36, 38, and 39 must not be collapsed. Forget and tracking mutations need explicit metadata
   first; rendered bookmark labels are not a mutation-grade contract.
 - Packet 37 may run after the existing local exact bookmark-name contract is confirmed. It should
@@ -944,6 +1170,7 @@ Media review should follow Ratatui guidance:
   | Resolve conflicts        | Packet 28                                           | full merge editor                                              |
   | Working-copy navigation  | Packet 30                                           | richer stack-aware movement policy                             |
   | Strong command coverage  | Packets 31 and 32                                   | low-frequency passthrough commands remain intentionally scoped |
+  | Maintainability/UI       | Pre-Packet-34 interruption wave                     | Packet 34 waits behind app decomposition and UI repair         |
 
 ## Follow-Up Planning Backlog
 

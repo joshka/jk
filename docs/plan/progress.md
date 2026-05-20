@@ -828,4 +828,31 @@
   rows and the separate `self.id()` template stream; restore/revert command semantics are covered by
   installed `jj` behavior and command-construction tests, but no transaction graph simulation is
   attempted.
-- Next slice: Packet 34: Split Guided Flow
+- Next slice: Pre-Packet-34 Interruption Packet A: App Decomposition And Screen Contracts
+
+## Pre-Packet-34 Planning Interruption: Maintainability And UI Repair Wave
+
+- Files changed: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+  `docs/process-observations.md`
+- Behavior: Packet 34 Split Guided Flow is postponed behind a maintainability and UI repair
+  interruption. The plan now inserts interruption packets after accepted Packet 33 and before Packet
+  34, with the first packet routed to `gpt-5.5 high` for decomposing `app.rs` and defining explicit
+  screen/action contracts.
+- Inserted packets/backlog: the interruption wave covers app decomposition and screen contracts;
+  navigation and view entry contracts, including `S` status selection, bookmarks/oplog entry,
+  view-menu access, multi-character command grammar, and `h`/`l` expand/collapse behavior; a
+  leader-style help menu; keyboard-driven action menus, popovers, selection highlighting, and theme
+  coherence; status file selection/actions; fetch remote selection; file viewing and no-wrap modes;
+  and validation/commit-message discipline.
+- Product boundary: the interruption does not rewrite Packet 33 implementation notes, does not edit
+  Rust, and does not remove Packet 34. Split Guided Flow remains planned but waits until the
+  maintainability/UI work lands or is explicitly reprioritized.
+- Validation: `just md-check`
+- Validation note: no Rust validation was run because this is a docs-only planning update.
+- Docs/fragility updates: `docs/plan/fragility-register.md` unchanged because this planning update
+  introduces no new parser, rendered-output, or command semantic contract; future implementation
+  packets must update it when they add such assumptions.
+- Remaining risk: the interruption packets are bounded prompts, not completed implementation. Packet
+  A must land first so later UI repair packets can avoid defaulting every change back through
+  `src/app.rs`.
+- Next slice: Pre-Packet-34 Interruption Packet A: App Decomposition And Screen Contracts
