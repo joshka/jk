@@ -54,12 +54,10 @@ impl RolePromptOption {
         }
     }
 
-    #[cfg(test)]
     pub fn role(&self) -> &'static str {
         self.role
     }
 
-    #[cfg(test)]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -106,6 +104,21 @@ impl RolePrompt {
         lines.push(self.preview_required_message.to_owned());
         lines.join("\n")
     }
+
+    pub fn source_revisions(&self) -> Vec<&str> {
+        self.options
+            .iter()
+            .filter(|option| option.role() == "source")
+            .map(RolePromptOption::value)
+            .collect()
+    }
+
+    pub fn destination_revision(&self) -> Option<&str> {
+        self.options
+            .iter()
+            .find(|option| option.role() == "destination")
+            .map(RolePromptOption::value)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -123,7 +136,6 @@ pub struct ActionMenuItem {
 }
 
 impl ActionMenuItem {
-    #[cfg(test)]
     pub fn action(&self) -> ActionKind {
         self.action
     }
@@ -318,10 +330,22 @@ mod tests {
                 if prompt.title() == "confirm role assignment"
         ));
         if let FollowUp::RolePrompt(prompt) = menu.items()[0].follow_up() {
+            assert_eq!(menu.items()[0].action(), ActionKind::Rebase);
             assert_eq!(prompt.options()[0].role(), "source");
             assert_eq!(
                 prompt.options()[0].value(),
                 "aaaabbbb1111111111111111111111111111111111"
+            );
+            assert_eq!(
+                prompt.source_revisions(),
+                vec![
+                    "aaaabbbb1111111111111111111111111111111111",
+                    "eeeeffff2222222222222222222222222222222222"
+                ]
+            );
+            assert_eq!(
+                prompt.destination_revision(),
+                Some("ccccdddd1111111111111111111111111111111111")
             );
             let labels = prompt
                 .options()

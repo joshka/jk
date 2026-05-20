@@ -201,6 +201,87 @@ impl JjGitPush {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjRebasePlan {
+    sources: Vec<String>,
+    destination: String,
+}
+
+impl JjRebasePlan {
+    pub fn new(sources: Vec<String>, destination: impl Into<String>) -> Self {
+        Self {
+            sources,
+            destination: destination.into(),
+        }
+        .normalize()
+    }
+
+    pub fn sources(&self) -> &[String] {
+        &self.sources
+    }
+
+    pub fn destination(&self) -> &str {
+        &self.destination
+    }
+
+    pub fn command_label(&self, _dry_run: bool) -> String {
+        let label_args = self
+            .command_argv(false)
+            .iter()
+            .map(|arg| arg.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self, _dry_run: bool) -> Vec<String> {
+        let mut argv = vec!["rebase".to_owned()];
+        for source in &self.sources {
+            argv.push("-r".to_owned());
+            argv.push(source.clone());
+        }
+        argv.push("-o".to_owned());
+        argv.push(self.destination.clone());
+
+        argv
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(false),
+            &self.command_label(false),
+            "rebased",
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        let sources = self
+            .sources
+            .iter()
+            .map(|source| format!("source: {source}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "command: {}\n\n{}\n\ndestination: {}\n\ngraph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n\nundo path: jj undo",
+            self.command_label(false),
+            sources,
+            self.destination,
+        )
+    }
+
+    fn normalize(mut self) -> Self {
+        self.sources.retain(|source| !source.trim().is_empty());
+        self
+    }
+}
+
 #[allow(dead_code)]
 pub fn git_remotes() -> Result<Vec<String>> {
     let mut jj = Command::new("jj");
@@ -1922,6 +2003,36 @@ mod tests {
     }
 
     #[test]
+    fn rebase_command_args_use_explicit_sources_and_destination() {
+        let rebase = JjRebasePlan::new(
+            vec!["source-a".to_owned(), "source-b".to_owned()],
+            "dest".to_owned(),
+        );
+
+        assert_eq!(
+            rebase.command_argv(false),
+            vec!["rebase", "-r", "source-a", "-r", "source-b", "-o", "dest"]
+        );
+        assert_eq!(
+            rebase.command_label(false),
+            "jj rebase -r source-a -r source-b -o dest"
+        );
+    }
+
+    #[test]
+    fn rebase_preview_summary_includes_command_effect_and_undo_path() {
+        let rebase = JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned());
+
+        let preview = rebase.preview_summary();
+
+        assert!(preview.contains("command: jj rebase -r source-a -o dest"));
+        assert!(preview.contains("source: source-a"));
+        assert!(preview.contains("destination: dest"));
+        assert!(preview.contains("graph effect: rebases the selected revisions"));
+        assert!(preview.contains("undo path: jj undo"));
+    }
+
+    #[test]
     fn git_push_bookmark_args_include_dry_run_when_previewing() {
         let push = JjGitPush::for_bookmark("main".to_owned()).with_remote("origin".to_owned());
 
@@ -1976,6 +2087,47 @@ mod tests {
         assert_eq!(
             push.command_argv(false),
             vec!["git", "push", "--remote", "origin"]
+        );
+    }
+
+    #[test]
+    fn rebase_plan_argv_includes_repeated_sources_and_destination() {
+        let rebase = JjRebasePlan::new(
+            vec![
+                "source-a".to_owned(),
+                "source-b".to_owned(),
+                "source-c".to_owned(),
+            ],
+            "dest".to_owned(),
+        );
+
+        assert_eq!(
+            rebase.command_argv(false),
+            vec![
+                "rebase", "-r", "source-a", "-r", "source-b", "-r", "source-c", "-o", "dest"
+            ]
+        );
+    }
+
+    #[test]
+    fn rebase_plan_argv_and_label_do_not_change_for_preview_flag() {
+        let rebase = JjRebasePlan::new(vec!["source-a".to_owned(), "source-b".to_owned()], "dest");
+
+        assert_eq!(
+            rebase.command_argv(true),
+            vec!["rebase", "-r", "source-a", "-r", "source-b", "-o", "dest"]
+        );
+        assert_eq!(
+            rebase.command_label(false),
+            "jj rebase -r source-a -r source-b -o dest"
+        );
+        assert_eq!(
+            rebase.command_label(true),
+            "jj rebase -r source-a -r source-b -o dest"
+        );
+        assert_eq!(
+            rebase.command_argv(false),
+            vec!["rebase", "-r", "source-a", "-r", "source-b", "-o", "dest"]
         );
     }
 

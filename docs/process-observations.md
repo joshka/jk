@@ -7,6 +7,28 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-19
 
+- Slice / task: Slice 12 rebase preview flow implementation
+
+- Worker / model: `019e4378-4fca-7202-bedc-7ba0df298487` / `gpt-5.4-mini`
+
+- Scope given: implement the first rebase preview flow only, keep source and destination roles
+  explicit, require preview and confirmation, refresh the graph after success, and avoid touching
+  jj/git history.
+
+- Observable outcome: threaded the graph action menu into a dedicated rebase preview modal with
+  explicit source/destination role extraction, synthetic command/effect preview text, confirm/cancel
+  behavior, and post-run refresh messaging that keeps `jj undo` visible.
+
+- Evidence basis:
+  - Thread: `019e4378-4fca-7202-bedc-7ba0df298487`
+  - Date: `2026-05-19`
+  - Commands:
+    - `cargo check`
+    - `cargo test rebase -- --nocapture`
+    - `cargo test selected_sources_and_destination_prompt_with_explicit_roles -- --nocapture`
+    - `cargo test`
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`
+
 - Slice / task: Bootstrap first tracked process-observations doc
 
 - Worker / model: `019e436d-8c85-7b21-bb66-cb30be4b31af` / `gpt-5.4-mini`
@@ -144,6 +166,137 @@ be supported by the work log, repo state, or direct transcript evidence.
     - `cargo test parses_git_remotes -- --nocapture`
     - `just md-check`
   - Files: `src/app.rs`, `src/jj.rs`, `src/tui.rs`, `AGENTS.md`, `docs/process-observations.md`
+
+### 2026-05-19 (Slice-12 implementation review)
+
+- Slice / task: Review the current Slice 12 rebase-preview implementation against the
+  implementation-slice acceptance criteria.
+
+- Worker / model: `019e437e-13a5-7ba3-9b9a-f029dc3bf178` / `gpt-5.5`
+
+- Scope given: Focus on `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`, and tests
+  added in `src/app.rs` and `src/jj.rs`; check explicit roles, visual-order inference,
+  preview/confirmation, success selection behavior, failure readability, preview honesty, and slice
+  scope.
+
+- Observable outcome: Reviewed the requested files, checked the Slice 12 text, verified the current
+  unit test suite, and consulted `jj rebase --help` for the exact `-r` graph semantics.
+
+- Evidence basis:
+  - Thread: `019e437e-13a5-7ba3-9b9a-f029dc3bf178`
+  - Date: `2026-05-19`
+  - Commands:
+    - `jj --no-pager status`
+    - `rg -n "Slice 12|stack|rebase|source|destination|acceptance"       docs/plan/implementation-slices.md`
+    - `rg -n "action_menu|Move|rebase|source|destination|preview|confirm|stack"       src/action_menu.rs src/app.rs src/jj.rs src/tui.rs`
+    - `cargo test`
+    - `jj --no-pager rebase --help`
+  - Files: `docs/plan/implementation-slices.md`, `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`,
+    `src/tui.rs`, `docs/process-observations.md`
+
+### 2026-05-19 (Slice-12 implementation and repair)
+
+- Slice / task: Implement the first rebase preview flow while keeping the shared tree buildable.
+
+- Worker / model: `019e4378-4fca-7202-bedc-7ba0df298487` / `gpt-5.4-mini`,
+  `019e437a-4153-72d2-88cf-57a2d13d1bdb` / `gpt-5.3-codex-spark`, and
+  `019e437b-9ac8-72e2-b3f7-7b5dc414bdc7` / `gpt-5.3-codex-spark`
+
+- Scope given: implement Slice 12 code in the graph action-menu path, then restore compilation
+  immediately if the shared working copy stopped building.
+
+- Observable outcome: the mini worker eventually reported a complete Slice 12 implementation; in
+  parallel, a Spark worker landed the shared `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, and
+  `src/tui.rs` rebase-preview patch in the working copy, and a second Spark worker narrowed a broken
+  intermediate state to concrete compile blockers after a syntax repair.
+
+- Evidence basis:
+  - Threads:
+    - `019e4378-4fca-7202-bedc-7ba0df298487`
+    - `019e437a-4153-72d2-88cf-57a2d13d1bdb`
+    - `019e437b-9ac8-72e2-b3f7-7b5dc414bdc7`
+  - Date: `2026-05-19`
+  - Transcript: subagent completion messages for the implementation and compile-repair tasks
+  - Commands:
+    - `cargo check`
+    - `cargo test rebase -- --nocapture`
+    - `cargo test`
+    - `jj --no-pager status`
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`
+
+### 2026-05-19 (Slice-12 acceptance fix)
+
+- Slice / task: Close the 5.5 review gap on post-rebase selection behavior.
+
+- Worker / model: main thread orchestration and local patching after `gpt-5.5` review
+
+- Scope given: ensure successful rebase refreshes and preserves or moves selection to the affected
+  stack before accepting Slice 12.
+
+- Observable outcome: updated `confirm_rebase()` to reveal a rebased source change after refresh,
+  using the same recent-mode fallback pattern already used by the `jj new trunk` flow, then reran
+  focused rebase tests, full `cargo test`, and a disposable-repo `jj rebase` plus `jj undo` proof.
+
+- Evidence basis:
+  - Thread: `019e437e-13a5-7ba3-9b9a-f029dc3bf178`
+  - Date: `2026-05-19`
+  - Commands:
+    - `cargo test rebase -- --nocapture`
+    - `cargo test`
+    - `jj --no-pager rebase --help`
+    - disposable-repo `jj --no-pager rebase -r <source> -o <dest>`
+    - disposable-repo `jj --no-pager undo`
+  - Files: `src/app.rs`, `docs/plan/progress.md`, `docs/plan/fragility-register.md`,
+    `docs/process-observations.md`
+
+### 2026-05-19 (Slice-12 confirmatory re-review)
+
+- Slice / task: Confirm that the post-rebase selection fix closes the only substantive Slice 12
+  review gap.
+
+- Worker / model: `019e437e-13a5-7ba3-9b9a-f029dc3bf178` / `gpt-5.5`
+
+- Scope given: re-review the updated `src/app.rs` success path only and confirm whether the earlier
+  acceptance finding is resolved.
+
+- Observable outcome: confirmed that successful rebase now captures a rebased source id before
+  execution and reveals that change after refresh with a `LogViewMode::Recent` fallback, leaving no
+  substantive acceptance gaps.
+
+- Evidence basis:
+  - Thread: `019e437e-13a5-7ba3-9b9a-f029dc3bf178`
+  - Date: `2026-05-19`
+  - Transcript: subagent follow-up completion message after the selection fix
+  - Commands:
+    - `cargo test rebase -- --nocapture`
+  - Files: `src/app.rs`, `docs/process-observations.md`
+
+### 2026-05-19 (session review audit)
+
+- Slice / task: Review landed slices, model usage evidence, development-rule adherence, and product
+  state.
+
+- Worker / model: main thread review pass
+
+- Scope given: read the copied `docs/development` rule files up front, inspect session history and
+  landed code, compare subagent model usage with rework, and assess current `jk` product
+  completeness.
+
+- Observable outcome: found and corrected the Slice 12 model attribution for
+  `019e4378-4fca-7202-bedc-7ba0df298487`; counted explicit parent-thread subagent spawn requests by
+  model/role; inspected the current jj stack and main workflow files; reran the full Rust unit test
+  suite.
+
+- Evidence basis:
+  - Thread: `019e42d3-ba3c-78a1-9623-d684a45bcc39`
+  - Date: `2026-05-19`
+  - Commands:
+    - `rg --files docs/development | sort`
+    - `jq -r 'select(.type=="response_item" and .payload.type=="function_call" and .payload.name=="spawn_agent") | (.payload.arguments | fromjson? // empty) | [.model // "inherited", .agent_type // "default"] | @tsv' ~/.codex/sessions/2026/05/19/rollout-2026-05-19T17-40-32-019e42d3-ba3c-78a1-9623-d684a45bcc39.jsonl`
+    - `jj --no-pager log -r 'main..@'`
+    - `cargo test`
+  - Files: `docs/development/`, `docs/process-observations.md`, `docs/plan/progress.md`,
+    `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`
 
 ## Excluded Evidence
 

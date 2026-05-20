@@ -144,3 +144,15 @@
   chosen remote, and the preview/result text still comes from `jj` CLI output, so future
   output-shape drift could require a parser or contract change
 - Next slice: Slice 12: Rebase Preview Flow
+
+## Slice 12: Rebase Preview Flow
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `cargo check`; focused `cargo test rebase -- --nocapture`; full `cargo test`;
+  disposable-repo manual `jj --no-pager rebase -r <source> -o <dest>` run followed by
+  `jj --no-pager undo`; `rustup run nightly cargo fmt --check`; `just md-check`
+- Remaining risk: the preview is honest about explicit roles, command shape, and undo path, but it
+  still summarizes graph effect textually instead of rendering a simulated before/after graph, and
+  long preview/result output remains unscrollable in a small terminal
+- Next slice: none; implementation slices complete

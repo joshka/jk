@@ -13,7 +13,7 @@ use color_eyre::eyre::eyre;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::DefaultTerminal;
 
-use crate::action_menu::{ActionMenu, FollowUp, RolePrompt};
+use crate::action_menu::{ActionKind, ActionMenu, FollowUp, RolePrompt};
 use crate::clipboard;
 use crate::command::{
     Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect, find_binding,
@@ -21,8 +21,8 @@ use crate::command::{
 };
 use crate::copy::CopyOption;
 use crate::jj::{
-    DiffFormat, JjCommand, JjGitPush, JjGitPushTarget, LogViewMode, ViewSpec, git_fetch,
-    git_remotes, new_trunk, resolve_exact_change_id,
+    DiffFormat, JjCommand, JjGitPush, JjGitPushTarget, JjRebasePlan, LogViewMode, ViewSpec,
+    git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -62,8 +62,16 @@ enum InteractionMode {
         selected: usize,
     },
     RolePrompt {
+        action: ActionKind,
         prompt: RolePrompt,
         selected: usize,
+    },
+    RebasePreview {
+        rebase: JjRebasePlan,
+        command_label: String,
+        preview_output: String,
+        status_context: Option<String>,
+        completed: bool,
     },
     PushRemotePrompt {
         target: JjGitPushTarget,
@@ -386,6 +394,7 @@ impl App {
                                 }
                                 FollowUp::RolePrompt(prompt) => {
                                     self.mode = InteractionMode::RolePrompt {
+                                        action: action.action(),
                                         prompt: prompt.clone(),
                                         selected: 0,
                                     };
@@ -399,7 +408,11 @@ impl App {
                 }
                 Ok(true)
             }
-            InteractionMode::RolePrompt { prompt, selected } => {
+            InteractionMode::RolePrompt {
+                action,
+                prompt,
+                selected,
+            } => {
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
                     KeyCode::Char('j') | KeyCode::Down => {
@@ -412,8 +425,62 @@ impl App {
                     }
                     KeyCode::Enter => {
                         let next_status = prompt.status_message();
+                        let action = *action;
+                        let rebase_plan = match action {
+                            ActionKind::Rebase => rebase_plan_from_prompt(prompt),
+                            _ => None,
+                        };
+
                         self.mode = InteractionMode::Normal;
-                        self.status = StatusLine::with_message(&self.view, next_status);
+
+                        match action {
+                            ActionKind::Rebase => match rebase_plan {
+                                Some(rebase) => self.open_rebase_preview(rebase),
+                                None => {
+                                    self.status =
+                                        StatusLine::error(&self.view, next_status.to_owned());
+                                }
+                            },
+                            ActionKind::Squash => {
+                                self.status = StatusLine::with_message(
+                                    &self.view,
+                                    "squash preview not yet implemented",
+                                );
+                            }
+                            _ => {
+                                self.status =
+                                    StatusLine::with_message(&self.view, next_status.to_owned());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::RebasePreview {
+                rebase,
+                command_label: _,
+                preview_output: _,
+                status_context,
+                completed,
+            } => {
+                let (rebase, status_context, completed) =
+                    { (rebase.clone(), status_context.clone(), *completed) };
+                match code {
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status =
+                                StatusLine::with_message(&self.view, "rebase cancelled".to_owned());
+                        }
+                    }
+                    KeyCode::Enter => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_rebase(rebase, status_context, viewport_height);
                     }
                     _ => {}
                 }
@@ -576,6 +643,44 @@ impl App {
         }
     }
 
+    fn open_rebase_preview(&mut self, rebase: JjRebasePlan) {
+        let status_context = Some(format!(
+            "rebase from {} source(s) into {} from {}",
+            rebase.sources().len(),
+            rebase.destination(),
+            self.view.spec().app_label()
+        ));
+        let source_labels = rebase
+            .sources()
+            .iter()
+            .map(|source| short_id(source))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let status_context = if source_labels.is_empty() {
+            status_context
+        } else {
+            status_context
+                .map(|status_context| format!("{status_context} | source(s): {source_labels}"))
+        };
+
+        match rebase.run_preview() {
+            Ok(output) => {
+                let command_label = rebase.command_label(true);
+                self.mode = InteractionMode::RebasePreview {
+                    rebase,
+                    command_label,
+                    preview_output: output.message().to_owned(),
+                    status_context,
+                    completed: false,
+                };
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                self.mode = InteractionMode::Normal;
+            }
+        }
+    }
+
     fn confirm_push(
         &mut self,
         push: JjGitPush,
@@ -671,6 +776,65 @@ impl App {
                 Ok(false)
             }
         }
+    }
+
+    fn confirm_rebase(
+        &mut self,
+        rebase: JjRebasePlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = rebase.command_label(false);
+        let primary_source = rebase.sources().first().cloned();
+        let result_message = match rebase.run() {
+            Ok(output) => match self.view.refresh() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let revealed_in_recent = match primary_source.as_deref() {
+                        Some(change_id) => match self
+                            .view
+                            .reveal_graph_change(change_id, LogViewMode::Recent)
+                        {
+                            Ok(switched_modes) => {
+                                self.view.clamp(viewport_height);
+                                switched_modes
+                            }
+                            Err(error) => {
+                                self.status = StatusLine::error(&self.view, error.to_string());
+                                return;
+                            }
+                        },
+                        None => false,
+                    };
+                    let message = if revealed_in_recent {
+                        format!(
+                            "{} | showing recent work | jj undo",
+                            output.message().trim()
+                        )
+                    } else {
+                        format!("{} | jj undo", output.message().trim())
+                    };
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("refresh failed: {error}")
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::RebasePreview {
+            rebase,
+            command_label,
+            preview_output: result_message,
+            status_context,
+            completed: true,
+        };
     }
 
     fn open_view_menu(&mut self) {
@@ -787,9 +951,23 @@ impl App {
                 menu,
                 selected: *selected,
             },
-            InteractionMode::RolePrompt { prompt, selected } => Overlay::RolePrompt {
+            InteractionMode::RolePrompt {
+                prompt, selected, ..
+            } => Overlay::RolePrompt {
                 prompt,
                 selected: *selected,
+            },
+            InteractionMode::RebasePreview {
+                command_label,
+                preview_output,
+                status_context,
+                completed,
+                ..
+            } => Overlay::RebasePreview {
+                command_label: command_label.as_str(),
+                preview_output: preview_output.as_str(),
+                status_context: status_context.as_ref(),
+                completed: *completed,
             },
             InteractionMode::PushRemotePrompt {
                 remotes, selected, ..
@@ -1028,6 +1206,21 @@ fn item_count_message(view: &ViewState, item_count: usize) -> String {
     }
 }
 
+fn rebase_plan_from_prompt(prompt: &RolePrompt) -> Option<JjRebasePlan> {
+    let destination = prompt.destination_revision()?;
+    let sources = prompt
+        .source_revisions()
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+
+    (!sources.is_empty()).then(|| JjRebasePlan::new(sources, destination.to_owned()))
+}
+
+fn short_id(id: &str) -> &str {
+    id.get(..8).unwrap_or(id)
+}
+
 #[derive(Clone, Debug)]
 pub enum StatusKind {
     Ready,
@@ -1037,6 +1230,7 @@ pub enum StatusKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action_menu::RolePromptOption;
 
     fn test_app(view: ViewState) -> App {
         App {
@@ -1177,6 +1371,122 @@ mod tests {
         );
         assert!(matches!(app.mode, InteractionMode::Normal));
         assert_eq!(app.status.message(), "pushed");
+    }
+
+    #[test]
+    fn rebase_plan_from_prompt_respects_explicit_roles() {
+        let prompt = RolePrompt::new(
+            "confirm role assignment",
+            vec![
+                RolePromptOption::new("source", "bbbbbbbb1111111111111111111111111111111111"),
+                RolePromptOption::new("destination", "cccccccc2222222222222222222222222222222222"),
+                RolePromptOption::new("source", "aaaaaaaa3333333333333333333333333333333333"),
+            ],
+            "Preview required before execution.",
+        );
+
+        let rebase =
+            rebase_plan_from_prompt(&prompt).expect("role prompt should include a destination");
+
+        assert_eq!(
+            rebase.sources(),
+            &[
+                "bbbbbbbb1111111111111111111111111111111111",
+                "aaaaaaaa3333333333333333333333333333333333"
+            ]
+        );
+        assert_eq!(
+            rebase.destination(),
+            "cccccccc2222222222222222222222222222222222"
+        );
+    }
+
+    #[test]
+    fn rebase_preview_entering_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::RebasePreview {
+            rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            command_label: "jj rebase -r source-a -o dest".to_owned(),
+            preview_output: "preview only".to_owned(),
+            status_context: Some("rebase preview context".to_owned()),
+            completed: false,
+        };
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+                .is_ok()
+        );
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "rebase cancelled");
+    }
+
+    #[test]
+    fn rebase_preview_completion_stays_until_closed() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::RebasePreview {
+            rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            command_label: "jj rebase -r source-a -o dest".to_owned(),
+            preview_output: "rebased".to_owned(),
+            status_context: None,
+            completed: true,
+        };
+        app.status = StatusLine::with_message(&app.view, "rebased");
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+                .is_ok()
+        );
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "rebased");
+    }
+
+    #[test]
+    fn rebase_role_prompt_enters_preview_with_explicit_plan() {
+        let prompt = RolePrompt::new(
+            "confirm role assignment",
+            vec![
+                RolePromptOption::new("source", "source-a".to_owned()),
+                RolePromptOption::new("destination", "dest".to_owned()),
+            ],
+            "Preview required before execution.",
+        );
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::RolePrompt {
+            action: ActionKind::Rebase,
+            prompt,
+            selected: 0,
+        };
+
+        let result = app.handle_mode_key(crossterm::event::KeyCode::Enter, 12);
+        assert!(result.is_ok());
+        let (command_label, status_context, preview_output) = match app.mode {
+            InteractionMode::RebasePreview {
+                ref command_label,
+                ref status_context,
+                ref preview_output,
+                ..
+            } => (
+                command_label.clone(),
+                status_context.clone(),
+                preview_output.clone(),
+            ),
+            _ => panic!("expected rebase preview mode"),
+        };
+        assert_eq!(command_label, "jj rebase -r source-a -o dest");
+        assert_eq!(
+            status_context.as_deref(),
+            Some("rebase from 1 source(s) into dest from jk | source(s): source-a")
+        );
+        assert_eq!(
+            preview_output,
+            "command: jj rebase -r source-a -o dest\n\nsource: source-a\n\ndestination: dest\n\ngraph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n\nundo path: jj undo"
+        );
     }
 
     #[test]

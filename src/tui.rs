@@ -77,6 +77,23 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             frame.render_widget(push_remote_prompt(remotes, selected), area);
         }
+        Overlay::RebasePreview {
+            command_label,
+            preview_output,
+            status_context,
+            completed,
+        } => {
+            let lines = preview_lines(
+                "Rebase preview",
+                command_label,
+                preview_output,
+                status_context,
+                completed,
+            );
+            let area = preview_area(frame.area(), &lines);
+            frame.render_widget(Clear, area);
+            frame.render_widget(preview_panel("Rebase preview", &lines), area);
+        }
         Overlay::RolePrompt { prompt, selected } => {
             let area = centered_area(frame.area(), 54, prompt.options().len() as u16 + 4);
             frame.render_widget(Clear, area);
@@ -88,49 +105,16 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             status_context,
             completed,
         } => {
-            let preview_lines = vec![
-                format!("command: {command_label}"),
-                String::new(),
-                if completed {
-                    "result output:".to_owned()
-                } else {
-                    "preview output:".to_owned()
-                },
-            ];
-            let output_lines = preview_output
-                .lines()
-                .map(ToOwned::to_owned)
-                .collect::<Vec<_>>();
-            let mut lines = Vec::with_capacity(
-                preview_lines.len()
-                    + output_lines.len()
-                    + if status_context.is_some() { 8 } else { 7 },
+            let lines = preview_lines(
+                "Push preview",
+                command_label,
+                preview_output,
+                status_context,
+                completed,
             );
-            lines.extend(preview_lines);
-            if let Some(status_context) = status_context {
-                lines.push(String::new());
-                lines.push(status_context.to_owned());
-            }
-            lines.extend(output_lines);
-            lines.push(String::new());
-            let hint = if completed {
-                "Enter: close  Esc/q: close".to_owned()
-            } else {
-                "Enter: confirm  Esc/q: cancel".to_owned()
-            };
-            lines.push(hint);
-
-            let height = (lines.len() as u16).min(frame.area().height);
-            let width = lines
-                .iter()
-                .map(|line| line.len())
-                .max()
-                .unwrap_or(0)
-                .max(44)
-                .min(frame.area().width.into()) as u16;
-            let area = centered_area(frame.area(), width, height);
+            let area = preview_area(frame.area(), &lines);
             frame.render_widget(Clear, area);
-            frame.render_widget(push_preview(&lines), area);
+            frame.render_widget(preview_panel("Push preview", &lines), area);
         }
     }
 }
@@ -157,6 +141,12 @@ pub enum Overlay<'a> {
         selected: usize,
     },
     PushPreview {
+        command_label: &'a str,
+        preview_output: &'a str,
+        status_context: Option<&'a String>,
+        completed: bool,
+    },
+    RebasePreview {
         command_label: &'a str,
         preview_output: &'a str,
         status_context: Option<&'a String>,
@@ -508,8 +498,54 @@ fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
     List::new(items).block(Block::bordered().title("Push remote"))
 }
 
-fn push_preview(lines: &[String]) -> Paragraph<'static> {
-    Paragraph::new(lines.join("\n")).block(Block::bordered().title("Push preview"))
+fn preview_lines(
+    title: &str,
+    command_label: &str,
+    preview_output: &str,
+    status_context: Option<&String>,
+    completed: bool,
+) -> Vec<String> {
+    let mut lines = vec![format!("{title}"), format!("command: {command_label}")];
+    if let Some(context) = status_context {
+        lines.push(format!("context: {context}"));
+    }
+    if preview_output.is_empty() {
+        lines.push("preview output unavailable".to_owned());
+    } else {
+        lines.push("output:".to_owned());
+        lines.extend(
+            preview_output
+                .lines()
+                .map(|line| format!("  {line}"))
+                .collect::<Vec<_>>(),
+        );
+    }
+    if completed {
+        lines.push("Enter: close".to_owned());
+    } else {
+        lines.push("Enter: confirm".to_owned());
+    }
+    lines.push("Esc/q: close".to_owned());
+    lines
+}
+
+fn preview_panel<'a>(title: &'a str, lines: &'a [String]) -> Paragraph<'a> {
+    Paragraph::new(lines.join("\n")).block(Block::bordered().title(title))
+}
+
+fn preview_area(area: Rect, lines: &[String]) -> Rect {
+    let width = lines
+        .iter()
+        .map(|line| line.len())
+        .max()
+        .unwrap_or(0)
+        .max(44)
+        .min(usize::from(area.width)) as u16;
+    let height = lines
+        .len()
+        .min(usize::from(area.height))
+        .min(usize::from(area.height)) as u16;
+    centered_area(area, width, height)
 }
 
 fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
