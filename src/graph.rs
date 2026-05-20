@@ -903,8 +903,8 @@ mod tests {
             labels,
             vec![
                 "new child of aaaaaaaa",
-                "rebase 1 revision into bbbbbbbb",
-                "squash 1 revision into bbbbbbbb"
+                "rebase 1 source revision into destination bbbbbbbb",
+                "squash 1 source revision into destination bbbbbbbb"
             ]
         );
     }

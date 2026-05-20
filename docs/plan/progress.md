@@ -356,3 +356,33 @@
   the tapes are rerun, so the output still needs external publication review before it becomes a
   user-facing artifact
 - Next slice: Packet 22: Squash Preview Flow
+
+## Packet 22: Squash Preview Flow
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/graph.rs`, `src/jj.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: graph action menus now expose source/destination wording for multi-revision rewrite
+  actions, and the existing role prompt can open a scrollable `jj squash` preview. The preview lists
+  every exact source revision, the exact destination, the exact command, graph effect,
+  noninteractive destination-message behavior, confirmation instruction, and `jj undo` recovery.
+  Confirmation runs one multi-source `jj squash` command, refreshes the current view, and prefers
+  revealing the destination afterward.
+- Command shape: one `jj squash` invocation with repeated `--from` arguments, an explicit `--into`
+  destination, and `--use-destination-message`. The destination-message flag is required so source
+  descriptions are discarded instead of opening an editor or prompt for a combined description.
+- Verification: `cargo check`; focused `cargo test squash`; focused `cargo test action_menu`; full
+  `cargo test`; `jj --no-pager squash --help`; disposable-repo proof under
+  `/tmp/jk-squash-proof.oAjsZe` for multi-source squash and `jj --no-pager undo`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-check`
+- Validation note: `just check` was attempted after Packet 22 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused squash/action-menu tests, full `cargo test`,
+  `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Validation note: two early focused-test invocations accidentally passed multiple Cargo test-name
+  filters and failed with `unexpected argument`; the affected filters were then run separately or
+  covered by `cargo test squash`, `cargo test action_menu`, and full `cargo test`.
+- Remaining risk: the flow intentionally relies on jj CLI squash semantics for multi-source `--from`
+  handling, emptied-source abandonment, descendant rebasing, and destination-message behavior. It
+  does not simulate a before/after graph or detect whether the destination remains visible until
+  after the command refreshes.
+- Next slice: TBD after review of guided rewrite flows

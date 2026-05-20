@@ -1043,3 +1043,38 @@ belong here.
   output.
 - Acceptance note: Packet 19 was accepted after GPT-5.5 code review, Spark code repair, GPT-5.5
   repaired review, and docs precision repair.
+
+## 2026-05-20 Packet 22 Squash Preview Worker
+
+- Thread id: `019e4483-d2ae-7561-b4c2-32459a33823d`.
+- Slice / task: Implement Packet 22 squash preview flow in the current jj working-copy change.
+- Working-copy description: `Add guided squash preview flow`.
+- Starting state: `jj --no-pager status` reported a clean working copy at change
+  `pxtwzyky 3bcdb813 (empty) Add guided squash preview flow`.
+- Observable outcome: `src/jj.rs` now has `JjSquashPlan`, whose command argv is
+  `squash --from <source> ... --into <destination> --use-destination-message` and whose preview text
+  states roles, graph effect, destination-message behavior, confirmation, and `jj undo`.
+- Observable outcome: `src/app.rs` now routes `ActionKind::Squash` role prompts into a scrollable
+  preview, requires Enter confirmation before running, refreshes after success, prefers revealing
+  the destination, keeps `jj undo` visible after successful execution and refresh/reveal failures,
+  and preserves command error text in `ActionOutput`.
+- Observable outcome: `src/action_menu.rs` and `src/graph.rs` now use action labels that explicitly
+  name source revisions and destination for multi-revision rewrite actions.
+- Manual proof: `jj --no-pager squash --help` was read before choosing the command shape. A
+  disposable repo under `/tmp/jk-squash-proof.oAjsZe` proved that
+  `jj --no-pager squash --from lx --from n --into lr --use-destination-message` completes without an
+  editor or prompt, and `jj --no-pager undo` restored the prior operation. Every mutating proof
+  command used that `/tmp` repo as cwd.
+- Validation run during implementation:
+  - `cargo check`
+  - `cargo test squash`
+  - `cargo test action_menu`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - attempted `just check`, which stopped at `cargo +nightly fmt` with `no such command: +nightly`
+- Rework status: an initial app patch failed because nearby fields had shifted, so the patch was
+  split into smaller imports, fields, mode, and helper edits. Two early focused-test invocations
+  used multiple Cargo filters and failed with `unexpected argument`; the relevant tests were rerun
+  with one filter or covered by full `cargo test`.

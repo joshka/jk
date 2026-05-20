@@ -23,8 +23,8 @@ use crate::command::{
 use crate::copy::CopyOption;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjGitPush, JjGitPushTarget, JjNewPlan,
-    JjOperationRecovery, JjOperationRecoveryKind, JjRebasePlan, LogViewMode, ViewSpec, git_fetch,
-    git_remotes, new_trunk, resolve_exact_change_id,
+    JjOperationRecovery, JjOperationRecoveryKind, JjRebasePlan, JjSquashPlan, LogViewMode,
+    ViewSpec, git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -34,6 +34,8 @@ use crate::view_state::ViewState;
 type NewRun = fn(&JjNewPlan) -> Result<String>;
 #[cfg(test)]
 type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
+#[cfg(test)]
+type SquashRun = fn(&JjSquashPlan) -> Result<String>;
 #[cfg(test)]
 type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 #[cfg(test)]
@@ -72,6 +74,8 @@ struct App {
     new_run: NewRun,
     #[cfg(test)]
     rebase_run: RebaseRun,
+    #[cfg(test)]
+    squash_run: SquashRun,
     #[cfg(test)]
     abandon_preview_load: AbandonPreviewLoad,
     #[cfg(test)]
@@ -119,6 +123,10 @@ enum InteractionMode {
     },
     RebasePreview {
         rebase: JjRebasePlan,
+        output: ActionOutput,
+    },
+    SquashPreview {
+        squash: JjSquashPlan,
         output: ActionOutput,
     },
     AbandonPreview {
@@ -174,6 +182,11 @@ fn default_new_run(new_change: &JjNewPlan) -> Result<String> {
 #[cfg(test)]
 fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {
     rebase.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_squash_run(squash: &JjSquashPlan) -> Result<String> {
+    squash.run().map(|output| output.message().to_owned())
 }
 
 #[cfg(test)]
@@ -248,6 +261,8 @@ impl App {
             #[cfg(test)]
             rebase_run: default_rebase_run,
             #[cfg(test)]
+            squash_run: default_squash_run,
+            #[cfg(test)]
             abandon_preview_load: default_abandon_preview_load,
             #[cfg(test)]
             abandon_run: default_abandon_run,
@@ -286,6 +301,16 @@ impl App {
     #[cfg(not(test))]
     fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
         rebase.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
+        (self.squash_run)(squash)
+    }
+
+    #[cfg(not(test))]
+    fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
+        squash.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -710,6 +735,10 @@ impl App {
                             ActionKind::Rebase => rebase_plan_from_prompt(prompt),
                             _ => None,
                         };
+                        let squash_plan = match action {
+                            ActionKind::Squash => squash_plan_from_prompt(prompt),
+                            _ => None,
+                        };
 
                         self.mode = InteractionMode::Normal;
 
@@ -721,12 +750,13 @@ impl App {
                                         StatusLine::error(&self.view, next_status.to_owned());
                                 }
                             },
-                            ActionKind::Squash => {
-                                self.status = StatusLine::with_message(
-                                    &self.view,
-                                    "squash preview not yet implemented",
-                                );
-                            }
+                            ActionKind::Squash => match squash_plan {
+                                Some(squash) => self.open_squash_preview(squash),
+                                None => {
+                                    self.status =
+                                        StatusLine::error(&self.view, next_status.to_owned());
+                                }
+                            },
                             ActionKind::New | ActionKind::Split | ActionKind::Abandon => {
                                 self.status =
                                     StatusLine::with_message(&self.view, next_status.to_owned());
@@ -792,6 +822,35 @@ impl App {
                         }
 
                         self.confirm_rebase(rebase, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::SquashPreview { squash, output } => {
+                let (squash, status_context, completed) = {
+                    (
+                        squash.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status =
+                                StatusLine::with_message(&self.view, "squash cancelled".to_owned());
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_squash(squash, status_context, viewport_height);
                     }
                     ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
                 }
@@ -1164,6 +1223,50 @@ impl App {
                 self.status = StatusLine::error(&self.view, message.clone());
                 self.mode = InteractionMode::RebasePreview {
                     rebase,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
+    fn open_squash_preview(&mut self, squash: JjSquashPlan) {
+        let status_context = Some(format!(
+            "squash from {} source(s) into {} from {}",
+            squash.sources().len(),
+            squash.destination(),
+            self.view.spec().app_label()
+        ));
+        let source_labels = squash
+            .sources()
+            .iter()
+            .map(|source| short_id(source))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let status_context = if source_labels.is_empty() {
+            status_context
+        } else {
+            status_context
+                .map(|status_context| format!("{status_context} | source(s): {source_labels}"))
+        };
+
+        match squash.run_preview() {
+            Ok(output) => {
+                let command_label = squash.command_label(true);
+                self.mode = InteractionMode::SquashPreview {
+                    squash,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = squash.command_label(true);
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::SquashPreview {
+                    squash,
                     output: ActionOutput::finished(command_label, message, status_context),
                 };
             }
@@ -1552,6 +1655,71 @@ impl App {
         };
     }
 
+    fn confirm_squash(
+        &mut self,
+        squash: JjSquashPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = squash.command_label(false);
+        let destination = squash.destination().to_owned();
+        let result_message = match self.run_squash(&squash) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let mut reveal_error = None;
+                    let revealed_in_recent =
+                        match self.reveal_graph_change(&destination, LogViewMode::Recent) {
+                            Ok(switched_modes) => {
+                                self.view.clamp(viewport_height);
+                                Some(switched_modes)
+                            }
+                            Err(error) => {
+                                self.status = StatusLine::error(&self.view, error.to_string());
+                                reveal_error = Some(format!(
+                                    "{} | reveal failed: {} | jj undo",
+                                    output.trim(),
+                                    error
+                                ));
+                                None
+                            }
+                        };
+
+                    let message = match revealed_in_recent {
+                        Some(switched_modes) => {
+                            if switched_modes {
+                                format!("{} | showing recent work | jj undo", output.trim())
+                            } else {
+                                format!("{} | jj undo", output.trim())
+                            }
+                        }
+                        None => match reveal_error.as_deref() {
+                            Some(message) => message.to_owned(),
+                            None => format!("{} | jj undo", output.trim()),
+                        },
+                    };
+                    if reveal_error.is_none() {
+                        self.status = StatusLine::with_message(&self.view, message.as_str());
+                    }
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("{} | refresh failed: {error} | jj undo", output.trim())
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::SquashPreview {
+            squash,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
     fn open_view_menu(&mut self) {
         let selected = view_formats()
             .iter()
@@ -1678,6 +1846,7 @@ impl App {
             },
             InteractionMode::NewPreview { output, .. } => Overlay::NewPreview { output },
             InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
+            InteractionMode::SquashPreview { output, .. } => Overlay::SquashPreview { output },
             InteractionMode::AbandonPreview { output, .. } => Overlay::AbandonPreview { output },
             InteractionMode::AbandonConfirm { input, output, .. } => {
                 Overlay::AbandonConfirm { input, output }
@@ -1942,6 +2111,17 @@ fn rebase_plan_from_prompt(prompt: &RolePrompt) -> Option<JjRebasePlan> {
     (!sources.is_empty()).then(|| JjRebasePlan::new(sources, destination.to_owned()))
 }
 
+fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjSquashPlan> {
+    let destination = prompt.destination_revision()?;
+    let sources = prompt
+        .source_revisions()
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+
+    (!sources.is_empty()).then(|| JjSquashPlan::new(sources, destination.to_owned()))
+}
+
 fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }
@@ -2034,6 +2214,14 @@ mod tests {
 
     fn mock_rebase_success(_: &JjRebasePlan) -> Result<String> {
         Ok("rebased".to_owned())
+    }
+
+    fn mock_squash_success(_: &JjSquashPlan) -> Result<String> {
+        Ok("squashed".to_owned())
+    }
+
+    fn mock_squash_failure(_: &JjSquashPlan) -> Result<String> {
+        Err(eyre!("jj squash failed: first line\nsecond line"))
     }
 
     fn mock_empty_abandon_preview(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
@@ -2150,6 +2338,16 @@ mod tests {
         Ok(true)
     }
 
+    fn mock_reveal_squash_destination_in_recent(
+        _view: &mut ViewState,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        assert_eq!(change_id, "dest");
+        assert_eq!(fallback_mode, LogViewMode::Recent);
+        Ok(true)
+    }
+
     fn test_app(view: ViewState) -> App {
         App {
             status: StatusLine::ready(&view),
@@ -2164,6 +2362,8 @@ mod tests {
             new_run: mock_new_success,
             #[cfg(test)]
             rebase_run: mock_rebase_success,
+            #[cfg(test)]
+            squash_run: mock_squash_success,
             #[cfg(test)]
             abandon_preview_load: mock_empty_abandon_preview,
             #[cfg(test)]
@@ -2641,6 +2841,34 @@ mod tests {
     }
 
     #[test]
+    fn squash_plan_from_prompt_respects_explicit_roles() {
+        let prompt = RolePrompt::new(
+            "confirm role assignment",
+            vec![
+                RolePromptOption::new("source", "bbbbbbbb1111111111111111111111111111111111"),
+                RolePromptOption::new("destination", "cccccccc2222222222222222222222222222222222"),
+                RolePromptOption::new("source", "aaaaaaaa3333333333333333333333333333333333"),
+            ],
+            "Preview required before execution.",
+        );
+
+        let squash =
+            squash_plan_from_prompt(&prompt).expect("role prompt should include a destination");
+
+        assert_eq!(
+            squash.sources(),
+            &[
+                "bbbbbbbb1111111111111111111111111111111111",
+                "aaaaaaaa3333333333333333333333333333333333"
+            ]
+        );
+        assert_eq!(
+            squash.destination(),
+            "cccccccc2222222222222222222222222222222222"
+        );
+    }
+
+    #[test]
     fn new_action_menu_enter_opens_preview_with_exact_parents() {
         let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
             crate::jj::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
@@ -2891,6 +3119,176 @@ mod tests {
         assert_eq!(
             preview_output,
             "command: jj rebase -r source-a -o dest\ncontext: rebase from 1 source(s) into dest from jk | source(s): source-a\noutput:\n  command: jj rebase -r source-a -o dest\n  \n  source: source-a\n  \n  destination: dest\n  \n  graph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n  \n  undo path: jj undo"
+        );
+    }
+
+    #[test]
+    fn squash_role_prompt_enters_preview_with_explicit_plan() {
+        let prompt = RolePrompt::new(
+            "confirm role assignment",
+            vec![
+                RolePromptOption::new("source", "source-a".to_owned()),
+                RolePromptOption::new("source", "source-b".to_owned()),
+                RolePromptOption::new("destination", "dest".to_owned()),
+            ],
+            "Preview required before execution.",
+        );
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::RolePrompt {
+            action: ActionKind::Squash,
+            prompt,
+            selected: 0,
+        };
+
+        let result = app.handle_mode_key(crossterm::event::KeyCode::Enter, 12);
+        assert!(result.is_ok());
+        let (command_label, status_context, preview_output) = match app.mode {
+            InteractionMode::SquashPreview { ref output, .. } => (
+                output.command_label().to_owned(),
+                output.status_context().cloned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected squash preview mode"),
+        };
+        assert_eq!(
+            command_label,
+            "jj squash --from source-a --from source-b --into dest --use-destination-message"
+        );
+        assert_eq!(
+            status_context.as_deref(),
+            Some("squash from 2 source(s) into dest from jk | source(s): source-a, source-b")
+        );
+        assert!(preview_output.contains("source: source-a"));
+        assert!(preview_output.contains("source: source-b"));
+        assert!(preview_output.contains("destination: dest"));
+        assert!(
+            preview_output.contains("--use-destination-message keeps the destination description")
+        );
+        assert!(preview_output.contains("confirmation: press Enter to run jj squash"));
+        assert!(preview_output.contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn squash_preview_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::SquashPreview {
+            squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            output: ActionOutput::pending(
+                "jj squash --from source-a --into dest --use-destination-message".to_owned(),
+                "preview only".to_owned(),
+                Some("squash preview context".to_owned()),
+            ),
+        };
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+                .is_ok()
+        );
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "squash cancelled");
+    }
+
+    #[test]
+    fn squash_confirm_success_refreshes_and_reveals_destination() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.reveal_graph_change = mock_reveal_squash_destination_in_recent;
+        app.mode = InteractionMode::SquashPreview {
+            squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            output: ActionOutput::pending(
+                "jj squash --from source-a --into dest --use-destination-message".to_owned(),
+                "preview only".to_owned(),
+                Some("squash preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::SquashPreview { output, .. } => output,
+            _ => panic!("expected squash result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(
+            output.command_label(),
+            "jj squash --from source-a --into dest --use-destination-message"
+        );
+        assert!(output.completed());
+        assert!(body.contains("squashed | showing recent work | jj undo"));
+        assert_eq!(
+            app.status.message(),
+            "squashed | showing recent work | jj undo"
+        );
+    }
+
+    #[test]
+    fn squash_confirm_refresh_failure_keeps_undo_visible() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.refresh_view = mock_refresh_failure;
+        app.mode = InteractionMode::SquashPreview {
+            squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            output: ActionOutput::pending(
+                "jj squash --from source-a --into dest --use-destination-message".to_owned(),
+                "preview only".to_owned(),
+                Some("squash preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::SquashPreview { output, .. } => output,
+            _ => panic!("expected squash result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("squashed | refresh failed: view refresh failed | jj undo"));
+        assert_eq!(app.status.message(), "view refresh failed");
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+    }
+
+    #[test]
+    fn squash_failure_keeps_full_error_output_readable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.squash_run = mock_squash_failure;
+        app.mode = InteractionMode::SquashPreview {
+            squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
+            output: ActionOutput::pending(
+                "jj squash --from source-a --into dest --use-destination-message".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::SquashPreview { output, .. } => output,
+            _ => panic!("expected squash result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(
+            output.command_label(),
+            "jj squash --from source-a --into dest --use-destination-message"
+        );
+        assert!(output.completed());
+        assert!(body.contains("jj squash failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj squash failed: first line\nsecond line"
         );
     }
 

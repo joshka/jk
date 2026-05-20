@@ -287,6 +287,12 @@ pub struct JjRebasePlan {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjSquashPlan {
+    sources: Vec<String>,
+    destination: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjNewPlan {
     parents: Vec<String>,
 }
@@ -420,6 +426,82 @@ impl JjRebasePlan {
 
         format!(
             "command: {}\n\n{}\n\ndestination: {}\n\ngraph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n\nundo path: jj undo",
+            self.command_label(false),
+            sources,
+            self.destination,
+        )
+    }
+
+    fn normalize(mut self) -> Self {
+        self.sources.retain(|source| !source.trim().is_empty());
+        self
+    }
+}
+
+impl JjSquashPlan {
+    pub fn new(sources: Vec<String>, destination: impl Into<String>) -> Self {
+        Self {
+            sources,
+            destination: destination.into(),
+        }
+        .normalize()
+    }
+
+    pub fn sources(&self) -> &[String] {
+        &self.sources
+    }
+
+    pub fn destination(&self) -> &str {
+        &self.destination
+    }
+
+    pub fn command_label(&self, _dry_run: bool) -> String {
+        let label_args = self
+            .command_argv(false)
+            .iter()
+            .map(|arg| arg.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self, _dry_run: bool) -> Vec<String> {
+        let mut argv = vec!["squash".to_owned()];
+        for source in &self.sources {
+            argv.push("--from".to_owned());
+            argv.push(source.clone());
+        }
+        argv.push("--into".to_owned());
+        argv.push(self.destination.clone());
+        argv.push("--use-destination-message".to_owned());
+
+        argv
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(false),
+            &self.command_label(false),
+            "squashed",
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        let sources = self
+            .sources
+            .iter()
+            .map(|source| format!("source: {source}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            "command: {}\n\n{}\n\ndestination: {}\n\ngraph effect: moves the selected source changes into the destination; jj may abandon emptied sources and rebase descendants\n\ndescription behavior: --use-destination-message keeps the destination description, discards source descriptions, and avoids an editor or prompt\n\nconfirmation: press Enter to run jj squash\nundo path: jj undo",
             self.command_label(false),
             sources,
             self.destination,
@@ -2486,6 +2568,51 @@ mod tests {
         assert!(preview.contains("source: source-a"));
         assert!(preview.contains("destination: dest"));
         assert!(preview.contains("graph effect: rebases the selected revisions"));
+        assert!(preview.contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn squash_command_args_use_explicit_sources_destination_and_message_policy() {
+        let squash = JjSquashPlan::new(
+            vec!["source-a".to_owned(), "source-b".to_owned()],
+            "dest".to_owned(),
+        );
+
+        assert_eq!(
+            squash.command_argv(false),
+            vec![
+                "squash",
+                "--from",
+                "source-a",
+                "--from",
+                "source-b",
+                "--into",
+                "dest",
+                "--use-destination-message"
+            ]
+        );
+        assert_eq!(
+            squash.command_label(false),
+            "jj squash --from source-a --from source-b --into dest --use-destination-message"
+        );
+    }
+
+    #[test]
+    fn squash_preview_summary_includes_roles_effect_message_policy_and_undo_path() {
+        let squash = JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned());
+
+        let preview = squash.preview_summary();
+
+        assert!(
+            preview.contains(
+                "command: jj squash --from source-a --into dest --use-destination-message"
+            )
+        );
+        assert!(preview.contains("source: source-a"));
+        assert!(preview.contains("destination: dest"));
+        assert!(preview.contains("graph effect: moves the selected source changes"));
+        assert!(preview.contains("--use-destination-message keeps the destination description"));
+        assert!(preview.contains("confirmation: press Enter to run jj squash"));
         assert!(preview.contains("undo path: jj undo"));
     }
 

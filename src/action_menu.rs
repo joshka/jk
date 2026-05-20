@@ -301,7 +301,7 @@ fn menu_item_for_multirev_action(
     destination_revision: &str,
 ) -> ActionMenuItem {
     let label = format!(
-        "{} {} revision{} into {}",
+        "{} {} source revision{} into destination {}",
         action.label(),
         source_revisions.len(),
         if source_revisions.len() == 1 { "" } else { "s" },
@@ -377,6 +377,16 @@ mod tests {
 
         assert_eq!(menu.items().len(), 3);
         assert!(menu.items()[0].label().contains("new merge child"));
+        assert!(
+            menu.items()[1]
+                .label()
+                .contains("source revisions into destination ccccdddd")
+        );
+        assert!(
+            menu.items()[2]
+                .label()
+                .contains("source revisions into destination ccccdddd")
+        );
         assert!(matches!(
             menu.items()[0].follow_up(),
             FollowUp::NewParents { parents }
@@ -429,6 +439,22 @@ mod tests {
             assert!(prompt.status_message().ends_with(PREVIEW_REQUIRED_MARKER));
         } else {
             panic!("expected role prompt follow-up");
+        }
+        if let FollowUp::RolePrompt(prompt) = menu.items()[2].follow_up() {
+            assert_eq!(menu.items()[2].action(), ActionKind::Squash);
+            assert_eq!(
+                prompt.source_revisions(),
+                vec![
+                    "aaaabbbb1111111111111111111111111111111111",
+                    "eeeeffff2222222222222222222222222222222222"
+                ]
+            );
+            assert_eq!(
+                prompt.destination_revision(),
+                Some("ccccdddd1111111111111111111111111111111111")
+            );
+        } else {
+            panic!("expected squash role prompt follow-up");
         }
     }
 
