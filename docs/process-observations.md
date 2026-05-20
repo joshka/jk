@@ -5,6 +5,26 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Progress audit after Packet 22 acceptance)
+
+- Slice / task: Audit progress documentation after Packet 22 acceptance.
+- Thread / model: `019e4490-5940-7983-96e9-7975a2ed5938` / `gpt-5.4-mini`.
+- Scope given: update `docs/plan/progress.md` so each completed packet entry is current and add a
+  factual audit note without expanding into code or fragility changes.
+- Observable outcome: `docs/plan/progress.md` no longer contains the stale review placeholders in
+  Packets 15-22, and Packet 22 now points to Packet 23 (`Describe And Commit Flows`) as the next
+  planned slice.
+- Evidence basis:
+  - Thread: `019e4490-5940-7983-96e9-7975a2ed5938`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `jj --no-pager status --quiet`
+    - `sed -n '1,260p' docs/plan/progress.md`
+    - `rg -n "Packet 13|Packet 14|Packet 15|Packet 16|Packet 17|Packet 18|Packet 19|Packet 20|Packet 21|Packet 22|Slice 13|Slice 14" docs/plan/progress.md`
+    - `sed -n '1,260p' docs/process-observations.md`
+  - Files: `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 21 VHS specs without committed GIFs)
 
 - Slice / task: Implement Packet 21 VHS specs without committed GIFs.

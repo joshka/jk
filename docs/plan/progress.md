@@ -192,7 +192,7 @@
   selected-source/multi-target abandon, but empty-versus-non-empty detection still depends on
   `jj diff -r <revision> --summary` stdout and the preview title depends on a narrow
   `description.first_line()` template
-- Next slice: TBD after review of exact-target mutation flows
+- Next slice: Packet 15: 5.5 Review Repair
 
 ## Packet 15: 5.5 Review Repair
 
@@ -206,7 +206,7 @@
 - Remaining risk: empty-preview abandon now rechecks immediately before execution and falls back to
   typed exact-revision confirmation if the target becomes non-empty, but the final recheck and
   `jj abandon` remain separate `jj` invocations rather than one atomic transaction
-- Next slice: TBD after review of exact-target mutation flows
+- Next slice: Packet 16: Operation Show/Diff Detail
 
 ## Packet 16: Operation Show/Diff Detail
 
@@ -271,7 +271,7 @@
   `jj redo`, so it does not preview which concrete operation will be undone or redone beyond showing
   the raw jj result afterward. Redo availability is not precomputed; unavailable redo is attempted
   and shown as readable jj error output.
-- Next slice: TBD after review of operation recovery flows
+- Next slice: Packet 18: `jj new` From Selected Parents
 
 ## Packet 18: `jj new` From Selected Parents
 
@@ -303,7 +303,7 @@
   stronger revset because Packet 18 requested the exact `jj new <change-id>` shape. Explicit
   multi-select ordering is now graph-row order rather than toggle order, which is tested but still
   depends on the rendered graph and metadata streams staying paired.
-- Next slice: TBD after review of exact-parent mutation flows
+- Next slice: Packet 19: Push Flow Simplification
 
 ## Packet 19: Push Flow Simplification
 
@@ -385,4 +385,4 @@
   handling, emptied-source abandonment, descendant rebasing, and destination-message behavior. It
   does not simulate a before/after graph or detect whether the destination remains visible until
   after the command refreshes.
-- Next slice: TBD after review of guided rewrite flows
+- Next slice: Packet 23: Describe And Commit Flows
