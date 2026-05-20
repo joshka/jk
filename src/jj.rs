@@ -242,6 +242,18 @@ pub struct LogItem {
 }
 
 impl LogItem {
+    pub fn new(
+        lines: Vec<Line<'static>>,
+        change_id: Option<String>,
+        commit_id: Option<String>,
+    ) -> Self {
+        Self {
+            lines,
+            change_id,
+            commit_id,
+        }
+    }
+
     pub fn lines(&self) -> Vec<Line<'static>> {
         self.lines.clone()
     }
@@ -250,12 +262,24 @@ impl LogItem {
         self.lines.len()
     }
 
+    pub fn action_id(&self) -> Option<&str> {
+        self.change_id()
+    }
+
     pub fn change_id(&self) -> Option<&str> {
         self.change_id.as_deref()
     }
 
     pub fn commit_id(&self) -> Option<&str> {
         self.commit_id.as_deref()
+    }
+
+    pub fn row_text(&self) -> String {
+        self.lines
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 
@@ -269,11 +293,7 @@ pub fn load_entries(spec: &ViewSpec) -> Result<Vec<LogItem>> {
     } else {
         Ok(lines
             .into_iter()
-            .map(|line| LogItem {
-                lines: vec![line],
-                change_id: spec.target.clone(),
-                commit_id: None,
-            })
+            .map(|line| LogItem::new(vec![line], spec.target.clone(), None))
             .collect())
     }
 }
@@ -363,15 +383,15 @@ fn group_lines(lines: Vec<Line<'static>>, metadata: Vec<RevisionMetadata>) -> Ve
         let standalone_graph_line = is_standalone_graph_line(&line);
 
         if (starts_item || standalone_graph_line) && !current_lines.is_empty() {
-            items.push(LogItem {
-                lines: current_lines,
-                change_id: current_metadata
+            items.push(LogItem::new(
+                current_lines,
+                current_metadata
                     .as_ref()
                     .map(|metadata| metadata.change_id.clone()),
-                commit_id: current_metadata
+                current_metadata
                     .as_ref()
                     .and_then(|metadata| metadata.commit_id.clone()),
-            });
+            ));
             current_lines = Vec::new();
             current_metadata = None;
         }
@@ -383,13 +403,13 @@ fn group_lines(lines: Vec<Line<'static>>, metadata: Vec<RevisionMetadata>) -> Ve
     }
 
     if !current_lines.is_empty() {
-        items.push(LogItem {
-            lines: current_lines,
-            change_id: current_metadata
+        items.push(LogItem::new(
+            current_lines,
+            current_metadata
                 .as_ref()
                 .map(|metadata| metadata.change_id.clone()),
-            commit_id: current_metadata.and_then(|metadata| metadata.commit_id),
-        });
+            current_metadata.and_then(|metadata| metadata.commit_id),
+        ));
     }
 
     items

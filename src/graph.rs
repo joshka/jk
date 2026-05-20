@@ -13,7 +13,7 @@ use ratatui::widgets::{List, ListItem, ListState};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{JjCommand, LogItem, ViewSpec, load_entries};
-use crate::search::{SearchQuery, entry_matches, highlight_line, line_text};
+use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 
 pub const BINDINGS: &[Binding] = &[
@@ -134,8 +134,20 @@ impl GraphView {
     }
 
     pub fn refresh(&mut self) -> Result<()> {
+        let previous_index = self.selection.index();
+        let previous_change_id = self
+            .entries
+            .get(previous_index)
+            .and_then(LogItem::action_id)
+            .map(str::to_owned);
+
         self.entries = load_entries(&self.spec)?;
-        self.clamp();
+        restore_selection(
+            &mut self.selection,
+            &self.entries,
+            previous_index,
+            previous_change_id,
+        );
         Ok(())
     }
 
@@ -158,7 +170,7 @@ impl GraphView {
     pub fn current_revset(&self) -> Option<&str> {
         self.entries
             .get(self.selection.index())
-            .and_then(LogItem::change_id)
+            .and_then(LogItem::action_id)
             .or_else(|| self.spec.target())
     }
 
@@ -198,7 +210,7 @@ impl GraphView {
         if let Some(commit_id) = entry.commit_id() {
             options.push(CopyOption::new("commit id", commit_id));
         }
-        options.push(CopyOption::new("row text", lines_text(&entry.lines())));
+        options.push(CopyOption::new("row text", entry.row_text()));
         options
     }
 
@@ -256,6 +268,91 @@ fn previous_matching_entry(
         .find(|index| entry_matches(&entries[*index].lines(), query))
 }
 
-fn lines_text(lines: &[ratatui::text::Line<'static>]) -> String {
-    lines.iter().map(line_text).collect::<Vec<_>>().join("\n")
+fn restore_selection(
+    selection: &mut Selection,
+    entries: &[LogItem],
+    previous_index: usize,
+    previous_change_id: Option<String>,
+) {
+    if let Some(change_id) = previous_change_id {
+        if let Some(index) = entries
+            .iter()
+            .position(|entry| entry.action_id() == Some(change_id.as_str()))
+        {
+            selection.set(index, entries.len());
+            return;
+        }
+    }
+
+    selection.set(previous_index, entries.len());
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::text::Line;
+
+    use super::*;
+    use crate::jj::JjCommand;
+
+    fn log_item(text: &str, change_id: Option<&str>, commit_id: Option<&str>) -> LogItem {
+        LogItem::new(
+            vec![Line::from(text.to_owned())],
+            change_id.map(str::to_owned),
+            commit_id.map(str::to_owned),
+        )
+    }
+
+    fn graph_view(entries: Vec<LogItem>) -> GraphView {
+        GraphView {
+            spec: ViewSpec::new(JjCommand::Log, Vec::new()),
+            entries,
+            selection: Selection::default(),
+        }
+    }
+
+    #[test]
+    fn copy_options_use_row_semantics() {
+        let view = graph_view(vec![log_item("row text", Some("change"), Some("commit"))]);
+
+        let options = view.copy_options();
+
+        assert_eq!(options.len(), 3);
+        assert_eq!(options[0].label(), "change id");
+        assert_eq!(options[0].value(), "change");
+        assert_eq!(options[1].label(), "commit id");
+        assert_eq!(options[1].value(), "commit");
+        assert_eq!(options[2].label(), "row text");
+        assert_eq!(options[2].value(), "row text");
+    }
+
+    #[test]
+    fn current_revset_is_none_for_non_selectable_log_rows() {
+        let view = graph_view(vec![log_item("(elided revisions)", None, None)]);
+
+        assert_eq!(view.current_revset(), None);
+    }
+
+    #[test]
+    fn restore_selection_prefers_matching_change_id_over_index() {
+        let entries = vec![
+            log_item("second", Some("second"), None),
+            log_item("first", Some("first"), None),
+        ];
+        let mut selection = Selection::default();
+        selection.set(1, 2);
+
+        restore_selection(&mut selection, &entries, 1, Some("second".to_owned()));
+
+        assert_eq!(selection.index(), 0);
+    }
+
+    #[test]
+    fn restore_selection_clamps_when_selected_change_disappears() {
+        let entries = vec![log_item("only", Some("only"), None)];
+        let mut selection = Selection::default();
+
+        restore_selection(&mut selection, &entries, 3, Some("missing".to_owned()));
+
+        assert_eq!(selection.index(), 0);
+    }
 }
