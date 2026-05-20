@@ -6,11 +6,12 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Clear, List, ListItem, Paragraph};
-use ratatui_macros::{line, span, text, vertical};
+use ratatui_macros::{line, span, vertical};
 
 use crate::app::{StatusKind, StatusLine, ViewFormatOption};
+use crate::command::HelpSection;
 use crate::copy::CopyOption;
 
 #[derive(Clone, Copy, Debug)]
@@ -41,13 +42,14 @@ pub fn render_chrome(frame: &mut Frame<'_>, areas: Areas, status: &StatusLine) {
     frame.render_widget(status_line(status), areas.status);
 }
 
-pub fn render_overlay(frame: &mut Frame<'_>, status: &StatusLine, overlay: Overlay<'_>) {
+pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Overlay<'_>) {
     match overlay {
         Overlay::None => {}
-        Overlay::Help => {
-            let area = centered_area(frame.area(), 62, 12);
+        Overlay::Help { sections } => {
+            let content = help_overlay_text(&sections);
+            let area = centered_area(frame.area(), 62, content.lines.len() as u16 + 2);
             frame.render_widget(Clear, area);
-            frame.render_widget(help_overlay(status.hints()), area);
+            frame.render_widget(help_overlay(content), area);
         }
         Overlay::CopyMenu { options, selected } => {
             let area = centered_area(frame.area(), 54, options.len() as u16 + 2);
@@ -64,7 +66,9 @@ pub fn render_overlay(frame: &mut Frame<'_>, status: &StatusLine, overlay: Overl
 
 pub enum Overlay<'a> {
     None,
-    Help,
+    Help {
+        sections: Vec<HelpSection>,
+    },
     CopyMenu {
         options: &'a [CopyOption],
         selected: usize,
@@ -160,29 +164,33 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
     Paragraph::new(line)
 }
 
-fn help_overlay(hints: StatusHints) -> Paragraph<'static> {
-    let lines = match hints {
-        StatusHints::Graph => text![
-            "q/Esc quit    r refresh    ? close help",
-            "j/k move      g/G ends     h back",
-            "l/s show      d diff       w mode",
-            "W revset      J jj         v view"
-        ],
-        StatusHints::ShowDocument => text![
-            "q/Esc quit    r refresh    ? close help",
-            "j/k scroll    g/G ends     h back",
-            "[/] file      Space/C-f page down",
-            "PageUp/C-b page up         d diff    v view"
-        ],
-        StatusHints::DiffDocument => text![
-            "q/Esc quit    r refresh    ? close help",
-            "j/k scroll    g/G ends     h back",
-            "[/] file      Space/C-f page down",
-            "PageUp/C-b page up         s show    v view"
-        ],
-    };
+fn help_overlay(content: Text<'static>) -> Paragraph<'static> {
+    Paragraph::new(content).block(Block::bordered().title("Help"))
+}
 
-    Paragraph::new(lines).block(Block::bordered().title("Help"))
+fn help_overlay_text(sections: &[HelpSection]) -> Text<'static> {
+    let mut lines = Vec::new();
+
+    for (index, section) in sections.iter().enumerate() {
+        if index > 0 {
+            lines.push(Line::default());
+        }
+        lines.push(Line::styled(
+            section.title().to_owned(),
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        ));
+        for row in section.rows() {
+            lines.push(line![
+                span!(Modifier::BOLD; "{keys}", keys = row.keys()),
+                "  ",
+                span!("{action}", action = row.action()),
+            ]);
+        }
+    }
+
+    Text::from(lines)
 }
 
 fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
@@ -239,5 +247,51 @@ fn status_style(status: &StatusLine) -> Style {
     match status.kind() {
         StatusKind::Ready => Style::default().fg(Color::DarkGray),
         StatusKind::Error => Style::default().fg(Color::Red),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::command::{HelpRow, HelpSectionKind};
+
+    use super::*;
+
+    #[test]
+    fn help_overlay_text_renders_generated_sections() {
+        let text = help_overlay_text(&[
+            HelpSection::new(
+                HelpSectionKind::Global,
+                vec![HelpRow::new("q, Esc", "quit"), HelpRow::new("?", "help")],
+            ),
+            HelpSection::new(
+                HelpSectionKind::Direct,
+                vec![
+                    HelpRow::new("w", "cycle view mode"),
+                    HelpRow::new("-", "none yet"),
+                ],
+            ),
+        ]);
+
+        let rendered = text
+            .lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        insta::assert_snapshot!(rendered, @r"
+        Global
+        q, Esc  quit
+        ?  help
+
+        Direct Actions
+        w  cycle view mode
+        -  none yet
+        ");
     }
 }

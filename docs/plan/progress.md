@@ -30,3 +30,13 @@
 - Remaining risk: custom revset entry now exists through a lightweight graph-only prompt (`W`), but
   it does not yet offer history, editing helpers, or generated help text
 - Next slice: Slice 3: Generated Help and Keymap
+
+## Slice 3: Generated Help And Keymap
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/tui.rs`, `src/view_state.rs`,
+  `docs/plan/progress.md`
+- Verification: full `cargo test` before and after `rustup run nightly cargo fmt`, including new
+  help-projection and snapshot-style overlay tests, then `just md-check`
+- Remaining risk: the status bar still uses concise handwritten hint text, while the help overlay is
+  now the generated source of truth for exact bindings
+- Next slice: Slice 4: Direct `jj git fetch`

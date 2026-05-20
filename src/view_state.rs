@@ -7,7 +7,7 @@ use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
-use crate::command::{Binding, CommandContext, ViewCommand, ViewEffect};
+use crate::command::{Binding, CommandContext, HelpContext, ViewCommand, ViewEffect};
 use crate::diff::DiffView;
 use crate::graph::GraphView;
 use crate::jj::{JjCommand, LogViewMode, ViewSpec};
@@ -84,6 +84,14 @@ impl ViewState {
             Self::Graph(_) => StatusHints::Graph,
             Self::Show(_) => StatusHints::ShowDocument,
             Self::Diff(_) => StatusHints::DiffDocument,
+        }
+    }
+
+    pub fn help_context(&self) -> HelpContext {
+        match self {
+            Self::Graph(_) => HelpContext::Graph,
+            Self::Show(_) => HelpContext::Show,
+            Self::Diff(_) => HelpContext::Diff,
         }
     }
 

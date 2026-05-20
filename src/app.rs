@@ -16,6 +16,7 @@ use ratatui::DefaultTerminal;
 use crate::clipboard;
 use crate::command::{
     Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect, find_binding,
+    project_help,
 };
 use crate::copy::CopyOption;
 use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
@@ -426,7 +427,13 @@ impl App {
 
     fn overlay(&self) -> Overlay<'_> {
         match &self.mode {
-            InteractionMode::Help => Overlay::Help,
+            InteractionMode::Help => Overlay::Help {
+                sections: project_help(
+                    APP_BINDINGS,
+                    self.view.bindings(),
+                    self.view.help_context(),
+                ),
+            },
             InteractionMode::CopyMenu { options, selected } => Overlay::CopyMenu {
                 options,
                 selected: *selected,
