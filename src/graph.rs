@@ -48,6 +48,9 @@ pub const BINDINGS: &[Binding] = &[
         Command::View(ViewCommand::OpenShow),
     ),
     Binding::new(KeyPattern::char('d'), Command::View(ViewCommand::OpenDiff)),
+    Binding::new(KeyPattern::char('e'), Command::Edit),
+    Binding::new(KeyPattern::char(']'), Command::NextEdit),
+    Binding::new(KeyPattern::char('['), Command::PrevEdit),
     Binding::new(
         KeyPattern::char('n'),
         Command::View(ViewCommand::NextSearchMatch),
@@ -546,7 +549,9 @@ mod tests {
     use ratatui::text::Line;
 
     use super::*;
+    use crate::command::find_binding;
     use crate::jj::JjCommand;
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
     fn log_item(text: &str, change_id: Option<&str>, commit_id: Option<&str>) -> LogItem {
         LogItem::new(
@@ -868,6 +873,7 @@ mod tests {
         assert_eq!(
             labels,
             vec![
+                "edit selected revision aaaaaaaa",
                 "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
                 "abandon selected revision aaaaaaaa",
@@ -973,12 +979,29 @@ mod tests {
         assert_eq!(
             labels,
             vec![
+                "edit selected revision aaaaaaaa",
                 "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
                 "abandon selected revision aaaaaaaa",
                 "restore selected revision aaaaaaaa",
                 "revert selected revision aaaaaaaa into @"
             ]
+        );
+    }
+
+    #[test]
+    fn graph_bindings_expose_edit_next_and_prev_keys() {
+        assert_eq!(
+            find_binding(BINDINGS, key(KeyCode::Char('e'))).map(Binding::command),
+            Some(Command::Edit)
+        );
+        assert_eq!(
+            find_binding(BINDINGS, key(KeyCode::Char(']'))).map(Binding::command),
+            Some(Command::NextEdit)
+        );
+        assert_eq!(
+            find_binding(BINDINGS, key(KeyCode::Char('['))).map(Binding::command),
+            Some(Command::PrevEdit)
         );
     }
 
@@ -1007,5 +1030,14 @@ mod tests {
         };
 
         assert_eq!(view.selected_revision(), Some("abcd"));
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
     }
 }

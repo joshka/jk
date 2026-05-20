@@ -5,6 +5,109 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 30 edit/next/prev navigation flows)
+
+- Slice / task: Implement Packet 30 preview-first graph-guided working-copy navigation for `edit`,
+  `next`, and `prev` in the current jj working-copy change `Add edit next prev navigation flows`.
+- Worker / model: `019e453c-d27e-7193-bd03-ea6e6aab8678` / `gpt-5` (Codex).
+- Scope given: keep main-thread work orchestration-only, avoid jj/git mutations in the project
+  checkout, add exact-row `edit` plus `next --edit` / `prev --edit` graph entry points, preserve raw
+  ambiguity failures in `ActionOutput`, refresh and reveal current `@` after success, and update
+  progress, fragility, and process docs.
+- Exploration decisions carried into implementation: `edit` stayed graph-only and exact-row only,
+  using `exactly(change_id(...), 1)` instead of broad revsets. `next` and `prev` stayed graph-only
+  direct keys and always use `--edit` so `jk` does not inherit installed `ui.movement.edit` defaults
+  or accidentally create empty changes. Their previews explicitly say movement is relative to `@`
+  and that the highlighted row is not an argument.
+- Observable outcome: graph bindings now expose `e`, `]`, and `[` for preview-first working-copy
+  navigation. The graph action menu adds `edit selected revision ...` only for exact single-row
+  graph contexts. `src/jj.rs` now owns one working-copy navigation plan type for exact `edit`,
+  `next --edit`, and `prev --edit`, and `src/app.rs` uses one shared preview/result path that runs
+  the exact previewed command, refreshes, reveals the edited/current `@` change, and keeps multiline
+  failures readable with `jj undo` visible on success.
+- Validation: `cargo check`; the focused Packet 30 `cargo test ... -- --test-threads=1` coverage
+  listed in `docs/plan/progress.md`; full `cargo test`; `rustup run nightly cargo fmt`;
+  `rustup run   nightly cargo fmt --check`; `just md-check`. `just check` still failed immediately
+  at the known local wrapper step `cargo +nightly fmt`.
+- Manual proof outcome: disposable repo `/tmp/jk-packet30-proof.uYVEee` was created with
+  `jj --no-pager git init`. In that repo, `jj --no-pager edit 'exactly(change_id("<base>"), 1)'`
+  moved `@` directly to the base change and `jj --no-pager undo` restored the previous working copy.
+  From `child a`, `jj --no-pager next --edit` moved `@` to `child b`, `jj --no-pager undo` restored
+  `child a`, `jj --no-pager prev --edit` moved `@` back to the base change, and another
+  `jj --no-pager undo` restored `child a`. With `@` edited back to the base change and both
+  `child a` and `sibling` editable children present, `jj --no-pager next --edit` failed with the raw
+  ambiguity chooser text plus
+  `Error: Cannot prompt for input since the output is not connected   to a terminal`; the packet
+  preserves that output instead of attempting to parse or choose.
+- Rework / blockers: an early setup script accidentally captured `@-` change ids after `jj new`,
+  which produced parent ids instead of the new working-copy change ids. The proof was corrected by
+  re-reading full change ids from `jj --no-pager log -r 'all()' --no-graph -T 'change_id ...'`
+  before running the navigation commands. Focused cargo tests were briefly launched in parallel and
+  blocked on Cargo package/artifact locks; the remaining focused tests were rerun sequentially.
+- Evidence basis:
+  - Thread: `019e453c-d27e-7193-bd03-ea6e6aab8678`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `jj --no-pager status`
+    - `cargo check`
+    - focused `cargo test ... -- --test-threads=1` for Packet 30 command/help/graph/app coverage
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-check`
+    - `just check`
+  - Manual proof commands, all with cwd `/tmp/jk-packet30-proof.uYVEee`:
+    - `jj --no-pager git init`
+    - `jj --no-pager config set --repo signing.behavior drop`
+    - `jj --no-pager file track file.txt`
+    - `jj --no-pager describe -m 'packet 30 base'`
+    - `jj --no-pager new -m 'packet 30 child a'`
+    - `jj --no-pager new -m 'packet 30 child b'`
+    - `jj --no-pager new <base-change-id> -m 'packet 30 sibling'`
+    - `jj --no-pager log -r 'all()' --no-graph -T 'change_id ++ \"\\t\" ++ description.first_line() ...'`
+    - `jj --no-pager edit 'exactly(change_id(\"<id>\"), 1)'`
+    - `jj --no-pager next --edit`
+    - `jj --no-pager prev --edit`
+    - `jj --no-pager undo`
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/command.rs`, `src/graph.rs`, `src/jj.rs`,
+    `src/tui.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
+### 2026-05-20 (Packet 30 5.5 command-boundary repair)
+
+- Slice / task: fix Packet 30 command-boundary miss where `resolve_exact_change_id` resolved `@`
+  through `jj log -r @ -T ...` without `--no-graph`, allowing graph output (`@`, `│`, etc.) to leak
+  into the exact-change-id parser after successful `jj next --edit` / `jj prev --edit`.
+- 5.5 finding trigger: Packet 30 accepted behavior depended on refreshing and revealing `@` after
+  success, but this success path also called `resolve_exact_change_id`, which had not been
+  explicitly bound to machine-line output.
+- Why earlier worker/app tests missed it: the tests validated navigation command vectors and action
+  preview/result flow but did not include a direct assertion for the post-action
+  `resolve_exact_change_id` command path where `@` is converted back into a machine-visible revset
+  before refresh.
+- Resolution: added `--no-graph` to `resolve_exact_change_id`'s command construction, and added
+  tests for the `--no-graph` argv contract plus graph-output rejection in `src/jj.rs`.
+- Evidence basis:
+  - Thread: `019e4550-f54b-7390-a2f0-d0df075baa2b`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `cargo test resolve_exact_change_id_command_uses_no_graph_contract -- --test-threads=1`
+    - `cargo test parse_exact_change_id_rejects_graph_like_output -- --test-threads=1`
+    - `cargo check`
+  - Files: `src/jj.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet 30 5.5 final acceptance)
+
+- Final 5.5 re-review accepted Packet 30 after the `--no-graph` repair from
+  `resolve_exact_change_id` with no findings.
+- Reviewer: `019e4553-4e86-7e53-adaf-30baaa0651fe`.
+- Residual validation gap: the shared app success branch for `next` and `prev` is currently covered
+  via `prev` path coverage; `next` uses that branch too but lacks separate validation.
+
 ### 2026-05-20 (Packet 29 day-to-day tutorial set)
 
 - Slice / task: Implement Packet 29 tutorial docs for shipped day-to-day workflows in the current jj

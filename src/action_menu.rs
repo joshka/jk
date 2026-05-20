@@ -23,6 +23,7 @@ impl SafetyTier {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionKind {
+    Edit,
     New,
     Split,
     Abandon,
@@ -36,6 +37,7 @@ pub enum ActionKind {
 impl ActionKind {
     fn label(self) -> &'static str {
         match self {
+            Self::Edit => "edit",
             Self::New => "new",
             Self::Split => "split",
             Self::Abandon => "abandon",
@@ -133,6 +135,9 @@ impl RolePrompt {
 pub enum FollowUp {
     StatusMessage(String),
     ExactRevision {
+        revision: String,
+    },
+    EditExactTarget {
         revision: String,
     },
     RestoreExactTarget {
@@ -287,10 +292,11 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
             .iter()
             .all(|source| source == current_revision)
     {
+        let edit = menu_item_for_edit(current_revision);
         let new = menu_item_for_new_parents(&new_parents);
         let split = menu_item_for_single_revision(ActionKind::Split, current_revision);
         let abandon = menu_item_for_single_revision(ActionKind::Abandon, current_revision);
-        let mut items = vec![new, split, abandon];
+        let mut items = vec![edit, new, split, abandon];
         items.extend(mutation_items);
         return ActionMenu::new(items);
     }
@@ -341,7 +347,8 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         ActionKind::Abandon => FollowUp::ExactRevision {
             revision: revision.to_owned(),
         },
-        ActionKind::New
+        ActionKind::Edit
+        | ActionKind::New
         | ActionKind::Split
         | ActionKind::Restore
         | ActionKind::Revert
@@ -357,6 +364,17 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         label,
         safety_tier: SafetyTier::PreviewFirst,
         follow_up,
+    }
+}
+
+fn menu_item_for_edit(revision: &str) -> ActionMenuItem {
+    ActionMenuItem {
+        action: ActionKind::Edit,
+        label: format!("edit selected revision {}", short_id(revision)),
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up: FollowUp::EditExactTarget {
+            revision: revision.to_owned(),
+        },
     }
 }
 
@@ -470,39 +488,46 @@ mod tests {
         let context = ExactActionContext::with_current("0000000011111111222222223333333344444444");
         let menu = build_action_menu(&context);
 
-        assert_eq!(menu.items().len(), 5);
-        assert_eq!(menu.items()[0].action(), ActionKind::New);
-        assert_eq!(menu.items()[1].action(), ActionKind::Split);
-        assert_eq!(menu.items()[2].action(), ActionKind::Abandon);
-        assert_eq!(menu.items()[3].action(), ActionKind::Restore);
-        assert_eq!(menu.items()[4].action(), ActionKind::Revert);
+        assert_eq!(menu.items().len(), 6);
+        assert_eq!(menu.items()[0].action(), ActionKind::Edit);
+        assert_eq!(menu.items()[1].action(), ActionKind::New);
+        assert_eq!(menu.items()[2].action(), ActionKind::Split);
+        assert_eq!(menu.items()[3].action(), ActionKind::Abandon);
+        assert_eq!(menu.items()[4].action(), ActionKind::Restore);
+        assert_eq!(menu.items()[5].action(), ActionKind::Revert);
         assert!(menu.items()[0].safety_tier().is_preview_first());
         assert!(menu.items()[1].safety_tier().is_preview_first());
         assert!(menu.items()[2].safety_tier().is_preview_first());
         assert!(menu.items()[3].safety_tier().is_preview_first());
         assert!(menu.items()[4].safety_tier().is_preview_first());
+        assert!(menu.items()[5].safety_tier().is_preview_first());
         assert!(matches!(
             menu.items()[0].follow_up(),
+            FollowUp::EditExactTarget { revision }
+                if revision == "0000000011111111222222223333333344444444"
+        ));
+        assert!(matches!(
+            menu.items()[1].follow_up(),
             FollowUp::NewParents { parents }
                 if parents == &vec!["0000000011111111222222223333333344444444".to_owned()]
         ));
         assert!(matches!(
-            menu.items()[1].follow_up(),
+            menu.items()[2].follow_up(),
             FollowUp::StatusMessage(message)
                 if message.ends_with(PREVIEW_REQUIRED_MARKER)
         ));
         assert!(matches!(
-            menu.items()[2].follow_up(),
+            menu.items()[3].follow_up(),
             FollowUp::ExactRevision { revision }
                 if revision == "0000000011111111222222223333333344444444"
         ));
         assert!(matches!(
-            menu.items()[3].follow_up(),
+            menu.items()[4].follow_up(),
             FollowUp::RestoreExactTarget { revision, path }
                 if revision == "0000000011111111222222223333333344444444" && path.is_none()
         ));
         assert!(matches!(
-            menu.items()[4].follow_up(),
+            menu.items()[5].follow_up(),
             FollowUp::RevertExactTarget { revision }
                 if revision == "0000000011111111222222223333333344444444"
         ));
@@ -677,6 +702,7 @@ mod tests {
         assert_eq!(
             actions,
             vec![
+                ActionKind::Edit,
                 ActionKind::New,
                 ActionKind::Split,
                 ActionKind::Abandon,
@@ -685,7 +711,7 @@ mod tests {
             ]
         );
         assert!(matches!(
-            menu.items()[0].follow_up(),
+            menu.items()[1].follow_up(),
             FollowUp::NewParents { parents }
                 if parents == &vec!["ccccdddd1111111111111111111111111111111111".to_owned()]
         ));

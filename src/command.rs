@@ -22,6 +22,9 @@ pub enum Command {
     OpenOperationLog,
     OperationUndo,
     OperationRedo,
+    Edit,
+    NextEdit,
+    PrevEdit,
     Describe,
     Commit,
     BookmarkCreate,
@@ -96,6 +99,9 @@ impl Command {
             | Self::OpenResolve
             | Self::OpenBookmarks
             | Self::OpenOperationLog
+            | Self::Edit
+            | Self::NextEdit
+            | Self::PrevEdit
             | Self::Describe
             | Self::Commit
             | Self::BookmarkCreate
@@ -348,6 +354,16 @@ fn help_metadata(
         Command::OpenResolve => Some((HelpSectionKind::Global, "resolve")),
         Command::OpenBookmarks => Some((HelpSectionKind::Global, "bookmarks")),
         Command::OpenOperationLog => Some((HelpSectionKind::Global, "operation log")),
+        Command::Edit => (context == HelpContext::Graph)
+            .then_some((HelpSectionKind::Preview, "edit selected revision")),
+        Command::NextEdit => (context == HelpContext::Graph).then_some((
+            HelpSectionKind::Preview,
+            "next editable change from @ (ignores selection)",
+        )),
+        Command::PrevEdit => (context == HelpContext::Graph).then_some((
+            HelpSectionKind::Preview,
+            "previous editable change from @ (ignores selection)",
+        )),
         Command::Describe => match context {
             HelpContext::Graph => Some((HelpSectionKind::Preview, "describe selected revision")),
             HelpContext::Status => Some((HelpSectionKind::Preview, "describe @")),
@@ -631,6 +647,29 @@ mod tests {
                 .iter()
                 .any(|row| row.keys() == "D" || row.keys() == "C")
         }));
+    }
+
+    #[test]
+    fn project_help_exposes_graph_edit_next_and_prev_only_in_graph() {
+        let view = [
+            Binding::new(KeyPattern::char('e'), Command::Edit),
+            Binding::new(KeyPattern::char(']'), Command::NextEdit),
+            Binding::new(KeyPattern::char('['), Command::PrevEdit),
+        ];
+
+        let graph_help = project_help(&[], &view, HelpContext::Graph);
+        let show_help = project_help(&[], &view, HelpContext::Show);
+
+        assert_eq!(graph_help[0].title(), "Preview / Confirm");
+        assert_eq!(
+            graph_help[0].rows(),
+            &[
+                HelpRow::new("e", "edit selected revision"),
+                HelpRow::new("]", "next editable change from @ (ignores selection)"),
+                HelpRow::new("[", "previous editable change from @ (ignores selection)"),
+            ]
+        );
+        assert_eq!(show_help[0].rows(), &[HelpRow::new("-", "none yet")]);
     }
 
     #[test]

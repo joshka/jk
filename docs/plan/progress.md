@@ -672,3 +672,72 @@
   broaden exact-target workflows will need a refresh to keep the walkthroughs aligned with shipped
   behavior.
 - Next slice: Packet 30: Edit/Next/Prev Navigation Flows
+
+## Packet 30: Edit/Next/Prev Navigation Flows
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/command.rs`, `src/graph.rs`, `src/jj.rs`,
+  `src/tui.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`
+- Behavior: graph view now offers preview-first working-copy navigation for `edit`, `next`, and
+  `prev`. Direct graph bindings use `e` for exact-row `edit`, `]` for `next --edit`, and `[` for
+  `prev --edit`. The graph action menu now adds `edit selected revision ...` only when the current
+  row itself is an exact single-row graph target. `next` and `prev` stay out of the action menu so
+  the UI does not imply they target the highlighted row.
+- Command shape: `edit` always runs `jj edit exactly(change_id("<change-id>"), 1)`. `next` always
+  runs `jj next --edit`. `prev` always runs `jj prev --edit`. `jk` does not pass graph-row targets
+  to `next`/`prev`, does not use bare `jj next`/`jj prev`, and does not parse or choose between
+  ambiguity candidates.
+- Preview/result behavior: `edit` previews show the exact selected graph revision and say the
+  command moves `@` to edit that revision directly. `next`/`prev` previews say the highlighted row
+  is not an argument, that movement is relative to current `@`, and that ambiguity stays a normal
+  `jj` failure path. Confirmation runs exactly the previewed command. Successful confirmation
+  refreshes the graph, reveals the edited/current `@` change with the existing recent-work fallback,
+  and keeps `jj undo` visible in status and completed output. Failures preserve full multiline
+  command output in `ActionOutput`.
+- Final 5.5 repair: Packet 30’s command-boundary miss was accepted and fixed by adding `--no-graph`
+  to the `resolve_exact_change_id` command path, so `next --edit` and `prev --edit` refresh/reveal
+  cannot be broken by graph-line contamination on `@`.
+- Final 5.5 re-review: packet `019e4553-4e86-7e53-adaf-30baaa0651fe` accepted Packet 30 after the
+  `--no-graph` repair with no findings.
+- Residual validation gap: only `prev` currently exercises the shared next/prev success flow in app
+  behavior, while `next` shares the same success branch and should be covered directly at the same
+  level.
+- Verification: `cargo check`; focused command tests
+  `cargo test edit_plan_uses_exact_change_id_revset -- --test-threads=1`,
+  `cargo test next_plan_uses_explicit_edit_flag_and_ignores_selection -- --test-threads=1`,
+  `cargo test prev_plan_uses_explicit_edit_flag_and_mentions_ambiguity -- --test-threads=1`; focused
+  graph/help/app tests
+  `cargo test project_help_exposes_graph_edit_next_and_prev_only_in_graph -- --test-threads=1`,
+  `cargo test graph_bindings_expose_edit_next_and_prev_keys -- --test-threads=1`,
+  `cargo test open_action_menu_prefers_single_row_context -- --test-threads=1`,
+  `cargo test edit_action_menu_enter_opens_preview_with_exact_target -- --test-threads=1`,
+  `cargo test edit_direct_key_requires_exact_selected_graph_row -- --test-threads=1`,
+  `cargo test next_direct_key_opens_preview_without_selected_row_targeting -- --test-threads=1`,
+  `cargo test working_copy_navigation_preview_cancel_restores_normal_mode -- --test-threads=1`,
+  `cargo test edit_confirm_success_refreshes_and_reveals_target -- --test-threads=1`,
+  `cargo test prev_confirm_success_resolves_current_working_copy_and_reveals_recent -- --test-threads=1`,
+  `cargo test working_copy_navigation_failure_keeps_output_readable -- --test-threads=1`; full
+  `cargo test`; focused
+  `cargo test resolve_exact_change_id_command_uses_no_graph_contract   -- --test-threads=1`,
+  `cargo test parse_exact_change_id_rejects_graph_like_output -- --test-threads=1`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `cargo check`
+- Validation note: `just check` was attempted after Packet 30 validation but still failed
+  immediately at the known `cargo +nightly fmt` wrapper step. Equivalent checks were run separately,
+  including `cargo check`, the focused Packet 30 tests above, full `cargo test`,
+  `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Manual proof: disposable repo `/tmp/jk-packet30-proof.uYVEee` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a base change, `child a`, `child b`, and a sibling
+  child were created. `jj --no-pager edit 'exactly(change_id("<base>"), 1)'` moved `@` directly to
+  the base change and `jj --no-pager undo` restored the sibling working copy.
+  `jj --no-pager edit 'exactly(change_id("<child-a>"), 1)'` followed by `jj --no-pager next --edit`
+  moved `@` from `child a` to `child b`, and `jj --no-pager undo` restored `child a`. From
+  `child a`, `jj --no-pager prev --edit` moved `@` back to the base change, and `jj --no-pager undo`
+  restored `child a`. With `@` edited back to the base change and two editable children available,
+  `jj --no-pager next --edit` failed non-interactively with the raw `jj` ambiguity prompt/output and
+  `Error: Cannot prompt for input since the output is not   connected to a terminal`; `jk` preserves
+  that failure as command output instead of interpreting it.
+- Remaining risk: `next --edit` and `prev --edit` still depend on installed `jj` topology semantics
+  and can fail with interactive ambiguity prompts when multiple editable successors/predecessors
+  exist. `jk` now keeps `--edit` explicit and preserves those failures readably, but it still does
+  not preview the final graph or resolve ambiguity on the user's behalf.
+- Next slice: Packet 31: follow-on graph-guided rewrite flows

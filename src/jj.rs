@@ -323,6 +323,19 @@ pub struct JjCommitPlan {
     message: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JjWorkingCopyNavigationKind {
+    Edit,
+    Next,
+    Prev,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjWorkingCopyNavigationPlan {
+    kind: JjWorkingCopyNavigationKind,
+    target_change_id: Option<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRestorePlan {
     revision: String,
@@ -547,6 +560,148 @@ impl JjCommitPlan {
             self.command_label(),
             self.message,
         )
+    }
+}
+
+impl JjWorkingCopyNavigationPlan {
+    pub fn edit(change_id: impl Into<String>) -> Self {
+        Self {
+            kind: JjWorkingCopyNavigationKind::Edit,
+            target_change_id: Some(change_id.into()),
+        }
+    }
+
+    pub fn next() -> Self {
+        Self {
+            kind: JjWorkingCopyNavigationKind::Next,
+            target_change_id: None,
+        }
+    }
+
+    pub fn prev() -> Self {
+        Self {
+            kind: JjWorkingCopyNavigationKind::Prev,
+            target_change_id: None,
+        }
+    }
+
+    pub fn kind(&self) -> JjWorkingCopyNavigationKind {
+        self.kind
+    }
+
+    pub fn target_change_id(&self) -> Option<&str> {
+        self.target_change_id.as_deref()
+    }
+
+    pub fn overlay_title(&self) -> &'static str {
+        match self.kind {
+            JjWorkingCopyNavigationKind::Edit => "Edit",
+            JjWorkingCopyNavigationKind::Next => "Next",
+            JjWorkingCopyNavigationKind::Prev => "Prev",
+        }
+    }
+
+    pub fn cancel_message(&self) -> &'static str {
+        match self.kind {
+            JjWorkingCopyNavigationKind::Edit => "edit cancelled",
+            JjWorkingCopyNavigationKind::Next => "next cancelled",
+            JjWorkingCopyNavigationKind::Prev => "prev cancelled",
+        }
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        match self.kind {
+            JjWorkingCopyNavigationKind::Edit => vec![
+                "edit".to_owned(),
+                exact_change_id_revset(
+                    self.target_change_id
+                        .as_deref()
+                        .expect("edit requires an exact target change id"),
+                ),
+            ],
+            JjWorkingCopyNavigationKind::Next => {
+                vec!["next".to_owned(), "--edit".to_owned()]
+            }
+            JjWorkingCopyNavigationKind::Prev => {
+                vec!["prev".to_owned(), "--edit".to_owned()]
+            }
+        }
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(),
+            &self.command_label(),
+            match self.kind {
+                JjWorkingCopyNavigationKind::Edit => "moved @ to edit the selected revision",
+                JjWorkingCopyNavigationKind::Next => "moved @ to the next change for editing",
+                JjWorkingCopyNavigationKind::Prev => "moved @ to the previous change for editing",
+            },
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        match self.kind {
+            JjWorkingCopyNavigationKind::Edit => {
+                let target = self
+                    .target_change_id
+                    .as_deref()
+                    .expect("edit requires an exact target change id");
+
+                format!(
+                    concat!(
+                        "command: {}\n\n",
+                        "target: exact selected graph revision {}\n",
+                        "effect: moves @ to edit that revision directly\n",
+                        "selection: the selected graph row becomes the exact jj edit argument\n",
+                        "confirmation: press Enter to run {}\n",
+                        "undo path: jj undo"
+                    ),
+                    self.command_label(),
+                    target,
+                    self.command_label(),
+                )
+            }
+            JjWorkingCopyNavigationKind::Next => format!(
+                concat!(
+                    "command: {}\n\n",
+                    "target: current working-copy change (@)\n",
+                    "selection: the highlighted graph row is not an argument to jj next --edit\n",
+                    "effect: runs jj topology movement relative to @ and opens the next change ",
+                    "for editing directly\n",
+                    "ambiguity: jj may fail if the next editable change is ambiguous or ",
+                    "unavailable\n",
+                    "confirmation: press Enter to run jj next --edit\n",
+                    "undo path: jj undo"
+                ),
+                self.command_label(),
+            ),
+            JjWorkingCopyNavigationKind::Prev => format!(
+                concat!(
+                    "command: {}\n\n",
+                    "target: current working-copy change (@)\n",
+                    "selection: the highlighted graph row is not an argument to jj prev --edit\n",
+                    "effect: runs jj topology movement relative to @ and opens the previous ",
+                    "change for editing directly\n",
+                    "ambiguity: jj may fail if the previous editable change is ambiguous or ",
+                    "unavailable\n",
+                    "confirmation: press Enter to run jj prev --edit\n",
+                    "undo path: jj undo"
+                ),
+                self.command_label(),
+            ),
+        }
     }
 }
 
@@ -1835,7 +1990,7 @@ pub fn new_trunk() -> Result<CommandOutput> {
 
 pub fn resolve_exact_change_id(revset: &str) -> Result<String> {
     let mut jj = base_command(ColorMode::Never);
-    jj.args(["log", "-r", revset, "-T", CHANGE_ID_TEMPLATE]);
+    jj.args(resolve_exact_change_id_command_argv(revset));
 
     let output = jj.output()?;
     if !output.status.success() {
@@ -1845,6 +2000,17 @@ pub fn resolve_exact_change_id(revset: &str) -> Result<String> {
 
     parse_exact_change_id(&String::from_utf8(output.stdout)?)
         .map_err(|error| eyre!("{} {}", revset, error))
+}
+
+fn resolve_exact_change_id_command_argv(revset: &str) -> Vec<String> {
+    vec![
+        "log".to_owned(),
+        "--no-graph".to_owned(),
+        "-r".to_owned(),
+        revset.to_owned(),
+        "-T".to_owned(),
+        CHANGE_ID_TEMPLATE.to_owned(),
+    ]
 }
 
 fn short_id(id: &str) -> &str {
@@ -2941,6 +3107,63 @@ mod tests {
         assert!(
             plan.preview_summary()
                 .contains("selected graph rows are not arguments")
+        );
+    }
+
+    #[test]
+    fn edit_plan_uses_exact_change_id_revset() {
+        let plan = JjWorkingCopyNavigationPlan::edit("change-a");
+
+        assert_eq!(
+            plan.command_argv(),
+            vec!["edit", "exactly(change_id(\"change-a\"), 1)"]
+        );
+        assert_eq!(
+            plan.command_label(),
+            "jj edit exactly(change_id(\"change-a\"), 1)"
+        );
+        assert_eq!(plan.target_change_id(), Some("change-a"));
+        assert!(
+            plan.preview_summary()
+                .contains("target: exact selected graph revision change-a")
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("moves @ to edit that revision directly")
+        );
+    }
+
+    #[test]
+    fn next_plan_uses_explicit_edit_flag_and_ignores_selection() {
+        let plan = JjWorkingCopyNavigationPlan::next();
+
+        assert_eq!(plan.command_argv(), vec!["next", "--edit"]);
+        assert_eq!(plan.command_label(), "jj next --edit");
+        assert_eq!(plan.target_change_id(), None);
+        assert!(
+            plan.preview_summary()
+                .contains("highlighted graph row is not an argument to jj next --edit")
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("runs jj topology movement relative to @")
+        );
+    }
+
+    #[test]
+    fn prev_plan_uses_explicit_edit_flag_and_mentions_ambiguity() {
+        let plan = JjWorkingCopyNavigationPlan::prev();
+
+        assert_eq!(plan.command_argv(), vec!["prev", "--edit"]);
+        assert_eq!(plan.command_label(), "jj prev --edit");
+        assert_eq!(plan.target_change_id(), None);
+        assert!(
+            plan.preview_summary()
+                .contains("highlighted graph row is not an argument to jj prev --edit")
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("previous editable change is ambiguous or unavailable")
         );
     }
 
@@ -4164,5 +4387,18 @@ mod tests {
         assert_eq!(parse_exact_change_id("abc\n").unwrap(), "abc");
         assert!(parse_exact_change_id("").is_err());
         assert!(parse_exact_change_id("abc\ndef\n").is_err());
+    }
+
+    #[test]
+    fn parse_exact_change_id_rejects_graph_like_output() {
+        assert!(parse_exact_change_id("@ abcdefghijkl\n│  some graph suffix").is_err());
+    }
+
+    #[test]
+    fn resolve_exact_change_id_command_uses_no_graph_contract() {
+        assert_eq!(
+            resolve_exact_change_id_command_argv("main"),
+            vec!["log", "--no-graph", "-r", "main", "-T", CHANGE_ID_TEMPLATE,]
+        );
     }
 }

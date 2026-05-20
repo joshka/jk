@@ -25,8 +25,9 @@ use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
     JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationRecoveryKind, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan, LogViewMode,
-    ViewSpec, git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
+    JjOperationRecoveryKind, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan,
+    JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec, git_fetch,
+    git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -60,6 +61,8 @@ type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 type AbandonRun = fn(&JjAbandonPlan) -> Result<String>;
 #[cfg(test)]
 type OperationRecoveryRun = fn(&JjOperationRecovery) -> Result<String>;
+#[cfg(test)]
+type WorkingCopyNavigationRun = fn(&JjWorkingCopyNavigationPlan) -> Result<String>;
 #[cfg(test)]
 type ResolveRevision = fn(&str) -> Result<String>;
 #[cfg(test)]
@@ -116,6 +119,8 @@ struct App {
     abandon_run: AbandonRun,
     #[cfg(test)]
     operation_recovery_run: OperationRecoveryRun,
+    #[cfg(test)]
+    working_copy_navigation_run: WorkingCopyNavigationRun,
     #[cfg(test)]
     resolve_revision: ResolveRevision,
     #[cfg(test)]
@@ -218,6 +223,10 @@ enum InteractionMode {
     },
     OperationRecoveryPreview {
         recovery: JjOperationRecovery,
+        output: ActionOutput,
+    },
+    WorkingCopyNavigationPreview {
+        navigation: JjWorkingCopyNavigationPlan,
         output: ActionOutput,
     },
 }
@@ -323,6 +332,11 @@ fn default_operation_recovery_run(recovery: &JjOperationRecovery) -> Result<Stri
 }
 
 #[cfg(test)]
+fn default_working_copy_navigation_run(navigation: &JjWorkingCopyNavigationPlan) -> Result<String> {
+    navigation.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
 fn default_resolve_revision(revset: &str) -> Result<String> {
     resolve_exact_change_id(revset)
 }
@@ -402,6 +416,8 @@ impl App {
             abandon_run: default_abandon_run,
             #[cfg(test)]
             operation_recovery_run: default_operation_recovery_run,
+            #[cfg(test)]
+            working_copy_navigation_run: default_working_copy_navigation_run,
             #[cfg(test)]
             resolve_revision: default_resolve_revision,
             #[cfg(test)]
@@ -562,6 +578,22 @@ impl App {
     }
 
     #[cfg(test)]
+    fn run_working_copy_navigation(
+        &self,
+        navigation: &JjWorkingCopyNavigationPlan,
+    ) -> Result<String> {
+        (self.working_copy_navigation_run)(navigation)
+    }
+
+    #[cfg(not(test))]
+    fn run_working_copy_navigation(
+        &self,
+        navigation: &JjWorkingCopyNavigationPlan,
+    ) -> Result<String> {
+        navigation.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
     fn resolve_revision(&self, revset: &str) -> Result<String> {
         (self.resolve_revision)(revset)
     }
@@ -709,6 +741,18 @@ impl App {
                 if let Some(kind) = binding.command().operation_recovery() {
                     self.open_operation_recovery_preview(kind);
                 }
+                Ok(false)
+            }
+            Command::Edit => {
+                self.open_graph_working_copy_navigation_preview(JjWorkingCopyNavigationKind::Edit);
+                Ok(false)
+            }
+            Command::NextEdit => {
+                self.open_graph_working_copy_navigation_preview(JjWorkingCopyNavigationKind::Next);
+                Ok(false)
+            }
+            Command::PrevEdit => {
+                self.open_graph_working_copy_navigation_preview(JjWorkingCopyNavigationKind::Prev);
                 Ok(false)
             }
             Command::Describe => {
@@ -928,7 +972,8 @@ impl App {
                                         ActionKind::Abandon => {
                                             self.open_abandon_preview(JjAbandonPlan::new(revision));
                                         }
-                                        ActionKind::New
+                                        ActionKind::Edit
+                                        | ActionKind::New
                                         | ActionKind::Split
                                         | ActionKind::Restore
                                         | ActionKind::Revert
@@ -941,6 +986,13 @@ impl App {
                                             );
                                         }
                                     }
+                                }
+                                FollowUp::EditExactTarget { revision } => {
+                                    let revision = revision.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    self.open_working_copy_navigation_preview(
+                                        JjWorkingCopyNavigationPlan::edit(revision),
+                                    );
                                 }
                                 FollowUp::RestoreExactTarget { revision, path } => {
                                     let revision = revision.clone();
@@ -1041,7 +1093,8 @@ impl App {
                                         StatusLine::error(&self.view, next_status.to_owned());
                                 }
                             },
-                            ActionKind::New
+                            ActionKind::Edit
+                            | ActionKind::New
                             | ActionKind::Split
                             | ActionKind::Restore
                             | ActionKind::Revert
@@ -1597,6 +1650,41 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::WorkingCopyNavigationPreview { navigation, output } => {
+                let (navigation, status_context, completed) = {
+                    (
+                        navigation.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                navigation.cancel_message().to_owned(),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_working_copy_navigation(
+                            navigation,
+                            status_context,
+                            viewport_height,
+                        );
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
         }
     }
 
@@ -1654,6 +1742,21 @@ impl App {
 
         self.mode = InteractionMode::ActionMenu { menu, selected: 0 };
         Ok(false)
+    }
+
+    fn graph_selected_revision(&self) -> Option<String> {
+        match &self.view {
+            ViewState::Graph(view) => view.selected_revision().map(str::to_owned),
+            ViewState::Show(_)
+            | ViewState::Diff(_)
+            | ViewState::Status(_)
+            | ViewState::Resolve(_)
+            | ViewState::FileList(_)
+            | ViewState::FileShow(_)
+            | ViewState::Bookmarks(_)
+            | ViewState::OperationLog(_)
+            | ViewState::OperationDetail(_) => None,
+        }
     }
 
     fn open_describe_prompt(&mut self) {
@@ -1841,6 +1944,68 @@ impl App {
             ),
             recovery,
         };
+    }
+
+    fn open_graph_working_copy_navigation_preview(&mut self, kind: JjWorkingCopyNavigationKind) {
+        let navigation = match kind {
+            JjWorkingCopyNavigationKind::Edit => {
+                let Some(revision) = self.graph_selected_revision() else {
+                    self.status = StatusLine::error(
+                        &self.view,
+                        "edit from graph requires a selected row with an exact revision".to_owned(),
+                    );
+                    return;
+                };
+                JjWorkingCopyNavigationPlan::edit(revision)
+            }
+            JjWorkingCopyNavigationKind::Next => JjWorkingCopyNavigationPlan::next(),
+            JjWorkingCopyNavigationKind::Prev => JjWorkingCopyNavigationPlan::prev(),
+        };
+
+        self.open_working_copy_navigation_preview(navigation);
+    }
+
+    fn open_working_copy_navigation_preview(&mut self, navigation: JjWorkingCopyNavigationPlan) {
+        let status_context = Some(match navigation.kind() {
+            JjWorkingCopyNavigationKind::Edit => format!(
+                "edit exact graph revision {} from {}",
+                navigation
+                    .target_change_id()
+                    .expect("edit preview requires exact change id"),
+                self.view.spec().app_label()
+            ),
+            JjWorkingCopyNavigationKind::Next => format!(
+                "move @ with jj next --edit from {}",
+                self.view.spec().app_label()
+            ),
+            JjWorkingCopyNavigationKind::Prev => format!(
+                "move @ with jj prev --edit from {}",
+                self.view.spec().app_label()
+            ),
+        });
+
+        match navigation.run_preview() {
+            Ok(output) => {
+                let command_label = navigation.command_label();
+                self.mode = InteractionMode::WorkingCopyNavigationPreview {
+                    navigation,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = navigation.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::WorkingCopyNavigationPreview {
+                    navigation,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
     }
 
     fn open_describe_preview(&mut self, describe: JjDescribePlan) {
@@ -2487,6 +2652,101 @@ impl App {
         };
     }
 
+    fn confirm_working_copy_navigation(
+        &mut self,
+        navigation: JjWorkingCopyNavigationPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = navigation.command_label();
+        let result_message = match self.run_working_copy_navigation(&navigation) {
+            Ok(output) => {
+                let reveal_change_id = match navigation.kind() {
+                    JjWorkingCopyNavigationKind::Edit => navigation
+                        .target_change_id()
+                        .expect("edit navigation requires exact target change id")
+                        .to_owned(),
+                    JjWorkingCopyNavigationKind::Next | JjWorkingCopyNavigationKind::Prev => {
+                        match self.resolve_revision("@") {
+                            Ok(change_id) => change_id,
+                            Err(error) => {
+                                let message = format!(
+                                    "{} | resolve @ failed: {error} | jj undo",
+                                    output.trim()
+                                );
+                                self.status = StatusLine::error(&self.view, error.to_string());
+                                self.mode = InteractionMode::WorkingCopyNavigationPreview {
+                                    navigation,
+                                    output: ActionOutput::finished(
+                                        command_label,
+                                        message,
+                                        status_context,
+                                    ),
+                                };
+                                return;
+                            }
+                        }
+                    }
+                };
+
+                match self.refresh_view_state() {
+                    Ok(()) => {
+                        self.view.clamp(viewport_height);
+                        let mut reveal_error = None;
+                        let revealed_in_recent = match self
+                            .reveal_graph_change(&reveal_change_id, LogViewMode::Recent)
+                        {
+                            Ok(switched_modes) => {
+                                self.view.clamp(viewport_height);
+                                Some(switched_modes)
+                            }
+                            Err(error) => {
+                                self.status = StatusLine::error(&self.view, error.to_string());
+                                reveal_error = Some(format!(
+                                    "{} | reveal failed: {} | jj undo",
+                                    output.trim(),
+                                    error
+                                ));
+                                None
+                            }
+                        };
+
+                        let message = match revealed_in_recent {
+                            Some(switched_modes) => {
+                                if switched_modes {
+                                    format!("{} | showing recent work | jj undo", output.trim())
+                                } else {
+                                    format!("{} | jj undo", output.trim())
+                                }
+                            }
+                            None => match reveal_error.as_deref() {
+                                Some(message) => message.to_owned(),
+                                None => format!("{} | jj undo", output.trim()),
+                            },
+                        };
+                        if reveal_error.is_none() {
+                            self.status = StatusLine::with_message(&self.view, message.as_str());
+                        }
+                        message
+                    }
+                    Err(error) => {
+                        self.status = StatusLine::error(&self.view, error.to_string());
+                        format!("{} | refresh failed: {error} | jj undo", output.trim())
+                    }
+                }
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::WorkingCopyNavigationPreview {
+            navigation,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
     fn confirm_abandon(
         &mut self,
         abandon: JjAbandonPlan,
@@ -3018,6 +3278,12 @@ impl App {
             InteractionMode::PushPreview { output, .. } => Overlay::PushPreview { output },
             InteractionMode::OperationRecoveryPreview { output, .. } => {
                 Overlay::OperationRecoveryPreview { output }
+            }
+            InteractionMode::WorkingCopyNavigationPreview { navigation, output } => {
+                Overlay::WorkingCopyNavigationPreview {
+                    title: navigation.overlay_title(),
+                    output,
+                }
             }
             InteractionMode::Normal
             | InteractionMode::SearchPrompt(_)
@@ -3603,6 +3869,30 @@ mod tests {
         ))
     }
 
+    fn mock_working_copy_navigation_success(
+        navigation: &JjWorkingCopyNavigationPlan,
+    ) -> Result<String> {
+        Ok(match navigation.kind() {
+            JjWorkingCopyNavigationKind::Edit => format!(
+                "editing {}",
+                navigation
+                    .target_change_id()
+                    .expect("edit mock requires exact target change id")
+            ),
+            JjWorkingCopyNavigationKind::Next => "moved to next editable change".to_owned(),
+            JjWorkingCopyNavigationKind::Prev => "moved to previous editable change".to_owned(),
+        })
+    }
+
+    fn mock_working_copy_navigation_failure(
+        navigation: &JjWorkingCopyNavigationPlan,
+    ) -> Result<String> {
+        Err(eyre!(
+            "{} failed: first line\nsecond line",
+            navigation.command_label()
+        ))
+    }
+
     fn mock_no_remotes() -> Result<Vec<String>> {
         Ok(Vec::new())
     }
@@ -3690,6 +3980,26 @@ mod tests {
         Ok(true)
     }
 
+    fn mock_reveal_edit_target_in_recent(
+        _view: &mut ViewState,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        assert_eq!(change_id, "change-a");
+        assert_eq!(fallback_mode, LogViewMode::Recent);
+        Ok(false)
+    }
+
+    fn mock_reveal_current_working_copy_in_recent(
+        _view: &mut ViewState,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        assert_eq!(change_id, "new-working-copy");
+        assert_eq!(fallback_mode, LogViewMode::Recent);
+        Ok(true)
+    }
+
     fn test_app(view: ViewState) -> App {
         App {
             status: StatusLine::ready(&view),
@@ -3728,6 +4038,8 @@ mod tests {
             abandon_run: mock_abandon_success,
             #[cfg(test)]
             operation_recovery_run: mock_operation_recovery_success,
+            #[cfg(test)]
+            working_copy_navigation_run: mock_working_copy_navigation_success,
             #[cfg(test)]
             resolve_revision: mock_resolve_current_change_id,
             #[cfg(test)]
@@ -4936,6 +5248,184 @@ mod tests {
     }
 
     #[test]
+    fn edit_action_menu_enter_opens_preview_with_exact_target() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::with_current("change-a"),
+            ),
+            selected: 0,
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (navigation, command_label, body) = match &app.mode {
+            InteractionMode::WorkingCopyNavigationPreview { navigation, output } => (
+                navigation.clone(),
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected working-copy navigation preview"),
+        };
+        assert_eq!(navigation.kind(), JjWorkingCopyNavigationKind::Edit);
+        assert_eq!(navigation.target_change_id(), Some("change-a"));
+        assert_eq!(command_label, "jj edit exactly(change_id(\"change-a\"), 1)");
+        assert!(body.contains("target: exact selected graph revision change-a"));
+        assert!(body.contains("moves @ to edit that revision directly"));
+    }
+
+    #[test]
+    fn edit_direct_key_requires_exact_selected_graph_row() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), None, None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('e'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "edit from graph requires a selected row with an exact revision"
+        );
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+    }
+
+    #[test]
+    fn next_direct_key_opens_preview_without_selected_row_targeting() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), None, None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char(']'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        let (navigation, command_label, body) = match &app.mode {
+            InteractionMode::WorkingCopyNavigationPreview { navigation, output } => (
+                navigation.clone(),
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected working-copy navigation preview"),
+        };
+        assert_eq!(navigation.kind(), JjWorkingCopyNavigationKind::Next);
+        assert_eq!(command_label, "jj next --edit");
+        assert!(body.contains("highlighted graph row is not an argument to jj next --edit"));
+        assert!(body.contains("runs jj topology movement relative to @"));
+    }
+
+    #[test]
+    fn working_copy_navigation_preview_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::WorkingCopyNavigationPreview {
+            navigation: JjWorkingCopyNavigationPlan::edit("change-a"),
+            output: ActionOutput::pending(
+                "jj edit exactly(change_id(\"change-a\"), 1)".to_owned(),
+                "preview only".to_owned(),
+                Some("edit preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "edit cancelled");
+    }
+
+    #[test]
+    fn edit_confirm_success_refreshes_and_reveals_target() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.reveal_graph_change = mock_reveal_edit_target_in_recent;
+        app.mode = InteractionMode::WorkingCopyNavigationPreview {
+            navigation: JjWorkingCopyNavigationPlan::edit("change-a"),
+            output: ActionOutput::pending(
+                "jj edit exactly(change_id(\"change-a\"), 1)".to_owned(),
+                "preview only".to_owned(),
+                Some("edit preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::WorkingCopyNavigationPreview { output, .. } => output,
+            _ => panic!("expected working-copy navigation result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("editing change-a | jj undo"));
+        assert_eq!(app.status.message(), "editing change-a | jj undo");
+    }
+
+    #[test]
+    fn prev_confirm_success_resolves_current_working_copy_and_reveals_recent() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), None, None),
+        ])));
+        app.reveal_graph_change = mock_reveal_current_working_copy_in_recent;
+        app.mode = InteractionMode::WorkingCopyNavigationPreview {
+            navigation: JjWorkingCopyNavigationPlan::prev(),
+            output: ActionOutput::pending(
+                "jj prev --edit".to_owned(),
+                "preview only".to_owned(),
+                Some("prev preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::WorkingCopyNavigationPreview { output, .. } => output,
+            _ => panic!("expected working-copy navigation result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("moved to previous editable change | showing recent work | jj undo"));
+        assert_eq!(
+            app.status.message(),
+            "moved to previous editable change | showing recent work | jj undo"
+        );
+    }
+
+    #[test]
+    fn working_copy_navigation_failure_keeps_output_readable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), None, None),
+        ])));
+        app.working_copy_navigation_run = mock_working_copy_navigation_failure;
+        app.mode = InteractionMode::WorkingCopyNavigationPreview {
+            navigation: JjWorkingCopyNavigationPlan::next(),
+            output: ActionOutput::pending(
+                "jj next --edit".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::WorkingCopyNavigationPreview { output, .. } => output,
+            _ => panic!("expected working-copy navigation result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(output.command_label(), "jj next --edit");
+        assert!(output.completed());
+        assert!(body.contains("jj next --edit failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj next --edit failed: first line\nsecond line"
+        );
+    }
+
+    #[test]
     fn new_preview_cancel_restores_normal_mode() {
         let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
             crate::jj::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
@@ -5991,7 +6481,7 @@ mod tests {
             menu: crate::action_menu::build_action_menu(
                 &crate::action_menu::ExactActionContext::with_current("change-a"),
             ),
-            selected: 2,
+            selected: 3,
         };
 
         app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
