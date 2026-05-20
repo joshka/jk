@@ -19,6 +19,7 @@ pub enum JjCommand {
     Show,
     Diff,
     Status,
+    OperationLog,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -86,6 +87,8 @@ const ALL_REPO_REVSET: &str = "all()";
 const FETCH_ARGS: [&str; 2] = ["git", "fetch"];
 const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
 const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
+const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
+const OPERATION_LOG_LIMIT: &str = "100";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
@@ -106,16 +109,25 @@ impl JjCommand {
             Self::Show => "jj show",
             Self::Diff => "jj diff",
             Self::Status => "jj status",
+            Self::OperationLog => "jj operation log",
         }
     }
 
-    fn subcommand(self) -> Option<&'static str> {
+    fn command_words(self) -> &'static [&'static str] {
         match self {
-            Self::Default => None,
-            Self::Log => Some("log"),
-            Self::Show => Some("show"),
-            Self::Diff => Some("diff"),
-            Self::Status => Some("status"),
+            Self::Default => &[],
+            Self::Log => &["log"],
+            Self::Show => &["show"],
+            Self::Diff => &["diff"],
+            Self::Status => &["status"],
+            Self::OperationLog => &["operation", "log"],
+        }
+    }
+
+    fn prefix_args(self) -> &'static [&'static str] {
+        match self {
+            Self::OperationLog => &["--at-op=@", "--limit", OPERATION_LOG_LIMIT],
+            Self::Default | Self::Log | Self::Show | Self::Diff | Self::Status => &[],
         }
     }
 
@@ -223,6 +235,7 @@ impl ViewSpec {
             JjCommand::Show => "jk show",
             JjCommand::Diff => "jk diff",
             JjCommand::Status => "jk status",
+            JjCommand::OperationLog => "jk operation log",
         };
 
         let args = self.display_args();
@@ -247,7 +260,9 @@ impl ViewSpec {
         self.target.clone().or_else(|| match self.command {
             JjCommand::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
             JjCommand::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
-            JjCommand::Default | JjCommand::Log | JjCommand::Status => None,
+            JjCommand::Default | JjCommand::Log | JjCommand::Status | JjCommand::OperationLog => {
+                None
+            }
         })
     }
 
@@ -397,6 +412,42 @@ impl LogItem {
     }
 }
 
+/// One selectable operation item parsed from rendered operation-log output.
+#[derive(Clone, Debug)]
+pub struct OperationLogItem {
+    lines: Vec<Line<'static>>,
+    operation_id: Option<String>,
+}
+
+impl OperationLogItem {
+    pub fn new(lines: Vec<Line<'static>>, operation_id: Option<String>) -> Self {
+        Self {
+            lines,
+            operation_id,
+        }
+    }
+
+    pub fn lines(&self) -> Vec<Line<'static>> {
+        self.lines.clone()
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn operation_id(&self) -> Option<&str> {
+        self.operation_id.as_deref()
+    }
+
+    pub fn row_text(&self) -> String {
+        self.lines
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 pub fn load_entries(spec: &ViewSpec) -> Result<Vec<LogItem>> {
     let output = run_jj(spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
@@ -410,6 +461,13 @@ pub fn load_entries(spec: &ViewSpec) -> Result<Vec<LogItem>> {
             .map(|line| LogItem::new(vec![line], spec.target.clone(), None))
             .collect())
     }
+}
+
+pub fn load_operation_log_entries(spec: &ViewSpec) -> Result<Vec<OperationLogItem>> {
+    let output = run_jj(spec, ColorMode::Always)?;
+    let lines = output.stdout.into_text()?.lines;
+    let operation_ids = run_operation_log_ids(spec)?;
+    Ok(group_operation_log_lines(lines, operation_ids))
 }
 
 pub fn load_compact_log_context(revset: &str) -> Result<Vec<Line<'static>>> {
@@ -430,11 +488,7 @@ pub fn document_plain_text(lines: &[Line<'static>]) -> String {
 
 fn run_jj(spec: &ViewSpec, color: ColorMode) -> Result<std::process::Output> {
     let mut jj = base_command(color);
-
-    if let Some(subcommand) = spec.command.subcommand() {
-        jj.arg(subcommand);
-    }
-    jj.args(&spec.args);
+    jj.args(jj_command_args(spec, None, false));
 
     let output = jj.output()?;
     if !output.status.success() {
@@ -463,13 +517,15 @@ fn run_direct_command(args: &[&str], label: &str, success_fallback: &str) -> Res
 }
 
 fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<Vec<RevisionMetadata>> {
-    let mut jj = base_command(ColorMode::Never);
+    Ok(run_jj_template_lines(spec, template)?
+        .into_iter()
+        .filter_map(|line| parse_metadata_line(&line))
+        .collect())
+}
 
-    if let Some(subcommand) = spec.command.subcommand() {
-        jj.arg(subcommand);
-    }
-    jj.args(["-T", template]);
-    jj.args(&spec.args);
+fn run_jj_template_lines(spec: &ViewSpec, template: &str) -> Result<Vec<String>> {
+    let mut jj = base_command(ColorMode::Never);
+    jj.args(jj_command_args(spec, Some(template), false));
 
     let output = jj.output()?;
     if !output.status.success() {
@@ -478,7 +534,45 @@ fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<Vec<RevisionM
     }
 
     let stdout = String::from_utf8(output.stdout)?;
-    Ok(stdout.lines().filter_map(parse_metadata_line).collect())
+    Ok(stdout.lines().map(str::to_owned).collect())
+}
+
+fn run_operation_log_ids(spec: &ViewSpec) -> Result<Vec<Option<String>>> {
+    let mut jj = base_command(ColorMode::Never);
+    jj.args(jj_command_args(spec, Some(OPERATION_ID_TEMPLATE), true));
+
+    let output = jj.output()?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(eyre!("{} metadata failed: {}", spec.label(), stderr.trim()));
+    }
+
+    let stdout = String::from_utf8(output.stdout)?;
+    Ok(stdout.lines().map(parse_operation_id_line).collect())
+}
+
+fn jj_command_args(spec: &ViewSpec, template: Option<&str>, no_graph: bool) -> Vec<String> {
+    let mut args = spec
+        .command
+        .command_words()
+        .iter()
+        .map(|arg| (*arg).to_owned())
+        .collect::<Vec<_>>();
+    args.extend(
+        spec.command
+            .prefix_args()
+            .iter()
+            .map(|arg| (*arg).to_owned()),
+    );
+    if no_graph {
+        args.push("--no-graph".to_owned());
+    }
+    if let Some(template) = template {
+        args.push("-T".to_owned());
+        args.push(template.to_owned());
+    }
+    args.extend(spec.args.iter().cloned());
+    args
 }
 
 fn base_command(color: ColorMode) -> Command {
@@ -587,6 +681,38 @@ fn group_lines(lines: Vec<Line<'static>>, metadata: Vec<RevisionMetadata>) -> Ve
     items
 }
 
+fn group_operation_log_lines(
+    lines: Vec<Line<'static>>,
+    operation_ids: Vec<Option<String>>,
+) -> Vec<OperationLogItem> {
+    let mut items = Vec::new();
+    let mut current_lines = Vec::new();
+    let mut current_operation_id = None;
+    let mut operation_ids = operation_ids.into_iter();
+
+    for line in lines {
+        let starts_item = starts_operation_log_item(&line);
+        let standalone_graph_line = is_standalone_graph_line(&line);
+
+        if (starts_item || standalone_graph_line) && !current_lines.is_empty() {
+            items.push(OperationLogItem::new(current_lines, current_operation_id));
+            current_lines = Vec::new();
+            current_operation_id = None;
+        }
+
+        if starts_item {
+            current_operation_id = operation_ids.next().flatten();
+        }
+        current_lines.push(line);
+    }
+
+    if !current_lines.is_empty() {
+        items.push(OperationLogItem::new(current_lines, current_operation_id));
+    }
+
+    items
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct RevisionMetadata {
     change_id: String,
@@ -609,6 +735,12 @@ fn parse_metadata_line(line: &str) -> Option<RevisionMetadata> {
         change_id,
         commit_id,
     })
+}
+
+fn parse_operation_id_line(line: &str) -> Option<String> {
+    line.split_whitespace()
+        .find(|token| is_operation_id(token))
+        .map(str::to_owned)
 }
 
 fn show_revset_arg(args: &[String]) -> Option<&str> {
@@ -693,12 +825,20 @@ fn is_full_change_id(token: &str) -> bool {
     token.len() == 32 && token.bytes().all(|byte| byte.is_ascii_lowercase())
 }
 
+fn is_operation_id(token: &str) -> bool {
+    token.len() == 128 && token.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn starts_log_item(line: &Line<'_>) -> bool {
     starts_log_item_text(&line_text(line))
 }
 
 fn starts_log_item_text(text: &str) -> bool {
     first_content_char(text).is_some_and(|character| matches!(character, '@' | '○' | '◆'))
+}
+
+fn starts_operation_log_item(line: &Line<'_>) -> bool {
+    first_content_char(&line_text(line)).is_some_and(|character| matches!(character, '@' | '○'))
 }
 
 fn is_standalone_graph_line(line: &Line<'_>) -> bool {
@@ -790,6 +930,37 @@ mod tests {
     }
 
     #[test]
+    fn groups_operation_log_rows_and_preserves_styles() {
+        let text =
+            b"\x1b[1m@\x1b[0m  current\n\xE2\x94\x82  args: jj describe\n\xE2\x97\x8B  previous\n"
+                .to_vec();
+        let lines = text.into_text().unwrap().lines;
+        let operation_ids = vec![Some(operation_id('a')), Some(operation_id('b'))];
+
+        let items = group_operation_log_lines(lines, operation_ids);
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].line_count(), 2);
+        assert_eq!(items[0].operation_id(), Some(operation_id('a').as_str()));
+        assert_eq!(items[0].lines[0].spans[0].content, "@");
+        assert_eq!(items[1].operation_id(), Some(operation_id('b').as_str()));
+    }
+
+    #[test]
+    fn operation_log_rows_allow_missing_metadata() {
+        let lines = b"@  current\n\xE2\x94\x82  args: jj describe\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+
+        let items = group_operation_log_lines(lines, vec![None]);
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].operation_id(), None);
+    }
+
+    #[test]
     fn parses_revision_metadata_lines() {
         assert_eq!(
             parse_metadata_line(
@@ -810,11 +981,65 @@ mod tests {
         assert_eq!(parse_metadata_line("│ ~  (elided revisions)"), None);
     }
 
+    #[test]
+    fn parses_operation_id_lines() {
+        let operation_id = operation_id('a');
+
+        assert_eq!(
+            parse_operation_id_line(&("@  ".to_owned() + &operation_id + "\n")),
+            Some(operation_id)
+        );
+        assert_eq!(parse_operation_id_line("not-an-operation"), None);
+    }
+
+    #[test]
+    fn operation_log_command_uses_at_op_prefix() {
+        assert_eq!(
+            jj_command_args(
+                &ViewSpec::new(JjCommand::OperationLog, Vec::new()),
+                None,
+                false
+            ),
+            vec![
+                "operation",
+                "log",
+                "--at-op=@",
+                "--limit",
+                OPERATION_LOG_LIMIT
+            ]
+        );
+    }
+
+    #[test]
+    fn operation_log_id_command_disables_graph_for_template_output() {
+        assert_eq!(
+            jj_command_args(
+                &ViewSpec::new(JjCommand::OperationLog, Vec::new()),
+                Some(OPERATION_ID_TEMPLATE),
+                true
+            ),
+            vec![
+                "operation",
+                "log",
+                "--at-op=@",
+                "--limit",
+                OPERATION_LOG_LIMIT,
+                "--no-graph",
+                "-T",
+                OPERATION_ID_TEMPLATE,
+            ]
+        );
+    }
+
     fn metadata(change_id: &str, commit_id: &str) -> RevisionMetadata {
         RevisionMetadata {
             change_id: change_id.to_owned(),
             commit_id: Some(commit_id.to_owned()),
         }
+    }
+
+    fn operation_id(digit: char) -> String {
+        std::iter::repeat_n(digit, 128).collect()
     }
 
     #[test]

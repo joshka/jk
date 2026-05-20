@@ -64,6 +64,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
     Binding::new(KeyPattern::char('W'), Command::PromptLogRevset),
     Binding::new(KeyPattern::char('S'), Command::OpenStatus),
+    Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
     Binding::new(KeyPattern::char('y'), Command::Copy),
     Binding::new(KeyPattern::char('v'), Command::ViewFormat),
@@ -165,6 +166,10 @@ impl App {
             }
             Command::OpenStatus => {
                 self.open_status()?;
+                Ok(true)
+            }
+            Command::OpenOperationLog => {
+                self.open_operation_log()?;
                 Ok(true)
             }
             Command::Fetch => {
@@ -529,7 +534,9 @@ impl App {
         let spec = match command {
             JjCommand::Show => ViewSpec::show(revset, self.diff_format),
             JjCommand::Diff => ViewSpec::diff(revset, self.diff_format),
-            JjCommand::Default | JjCommand::Log | JjCommand::Status => return Ok(()),
+            JjCommand::Default | JjCommand::Log | JjCommand::Status | JjCommand::OperationLog => {
+                return Ok(());
+            }
         };
         self.push_view(spec)
     }
@@ -540,6 +547,14 @@ impl App {
         }
 
         self.push_view(ViewSpec::new(JjCommand::Status, Vec::new()))
+    }
+
+    fn open_operation_log(&mut self) -> Result<()> {
+        if matches!(self.view.command(), JjCommand::OperationLog) {
+            return Ok(());
+        }
+
+        self.push_view(ViewSpec::new(JjCommand::OperationLog, Vec::new()))
     }
 
     fn push_view(&mut self, spec: ViewSpec) -> Result<()> {
@@ -620,8 +635,9 @@ fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
         "show" => Ok(ViewSpec::new(JjCommand::Show, rest.to_vec())),
         "diff" => Ok(ViewSpec::new(JjCommand::Diff, rest.to_vec())),
         "status" => Ok(ViewSpec::new(JjCommand::Status, rest.to_vec())),
+        "operation-log" => Ok(ViewSpec::new(JjCommand::OperationLog, rest.to_vec())),
         unknown => Err(eyre!(
-            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status"
+            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, operation-log"
         )),
     }
 }
@@ -636,8 +652,8 @@ pub struct StatusLine {
 
 impl StatusLine {
     fn ready(view: &ViewState) -> Self {
-        let message = if let Some(item_count) = view.graph_item_count() {
-            graph_status_message(item_count, view.graph_mode_label())
+        let message = if let Some(item_count) = view.item_count() {
+            item_count_message(view, item_count)
         } else {
             format!(
                 "{}/{} lines",
@@ -698,6 +714,16 @@ fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
     }
 }
 
+fn item_count_message(view: &ViewState, item_count: usize) -> String {
+    match view.command() {
+        JjCommand::OperationLog => format!("{item_count} operations"),
+        JjCommand::Default | JjCommand::Log => {
+            graph_status_message(item_count, view.graph_mode_label())
+        }
+        JjCommand::Show | JjCommand::Diff | JjCommand::Status => format!("{item_count} items"),
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum StatusKind {
     Ready,
@@ -746,6 +772,14 @@ mod tests {
         let spec = initial_view(vec!["status".into()]).unwrap();
 
         assert_eq!(spec.command(), JjCommand::Status);
+        assert!(spec.args().is_empty());
+    }
+
+    #[test]
+    fn parses_operation_log_startup_view() {
+        let spec = initial_view(vec!["operation-log".into()]).unwrap();
+
+        assert_eq!(spec.command(), JjCommand::OperationLog);
         assert!(spec.args().is_empty());
     }
 

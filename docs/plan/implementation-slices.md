@@ -219,11 +219,12 @@ Recommended scope:
 
 Acceptance criteria:
 
-- operation log opens from shortcut/command mode;
+- operation log opens from a stable shortcut;
 - movement is operation-item based;
 - copy operation id works when id is known;
 - refresh preserves selected operation when possible;
-- restore/revert actions are not available until exact ids and confirmations exist.
+- command-mode entry stays deferred until that app surface exists, and restore/revert actions are
+  not available until exact ids and confirmations exist.
 
 Validation:
 

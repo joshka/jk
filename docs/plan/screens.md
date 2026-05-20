@@ -79,7 +79,7 @@ Use this template when adding or refining a screen:
 - source `jj` command(s): `jj op log`.
 - why screen: recovery is important enough to deserve a stable home.
 - selection unit: logical operation item.
-- entry points: dedicated shortcut and command mode.
+- entry points: dedicated shortcut; command mode once that surface exists.
 - primary actions: open op-show, open op-diff, undo, redo, restore, revert.
 - back/exit behavior: back returns to previous screen.
 - acceptance criteria: recovery paths are visible and confidence-building.

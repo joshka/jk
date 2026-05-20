@@ -76,3 +76,18 @@
   startup path, but command-mode entry remains deferred because that app surface is not yet present,
   and recommended planning keeps command mode secondary
 - Next slice: Slice 7: Operation Log First Pass
+
+## Slice 7: Operation Log First Pass
+
+- Files changed: `src/main.rs`, `src/jj.rs`, `src/command.rs`, `src/view_state.rs`, `src/app.rs`,
+  `src/tui.rs`, `src/operation_log.rs`, `docs/plan/implementation-slices.md`,
+  `docs/plan/screens.md`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`
+- Verification: focused `cargo test operation_log`, focused
+  `cargo test jj::tests::groups_operation_log_rows_and_preserves_styles`, full `cargo test`,
+  `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`, and
+  `panache format --check README.md docs`
+- Remaining risk: command-mode entry remains deferred because that app surface is still absent,
+  operation show/diff remain explicit placeholders until a dedicated detail or preview design lands,
+  and exact operation ids currently depend on pairing rendered `operation log` rows with a separate
+  `self.id()` template stream in the same row order under `--at-op=@`
+- Next slice: Slice 8: Bookmark List First Pass

@@ -5,6 +5,7 @@ mod copy;
 mod diff;
 mod graph;
 mod jj;
+mod operation_log;
 mod rendered_jj;
 mod search;
 mod selection;

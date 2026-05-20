@@ -19,6 +19,8 @@ when they are narrow and useful, but they should be visible during planning and 
   | File headings        | Default and `--git` rendered diff/show headings                | Heading changes can break sticky file context                      | Preserve raw document lines; test default and git diff heading forms       |
   | Sticky projections   | Active file inferred from scroll position and headings         | Unusual output can produce no active file                          | Degrade to a plain scrollable document                                     |
   | Diff format state    | Detecting and adding `--git` format arguments                  | Other diff tools or future formats may not match assumptions       | Keep behavior explicit and local to diff/show command construction         |
+  | Operation-log rows   | Rendered `jj operation log` item starts and graph-only lines   | Output shape changes can split or merge visible operations         | Keep parsing narrow; test multi-line rows, ANSI spans, and graph-only rows |
+  | Operation-log ids    | Separate `self.id()` template output paired by row order       | Rendered rows and metadata rows can drift or differ under new args | Keep both calls on `--at-op=@ operation log`; degrade to non-copyable rows |
 
 ## Planned Screens
 
@@ -29,15 +31,15 @@ Narrow machine-oriented templates are different from arbitrary user-facing rende
 acceptable when they expose explicit fields for `jk`; they should not become a second copy of jj's
 template language or presentation model.
 
-  | Screen or workflow | Expected dependency                                     | Preferred contract                                                                        |
-  | ------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-  | Status             | Rendered `jj status` sections, working-copy file groups | Rendered output first; structured data if actions need precise file sets                  |
-  | Operation log      | Rendered `jj op log` graph and operation ids            | Narrow parser for operation ids; typed API if recovery flows need transaction detail      |
-  | Bookmarks          | Rendered bookmark lists and tracking markers            | Rendered output first; `jj_lib` or structured output if actions need exact tracking state |
-  | File list          | File names from status, show, or diff output            | Structured output or narrow templates once file actions become mutation-capable           |
-  | Resolve            | Conflict listing and file state                         | Typed API preferred before guided conflict resolution expands                             |
-  | Rewrite flows      | Preview output plus command planning                    | Prefer `jj` command previews; avoid duplicating revset/fileset semantics                  |
-  | Sync flows         | Fetch/push stderr/stdout and bookmark state             | Prefer command passthrough until structured state is needed                               |
+  | Screen or workflow | Expected dependency                                     | Preferred contract                                                                                                                 |
+  | ------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+  | Status             | Rendered `jj status` sections, working-copy file groups | Rendered output first; structured data if actions need precise file sets                                                           |
+  | Operation log      | Rendered `jj op log` graph and operation ids            | Narrow parser for operation ids; use `--at-op=@` to avoid view-time snapshots; typed API if recovery flows need transaction detail |
+  | Bookmarks          | Rendered bookmark lists and tracking markers            | Rendered output first; `jj_lib` or structured output if actions need exact tracking state                                          |
+  | File list          | File names from status, show, or diff output            | Structured output or narrow templates once file actions become mutation-capable                                                    |
+  | Resolve            | Conflict listing and file state                         | Typed API preferred before guided conflict resolution expands                                                                      |
+  | Rewrite flows      | Preview output plus command planning                    | Prefer `jj` command previews; avoid duplicating revset/fileset semantics                                                           |
+  | Sync flows         | Fetch/push stderr/stdout and bookmark state             | Prefer command passthrough until structured state is needed                                                                        |
 
 ## Source Integration Spike
 
