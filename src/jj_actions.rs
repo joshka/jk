@@ -480,6 +480,7 @@ pub enum JjBookmarkMutationKind {
     Create,
     Set,
     Move,
+    Rename,
     Delete,
 }
 
@@ -493,6 +494,7 @@ pub enum JjBookmarkTarget {
 pub struct JjBookmarkMutationPlan {
     kind: JjBookmarkMutationKind,
     name: String,
+    new_name: Option<String>,
     target: Option<JjBookmarkTarget>,
 }
 
@@ -1211,6 +1213,7 @@ impl JjBookmarkMutationKind {
             Self::Create => "create",
             Self::Set => "set",
             Self::Move => "move",
+            Self::Rename => "rename",
             Self::Delete => "delete",
         }
     }
@@ -1220,6 +1223,7 @@ impl JjBookmarkMutationKind {
             Self::Create => "created bookmark",
             Self::Set => "set bookmark",
             Self::Move => "moved bookmark",
+            Self::Rename => "renamed bookmark",
             Self::Delete => "deleted bookmark",
         }
     }
@@ -1261,6 +1265,7 @@ impl JjBookmarkMutationPlan {
         Self {
             kind: JjBookmarkMutationKind::Create,
             name: name.into(),
+            new_name: None,
             target: Some(target),
         }
     }
@@ -1269,6 +1274,7 @@ impl JjBookmarkMutationPlan {
         Self {
             kind: JjBookmarkMutationKind::Set,
             name: name.into(),
+            new_name: None,
             target: Some(target),
         }
     }
@@ -1277,7 +1283,17 @@ impl JjBookmarkMutationPlan {
         Self {
             kind: JjBookmarkMutationKind::Move,
             name: name.into(),
+            new_name: None,
             target: Some(target),
+        }
+    }
+
+    pub fn rename(old_name: impl Into<String>, new_name: impl Into<String>) -> Self {
+        Self {
+            kind: JjBookmarkMutationKind::Rename,
+            name: old_name.into(),
+            new_name: Some(new_name.into()),
+            target: None,
         }
     }
 
@@ -1285,6 +1301,7 @@ impl JjBookmarkMutationPlan {
         Self {
             kind: JjBookmarkMutationKind::Delete,
             name: name.into(),
+            new_name: None,
             target: None,
         }
     }
@@ -1295,6 +1312,10 @@ impl JjBookmarkMutationPlan {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn new_name(&self) -> Option<&str> {
+        self.new_name.as_deref()
     }
 
     pub fn target(&self) -> Option<&JjBookmarkTarget> {
@@ -1333,6 +1354,12 @@ impl JjBookmarkMutationPlan {
                 "--to".to_owned(),
                 self.required_target().command_arg(),
                 exact_string_pattern(&self.name),
+            ],
+            JjBookmarkMutationKind::Rename => vec![
+                "bookmark".to_owned(),
+                "rename".to_owned(),
+                self.name.clone(),
+                self.required_new_name().to_owned(),
             ],
             JjBookmarkMutationKind::Delete => vec![
                 "bookmark".to_owned(),
@@ -1393,6 +1420,19 @@ impl JjBookmarkMutationPlan {
                     "undo path: jj undo".to_owned(),
                 ]);
             }
+            JjBookmarkMutationKind::Rename => {
+                lines.extend([
+                    format!("old name: {}", self.name),
+                    format!("new name: {}", self.required_new_name()),
+                    "target: exact selected local bookmark row; rendered labels are not parsed"
+                        .to_owned(),
+                    "effect: renames one local bookmark without --overwrite-existing".to_owned(),
+                    "duplicate name: jj failure output is preserved if the new name already exists"
+                        .to_owned(),
+                    "confirmation: press Enter to run jj bookmark rename".to_owned(),
+                    "undo path: jj undo".to_owned(),
+                ]);
+            }
             JjBookmarkMutationKind::Delete => {
                 lines.extend([
                     format!(
@@ -1417,6 +1457,56 @@ impl JjBookmarkMutationPlan {
             .as_ref()
             .expect("bookmark mutation kind requires target")
     }
+
+    fn required_new_name(&self) -> &str {
+        self.new_name
+            .as_deref()
+            .expect("bookmark rename requires new name")
+    }
+}
+
+pub fn validate_bookmark_rename_new_name(
+    old_name: &str,
+    new_name: &str,
+) -> std::result::Result<(), String> {
+    if new_name.is_empty() {
+        return Err("empty bookmark name".to_owned());
+    }
+    if new_name == old_name {
+        return Err("new bookmark name is unchanged".to_owned());
+    }
+    if new_name == "@" {
+        return Err("bookmark name must not be @".to_owned());
+    }
+    if new_name.starts_with('-') {
+        return Err("bookmark name must not start with '-'".to_owned());
+    }
+    if new_name.starts_with('/') || new_name.ends_with('/') || new_name.contains("//") {
+        return Err("bookmark name must not contain empty path components".to_owned());
+    }
+    if new_name.starts_with('.') || new_name.contains("/.") {
+        return Err("bookmark name components must not start with '.'".to_owned());
+    }
+    if new_name.ends_with('.') || new_name.ends_with(".lock") {
+        return Err("bookmark name must not end with '.' or '.lock'".to_owned());
+    }
+    if new_name.contains("..") {
+        return Err("bookmark name must not contain '..'".to_owned());
+    }
+    if new_name
+        .chars()
+        .any(|character| character.is_control() || character.is_whitespace())
+    {
+        return Err("bookmark name must not contain whitespace or control characters".to_owned());
+    }
+    if new_name
+        .chars()
+        .any(|character| matches!(character, '@' | ':' | '?' | '*' | '[' | '\\' | '^' | '~'))
+    {
+        return Err("bookmark name contains a reserved ref character".to_owned());
+    }
+
+    Ok(())
 }
 
 impl JjRebasePlan {
@@ -2276,6 +2366,59 @@ mod tests {
                 .preview_summary()
                 .contains("track/untrack stay disabled")
         );
+    }
+
+    #[test]
+    fn bookmark_rename_uses_old_and_new_names_as_argv() {
+        let rename = JjBookmarkMutationPlan::rename("feature/\"old name\"", "feature/new'special");
+
+        assert_eq!(
+            rename.command_argv(),
+            vec![
+                "bookmark",
+                "rename",
+                "feature/\"old name\"",
+                "feature/new'special"
+            ]
+        );
+        assert_eq!(
+            rename.command_label(),
+            "jj bookmark rename feature/\"old name\" feature/new'special"
+        );
+        let preview = rename.preview_summary();
+        assert!(preview.contains("old name: feature/\"old name\""));
+        assert!(preview.contains("new name: feature/new'special"));
+        assert!(preview.contains("without --overwrite-existing"));
+        assert!(preview.contains("confirmation: press Enter to run jj bookmark rename"));
+    }
+
+    #[test]
+    fn bookmark_rename_new_name_validation_rejects_obvious_invalid_inputs() {
+        assert_eq!(
+            validate_bookmark_rename_new_name("feature/name", "").unwrap_err(),
+            "empty bookmark name"
+        );
+        assert_eq!(
+            validate_bookmark_rename_new_name("feature/name", "feature/name").unwrap_err(),
+            "new bookmark name is unchanged"
+        );
+        assert_eq!(
+            validate_bookmark_rename_new_name("feature/name", "bad name").unwrap_err(),
+            "bookmark name must not contain whitespace or control characters"
+        );
+        assert_eq!(
+            validate_bookmark_rename_new_name("feature/name", " feature/renamed ").unwrap_err(),
+            "bookmark name must not contain whitespace or control characters"
+        );
+        assert_eq!(
+            validate_bookmark_rename_new_name("feature/name", "feature@origin").unwrap_err(),
+            "bookmark name contains a reserved ref character"
+        );
+        assert_eq!(
+            validate_bookmark_rename_new_name("feature/name", "feature//name").unwrap_err(),
+            "bookmark name must not contain empty path components"
+        );
+        assert!(validate_bookmark_rename_new_name("feature/name", "feature/renamed").is_ok());
     }
 
     #[test]

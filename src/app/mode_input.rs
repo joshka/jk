@@ -20,7 +20,7 @@ use crate::clipboard;
 use crate::command::{Binding, BindingMatch, ViewCommand, ViewEffect, match_help_binding_sequence};
 use crate::jj::{
     JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan,
-    JjRebasePlan, JjSquashPlan,
+    JjRebasePlan, JjSquashPlan, validate_bookmark_rename_new_name,
 };
 use crate::search::SearchQuery;
 
@@ -348,6 +348,39 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::BookmarkRenamePrompt { old_name, input } => {
+                match code {
+                    KeyCode::Esc => {
+                        self.mode = InteractionMode::Normal;
+                        self.status =
+                            StatusLine::with_message(&self.view, "bookmark rename cancelled");
+                    }
+                    KeyCode::Enter => {
+                        let old_name = old_name.clone();
+                        let new_name = std::mem::take(input);
+                        self.mode = InteractionMode::Normal;
+                        match validate_bookmark_rename_new_name(&old_name, &new_name) {
+                            Ok(()) => {
+                                self.open_bookmark_mutation_preview(
+                                    JjBookmarkMutationPlan::rename(old_name, new_name),
+                                );
+                            }
+                            Err(reason) => {
+                                self.status = StatusLine::with_message(
+                                    &self.view,
+                                    format!("bookmark rename cancelled: {reason}"),
+                                );
+                            }
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        input.pop();
+                    }
+                    KeyCode::Char(character) => input.push(character),
+                    _ => {}
+                }
+                Ok(true)
+            }
             InteractionMode::AbandonPreview {
                 abandon,
                 preview,
@@ -654,6 +687,9 @@ fn bookmark_mutation_plan(
         JjBookmarkMutationKind::Create => JjBookmarkMutationPlan::create(name, target),
         JjBookmarkMutationKind::Set => JjBookmarkMutationPlan::set(name, target),
         JjBookmarkMutationKind::Move => JjBookmarkMutationPlan::move_to(name, target),
+        JjBookmarkMutationKind::Rename => {
+            unreachable!("bookmark rename uses the old-name prompt and has no revision target")
+        }
         JjBookmarkMutationKind::Delete => JjBookmarkMutationPlan::delete(name),
     }
 }

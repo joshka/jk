@@ -52,6 +52,15 @@ pub(in crate::app::action_lifecycle) fn bookmark_status_context(
     mutation: &JjBookmarkMutationPlan,
     view_label: &str,
 ) -> String {
+    if let Some(new_name) = mutation.new_name() {
+        return format!(
+            "bookmark rename '{}' to '{}' from {}",
+            mutation.name(),
+            new_name,
+            view_label
+        );
+    }
+
     match mutation.target() {
         Some(target) => format!(
             "bookmark {} '{}' targets {} from {}",

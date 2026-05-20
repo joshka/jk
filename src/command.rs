@@ -30,6 +30,7 @@ pub enum Command {
     BookmarkCreate,
     BookmarkSet,
     BookmarkMove,
+    BookmarkRename,
     BookmarkDelete,
     Fetch,
     FetchRemote,
@@ -126,6 +127,7 @@ impl Command {
             | Self::BookmarkCreate
             | Self::BookmarkSet
             | Self::BookmarkMove
+            | Self::BookmarkRename
             | Self::BookmarkDelete
             | Self::Fetch
             | Self::FetchRemote
@@ -553,6 +555,10 @@ fn help_metadata(
         Command::BookmarkMove => match context {
             HelpContext::Graph => Some((HelpSectionKind::Actions, "move bookmark here")),
             HelpContext::Status => Some((HelpSectionKind::Actions, "move bookmark to @")),
+            _ => None,
+        },
+        Command::BookmarkRename => match context {
+            HelpContext::Bookmarks => Some((HelpSectionKind::Actions, "rename local bookmark")),
             _ => None,
         },
         Command::BookmarkDelete => match context {

@@ -349,11 +349,16 @@ impl ViewState {
     }
 
     pub fn selected_local_bookmark_name(&self) -> Result<Option<&str>> {
+        self.selected_local_bookmark_name_for("delete")
+    }
+
+    pub fn selected_local_bookmark_name_for(&self, action: &str) -> Result<Option<&str>> {
         match self {
             Self::Bookmarks(view) => view.selected_local_bookmark_name().map_or_else(
                 || {
                     Err(color_eyre::eyre::eyre!(
-                        "delete requires a selected exact local bookmark"
+                        "{} requires a selected exact local bookmark",
+                        action
                     ))
                 },
                 |name| Ok(Some(name)),

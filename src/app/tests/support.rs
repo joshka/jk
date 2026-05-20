@@ -159,6 +159,10 @@ pub(super) fn mock_commit_failure(_: &JjCommitPlan) -> Result<String> {
 }
 
 pub(super) fn mock_bookmark_mutation_success(mutation: &JjBookmarkMutationPlan) -> Result<String> {
+    if let Some(new_name) = mutation.new_name() {
+        return Ok(format!("bookmark rename {} -> {new_name}", mutation.name()));
+    }
+
     Ok(format!(
         "bookmark {} {}",
         mutation.kind().label(),
@@ -168,6 +172,13 @@ pub(super) fn mock_bookmark_mutation_success(mutation: &JjBookmarkMutationPlan) 
 
 pub(super) fn mock_bookmark_mutation_failure(_: &JjBookmarkMutationPlan) -> Result<String> {
     Err(eyre!("jj bookmark failed: first line\nsecond line"))
+}
+
+pub(super) fn mock_bookmark_mutation_duplicate_name_failure(
+    mutation: &JjBookmarkMutationPlan,
+) -> Result<String> {
+    let name = mutation.new_name().unwrap_or(mutation.name());
+    Err(eyre!("Error: Bookmark already exists: {name}"))
 }
 
 pub(super) fn mock_empty_abandon_preview(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {

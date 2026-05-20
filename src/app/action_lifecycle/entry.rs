@@ -278,6 +278,28 @@ impl App {
         self.open_bookmark_mutation_preview(JjBookmarkMutationPlan::delete(name));
     }
 
+    pub(in crate::app) fn open_bookmark_rename_prompt(&mut self) {
+        let old_name = match self.view.selected_local_bookmark_name_for("rename") {
+            Ok(Some(name)) => name.to_owned(),
+            Ok(None) => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    "bookmark rename is only available from bookmarks view".to_owned(),
+                );
+                return;
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                return;
+            }
+        };
+
+        self.mode = InteractionMode::BookmarkRenamePrompt {
+            old_name,
+            input: String::new(),
+        };
+    }
+
     pub(in crate::app) fn open_push_prompt(&mut self) -> Result<bool> {
         let target = match self.view.push_target() {
             Ok(Some(target)) => target,

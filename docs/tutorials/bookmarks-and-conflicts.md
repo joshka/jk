@@ -11,6 +11,7 @@
 - Use `bc` from graph or status to create a local bookmark. A bare `b` remains a timed fallback for
   now, but generated help shows the explicit multi-key form.
 - Use `=` on graph or status to set a bookmark and `m` to move one.
+- Use `br` in the bookmarks view to rename a local bookmark row.
 - Use `x` in the bookmarks view to delete a local bookmark row.
 - The bookmark list is useful for inspection and for selecting exact bookmark targets.
 - Remote and tracking behavior stays outside the current bookmark contract.

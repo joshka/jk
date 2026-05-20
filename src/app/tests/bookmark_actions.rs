@@ -279,6 +279,327 @@ fn bookmark_delete_rejects_nonlocal_bookmark_rows() {
 }
 
 #[test]
+fn bookmark_rename_prompt_uses_selected_exact_local_bookmark() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+            Vec::new(),
+            "feature/name".to_owned(),
+            Some("change-a".to_owned()),
+            None,
+        )]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+    assert!(matches!(
+        app.mode,
+        InteractionMode::BookmarkRenamePrompt { ref old_name, .. }
+            if old_name == "feature/name"
+    ));
+
+    for character in "feature/renamed".chars() {
+        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+    }
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let (mutation, output) = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
+        _ => panic!("expected bookmark rename preview"),
+    };
+    assert_eq!(mutation.kind(), JjBookmarkMutationKind::Rename);
+    assert_eq!(mutation.name(), "feature/name");
+    assert_eq!(mutation.new_name(), Some("feature/renamed"));
+    assert_eq!(
+        output.command_label(),
+        "jj bookmark rename feature/name feature/renamed"
+    );
+    let body = output.body_lines().join("\n");
+    assert!(body.contains("old name: feature/name"));
+    assert!(body.contains("new name: feature/renamed"));
+    assert!(body.contains("without --overwrite-existing"));
+    assert!(body.contains("confirmation: press Enter to run jj bookmark rename"));
+    assert_eq!(
+        output.status_context().map(String::as_str),
+        Some("bookmark rename 'feature/name' to 'feature/renamed' from jk bookmarks")
+    );
+}
+
+#[test]
+fn bookmark_rename_prompt_rejects_whitespace_wrapped_input_before_preview() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+            Vec::new(),
+            "feature/name".to_owned(),
+            Some("change-a".to_owned()),
+            None,
+        )]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+    for character in " feature/renamed ".chars() {
+        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+    }
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "bookmark rename cancelled: bookmark name must not contain whitespace or control characters"
+    );
+}
+
+#[test]
+fn bookmark_rename_prompt_cancel_and_invalid_inputs_do_not_open_preview() {
+    let view = || {
+        ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![
+            crate::jj::BookmarkItem::new(
+                Vec::new(),
+                "feature/name".to_owned(),
+                Some("change-a".to_owned()),
+                None,
+            ),
+        ]))
+    };
+
+    let mut app = test_app(view());
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(app.status.message(), "bookmark rename cancelled");
+
+    let mut app = test_app(view());
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "bookmark rename cancelled: empty bookmark name"
+    );
+
+    let mut app = test_app(view());
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+    for character in "feature/name".chars() {
+        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+    }
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "bookmark rename cancelled: new bookmark name is unchanged"
+    );
+
+    let mut app = test_app(view());
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+    for character in "bad name".chars() {
+        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+    }
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "bookmark rename cancelled: bookmark name must not contain whitespace or control characters"
+    );
+}
+
+#[test]
+fn bookmark_rename_rejects_nonlocal_bookmark_rows() {
+    let remote = crate::jj::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
+        .with_state(crate::jj::BookmarkRowState::Remote {
+            remote: "origin".to_owned(),
+            tracking: crate::jj::RemoteBookmarkTrackingState::Untracked { synced: false },
+            local_peer: crate::jj::BookmarkLocalPeerState::Unknown,
+        });
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![remote]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "rename requires a selected exact local bookmark"
+    );
+
+    let unknown = crate::jj::BookmarkItem::new(
+        Vec::new(),
+        "maybe-local".to_owned(),
+        Some("change-a".to_owned()),
+        None,
+    )
+    .with_state(crate::jj::BookmarkRowState::Unknown);
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![unknown]),
+    ));
+
+    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
+        .unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(
+        app.status.message(),
+        "rename requires a selected exact local bookmark"
+    );
+}
+
+#[test]
+fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+            Vec::new(),
+            "feature/name".to_owned(),
+            Some("change-a".to_owned()),
+            None,
+        )]),
+    ));
+    app.mode = InteractionMode::BookmarkMutationPreview {
+        mutation: JjBookmarkMutationPlan::rename("feature/name", "feature/renamed"),
+        output: ActionOutput::pending(
+            "jj bookmark rename feature/name feature/renamed".to_owned(),
+            "preview only".to_owned(),
+            Some("bookmark rename context".to_owned()),
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { output, .. } => output,
+        _ => panic!("expected bookmark rename result"),
+    };
+    assert!(output.completed());
+    assert!(
+        output
+            .body_lines()
+            .join("\n")
+            .contains("bookmark rename feature/name -> feature/renamed | jj undo")
+    );
+    assert_eq!(
+        output.status_context().map(String::as_str),
+        Some("bookmark rename context")
+    );
+    assert_eq!(
+        app.status.message(),
+        "bookmark rename feature/name -> feature/renamed | jj undo"
+    );
+
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+            Vec::new(),
+            "feature/name".to_owned(),
+            Some("change-a".to_owned()),
+            None,
+        )]),
+    ));
+    app.services.bookmark_mutation_run = mock_bookmark_mutation_failure;
+    app.mode = InteractionMode::BookmarkMutationPreview {
+        mutation: JjBookmarkMutationPlan::rename("feature/name", "main"),
+        output: ActionOutput::pending(
+            "jj bookmark rename feature/name main".to_owned(),
+            "preview only".to_owned(),
+            None,
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { output, .. } => output,
+        _ => panic!("expected bookmark rename result"),
+    };
+    assert!(output.completed());
+    assert!(
+        output
+            .body_lines()
+            .join("\n")
+            .contains("jj bookmark failed: first line")
+    );
+    assert!(output.body_lines().join("\n").contains("second line"));
+    assert_eq!(
+        app.status.message(),
+        "jj bookmark failed: first line\nsecond line"
+    );
+
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+            Vec::new(),
+            "feature/name".to_owned(),
+            Some("change-a".to_owned()),
+            None,
+        )]),
+    ));
+    app.mode = InteractionMode::BookmarkMutationPreview {
+        mutation: JjBookmarkMutationPlan::rename("feature/name", "feature/renamed"),
+        output: ActionOutput::pending(
+            "jj bookmark rename feature/name feature/renamed".to_owned(),
+            "preview only".to_owned(),
+            None,
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(app.status.message(), "bookmark rename cancelled");
+}
+
+#[test]
+fn bookmark_rename_confirm_duplicate_name_failure_preserves_error_output() {
+    let mut app = test_app(ViewState::Bookmarks(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+            Vec::new(),
+            "feature/name".to_owned(),
+            Some("change-a".to_owned()),
+            None,
+        )]),
+    ));
+    app.services.bookmark_mutation_run = mock_bookmark_mutation_duplicate_name_failure;
+    app.mode = InteractionMode::BookmarkMutationPreview {
+        mutation: JjBookmarkMutationPlan::rename("feature/name", "feature/renamed"),
+        output: ActionOutput::pending(
+            "jj bookmark rename feature/name feature/renamed".to_owned(),
+            "preview only".to_owned(),
+            None,
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::BookmarkMutationPreview { output, .. } => output,
+        _ => panic!("expected bookmark rename result"),
+    };
+    let body = output.body_lines().join("\n");
+    assert!(body.contains("Error: Bookmark already exists: feature/renamed"));
+    assert_eq!(
+        app.status.message(),
+        "Error: Bookmark already exists: feature/renamed"
+    );
+}
+
+#[test]
 fn file_list_x_is_not_bookmark_delete() {
     let mut app = test_app(ViewState::FileList(
         crate::file_list::FileListView::test_new(vec![crate::jj::FileListItem::new(

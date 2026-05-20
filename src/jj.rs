@@ -20,7 +20,7 @@ pub use crate::jj_actions::{
     JjDuplicatePlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
     JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSplitPlan, JjSplitTarget, JjSquashPlan, JjWorkingCopyNavigationKind,
-    JjWorkingCopyNavigationPlan,
+    JjWorkingCopyNavigationPlan, validate_bookmark_rename_new_name,
 };
 #[allow(unused_imports)]
 pub use crate::jj_rows::{

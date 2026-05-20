@@ -49,6 +49,10 @@ pub(crate) enum InteractionMode {
         target: JjBookmarkTarget,
         input: String,
     },
+    BookmarkRenamePrompt {
+        old_name: String,
+        input: String,
+    },
     DescribePreview {
         describe: JjDescribePlan,
         output: ActionOutput,
@@ -155,6 +159,9 @@ impl InteractionMode {
                 view,
                 format!("bookmark {} {}: {input}", kind.label(), target.label()),
             ),
+            Self::BookmarkRenamePrompt { old_name, input } => {
+                StatusLine::with_message(view, format!("bookmark rename {old_name}: {input}"))
+            }
             Self::AbandonConfirm { input, .. } => StatusLine::with_message(
                 view,
                 format!("type exact revision to confirm abandon: {input}"),
@@ -234,7 +241,8 @@ impl InteractionMode {
             | Self::LogRevsetPrompt(_)
             | Self::DescribePrompt { .. }
             | Self::CommitPrompt(_)
-            | Self::BookmarkNamePrompt { .. } => Overlay::None,
+            | Self::BookmarkNamePrompt { .. }
+            | Self::BookmarkRenamePrompt { .. } => Overlay::None,
         }
     }
 }

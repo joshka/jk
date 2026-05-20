@@ -2074,3 +2074,65 @@
 - Remaining risk: this is a structural refactor over app action lifecycle and tests. The proof is
   compiler and test coverage rather than manual TUI driving, because no behavior or terminal
   interaction contract intentionally changed.
+
+## Packet 37: Bookmark Rename Flow
+
+- Files changed: `src/app.rs`, `src/app_screen.rs`, `src/app/action_lifecycle/entry.rs`,
+  `src/app/action_lifecycle/shared.rs`, `src/app/mode_input.rs`,
+  `src/app/tests/bookmark_actions.rs`, `src/app/tests/support.rs`, `src/command.rs`, `src/jj.rs`,
+  `src/jj_actions.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and
+  `docs/plan/screens/bookmarks.md`, `docs/process-observations.md`, and
+  `docs/tutorials/bookmarks-and-conflicts.md`.
+
+- Behavior: the bookmarks view now exposes bookmark rename through `br`. Rename starts only when the
+  selected row has Packet 36 metadata proving one exact local bookmark name. Remote, unknown, and
+  non-bookmark contexts do not open a rename prompt. The prompt collects one new bookmark name,
+  rejects empty, unchanged, and obvious invalid names before preview, then opens the existing
+  preview-first ActionOutput flow.
+
+- Command shape: rename uses `jj bookmark rename <old> <new>` with old and new names passed as argv
+  values, never through a shell string, and never with `--overwrite-existing`. The preview shows the
+  old name, new name, exact command label, duplicate-name failure expectation, confirmation prompt,
+  and `jj undo` recovery.
+
+- Validation boundary: `jk` does not duplicate the complete jj bookmark grammar. It rejects a
+  conservative subset before execution: empty or unchanged names, whitespace/control characters,
+  option-like names, remote-syntax `@`, empty path components, component-leading dots, trailing dot
+  or `.lock`, `..`, and common Git-ref reserved characters. Deeper grammar and duplicate-name
+  failures are left to jj so raw CLI output remains authoritative.
+
+- Proof: disposable repo `/tmp/jk-packet37-rename-proof.vn476I` verified successful rename,
+  duplicate-name failure, and undo. Commands were run with cwd set to that proof repo:
+  `jj --no-pager bookmark rename packet37-old packet37-new` changed the visible row to
+  `packet37-new`; `jj --no-pager bookmark rename packet37-new packet37-existing` failed with
+  `Error: Bookmark already exists: packet37-existing`; `jj --no-pager undo` restored `packet37-old`.
+
+- Validation: `cargo test bookmark -- --test-threads=1`;
+  `cargo test app::tests::bookmark_actions -- --test-threads=1`;
+  `cargo test bookmark_rename -- --test-threads=1`; full `cargo test` passed with 453 passed / 2
+  ignored; `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; and `just check`.
+
+- Review repair: bookmark rename prompt input now reaches validation unchanged, the app-level
+  nonlocal rename rejection covers an explicit `BookmarkRowState::Remote`, and the duplicate-name
+  failure path preserves `Bookmark already exists` through the test service mock and action output.
+
+- Remaining risk: the early validator is intentionally conservative and may reject a jj-supported
+  exotic bookmark name. That is preferable for this mutation path until `jk` has structured jj
+  ref-name validation; accepted names and all command execution still use argv values rather than
+  display-label inference.
+
+## App Refactor Audit Follow-Up
+
+- Files changed: `docs/plan/progress.md`, `docs/process-observations.md`
+- Audit summary: a gpt-5.5 high read-only audit found no blocking refactor slice. `src/app.rs` is
+  now 511 LOC and owns only app orchestration, key dispatch, and `ViewEffect` routing. The remaining
+  app module sizes are acceptable because ownership is coherent, with watch items at
+  `src/app/action_lifecycle/preview.rs` about 694 LOC, `src/app/mode_input.rs` about 695 LOC, and
+  `src/app/tests/support.rs` about 550 LOC.
+- Target bands: `src/app.rs` is healthy in the 450-650 LOC range, should be reviewed around 750-800
+  LOC, and is suspect at 900-1000 LOC. Extracted dispatch/lifecycle modules can be 600-750 LOC only
+  when they have a clear owner.
+- Next potential refactor: if `src/app/action_lifecycle/preview.rs` grows, the next candidate is
+  naming and ownership around the immediate action paths rather than another broad app split.
+- Validation: `just md-check`

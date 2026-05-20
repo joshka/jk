@@ -59,7 +59,7 @@ focused ref-state utility surface.
 - `Enter`, `s`, `l`, `Right`: open target in show when available
 - `bc`: create flow from graph or status
 - `r`: refresh
-- `R`: rename flow
+- `br`: rename local bookmark flow
 - `x`: delete local bookmark flow
 - `t`: track/untrack flow
 - `y`: copy bookmark name or target

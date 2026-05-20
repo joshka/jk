@@ -3392,3 +3392,100 @@ belong here.
 
 - Residual risk: no manual TUI smoke was run for this structural refactor. Existing app/action tests
   and full test coverage are the behavioral proof for the unchanged user-facing flows.
+
+### 2026-05-20 (app refactor audit follow-up)
+
+- Slice / task: high read-only audit of the app refactor boundary after the Packet A split work.
+- Thread id: `019e47bf-6a95-7760-aec6-a7d324ccea27`.
+- Model / routing: gpt-5.5 high, read-only audit.
+- Observable outcome: `src/app.rs` is 511 LOC and now owns only app orchestration, key dispatch, and
+  `ViewEffect` routing. The remaining app module sizes are acceptable because ownership stays
+  coherent. Watch items are `src/app/action_lifecycle/preview.rs` about 694 LOC,
+  `src/app/mode_input.rs` about 695 LOC, and `src/app/tests/support.rs` about 550 LOC.
+- Target band: `src/app.rs` is healthy in the 450-650 LOC range, should be reviewed around 750-800
+  LOC, and is suspect at 900-1000 LOC. Extracted dispatch/lifecycle modules can reach 600-750 LOC
+  only when they have a clear owner.
+- Audit finding: the 5.5 high read-only audit found no blocking refactor slice. The next likely
+  refactor, if `src/app/action_lifecycle/preview.rs` grows, is naming and ownership around the
+  immediate action paths.
+- Evidence basis: `wc -l src/app.rs src/app/action_lifecycle/preview.rs src/app/mode_input.rs`.
+- Evidence basis: `wc -l src/app/tests/support.rs src/app/action_lifecycle.rs src/app/tests.rs`.
+- Supporting commands: `printenv CODEX_THREAD_ID` and `date +%F`.
+
+### 2026-05-20 (Packet 37 bookmark rename flow)
+
+- Slice / task: implement Packet 37 in `pyktzsot Add bookmark rename flow`.
+
+- Thread id: `019e47ac-a50a-7110-8fa4-4daec4f3b78b`.
+
+- Model / routing: gpt-5.5 high by user request, because exact local bookmark identity, prompt
+  validation, and confirmed mutation lifecycle are mutation-critical.
+
+- Context read: `AGENTS.md`, `docs/development/rules/change-shape.md`,
+  `docs/development/rules/boundary.md`, `docs/development/rules/testing.md`,
+  `docs/development/rules/refactoring.md`, `docs/development/rules/agent-workflow.md`,
+  `docs/development/rules/vcs.md`, `docs/agent/architecture.md`, `docs/agent/testing.md`,
+  `docs/agent/workflow.md`, `docs/plan/next-implementation-slices.md` Packet 36 through Packet 38
+  boundaries, `docs/plan/fragility-register.md`, and current bookmark action code/tests.
+
+- Command evidence reused: `jj --no-pager bookmark rename --help` says
+  `jj bookmark rename [OPTIONS] <OLD> <NEW>` and exposes `--overwrite-existing`. Packet 37 keeps
+  overwrite out of command construction.
+
+- Observable outcome: `src/jj_actions.rs` now includes `JjBookmarkMutationKind::Rename` and builds
+  argv as `["bookmark", "rename", old, new]`. `src/app.rs` binds `br` to rename, while
+  `src/app/action_lifecycle/entry.rs` opens a rename prompt only from selected exact local bookmark
+  rows. `src/app/mode_input.rs` rejects empty, unchanged, whitespace/control, option-like,
+  remote-syntax, empty-component, and common Git-ref-reserved new names before preview.
+
+- Preview/result behavior: rename reuses the existing bookmark ActionOutput preview/result pane,
+  shows old and new names, preserves duplicate-name or command failure output, refreshes the active
+  view on success, and keeps `jj undo` visible. Delete wording remains delete/not-forget, and future
+  forget wording remains a separate Packet 38 concern. The bookmarks tutorial and screen plan now
+  name `br` as the rename key instead of stale `R` wording.
+
+- Disposable proof: `/tmp/jk-packet37-rename-proof.vn476I` was created for mutation proof. All
+  mutating proof `jj` commands ran with cwd set to that repo:
+
+  ```text
+  jj --no-pager bookmark rename packet37-old packet37-new
+  jj --no-pager bookmark rename packet37-new packet37-existing
+  jj --no-pager undo
+  ```
+
+  The first rename succeeded; the duplicate-name rename failed with
+  `Error: Bookmark already exists: packet37-existing` while leaving both bookmarks unchanged; undo
+  restored `packet37-old`.
+
+- Validation trail: `cargo test bookmark -- --test-threads=1`;
+  `cargo test app::tests::bookmark_actions -- --test-threads=1`;
+  `cargo test bookmark_rename -- --test-threads=1`; full `cargo test` passed with 453 passed / 2
+  ignored; `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; and `just check`.
+
+- Fragility-register decision: added bookmark rename identity and bookmark name validation entries.
+  The accepted contract is early app rejection for obvious invalid input plus jj-owned deeper
+  grammar/duplicate-name diagnostics, not a full duplicate of jj's bookmark grammar.
+
+### 2026-05-20 (Packet 37 review repair)
+
+- Slice / task: repair the Packet 37 bookmark rename review findings in
+  `pyktzsot Add bookmark rename flow`.
+- Thread id: `019e47b8-5525-7ca3-8b91-2d48d8ca7600`.
+- Observable outcome: bookmark rename prompt input now reaches validation unchanged, so leading and
+  trailing whitespace are rejected by the shared bookmark-name validator instead of being trimmed
+  away before preview. The app-level nonlocal rejection test now covers an explicit
+  `BookmarkRowState::Remote`, and the rename failure test preserves a duplicate-name style error
+  message through the test service mock and action output/status path.
+- Validation / proof run:
+  - `cargo test bookmark_rename -- --test-threads=1`
+  - `cargo test app::tests::bookmark_actions -- --test-threads=1`
+  - `cargo test bookmark -- --test-threads=1`
+  - `cargo check`
+  - `cargo clippy -- -D warnings`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Files: `src/app/mode_input.rs`, `src/app/tests/bookmark_actions.rs`, `src/app/tests/support.rs`,
+    `src/jj_actions.rs`, `docs/plan/progress.md`, `docs/process-observations.md`

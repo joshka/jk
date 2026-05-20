@@ -63,6 +63,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('C'), Command::Commit),
     Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
     Binding::sequence(BOOKMARK_CREATE_KEYS, Command::BookmarkCreate),
+    Binding::sequence(BOOKMARK_RENAME_KEYS, Command::BookmarkRename),
     Binding::new(KeyPattern::char('='), Command::BookmarkSet),
     Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
@@ -78,6 +79,7 @@ const APP_BINDINGS: &[Binding] = &[
 ];
 
 const BOOKMARK_CREATE_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('c')];
+const BOOKMARK_RENAME_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('r')];
 const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
 
 fn current_viewport_width() -> u16 {
@@ -369,6 +371,10 @@ impl App {
             }
             Command::BookmarkMove => {
                 self.open_bookmark_name_prompt(JjBookmarkMutationKind::Move);
+                Ok(false)
+            }
+            Command::BookmarkRename => {
+                self.open_bookmark_rename_prompt();
                 Ok(false)
             }
             Command::BookmarkDelete => {
