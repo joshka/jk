@@ -22,6 +22,10 @@ This README only describes shipped behavior. Planned packets live in
 [`docs/plan/next-implementation-slices.md`](docs/plan/next-implementation-slices.md), and shipped
 progress is tracked in [`docs/plan/progress.md`](docs/plan/progress.md).
 
+Short walkthroughs for the supported daily loops live in
+[`docs/tutorials/`](docs/tutorials/README.md). The tracked demo setup used by some of those examples
+is documented in [`docs/demo/`](docs/demo/README.md).
+
 ## Install And Run
 
 Prerequisites:
@@ -116,6 +120,7 @@ redo.
 
 - Generated screenshots, GIFs, and demo repos are not committed.
 - The tracked capture specs and setup notes live in [`docs/demo/`](docs/demo/README.md).
+- Tutorial walkthroughs live in [`docs/tutorials/`](docs/tutorials/README.md).
 - If capture artifacts are added later, keep the generated output under ignored `target/vhs` or host
   it externally.
 

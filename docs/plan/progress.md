@@ -650,4 +650,25 @@
   exact conflict-scoped filesets.
 - Final 5.5 re-review accepted Packet 28 after the default `@` target normalization, with no
   findings.
-- Next slice: Packet 29: Day-To-Day Tutorial Set
+
+## Packet 29: Day-To-Day Tutorial Set
+
+- Files changed: `README.md`, `docs/tutorials/README.md`, `docs/tutorials/daily-loop.md`,
+  `docs/tutorials/rewrite-and-recovery.md`, `docs/tutorials/bookmarks-and-conflicts.md`,
+  `docs/plan/progress.md`, `docs/process-observations.md`
+- Behavior: added a concise tutorial index and three walkthroughs for the shipped daily loop. The
+  tutorials cover inspect, show/diff, status, fetch, push, create new work, describe/commit,
+  abandon, squash/rebase/absorb, restore/revert, operation recovery, bookmarks, and the read-only
+  resolve screen. The examples reuse the tracked demo repos where that keeps the setup concrete and
+  say clearly when a flow needs a repo with exact targets or conflicts.
+- Final 5.5 repair: tutorial keybinding and scope language was corrected for graph show entry,
+  action-menu vs abandon entry, restore/revert scope visibility, and bookmark command scopes.
+- Final 5.5 re-review accepted Packet 29 after the final daily-loop wording repair, with no
+  findings.
+- Validation: `just demo-setup`; `vhs validate docs/demo/*.tape`; `just md-check`
+- Validation note: render commands such as `just demo-static-log` and `just demo-operation-recovery`
+  were not run so the repo did not generate or commit media.
+- Remaining risk: the tutorials intentionally stay concise, so future packets that add bindings or
+  broaden exact-target workflows will need a refresh to keep the walkthroughs aligned with shipped
+  behavior.
+- Next slice: Packet 30: Edit/Next/Prev Navigation Flows

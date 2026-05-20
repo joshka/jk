@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 29 day-to-day tutorial set)
+
+- Slice / task: Implement Packet 29 tutorial docs for shipped day-to-day workflows in the current jj
+  working-copy change `Add day-to-day tutorial docs`.
+- Worker / model: `019e452c-74f3-75f1-af52-450356fc8ae5` / `gpt-5` (Codex).
+- Scope given: create concise tutorials/examples for the workflows `jk` actually supports today,
+  keep generated media out of the repo, update `README.md`, `docs/tutorials/`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`, and do not touch Rust or Cargo files.
+- Observable outcome: added a new `docs/tutorials/` index plus three walkthroughs for the daily
+  loop, rewrite/recovery, and bookmarks/conflicts. The README now points readers to the tutorial
+  set, and the walkthroughs reuse tracked demo repos where that keeps the setup concrete.
+- 5.5 follow-up: keybinding and scope wording issues in these packet-29 tutorials were corrected for
+  show navigation, abandon-action access, restore/revert visibility, and bookmark scope (`b/= /m` on
+  graph/status, `x` in bookmarks view).
+- 5.5 final acceptance: 5.5 found no remaining findings after the read-only/source/prose
+  cross-check; residual risk is that tutorials are concise and rely on `?`/previews for
+  context-specific action availability.
+- Validation: `just demo-setup`; `vhs validate docs/demo/*.tape`; `just md-check`.
+- Skipped commands: render commands such as `just demo-static-log` and
+  `just demo-operation-recovery` were intentionally skipped so the repo did not generate GIFs or
+  screenshots.
+- Evidence basis:
+  - Thread: `019e452c-74f3-75f1-af52-450356fc8ae5`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `command -v vhs`
+    - `just demo-setup`
+    - `vhs validate docs/demo/*.tape`
+    - `just md-check`
+  - Files: `README.md`, `docs/tutorials/README.md`, `docs/tutorials/daily-loop.md`,
+    `docs/tutorials/rewrite-and-recovery.md`, `docs/tutorials/bookmarks-and-conflicts.md`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 28 resolve screen and conflict flow)
 
 - Slice / task: Implement Packet 28 first-pass `jk resolve` conflict list screen in the current jj
