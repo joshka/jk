@@ -16,6 +16,7 @@ use crate::app_screen::ViewMenuOption;
 use crate::app_status::{StatusKind, StatusLine};
 use crate::command::HelpSection;
 use crate::copy::CopyOption;
+use crate::theme;
 
 #[derive(Clone, Copy, Debug)]
 pub enum StatusHints {
@@ -558,14 +559,14 @@ fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
         .enumerate()
         .map(|(index, option)| {
             let style = if index == selected {
-                Style::default().bg(Color::Rgb(52, 54, 62))
+                theme::active_row_style()
             } else {
                 Style::default()
             };
             ListItem::new(Line::from(option.label().to_owned())).style(style)
         })
         .collect::<Vec<_>>();
-    List::new(items).block(Block::bordered().title("Copy"))
+    List::new(items).block(overlay_block("Copy"))
 }
 
 fn view_menu(options: &[ViewMenuOption], selected: usize) -> List<'static> {
@@ -574,14 +575,14 @@ fn view_menu(options: &[ViewMenuOption], selected: usize) -> List<'static> {
         .enumerate()
         .map(|(index, option)| {
             let style = if index == selected {
-                Style::default().bg(Color::Rgb(52, 54, 62))
+                theme::active_row_style()
             } else {
                 Style::default()
             };
             ListItem::new(Line::from(option.label().to_owned())).style(style)
         })
         .collect::<Vec<_>>();
-    List::new(items).block(Block::bordered().title("View"))
+    List::new(items).block(overlay_block("View"))
 }
 
 fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
@@ -591,19 +592,28 @@ fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
         .enumerate()
         .map(|(index, item)| {
             let style = if index == selected {
-                Style::default().bg(Color::Rgb(52, 54, 62))
+                theme::active_row_style()
             } else {
                 Style::default()
             };
-            let label = format!(
-                "{}  ({})",
-                item.label(),
-                item.safety_tier().preview_marker()
-            );
-            ListItem::new(Line::from(label)).style(style)
+            ListItem::new(line![
+                span!(theme::key_style(); "{shortcut}", shortcut = item.shortcut()),
+                "  ",
+                span!("{label}", label = item.label()),
+            ])
+            .style(style)
         })
         .collect::<Vec<_>>();
-    List::new(items).block(Block::bordered().title("Action menu"))
+    let title = if menu
+        .items()
+        .first()
+        .is_some_and(|item| !item.safety_tier().preview_marker().is_empty())
+    {
+        "Action menu (preview required)"
+    } else {
+        "Action menu"
+    };
+    List::new(items).block(overlay_block(title))
 }
 
 fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
@@ -612,7 +622,7 @@ fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
         .enumerate()
         .map(|(index, remote)| {
             let style = if index == selected {
-                Style::default().bg(Color::Rgb(52, 54, 62))
+                theme::active_row_style()
             } else {
                 Style::default()
             };
@@ -620,7 +630,7 @@ fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
         })
         .collect::<Vec<_>>();
 
-    List::new(items).block(Block::bordered().title("Push remote"))
+    List::new(items).block(overlay_block("Push remote"))
 }
 
 fn action_output_title(action: &str, output: &ActionOutput) -> String {
@@ -632,7 +642,7 @@ fn action_output_title(action: &str, output: &ActionOutput) -> String {
 }
 
 fn render_action_output(frame: &mut Frame<'_>, area: Rect, title: &str, output: &ActionOutput) {
-    let block = Block::bordered().title(title.to_owned());
+    let block = overlay_block(title.to_owned());
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -673,7 +683,7 @@ fn render_abandon_confirm(
     input: &str,
     output: &ActionOutput,
 ) {
-    let block = Block::bordered().title(title.to_owned());
+    let block = overlay_block(title.to_owned());
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -723,12 +733,11 @@ fn action_output_footer(completed: bool) -> Paragraph<'static> {
     spans.extend(line![key("PgUp/PgDn"), " page  "].spans);
     spans.extend(line![key("g/G"), " ends"].spans);
 
-    Paragraph::new(Line::from(spans)).style(Style::default().fg(Color::Gray))
+    Paragraph::new(Line::from(spans)).style(theme::muted_style())
 }
 
 fn abandon_confirm_footer(input: &str) -> Paragraph<'static> {
-    Paragraph::new(Line::from(abandon_confirm_footer_text(input)))
-        .style(Style::default().fg(Color::Gray))
+    Paragraph::new(Line::from(abandon_confirm_footer_text(input))).style(theme::muted_style())
 }
 
 fn action_output_area(area: Rect, title: &str, output: &ActionOutput) -> Rect {
@@ -780,7 +789,7 @@ fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
         .enumerate()
         .map(|(index, option)| {
             let style = if index == selected {
-                Style::default().bg(Color::Rgb(52, 54, 62))
+                theme::active_row_style()
             } else {
                 Style::default()
             };
@@ -788,13 +797,22 @@ fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
         })
         .collect();
 
-    let preview_hint = prompt.status_message();
+    let preview_hint = prompt.preview_required_message();
     if !preview_hint.is_empty() {
-        items.push(ListItem::new(Line::from(preview_hint)).style(Style::default().fg(Color::Gray)));
+        items.push(ListItem::new(Line::from(preview_hint.to_owned())).style(theme::muted_style()));
     }
 
-    List::new(items)
-        .block(Block::bordered().title(format!("{} (preview required)", prompt.title())))
+    List::new(items).block(overlay_block(format!(
+        "{} (preview required)",
+        prompt.title()
+    )))
+}
+
+fn overlay_block(title: impl Into<String>) -> Block<'static> {
+    Block::bordered()
+        .border_style(theme::overlay_border_style())
+        .title_style(theme::overlay_title_style())
+        .title(title.into())
 }
 
 fn centered_area(area: ratatui::layout::Rect, width: u16, height: u16) -> ratatui::layout::Rect {
@@ -812,7 +830,7 @@ fn centered_area(area: ratatui::layout::Rect, width: u16, height: u16) -> ratatu
 }
 
 fn key(label: &str) -> ratatui::text::Span<'_> {
-    span!(Modifier::BOLD; "{label}")
+    span!(theme::key_style(); "{label}")
 }
 
 fn status_style(status: &StatusLine) -> Style {
@@ -855,6 +873,20 @@ mod tests {
             .collect::<String>()
             .trim_end()
             .to_owned()
+    }
+
+    fn render_widget_rows(
+        width: u16,
+        height: u16,
+        render: impl FnOnce(&mut ratatui::Frame<'_>),
+    ) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(render).unwrap();
+
+        (0..height)
+            .map(|row| row_text(terminal.backend().buffer(), row, width))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     #[test]
@@ -956,6 +988,91 @@ mod tests {
         assert_snapshot!(render_chrome_snapshot(&status, 100), @r"
         title|jk resolve
         status|1 conflicts  q quit  j/k move  Enter/l inspect  / search  y copy  ? help
+        ");
+    }
+
+    #[test]
+    fn action_menu_renders_shortcuts_and_preview_policy() {
+        let menu = crate::action_menu::build_action_menu(
+            &crate::action_menu::ExactActionContext::with_current("change-a"),
+        );
+
+        let rendered = render_widget_rows(48, 8, |frame| {
+            frame.render_widget(action_menu(&menu, 1), frame.area());
+        });
+
+        assert_snapshot!(rendered, @r"
+        ┌Action menu (preview required)────────────────┐
+        │e  edit selected revision change-a            │
+        │n  new child of change-a                      │
+        │s  split selected revision change-a           │
+        │x  abandon selected revision change-a         │
+        │r  restore selected revision change-a         │
+        │v  revert selected revision change-a into @   │
+        └──────────────────────────────────────────────┘
+        ");
+    }
+
+    #[test]
+    fn action_menu_selected_row_has_visible_fallback_style() {
+        let menu = crate::action_menu::build_action_menu(
+            &crate::action_menu::ExactActionContext::with_current("change-a"),
+        );
+        let mut terminal = Terminal::new(TestBackend::new(48, 8)).unwrap();
+        terminal
+            .draw(|frame| {
+                frame.render_widget(action_menu(&menu, 1), frame.area());
+            })
+            .unwrap();
+
+        let selected_cell = &terminal.backend().buffer()[(1, 2)];
+        let style = theme::active_row_style();
+        assert_eq!(selected_cell.bg, style.bg.unwrap());
+        assert!(selected_cell.modifier.contains(Modifier::REVERSED));
+        assert!(selected_cell.modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn action_menu_keeps_shortcuts_visible_on_narrow_terminals() {
+        let menu = crate::action_menu::build_action_menu(
+            &crate::action_menu::ExactActionContext::with_current("change-a"),
+        );
+
+        let rendered = render_widget_rows(28, 5, |frame| {
+            frame.render_widget(action_menu(&menu, 0), frame.area());
+        });
+
+        assert_snapshot!(rendered, @r"
+        ┌Action menu (preview requi┐
+        │e  edit selected revision │
+        │n  new child of change-a  │
+        │s  split selected revision│
+        └──────────────────────────┘
+        ");
+    }
+
+    #[test]
+    fn role_prompt_uses_shared_popover_presentation() {
+        let prompt = RolePrompt::new(
+            "confirm role assignment",
+            vec![
+                crate::action_menu::RolePromptOption::new("source", "source-a"),
+                crate::action_menu::RolePromptOption::new("destination", "dest-a"),
+            ],
+            "Preview required before execution.",
+        );
+
+        let rendered = render_widget_rows(50, 6, |frame| {
+            frame.render_widget(role_prompt(&prompt, 0), frame.area());
+        });
+
+        assert_snapshot!(rendered, @r"
+        ┌confirm role assignment (preview required)──────┐
+        │source: source-a                                │
+        │destination: dest-a                             │
+        │Preview required before execution.              │
+        │                                                │
+        └────────────────────────────────────────────────┘
         ");
     }
 

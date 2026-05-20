@@ -23,6 +23,7 @@ mod selection;
 mod show;
 mod status;
 mod sticky_file_view;
+mod theme;
 mod tui;
 mod view_state;
 

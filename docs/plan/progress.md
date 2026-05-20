@@ -1135,3 +1135,82 @@
   - `cargo clippy -- -D warnings` remains blocked by known issues.
 - Non-blocking follow-up: direct idle Help-prefix timeout coverage for no-suffix path.
 - Next slice: Interruption Packet D: Action Menu, Popovers, And Selection Presentation.
+
+## Interruption Packet D: Action Menu, Popovers, And Selection Presentation
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/tui.rs`, `src/theme.rs`, `src/main.rs`,
+  `src/graph.rs`, `src/bookmarks.rs`, `src/operation_log.rs`, `src/file_list.rs`, `src/resolve.rs`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`.
+- Behavior: action-menu items now advertise direct single-key shortcuts and app dispatch can execute
+  a visible action by pressing that key without moving the menu cursor first. Existing `j`/`k`,
+  arrows, `Enter`, `Esc`, and `q` behavior remains available.
+- Presentation: app-owned list selection, popovers, and action-output borders now use the shared
+  `theme` helper. The active-row style uses background plus bold/reversed modifiers without setting
+  a foreground, so jj-backed selected rows keep rendered ANSI foreground colors while remaining
+  visible in low-color or no-color terminals. Graph multi-selected rows use bold without forcing a
+  foreground.
+- Popovers: action menus show compact key-prefixed rows and a shorter preview-required title so
+  narrow terminals keep shortcuts and labels visible. Role prompts render the preview-required hint
+  as its own row instead of flattening multiline status text into one item.
+- Test coverage: action-menu model tests cover shortcut metadata and path-restore shortcut
+  disambiguation. App tests cover direct shortcut execution, close/cancel behavior, selected context
+  preservation, and path restore by shortcut. TUI and graph tests cover action-menu snapshots,
+  narrow terminal rendering, selected-row fallback styling, jj-backed foreground preservation,
+  role-prompt popover rendering, and theme fallback modifiers.
+- Verification:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test action_menu -- --test-threads=1` passed.
+  - `cargo test theme::tests -- --test-threads=1` passed.
+  - `cargo test tui::tests -- --test-threads=1` passed.
+  - full `cargo test` passed with 375 tests after the review repair.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
+- Fragility: `docs/plan/fragility-register.md` unchanged. Packet D introduced app-owned fallback
+  styles and keyboard metadata; it did not parse rendered `jj` output, infer colors from rendered
+  output, or change command semantics.
+- Remaining risk: shortcut letters are scoped to the action menu only and are now discoverable
+  there, but future command-menu work may want a single registry for all modal-local shortcuts.
+- Next slice: Interruption Packet E: Status File Actions.
+
+### Packet D Review Repair
+
+- Files changed: `src/theme.rs`, `src/graph.rs`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Review finding: `theme::active_row_style()` set `fg(Color::White)`, and jj-backed list views used
+  that style as `List::highlight_style`, which could override rendered jj ANSI foreground colors on
+  the current row.
+- Repair: active-row fallback styling no longer sets a foreground color. It keeps the background,
+  bold, and reversed modifiers for visibility. Graph marked-row styling also no longer sets a
+  foreground, so explicit graph selections keep rendered span foregrounds while still gaining a bold
+  marker.
+- Test coverage: theme tests now assert active and marked row styles have no forced foreground.
+  Graph rendering tests prove current-row highlighting preserves a rendered foreground color while
+  applying background plus bold/reversed modifiers, and explicit graph selection preserves rendered
+  foreground while applying bold.
+- Validation:
+  - `cargo test theme::tests -- --test-threads=1` passed.
+  - `cargo test foreground -- --test-threads=1` passed.
+  - `cargo test tui::tests::action_menu_selected_row_has_visible_fallback_style -- --test-threads=1`
+    passed.
+  - `cargo test tui::tests -- --test-threads=1` passed.
+  - `cargo check` passed with existing dead-code warnings.
+  - full `cargo test` passed with 375 tests.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
+- Final 5.5 acceptance:
+  - Packet D accepted as-is after repair with no blocking findings.
+  - Acceptance evidence: `theme::active_row_style()` leaves foreground unset;
+    `theme::marked_row_style()` is BOLD-only; graph tests verify rendered current-row foreground
+    survives `List` highlighting while adding background and bold/reversed, and explicit graph
+    selection preserves rendered foreground while adding bold.
+  - Current inference boundary: foreground preservation is render-tested on graph, and inferred for
+    other jj-backed lists through the same shared style path.
+- Next slice: `Interruption Packet E: Status File Actions`.

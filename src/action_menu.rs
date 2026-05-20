@@ -48,6 +48,20 @@ impl ActionKind {
             Self::Absorb => "absorb",
         }
     }
+
+    fn shortcut(self) -> char {
+        match self {
+            Self::Edit => 'e',
+            Self::New => 'n',
+            Self::Split => 's',
+            Self::Abandon => 'x',
+            Self::Restore => 'r',
+            Self::Revert => 'v',
+            Self::Rebase => 'b',
+            Self::Squash => 'u',
+            Self::Absorb => 'a',
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -103,6 +117,10 @@ impl RolePrompt {
 
     pub fn options(&self) -> &[RolePromptOption] {
         &self.options
+    }
+
+    pub fn preview_required_message(&self) -> &str {
+        self.preview_required_message
     }
 
     pub fn status_message(&self) -> String {
@@ -166,6 +184,7 @@ pub enum FollowUp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionMenuItem {
     action: ActionKind,
+    shortcut: char,
     label: String,
     safety_tier: SafetyTier,
     follow_up: FollowUp,
@@ -180,6 +199,7 @@ impl ActionMenuItem {
     ) -> Self {
         Self {
             action,
+            shortcut: action.shortcut(),
             label: label.into(),
             safety_tier,
             follow_up,
@@ -188,6 +208,10 @@ impl ActionMenuItem {
 
     pub fn action(&self) -> ActionKind {
         self.action
+    }
+
+    pub fn shortcut(&self) -> char {
+        self.shortcut
     }
 
     pub fn label(&self) -> &str {
@@ -219,6 +243,10 @@ impl ActionMenu {
 
     pub fn items(&self) -> &[ActionMenuItem] {
         &self.items
+    }
+
+    pub fn item_for_shortcut(&self, shortcut: char) -> Option<&ActionMenuItem> {
+        self.items.iter().find(|item| item.shortcut() == shortcut)
     }
 }
 
@@ -349,6 +377,7 @@ fn menu_item_for_new_parents(parent_revisions: &[String]) -> ActionMenuItem {
     };
     ActionMenuItem {
         action: ActionKind::New,
+        shortcut: ActionKind::New.shortcut(),
         label,
         safety_tier: SafetyTier::PreviewFirst,
         follow_up: FollowUp::NewParents {
@@ -381,6 +410,7 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
     };
     ActionMenuItem {
         action,
+        shortcut: action.shortcut(),
         label,
         safety_tier: SafetyTier::PreviewFirst,
         follow_up,
@@ -390,6 +420,7 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
 fn menu_item_for_edit(revision: &str) -> ActionMenuItem {
     ActionMenuItem {
         action: ActionKind::Edit,
+        shortcut: ActionKind::Edit.shortcut(),
         label: format!("edit selected revision {}", short_id(revision)),
         safety_tier: SafetyTier::PreviewFirst,
         follow_up: FollowUp::EditExactTarget {
@@ -425,6 +456,7 @@ fn menu_item_for_multirev_action(
     );
     ActionMenuItem {
         action,
+        shortcut: action.shortcut(),
         label,
         safety_tier: SafetyTier::PreviewFirst,
         follow_up: FollowUp::RolePrompt(role_prompt),
@@ -444,6 +476,7 @@ fn menu_item_for_absorb(source_revision: &str, destination_revisions: &[String])
     );
     ActionMenuItem {
         action: ActionKind::Absorb,
+        shortcut: ActionKind::Absorb.shortcut(),
         label,
         safety_tier: SafetyTier::PreviewFirst,
         follow_up: FollowUp::AbsorbCandidates {
@@ -458,6 +491,7 @@ fn mutation_menu_items(current_revision: &str, selected_path: Option<&str>) -> V
     if let Some(path) = selected_path {
         items.push(ActionMenuItem {
             action: ActionKind::Restore,
+            shortcut: 'p',
             label: format!("restore selected path from {}", short_id(current_revision)),
             safety_tier: SafetyTier::PreviewFirst,
             follow_up: FollowUp::RestoreExactTarget {
@@ -468,6 +502,7 @@ fn mutation_menu_items(current_revision: &str, selected_path: Option<&str>) -> V
     }
     items.push(ActionMenuItem {
         action: ActionKind::Restore,
+        shortcut: ActionKind::Restore.shortcut(),
         label: format!("restore selected revision {}", short_id(current_revision)),
         safety_tier: SafetyTier::PreviewFirst,
         follow_up: FollowUp::RestoreExactTarget {
@@ -477,6 +512,7 @@ fn mutation_menu_items(current_revision: &str, selected_path: Option<&str>) -> V
     });
     items.push(ActionMenuItem {
         action: ActionKind::Revert,
+        shortcut: ActionKind::Revert.shortcut(),
         label: format!(
             "revert selected revision {} into @",
             short_id(current_revision)
@@ -510,11 +546,17 @@ mod tests {
 
         assert_eq!(menu.items().len(), 6);
         assert_eq!(menu.items()[0].action(), ActionKind::Edit);
+        assert_eq!(menu.items()[0].shortcut(), 'e');
         assert_eq!(menu.items()[1].action(), ActionKind::New);
+        assert_eq!(menu.items()[1].shortcut(), 'n');
         assert_eq!(menu.items()[2].action(), ActionKind::Split);
+        assert_eq!(menu.items()[2].shortcut(), 's');
         assert_eq!(menu.items()[3].action(), ActionKind::Abandon);
+        assert_eq!(menu.items()[3].shortcut(), 'x');
         assert_eq!(menu.items()[4].action(), ActionKind::Restore);
+        assert_eq!(menu.items()[4].shortcut(), 'r');
         assert_eq!(menu.items()[5].action(), ActionKind::Revert);
+        assert_eq!(menu.items()[5].shortcut(), 'v');
         assert!(menu.items()[0].safety_tier().is_preview_first());
         assert!(menu.items()[1].safety_tier().is_preview_first());
         assert!(menu.items()[2].safety_tier().is_preview_first());
@@ -768,6 +810,12 @@ mod tests {
         assert_eq!(
             actions,
             vec![ActionKind::Restore, ActionKind::Restore, ActionKind::Revert]
+        );
+        assert_eq!(menu.items()[0].shortcut(), 'p');
+        assert_eq!(menu.items()[1].shortcut(), 'r');
+        assert_eq!(
+            menu.item_for_shortcut('p').map(ActionMenuItem::label),
+            Some("restore selected path from ccccdddd")
         );
         assert!(matches!(
             menu.items()[0].follow_up(),

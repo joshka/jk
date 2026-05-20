@@ -8,7 +8,6 @@
 use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState};
 
@@ -17,6 +16,7 @@ use crate::copy::CopyOption;
 use crate::jj::{JjCommand, ResolveEntry, ViewSpec, load_resolve_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
+use crate::theme;
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
@@ -266,11 +266,7 @@ fn entry_list(entries: &[ResolveEntry], search: Option<&SearchQuery>) -> List<'s
         })
         .collect::<Vec<_>>();
 
-    List::new(items).highlight_style(
-        Style::default()
-            .bg(Color::Rgb(52, 54, 62))
-            .add_modifier(Modifier::BOLD),
-    )
+    List::new(items).highlight_style(theme::active_row_style())
 }
 
 fn entry_lines(entry: &ResolveEntry) -> Vec<Line<'static>> {

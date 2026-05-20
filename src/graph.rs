@@ -7,7 +7,7 @@
 use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState};
 
@@ -17,6 +17,7 @@ use crate::copy::CopyOption;
 use crate::jj::{JjCommand, LogItem, LogViewMode, ViewSpec, load_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
+use crate::theme;
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('w'), Command::View(ViewCommand::CycleMode)),
@@ -73,9 +74,7 @@ pub const BINDINGS: &[Binding] = &[
 const GIT_FETCH_KEYS: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('f')];
 
 fn explicit_selection_style() -> Style {
-    Style::default()
-        .fg(Color::Green)
-        .add_modifier(Modifier::BOLD)
+    theme::marked_row_style()
 }
 
 /// Selectable graph output from `jj` or `jj log`.
@@ -471,11 +470,7 @@ fn entry_list(
         })
         .collect::<Vec<_>>();
 
-    List::new(items).highlight_style(
-        Style::default()
-            .bg(Color::Rgb(52, 54, 62))
-            .add_modifier(Modifier::BOLD),
-    )
+    List::new(items).highlight_style(theme::active_row_style())
 }
 
 fn entry_lines(
@@ -549,6 +544,9 @@ fn retain_selected_change_ids(selected_change_ids: &mut Vec<String>, entries: &[
 
 #[cfg(test)]
 mod tests {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    use ratatui::style::{Color, Modifier};
     use ratatui::text::Line;
 
     use super::*;
@@ -1016,6 +1014,52 @@ mod tests {
         assert_eq!(selected[0].style, explicit_selection_style());
         assert_eq!(unselected[0].style, Style::default());
         assert_ne!(selected[0].style, unselected[0].style);
+    }
+
+    #[test]
+    fn current_row_highlight_preserves_rendered_foreground() {
+        let view = graph_view(vec![LogItem::new(
+            vec![Line::styled(
+                "colored row",
+                Style::default().fg(Color::LightRed),
+            )],
+            Some("change".to_owned()),
+            None,
+        )]);
+        let mut terminal = Terminal::new(TestBackend::new(16, 1)).unwrap();
+
+        terminal
+            .draw(|frame| {
+                view.render(frame, frame.area(), None);
+            })
+            .unwrap();
+
+        let selected_cell = &terminal.backend().buffer()[(0, 0)];
+        let highlight = theme::active_row_style();
+        assert_eq!(highlight.fg, None);
+        assert_eq!(selected_cell.fg, Color::LightRed);
+        assert_eq!(selected_cell.bg, highlight.bg.unwrap());
+        assert!(selected_cell.modifier.contains(Modifier::REVERSED));
+        assert!(selected_cell.modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn explicit_selection_preserves_rendered_foreground() {
+        let selected = entry_lines(
+            &LogItem::new(
+                vec![Line::styled(
+                    "colored row",
+                    Style::default().fg(Color::LightBlue),
+                )],
+                Some("change".to_owned()),
+                None,
+            ),
+            None,
+            true,
+        );
+
+        assert_eq!(selected[0].style.fg, Some(Color::LightBlue));
+        assert!(selected[0].style.add_modifier.contains(Modifier::BOLD));
     }
 
     #[test]

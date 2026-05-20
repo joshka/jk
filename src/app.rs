@@ -13,7 +13,7 @@ use color_eyre::eyre::eyre;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::DefaultTerminal;
 
-use crate::action_menu::{ActionKind, FollowUp, RolePrompt, build_action_menu};
+use crate::action_menu::{ActionKind, ActionMenuItem, FollowUp, RolePrompt, build_action_menu};
 use crate::action_output::{
     ActionOutput, ActionOutputKey, action_output_visible_lines, handle_action_output_key,
 };
@@ -1083,106 +1083,15 @@ impl App {
                         *selected = selected.saturating_sub(1);
                     }
                     KeyCode::Enter => {
-                        if let Some(action) = menu.items().get(*selected) {
-                            match action.follow_up() {
-                                FollowUp::StatusMessage(message) => {
-                                    self.status =
-                                        StatusLine::with_message(&self.view, message.as_str());
-                                    self.mode = InteractionMode::Normal;
-                                }
-                                FollowUp::ExactRevision { revision } => {
-                                    let action = action.action();
-                                    let revision = revision.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    match action {
-                                        ActionKind::Abandon => {
-                                            self.open_abandon_preview(JjAbandonPlan::new(revision));
-                                        }
-                                        ActionKind::Edit
-                                        | ActionKind::New
-                                        | ActionKind::Split
-                                        | ActionKind::Restore
-                                        | ActionKind::Revert
-                                        | ActionKind::Rebase
-                                        | ActionKind::Squash
-                                        | ActionKind::Absorb => {
-                                            self.status = StatusLine::with_message(
-                                                &self.view,
-                                                "preview not yet implemented",
-                                            );
-                                        }
-                                    }
-                                }
-                                FollowUp::EditExactTarget { revision } => {
-                                    let revision = revision.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    self.open_working_copy_navigation_preview(
-                                        JjWorkingCopyNavigationPlan::edit(revision),
-                                    );
-                                }
-                                FollowUp::RestoreExactTarget { revision, path } => {
-                                    let revision = revision.clone();
-                                    let path = path.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    match path {
-                                        Some(path) => {
-                                            self.open_restore_preview(JjRestorePlan::for_path(
-                                                revision, path,
-                                            ));
-                                        }
-                                        None => {
-                                            self.open_restore_preview(JjRestorePlan::for_revision(
-                                                revision,
-                                            ));
-                                        }
-                                    }
-                                }
-                                FollowUp::RevertExactTarget { revision } => {
-                                    let revision = revision.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    self.open_revert_preview(JjRevertPlan::new(revision));
-                                }
-                                FollowUp::OperationRestoreExactTarget { operation_id } => {
-                                    let operation_id = operation_id.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    self.open_operation_target_preview(JjOperationTarget::restore(
-                                        operation_id,
-                                    ));
-                                }
-                                FollowUp::OperationRevertExactTarget { operation_id } => {
-                                    let operation_id = operation_id.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    self.open_operation_target_preview(JjOperationTarget::revert(
-                                        operation_id,
-                                    ));
-                                }
-                                FollowUp::NewParents { parents } => {
-                                    let parents = parents.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    self.open_new_preview(JjNewPlan::new(parents));
-                                }
-                                FollowUp::RolePrompt(prompt) => {
-                                    self.mode = InteractionMode::RolePrompt {
-                                        action: action.action(),
-                                        prompt: prompt.clone(),
-                                        selected: 0,
-                                    };
-                                }
-                                FollowUp::AbsorbCandidates {
-                                    source,
-                                    destinations,
-                                } => {
-                                    let source = source.clone();
-                                    let destinations = destinations.clone();
-                                    self.mode = InteractionMode::Normal;
-                                    self.open_absorb_preview(JjAbsorbPlan::new(
-                                        source,
-                                        destinations,
-                                    ));
-                                }
-                            }
+                        if let Some(action) = menu.items().get(*selected).cloned() {
+                            self.apply_action_menu_item(action);
                         } else {
                             self.mode = InteractionMode::Normal;
+                        }
+                    }
+                    KeyCode::Char(shortcut) => {
+                        if let Some(action) = menu.item_for_shortcut(shortcut).cloned() {
+                            self.apply_action_menu_item(action);
                         }
                     }
                     _ => {}
@@ -2016,6 +1925,92 @@ impl App {
 
         self.mode = InteractionMode::ActionMenu { menu, selected: 0 };
         Ok(false)
+    }
+
+    fn apply_action_menu_item(&mut self, item: ActionMenuItem) {
+        match item.follow_up() {
+            FollowUp::StatusMessage(message) => {
+                self.status = StatusLine::with_message(&self.view, message.as_str());
+                self.mode = InteractionMode::Normal;
+            }
+            FollowUp::ExactRevision { revision } => {
+                let action = item.action();
+                let revision = revision.clone();
+                self.mode = InteractionMode::Normal;
+                match action {
+                    ActionKind::Abandon => {
+                        self.open_abandon_preview(JjAbandonPlan::new(revision));
+                    }
+                    ActionKind::Edit
+                    | ActionKind::New
+                    | ActionKind::Split
+                    | ActionKind::Restore
+                    | ActionKind::Revert
+                    | ActionKind::Rebase
+                    | ActionKind::Squash
+                    | ActionKind::Absorb => {
+                        self.status =
+                            StatusLine::with_message(&self.view, "preview not yet implemented");
+                    }
+                }
+            }
+            FollowUp::EditExactTarget { revision } => {
+                let revision = revision.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_working_copy_navigation_preview(JjWorkingCopyNavigationPlan::edit(
+                    revision,
+                ));
+            }
+            FollowUp::RestoreExactTarget { revision, path } => {
+                let revision = revision.clone();
+                let path = path.clone();
+                self.mode = InteractionMode::Normal;
+                match path {
+                    Some(path) => {
+                        self.open_restore_preview(JjRestorePlan::for_path(revision, path));
+                    }
+                    None => {
+                        self.open_restore_preview(JjRestorePlan::for_revision(revision));
+                    }
+                }
+            }
+            FollowUp::RevertExactTarget { revision } => {
+                let revision = revision.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_revert_preview(JjRevertPlan::new(revision));
+            }
+            FollowUp::OperationRestoreExactTarget { operation_id } => {
+                let operation_id = operation_id.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_operation_target_preview(JjOperationTarget::restore(operation_id));
+            }
+            FollowUp::OperationRevertExactTarget { operation_id } => {
+                let operation_id = operation_id.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_operation_target_preview(JjOperationTarget::revert(operation_id));
+            }
+            FollowUp::NewParents { parents } => {
+                let parents = parents.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_new_preview(JjNewPlan::new(parents));
+            }
+            FollowUp::RolePrompt(prompt) => {
+                self.mode = InteractionMode::RolePrompt {
+                    action: item.action(),
+                    prompt: prompt.clone(),
+                    selected: 0,
+                };
+            }
+            FollowUp::AbsorbCandidates {
+                source,
+                destinations,
+            } => {
+                let source = source.clone();
+                let destinations = destinations.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_absorb_preview(JjAbsorbPlan::new(source, destinations));
+            }
+        }
     }
 
     fn graph_selected_revision(&self) -> Option<String> {
@@ -5852,6 +5847,46 @@ mod tests {
     }
 
     #[test]
+    fn action_menu_shortcut_opens_item_without_moving_selection() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::with_current("current")
+                    .with_sources(["parent-a", "parent-b"]),
+            ),
+            selected: 3,
+        };
+
+        app.handle_mode_key(KeyCode::Char('n'), 12).unwrap();
+
+        let parents = match &app.mode {
+            InteractionMode::NewPreview { new_change, .. } => new_change.parents().to_vec(),
+            _ => panic!("expected new preview mode"),
+        };
+        assert_eq!(parents, ["parent-a", "parent-b"]);
+    }
+
+    #[test]
+    fn action_menu_close_key_preserves_normal_context() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::with_current("change-a"),
+            ),
+            selected: 4,
+        };
+
+        app.handle_mode_key(KeyCode::Char('q'), 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.graph_selected_revision().as_deref(), Some("change-a"));
+    }
+
+    #[test]
     fn edit_action_menu_enter_opens_preview_with_exact_target() {
         let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
             crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
@@ -6389,6 +6424,35 @@ mod tests {
         assert!(body.contains("target revision: change-a"));
         assert!(body.contains("selected path: src/main.rs"));
         assert!(body.contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn restore_action_menu_path_shortcut_opens_path_preview() {
+        let mut app = test_app(ViewState::FileList(
+            crate::file_list::FileListView::test_with_spec(
+                ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
+                    .with_exact_change_target(),
+                vec![crate::jj::FileListItem::new(
+                    Vec::new(),
+                    "src/main.rs".to_owned(),
+                )],
+            ),
+        ));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::detail("change-a")
+                    .with_selected_path("src/main.rs"),
+            ),
+            selected: 1,
+        };
+
+        app.handle_mode_key(KeyCode::Char('p'), 12).unwrap();
+
+        let path = match &app.mode {
+            InteractionMode::RestorePreview { restore, .. } => restore.path().map(str::to_owned),
+            _ => panic!("expected restore preview mode"),
+        };
+        assert_eq!(path.as_deref(), Some("src/main.rs"));
     }
 
     #[test]

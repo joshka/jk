@@ -5,6 +5,117 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Interruption Packet D action menu presentation)
+
+- Slice / task: implement Interruption Packet D in jj change `Improve action menu presentation`.
+- User request: make action and popover surfaces keyboard-driven, themed, and visibly connected to
+  the current selection without adding commands, changing mutation semantics, or broadening the
+  theme system.
+- Observable outcome: `src/action_menu.rs` now carries shortcut metadata per action-menu item, with
+  path restore using `p` so it remains distinguishable from whole-revision restore on `r`.
+  `src/app.rs` routes visible action-menu shortcut keys through the same follow-up handling as
+  `Enter`, while `Esc`/`q` still close the menu without losing selected context.
+- Presentation outcome: `src/theme.rs` now owns app chrome and selected-row fallback styles.
+  `src/tui.rs` uses those styles for menus, prompts, and action-output borders; graph, bookmark,
+  operation-log, file-list, and resolve list renderers share the same active-row highlight.
+- Rework / stuck point: focused TUI snapshots exposed that role prompts were rendering
+  `RolePrompt::status_message()` as one list row with embedded newlines. The implementation kept the
+  multiline status message for app status/error use and added `preview_required_message()` for the
+  popover row, which made the rendered prompt readable.
+- Code quality observation: the small `theme` module reduced duplicated magic RGB styles across
+  `src/tui.rs` and list owners without introducing a configurable theme surface. `app.rs` grew only
+  an `apply_action_menu_item` helper and shortcut routing, keeping presentation policy out of app
+  orchestration.
+- Model routing: `gpt-5.5 high` was justified for this slice. The work crossed action metadata, app
+  modal dispatch, shared overlay rendering, low-color fallback policy, and multiple list owners, and
+  it caught a real rendering issue in the role prompt rather than only applying mechanical styles.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test action_menu -- --test-threads=1`
+  - `cargo test theme::tests -- --test-threads=1`
+  - `cargo test tui::tests -- --test-threads=1`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - attempted `cargo clippy -- -D warnings`
+  - `just md-check`
+- Warning / blocker status: `cargo check` passes with the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy remains blocked
+  by those dead-code warnings plus the existing `collapsible_if` findings in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`.
+- Docs / fragility: `docs/plan/progress.md` updated for Packet D. `docs/plan/fragility-register.md`
+  was not changed because this packet added app-owned styles and shortcut metadata without parsing
+  or inferring rendered `jj` output.
+- Evidence basis:
+  - Thread: `019e4600-f1ce-7562-8362-e9a3d36d2e93`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `jj --no-pager status`, `cargo check`, `cargo test action_menu -- --test-threads=1`,
+    `cargo test theme::tests -- --test-threads=1`, `cargo test tui::tests -- --test-threads=1`,
+    `cargo test`, `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`,
+    `cargo clippy -- -D warnings`, `just md-check`, `printenv CODEX_THREAD_ID`, `date +%F`
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/tui.rs`, `src/theme.rs`, `src/graph.rs`,
+    `src/bookmarks.rs`, `src/operation_log.rs`, `src/file_list.rs`, `src/resolve.rs`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet D foreground-preservation review repair)
+
+- Slice / task: narrow review repair in jj change `Improve action menu presentation`.
+- Review finding: `theme::active_row_style()` forced `fg(Color::White)`, and jj-backed lists used
+  that style as `List::highlight_style`, so current-row highlighting could erase foreground colors
+  from rendered jj ANSI spans.
+- Observable outcome: `src/theme.rs` active-row and marked-row fallback styles no longer set
+  foreground colors. `src/graph.rs` tests now prove current-row highlighting preserves a rendered
+  foreground while still applying the shared background plus bold/reversed modifiers, and explicit
+  graph selection preserves rendered foreground while adding bold.
+- Scope control: no action commands, shortcut mapping, mutation semantics, parser contracts, or
+  broader theme configuration changed.
+- Validation / proof run during repair:
+  - `cargo test theme::tests -- --test-threads=1`
+  - `cargo test foreground -- --test-threads=1`
+  - `cargo test tui::tests::action_menu_selected_row_has_visible_fallback_style -- --test-threads=1`
+  - `cargo test tui::tests -- --test-threads=1`
+  - `cargo check`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+- Warning / blocker status: clippy remains blocked by the known dead-code findings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`, plus the known
+  `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Evidence basis:
+  - Thread: `019e4600-f1ce-7562-8362-e9a3d36d2e93`
+  - Date: `2026-05-20`
+  - Files: `src/theme.rs`, `src/graph.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet D 5.5 final acceptance)
+
+- Final 5.5 acceptance: Packet D accepted as-is after the foreground-preservation repair with no
+  blocking findings.
+- Validation / proof:
+  - `cargo test theme::tests -- --test-threads=1`
+  - `cargo test foreground -- --test-threads=1`
+  - `cargo check`
+  - full `cargo test` passed with 375 tests.
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+- Acceptance evidence:
+  - `theme::active_row_style()` now leaves foreground unset.
+  - `theme::marked_row_style()` is BOLD-only.
+  - Graph tests prove the current-row highlight preserves rendered foreground while adding shared
+    background plus bold/reversed modifiers.
+  - Graph explicit selection keeps rendered foreground while adding BOLD.
+- Residual validation gap: foreground preservation is directly proven on graph output and inferred
+  for other jj-backed lists through the same shared style path.
+- Warning / blocker status: `cargo clippy -- -D warnings` remains blocked by known six issues.
+- Next slice: `Interruption Packet E: Status File Actions`.
+- Evidence basis:
+  - Thread: `019e4600-f1ce-7562-8362-e9a3d36d2e93`
+  - Date: `2026-05-20`
+  - Commands: `cargo test theme::tests -- --test-threads=1`,
+    `cargo test foreground -- --test-threads=1`, `cargo check`, `cargo test`,
+    `rustup run nightly cargo fmt --check`, `just md-check`, `cargo clippy -- -D warnings`
+  - Files: `src/theme.rs`, `src/graph.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Interruption Packet A1 jj action-plan extraction)
 
 - Slice / task: behavior-preserving Rust extraction in jj change `Extract jj action plans`.
