@@ -3,7 +3,7 @@
 This directory is the durable planning surface for `jk`. It exists to separate product planning from
 implementation details and to keep roadmap decisions close to the codebase.
 
-The planning model has thirteen parts:
+The planning model has fourteen parts:
 
 1. [`command-inventory.md`](command-inventory.md): broad `jj` command coverage matrix and first-pass
    classification.
@@ -11,6 +11,8 @@ The planning model has thirteen parts:
    be approved or overridden directly.
 1. [`implementation-slices.md`](implementation-slices.md): ordered execution slices with acceptance
    criteria and validation expectations.
+1. [`next-implementation-slices.md`](next-implementation-slices.md): delegation-ready continuation
+   packets after the completed initial implementation slices.
 1. [`view-model.md`](view-model.md): cross-screen UI framing, especially around hybrid views and the
    role of inline detail versus split layouts.
 1. [`interaction-model.md`](interaction-model.md): shared shortcut vocabulary, mutation safety
@@ -61,6 +63,8 @@ When considering a new capability:
 1. Check the default recommendation in [`recommended-approach.md`](recommended-approach.md).
 1. Check whether it is already an executable slice in
    [`implementation-slices.md`](implementation-slices.md).
+1. For post-Slice-12 work, check the next delegation packet in
+   [`next-implementation-slices.md`](next-implementation-slices.md).
 1. Check whether the view should be single-surface, inline-expanded, or optionally split in
    [`view-model.md`](view-model.md).
 1. Check shared shortcut and mutation-safety policy in

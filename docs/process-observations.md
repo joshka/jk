@@ -5,6 +5,69 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-19 (Packet 15 planning follow-up)
+
+- Slice / task: Refine Packet 15 contract language and disposable-repo execution discipline
+
+- Worker / model: `019e43d5-1799-78a1-92b7-fb709d7d640c` / `gpt-5.3-codex-spark`
+
+- Scope given: rewrite Packet 15 as a general exact-target abandon flow, require stronger
+  confirmation for non-empty changes, forbid ambiguous targets, and require manual proof/write
+  testing to use isolated disposable repos under `/tmp` instead of the repo under active
+  development.
+
+- Observable outcome: updated `docs/plan/next-implementation-slices.md` to broaden Packet 15 to all
+  exact-target abandon contexts, distinguish empty/non-empty confirmation behavior, and require
+  `/tmp`-scoped manual proof with `cwd` set to the temporary repo; also added a follow-up
+  observation entry explaining the correction.
+
+- Evidence basis:
+  - Thread: `019e43d5-1799-78a1-92b7-fb709d7d640c`
+  - Date: `2026-05-19`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `rg --files docs/plan docs/process-observations.md`
+    - `rg -n "Packet 15|disposable|abandon" docs/plan/next-implementation-slices.md`
+    - `sed -n '1,240p' docs/plan/next-implementation-slices.md`
+    - `sed -n '1,160p' docs/process-observations.md`
+    - `just md-check`
+  - Files: `docs/plan/next-implementation-slices.md`, `docs/process-observations.md`
+
+### 2026-05-19 (future follow-up planning expansion)
+
+- Slice / task: Expand the next implementation-slices plan with downstream follow-up waves.
+
+- Worker / model: `019e43d7-783b-7e40-86bf-6f8805f95a80` / `gpt-5.5` (high reasoning). Main thread
+  orchestrated and reviewed this turn.
+
+- Scope given: edit only `docs/plan/next-implementation-slices.md` and
+  `docs/process-observations.md`, avoid source code, `AGENTS.md`, `docs/development`, generated
+  files, README, the plan index, and jj/git commands, and broaden the plan beyond the current
+  near-term implementation packets.
+
+- Observable outcome: added a follow-up backlog after the workflow coverage map that covers abandon,
+  operation recovery, rewrite, richer `jj new`, refs/tags/workspaces, file workflows, sync, conflict
+  resolution, command-mode policy, tutorial/demo/media, integration contracts, performance, and
+  accessibility/terminal compatibility follow-ups. The backlog records likely prerequisites,
+  promotion evidence, and the continuing requirement that write-operation proof use isolated `/tmp`
+  repositories.
+
+- Evidence basis:
+  - Thread: `019e43d7-783b-7e40-86bf-6f8805f95a80`
+  - Date: `2026-05-19`
+  - Commands:
+    - `sed -n '1,260p' docs/plan/next-implementation-slices.md`
+    - `sed -n '260,620p' docs/plan/next-implementation-slices.md`
+    - `sed -n '1,260p' docs/process-observations.md`
+    - `sed -n '260,620p' docs/process-observations.md`
+    - `sed -n '1,220p' docs/agent/documentation.md`
+    - `sed -n '1,220p' docs/plan/command-inventory.md`
+    - `sed -n '1,220p' docs/plan/workflows.md`
+    - `sed -n '1,260p' docs/plan/integration-strategy.md`
+    - `sed -n '1,180p' docs/plan/fragility-register.md`
+    - `printenv CODEX_THREAD_ID`
+  - Files: `docs/plan/next-implementation-slices.md`, `docs/process-observations.md`
+
 ### 2026-05-19
 
 - Slice / task: Slice 12 rebase preview flow implementation
@@ -297,6 +360,49 @@ be supported by the work log, repo state, or direct transcript evidence.
     - `cargo test`
   - Files: `docs/development/`, `docs/process-observations.md`, `docs/plan/progress.md`,
     `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`
+
+### 2026-05-19 (next implementation planning)
+
+- Slice / task: Write the next implementation-slice plan after completed Slices 0-12.
+
+- Worker / model: main thread orchestration plus `gpt-5.5` subagents:
+  `019e43b8-34ab-7263-9c25-066c5d46b2c0` / explorer for product and workflow packet planning,
+  `019e43b8-5352-79f0-ba9b-6d9185d25fb8` / explorer for documentation, demo, and VHS planning, and
+  `019e43bb-b4ec-7180-99b8-4f75f4a3fbf1` / worker for the tracked docs update.
+
+- Scope given: create or update `docs/plan/next-implementation-slices.md`, index it from
+  `docs/plan/README.md`, record this planning turn here, keep the write set narrow, and avoid jj/git
+  commands.
+
+- Observable outcome: two read-only planning agents proposed product/workflow and docs/demo packets;
+  the docs worker then drafted delegation-ready Packets 13-32 with bounded ownership, acceptance,
+  validation, docs/fragility requirements, model/review routing, Ratatui-grounded demo guidance, and
+  a day-to-day workflow coverage map.
+
+- Evidence basis:
+  - Thread: `019e43bb-b4ec-7180-99b8-4f75f4a3fbf1`
+  - Date: `2026-05-19`
+  - Commands:
+    - `sed -n '1,240p' docs/plan/README.md`
+    - `sed -n '1,260p' docs/plan/implementation-slices.md`
+    - `sed -n '1,260p' docs/plan/progress.md`
+    - `sed -n '1,260p' docs/plan/command-inventory.md`
+    - `sed -n '1,260p' docs/plan/workflows/rewrite.md`
+    - `sed -n '1,260p' docs/plan/workflows/recover.md`
+    - `sed -n '1,260p' docs/plan/workflows/sync.md`
+    - `sed -n '1,260p' docs/plan/workflows/refs-and-workspaces.md`
+    - `sed -n '1,320p' docs/plan/fragility-register.md`
+    - `sed -n '1,260p' docs/agent/testing.md`
+    - `sed -n '1,260p' docs/agent/documentation.md`
+    - `sed -n '1,260p' docs/process-observations.md`
+    - `printenv CODEX_THREAD_ID`
+    - `panache format docs/plan/next-implementation-slices.md docs/plan/README.md docs/process-observations.md`
+    - `just md-check`
+  - Web sources:
+    - `https://ratatui.rs/recipes/apps/release-your-app/`
+    - `https://ratatui.rs/recipes/apps/submitting-to-the-showcase/`
+  - Files: `docs/plan/next-implementation-slices.md`, `docs/plan/README.md`,
+    `docs/process-observations.md`
 
 ## Analysis From This Session
 
