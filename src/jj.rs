@@ -293,6 +293,12 @@ pub struct JjSquashPlan {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjAbsorbPlan {
+    source: String,
+    destinations: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjNewPlan {
     parents: Vec<String>,
 }
@@ -893,6 +899,95 @@ impl JjSquashPlan {
 
     fn normalize(mut self) -> Self {
         self.sources.retain(|source| !source.trim().is_empty());
+        self
+    }
+}
+
+impl JjAbsorbPlan {
+    pub fn new(source: impl Into<String>, destinations: Vec<String>) -> Self {
+        Self {
+            source: source.into(),
+            destinations,
+        }
+        .normalize()
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    pub fn destinations(&self) -> &[String] {
+        &self.destinations
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self
+            .command_argv()
+            .iter()
+            .map(|arg| arg.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        let mut argv = vec![
+            "absorb".to_owned(),
+            "--from".to_owned(),
+            exact_change_id_revset(&self.source),
+        ];
+        for destination in &self.destinations {
+            argv.push("--into".to_owned());
+            argv.push(exact_change_id_revset(destination));
+        }
+
+        argv
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(self.command_argv(), &self.command_label(), "absorbed")
+    }
+
+    pub fn preview_summary(&self) -> String {
+        let destinations = self
+            .destinations
+            .iter()
+            .map(|destination| format!("candidate destination: {destination}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            concat!(
+                "command: {}\n\n",
+                "source: {}\n",
+                "{}\n\n",
+                "selection: selected revisions are candidate destinations; jj absorb only ",
+                "considers selected revisions that are ancestors of the source\n\n",
+                "effect: jj splits source changes and moves each change to the closest ",
+                "selected mutable ancestor where the corresponding lines were last modified\n\n",
+                "opacity: jk does not simulate line-level placement or final graph shape\n\n",
+                "ambiguity: changes remain in the source when jj cannot choose unambiguously\n\n",
+                "source result: the source may become empty or abandoned depending on jj ",
+                "semantics\n\n",
+                "confirmation: press Enter to run jj absorb\n",
+                "recovery: jj undo\n",
+                "review: jj op show -p"
+            ),
+            self.command_label(),
+            self.source,
+            destinations,
+        )
+    }
+
+    fn normalize(mut self) -> Self {
+        self.destinations
+            .retain(|destination| !destination.trim().is_empty() && destination != &self.source);
         self
     }
 }
@@ -3210,6 +3305,48 @@ mod tests {
         assert!(preview.contains("--use-destination-message keeps the destination description"));
         assert!(preview.contains("confirmation: press Enter to run jj squash"));
         assert!(preview.contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn absorb_command_args_use_exact_source_and_repeated_candidate_destinations() {
+        let absorb = JjAbsorbPlan::new(
+            "source-change",
+            vec!["dest-a".to_owned(), "dest-b".to_owned()],
+        );
+
+        assert_eq!(
+            absorb.command_argv(),
+            vec![
+                "absorb",
+                "--from",
+                "exactly(change_id(\"source-change\"), 1)",
+                "--into",
+                "exactly(change_id(\"dest-a\"), 1)",
+                "--into",
+                "exactly(change_id(\"dest-b\"), 1)",
+            ]
+        );
+        assert_eq!(
+            absorb.command_label(),
+            "jj absorb --from exactly(change_id(\"source-change\"), 1) --into exactly(change_id(\"dest-a\"), 1) --into exactly(change_id(\"dest-b\"), 1)"
+        );
+    }
+
+    #[test]
+    fn absorb_preview_summary_names_bounded_opacity_and_recovery_paths() {
+        let absorb = JjAbsorbPlan::new("source-change", vec!["dest-a".to_owned()]);
+
+        let preview = absorb.preview_summary();
+
+        assert!(preview.contains("source: source-change"));
+        assert!(preview.contains("candidate destination: dest-a"));
+        assert!(preview.contains("selected revisions are candidate destinations"));
+        assert!(preview.contains("only considers selected revisions that are ancestors"));
+        assert!(preview.contains("jk does not simulate line-level placement"));
+        assert!(preview.contains("changes remain in the source"));
+        assert!(preview.contains("source may become empty or abandoned"));
+        assert!(preview.contains("recovery: jj undo"));
+        assert!(preview.contains("review: jj op show -p"));
     }
 
     #[test]

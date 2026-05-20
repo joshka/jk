@@ -115,6 +115,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::AbsorbPreview { output } => {
+            let title = action_output_title("Absorb", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::AbandonPreview { output } => {
             let title = action_output_title("Abandon", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -195,6 +201,9 @@ pub enum Overlay<'a> {
         output: &'a ActionOutput,
     },
     SquashPreview {
+        output: &'a ActionOutput,
+    },
+    AbsorbPreview {
         output: &'a ActionOutput,
     },
     AbandonPreview {

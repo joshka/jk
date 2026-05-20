@@ -22,11 +22,11 @@ use crate::command::{
 };
 use crate::copy::CopyOption;
 use crate::jj::{
-    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjBookmarkMutationKind, JjBookmarkMutationPlan,
-    JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitPush,
-    JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjRebasePlan,
-    JjSquashPlan, LogViewMode, ViewSpec, git_fetch, git_remotes, new_trunk,
-    resolve_exact_change_id,
+    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
+    JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
+    JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationRecoveryKind, JjRebasePlan, JjSquashPlan, LogViewMode, ViewSpec, git_fetch,
+    git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -38,6 +38,8 @@ type NewRun = fn(&JjNewPlan) -> Result<String>;
 type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
 #[cfg(test)]
 type SquashRun = fn(&JjSquashPlan) -> Result<String>;
+#[cfg(test)]
+type AbsorbRun = fn(&JjAbsorbPlan) -> Result<String>;
 #[cfg(test)]
 type DescribeRun = fn(&JjDescribePlan) -> Result<String>;
 #[cfg(test)]
@@ -84,6 +86,8 @@ struct App {
     rebase_run: RebaseRun,
     #[cfg(test)]
     squash_run: SquashRun,
+    #[cfg(test)]
+    absorb_run: AbsorbRun,
     #[cfg(test)]
     describe_run: DescribeRun,
     #[cfg(test)]
@@ -165,6 +169,10 @@ enum InteractionMode {
         squash: JjSquashPlan,
         output: ActionOutput,
     },
+    AbsorbPreview {
+        absorb: JjAbsorbPlan,
+        output: ActionOutput,
+    },
     AbandonPreview {
         abandon: JjAbandonPlan,
         preview: JjAbandonPreview,
@@ -228,6 +236,11 @@ fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {
 #[cfg(test)]
 fn default_squash_run(squash: &JjSquashPlan) -> Result<String> {
     squash.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_absorb_run(absorb: &JjAbsorbPlan) -> Result<String> {
+    absorb.run().map(|output| output.message().to_owned())
 }
 
 #[cfg(test)]
@@ -319,6 +332,8 @@ impl App {
             #[cfg(test)]
             squash_run: default_squash_run,
             #[cfg(test)]
+            absorb_run: default_absorb_run,
+            #[cfg(test)]
             describe_run: default_describe_run,
             #[cfg(test)]
             commit_run: default_commit_run,
@@ -373,6 +388,16 @@ impl App {
     #[cfg(not(test))]
     fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
         squash.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_absorb(&self, absorb: &JjAbsorbPlan) -> Result<String> {
+        (self.absorb_run)(absorb)
+    }
+
+    #[cfg(not(test))]
+    fn run_absorb(&self, absorb: &JjAbsorbPlan) -> Result<String> {
+        absorb.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -800,7 +825,8 @@ impl App {
                                         ActionKind::New
                                         | ActionKind::Split
                                         | ActionKind::Rebase
-                                        | ActionKind::Squash => {
+                                        | ActionKind::Squash
+                                        | ActionKind::Absorb => {
                                             self.status = StatusLine::with_message(
                                                 &self.view,
                                                 "preview not yet implemented",
@@ -819,6 +845,18 @@ impl App {
                                         prompt: prompt.clone(),
                                         selected: 0,
                                     };
+                                }
+                                FollowUp::AbsorbCandidates {
+                                    source,
+                                    destinations,
+                                } => {
+                                    let source = source.clone();
+                                    let destinations = destinations.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    self.open_absorb_preview(JjAbsorbPlan::new(
+                                        source,
+                                        destinations,
+                                    ));
                                 }
                             }
                         } else {
@@ -873,7 +911,10 @@ impl App {
                                         StatusLine::error(&self.view, next_status.to_owned());
                                 }
                             },
-                            ActionKind::New | ActionKind::Split | ActionKind::Abandon => {
+                            ActionKind::New
+                            | ActionKind::Split
+                            | ActionKind::Abandon
+                            | ActionKind::Absorb => {
                                 self.status =
                                     StatusLine::with_message(&self.view, next_status.to_owned());
                             }
@@ -1151,6 +1192,35 @@ impl App {
                         }
 
                         self.confirm_squash(squash, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::AbsorbPreview { absorb, output } => {
+                let (absorb, status_context, completed) = {
+                    (
+                        absorb.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status =
+                                StatusLine::with_message(&self.view, "absorb cancelled".to_owned());
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_absorb(absorb, status_context, viewport_height);
                     }
                     ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
                 }
@@ -1762,6 +1832,53 @@ impl App {
         }
     }
 
+    fn open_absorb_preview(&mut self, absorb: JjAbsorbPlan) {
+        if absorb.destinations().is_empty() {
+            self.status = StatusLine::error(
+                &self.view,
+                "absorb requires at least one selected exact candidate destination".to_owned(),
+            );
+            return;
+        }
+
+        let destination_labels = absorb
+            .destinations()
+            .iter()
+            .map(|destination| short_id(destination))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let status_context = Some(format!(
+            "absorb source {} into {} selected candidate destination(s) from {} | candidate(s): {}",
+            absorb.source(),
+            absorb.destinations().len(),
+            self.view.spec().app_label(),
+            destination_labels
+        ));
+
+        match absorb.run_preview() {
+            Ok(output) => {
+                let command_label = absorb.command_label();
+                self.mode = InteractionMode::AbsorbPreview {
+                    absorb,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = absorb.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::AbsorbPreview {
+                    absorb,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
     fn open_abandon_preview(&mut self, abandon: JjAbandonPlan) {
         let status_context = Some(format!(
             "abandon exact revision {} from {}",
@@ -2348,6 +2465,41 @@ impl App {
         };
     }
 
+    fn confirm_absorb(
+        &mut self,
+        absorb: JjAbsorbPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = absorb.command_label();
+        let result_message = match self.run_absorb(&absorb) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = format!("{} | jj undo | jj op show -p", output.trim());
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!(
+                        "{} | refresh failed: {error} | jj undo | jj op show -p",
+                        output.trim()
+                    )
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::AbsorbPreview {
+            absorb,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
     fn open_view_menu(&mut self) {
         let selected = view_formats()
             .iter()
@@ -2495,6 +2647,7 @@ impl App {
             InteractionMode::NewPreview { output, .. } => Overlay::NewPreview { output },
             InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
             InteractionMode::SquashPreview { output, .. } => Overlay::SquashPreview { output },
+            InteractionMode::AbsorbPreview { output, .. } => Overlay::AbsorbPreview { output },
             InteractionMode::AbandonPreview { output, .. } => Overlay::AbandonPreview { output },
             InteractionMode::AbandonConfirm { input, output, .. } => {
                 Overlay::AbandonConfirm { input, output }
@@ -2906,6 +3059,14 @@ mod tests {
         Err(eyre!("jj squash failed: first line\nsecond line"))
     }
 
+    fn mock_absorb_success(_: &JjAbsorbPlan) -> Result<String> {
+        Ok("absorbed".to_owned())
+    }
+
+    fn mock_absorb_failure(_: &JjAbsorbPlan) -> Result<String> {
+        Err(eyre!("jj absorb failed: first line\nsecond line"))
+    }
+
     fn mock_describe_success(describe: &JjDescribePlan) -> Result<String> {
         Ok(format!("described {}", describe.target().label()))
     }
@@ -3084,6 +3245,8 @@ mod tests {
             rebase_run: mock_rebase_success,
             #[cfg(test)]
             squash_run: mock_squash_success,
+            #[cfg(test)]
+            absorb_run: mock_absorb_success,
             #[cfg(test)]
             describe_run: mock_describe_success,
             #[cfg(test)]
@@ -4665,6 +4828,142 @@ mod tests {
             app.status.message(),
             "jj squash failed: first line\nsecond line"
         );
+    }
+
+    #[test]
+    fn absorb_action_menu_enter_opens_preview_with_current_source_and_candidates() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+            crate::jj::LogItem::new(Vec::new(), Some("dest-a".to_owned()), None),
+            crate::jj::LogItem::new(Vec::new(), Some("dest-b".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::with_current("source")
+                    .with_sources(["source", "dest-a", "dest-b"]),
+            ),
+            selected: 3,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let (source, destinations, command_label, body) = match &app.mode {
+            InteractionMode::AbsorbPreview { absorb, output } => (
+                absorb.source().to_owned(),
+                absorb.destinations().to_vec(),
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected absorb preview mode"),
+        };
+        assert_eq!(source, "source");
+        assert_eq!(destinations, ["dest-a", "dest-b"]);
+        assert_eq!(
+            command_label,
+            "jj absorb --from exactly(change_id(\"source\"), 1) --into exactly(change_id(\"dest-a\"), 1) --into exactly(change_id(\"dest-b\"), 1)"
+        );
+        assert!(body.contains("source: source"));
+        assert!(body.contains("candidate destination: dest-a"));
+        assert!(body.contains("candidate destination: dest-b"));
+        assert!(body.contains("only considers selected revisions that are ancestors"));
+        assert!(body.contains("jj op show -p"));
+    }
+
+    #[test]
+    fn absorb_preview_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::AbsorbPreview {
+            absorb: JjAbsorbPlan::new("source", vec!["dest-a".to_owned()]),
+            output: ActionOutput::pending(
+                "jj absorb --from exactly(change_id(\"source\"), 1) --into exactly(change_id(\"dest-a\"), 1)".to_owned(),
+                "preview only".to_owned(),
+                Some("absorb preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "absorb cancelled");
+    }
+
+    #[test]
+    fn absorb_confirm_success_keeps_undo_and_operation_review_visible() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::AbsorbPreview {
+            absorb: JjAbsorbPlan::new("source", vec!["dest-a".to_owned()]),
+            output: ActionOutput::pending(
+                "jj absorb --from exactly(change_id(\"source\"), 1) --into exactly(change_id(\"dest-a\"), 1)".to_owned(),
+                "preview only".to_owned(),
+                Some("absorb preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::AbsorbPreview { output, .. } => output,
+            _ => panic!("expected absorb result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("absorbed | jj undo | jj op show -p"));
+        assert_eq!(app.status.message(), "absorbed | jj undo | jj op show -p");
+    }
+
+    #[test]
+    fn absorb_failure_keeps_full_error_output_readable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+        ])));
+        app.absorb_run = mock_absorb_failure;
+        app.mode = InteractionMode::AbsorbPreview {
+            absorb: JjAbsorbPlan::new("source", vec!["dest-a".to_owned()]),
+            output: ActionOutput::pending(
+                "jj absorb --from exactly(change_id(\"source\"), 1) --into exactly(change_id(\"dest-a\"), 1)".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::AbsorbPreview { output, .. } => output,
+            _ => panic!("expected absorb result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("jj absorb failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj absorb failed: first line\nsecond line"
+        );
+    }
+
+    #[test]
+    fn absorb_without_candidates_returns_clear_status() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+        ])));
+
+        app.open_absorb_preview(JjAbsorbPlan::new("source", Vec::new()));
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "absorb requires at least one selected exact candidate destination"
+        );
+        assert!(matches!(app.status.kind(), StatusKind::Error));
     }
 
     #[test]

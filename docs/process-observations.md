@@ -5,6 +5,70 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 25 absorb preview flow)
+
+- Slice / task: Implement Packet 25 bounded graph-only guided `jj absorb` preview flow.
+- Worker / model: `019e44c5-7818-7202-8217-404cbbaffa45` / `gpt-5` (Codex).
+- Scope given: preserve unrelated edits, keep work in the current jj change
+  `Add absorb preview flow`, stay within the action menu, app, jj command, TUI, focused tests, and
+  plan/process docs unless required, and use exact graph metadata for source and candidate
+  destinations.
+- Observable outcome: the graph action menu now offers `absorb` only when the current graph row has
+  an exact change id and selected exact graph rows provide candidate destinations after excluding
+  the current row. The preview carries the exact command shape, explains selected candidate ancestry
+  and line-level opacity, and confirmation leaves a scrollable result with `jj undo` and
+  `jj op show -p` visible.
+- Manual proof outcome: disposable repo `/tmp/jk-absorb-proof.ADHs9w` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a base line was tracked, change A edited the line,
+  and change B edited the same line. `jj --no-pager absorb --from @ --into @-` absorbed into one
+  revision and left the source working copy empty, `jj --no-pager op show -p --color never` showed
+  the operation patch, and `jj --no-pager undo` restored the previous graph.
+- Rework / blockers: an initial `cargo test absorb --lib` invocation failed because `jk` is a binary
+  crate without library targets, and one later combined Cargo test invocation failed because Cargo
+  accepts only one test-name filter. The equivalent focused tests were run separately and passed.
+  `cargo check` still reports the existing dead-code warnings for `FileShowView::new`,
+  `ViewSpec::bookmarks`, and `FileListItem::row_text`. `just check` still fails immediately at the
+  known `cargo +nightly fmt` wrapper step.
+- Evidence basis:
+  - Thread: `019e44c5-7818-7202-8217-404cbbaffa45`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `jj --no-pager status`
+    - `cargo check`
+    - `cargo test absorb`
+    - `cargo test action_menu`
+    - `cargo test app::tests::absorb -- --test-threads=1`
+    - `cargo test jj::tests::absorb -- --test-threads=1`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-check`
+    - `just check`
+  - Manual proof commands, all with cwd `/tmp/jk-absorb-proof.ADHs9w`:
+    - `jj --no-pager git init`
+    - `printf 'base\n' > file.txt`
+    - `jj --no-pager file track file.txt`
+    - `jj --no-pager describe -m 'packet 25 base line'`
+    - `jj --no-pager new`
+    - `printf 'A\n' > file.txt`
+    - `jj --no-pager describe -m 'packet 25 change A edits line'`
+    - `jj --no-pager new`
+    - `printf 'B\n' > file.txt`
+    - `jj --no-pager describe -m 'packet 25 change B edits same line'`
+    - `jj --no-pager absorb --from @ --into @-`
+    - `jj --no-pager op show -p --color never`
+    - `jj --no-pager undo`
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/graph.rs`, `src/jj.rs`, `src/tui.rs`,
+    `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet 25 5.5 final review)
+
+- Final 5.5 review: `019e44cf-4ec5-7bf2-a20d-0a8f83315480` (`gpt-5.5`, high) reported no findings
+  and accepted Packet 25.
+- Review evidence: read-only acceptance inspection only, including `jj --no-pager absorb --help`.
+- Residual-risk acceptance: `jk` does not simulate ancestry filtering, line placement, or final
+  graph shape, and this behavior was accepted as an explicit constraint.
+
 ### 2026-05-20 (Progress audit after Packet 22 acceptance)
 
 - Slice / task: Audit progress documentation after Packet 22 acceptance.

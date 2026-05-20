@@ -904,7 +904,8 @@ mod tests {
             vec![
                 "new child of aaaaaaaa",
                 "rebase 1 source revision into destination bbbbbbbb",
-                "squash 1 source revision into destination bbbbbbbb"
+                "squash 1 source revision into destination bbbbbbbb",
+                "absorb current revision bbbbbbbb into 1 candidate destination"
             ]
         );
     }

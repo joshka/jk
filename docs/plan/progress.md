@@ -484,3 +484,42 @@
   remote field, and remote/tracking flows remain deferred until explicit metadata is modeled beyond
   local delete gating.
 - Next slice: Packet 25: Absorb Preview Flow
+
+## Packet 25: Absorb Preview Flow
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/graph.rs`, `src/jj.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: graph action menus now expose a bounded preview-first `absorb` action only when the
+  current graph row has an exact change id and at least one selected exact graph row remains after
+  excluding the current row. The current row is the single source revision. Explicitly selected rows
+  are candidate destinations, and the preview states that jj only considers selected revisions that
+  are ancestors of the source.
+- Command shape: one `jj absorb` invocation with a single exact `--from` revset,
+  `exactly(change_id("<source>"), 1)`, and repeated exact `--into` revsets,
+  `exactly(change_id("<candidate>"), 1)`. The flow does not expose bare `jj absorb`,
+  status/current-`@` absorb, implicit `mutable()`, filesets, patch selection, multi-source absorb,
+  `--ignore-immutable`, or `--no-integrate-operation`.
+- Preview/result behavior: the preview lists the exact source id, candidate destination ids, exact
+  command, line-level placement semantics, ambiguity behavior, source emptying/abandonment caveat,
+  and the `jj undo` and `jj op show -p` review paths. Confirmation refreshes the current view and
+  keeps `jj undo | jj op show -p` visible in the completed scrollable result output.
+- Verification: `cargo check`; focused `cargo test absorb`; focused `cargo test action_menu`;
+  focused `cargo test app::tests::absorb -- --test-threads=1`; focused
+  `cargo test jj::tests::absorb -- --test-threads=1`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-check`
+- Validation note: `just check` was attempted after Packet 25 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused absorb/action-menu tests, full `cargo test`,
+  `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Manual proof: disposable repo `/tmp/jk-absorb-proof.ADHs9w` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a base line was tracked, change A edited the line,
+  and change B edited the same line. `jj --no-pager absorb --from @ --into @-` absorbed the source
+  changes into one revision, rebased the descendant, and left the source working copy empty.
+  `jj --no-pager op show -p --color never` showed the changed commits and rendered patch, and
+  `jj --no-pager undo` restored the pre-absorb graph.
+- Final 5.5 review `019e44cf-4ec5-7bf2-a20d-0a8f83315480` (`gpt-5.5`, high) reported no findings and
+  accepted Packet 25.
+- Remaining risk: `jk` does not simulate line-level placement, candidate ancestry filtering, source
+  emptying, source abandonment, or final graph shape. Those remain jj semantics visible through the
+  preview text, result output, `jj undo`, and rendered `jj op show -p` review path.
+- Next slice: Packet 26: Rebase Polish And Before/After Graph

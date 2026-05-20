@@ -28,6 +28,7 @@ pub enum ActionKind {
     Abandon,
     Rebase,
     Squash,
+    Absorb,
 }
 
 impl ActionKind {
@@ -38,6 +39,7 @@ impl ActionKind {
             Self::Abandon => "abandon",
             Self::Rebase => "rebase",
             Self::Squash => "squash",
+            Self::Absorb => "absorb",
         }
     }
 }
@@ -126,9 +128,17 @@ impl RolePrompt {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FollowUp {
     StatusMessage(String),
-    ExactRevision { revision: String },
-    NewParents { parents: Vec<String> },
+    ExactRevision {
+        revision: String,
+    },
+    NewParents {
+        parents: Vec<String>,
+    },
     RolePrompt(RolePrompt),
+    AbsorbCandidates {
+        source: String,
+        destinations: Vec<String>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -239,20 +249,21 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
         return ActionMenu::new(vec![new, split, abandon]);
     }
 
-    let sources = context
+    let selected_revisions = context
         .source_revisions()
         .iter()
-        .filter(|source| *source != &current_revision)
+        .filter(|source| *source != current_revision)
         .cloned()
         .collect::<Vec<_>>();
-    if sources.is_empty() {
+    if selected_revisions.is_empty() {
         return ActionMenu::default();
     }
 
     ActionMenu::new(vec![
         menu_item_for_new_parents(&new_parents),
-        menu_item_for_multirev_action(ActionKind::Rebase, &sources, current_revision),
-        menu_item_for_multirev_action(ActionKind::Squash, &sources, current_revision),
+        menu_item_for_multirev_action(ActionKind::Rebase, &selected_revisions, current_revision),
+        menu_item_for_multirev_action(ActionKind::Squash, &selected_revisions, current_revision),
+        menu_item_for_absorb(current_revision, &selected_revisions),
     ])
 }
 
@@ -282,7 +293,11 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         ActionKind::Abandon => FollowUp::ExactRevision {
             revision: revision.to_owned(),
         },
-        ActionKind::New | ActionKind::Split | ActionKind::Rebase | ActionKind::Squash => {
+        ActionKind::New
+        | ActionKind::Split
+        | ActionKind::Rebase
+        | ActionKind::Squash
+        | ActionKind::Absorb => {
             let message = format!("{} {}", label, PREVIEW_REQUIRED_MARKER);
             FollowUp::StatusMessage(message)
         }
@@ -325,6 +340,28 @@ fn menu_item_for_multirev_action(
         label,
         safety_tier: SafetyTier::PreviewFirst,
         follow_up: FollowUp::RolePrompt(role_prompt),
+    }
+}
+
+fn menu_item_for_absorb(source_revision: &str, destination_revisions: &[String]) -> ActionMenuItem {
+    let label = format!(
+        "absorb current revision {} into {} candidate destination{}",
+        short_id(source_revision),
+        destination_revisions.len(),
+        if destination_revisions.len() == 1 {
+            ""
+        } else {
+            "s"
+        },
+    );
+    ActionMenuItem {
+        action: ActionKind::Absorb,
+        label,
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up: FollowUp::AbsorbCandidates {
+            source: source_revision.to_owned(),
+            destinations: destination_revisions.to_vec(),
+        },
     }
 }
 
@@ -375,7 +412,7 @@ mod tests {
                 ]);
         let menu = build_action_menu(&context);
 
-        assert_eq!(menu.items().len(), 3);
+        assert_eq!(menu.items().len(), 4);
         assert!(menu.items()[0].label().contains("new merge child"));
         assert!(
             menu.items()[1]
@@ -456,6 +493,22 @@ mod tests {
         } else {
             panic!("expected squash role prompt follow-up");
         }
+        assert!(
+            menu.items()[3]
+                .label()
+                .contains("absorb current revision ccccdddd into 2 candidate destinations")
+        );
+        assert!(matches!(
+            menu.items()[3].follow_up(),
+            FollowUp::AbsorbCandidates {
+                source,
+                destinations,
+            } if source == "ccccdddd1111111111111111111111111111111111"
+                && destinations == &vec![
+                    "aaaabbbb1111111111111111111111111111111111".to_owned(),
+                    "eeeeffff2222222222222222222222222222222222".to_owned()
+                ]
+        ));
     }
 
     #[test]
@@ -481,7 +534,12 @@ mod tests {
 
         assert_eq!(
             actions,
-            vec![ActionKind::New, ActionKind::Rebase, ActionKind::Squash]
+            vec![
+                ActionKind::New,
+                ActionKind::Rebase,
+                ActionKind::Squash,
+                ActionKind::Absorb
+            ]
         );
     }
 
