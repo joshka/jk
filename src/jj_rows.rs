@@ -68,6 +68,12 @@ impl LogItem {
             .collect::<Vec<_>>()
             .join("\n")
     }
+
+    pub fn is_visible_working_copy(&self) -> bool {
+        self.lines
+            .first()
+            .is_some_and(|line| first_content_char(&line_text(line)) == Some('@'))
+    }
 }
 
 /// One selectable bookmark item parsed from rendered bookmark output.

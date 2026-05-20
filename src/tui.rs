@@ -117,6 +117,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::SplitPreview { output } => {
+            let title = action_output_title("Split", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::RestorePreview { output } => {
             let title = action_output_title("Restore", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -250,6 +256,9 @@ pub enum Overlay<'a> {
         output: &'a ActionOutput,
     },
     RebasePreview {
+        output: &'a ActionOutput,
+    },
+    SplitPreview {
         output: &'a ActionOutput,
     },
     RestorePreview {

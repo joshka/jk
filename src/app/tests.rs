@@ -36,6 +36,29 @@ fn mock_rebase_failure(_: &JjRebasePlan) -> Result<String> {
     Err(eyre!("jj rebase failed: first line\nsecond line"))
 }
 
+fn mock_split_success(split: &JjSplitPlan) -> Result<String> {
+    Ok(split.success_result_message("exit status: 0"))
+}
+
+fn mock_split_failure(split: &JjSplitPlan) -> Result<String> {
+    assert_eq!(split.command_label(), "jj split");
+    Err(eyre!("jj split failed with status exit status: 1"))
+}
+
+fn mock_split_success_service(
+    _terminal: Option<&mut DefaultTerminal>,
+    split: &JjSplitPlan,
+) -> Result<String> {
+    mock_split_success(split)
+}
+
+fn mock_split_failure_service(
+    _terminal: Option<&mut DefaultTerminal>,
+    split: &JjSplitPlan,
+) -> Result<String> {
+    mock_split_failure(split)
+}
+
 fn mock_squash_success(_: &JjSquashPlan) -> Result<String> {
     Ok("squashed".to_owned())
 }
@@ -416,6 +439,7 @@ fn test_services() -> AppServices {
     let mut services = AppServices::default();
     services.new_run = mock_new_success;
     services.rebase_run = mock_rebase_success;
+    services.split_run = mock_split_success_service;
     services.squash_run = mock_squash_success;
     services.absorb_run = mock_absorb_success;
     services.restore_run = mock_restore_success;
@@ -2448,6 +2472,201 @@ fn edit_confirm_success_refreshes_and_reveals_target() {
     assert!(output.completed());
     assert!(body.contains("editing change-a | jj undo"));
     assert_eq!(app.status.message(), "editing change-a | jj undo");
+}
+
+#[test]
+fn split_action_menu_enter_opens_exact_target_preview() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(
+            vec![ratatui::text::Line::from("○  change")],
+            Some("change-a".to_owned()),
+            None,
+        ),
+    ])));
+    app.mode = InteractionMode::ActionMenu {
+        menu: crate::action_menu::build_action_menu(
+            &crate::action_menu::ExactActionContext::with_current("change-a"),
+        ),
+        selected: 2,
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let (target, command_label, body) = match &app.mode {
+        InteractionMode::SplitPreview { split, output } => (
+            split.target().exact_change_id().map(str::to_owned),
+            output.command_label().to_owned(),
+            output.body_lines().join("\n"),
+        ),
+        _ => panic!("expected split preview"),
+    };
+    assert_eq!(target.as_deref(), Some("change-a"));
+    assert_eq!(
+        command_label,
+        "jj split --revision exactly(change_id(\"change-a\"), 1)"
+    );
+    assert!(body.contains("target: exact selected graph revision change-a"));
+    assert!(body.contains("jj's diff editor"));
+    assert!(body.contains("jk is not an in-app patch editor"));
+}
+
+#[test]
+fn split_visible_working_copy_uses_bare_command() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(
+            vec![ratatui::text::Line::from("@  current")],
+            Some("current-change".to_owned()),
+            None,
+        ),
+    ])));
+
+    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key(KeyCode::Char('s'), 12).unwrap();
+
+    let (target, command_label, body) = match &app.mode {
+        InteractionMode::SplitPreview { split, output } => (
+            split.target().exact_change_id().map(str::to_owned),
+            output.command_label().to_owned(),
+            output.body_lines().join("\n"),
+        ),
+        _ => panic!("expected split preview"),
+    };
+    assert_eq!(target, None);
+    assert_eq!(command_label, "jj split");
+    assert!(body.contains("target: current working-copy change (@)"));
+    assert!(body.contains("fileset: no fileset is passed"));
+}
+
+#[test]
+fn split_preview_cancel_preserves_graph_selection() {
+    let mut graph = crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::jj::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+    ]);
+    graph.execute(
+        ViewCommand::MoveDown,
+        CommandContext {
+            viewport_height: 12,
+            viewport_width: 80,
+            search: None,
+        },
+    );
+    let mut app = test_app(ViewState::Graph(graph));
+    app.mode = InteractionMode::SplitPreview {
+        split: JjSplitPlan::exact_change("second"),
+        output: ActionOutput::pending(
+            "jj split --revision exactly(change_id(\"second\"), 1)".to_owned(),
+            "preview only".to_owned(),
+            Some("split preview context".to_owned()),
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+    let ViewState::Graph(graph) = &app.view else {
+        panic!("expected graph view");
+    };
+    assert_eq!(graph.selected_revision(), Some("second"));
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(app.status.message(), "split cancelled");
+}
+
+#[test]
+fn split_confirm_success_refreshes_reveals_and_keeps_recovery_visible() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    ])));
+    app.services.reveal_graph_change = mock_reveal_edit_target_in_recent;
+    app.mode = InteractionMode::SplitPreview {
+        split: JjSplitPlan::exact_change("change-a"),
+        output: ActionOutput::pending(
+            "jj split --revision exactly(change_id(\"change-a\"), 1)".to_owned(),
+            "preview only".to_owned(),
+            Some("split exact graph revision change-a from jk".to_owned()),
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::SplitPreview { output, .. } => output,
+        _ => panic!("expected split result"),
+    };
+    let body = output.body_lines().join("\n");
+    assert!(output.completed());
+    assert!(body.contains("child exit status: exit status: 0"));
+    assert!(body.contains("did not capture that output"));
+    assert!(body.contains("refresh: split completed | jj undo | jj op show -p"));
+    assert_eq!(
+        app.status.message(),
+        "split completed | jj undo | jj op show -p"
+    );
+}
+
+#[test]
+fn split_current_confirm_success_reveals_current_working_copy_when_possible() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
+    ])));
+    app.services.reveal_graph_change = mock_reveal_current_working_copy_in_recent;
+    app.mode = InteractionMode::SplitPreview {
+        split: JjSplitPlan::current_working_copy(),
+        output: ActionOutput::pending(
+            "jj split".to_owned(),
+            "preview only".to_owned(),
+            Some("split current working-copy change (@) from jk".to_owned()),
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::SplitPreview { output, .. } => output,
+        _ => panic!("expected split result"),
+    };
+    let body = output.body_lines().join("\n");
+    assert!(output.completed());
+    assert!(
+        body.contains("refresh: split completed | showing recent work | jj undo | jj op show -p")
+    );
+    assert_eq!(
+        app.status.message(),
+        "split completed | showing recent work | jj undo | jj op show -p"
+    );
+}
+
+#[test]
+fn split_failure_keeps_app_owned_result_without_claiming_captured_stderr() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
+    ])));
+    app.services.split_run = mock_split_failure_service;
+    app.mode = InteractionMode::SplitPreview {
+        split: JjSplitPlan::current_working_copy(),
+        output: ActionOutput::pending("jj split".to_owned(), "preview only".to_owned(), None),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::SplitPreview { output, .. } => output,
+        _ => panic!("expected split result"),
+    };
+    let body = output.body_lines().join("\n");
+    assert_eq!(output.command_label(), "jj split");
+    assert!(output.completed());
+    assert!(body.contains("result: split command failed or did not complete"));
+    assert!(body.contains("runner status: jj split failed with status exit status: 1"));
+    assert!(body.contains("did not capture stderr"));
+    assert!(body.contains("if jj recorded an operation, use jj undo"));
+    assert!(body.contains("review: jj op show -p"));
+    assert!(matches!(app.status.kind(), StatusKind::Error));
+    assert!(
+        app.status
+            .message()
+            .contains("runner status: jj split failed")
+    );
 }
 
 #[test]

@@ -22,7 +22,8 @@ use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjCommand, JjCommitPlan, JjDescribePlan, JjGitFetch, JjGitPush,
     JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
+    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
+    LogViewMode, ViewSpec,
 };
 use crate::search::SearchQuery;
 use crate::tui;
@@ -106,6 +107,14 @@ impl App {
 
     fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
         self.services.run_rebase(rebase)
+    }
+
+    fn run_split(
+        &self,
+        terminal: Option<&mut DefaultTerminal>,
+        split: &JjSplitPlan,
+    ) -> Result<String> {
+        self.services.run_split(terminal, split)
     }
 
     fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
@@ -212,7 +221,7 @@ impl App {
 
             let viewport_height = terminal.size()?.height.saturating_sub(2);
             if event::poll(Duration::from_millis(200))? {
-                self.handle_event(event::read()?, viewport_height)?;
+                self.handle_event(terminal, event::read()?, viewport_height)?;
             } else {
                 self.flush_expired_pending_command(viewport_height)?;
             }
@@ -221,7 +230,12 @@ impl App {
         Ok(())
     }
 
-    fn handle_event(&mut self, event: Event, viewport_height: u16) -> Result<()> {
+    fn handle_event(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+        event: Event,
+        viewport_height: u16,
+    ) -> Result<()> {
         let key = match event {
             Event::Key(key) => key,
             Event::Resize(width, height) => {
@@ -238,7 +252,7 @@ impl App {
             return Ok(());
         }
 
-        if self.handle_mode_key_event(key, viewport_height)? {
+        if self.handle_mode_key_event_with_terminal(key, viewport_height, Some(terminal))? {
             return Ok(());
         }
 

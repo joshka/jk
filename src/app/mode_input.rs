@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::DefaultTerminal;
 
 use crate::action_menu::{ActionKind, RolePrompt};
 use crate::action_output::{
@@ -28,9 +29,10 @@ use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand, binding_k
 impl App {
     #[cfg(test)]
     pub(super) fn handle_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
-        self.handle_mode_key_event(
+        self.handle_mode_key_event_with_terminal(
             KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
             viewport_height,
+            None,
         )
     }
 
@@ -39,12 +41,21 @@ impl App {
         key: KeyEvent,
         viewport_height: u16,
     ) -> Result<bool> {
+        self.handle_mode_key_event_with_terminal(key, viewport_height, None)
+    }
+
+    pub(super) fn handle_mode_key_event_with_terminal(
+        &mut self,
+        key: KeyEvent,
+        viewport_height: u16,
+        terminal: Option<&mut DefaultTerminal>,
+    ) -> Result<bool> {
         if matches!(self.mode, InteractionMode::Help) {
             return self.handle_help_key(key, viewport_height);
         }
 
         let code = key.code;
-        if self.handle_common_action_preview_key(code, viewport_height) {
+        if self.handle_common_action_preview_key(code, viewport_height, terminal) {
             return Ok(true);
         }
 
@@ -469,6 +480,7 @@ impl App {
             | InteractionMode::BookmarkMutationPreview { .. }
             | InteractionMode::NewPreview { .. }
             | InteractionMode::RebasePreview { .. }
+            | InteractionMode::SplitPreview { .. }
             | InteractionMode::RestorePreview { .. }
             | InteractionMode::RevertPreview { .. }
             | InteractionMode::SquashPreview { .. }

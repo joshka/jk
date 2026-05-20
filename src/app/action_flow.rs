@@ -4,6 +4,7 @@
 //! for each pending jj action.
 
 use crossterm::event::KeyCode;
+use ratatui::DefaultTerminal;
 
 use crate::action_output::{
     ActionOutput, ActionOutputKey, action_output_visible_lines, handle_action_output_key,
@@ -13,7 +14,7 @@ use crate::app_status::StatusLine;
 use crate::jj::{
     JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjGitFetch, JjGitPush,
     JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSquashPlan, JjWorkingCopyNavigationPlan,
+    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
 
 use super::App;
@@ -23,16 +24,22 @@ impl App {
         &mut self,
         code: KeyCode,
         viewport_height: u16,
+        terminal: Option<&mut DefaultTerminal>,
     ) -> bool {
         let Some(event) = self.mode.common_action_preview_event(code, viewport_height) else {
             return false;
         };
 
-        self.apply_action_preview_event(event, viewport_height);
+        self.apply_action_preview_event(event, viewport_height, terminal);
         true
     }
 
-    fn apply_action_preview_event(&mut self, event: ActionPreviewEvent, viewport_height: u16) {
+    fn apply_action_preview_event(
+        &mut self,
+        event: ActionPreviewEvent,
+        viewport_height: u16,
+        terminal: Option<&mut DefaultTerminal>,
+    ) {
         match event {
             ActionPreviewEvent::StayOpen => {}
             ActionPreviewEvent::CloseCompleted => self.mode = InteractionMode::Normal,
@@ -41,7 +48,7 @@ impl App {
                 self.status = StatusLine::with_message(&self.view, message);
             }
             ActionPreviewEvent::Confirm(confirmation) => {
-                self.confirm_action_preview(confirmation, viewport_height);
+                self.confirm_action_preview(confirmation, viewport_height, terminal);
             }
         }
     }
@@ -50,6 +57,7 @@ impl App {
         &mut self,
         confirmation: ActionPreviewConfirmation,
         viewport_height: u16,
+        terminal: Option<&mut DefaultTerminal>,
     ) {
         match confirmation {
             ActionPreviewConfirmation::Describe {
@@ -72,6 +80,10 @@ impl App {
                 rebase,
                 status_context,
             } => self.confirm_rebase(rebase, status_context, viewport_height),
+            ActionPreviewConfirmation::Split {
+                split,
+                status_context,
+            } => self.confirm_split(split, status_context, viewport_height, terminal),
             ActionPreviewConfirmation::Restore {
                 restore,
                 status_context,
@@ -167,6 +179,16 @@ impl InteractionMode {
                 "rebase cancelled".to_owned(),
                 |status_context| ActionPreviewConfirmation::Rebase {
                     rebase: rebase.clone(),
+                    status_context,
+                },
+            )),
+            Self::SplitPreview { split, output } => Some(action_preview_event(
+                code,
+                output,
+                visible_lines,
+                "split cancelled".to_owned(),
+                |status_context| ActionPreviewConfirmation::Split {
+                    split: split.clone(),
                     status_context,
                 },
             )),
@@ -293,6 +315,10 @@ enum ActionPreviewConfirmation {
     },
     Rebase {
         rebase: JjRebasePlan,
+        status_context: Option<String>,
+    },
+    Split {
+        split: JjSplitPlan,
         status_context: Option<String>,
     },
     Restore {

@@ -4,6 +4,7 @@
 //! prompt completion, preview opening, and confirmed jj action results do to app state.
 
 use color_eyre::Result;
+use ratatui::DefaultTerminal;
 
 use crate::action_menu::{ActionKind, ActionMenuItem, FollowUp};
 use crate::action_output::ActionOutput;
@@ -13,8 +14,8 @@ use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
     JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitFetch, JjGitPush,
     JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget,
-    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
-    JjWorkingCopyNavigationPlan, LogViewMode,
+    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSplitTarget, JjSquashPlan,
+    JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode,
 };
 use crate::view_state::ViewState;
 
@@ -47,6 +48,15 @@ impl App {
                             StatusLine::with_message(&self.view, "preview not yet implemented");
                     }
                 }
+            }
+            FollowUp::SplitExactTarget { revision } => {
+                let revision = revision.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_split_preview(JjSplitPlan::exact_change(revision));
+            }
+            FollowUp::SplitCurrentWorkingCopy => {
+                self.mode = InteractionMode::Normal;
+                self.open_split_preview(JjSplitPlan::current_working_copy());
             }
             FollowUp::EditExactTarget { revision } => {
                 let revision = revision.clone();
@@ -654,6 +664,37 @@ impl App {
         }
     }
 
+    pub(super) fn open_split_preview(&mut self, split: JjSplitPlan) {
+        let status_context = Some(format!(
+            "{} from {}",
+            split.status_context(),
+            self.view.spec().app_label()
+        ));
+
+        match split.run_preview() {
+            Ok(output) => {
+                let command_label = split.command_label();
+                self.mode = InteractionMode::SplitPreview {
+                    split,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = split.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::SplitPreview {
+                    split,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
     pub(super) fn open_restore_preview(&mut self, restore: JjRestorePlan) {
         let target = restore
             .path()
@@ -1161,6 +1202,91 @@ impl App {
             recovery,
             output: ActionOutput::finished(command_label, result_message, status_context),
         };
+    }
+
+    pub(super) fn confirm_split(
+        &mut self,
+        split: JjSplitPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+        terminal: Option<&mut DefaultTerminal>,
+    ) {
+        let command_label = split.command_label();
+        let result_message = match self.run_split(terminal, &split) {
+            Ok(output) => self.finish_successful_split(&split, output, viewport_height),
+            Err(error) => {
+                let message = split.failure_result_message(&error.to_string());
+                self.status = StatusLine::error(&self.view, message.clone());
+                message
+            }
+        };
+
+        self.mode = InteractionMode::SplitPreview {
+            split,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    fn finish_successful_split(
+        &mut self,
+        split: &JjSplitPlan,
+        output: String,
+        viewport_height: u16,
+    ) -> String {
+        let reveal_change_id = match split.target() {
+            JjSplitTarget::ExactChange(change_id) => Some(change_id.clone()),
+            JjSplitTarget::CurrentWorkingCopy => match self.resolve_revision("@") {
+                Ok(change_id) => Some(change_id),
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    return format!(
+                        "{output}\nrefresh: skipped because resolving @ failed: {error}\nrecovery: jj undo\nreview: jj op show -p"
+                    );
+                }
+            },
+        };
+
+        match self.refresh_view_state() {
+            Ok(()) => {
+                self.view.clamp(viewport_height, current_viewport_width());
+                let mut reveal_error = None;
+                let revealed_in_recent = match reveal_change_id.as_deref() {
+                    Some(change_id) => {
+                        match self.reveal_graph_change(change_id, LogViewMode::Recent) {
+                            Ok(switched_modes) => {
+                                self.view.clamp(viewport_height, current_viewport_width());
+                                Some(switched_modes)
+                            }
+                            Err(error) => {
+                                self.status = StatusLine::error(&self.view, error.to_string());
+                                reveal_error = Some(format!(
+                                    "{output}\nrefresh: active view refreshed\nreveal: failed: {error}\nrecovery: jj undo\nreview: jj op show -p"
+                                ));
+                                None
+                            }
+                        }
+                    }
+                    None => None,
+                };
+
+                let message = match revealed_in_recent {
+                    Some(true) => "split completed | showing recent work | jj undo | jj op show -p",
+                    Some(false) => "split completed | jj undo | jj op show -p",
+                    None => match reveal_error.as_deref() {
+                        Some(message) => return message.to_owned(),
+                        None => "split completed | jj undo | jj op show -p",
+                    },
+                };
+                self.status = StatusLine::with_message(&self.view, message);
+                format!("{output}\nrefresh: {message}")
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                format!(
+                    "{output}\nrefresh: failed: {error}\nrecovery: jj undo\nreview: jj op show -p"
+                )
+            }
+        }
     }
 
     pub(super) fn confirm_operation_target(

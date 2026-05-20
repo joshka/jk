@@ -155,6 +155,10 @@ pub enum FollowUp {
     ExactRevision {
         revision: String,
     },
+    SplitExactTarget {
+        revision: String,
+    },
+    SplitCurrentWorkingCopy,
     EditExactTarget {
         revision: String,
     },
@@ -258,6 +262,7 @@ pub struct ExactActionContext {
     current_revision: Option<String>,
     source_revisions: Vec<String>,
     selected_path: Option<String>,
+    current_is_visible_working_copy: bool,
     surface: ActionSurface,
 }
 
@@ -267,6 +272,7 @@ impl ExactActionContext {
             current_revision: Some(current_revision.into()),
             source_revisions: Vec::new(),
             selected_path: None,
+            current_is_visible_working_copy: false,
             surface: ActionSurface::Graph,
         }
     }
@@ -276,6 +282,7 @@ impl ExactActionContext {
             current_revision: Some(current_revision.into()),
             source_revisions: Vec::new(),
             selected_path: None,
+            current_is_visible_working_copy: false,
             surface: ActionSurface::Detail,
         }
     }
@@ -285,6 +292,7 @@ impl ExactActionContext {
             current_revision: Some("@".to_owned()),
             source_revisions: Vec::new(),
             selected_path: Some(path.into()),
+            current_is_visible_working_copy: false,
             surface: ActionSurface::Status,
         }
     }
@@ -295,6 +303,7 @@ impl ExactActionContext {
             current_revision: None,
             source_revisions: Vec::new(),
             selected_path: None,
+            current_is_visible_working_copy: false,
             surface: ActionSurface::Graph,
         }
     }
@@ -313,6 +322,11 @@ impl ExactActionContext {
         self
     }
 
+    pub fn with_visible_working_copy(mut self) -> Self {
+        self.current_is_visible_working_copy = true;
+        self
+    }
+
     pub fn current_revision(&self) -> Option<&str> {
         self.current_revision.as_deref()
     }
@@ -323,6 +337,10 @@ impl ExactActionContext {
 
     pub fn selected_path(&self) -> Option<&str> {
         self.selected_path.as_deref()
+    }
+
+    fn current_is_visible_working_copy(&self) -> bool {
+        self.current_is_visible_working_copy
     }
 
     fn is_detail_surface(&self) -> bool {
@@ -366,7 +384,8 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     {
         let edit = menu_item_for_edit(current_revision);
         let new = menu_item_for_new_parents(&new_parents);
-        let split = menu_item_for_single_revision(ActionKind::Split, current_revision);
+        let split =
+            menu_item_for_split(current_revision, context.current_is_visible_working_copy());
         let abandon = menu_item_for_single_revision(ActionKind::Abandon, current_revision);
         let mut items = vec![edit, new, split, abandon];
         items.extend(mutation_items);
@@ -422,12 +441,12 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         },
         ActionKind::Edit
         | ActionKind::New
-        | ActionKind::Split
         | ActionKind::Restore
         | ActionKind::Revert
         | ActionKind::Rebase
         | ActionKind::Squash
-        | ActionKind::Absorb => {
+        | ActionKind::Absorb
+        | ActionKind::Split => {
             let message = format!("{} {}", label, PREVIEW_REQUIRED_MARKER);
             FollowUp::StatusMessage(message)
         }
@@ -435,6 +454,29 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
     ActionMenuItem {
         action,
         shortcut: action.shortcut(),
+        label,
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up,
+    }
+}
+
+fn menu_item_for_split(revision: &str, current_is_visible_working_copy: bool) -> ActionMenuItem {
+    let label = if current_is_visible_working_copy {
+        "split current working-copy change @".to_owned()
+    } else {
+        format!("split selected revision {}", short_id(revision))
+    };
+    let follow_up = if current_is_visible_working_copy {
+        FollowUp::SplitCurrentWorkingCopy
+    } else {
+        FollowUp::SplitExactTarget {
+            revision: revision.to_owned(),
+        }
+    };
+
+    ActionMenuItem {
+        action: ActionKind::Split,
+        shortcut: ActionKind::Split.shortcut(),
         label,
         safety_tier: SafetyTier::PreviewFirst,
         follow_up,
@@ -612,8 +654,8 @@ mod tests {
         ));
         assert!(matches!(
             menu.items()[2].follow_up(),
-            FollowUp::StatusMessage(message)
-                if message.ends_with(PREVIEW_REQUIRED_MARKER)
+            FollowUp::SplitExactTarget { revision }
+                if revision == "0000000011111111222222223333333344444444"
         ));
         assert!(matches!(
             menu.items()[3].follow_up(),
@@ -813,6 +855,29 @@ mod tests {
             menu.items()[1].follow_up(),
             FollowUp::NewParents { parents }
                 if parents == &vec!["ccccdddd1111111111111111111111111111111111".to_owned()]
+        ));
+        assert!(matches!(
+            menu.items()[2].follow_up(),
+            FollowUp::SplitExactTarget { revision }
+                if revision == "ccccdddd1111111111111111111111111111111111"
+        ));
+    }
+
+    #[test]
+    fn visible_working_copy_split_uses_current_follow_up() {
+        let context =
+            ExactActionContext::with_current("ccccdddd1111111111111111111111111111111111")
+                .with_visible_working_copy();
+        let menu = build_action_menu(&context);
+
+        assert_eq!(menu.items()[2].action(), ActionKind::Split);
+        assert_eq!(
+            menu.items()[2].label(),
+            "split current working-copy change @"
+        );
+        assert!(matches!(
+            menu.items()[2].follow_up(),
+            FollowUp::SplitCurrentWorkingCopy
         ));
     }
 

@@ -19,7 +19,8 @@ pub use crate::jj_actions::{
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget,
     JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
     JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
+    JjSplitPlan, JjSplitTarget, JjSquashPlan, JjWorkingCopyNavigationKind,
+    JjWorkingCopyNavigationPlan,
 };
 pub use crate::jj_rows::{
     BookmarkItem, FileListItem, LogItem, OperationLogItem, ResolveEntry, document_plain_text,

@@ -12,7 +12,7 @@ use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
     JjDescribeTarget, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan,
+    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
     JjWorkingCopyNavigationPlan,
 };
 use crate::tui::Overlay;
@@ -67,6 +67,10 @@ pub(crate) enum InteractionMode {
     },
     RebasePreview {
         rebase: JjRebasePlan,
+        output: ActionOutput,
+    },
+    SplitPreview {
+        split: JjSplitPlan,
         output: ActionOutput,
     },
     RestorePreview {
@@ -189,6 +193,7 @@ impl InteractionMode {
             }
             Self::NewPreview { output, .. } => Overlay::NewPreview { output },
             Self::RebasePreview { output, .. } => Overlay::RebasePreview { output },
+            Self::SplitPreview { output, .. } => Overlay::SplitPreview { output },
             Self::RestorePreview { output, .. } => Overlay::RestorePreview { output },
             Self::RevertPreview { output, .. } => Overlay::RevertPreview { output },
             Self::SquashPreview { output, .. } => Overlay::SquashPreview { output },

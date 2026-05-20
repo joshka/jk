@@ -5,17 +5,21 @@
 //! across the app state.
 
 use color_eyre::Result;
+use color_eyre::eyre::eyre;
+use ratatui::DefaultTerminal;
 
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
     JjDescribePlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget,
-    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
-    LogViewMode, ViewSpec, git_remotes, new_trunk, resolve_exact_change_id,
+    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
+    JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec, git_remotes, new_trunk,
+    resolve_exact_change_id,
 };
 use crate::view_state::ViewState;
 
 pub(in crate::app) type NewRun = fn(&JjNewPlan) -> Result<String>;
 pub(in crate::app) type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
+pub(in crate::app) type SplitRun = fn(Option<&mut DefaultTerminal>, &JjSplitPlan) -> Result<String>;
 pub(in crate::app) type SquashRun = fn(&JjSquashPlan) -> Result<String>;
 pub(in crate::app) type AbsorbRun = fn(&JjAbsorbPlan) -> Result<String>;
 pub(in crate::app) type RestoreRun = fn(&JjRestorePlan) -> Result<String>;
@@ -44,6 +48,7 @@ pub(in crate::app) type LoadView = fn(ViewSpec) -> Result<ViewState>;
 pub(in crate::app) struct AppServices {
     pub(in crate::app) new_run: NewRun,
     pub(in crate::app) rebase_run: RebaseRun,
+    pub(in crate::app) split_run: SplitRun,
     pub(in crate::app) squash_run: SquashRun,
     pub(in crate::app) absorb_run: AbsorbRun,
     pub(in crate::app) restore_run: RestoreRun,
@@ -76,6 +81,14 @@ impl AppServices {
 
     pub(in crate::app) fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
         (self.rebase_run)(rebase)
+    }
+
+    pub(in crate::app) fn run_split(
+        &self,
+        terminal: Option<&mut DefaultTerminal>,
+        split: &JjSplitPlan,
+    ) -> Result<String> {
+        (self.split_run)(terminal, split)
     }
 
     pub(in crate::app) fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
@@ -196,6 +209,7 @@ impl Default for AppServices {
         Self {
             new_run: default_new_run,
             rebase_run: default_rebase_run,
+            split_run: default_split_run,
             squash_run: default_squash_run,
             absorb_run: default_absorb_run,
             restore_run: default_restore_run,
@@ -229,6 +243,22 @@ fn default_new_run(new_change: &JjNewPlan) -> Result<String> {
 
 fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {
     rebase.run().map(|output| output.message().to_owned())
+}
+
+fn default_split_run(
+    terminal: Option<&mut DefaultTerminal>,
+    split: &JjSplitPlan,
+) -> Result<String> {
+    let Some(terminal) = terminal else {
+        return Err(eyre!(
+            "{} requires an interactive terminal handoff",
+            split.command_label()
+        ));
+    };
+
+    split
+        .run_interactive(terminal)
+        .map(|output| output.message().to_owned())
 }
 
 fn default_squash_run(squash: &JjSquashPlan) -> Result<String> {

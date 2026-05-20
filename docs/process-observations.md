@@ -2987,3 +2987,79 @@ belong here.
   - Ignored live-terminal proofs were not rerun; the repair tightened their checks only.
 
 - No product split UI, `JjSplitPlan`, action-menu changes, or active-repo mutation proof were added.
+
+## 2026-05-20 Packet 34 Split Guided Flow
+
+- Thread id: `019e4740-0855-7c31-ab5d-2f298b1211bb`.
+
+- Scope given: implement bounded preview-first `jj split` for visible/current `@` or exact graph
+  targets, use the Packet 34c inherited-stdio runner, avoid in-app patch editing, keep post-command
+  status app-owned, and keep all mutation/manual proof in a disposable `/tmp` jj repo.
+
+- Code outcome: `src/jj_actions.rs` now owns `JjSplitPlan`, with bare `jj split` for the
+  current-working-copy target and `jj split --revision exactly(change_id("<id>"), 1)` for exact
+  graph targets. `src/action_menu.rs` now gives split a real follow-up instead of a placeholder
+  status. `src/graph.rs` treats rows rendered with a visible `@` marker as current-working-copy
+  split launch context, while exact non-current rows keep exact revision targeting.
+
+- App outcome: `src/app_screen.rs`, `src/app/action_flow.rs`, `src/app/action_lifecycle.rs`,
+  `src/app/mode_input.rs`, `src/app/services.rs`, `src/app.rs`, and `src/tui.rs` now carry a
+  `SplitPreview` overlay through preview, cancel, confirm, result, refresh, and reveal. Production
+  confirmation requires a live Ratatui terminal and calls the Packet 34c inherited-stdio runner;
+  tests use the app service seam without launching an editor.
+
+- Output visibility decision: split result text is app-owned. It names command label, child/runner
+  status, `jj undo`, and `jj op show -p`, and states that jj editor/output was live terminal output
+  while `jk` was suspended. The result does not claim captured child stderr.
+
+- Disposable proof: `/tmp/jk-packet34-proof.6Kx9Pw` was initialized from its own cwd with
+  `jj --no-pager git init`; `split.txt` was created there; and `jj --no-pager file track split.txt`
+  was run from that same proof repo cwd. The ignored runner proof tests then ran from this checkout
+  but forced the `jj split --tool false` child cwd to the `/tmp` proof repo through
+  `JK_INTERACTIVE_PROOF_REPO`.
+
+- Proof commands:
+
+  ```sh
+  JK_INTERACTIVE_PROOF_REPO=/tmp/jk-packet34-proof.6Kx9Pw \
+    cargo test real_runner_reports_jj_failure_from_tmp_repo -- --ignored --test-threads=1
+
+  JK_INTERACTIVE_PROOF_REPO=/tmp/jk-packet34-proof.6Kx9Pw \
+    cargo test real_ratatui_runner_reports_jj_failure_from_tmp_repo \
+      -- --ignored --nocapture --test-threads=1
+  ```
+
+- Proof output summary: both proof tests returned clean nonzero child status for
+  `jj --no-pager split --tool false`. The visible `Error: Failed to edit diff` text was inherited
+  child terminal output, not captured runner result text. The PTY proof exercised the real Ratatui
+  suspend/restore path.
+
+- Validation so far:
+  - `cargo check`
+  - `cargo test split -- --test-threads=1`
+  - `cargo test action_menu -- --test-threads=1`
+  - `cargo test app::tests::split -- --test-threads=1`
+  - `cargo test jj_actions::tests::split -- --test-threads=1`
+  - `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - ignored `/tmp` runner proof commands listed above
+  - `cargo clippy -- -D warnings` attempted
+  - PTY `cargo run`, quit with `q`
+
+- Warning / blocker status: `cargo check` and PTY `cargo run` still report the existing dead-code
+  warnings for `ViewSpec::bookmarks` and `FileListItem::row_text`. `cargo clippy -- -D warnings`
+  remains blocked by those two dead-code warnings plus the known `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`. The smoke rendered and exited
+  cleanly but was not warning-free because of those existing warnings.
+
+- Review expectation: review Packet 34 for honest split/editor semantics, exact target handling,
+  inherited-stdio runner use, post-command app-owned status/result visibility, refresh/reveal
+  behavior, noninteractive failure behavior, `/tmp` proof cwd discipline, tests, docs, and evidence
+  that the flow does not pretend to be an in-app patch editor.
+
+- Residual risk: default diff-editor cancel/complete was not manually driven because the Codex PTY
+  cannot safely control an arbitrary user-configured editor without risking a blocked session. The
+  implemented proof covers controlled failure, inherited stdio, terminal suspension, wait, and
+  restore.

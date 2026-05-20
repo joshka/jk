@@ -369,9 +369,12 @@ impl GraphView {
             );
         };
         let selected_revisions = self.selected_revisions_in_graph_order();
-        let menu = build_action_menu(
-            &ExactActionContext::with_current(current_revision).with_sources(selected_revisions),
-        );
+        let mut context =
+            ExactActionContext::with_current(current_revision).with_sources(selected_revisions);
+        if self.current_row_is_visible_working_copy() {
+            context = context.with_visible_working_copy();
+        }
+        let menu = build_action_menu(&context);
         if menu.is_empty() {
             ViewEffect::StatusMessage("no preview actions available for selection".to_owned())
         } else {
@@ -393,6 +396,12 @@ impl GraphView {
         self.entries
             .get(self.selection.index())
             .and_then(LogItem::action_id)
+    }
+
+    fn current_row_is_visible_working_copy(&self) -> bool {
+        self.entries
+            .get(self.selection.index())
+            .is_some_and(LogItem::is_visible_working_copy)
     }
 
     fn selected_revisions_in_graph_order(&self) -> Vec<String> {
@@ -900,6 +909,30 @@ mod tests {
                 "revert selected revision aaaaaaaa into @"
             ]
         );
+    }
+
+    #[test]
+    fn open_action_menu_uses_bare_split_for_visible_working_copy() {
+        let mut view = graph_view(vec![
+            log_item("@  current", Some("aaaaaaaa"), None),
+            log_item("○  parent", Some("bbbbbbbb"), None),
+        ]);
+
+        let effect = view.execute(ViewCommand::OpenActionMenu, command_context());
+        let action_menu = if let ViewEffect::OpenActionMenu(action_menu) = effect {
+            action_menu
+        } else {
+            panic!("expected action menu");
+        };
+
+        assert_eq!(
+            action_menu.items()[2].label(),
+            "split current working-copy change @"
+        );
+        assert!(matches!(
+            action_menu.items()[2].follow_up(),
+            crate::action_menu::FollowUp::SplitCurrentWorkingCopy
+        ));
     }
 
     #[test]

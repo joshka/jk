@@ -1332,10 +1332,10 @@ Audit result from 2026-05-20:
 
 ### Packet 32 Scheduling Notes
 
-- Immediate next recommended packet: Pre-Packet-34 Interruption Packet A, because Packet 33 shipped
-  operation-log recovery for exact operation ids and the user requested a maintainability/UI
-  interruption before Split Guided Flow. Packet 34 is postponed until the interruption wave either
-  lands or is explicitly reprioritized.
+- Historical scheduling note: before Packet 34, the immediate recommendation was the Pre-Packet-34
+  Interruption Packet A maintainability/UI interruption because Packet 33 had shipped operation-log
+  recovery for exact operation ids and the user requested app decomposition before Split Guided
+  Flow.
 - Packets 34 and 35 should stay separate. `split` has editor/process uncertainty, while `duplicate`
   is a graph rewrite with different target and refresh behavior.
 - The interruption packets should not be treated as command-coverage parity work. Their purpose is
