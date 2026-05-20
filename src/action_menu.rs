@@ -23,6 +23,7 @@ impl SafetyTier {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionKind {
+    New,
     Split,
     Abandon,
     Rebase,
@@ -32,6 +33,7 @@ pub enum ActionKind {
 impl ActionKind {
     fn label(self) -> &'static str {
         match self {
+            Self::New => "new",
             Self::Split => "split",
             Self::Abandon => "abandon",
             Self::Rebase => "rebase",
@@ -125,6 +127,7 @@ impl RolePrompt {
 pub enum FollowUp {
     StatusMessage(String),
     ExactRevision { revision: String },
+    NewParents { parents: Vec<String> },
     RolePrompt(RolePrompt),
 }
 
@@ -218,10 +221,22 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
         return ActionMenu::default();
     };
 
-    if context.source_revisions().is_empty() {
+    let new_parents = if context.source_revisions().is_empty() {
+        vec![current_revision.to_owned()]
+    } else {
+        context.source_revisions().to_vec()
+    };
+
+    if context.source_revisions().is_empty()
+        || context
+            .source_revisions()
+            .iter()
+            .all(|source| source == current_revision)
+    {
+        let new = menu_item_for_new_parents(&new_parents);
         let split = menu_item_for_single_revision(ActionKind::Split, current_revision);
         let abandon = menu_item_for_single_revision(ActionKind::Abandon, current_revision);
-        return ActionMenu::new(vec![split, abandon]);
+        return ActionMenu::new(vec![new, split, abandon]);
     }
 
     let sources = context
@@ -235,9 +250,26 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     }
 
     ActionMenu::new(vec![
+        menu_item_for_new_parents(&new_parents),
         menu_item_for_multirev_action(ActionKind::Rebase, &sources, current_revision),
         menu_item_for_multirev_action(ActionKind::Squash, &sources, current_revision),
     ])
+}
+
+fn menu_item_for_new_parents(parent_revisions: &[String]) -> ActionMenuItem {
+    let label = if parent_revisions.len() == 1 {
+        format!("new child of {}", short_id(&parent_revisions[0]))
+    } else {
+        format!("new merge child of {} parents", parent_revisions.len())
+    };
+    ActionMenuItem {
+        action: ActionKind::New,
+        label,
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up: FollowUp::NewParents {
+            parents: parent_revisions.to_vec(),
+        },
+    }
 }
 
 fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMenuItem {
@@ -250,7 +282,7 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         ActionKind::Abandon => FollowUp::ExactRevision {
             revision: revision.to_owned(),
         },
-        ActionKind::Split | ActionKind::Rebase | ActionKind::Squash => {
+        ActionKind::New | ActionKind::Split | ActionKind::Rebase | ActionKind::Squash => {
             let message = format!("{} {}", label, PREVIEW_REQUIRED_MARKER);
             FollowUp::StatusMessage(message)
         }
@@ -309,18 +341,25 @@ mod tests {
         let context = ExactActionContext::with_current("0000000011111111222222223333333344444444");
         let menu = build_action_menu(&context);
 
-        assert_eq!(menu.items().len(), 2);
-        assert_eq!(menu.items()[0].action(), ActionKind::Split);
-        assert_eq!(menu.items()[1].action(), ActionKind::Abandon);
+        assert_eq!(menu.items().len(), 3);
+        assert_eq!(menu.items()[0].action(), ActionKind::New);
+        assert_eq!(menu.items()[1].action(), ActionKind::Split);
+        assert_eq!(menu.items()[2].action(), ActionKind::Abandon);
         assert!(menu.items()[0].safety_tier().is_preview_first());
         assert!(menu.items()[1].safety_tier().is_preview_first());
+        assert!(menu.items()[2].safety_tier().is_preview_first());
         assert!(matches!(
             menu.items()[0].follow_up(),
+            FollowUp::NewParents { parents }
+                if parents == &vec!["0000000011111111222222223333333344444444".to_owned()]
+        ));
+        assert!(matches!(
+            menu.items()[1].follow_up(),
             FollowUp::StatusMessage(message)
                 if message.ends_with(PREVIEW_REQUIRED_MARKER)
         ));
         assert!(matches!(
-            menu.items()[1].follow_up(),
+            menu.items()[2].follow_up(),
             FollowUp::ExactRevision { revision }
                 if revision == "0000000011111111222222223333333344444444"
         ));
@@ -336,15 +375,24 @@ mod tests {
                 ]);
         let menu = build_action_menu(&context);
 
-        assert_eq!(menu.items().len(), 2);
-        assert!(menu.items()[0].label().contains("rebase"));
+        assert_eq!(menu.items().len(), 3);
+        assert!(menu.items()[0].label().contains("new merge child"));
         assert!(matches!(
             menu.items()[0].follow_up(),
+            FollowUp::NewParents { parents }
+                if parents == &vec![
+                    "aaaabbbb1111111111111111111111111111111111".to_owned(),
+                    "eeeeffff2222222222222222222222222222222222".to_owned()
+                ]
+        ));
+        assert!(menu.items()[1].label().contains("rebase"));
+        assert!(matches!(
+            menu.items()[1].follow_up(),
             FollowUp::RolePrompt(prompt)
                 if prompt.title() == "confirm role assignment"
         ));
-        if let FollowUp::RolePrompt(prompt) = menu.items()[0].follow_up() {
-            assert_eq!(menu.items()[0].action(), ActionKind::Rebase);
+        if let FollowUp::RolePrompt(prompt) = menu.items()[1].follow_up() {
+            assert_eq!(menu.items()[1].action(), ActionKind::Rebase);
             assert_eq!(prompt.options()[0].role(), "source");
             assert_eq!(
                 prompt.options()[0].value(),
@@ -405,6 +453,33 @@ mod tests {
             .map(ActionMenuItem::action)
             .collect::<Vec<_>>();
 
-        assert_eq!(actions, vec![ActionKind::Rebase, ActionKind::Squash]);
+        assert_eq!(
+            actions,
+            vec![ActionKind::New, ActionKind::Rebase, ActionKind::Squash]
+        );
+    }
+
+    #[test]
+    fn self_selection_keeps_new_parent_and_single_revision_actions() {
+        let context =
+            ExactActionContext::with_current("ccccdddd1111111111111111111111111111111111")
+                .with_sources(["ccccdddd1111111111111111111111111111111111"]);
+        let menu = build_action_menu(&context);
+
+        let actions = menu
+            .items()
+            .iter()
+            .map(ActionMenuItem::action)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            actions,
+            vec![ActionKind::New, ActionKind::Split, ActionKind::Abandon]
+        );
+        assert!(matches!(
+            menu.items()[0].follow_up(),
+            FollowUp::NewParents { parents }
+                if parents == &vec!["ccccdddd1111111111111111111111111111111111".to_owned()]
+        ));
     }
 }

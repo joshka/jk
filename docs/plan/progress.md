@@ -272,3 +272,35 @@
   the raw jj result afterward. Redo availability is not precomputed; unavailable redo is attempted
   and shown as readable jj error output.
 - Next slice: TBD after review of operation recovery flows
+
+## Packet 18: `jj new` From Selected Parents
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/graph.rs`, `src/jj.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: graph action menus now offer a preview-first `new` action. With no explicit
+  multi-selection, it previews and runs `jj new <current-change-id>`. With explicit graph
+  selections, it previews and runs `jj new <parent-1> <parent-2> ...` using current graph row order.
+  Preview/result output uses the scrollable ActionOutput overlay, lists every exact parent id, and
+  keeps `jj undo` visible after success.
+- Verification: `cargo check`; focused `cargo test new_plan`, `cargo test open_action_menu`,
+  `cargo test new_`, and `cargo test action_menu`; full `cargo test`; `jj --no-pager help new`;
+  disposable-repo single-parent and merge-parent `jj new` proof under
+  `/tmp/jk-packet18-proof.gGQtDR`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt --check`; `just md-check`
+- Validation note: `just check` was attempted after Packet 18 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused new/action-menu tests, full `cargo test`, `rustup run nightly cargo fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Manual proof: disposable repo `/tmp/jk-packet18-proof.gGQtDR` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, the single-parent proof created working copy
+  `squuswtskrqpwnpurzsxrzmkxkvnwmmo` with parent `zuupqvnuymlryzzwxxxmvkuwymopmsyy`, then
+  `jj --no-pager undo` restored the base working copy. From the same repo's cwd, the merge-parent
+  proof created working copy `wtwnpzzqkwnwultqoupwrkotxrkywmxn` with exact parents
+  `vnswyskrxrwtskxyzrptylwntzklqrmr` and `qzzyspyxnskmwxpprqzvposmxrypnqtm`, then
+  `jj --no-pager undo` restored the prior right-parent working copy.
+- Remaining risk: parent identity is exact only because graph rows carry template-derived full
+  change ids; the flow intentionally does not wrap these positional `jj new` parent arguments in a
+  stronger revset because Packet 18 requested the exact `jj new <change-id>` shape. Explicit
+  multi-select ordering is now graph-row order rather than toggle order, which is tested but still
+  depends on the rendered graph and metadata streams staying paired.
+- Next slice: TBD after review of exact-parent mutation flows

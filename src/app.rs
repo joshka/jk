@@ -22,7 +22,7 @@ use crate::command::{
 };
 use crate::copy::CopyOption;
 use crate::jj::{
-    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjGitPush, JjGitPushTarget,
+    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjGitPush, JjGitPushTarget, JjNewPlan,
     JjOperationRecovery, JjOperationRecoveryKind, JjRebasePlan, LogViewMode, ViewSpec, git_fetch,
     git_remotes, new_trunk, resolve_exact_change_id,
 };
@@ -31,6 +31,8 @@ use crate::tui::{self, Overlay, StatusHints};
 use crate::view_state::ViewState;
 
 #[cfg(test)]
+type NewRun = fn(&JjNewPlan) -> Result<String>;
+#[cfg(test)]
 type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
 #[cfg(test)]
 type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
@@ -38,6 +40,8 @@ type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 type AbandonRun = fn(&JjAbandonPlan) -> Result<String>;
 #[cfg(test)]
 type OperationRecoveryRun = fn(&JjOperationRecovery) -> Result<String>;
+#[cfg(test)]
+type ResolveRevision = fn(&str) -> Result<String>;
 #[cfg(test)]
 type RefreshView = fn(&mut ViewState) -> Result<()>;
 #[cfg(test)]
@@ -59,6 +63,8 @@ struct App {
     search: Option<SearchQuery>,
     should_quit: bool,
     #[cfg(test)]
+    new_run: NewRun,
+    #[cfg(test)]
     rebase_run: RebaseRun,
     #[cfg(test)]
     abandon_preview_load: AbandonPreviewLoad,
@@ -66,6 +72,8 @@ struct App {
     abandon_run: AbandonRun,
     #[cfg(test)]
     operation_recovery_run: OperationRecoveryRun,
+    #[cfg(test)]
+    resolve_revision: ResolveRevision,
     #[cfg(test)]
     refresh_view: RefreshView,
     #[cfg(test)]
@@ -92,6 +100,10 @@ enum InteractionMode {
         action: ActionKind,
         prompt: RolePrompt,
         selected: usize,
+    },
+    NewPreview {
+        new_change: JjNewPlan,
+        output: ActionOutput,
     },
     RebasePreview {
         rebase: JjRebasePlan,
@@ -143,6 +155,11 @@ const APP_BINDINGS: &[Binding] = &[
 ];
 
 #[cfg(test)]
+fn default_new_run(new_change: &JjNewPlan) -> Result<String> {
+    new_change.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
 fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {
     rebase.run().map(|output| output.message().to_owned())
 }
@@ -160,6 +177,11 @@ fn default_abandon_run(abandon: &JjAbandonPlan) -> Result<String> {
 #[cfg(test)]
 fn default_operation_recovery_run(recovery: &JjOperationRecovery) -> Result<String> {
     recovery.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_resolve_revision(revset: &str) -> Result<String> {
+    resolve_exact_change_id(revset)
 }
 
 #[cfg(test)]
@@ -195,6 +217,8 @@ impl App {
             search: None,
             should_quit: false,
             #[cfg(test)]
+            new_run: default_new_run,
+            #[cfg(test)]
             rebase_run: default_rebase_run,
             #[cfg(test)]
             abandon_preview_load: default_abandon_preview_load,
@@ -203,10 +227,22 @@ impl App {
             #[cfg(test)]
             operation_recovery_run: default_operation_recovery_run,
             #[cfg(test)]
+            resolve_revision: default_resolve_revision,
+            #[cfg(test)]
             refresh_view: default_refresh_view,
             #[cfg(test)]
             reveal_graph_change: default_reveal_graph_change,
         })
+    }
+
+    #[cfg(test)]
+    fn run_new_change(&self, new_change: &JjNewPlan) -> Result<String> {
+        (self.new_run)(new_change)
+    }
+
+    #[cfg(not(test))]
+    fn run_new_change(&self, new_change: &JjNewPlan) -> Result<String> {
+        new_change.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -250,6 +286,16 @@ impl App {
     }
 
     #[cfg(test)]
+    fn resolve_revision(&self, revset: &str) -> Result<String> {
+        (self.resolve_revision)(revset)
+    }
+
+    #[cfg(not(test))]
+    fn resolve_revision(&self, revset: &str) -> Result<String> {
+        resolve_exact_change_id(revset)
+    }
+
+    #[cfg(test)]
     fn refresh_view_state(&mut self) -> Result<()> {
         (self.refresh_view)(&mut self.view)
     }
@@ -260,20 +306,12 @@ impl App {
     }
 
     #[cfg(test)]
-    fn reveal_graph_change_for_rebase(
-        &mut self,
-        change_id: &str,
-        fallback_mode: LogViewMode,
-    ) -> Result<bool> {
+    fn reveal_graph_change(&mut self, change_id: &str, fallback_mode: LogViewMode) -> Result<bool> {
         (self.reveal_graph_change)(&mut self.view, change_id, fallback_mode)
     }
 
     #[cfg(not(test))]
-    fn reveal_graph_change_for_rebase(
-        &mut self,
-        change_id: &str,
-        fallback_mode: LogViewMode,
-    ) -> Result<bool> {
+    fn reveal_graph_change(&mut self, change_id: &str, fallback_mode: LogViewMode) -> Result<bool> {
         self.view.reveal_graph_change(change_id, fallback_mode)
     }
 
@@ -555,7 +593,8 @@ impl App {
                                         ActionKind::Abandon => {
                                             self.open_abandon_preview(JjAbandonPlan::new(revision));
                                         }
-                                        ActionKind::Split
+                                        ActionKind::New
+                                        | ActionKind::Split
                                         | ActionKind::Rebase
                                         | ActionKind::Squash => {
                                             self.status = StatusLine::with_message(
@@ -564,6 +603,11 @@ impl App {
                                             );
                                         }
                                     }
+                                }
+                                FollowUp::NewParents { parents } => {
+                                    let parents = parents.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    self.open_new_preview(JjNewPlan::new(parents));
                                 }
                                 FollowUp::RolePrompt(prompt) => {
                                     self.mode = InteractionMode::RolePrompt {
@@ -620,13 +664,44 @@ impl App {
                                     "squash preview not yet implemented",
                                 );
                             }
-                            _ => {
+                            ActionKind::New | ActionKind::Split | ActionKind::Abandon => {
                                 self.status =
                                     StatusLine::with_message(&self.view, next_status.to_owned());
                             }
                         }
                     }
                     _ => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::NewPreview { new_change, output } => {
+                let (new_change, status_context, completed) = {
+                    (
+                        new_change.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                "new change cancelled".to_owned(),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_new_change(new_change, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
                 }
                 Ok(true)
             }
@@ -956,6 +1031,44 @@ impl App {
         };
     }
 
+    fn open_new_preview(&mut self, new_change: JjNewPlan) {
+        let parent_labels = new_change
+            .parents()
+            .iter()
+            .map(|parent| short_id(parent))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let status_context = Some(format!(
+            "new from {} parent(s) from {} | parent(s): {}",
+            new_change.parents().len(),
+            self.view.spec().app_label(),
+            parent_labels
+        ));
+
+        match new_change.run_preview() {
+            Ok(output) => {
+                let command_label = new_change.command_label();
+                self.mode = InteractionMode::NewPreview {
+                    new_change,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = new_change.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::NewPreview {
+                    new_change,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
     fn open_rebase_preview(&mut self, rebase: JjRebasePlan) {
         let status_context = Some(format!(
             "rebase from {} source(s) into {} from {}",
@@ -1031,6 +1144,86 @@ impl App {
                 };
             }
         }
+    }
+
+    fn confirm_new_change(
+        &mut self,
+        new_change: JjNewPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = new_change.command_label();
+        let result_message = match self.run_new_change(&new_change) {
+            Ok(output) => {
+                let new_change_id = match self.resolve_revision("@") {
+                    Ok(change_id) => change_id,
+                    Err(error) => {
+                        let message =
+                            format!("{} | resolve @ failed: {error} | jj undo", output.trim());
+                        self.status = StatusLine::error(&self.view, error.to_string());
+                        self.mode = InteractionMode::NewPreview {
+                            new_change,
+                            output: ActionOutput::finished(command_label, message, status_context),
+                        };
+                        return;
+                    }
+                };
+
+                match self.refresh_view_state() {
+                    Ok(()) => {
+                        self.view.clamp(viewport_height);
+                        let mut reveal_error = None;
+                        let revealed_in_recent =
+                            match self.reveal_graph_change(&new_change_id, LogViewMode::Recent) {
+                                Ok(switched_modes) => {
+                                    self.view.clamp(viewport_height);
+                                    Some(switched_modes)
+                                }
+                                Err(error) => {
+                                    self.status = StatusLine::error(&self.view, error.to_string());
+                                    reveal_error = Some(format!(
+                                        "{} | reveal failed: {} | jj undo",
+                                        output.trim(),
+                                        error
+                                    ));
+                                    None
+                                }
+                            };
+
+                        let message = match revealed_in_recent {
+                            Some(switched_modes) => {
+                                if switched_modes {
+                                    format!("{} | showing recent work | jj undo", output.trim())
+                                } else {
+                                    format!("{} | jj undo", output.trim())
+                                }
+                            }
+                            None => match reveal_error.as_deref() {
+                                Some(message) => message.to_owned(),
+                                None => format!("{} | jj undo", output.trim()),
+                            },
+                        };
+                        if reveal_error.is_none() {
+                            self.status = StatusLine::with_message(&self.view, message.as_str());
+                        }
+                        message
+                    }
+                    Err(error) => {
+                        self.status = StatusLine::error(&self.view, error.to_string());
+                        format!("{} | refresh failed: {error} | jj undo", output.trim())
+                    }
+                }
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::NewPreview {
+            new_change,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
     }
 
     fn confirm_push(
@@ -1244,23 +1437,23 @@ impl App {
                     self.view.clamp(viewport_height);
                     let mut reveal_error = None;
                     let revealed_in_recent = match primary_source.as_deref() {
-                        Some(change_id) => match self
-                            .reveal_graph_change_for_rebase(change_id, LogViewMode::Recent)
-                        {
-                            Ok(switched_modes) => {
-                                self.view.clamp(viewport_height);
-                                Some(switched_modes)
+                        Some(change_id) => {
+                            match self.reveal_graph_change(change_id, LogViewMode::Recent) {
+                                Ok(switched_modes) => {
+                                    self.view.clamp(viewport_height);
+                                    Some(switched_modes)
+                                }
+                                Err(error) => {
+                                    self.status = StatusLine::error(&self.view, error.to_string());
+                                    reveal_error = Some(format!(
+                                        "{} | reveal failed: {} | jj undo",
+                                        output.trim(),
+                                        error
+                                    ));
+                                    None
+                                }
                             }
-                            Err(error) => {
-                                self.status = StatusLine::error(&self.view, error.to_string());
-                                reveal_error = Some(format!(
-                                    "{} | reveal failed: {} | jj undo",
-                                    output.trim(),
-                                    error
-                                ));
-                                None
-                            }
-                        },
+                        }
                         None => None,
                     };
 
@@ -1320,14 +1513,14 @@ impl App {
     }
 
     fn run_new_trunk(&mut self, viewport_height: u16) {
-        if let Err(error) = resolve_exact_change_id("trunk()") {
+        if let Err(error) = self.resolve_revision("trunk()") {
             self.status = StatusLine::error(&self.view, error.to_string());
             return;
         }
 
         match new_trunk() {
             Ok(_) => {
-                let new_change_id = match resolve_exact_change_id("@") {
+                let new_change_id = match self.resolve_revision("@") {
                     Ok(change_id) => change_id,
                     Err(error) => {
                         self.status = StatusLine::error(&self.view, error.to_string());
@@ -1423,6 +1616,7 @@ impl App {
                 prompt,
                 selected: *selected,
             },
+            InteractionMode::NewPreview { output, .. } => Overlay::NewPreview { output },
             InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
             InteractionMode::AbandonPreview { output, .. } => Overlay::AbandonPreview { output },
             InteractionMode::AbandonConfirm { input, output, .. } => {
@@ -1756,6 +1950,14 @@ mod tests {
     static ABANDON_DRIFT_RECHECK_CALLS: AtomicUsize = AtomicUsize::new(0);
     static ABANDON_FAILED_RECHECK_CALLS: AtomicUsize = AtomicUsize::new(0);
 
+    fn mock_new_success(new_change: &JjNewPlan) -> Result<String> {
+        Ok(format!("new parents: {}", new_change.parents().join(",")))
+    }
+
+    fn mock_new_failure(_: &JjNewPlan) -> Result<String> {
+        Err(eyre!("jj new failed: first line\nsecond line"))
+    }
+
     fn mock_rebase_success(_: &JjRebasePlan) -> Result<String> {
         Ok("rebased".to_owned())
     }
@@ -1817,6 +2019,11 @@ mod tests {
         ))
     }
 
+    fn mock_resolve_current_change_id(revset: &str) -> Result<String> {
+        assert_eq!(revset, "@");
+        Ok("new-working-copy".to_owned())
+    }
+
     fn panic_abandon_run(_: &JjAbandonPlan) -> Result<String> {
         panic!("abandon should not run without exact confirmation")
     }
@@ -1835,6 +2042,16 @@ mod tests {
         ))
     }
 
+    fn mock_reveal_new_change_in_recent(
+        _view: &mut ViewState,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        assert_eq!(change_id, "new-working-copy");
+        assert_eq!(fallback_mode, LogViewMode::Recent);
+        Ok(true)
+    }
+
     fn test_app(view: ViewState) -> App {
         App {
             status: StatusLine::ready(&view),
@@ -1846,6 +2063,8 @@ mod tests {
             search: None,
             should_quit: false,
             #[cfg(test)]
+            new_run: mock_new_success,
+            #[cfg(test)]
             rebase_run: mock_rebase_success,
             #[cfg(test)]
             abandon_preview_load: mock_empty_abandon_preview,
@@ -1853,6 +2072,8 @@ mod tests {
             abandon_run: mock_abandon_success,
             #[cfg(test)]
             operation_recovery_run: mock_operation_recovery_success,
+            #[cfg(test)]
+            resolve_revision: mock_resolve_current_change_id,
             #[cfg(test)]
             refresh_view: mock_refresh_ok,
             #[cfg(test)]
@@ -2110,6 +2331,123 @@ mod tests {
     }
 
     #[test]
+    fn new_action_menu_enter_opens_preview_with_exact_parents() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::with_current("current")
+                    .with_sources(["parent-a", "parent-b"]),
+            ),
+            selected: 0,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let (parents, command_label, body) = match &app.mode {
+            InteractionMode::NewPreview { new_change, output } => (
+                new_change.parents().to_vec(),
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected new preview mode"),
+        };
+        assert_eq!(parents, ["parent-a", "parent-b"]);
+        assert_eq!(command_label, "jj new parent-a parent-b");
+        assert!(body.contains("parent: parent-a"));
+        assert!(body.contains("parent: parent-b"));
+        assert!(body.contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn new_preview_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::NewPreview {
+            new_change: JjNewPlan::new(vec!["parent-a".to_owned()]),
+            output: ActionOutput::pending(
+                "jj new parent-a".to_owned(),
+                "preview only".to_owned(),
+                Some("new preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "new change cancelled");
+    }
+
+    #[test]
+    fn new_confirm_success_refreshes_and_reveals_working_copy() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        ])));
+        app.reveal_graph_change = mock_reveal_new_change_in_recent;
+        app.mode = InteractionMode::NewPreview {
+            new_change: JjNewPlan::new(vec!["parent-a".to_owned(), "parent-b".to_owned()]),
+            output: ActionOutput::pending(
+                "jj new parent-a parent-b".to_owned(),
+                "preview only".to_owned(),
+                Some("new preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::NewPreview { output, .. } => output,
+            _ => panic!("expected new result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(output.command_label(), "jj new parent-a parent-b");
+        assert!(output.completed());
+        assert!(body.contains("new parents: parent-a,parent-b | showing recent work | jj undo"));
+        assert_eq!(
+            app.status.message(),
+            "new parents: parent-a,parent-b | showing recent work | jj undo"
+        );
+    }
+
+    #[test]
+    fn new_failure_keeps_full_error_output_readable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        ])));
+        app.new_run = mock_new_failure;
+        app.mode = InteractionMode::NewPreview {
+            new_change: JjNewPlan::new(vec!["parent-a".to_owned()]),
+            output: ActionOutput::pending(
+                "jj new parent-a".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::NewPreview { output, .. } => output,
+            _ => panic!("expected new result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(output.command_label(), "jj new parent-a");
+        assert!(output.completed());
+        assert!(body.contains("jj new failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj new failed: first line\nsecond line"
+        );
+    }
+
+    #[test]
     fn rebase_preview_entering_cancel_restores_normal_mode() {
         let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
             crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
@@ -2256,7 +2594,7 @@ mod tests {
             menu: crate::action_menu::build_action_menu(
                 &crate::action_menu::ExactActionContext::with_current("change-a"),
             ),
-            selected: 1,
+            selected: 2,
         };
 
         app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)

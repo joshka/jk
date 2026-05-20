@@ -79,6 +79,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             frame.render_widget(push_remote_prompt(remotes, selected), area);
         }
+        Overlay::NewPreview { output } => {
+            let title = action_output_title("New change", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::RebasePreview { output } => {
             let title = action_output_title("Rebase", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -144,6 +150,9 @@ pub enum Overlay<'a> {
         selected: usize,
     },
     PushPreview {
+        output: &'a ActionOutput,
+    },
+    NewPreview {
         output: &'a ActionOutput,
     },
     OperationRecoveryPreview {

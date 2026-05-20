@@ -346,14 +346,9 @@ impl GraphView {
                 "action menu requires current row to have an exact revision id".to_owned(),
             );
         };
-        let sources = self
-            .selected_change_ids
-            .iter()
-            .filter(|selected| selected.as_str() != current_revision)
-            .cloned()
-            .collect::<Vec<_>>();
+        let selected_revisions = self.selected_revisions_in_graph_order();
         let menu = build_action_menu(
-            &ExactActionContext::with_current(current_revision).with_sources(sources),
+            &ExactActionContext::with_current(current_revision).with_sources(selected_revisions),
         );
         if menu.is_empty() {
             ViewEffect::StatusMessage("no preview actions available for selection".to_owned())
@@ -376,6 +371,19 @@ impl GraphView {
         self.entries
             .get(self.selection.index())
             .and_then(LogItem::action_id)
+    }
+
+    fn selected_revisions_in_graph_order(&self) -> Vec<String> {
+        self.entries
+            .iter()
+            .filter_map(LogItem::action_id)
+            .filter(|action_id| {
+                self.selected_change_ids
+                    .iter()
+                    .any(|selected| selected == action_id)
+            })
+            .map(str::to_owned)
+            .collect()
     }
 
     fn reveal_change_id_with_loader(
@@ -860,6 +868,7 @@ mod tests {
         assert_eq!(
             labels,
             vec![
+                "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
                 "abandon selected revision aaaaaaaa"
             ]
@@ -893,10 +902,44 @@ mod tests {
         assert_eq!(
             labels,
             vec![
+                "new child of aaaaaaaa",
                 "rebase 1 revision into bbbbbbbb",
                 "squash 1 revision into bbbbbbbb"
             ]
         );
+    }
+
+    #[test]
+    fn open_action_menu_orders_new_parents_by_graph_rows() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("aaaaaaaa"), None),
+            log_item("second", Some("bbbbbbbb"), None),
+            log_item("third", Some("cccccccc"), None),
+        ]);
+
+        view.select_last();
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected cccccccc".to_owned())
+        );
+        view.select_first();
+        assert_eq!(
+            view.execute(ViewCommand::ToggleSelect, command_context()),
+            ViewEffect::StatusMessage("selected aaaaaaaa".to_owned())
+        );
+        view.select_next();
+        let effect = view.execute(ViewCommand::OpenActionMenu, command_context());
+        let action_menu = if let ViewEffect::OpenActionMenu(action_menu) = effect {
+            action_menu
+        } else {
+            panic!("expected action menu");
+        };
+
+        assert!(matches!(
+            action_menu.items()[0].follow_up(),
+            crate::action_menu::FollowUp::NewParents { parents }
+                if parents == &vec!["aaaaaaaa".to_owned(), "cccccccc".to_owned()]
+        ));
     }
 
     #[test]
@@ -925,6 +968,7 @@ mod tests {
         assert_eq!(
             labels,
             vec![
+                "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
                 "abandon selected revision aaaaaaaa"
             ]

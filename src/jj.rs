@@ -286,6 +286,77 @@ pub struct JjRebasePlan {
     destination: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjNewPlan {
+    parents: Vec<String>,
+}
+
+impl JjNewPlan {
+    pub fn new(parents: Vec<String>) -> Self {
+        Self { parents }.normalize()
+    }
+
+    pub fn parents(&self) -> &[String] {
+        &self.parents
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self
+            .command_argv()
+            .iter()
+            .map(|arg| arg.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        let mut argv = vec!["new".to_owned()];
+        argv.extend(self.parents.iter().cloned());
+        argv
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(),
+            &self.command_label(),
+            "created new change",
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        let parents = self
+            .parents
+            .iter()
+            .map(|parent| format!("parent: {parent}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let graph_effect = if self.parents.len() == 1 {
+            "graph effect: creates a new working-copy change from the selected parent"
+        } else {
+            "graph effect: creates a new working-copy merge change from the selected parents"
+        };
+
+        format!(
+            "command: {}\n\n{}\n\n{}\n\nconfirmation: press Enter to run jj new\nundo path: jj undo",
+            self.command_label(),
+            parents,
+            graph_effect,
+        )
+    }
+
+    fn normalize(mut self) -> Self {
+        self.parents.retain(|parent| !parent.trim().is_empty());
+        self
+    }
+}
+
 impl JjRebasePlan {
     pub fn new(sources: Vec<String>, destination: impl Into<String>) -> Self {
         Self {
@@ -1856,6 +1927,38 @@ mod tests {
         );
         assert_eq!(spec.label(), "jj bookmark list --revision main");
         assert_eq!(spec.app_label(), "jk bookmarks --revision main");
+    }
+
+    #[test]
+    fn new_plan_uses_positional_parent_revsets() {
+        let plan = JjNewPlan::new(vec!["parent-a".to_owned()]);
+
+        assert_eq!(plan.command_argv(), vec!["new", "parent-a"]);
+        assert_eq!(plan.command_label(), "jj new parent-a");
+        assert!(plan.preview_summary().contains("parent: parent-a"));
+        assert!(plan.preview_summary().contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn new_plan_preserves_multiple_parent_order() {
+        let plan = JjNewPlan::new(vec![
+            "parent-a".to_owned(),
+            "parent-b".to_owned(),
+            "parent-c".to_owned(),
+        ]);
+
+        assert_eq!(
+            plan.command_argv(),
+            vec!["new", "parent-a", "parent-b", "parent-c"]
+        );
+        assert_eq!(plan.command_label(), "jj new parent-a parent-b parent-c");
+        assert_eq!(
+            plan.preview_summary()
+                .lines()
+                .filter(|line| line.starts_with("parent: "))
+                .collect::<Vec<_>>(),
+            vec!["parent: parent-a", "parent: parent-b", "parent: parent-c"]
+        );
     }
 
     #[test]

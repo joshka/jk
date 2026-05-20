@@ -5,6 +5,68 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 18 `jj new` from parents)
+
+- Slice / task: Implement Packet 18 `jj new` from the selected graph parent or selected multiple
+  graph parents.
+
+- Worker / model: `019e444b-2fc7-7cc1-9bf8-da3da5af5d27` / `gpt-5` (Codex).
+
+- Scope given: preserve unrelated edits, stay primarily within graph, action-menu, app, jj command,
+  TUI, command/help if needed, tests, and plan/process docs; use exact selected graph parent ids;
+  avoid description prompts, bookmark creation, rebase/squash expansion, insert-before/after, or a
+  revset editor; prove the behavior in a disposable `/tmp` jj repo.
+
+- Observable outcome: the graph action menu now carries a preview-first `new` action. A single
+  current exact graph row previews `jj new <change-id>`. Explicit graph multi-select previews
+  `jj new <parent-1> <parent-2> ...` in graph row order. The preview lists all exact parent ids,
+  confirmation runs the positional command shape, successful execution refreshes and reveals the new
+  `@` change with recent-mode fallback, and failures remain readable in a completed ActionOutput
+  overlay.
+
+- Manual proof outcome: disposable repo `/tmp/jk-packet18-proof.gGQtDR` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, the single-parent proof created working copy
+  `squuswtskrqpwnpurzsxrzmkxkvnwmmo` with exact parent `zuupqvnuymlryzzwxxxmvkuwymopmsyy` and was
+  followed by `jj --no-pager undo`. From the same repo's cwd, the merge-parent proof created working
+  copy `wtwnpzzqkwnwultqoupwrkotxrkywmxn` with exact parents `vnswyskrxrwtskxyzrptylwntzklqrmr` and
+  `qzzyspyxnskmwxpprqzvposmxrypnqtm` and was followed by `jj --no-pager undo`.
+
+- Evidence basis:
+  - Thread: `019e444b-2fc7-7cc1-9bf8-da3da5af5d27`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `jj --no-pager status`
+    - `cargo check`
+    - `cargo test new_plan`
+    - `cargo test open_action_menu`
+    - `cargo test new_`
+    - `cargo test action_menu`
+    - `cargo test`
+    - `jj --no-pager help new`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-check`
+    - `just check`
+  - Manual proof commands, all with cwd `/tmp/jk-packet18-proof.gGQtDR`:
+    - `jj --no-pager git init`
+    - `printf 'base\n' > file.txt`
+    - `jj --no-pager file track file.txt`
+    - `jj --no-pager describe -m 'packet 18 base parent'`
+    - `jj --no-pager log -r @ --no-graph -T 'change_id ++ "\n"'`
+    - `jj --no-pager new zuupqvnuymlryzzwxxxmvkuwymopmsyy`
+    - `jj --no-pager log -r @ --no-graph -T 'change_id ++ " " ++ parents.map(|p| p.change_id()).join(" ") ++ "\n"'`
+    - `jj --no-pager undo`
+    - `jj --no-pager new zuupqvnuymlryzzwxxxmvkuwymopmsyy`
+    - `jj --no-pager describe -m 'packet 18 left parent'`
+    - `jj --no-pager new zuupqvnuymlryzzwxxxmvkuwymopmsyy`
+    - `jj --no-pager describe -m 'packet 18 right parent'`
+    - `jj --no-pager new vnswyskrxrwtskxyzrptylwntzklqrmr qzzyspyxnskmwxpprqzvposmxrypnqtm`
+    - `jj --no-pager undo`
+  - Validation note: `just check` failed immediately at `cargo +nightly fmt` with
+    `no such command: +nightly`; the equivalent checks listed above passed separately.
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/graph.rs`, `src/jj.rs`, `src/tui.rs`,
+    `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 17 operation undo/redo)
 
 - Slice / task: Implement Packet 17 undo/redo access from the operation log.
