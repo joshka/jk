@@ -80,8 +80,13 @@ Keep modules aligned with user-visible concepts:
   action means; `action_output.rs` decides how output panes move.
 - `command.rs` owns binding metadata and the command/effect vocabulary shared between app-level
   dispatch and individual views.
-- `jj.rs` owns `jj` command construction, view specs, diff-format arguments, and conversion from
-  rendered CLI output into the minimal structures `jk` needs.
+- `jj_actions.rs` owns preview-first `jj` action and mutation plans, including argv construction,
+  labels, preview summaries, exact revset/fileset quoting, direct run methods, and fallback result
+  wording for user-confirmed mutation flows.
+- `jj.rs` owns view-spec command construction, direct process helpers, diff-format arguments,
+  rendered row loading, and conversion from rendered CLI output into the minimal structures `jk`
+  needs. It re-exports action-plan types for compatibility, but action-plan behavior should stay in
+  `jj_actions.rs`.
 - `graph.rs` owns the default/log graph view, graph-row selection, graph search, and graph-to-detail
   navigation.
 - `show.rs` and `diff.rs` own their view behavior and should stay distinct even when they share
@@ -110,8 +115,10 @@ Every active app screen should have one explicit owner for each part of its cont
   overlay chrome without deciding app behavior.
 - Status projection: `app_status.rs` constructs durable ready/error status lines from the active
   view; `app_screen.rs` supplies transient prompt status text while a mode is active.
-- Command execution: `jj.rs` owns command construction and execution wrappers. `app.rs` owns when a
-  command is run, how results refresh or reveal views, and what status/result screen follows.
+- Command execution: `jj_actions.rs` owns action-plan command contracts for confirmed mutation
+  flows; `jj.rs` owns the shared `jj` process helpers and view-spec command construction. `app.rs`
+  owns when a command is run, how results refresh or reveal views, and what status/result screen
+  follows.
 - View behavior: view modules execute `ViewCommand` into `ViewEffect`; `app.rs` applies global
   effects such as opening screens, copying, pushing views, refreshing, or changing search state.
 
@@ -171,8 +178,9 @@ style, or modal layout unless the app design genuinely changes.
 
 ## Terminal And Process Boundaries
 
-Terminal lifecycle belongs in `app.rs` and Ratatui setup. Command execution belongs in `jj.rs`.
-Clipboard integration belongs in `clipboard.rs`.
+Terminal lifecycle belongs in `app.rs` and Ratatui setup. View and process command execution helpers
+belong in `jj.rs`; preview-first mutation command plans belong in `jj_actions.rs`. Clipboard
+integration belongs in `clipboard.rs`.
 
 Make side effects visible:
 

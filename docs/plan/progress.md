@@ -943,3 +943,32 @@
   be reviewed without simultaneous command-plan churn.
 - Next slice: Interruption Packet A1: Extract `jj` Action Plans, unless Packet A review requests
   repair of the existing app screen/status/action-output extraction first.
+
+## Interruption Packet A1: Extract `jj` Action Plans
+
+- Files changed: `src/jj_actions.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: preview-first action and mutation plans moved from `src/jj.rs` into `src/jj_actions.rs`.
+  The new owner holds operation recovery/target actions, git push, new, describe, commit,
+  edit/next/prev, restore, revert, bookmark mutations, rebase, squash, absorb, abandon, exact
+  change-id revset quoting, exact bookmark patterns, root-file fileset quoting, and abandon preview
+  text. `src/jj.rs` keeps `ViewSpec`, rendered row models, metadata loaders, parsers, direct process
+  helpers, and compatibility re-exports for existing `crate::jj::...` imports.
+- Product boundary: this is a behavior-preserving extraction. Command argv, command labels, preview
+  summaries, fallback messages, exact quoting helpers, and abandon preview behavior were moved with
+  their tests rather than redesigned. `docs/plan/fragility-register.md` is unchanged because no
+  parser, rendered-output assumption, or command semantic contract changed.
+- Verification: focused `cargo test jj_actions -- --test-threads=1`; full `cargo test`;
+  `cargo check`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; attempted
+  `cargo clippy -- -D warnings`; `just md-fmt`; `just md-check`; attempted `just check`.
+- Validation note: `cargo check` still reports the pre-existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy remains blocked
+  by those warnings plus pre-existing `collapsible_if` findings in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`. `just check` remains blocked by the known local
+  wrapper issue: `cargo +nightly fmt` exits with `no such command: +nightly`; the direct equivalent
+  `rustup run nightly cargo fmt --check`, full tests, cargo check, and Markdown checks passed.
+- Remaining risk: `src/jj.rs` still owns rendered row loading, metadata pairing, and parser tests
+  until Packet A2. The compatibility re-exports keep call-site churn low, but future work should
+  import directly from `jj_actions.rs` once the module boundary is established.
+- Next slice: Interruption Packet A2: Extract `jj` Rendered Row Loading, after Packet A1 review
+  confirms command-plan behavior was preserved.

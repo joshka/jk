@@ -5,6 +5,50 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Interruption Packet A1 jj action-plan extraction)
+
+- Slice / task: behavior-preserving Rust extraction in jj change `Extract jj action plans`.
+- User request: move preview-first `jj` action and mutation command plans out of `src/jj.rs` into a
+  coherent owner module without changing command semantics, parser behavior, `ViewSpec`, or
+  user-visible commands.
+- Observable outcome: `src/jj_actions.rs` now owns action-plan types and tests for operation
+  recovery/target actions, git push, new, describe, commit, edit/next/prev, restore, revert,
+  bookmark mutations, rebase, squash, absorb, abandon, exact revset/fileset quoting, exact bookmark
+  patterns, and abandon preview text. `src/jj.rs` retains view specs, rendered row item models,
+  metadata loading, row grouping, parsers, direct process helpers, and compatibility re-exports for
+  existing `crate::jj::...` imports.
+- Architecture outcome: `docs/agent/architecture.md` now names `jj_actions.rs` as the owner for
+  preview-first mutation command contracts while keeping `jj.rs` responsible for process helpers,
+  view-spec command construction, and rendered-output conversion.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test jj_actions -- --test-threads=1`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - attempted `cargo clippy -- -D warnings`
+  - `just md-fmt`
+  - `just md-check`
+  - attempted `just check`
+- Warning / blocker status: `cargo check` passes with the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy remains blocked
+  by those warnings plus pre-existing `collapsible_if` findings in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`; no warning-cleanup sweep was performed. `just check`
+  remains blocked by the known local wrapper issue where `cargo +nightly fmt` exits with
+  `no such command: +nightly`.
+- Docs / fragility: `docs/plan/fragility-register.md` unchanged because this extraction moved
+  existing command contracts and tests without changing parser, rendered-output, or command semantic
+  assumptions.
+- Evidence basis:
+  - Thread: `019e45bd-abf2-7e92-a7d4-3dffc70518c1`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `jj --no-pager status`, `cargo check`, `cargo test jj_actions -- --test-threads=1`,
+    `cargo test`, `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`,
+    `cargo clippy -- -D warnings`, `just md-fmt`, `just md-check`, `just check`,
+    `printenv CODEX_THREAD_ID`, `date +%F`
+  - Files: `src/jj_actions.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Interruption Packet A follow-up module coherence audit)
 
 - Slice / task: docs-only module-coherence audit in jj change `Audit module coherence`.

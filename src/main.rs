@@ -12,6 +12,7 @@ mod file_list;
 mod file_show;
 mod graph;
 mod jj;
+mod jj_actions;
 mod operation_detail;
 mod operation_log;
 mod rendered_jj;
