@@ -64,6 +64,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
     Binding::new(KeyPattern::char('W'), Command::PromptLogRevset),
     Binding::new(KeyPattern::char('S'), Command::OpenStatus),
+    Binding::new(KeyPattern::char('B'), Command::OpenBookmarks),
     Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
     Binding::new(KeyPattern::char('y'), Command::Copy),
@@ -166,6 +167,10 @@ impl App {
             }
             Command::OpenStatus => {
                 self.open_status()?;
+                Ok(true)
+            }
+            Command::OpenBookmarks => {
+                self.open_bookmarks()?;
                 Ok(true)
             }
             Command::OpenOperationLog => {
@@ -534,9 +539,11 @@ impl App {
         let spec = match command {
             JjCommand::Show => ViewSpec::show(revset, self.diff_format),
             JjCommand::Diff => ViewSpec::diff(revset, self.diff_format),
-            JjCommand::Default | JjCommand::Log | JjCommand::Status | JjCommand::OperationLog => {
-                return Ok(());
-            }
+            JjCommand::Default
+            | JjCommand::Log
+            | JjCommand::Status
+            | JjCommand::Bookmarks
+            | JjCommand::OperationLog => return Ok(()),
         };
         self.push_view(spec)
     }
@@ -555,6 +562,14 @@ impl App {
         }
 
         self.push_view(ViewSpec::new(JjCommand::OperationLog, Vec::new()))
+    }
+
+    fn open_bookmarks(&mut self) -> Result<()> {
+        if matches!(self.view.command(), JjCommand::Bookmarks) {
+            return Ok(());
+        }
+
+        self.push_view(ViewSpec::new(JjCommand::Bookmarks, Vec::new()))
     }
 
     fn push_view(&mut self, spec: ViewSpec) -> Result<()> {
@@ -635,9 +650,10 @@ fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
         "show" => Ok(ViewSpec::new(JjCommand::Show, rest.to_vec())),
         "diff" => Ok(ViewSpec::new(JjCommand::Diff, rest.to_vec())),
         "status" => Ok(ViewSpec::new(JjCommand::Status, rest.to_vec())),
+        "bookmarks" => Ok(ViewSpec::new(JjCommand::Bookmarks, rest.to_vec())),
         "operation-log" => Ok(ViewSpec::new(JjCommand::OperationLog, rest.to_vec())),
         unknown => Err(eyre!(
-            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, operation-log"
+            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, bookmarks, operation-log"
         )),
     }
 }
@@ -716,6 +732,7 @@ fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
 
 fn item_count_message(view: &ViewState, item_count: usize) -> String {
     match view.command() {
+        JjCommand::Bookmarks => format!("{item_count} bookmarks"),
         JjCommand::OperationLog => format!("{item_count} operations"),
         JjCommand::Default | JjCommand::Log => {
             graph_status_message(item_count, view.graph_mode_label())
@@ -784,8 +801,16 @@ mod tests {
     }
 
     #[test]
+    fn parses_bookmarks_startup_view() {
+        let spec = initial_view(vec!["bookmarks".into()]).unwrap();
+
+        assert_eq!(spec.command(), JjCommand::Bookmarks);
+        assert!(spec.args().is_empty());
+    }
+
+    #[test]
     fn rejects_unknown_startup_command() {
-        assert!(initial_view(vec!["bookmarks".into()]).is_err());
+        assert!(initial_view(vec!["bookmark".into()]).is_err());
     }
 
     #[test]

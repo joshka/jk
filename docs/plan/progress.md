@@ -91,3 +91,18 @@
   and exact operation ids currently depend on pairing rendered `operation log` rows with a separate
   `self.id()` template stream in the same row order under `--at-op=@`
 - Next slice: Slice 8: Bookmark List First Pass
+
+## Slice 8: Bookmark List First Pass
+
+- Files changed: `src/main.rs`, `src/jj.rs`, `src/command.rs`, `src/view_state.rs`, `src/app.rs`,
+  `src/tui.rs`, `src/bookmarks.rs`, `docs/plan/implementation-slices.md`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`
+- Verification: focused `cargo test bookmarks`, focused
+  `cargo test bookmark_list_command_uses_bookmark_words_and_labels`,
+  `cargo test parses_bookmark_metadata_lines`, `cargo test pairs_bookmark_rows_in_render_order`,
+  `cargo test bookmark_rows_allow_missing_and_extra_metadata`
+- Remaining risk: command-mode entry remains deferred because that app surface is still absent, and
+  exact bookmark names and target ids currently depend on pairing rendered local bookmark rows with
+  a separate metadata template stream by row order while remote/tracking semantics stay deliberately
+  non-semantic in this first pass
+- Next slice: Slice 9: File List And File Show

@@ -245,11 +245,12 @@ Recommended scope:
 
 Acceptance criteria:
 
-- bookmarks open from shortcut/command mode;
+- bookmarks open from a stable shortcut and direct startup;
 - selected bookmark has exact name where available;
 - copy name/target works;
 - refresh preserves selected bookmark name;
-- mutation actions are unavailable or clearly previewed until semantic state exists.
+- command-mode entry stays deferred until that app surface exists, and mutation actions remain
+  unavailable until stronger bookmark semantics exist.
 
 Validation:
 

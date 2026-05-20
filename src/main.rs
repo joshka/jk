@@ -1,4 +1,5 @@
 mod app;
+mod bookmarks;
 mod clipboard;
 mod command;
 mod copy;

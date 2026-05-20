@@ -16,6 +16,7 @@ pub enum Command {
     SearchPrompt,
     PromptLogRevset,
     OpenStatus,
+    OpenBookmarks,
     OpenOperationLog,
     Fetch,
     Copy,
@@ -126,6 +127,7 @@ pub enum HelpContext {
     Show,
     Diff,
     Status,
+    Bookmarks,
     OperationLog,
 }
 
@@ -290,6 +292,7 @@ fn help_metadata(
             (context == HelpContext::Graph).then_some((HelpSectionKind::Direct, "custom revset"))
         }
         Command::OpenStatus => Some((HelpSectionKind::Global, "status")),
+        Command::OpenBookmarks => Some((HelpSectionKind::Global, "bookmarks")),
         Command::OpenOperationLog => Some((HelpSectionKind::Global, "operation log")),
         Command::Fetch => Some((HelpSectionKind::Direct, "fetch")),
         Command::Copy => Some((HelpSectionKind::Global, "copy")),
@@ -320,6 +323,7 @@ fn view_help_metadata(
         ViewCommand::OpenShow => {
             let action = match context {
                 HelpContext::Graph | HelpContext::Diff => "open show",
+                HelpContext::Bookmarks => "open show",
                 HelpContext::OperationLog => "operation show (not yet)",
                 HelpContext::Show | HelpContext::Status => return None,
             };
@@ -329,7 +333,7 @@ fn view_help_metadata(
             let action = match context {
                 HelpContext::Graph | HelpContext::Show => "open diff",
                 HelpContext::OperationLog => "operation diff (not yet)",
-                HelpContext::Diff | HelpContext::Status => return None,
+                HelpContext::Bookmarks | HelpContext::Diff | HelpContext::Status => return None,
             };
             Some((HelpSectionKind::Direct, action))
         }

@@ -19,6 +19,7 @@ pub enum JjCommand {
     Show,
     Diff,
     Status,
+    Bookmarks,
     OperationLog,
 }
 
@@ -86,6 +87,8 @@ const RECENT_WORK_REVSET: &str = "latest(mutable(), 20) | @ | trunk()";
 const ALL_REPO_REVSET: &str = "all()";
 const FETCH_ARGS: [&str; 2] = ["git", "fetch"];
 const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
+const BOOKMARK_COMMAND_WORDS: [&str; 2] = ["bookmark", "list"];
+const BOOKMARK_METADATA_TEMPLATE: &str = r#"name ++ "\t" ++ if(self.normal_target(), self.normal_target().change_id(), "") ++ "\t" ++ if(self.normal_target(), self.normal_target().commit_id(), "") ++ "\n""#;
 const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
 const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
 const OPERATION_LOG_LIMIT: &str = "100";
@@ -109,6 +112,7 @@ impl JjCommand {
             Self::Show => "jj show",
             Self::Diff => "jj diff",
             Self::Status => "jj status",
+            Self::Bookmarks => "jj bookmark list",
             Self::OperationLog => "jj operation log",
         }
     }
@@ -120,6 +124,7 @@ impl JjCommand {
             Self::Show => &["show"],
             Self::Diff => &["diff"],
             Self::Status => &["status"],
+            Self::Bookmarks => &BOOKMARK_COMMAND_WORDS,
             Self::OperationLog => &["operation", "log"],
         }
     }
@@ -127,7 +132,12 @@ impl JjCommand {
     fn prefix_args(self) -> &'static [&'static str] {
         match self {
             Self::OperationLog => &["--at-op=@", "--limit", OPERATION_LOG_LIMIT],
-            Self::Default | Self::Log | Self::Show | Self::Diff | Self::Status => &[],
+            Self::Default
+            | Self::Log
+            | Self::Show
+            | Self::Diff
+            | Self::Status
+            | Self::Bookmarks => &[],
         }
     }
 
@@ -187,6 +197,15 @@ impl ViewSpec {
         }
     }
 
+    pub fn bookmarks(args: Vec<String>) -> Self {
+        Self {
+            command: JjCommand::Bookmarks,
+            args,
+            target: None,
+            diff_format: DiffFormat::Default,
+        }
+    }
+
     pub fn show(revset: String, diff_format: DiffFormat) -> Self {
         Self {
             command: JjCommand::Show,
@@ -235,6 +254,7 @@ impl ViewSpec {
             JjCommand::Show => "jk show",
             JjCommand::Diff => "jk diff",
             JjCommand::Status => "jk status",
+            JjCommand::Bookmarks => "jk bookmarks",
             JjCommand::OperationLog => "jk operation log",
         };
 
@@ -260,9 +280,11 @@ impl ViewSpec {
         self.target.clone().or_else(|| match self.command {
             JjCommand::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
             JjCommand::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
-            JjCommand::Default | JjCommand::Log | JjCommand::Status | JjCommand::OperationLog => {
-                None
-            }
+            JjCommand::Default
+            | JjCommand::Log
+            | JjCommand::Status
+            | JjCommand::Bookmarks
+            | JjCommand::OperationLog => None,
         })
     }
 
@@ -271,6 +293,10 @@ impl ViewSpec {
     }
 
     pub fn with_diff_format(&self, diff_format: DiffFormat) -> Self {
+        if matches!(self.command, JjCommand::Bookmarks) {
+            return self.clone();
+        }
+
         let mut spec = self.clone();
         spec.diff_format = diff_format;
         spec.args = diff_format_args(
@@ -412,6 +438,59 @@ impl LogItem {
     }
 }
 
+/// One selectable bookmark item parsed from rendered bookmark output.
+#[derive(Clone, Debug)]
+pub struct BookmarkItem {
+    lines: Vec<Line<'static>>,
+    name: String,
+    target_change_id: Option<String>,
+    target_commit_id: Option<String>,
+}
+
+impl BookmarkItem {
+    pub fn new(
+        lines: Vec<Line<'static>>,
+        name: String,
+        target_change_id: Option<String>,
+        target_commit_id: Option<String>,
+    ) -> Self {
+        Self {
+            lines,
+            name,
+            target_change_id,
+            target_commit_id,
+        }
+    }
+
+    pub fn lines(&self) -> Vec<Line<'static>> {
+        self.lines.clone()
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn bookmark_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn target_change_id(&self) -> Option<&str> {
+        self.target_change_id.as_deref()
+    }
+
+    pub fn target_commit_id(&self) -> Option<&str> {
+        self.target_commit_id.as_deref()
+    }
+
+    pub fn row_text(&self) -> String {
+        self.lines
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 /// One selectable operation item parsed from rendered operation-log output.
 #[derive(Clone, Debug)]
 pub struct OperationLogItem {
@@ -461,6 +540,13 @@ pub fn load_entries(spec: &ViewSpec) -> Result<Vec<LogItem>> {
             .map(|line| LogItem::new(vec![line], spec.target.clone(), None))
             .collect())
     }
+}
+
+pub fn load_bookmark_entries(spec: &ViewSpec) -> Result<Vec<BookmarkItem>> {
+    let output = run_jj(spec, ColorMode::Always)?;
+    let lines = output.stdout.into_text()?.lines;
+    let metadata = run_jj_bookmark_metadata(spec)?;
+    Ok(pair_bookmark_lines(lines, metadata))
 }
 
 pub fn load_operation_log_entries(spec: &ViewSpec) -> Result<Vec<OperationLogItem>> {
@@ -520,6 +606,13 @@ fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<Vec<RevisionM
     Ok(run_jj_template_lines(spec, template)?
         .into_iter()
         .filter_map(|line| parse_metadata_line(&line))
+        .collect())
+}
+
+fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
+    Ok(run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE)?
+        .into_iter()
+        .filter_map(|line| parse_bookmark_metadata_line(&line))
         .collect())
 }
 
@@ -681,6 +774,37 @@ fn group_lines(lines: Vec<Line<'static>>, metadata: Vec<RevisionMetadata>) -> Ve
     items
 }
 
+fn pair_bookmark_lines(
+    lines: Vec<Line<'static>>,
+    metadata: Vec<BookmarkMetadata>,
+) -> Vec<BookmarkItem> {
+    let mut items = Vec::new();
+    let mut metadata = metadata.into_iter();
+
+    for line in lines {
+        let text = line_text(&line);
+        let metadata = starts_local_bookmark_row(&text)
+            .then(|| metadata.next())
+            .flatten();
+        let bookmark_name = metadata
+            .as_ref()
+            .map(|metadata| metadata.name.clone())
+            .unwrap_or_else(|| bookmark_name_from_rendered_row(&text));
+        items.push(BookmarkItem::new(
+            vec![line],
+            bookmark_name,
+            metadata
+                .as_ref()
+                .and_then(|metadata| metadata.target_change_id.clone()),
+            metadata
+                .as_ref()
+                .and_then(|metadata| metadata.target_commit_id.clone()),
+        ));
+    }
+
+    items
+}
+
 fn group_operation_log_lines(
     lines: Vec<Line<'static>>,
     operation_ids: Vec<Option<String>>,
@@ -719,6 +843,13 @@ struct RevisionMetadata {
     commit_id: Option<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct BookmarkMetadata {
+    name: String,
+    target_change_id: Option<String>,
+    target_commit_id: Option<String>,
+}
+
 fn parse_metadata_line(line: &str) -> Option<RevisionMetadata> {
     let mut change_id = None;
     let mut commit_id = None;
@@ -734,6 +865,30 @@ fn parse_metadata_line(line: &str) -> Option<RevisionMetadata> {
     change_id.map(|change_id| RevisionMetadata {
         change_id,
         commit_id,
+    })
+}
+
+fn parse_bookmark_metadata_line(line: &str) -> Option<BookmarkMetadata> {
+    if line.is_empty() {
+        return None;
+    }
+
+    let mut fields = line.split('\t');
+    let name = fields.next()?;
+    if name.is_empty() {
+        return None;
+    }
+
+    Some(BookmarkMetadata {
+        name: name.to_owned(),
+        target_change_id: fields
+            .next()
+            .filter(|field| !field.is_empty())
+            .map(str::to_owned),
+        target_commit_id: fields
+            .next()
+            .filter(|field| !field.is_empty())
+            .map(str::to_owned),
     })
 }
 
@@ -841,6 +996,12 @@ fn starts_operation_log_item(line: &Line<'_>) -> bool {
     first_content_char(&line_text(line)).is_some_and(|character| matches!(character, '@' | '○'))
 }
 
+fn starts_local_bookmark_row(text: &str) -> bool {
+    text.chars()
+        .next()
+        .is_some_and(|character| !character.is_whitespace())
+}
+
 fn is_standalone_graph_line(line: &Line<'_>) -> bool {
     let text = line_text(line);
     first_content_char(&text).is_none_or(|character| character == '~')
@@ -856,6 +1017,14 @@ fn line_text(line: &Line<'_>) -> String {
         .iter()
         .map(|span| span.content.as_ref())
         .collect()
+}
+
+fn bookmark_name_from_rendered_row(text: &str) -> String {
+    text.split_once(':')
+        .map(|(name, _)| name.trim())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| text.trim())
+        .to_owned()
 }
 
 #[cfg(test)]
@@ -993,6 +1162,108 @@ mod tests {
     }
 
     #[test]
+    fn bookmark_list_command_uses_bookmark_words_and_labels() {
+        let spec = ViewSpec::bookmarks(vec!["--revision".to_owned(), "main".to_owned()]);
+
+        assert_eq!(spec.command(), JjCommand::Bookmarks);
+        assert_eq!(
+            jj_command_args(&spec, None, false),
+            vec!["bookmark", "list", "--revision", "main"]
+        );
+        assert_eq!(spec.label(), "jj bookmark list --revision main");
+        assert_eq!(spec.app_label(), "jk bookmarks --revision main");
+    }
+
+    #[test]
+    fn parses_bookmark_metadata_lines() {
+        assert_eq!(
+            parse_bookmark_metadata_line(
+                "main\twuqolszplkmommqzmxpmmwtwrpuuwkmo\t2f81d8af4234fef19b84d1495383a55999bb37fa"
+            ),
+            Some(BookmarkMetadata {
+                name: "main".to_owned(),
+                target_change_id: Some("wuqolszplkmommqzmxpmmwtwrpuuwkmo".to_owned()),
+                target_commit_id: Some("2f81d8af4234fef19b84d1495383a55999bb37fa".to_owned()),
+            })
+        );
+        assert_eq!(
+            parse_bookmark_metadata_line("main\t\t"),
+            Some(BookmarkMetadata {
+                name: "main".to_owned(),
+                target_change_id: None,
+                target_commit_id: None,
+            })
+        );
+        assert_eq!(parse_bookmark_metadata_line(""), None);
+    }
+
+    #[test]
+    fn pairs_bookmark_rows_in_render_order() {
+        let lines = b"main: okrnpmzv d10e26b6 Update agent repository guidance\nprototype: nqvrkyps f65c4354 docs: add explicit unsupported warning\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let metadata = vec![
+            bookmark_metadata(
+                "main",
+                Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv"),
+                Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6"),
+            ),
+            bookmark_metadata(
+                "prototype",
+                Some("nqvrkypsnqvrkypsnqvrkypsnqvrkyps"),
+                Some("f65c4354f65c4354f65c4354f65c4354f65c4354"),
+            ),
+        ];
+
+        let items = pair_bookmark_lines(lines, metadata);
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].line_count(), 1);
+        assert_eq!(items[0].bookmark_name(), "main");
+        assert_eq!(
+            items[0].target_change_id(),
+            Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv")
+        );
+        assert_eq!(
+            items[0].target_commit_id(),
+            Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6")
+        );
+        assert_eq!(items[1].bookmark_name(), "prototype");
+    }
+
+    #[test]
+    fn bookmark_rows_allow_missing_and_extra_metadata() {
+        let lines = b"main: okrnpmzv d10e26b6 Update agent repository guidance\n  @origin: okrnpmzv d10e26b6 Update agent repository guidance\nprototype: nqvrkyps f65c4354 docs: add explicit unsupported warning\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let metadata = vec![
+            bookmark_metadata(
+                "main",
+                Some("okrnpmzvokrnpmzvokrnpmzvokrnpmzv"),
+                Some("d10e26b6d10e26b6d10e26b6d10e26b6d10e26b6"),
+            ),
+            bookmark_metadata(
+                "prototype",
+                Some("nqvrkypsnqvrkypsnqvrkypsnqvrkyps"),
+                Some("f65c4354f65c4354f65c4354f65c4354f65c4354"),
+            ),
+        ];
+
+        let items = pair_bookmark_lines(lines, metadata);
+
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].bookmark_name(), "main");
+        assert_eq!(items[1].bookmark_name(), "@origin");
+        assert_eq!(items[1].target_change_id(), None);
+        assert_eq!(items[1].target_commit_id(), None);
+        assert_eq!(items[2].bookmark_name(), "prototype");
+    }
+
+    #[test]
     fn operation_log_command_uses_at_op_prefix() {
         assert_eq!(
             jj_command_args(
@@ -1035,6 +1306,18 @@ mod tests {
         RevisionMetadata {
             change_id: change_id.to_owned(),
             commit_id: Some(commit_id.to_owned()),
+        }
+    }
+
+    fn bookmark_metadata(
+        name: &str,
+        target_change_id: Option<&str>,
+        target_commit_id: Option<&str>,
+    ) -> BookmarkMetadata {
+        BookmarkMetadata {
+            name: name.to_owned(),
+            target_change_id: target_change_id.map(str::to_owned),
+            target_commit_id: target_commit_id.map(str::to_owned),
         }
     }
 
