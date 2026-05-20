@@ -968,6 +968,39 @@ Audit result from 2026-05-20:
   process-boundary honesty, evidence quality, docs consistency, and whether Packet 34 is now
   safer/better bounded.
 
+### Packet 34c: Interactive Split Process Runner
+
+- Goal: add and prove the smallest process-boundary primitive needed to hand interactive `jj split`
+  from the Ratatui app to jj's diff editor.
+- Owner concept: terminal suspension in `app.rs` / Ratatui setup and inherited-stdio `jj` process
+  execution in `jj.rs`.
+- Expected write set: likely `src/app.rs`, `src/app/services.rs`, `src/jj.rs`, or a narrowly named
+  terminal/process helper if that is clearer; focused tests near the owner; `docs/plan/progress.md`
+  and `docs/process-observations.md`.
+- Non-goals: no product split action, no `JjSplitPlan`, no action-menu split flow, no in-app patch
+  editor, no broad terminal lifecycle rewrite, and no active-repo mutation proof.
+- Acceptance criteria:
+  - a confirmed interactive command path leaves raw mode and the alternate screen before spawning
+    the child process, then restores the Ratatui terminal before returning to the event loop;
+  - the child process inherits stdin, stdout, and stderr instead of using `Command::output()`;
+  - failures while spawning, waiting, or restoring the terminal surface readable status or result
+    text without leaving the app in raw/alternate-screen limbo;
+  - the runner is testable without launching a real editor, with unit tests covering command
+    construction, inherited-stdio intent, and restore-on-error behavior where practical;
+  - the final manual proof uses only disposable `/tmp` jj repositories and runs every mutation from
+    the proof repo's `cwd`.
+- Validation: `cargo check`; focused owner tests; `rustup run nightly cargo fmt --check`;
+  `just md-check`; manual `/tmp` proof that a noninteractive failure still returns cleanly and, if
+  practical in a real terminal, that an inherited-stdio split editor handoff can be cancelled or
+  completed without corrupting the TUI terminal state.
+- Docs/fragility updates: update `progress.md`; update the split fragility entry only if the runner
+  introduces new assumptions about jj output wording or terminal escape behavior.
+- Suggested agent/model routing: gpt-5.5 high implementation or review, because the packet crosses
+  terminal lifecycle, process stdio, and mutation safety.
+- Review prompt: review Packet 34c for terminal lifecycle correctness, inherited stdio, restoration
+  on success/failure/panic-adjacent paths, exact `/tmp` proof cwd discipline, tests, and whether it
+  is small enough for Packet 34 to depend on without absorbing split UI behavior.
+
 ### Packet 34: Split Guided Flow
 
 - Goal: add a bounded `jj split` flow for the current or exact selected change when the UI can
@@ -977,9 +1010,10 @@ Audit result from 2026-05-20:
   focused tests, `docs/plan/progress.md`, and `docs/plan/fragility-register.md`.
 - Non-goals: no in-app patch editor, no line-level split UI, no automatic split decisions, no broad
   `diffedit` support, and no noninteractive fake split.
-- Prerequisite: Packet 34a must first choose one of two implementation boundaries: add/prove an
-  interactive process or terminal-suspension runner for real editor handoff, or deliberately ship a
-  preview/readable-failure flow that does not attempt to run interactive split in-app.
+- Prerequisite: Packet 34a and the Packet 34b follow-up spike chose a dedicated implementation
+  boundary. Packet 34c must first add and prove a terminal-suspension / inherited-stdio runner for
+  real editor handoff. Until that lands, no-fileset interactive split must remain preview-only or
+  absent from the product flow rather than executing through the captured runner.
 - Command contract: preserve the planned command shapes exactly: bare `jj split` for the
   visible/current `@`, and `jj split --revision exactly(change_id("<id>"), 1)` for exact graph
   targets.
@@ -992,10 +1026,10 @@ Audit result from 2026-05-20:
   readable `jj` output rather than local guessing.
 - Validation: command-construction tests for supported split shapes; view-level preview, cancel,
   confirm, and result tests; output/result tests for interactive-editor failure text; either
-  terminal/editor handoff proof through the chosen interactive runner or explicit tests proving the
-  preview/readable-failure boundary; disposable `/tmp` jj repo proof for any feasible mutation or
-  failure path, with mutations run from the proof repo's `cwd`; `cargo check`; focused rewrite
-  tests; full `cargo test` and `just check` when practical.
+  terminal/editor handoff proof through the Packet 34c runner or explicit tests proving the command
+  stays preview-only until that runner exists; disposable `/tmp` jj repo proof for any feasible
+  mutation or failure path, with mutations run from the proof repo's `cwd`; `cargo check`; focused
+  rewrite tests; full `cargo test` and `just check` when practical.
 - Docs/fragility updates: record the editor/process boundary and any command-output assumptions;
   update `progress.md`.
 - Suggested agent/model routing: gpt-5.5 high implementation and review, because Packet 34a showed

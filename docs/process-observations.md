@@ -2803,3 +2803,67 @@ belong here.
 - Review expectation: review Packet 34a for command-shape accuracy against `jj split --help`,
   process-boundary honesty, evidence quality, docs consistency, and whether Packet 34 is now
   safer/better bounded.
+
+## 2026-05-20 Packet 34b Process-Boundary Spike
+
+- Thread id: `019e4710-9e5e-71e3-8bea-c52b302a2f95`.
+
+- Scope given: inspect current `jj` process execution and Ratatui terminal lifecycle, run any
+  practical mutation proof only in disposable `/tmp` jj repos with the proof repo as `cwd`, avoid
+  Rust edits unless necessary, and decide whether Packet 34 can execute interactive `jj split`.
+
+- Model / subagent evidence: Packet 34b was performed by a gpt-5.5 high worker/subagent with thread
+  id `019e4710-9e5e-71e3-8bea-c52b302a2f95`. It inspected `src/jj.rs`, `src/app.rs`,
+  `src/app/services.rs`, Ratatui 0.30 local source, Packet 34a docs, and
+  `jj --no-pager split --help`.
+
+- Code inspection outcome: `src/jj.rs` direct command helpers use `Command::output()`, which
+  captures stdout/stderr and does not inherit a terminal. `src/app.rs` runs the event loop inside
+  `ratatui::run`; Ratatui 0.30 `run()` calls `init()` before the app closure and `restore()` only
+  after it returns. `init()` enables raw mode and enters the alternate screen; `restore()` disables
+  raw mode and leaves the alternate screen.
+
+- Boundary decision: interactive no-fileset `jj split` should not be run through the existing
+  captured runner. The safe route is a dedicated Packet 34c that suspends the Ratatui terminal,
+  spawns `jj` with inherited stdin/stdout/stderr, waits for it, and restores the terminal before
+  returning control to the TUI. Packet 34 remains blocked on that runner for real editor handoff.
+
+- Disposable proof repo: `/tmp/jk-packet34b-proof.upUcu2`.
+
+- Proof commands run with `/tmp/jk-packet34b-proof.upUcu2` as `cwd`:
+
+  ```sh
+  jj --no-pager git init
+  printf 'alpha\nbeta\n' > split.txt
+  jj --no-pager status
+  jj --no-pager split --tool false
+  jj --no-pager split
+  jj --no-pager split split.txt -m selected
+  jj --no-pager log --no-graph -T 'change_id.short() ++ " " ++ description.first_line() ++ "\n"'
+  ```
+
+- Proof output summary: `jj --no-pager split --tool false` failed with `Error: Failed to edit diff`;
+  bare `jj --no-pager split` under the captured non-TTY process failed with
+  `failed to set up terminal: Device not configured (os error 6)`. The fileset command
+  `jj --no-pager split split.txt -m selected` succeeded and printed selected/remaining change
+  summaries, which proves only that noninteractive fileset split can run as a captured process.
+
+- Observable outcome: `docs/plan/next-implementation-slices.md` now adds Packet 34c for the
+  interactive split process runner and updates Packet 34 to depend on it. `docs/plan/progress.md`
+  records the decision, proof repo, exact proof outputs, and residual risk.
+
+- Validation / proof run:
+  - `jj --no-pager split --help`
+  - `/tmp` proof commands listed above
+  - `just md-check`
+
+- Validation note: no Rust files were edited, so `cargo check`, focused Rust tests, and rustfmt were
+  not run. No mutation proof command was run in `/Users/joshka/local/jk`.
+
+- Review expectation: review Packet 34b for terminal lifecycle correctness, evidence that
+  interactive `jj split` is not safe through the captured runner, exact `/tmp` proof cwd discipline,
+  docs consistency, and whether the Packet 34c / Packet 34 boundary is now unambiguous.
+
+- Review outcome: gpt-5.5 high review `019e4717-5e19-7c20-8a26-db2d1c312b06` found no findings,
+  verified the existing `Command::output()` / `ratatui::run` boundary and Packet 34c / 34 gating,
+  and ran `jj --no-pager split --help` but did not rerun `just md-check`.

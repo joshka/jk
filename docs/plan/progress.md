@@ -1583,3 +1583,40 @@
 - Next recommended slice: choose and prove the Packet 34 implementation boundary, preferably a
   bounded interactive process or terminal-suspension runner spike before the product split flow, or
   an explicit preview/readable-failure boundary if that is the cleaner path.
+
+## Packet 34b: Split Process-Boundary Spike
+
+- Files changed: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Behavior: Packet 34b resolves the Packet 34a open decision in favor of a dedicated implementation
+  packet before the product split flow. Packet 34c now owns the terminal-suspension and inherited
+  stdio runner; Packet 34 must not execute no-fileset interactive split through the captured
+  `Command::output()` runner.
+- Code inspection evidence: `src/jj.rs` direct runners (`run_direct_args`, `run_direct_args_stdout`,
+  and related helpers) use `Command::output()`, so stdout and stderr are captured pipes and the
+  child process does not inherit the app TTY. `src/app.rs` enters the TUI with `ratatui::run`, and
+  Ratatui 0.30's `run()` initializes raw mode plus alternate screen before invoking the app closure
+  and restores only after the closure returns.
+- Process-boundary decision: real `jj split` editor handoff needs a mid-run terminal suspension that
+  leaves raw mode and alternate screen, spawns `jj` with inherited stdin/stdout/stderr, waits for
+  the child, and restores the Ratatui terminal before the event loop resumes.
+- `/tmp` proof: disposable repo `/tmp/jk-packet34b-proof.upUcu2` was initialized with
+  `jj --no-pager git init`, then `split.txt` was added from that repo's cwd. From that same proof
+  repo cwd, `jj --no-pager split --tool false` failed with `Error: Failed to edit diff`, and bare
+  `jj --no-pager split` failed under the captured non-TTY process with
+  `failed to set up terminal: Device not configured (os error 6)`.
+- `/tmp` process-only success proof: from the same proof repo cwd,
+  `jj --no-pager split split.txt -m selected` succeeded and printed selected/remaining change
+  summaries. This proves that noninteractive fileset split can run as a normal captured process, but
+  it is not the planned product path because no-fileset Packet 34 split delegates patch selection to
+  jj's diff editor.
+- Validation: `just md-check`.
+- Review outcome: gpt-5.5 high review `019e4717-5e19-7c20-8a26-db2d1c312b06` found no findings,
+  verified the existing `Command::output()` / `ratatui::run` boundary and Packet 34c / 34 gating,
+  and ran `jj --no-pager split --help` but did not rerun `just md-check`.
+- Remaining risk: the dedicated runner still needs Rust implementation and a live-terminal manual
+  proof for a real inherited-stdio editor handoff. Unit tests can cover runner intent and
+  restoration branches, but they cannot by themselves prove a human diff editor session behaves
+  correctly in every terminal.
+- Next recommended slice: Packet 34c, the interactive split process runner, before Packet 34 Split
+  Guided Flow.
