@@ -1,127 +1,127 @@
 # jk
 
-`jk` is an experimental Rust TUI for [Jujutsu](https://github.com/jj-vcs/jj). It is a log-first
-interface for keeping `jj` visible while work happens in an editor, another terminal, or an agent
-session, then refreshing in place instead of repeatedly quitting and rerunning `jj log`.
+`jk` is a log-first Rust TUI for [Jujutsu](https://github.com/jj-vcs/jj). It shells out to `jj`, so
+the app keeps the user's templates, colors, graph symbols, diff formatting, and CLI wording instead
+of recreating a separate repository model. The current focus is the everyday loop of scanning
+history, drilling into `show`/`diff`, checking status, and returning without leaving the terminal.
 
-The current implementation shells out to `jj` and uses rendered `jj` output as the default
-presentation source. It preserves user colors, templates, graph symbols, wording, and diff style
-wherever possible. The long-term direction is a Rust-based jj interface that feels close to the
-existing CLI UI while making it cheap to navigate between related jj concepts.
+## What Ships Today
 
-## Direction
+`jk` currently ships these surfaces:
 
-`jk` is intentionally not a pane-heavy repository dashboard. The preferred interaction model is one
-active view at a time:
+- a default graph view and explicit `log`, `show`, `diff`, `status`, `bookmarks`, and
+  `operation-log` startup views;
+- one-active-view navigation with `show`/`diff` drill-down, back, refresh, and search;
+- focused utility views for files, bookmarks, status, and operation history;
+- copy menus for selected revisions, files, bookmarks, and operation-log rows;
+- direct `jj` actions for fetch (`f`) and graph `c` / `jj new trunk`;
+- preview/result-gated (guided) mutation flows for push, operation undo/redo, graph action-menu
+  `new`, abandon, rebase, and related action-menu flows where implemented.
 
-- start in a compact `jj` or `jj log` graph view;
-- move with vimish keys;
-- open the selected change as `show` or `diff`;
-- move back to the previous view;
-- refresh the current view in place after external changes;
-- keep revsets, templates, colors, and command names aligned with jj.
-
-This follows the direction explored in [`jj-vcs/jj#9319`](https://github.com/jj-vcs/jj/pull/9319): a
-native, Rust-shaped, jj-centered TUI with view-centric navigation. Splits and previews may be useful
-later, but panes should be presentation choices rather than the core mental model.
-
-## Current State
-
-Today `jk` supports:
-
-- default graph view through `jj`;
-- explicit `log`, `show`, and `diff` startup commands;
-- graph navigation by selected change id;
-- sticky file context in `show` and `diff` views;
-- text search within the current view;
-- copy menus for selected revisions or file labels;
-- switching between default jj diff output and `--git` diff output;
-- refresh-in-place for the current view.
-
-This is still a prototype. It is useful enough to exercise the architecture, but the product surface
-is intentionally narrow.
+This README only describes shipped behavior. Planned packets live in
+[`docs/plan/next-implementation-slices.md`](docs/plan/next-implementation-slices.md), and shipped
+progress is tracked in [`docs/plan/progress.md`](docs/plan/progress.md).
 
 ## Install And Run
 
 Prerequisites:
 
-- Rust toolchain with edition 2024 support;
-- `jj` available on `PATH`;
-- nightly Rust for formatting through the repository `rustfmt.toml`.
+- a recent Rust toolchain with edition 2024 support;
+- `jj` on `PATH`;
+- `just` if you want the helper commands.
 
-Run the TUI from a jj repository:
+Run `jk` from a `jj` repository:
 
 ```sh
 just run
 ```
 
-You can also pass a supported startup command:
+The helper runs `cargo run` from the repository root. You can also invoke Cargo directly:
 
 ```sh
+cargo run
 cargo run -- log
 cargo run -- log -r 'mine() & mutable()'
 cargo run -- show @
 cargo run -- diff -r @
+cargo run -- status
+cargo run -- bookmarks
+cargo run -- operation-log
 ```
 
-## Keybindings
+## Help And Keys
+
+Press `?` for the generated in-app help overlay. It reflects the current bindings for the active
+view, which is the quickest way to see the exact key surface without consulting the source.
 
 Global keys:
 
-  | Key         | Action                                |
-  | ----------- | ------------------------------------- |
-  | `q`, `Esc`  | Quit                                  |
-  | `?`         | Toggle help                           |
-  | `r`         | Refresh the current view              |
-  | `/`         | Search within the current view        |
-  | `n`, `N`    | Move to next or previous search match |
-  | `y`         | Open the copy menu                    |
-  | `v`         | Open the diff-format menu             |
-  | `h`, `Left` | Go back                               |
-  | `L`         | Switch to `jk log`                    |
-  | `J`         | Switch to the default `jk` view       |
+- `q` or `Esc` quits;
+- `/` starts search;
+- `n` and `N` move between search matches;
+- `r` refreshes the current view;
+- `h` or `Left` goes back;
+- `L` switches to `jk log`;
+- `J` switches back to the default `jk` view;
+- `S` opens status;
+- `B` opens bookmarks;
+- `O` opens operation log;
+- `f` fetches;
+- `p` opens push;
+- `y` opens the copy menu;
+- `v` opens the diff-format menu;
+- `W` prompts for a custom graph revset.
 
 Graph view:
 
-  | Key               | Action                              |
-  | ----------------- | ----------------------------------- |
-  | `j`, `Down`       | Move down                           |
-  | `k`, `Up`         | Move up                             |
-  | `g`, `Home`       | Move to first item                  |
-  | `G`, `End`        | Move to last item                   |
-  | `l`, `Right`, `s` | Open `show` for the selected change |
-  | `d`               | Open `diff` for the selected change |
+- `j` and `k` move;
+- `g` and `G` jump to the first or last item;
+- `s`, `l`, or `Right` open `show`;
+- `d` opens `diff`;
+- `Space` toggles exact revision selection for preview-first actions;
+- `a` opens the action menu;
+- `c` creates a new working-copy change from trunk;
+- `w` cycles the graph log mode.
 
 Show and diff views:
 
-  | Key                               | Action                   |
-  | --------------------------------- | ------------------------ |
-  | `j`, `Down`                       | Scroll down              |
-  | `k`, `Up`                         | Scroll up                |
-  | `Space`, `PageDown`, `Ctrl-f`     | Page down                |
-  | `Shift-Space`, `PageUp`, `Ctrl-b` | Page up                  |
-  | `g`, `Home`                       | Scroll to top            |
-  | `G`, `End`                        | Scroll to bottom         |
-  | `]`                               | Jump to next file        |
-  | `[`                               | Jump to previous file    |
-  | `s`                               | Switch from diff to show |
-  | `d`                               | Switch from show to diff |
+- `j` and `k` scroll;
+- `Space`, `PageDown`, and `Ctrl-f` page down;
+- `Shift-Space`, `PageUp`, and `Ctrl-b` page up;
+- `[` and `]` jump between files;
+- `l` opens the file list;
+- `s` switches from diff to show;
+- `d` switches from show to diff.
 
-## Development
+Bookmarks and operation log are item-based views. Bookmarks open the selected change with `s` or
+`Enter` when a target change id is present. Operation log opens operation `show` with `s` or
+`Enter`, operation `diff` with `d`, and global repo recovery with `u` for undo and `Ctrl-r` for
+redo.
 
-Use the repository `just` commands:
+## Safety Notes
 
-```sh
-just fmt
-just md-fmt
-just md-check
-just test
-just check
-```
+- Direct low-friction mutation actions (`f` and `c`) execute immediately and show the resulting
+  status/output from `jj`; where recovery is available, `jj`-level undo is still the intended
+  fallback.
+- Guided flows (for example push, operation undo/redo, graph action-menu `new`, abandon, and rebase)
+  show preview or result text before execution.
+- Where `jj` exposes an exact target, `jk` keeps that target exact instead of guessing from a label.
+- Successful mutations keep the undo path visible when `jj` supports one.
+- Operation-log undo and redo act on the repo cursor, not on the selected row.
+- Push is previewed and does not ship a force-push shortcut.
+- If `jj` rejects an action or a target is unavailable, `jk` shows a readable result or status error
+  instead of pretending success.
 
-`just check` formats Rust with nightly rustfmt, checks Markdown with Panache, then runs
-`cargo check` and `cargo test`.
+## Media And Captures
 
-The architecture notes in [`docs/agent/architecture.md`](docs/agent/architecture.md) describe the
-current internal boundaries. The most important rule is that `jk` should stay close to jj rather
-than quietly becoming a separate repository model.
+- Generated screenshots, GIFs, and demo repos are not committed.
+- If capture artifacts are added later, keep the generated output under ignored `target/vhs` or host
+  it externally.
+
+## Contributor References
+
+- [`docs/product-direction.md`](docs/product-direction.md) for the product shape.
+- [`docs/plan/progress.md`](docs/plan/progress.md) for shipped packet history.
+- [`docs/plan/next-implementation-slices.md`](docs/plan/next-implementation-slices.md) for planned
+  packets and their boundaries.
+- [`docs/agent/documentation.md`](docs/agent/documentation.md) for doc style and truthfulness.

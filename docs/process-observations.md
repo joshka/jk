@@ -5,6 +5,27 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 20 README/user docs refresh)
+
+- Slice / task: Implement Packet 20 README/User Docs Refresh.
+- Thread / model: `019e446b-10fd-7462-b1e9-582830d91e5c` / `gpt-5.4-mini`.
+- Scope given: update the public README and user-facing docs without editing Rust code, avoid
+  documenting planned behavior as shipped, keep progress current, and record a factual packet
+  observation.
+- Observable outcome: the README now describes the current shipped surface in a compact form, points
+  readers to generated in-app help for exact bindings, distinguishes shipped behavior from planned
+  packets, and includes the requested safety and media-capture notes.
+- Evidence basis:
+  - Thread: `019e446b-10fd-7462-b1e9-582830d91e5c`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `jj --no-pager status`
+    - `jj --no-pager log -r @ -T 'description.first_line() ++ "\n"'`
+    - `printenv CODEX_THREAD_ID`
+    - `just md-check`
+  - Files: `README.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+  - Validation note: no Rust validation was required because the packet was docs-only.
+
 ### 2026-05-20 (Packet 18 `jj new` from parents)
 
 - Slice / task: Implement Packet 18 `jj new` from the selected graph parent or selected multiple

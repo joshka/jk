@@ -333,3 +333,13 @@
   output and may be followed by a local `refresh failed: ...` line if the post-push refresh step
   fails.
 - Next slice: Packet 20 README/User Docs Refresh
+
+## Packet 20: README/User Docs Refresh
+
+- Files changed: `README.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `just md-check`; manual read-through against the current command inventory, shipped
+  packet history, and README claims
+- Remaining risk: the README now summarizes the current shipped surface instead of enumerating every
+  binding, so it will need another refresh when shipped keys or startup views expand, and Packet 21
+  will need to add capture specs before the media policy section can point at concrete artifacts
+- Next slice: Packet 21: VHS Specs Without Committed GIFs
