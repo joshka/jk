@@ -1,5 +1,18 @@
 # Slice Progress
 
+## Packet Clippy Baseline Cleanup
+
+- Slice / task: remove known clippy baseline blockers (`dead_code` and `collapsible_if`) and keep
+  behavior unchanged.
+- Files changed: `src/app/navigation.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+  `src/operation_log.rs`, `src/jj_rows.rs`
+- Validation: `cargo check`; `cargo clippy -- -D warnings`; focused
+  `cargo test bookmarks -- --test-threads=1`; focused `cargo test file_list -- --test-threads=1`;
+  focused `cargo test graph -- --test-threads=1`; full `cargo test`;
+  `rustup run nightly cargo fmt --check`; `cargo test operation_log -- --test-threads=1`;
+  `just check`; `just md-check`.
+- Residual risk: no behavior change; remaining risk only if parser contracts shift (not touched).
+
 ## Slice 0: Source Integration Spike
 
 - Files changed: `docs/plan/integration-feasibility.md`, `docs/plan/fragility-register.md`,

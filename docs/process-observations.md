@@ -5,6 +5,31 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Clippy baseline cleanup)
+
+- Slice / task: remove known baseline clippy blockers (dead_code and collapsible_if) without
+  changing runtime behavior.
+- Thread id: `019e47a8-b75d-7271-bee1-4c86f223cf9d`.
+- Observable outcome: `ViewSpec::bookmarks` is now used from startup command parsing,
+  `FileListItem::row_text` is test-scoped, and `restore_selection` in bookmarks/graph/operation-log
+  uses clippy-compatible let chains.
+- Validation / proof run:
+  - `cargo check`
+  - `cargo clippy -- -D warnings`
+  - `cargo test bookmarks -- --test-threads=1`
+  - `cargo test file_list -- --test-threads=1`
+  - `cargo test graph -- --test-threads=1`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt --check`
+  - `cargo test operation_log -- --test-threads=1`
+  - `just check`
+  - `just md-check`
+- Evidence basis:
+  - Files: `src/app/navigation.rs`, `src/bookmarks.rs`, `src/graph.rs`, `src/operation_log.rs`,
+    `src/jj_rows.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+  - Date: `2026-05-20` from local `date +%F`
+  - Command log available in this session transcript and workspace state
+
 ### 2026-05-20 (Packet 36 review repair)
 
 - Slice / task: repair Packet 36 bookmark tracking metadata review findings in

@@ -280,14 +280,13 @@ fn restore_selection(
     previous_index: usize,
     previous_bookmark_name: Option<String>,
 ) {
-    if let Some(bookmark_name) = previous_bookmark_name {
-        if let Some(index) = entries
+    if let Some(bookmark_name) = previous_bookmark_name
+        && let Some(index) = entries
             .iter()
             .position(|entry| entry.bookmark_name() == bookmark_name.as_str())
-        {
-            selection.set(index, entries.len());
-            return;
-        }
+    {
+        selection.set(index, entries.len());
+        return;
     }
 
     selection.set(previous_index, entries.len());

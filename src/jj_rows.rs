@@ -247,6 +247,7 @@ impl FileListItem {
         &self.path
     }
 
+    #[cfg(test)]
     pub fn row_text(&self) -> String {
         self.lines
             .iter()

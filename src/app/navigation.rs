@@ -272,7 +272,7 @@ pub(in crate::app) fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
                 Ok(ViewSpec::new(JjCommand::Resolve, rest.to_vec()))
             }
         }
-        "bookmarks" => Ok(ViewSpec::new(JjCommand::Bookmarks, rest.to_vec())),
+        "bookmarks" => Ok(ViewSpec::bookmarks(rest.to_vec())),
         "operation-log" => Ok(ViewSpec::new(JjCommand::OperationLog, rest.to_vec())),
         unknown => Err(eyre!(
             "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, resolve, bookmarks, operation-log"

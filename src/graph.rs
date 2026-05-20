@@ -542,14 +542,13 @@ fn restore_selection(
     previous_index: usize,
     previous_change_id: Option<String>,
 ) {
-    if let Some(change_id) = previous_change_id {
-        if let Some(index) = entries
+    if let Some(change_id) = previous_change_id
+        && let Some(index) = entries
             .iter()
             .position(|entry| entry.action_id() == Some(change_id.as_str()))
-        {
-            selection.set(index, entries.len());
-            return;
-        }
+    {
+        selection.set(index, entries.len());
+        return;
     }
 
     selection.set(previous_index, entries.len());
