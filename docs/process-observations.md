@@ -2315,3 +2315,52 @@ belong here.
     `collapsible_if`).
 - Non-blocking follow-up: add direct idle Help-prefix timeout coverage with no suffix.
 - Next slice: `Interruption Packet D: Action Menu, Popovers, And Selection Presentation`.
+
+## 2026-05-20 Interruption Packet E Status File Actions
+
+- Thread id: `019e4614-cc4e-7590-a515-0439f60bbb81`.
+- Slice / task: make status files selectable and action-capable through exact file-path contracts on
+  top of accepted Packet D.
+- Starting state: `jj --no-pager status` reported an empty working copy at
+  `uupzytup 0fb3b68f (empty) Add status file actions`, with parent
+  `qyzxmzrr deea1b07 Improve action menu presentation`.
+- Explorer evidence used: Packet D had already centralized action-menu shortcuts and selected-row
+  styling; `JjRestorePlan` already owned root-file fileset quoting for exact file-list paths; status
+  still used `StickyFileDocument` with no row model or path ownership.
+- Observable outcome: `src/status.rs` now owns a small `StatusRow` parser over rendered `jj status`
+  lines. It treats clean `M`, `A`, and `D` rows as exact repo-relative paths, and keeps headers,
+  renamed rows, conflicts, untracked-looking rows, absolute paths, parent-relative paths, and
+  multi-path text disabled with specific messages.
+- Observable outcome: `src/view_state.rs` now exposes status exact paths through the existing
+  restore/revert context boundary, while `src/action_menu.rs` distinguishes status paths from
+  graph/detail revision contexts and offers only working-copy path restore.
+- Observable outcome: `src/jj_actions.rs` added an explicit working-copy restore target so status
+  restore uses `jj restore root-file:"<path>"` rather than pretending `@` is an exact change-id
+  revset.
+- Rework / stuck points: an initial parser accepted long alphabetic prefixes, so
+  `Working copy changes:` became a disabled fake status row. The focused `cargo test status` run
+  caught this, and the parser now only considers one- or two-character status codes.
+- Rework / stuck points: one disposable `/tmp` proof script attempted repeated undo/restore cycles
+  after manually rewriting the same file content and triggered jj backend duplicate-commit internal
+  errors. The useful proof was rerun in fresh `/tmp` repos with one mutation per operation and
+  explicit `jj undo` recovery.
+- Code quality note: path-scoped revert stayed out of the UI because `jj revert --help` for the
+  installed jj exposes revision and destination arguments but no fileset/path argument. Keeping this
+  disabled avoids a misleading action even though the packet mentions restore/revert context.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test status`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-fmt`
+  - `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+  - disposable `/tmp` jj restore proof for modified, added, and deleted paths
+- Validation note: `cargo check` still reports the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy with
+  `-D warnings` remains blocked by those warnings plus existing `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Model routing note: 5.5 high was justified for this slice because exact file paths feed mutation
+  commands. The useful constraint was forcing ambiguous status shapes to disabled states instead of
+  stretching the parser to cover renames or conflicts.

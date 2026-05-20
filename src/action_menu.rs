@@ -162,6 +162,9 @@ pub enum FollowUp {
         revision: String,
         path: Option<String>,
     },
+    RestoreWorkingCopyPath {
+        path: String,
+    },
     RevertExactTarget {
         revision: String,
     },
@@ -277,6 +280,15 @@ impl ExactActionContext {
         }
     }
 
+    pub fn status_path(path: impl Into<String>) -> Self {
+        Self {
+            current_revision: Some("@".to_owned()),
+            source_revisions: Vec::new(),
+            selected_path: Some(path.into()),
+            surface: ActionSurface::Status,
+        }
+    }
+
     #[cfg(test)]
     pub fn none() -> Self {
         Self {
@@ -316,12 +328,24 @@ impl ExactActionContext {
     fn is_detail_surface(&self) -> bool {
         matches!(self.surface, ActionSurface::Detail)
     }
+
+    fn is_status_surface(&self) -> bool {
+        matches!(self.surface, ActionSurface::Status)
+    }
 }
 
 pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     let Some(current_revision) = context.current_revision() else {
         return ActionMenu::default();
     };
+
+    if context.is_status_surface() {
+        return context
+            .selected_path()
+            .map(status_path_action_menu)
+            .unwrap_or_default();
+    }
+
     let mutation_items = mutation_menu_items(current_revision, context.selected_path());
 
     if context.is_detail_surface() {
@@ -529,6 +553,19 @@ fn mutation_menu_items(current_revision: &str, selected_path: Option<&str>) -> V
 enum ActionSurface {
     Graph,
     Detail,
+    Status,
+}
+
+fn status_path_action_menu(path: &str) -> ActionMenu {
+    ActionMenu::new(vec![ActionMenuItem {
+        action: ActionKind::Restore,
+        shortcut: ActionKind::Restore.shortcut(),
+        label: format!("restore selected status path {path}"),
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up: FollowUp::RestoreWorkingCopyPath {
+            path: path.to_owned(),
+        },
+    }])
 }
 
 fn short_id(id: &str) -> &str {
@@ -822,6 +859,23 @@ mod tests {
             FollowUp::RestoreExactTarget { revision, path }
                 if revision == "ccccdddd1111111111111111111111111111111111"
                     && path.as_deref() == Some("src/quoted path.rs")
+        ));
+    }
+
+    #[test]
+    fn status_path_context_offers_only_working_copy_path_restore() {
+        let menu = build_action_menu(&ExactActionContext::status_path("src/status.rs"));
+
+        assert_eq!(menu.items().len(), 1);
+        assert_eq!(menu.items()[0].action(), ActionKind::Restore);
+        assert_eq!(menu.items()[0].shortcut(), 'r');
+        assert_eq!(
+            menu.items()[0].label(),
+            "restore selected status path src/status.rs"
+        );
+        assert!(matches!(
+            menu.items()[0].follow_up(),
+            FollowUp::RestoreWorkingCopyPath { path } if path == "src/status.rs"
         ));
     }
 }

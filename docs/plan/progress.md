@@ -1214,3 +1214,45 @@
   - Current inference boundary: foreground preservation is render-tested on graph, and inferred for
     other jj-backed lists through the same shared style path.
 - Next slice: `Interruption Packet E: Status File Actions`.
+
+## Interruption Packet E: Status File Actions
+
+- Files changed: `src/status.rs`, `src/view_state.rs`, `src/action_menu.rs`, `src/app.rs`,
+  `src/jj_actions.rs`, `src/command.rs`, `src/tui.rs`, `docs/plan/progress.md`,
+  `docs/process-observations.md`, and `docs/plan/fragility-register.md`.
+- Behavior: status is now a row-selectable view. Each rendered status line remains the presentation
+  source, while `StatusRow` records whether the line confidently owns one exact repo-relative path.
+  `M`, `A`, and `D` rows with clean relative paths enable file actions; headers, conflicts, renamed
+  rows, untracked-looking rows, absolute paths, parent-relative paths, and multi-path rows remain
+  selectable but report a disabled reason instead of guessing.
+- Action routing: status exact paths flow through `ViewState::exact_restore_revert_context()` into
+  `ExactActionContext::status_path()`. The status action menu exposes only working-copy path
+  restore, which opens the existing preview/result surface with `jj restore root-file:"<path>"`.
+  Path-scoped revert remains unavailable because installed `jj revert` has no fileset argument.
+- Refresh and output behavior: status refresh preserves selection by exact path when possible,
+  otherwise by prior row text, then clamps by index. Restore confirmation continues to preserve raw
+  command output in the action-output result screen and keeps `jj undo` visible.
+- Test coverage: parser tests cover modified, added, deleted, renamed, conflict, untracked-looking,
+  absolute, parent-relative, and multi-path rows. Status view tests cover movement, search, exact
+  selected path, disabled header rows, refresh preservation, and clamp. Action-menu, view-state,
+  command-construction, and app tests cover status path routing and preview/result behavior.
+- Mutation proof: disposable `/tmp` jj repos proved `jj restore root-file:"modified.txt"`,
+  `jj restore root-file:"added.txt"`, and `jj restore root-file:"deleted.txt"` remove only the
+  selected working-copy file changes, and `jj undo` restores the prior status. A follow-up exact
+  argv proof in `/tmp/jk-status-actions-exact3.5c8PvE` used the app-equivalent single argument
+  `root-file:"file.txt"` and verified restore plus undo recovery.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test status` passed.
+  - full `cargo test` passed with 387 tests.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
+- Remaining risk: the exact-path parser intentionally recognizes only the narrow default single-path
+  `jj status` row shape. If jj status output becomes configurable or gains structured output
+  suitable for status files, this should move to a stronger contract instead of expanding
+  rendered-text inference.
+- Next slice: `Interruption Packet F: Fetch Remote Selection`.

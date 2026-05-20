@@ -368,8 +368,14 @@ pub struct JjWorkingCopyNavigationPlan {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRestorePlan {
-    revision: String,
+    target: JjRestoreTarget,
     path: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum JjRestoreTarget {
+    ExactChange(String),
+    CurrentWorkingCopy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -730,20 +736,27 @@ impl JjWorkingCopyNavigationPlan {
 impl JjRestorePlan {
     pub fn for_revision(revision: impl Into<String>) -> Self {
         Self {
-            revision: revision.into(),
+            target: JjRestoreTarget::ExactChange(revision.into()),
             path: None,
         }
     }
 
     pub fn for_path(revision: impl Into<String>, path: impl Into<String>) -> Self {
         Self {
-            revision: revision.into(),
+            target: JjRestoreTarget::ExactChange(revision.into()),
+            path: Some(path.into()),
+        }
+    }
+
+    pub fn for_working_copy_path(path: impl Into<String>) -> Self {
+        Self {
+            target: JjRestoreTarget::CurrentWorkingCopy,
             path: Some(path.into()),
         }
     }
 
     pub fn revision(&self) -> &str {
-        &self.revision
+        self.target.label()
     }
 
     pub fn path(&self) -> Option<&str> {
@@ -756,11 +769,14 @@ impl JjRestorePlan {
     }
 
     pub fn command_argv(&self) -> Vec<String> {
-        let mut argv = vec![
-            "restore".to_owned(),
-            "--changes-in".to_owned(),
-            exact_change_id_revset(&self.revision),
-        ];
+        let mut argv = match &self.target {
+            JjRestoreTarget::ExactChange(revision) => vec![
+                "restore".to_owned(),
+                "--changes-in".to_owned(),
+                exact_change_id_revset(revision),
+            ],
+            JjRestoreTarget::CurrentWorkingCopy => vec!["restore".to_owned()],
+        };
         if let Some(path) = &self.path {
             argv.push(root_file_fileset(path));
         }
@@ -773,11 +789,14 @@ impl JjRestorePlan {
     }
 
     pub fn preview_diff_argv(&self) -> Vec<String> {
-        let mut argv = vec![
-            "diff".to_owned(),
-            "-r".to_owned(),
-            exact_change_id_revset(&self.revision),
-        ];
+        let mut argv = match &self.target {
+            JjRestoreTarget::ExactChange(revision) => vec![
+                "diff".to_owned(),
+                "-r".to_owned(),
+                exact_change_id_revset(revision),
+            ],
+            JjRestoreTarget::CurrentWorkingCopy => vec!["diff".to_owned()],
+        };
         if let Some(path) = &self.path {
             argv.push(root_file_fileset(path));
         }
@@ -796,7 +815,7 @@ impl JjRestorePlan {
 
     pub fn preview_summary(&self, forward_diff: &str) -> String {
         let mut lines = vec![
-            format!("target revision: {}", self.revision),
+            format!("target revision: {}", self.revision()),
             format!("command: {}", self.command_label()),
         ];
 
@@ -804,10 +823,7 @@ impl JjRestorePlan {
             Some(path) => {
                 lines.push(format!("selected path: {path}"));
                 lines.push(format!("exact fileset: {}", root_file_fileset(path)));
-                lines.push(
-                    "effect: restore removes the selected path's forward diff from that exact revision"
-                        .to_owned(),
-                );
+                lines.push(self.target.path_restore_effect());
             }
             None => lines.push(
                 "effect: restore removes the selected revision's forward diff from that exact revision"
@@ -826,6 +842,27 @@ impl JjRestorePlan {
         ]);
 
         lines.join("\n")
+    }
+}
+
+impl JjRestoreTarget {
+    fn label(&self) -> &str {
+        match self {
+            Self::ExactChange(revision) => revision,
+            Self::CurrentWorkingCopy => "@",
+        }
+    }
+
+    fn path_restore_effect(&self) -> String {
+        match self {
+            Self::ExactChange(_) => {
+                "effect: restore removes the selected path's forward diff from that exact revision"
+                    .to_owned()
+            }
+            Self::CurrentWorkingCopy => {
+                "effect: restore removes the selected path's working-copy diff from @".to_owned()
+            }
+        }
     }
 }
 
@@ -1735,6 +1772,30 @@ mod tests {
             preview.contains("exact fileset: root-file:\"dir/with spaces/quo\\\"te\\\\[glob]?*\"")
         );
         assert!(preview.contains("effect: restore removes the selected path's forward diff"));
+    }
+
+    #[test]
+    fn restore_plan_uses_default_working_copy_restore_for_status_paths() {
+        let restore = JjRestorePlan::for_working_copy_path("src/status.rs");
+
+        assert_eq!(
+            restore.command_argv(),
+            vec!["restore", "root-file:\"src/status.rs\""]
+        );
+        assert_eq!(
+            restore.preview_diff_argv(),
+            vec!["diff", "root-file:\"src/status.rs\""]
+        );
+        assert_eq!(
+            restore.command_label(),
+            "jj restore root-file:\"src/status.rs\""
+        );
+
+        let preview = restore.preview_summary("M src/status.rs\n");
+        assert!(preview.contains("target revision: @"));
+        assert!(preview.contains("selected path: src/status.rs"));
+        assert!(preview.contains("working-copy diff from @"));
+        assert!(preview.contains("preview source: jj diff root-file:\"src/status.rs\""));
     }
 
     #[test]

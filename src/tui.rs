@@ -380,6 +380,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " search  ",
             key("y"),
             " copy  ",
+            key("a"),
+            " actions  ",
             key("D/C"),
             " describe/commit @  ",
             key("b/=/m"),

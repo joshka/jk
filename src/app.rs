@@ -1974,6 +1974,11 @@ impl App {
                     }
                 }
             }
+            FollowUp::RestoreWorkingCopyPath { path } => {
+                let path = path.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_restore_preview(JjRestorePlan::for_working_copy_path(path));
+            }
             FollowUp::RevertExactTarget { revision } => {
                 let revision = revision.clone();
                 self.mode = InteractionMode::Normal;
@@ -6373,7 +6378,7 @@ mod tests {
     }
 
     #[test]
-    fn open_action_menu_rejects_unsupported_status_view() {
+    fn open_action_menu_rejects_status_without_exact_path() {
         let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[])));
 
         app.open_action_menu(12).unwrap();
@@ -6381,7 +6386,62 @@ mod tests {
         assert!(matches!(app.mode, InteractionMode::Normal));
         assert_eq!(
             app.status.message(),
-            "action menu is only available from graph, show, diff, file list, or file show"
+            "status file action unavailable: status output is empty"
+        );
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+    }
+
+    #[test]
+    fn status_action_menu_opens_working_copy_path_restore_preview() {
+        let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[
+            "Working copy changes:",
+            "M src/status.rs",
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('j'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        let menu = match &app.mode {
+            InteractionMode::ActionMenu { menu, .. } => menu,
+            _ => panic!("expected status action menu"),
+        };
+        assert_eq!(menu.items().len(), 1);
+        assert!(matches!(
+            menu.items()[0].follow_up(),
+            FollowUp::RestoreWorkingCopyPath { path } if path == "src/status.rs"
+        ));
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (path, command_label, body) = match &app.mode {
+            InteractionMode::RestorePreview { restore, output } => (
+                restore.path().map(str::to_owned),
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected restore preview mode"),
+        };
+        assert_eq!(path.as_deref(), Some("src/status.rs"));
+        assert_eq!(command_label, "jj restore root-file:\"src/status.rs\"");
+        assert!(body.contains("target revision: @"));
+        assert!(body.contains("selected path: src/status.rs"));
+    }
+
+    #[test]
+    fn status_action_menu_reports_disabled_ambiguous_row() {
+        let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[
+            "R {old.rs => new.rs}",
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "status file action unavailable: renamed status rows contain multiple paths"
         );
         assert!(matches!(app.status.kind(), StatusKind::Error));
     }

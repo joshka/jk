@@ -425,8 +425,11 @@ impl ViewState {
                     ExactActionContext::detail(revision).with_selected_path(path),
                 ))
             }
-            Self::Status(_)
-            | Self::Resolve(_)
+            Self::Status(view) => Ok(Some(ExactActionContext::status_path(
+                view.selected_exact_path()
+                    .map_err(|message| color_eyre::eyre::eyre!(message))?,
+            ))),
+            Self::Resolve(_)
             | Self::Bookmarks(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),
@@ -560,6 +563,31 @@ mod tests {
         assert_eq!(
             file_show.exact_restore_revert_context().unwrap(),
             Some(ExactActionContext::detail("abcdefg").with_selected_path("src/main.rs"))
+        );
+    }
+
+    #[test]
+    fn exact_restore_revert_context_uses_status_selected_path_at_working_copy() {
+        let mut status =
+            crate::status::StatusView::test_new(&["Working copy changes:", "M src/status.rs"]);
+        status.scroll_down(4, 1);
+        let view = ViewState::Status(status);
+
+        assert_eq!(
+            view.exact_restore_revert_context().unwrap(),
+            Some(ExactActionContext::status_path("src/status.rs"))
+        );
+    }
+
+    #[test]
+    fn exact_restore_revert_context_rejects_ambiguous_status_row() {
+        let view = ViewState::Status(crate::status::StatusView::test_new(&[
+            "R {old.rs => new.rs}",
+        ]));
+
+        assert_eq!(
+            view.exact_restore_revert_context().unwrap_err().to_string(),
+            "status file action unavailable: renamed status rows contain multiple paths"
         );
     }
 

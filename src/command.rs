@@ -662,6 +662,7 @@ fn view_help_metadata(
             HelpContext::Graph
                 | HelpContext::Show
                 | HelpContext::Diff
+                | HelpContext::Status
                 | HelpContext::FileList
                 | HelpContext::FileShow
                 | HelpContext::OperationLog
