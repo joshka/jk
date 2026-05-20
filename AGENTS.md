@@ -22,6 +22,117 @@ pipeline reconstruction, semantic inference from rendered text, or duplicated `j
 [`docs/plan/integration-strategy.md`](docs/plan/integration-strategy.md) and record assumptions in
 [`docs/plan/fragility-register.md`](docs/plan/fragility-register.md).
 
+## Always-On Agent Guidance
+
+Apply this section in every turn and in every subagent. It summarizes the repo-local shared guidance
+copied into [`docs/development/`](docs/development/) so agents and GitHub readers do not depend on a
+sibling checkout or generated scripts.
+
+- Preserve unrelated human or agent work. Inspect the working copy before editing, avoid reverting
+  unowned changes, and stop for direction if existing edits conflict with the task.
+- Preserve intent over literal instructions. If the requested steps appear to miss the stated goal,
+  choose the path that satisfies the goal and explain the tradeoff.
+- Keep durable context on disk. Put repository-specific facts, assumptions, decisions, and follow-up
+  notes in tracked docs or ignored `AGENTS.override.md` files rather than relying on chat context.
+- Prefer tools and checks over repeated prompting. If the same correction would be needed again,
+  make it mechanical through code, tests, lint configuration, scripts, templates, or local guidance.
+- Distill conventions from accepted artifacts before inventing style. Start from nearby code, tests,
+  docs, snapshots, and existing architecture notes.
+- Define the quality bar before judgment-heavy work such as naming, API shape, documentation
+  structure, user-visible behavior, or rule wording.
+- Identify the owning module before editing. Put behavior where the concept lives, not in the first
+  caller, facade, helper, or test that mentions it.
+- Keep changes minimal but complete. Use one purpose per change; treat `and` in a change description
+  as a scope warning.
+- Separate structure from behavior. Avoid mixing formatting, renames, dependency updates, rewrites,
+  and semantic changes unless the coupling is necessary and documented.
+- Prefer build-preserving edits. Make changes along natural paths and run focused validation early
+  so failures stay close to their cause.
+- Choose validation by risk. Match proof to the changed surface: parser samples for parsers,
+  navigation boundaries for TUI movement, rendered output checks for presentation, and docs checks
+  for documentation.
+- Report proof in handoffs instead of confidence language. State what was run, what passed, what was
+  not run, and any residual risk.
+- Review output as a future maintainer. Check correctness, edge cases, API clarity, documentation
+  truthfulness, ownership, test focus, validation evidence, and remaining risk before handoff.
+- Keep secrets out of context, docs, logs, and tests. Redact or avoid exposing tokens, credentials,
+  local private paths that are not needed, and sensitive command output.
+- Make exec-like workflows noninteractive by default. Use `--no-pager`, avoid editor prompts, and
+  keep commands suitable for agents, CI, and background tasks.
+- Make ambient inputs explicit where they affect behavior: current directory, environment, terminal
+  size, config, time, randomness, locale, network state, and process state.
+- Push uncertainty to boundaries. Parse and validate external strings, CLI output, JSON, provider
+  responses, and user input before passing trusted values inward.
+- Treat terminal UI as a product surface. Preserve conservative terminal behavior, accessibility,
+  platform variation, and user-configured `jj` presentation whenever practical.
+
+## Shared Development Guidance
+
+This repo carries a local copy of the reviewed `joshka/practice` development guidance in
+[`docs/development/`](docs/development/). Use this repo's local rules first. When local guidance is
+silent, use the copied shared guidance as the fallback. The public rendered reference is [Software
+Practices](https://www.joshka.net/practice/), and the canonical source repository is
+[`joshka/practice`](https://github.com/joshka/practice).
+
+Load these files deliberately:
+
+- [`docs/development/README.md`](docs/development/README.md): read when changing, refreshing, or
+  explaining the copied shared guidance tree.
+- [`docs/development/snippets/agents/rules.md`](docs/development/snippets/agents/rules.md): read at
+  the start of broad, ambiguous, multi-domain, or high-risk agent work when a compact full rule
+  surface is more useful than loading one domain.
+- [`docs/development/rules/README.md`](docs/development/rules/README.md): read when choosing which
+  domain rule files apply to a task.
+- [`docs/development/bootstrap-downstream.md`](docs/development/bootstrap-downstream.md): read when
+  installing, refreshing, or merging this guidance into another downstream repo.
+- [`docs/development/update.py`](docs/development/update.py): inspect before changing the refresh
+  workflow or running a guidance refresh from `joshka/practice`.
+
+Read the domain files that match the task:
+
+- [`docs/development/rules/agent-workflow.md`](docs/development/rules/agent-workflow.md): read for
+  agent planning, delegation, context capture, handoffs, validation reporting, or repeated feedback
+  that should become durable guidance.
+- [`docs/development/rules/boundary.md`](docs/development/rules/boundary.md): read for parsing,
+  validation, state ownership, lifecycle transitions, policy boundaries, provider/CLI integration,
+  terminal behavior, or other effect boundaries.
+- [`docs/development/rules/change-shape.md`](docs/development/rules/change-shape.md): read before
+  shaping a change, splitting scope, touching generated artifacts, moving behavior between modules,
+  changing dependencies, or mixing refactors with behavior changes.
+- [`docs/development/rules/documentation.md`](docs/development/rules/documentation.md): read for
+  README, Rustdoc, guides, examples, doc structure, claims about current behavior, or documentation
+  review.
+- [`docs/development/rules/observability.md`](docs/development/rules/observability.md): read when
+  adding or changing diagnostics, errors, logs, degradation behavior, or failure visibility.
+- [`docs/development/rules/performance.md`](docs/development/rules/performance.md): read when
+  optimizing, changing hot paths, adding caches, making performance claims, or trading readability
+  for speed.
+- [`docs/development/rules/refactoring.md`](docs/development/rules/refactoring.md): read before
+  refactoring, extracting abstractions, renaming concepts, moving code, or reducing duplication.
+- [`docs/development/rules/review.md`](docs/development/rules/review.md): read when preparing a PR,
+  responding to review, writing handoff notes, classifying prototype reuse, or deciding what belongs
+  in issues, ADRs, or PR descriptions.
+- [`docs/development/rules/rust.md`](docs/development/rules/rust.md): read for Rust API shape, trait
+  design, generics, ownership, errors, features, dependencies, docs, examples, macros, unsafe, or
+  public crate behavior.
+- [`docs/development/rules/source.md`](docs/development/rules/source.md): read when gathering
+  context, using generated/vendor files, relying on external sources, or deciding what evidence is
+  authoritative.
+- [`docs/development/rules/test-failures.md`](docs/development/rules/test-failures.md): read when
+  writing assertions, improving failure messages, snapshotting output, or making tests explain the
+  broken contract.
+- [`docs/development/rules/testing.md`](docs/development/rules/testing.md): read when choosing
+  validation, adding tests, changing parser samples, checking feature combinations, proving command
+  construction, or updating CI expectations.
+- [`docs/development/rules/vcs.md`](docs/development/rules/vcs.md): read before jj/git topology
+  work, bookmarks, branching, rebasing, squashing, conflict recovery, publishing, or preserving
+  unrelated working-copy edits.
+
+Do not hand edit copied generated rule files unless intentionally forking this repo's guidance.
+Prefer changing local project instructions in this file or the existing `docs/agent/` files. If a
+shared rule causes friction or seems wrong for most projects, send feedback upstream instead of only
+patching around it locally.
+
 ## Project Structure & Module Organization
 
 Source lives in `src/`; tests are colocated in each module under `#[cfg(test)]`. The code is
