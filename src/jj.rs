@@ -2640,12 +2640,40 @@ mod tests {
     }
 
     #[test]
+    fn git_push_revision_can_use_jj_default_remote_resolution() {
+        let push = JjGitPush::for_revision("main".to_owned());
+
+        assert_eq!(
+            push.command_argv(false),
+            vec!["git", "push", "--revision", "main"]
+        );
+        assert_eq!(
+            push.command_label(true),
+            "jj git push --dry-run --revision main"
+        );
+    }
+
+    #[test]
     fn git_push_status_default_uses_remote_only_target() {
         let push = JjGitPush::for_status().with_remote("origin".to_owned());
 
         assert_eq!(
             push.command_argv(false),
             vec!["git", "push", "--remote", "origin"]
+        );
+        assert_eq!(
+            push.command_label(true),
+            "jj git push --dry-run --remote origin"
+        );
+    }
+
+    #[test]
+    fn git_push_bookmark_can_use_jj_default_remote_resolution() {
+        let push = JjGitPush::for_bookmark("main".to_owned());
+
+        assert_eq!(
+            push.command_argv(true),
+            vec!["git", "push", "--dry-run", "--bookmark", "main"]
         );
     }
 

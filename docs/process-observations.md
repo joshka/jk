@@ -962,3 +962,36 @@ tied to a concrete command, file state, or transcript.
 
 Update this file on each turn, as requested by the user, with any new provable observations that
 belong here.
+
+## 2026-05-20 Packet 19 Push Simplification Worker
+
+- Thread id: `019e445b-d34a-7712-91e8-276e57080659`.
+- Slice / task: Implement Packet 19 push-flow simplification in the existing
+  `Simplify guided push flow` jj working-copy change.
+- Starting state: `jj --no-pager status` reported a clean working copy at change
+  `umwzntvm 74d936a2 (empty) Simplify guided push flow`.
+- Observable outcome: `src/app.rs` now skips the push remote picker when exactly one remote is
+  discovered, keeps the picker for multiple remotes, preserves no-remote and unsupported-view
+  errors, and stores explicit status/bookmark/revision target semantics in the scrollable
+  `ActionOutput` preview/result context.
+- Observable outcome: `src/jj.rs` has focused command-construction coverage for remote and no-remote
+  push shapes, including default status pushes, exact bookmarks, and exact revisions.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test push`
+  - full `cargo test`
+  - disposable proof under `/tmp/jk-packet19-proof.NfYfy6` using `jj --no-pager git init`,
+    `jj --no-pager git remote list`, and `jj --no-pager git push --dry-run` with command cwd set to
+    that repo
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - attempted `just check`, which stopped at `cargo +nightly fmt` with `no such command: +nightly`
+- Rework status: after the first focused test compile found one test fixture using `&str` where
+  `JjGitPush::for_revision` requires `String`, the fixture was updated and `cargo test push` passed.
+- Review note: GPT-5.5 review identified a residual doc-precision issue after the Spark code repair:
+  Packet 19 output documentation over-stated that preview/result bodies are only raw jj output,
+  while refreshed views can append a local `refresh failed: ...` context line after successful push
+  output.
+- Acceptance note: Packet 19 was accepted after GPT-5.5 code review, Spark code repair, GPT-5.5
+  repaired review, and docs precision repair.

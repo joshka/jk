@@ -43,6 +43,12 @@ type OperationRecoveryRun = fn(&JjOperationRecovery) -> Result<String>;
 #[cfg(test)]
 type ResolveRevision = fn(&str) -> Result<String>;
 #[cfg(test)]
+type GitRemotesLoad = fn() -> Result<Vec<String>>;
+#[cfg(test)]
+type PushPreviewRun = fn(&JjGitPush) -> Result<String>;
+#[cfg(test)]
+type PushRun = fn(&JjGitPush) -> Result<String>;
+#[cfg(test)]
 type RefreshView = fn(&mut ViewState) -> Result<()>;
 #[cfg(test)]
 type RevealGraphChange = fn(&mut ViewState, &str, LogViewMode) -> Result<bool>;
@@ -74,6 +80,12 @@ struct App {
     operation_recovery_run: OperationRecoveryRun,
     #[cfg(test)]
     resolve_revision: ResolveRevision,
+    #[cfg(test)]
+    git_remotes_load: GitRemotesLoad,
+    #[cfg(test)]
+    push_preview_run: PushPreviewRun,
+    #[cfg(test)]
+    push_run: PushRun,
     #[cfg(test)]
     refresh_view: RefreshView,
     #[cfg(test)]
@@ -185,6 +197,21 @@ fn default_resolve_revision(revset: &str) -> Result<String> {
 }
 
 #[cfg(test)]
+fn default_git_remotes_load() -> Result<Vec<String>> {
+    git_remotes()
+}
+
+#[cfg(test)]
+fn default_push_preview_run(push: &JjGitPush) -> Result<String> {
+    push.run_preview().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_push_run(push: &JjGitPush) -> Result<String> {
+    push.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
 fn default_refresh_view(view: &mut ViewState) -> Result<()> {
     view.refresh()
 }
@@ -228,6 +255,12 @@ impl App {
             operation_recovery_run: default_operation_recovery_run,
             #[cfg(test)]
             resolve_revision: default_resolve_revision,
+            #[cfg(test)]
+            git_remotes_load: default_git_remotes_load,
+            #[cfg(test)]
+            push_preview_run: default_push_preview_run,
+            #[cfg(test)]
+            push_run: default_push_run,
             #[cfg(test)]
             refresh_view: default_refresh_view,
             #[cfg(test)]
@@ -313,6 +346,36 @@ impl App {
     #[cfg(not(test))]
     fn reveal_graph_change(&mut self, change_id: &str, fallback_mode: LogViewMode) -> Result<bool> {
         self.view.reveal_graph_change(change_id, fallback_mode)
+    }
+
+    #[cfg(test)]
+    fn load_git_remotes(&self) -> Result<Vec<String>> {
+        (self.git_remotes_load)()
+    }
+
+    #[cfg(not(test))]
+    fn load_git_remotes(&self) -> Result<Vec<String>> {
+        git_remotes()
+    }
+
+    #[cfg(test)]
+    fn load_push_preview(&self, push: &JjGitPush) -> Result<String> {
+        (self.push_preview_run)(push)
+    }
+
+    #[cfg(not(test))]
+    fn load_push_preview(&self, push: &JjGitPush) -> Result<String> {
+        push.run_preview().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_push(&self, push: &JjGitPush) -> Result<String> {
+        (self.push_run)(push)
+    }
+
+    #[cfg(not(test))]
+    fn run_push(&self, push: &JjGitPush) -> Result<String> {
+        push.run().map(|output| output.message().to_owned())
     }
 
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
@@ -953,21 +1016,24 @@ impl App {
             }
         };
 
-        match git_remotes() {
+        match self.load_git_remotes() {
             Ok(remotes) => {
-                if remotes.is_empty() {
-                    self.status = StatusLine::error(
-                        &self.view,
-                        "no git remotes found; add a remote before pushing".to_owned(),
-                    );
-                    return Ok(false);
+                match remotes.as_slice() {
+                    [] => {
+                        self.status = StatusLine::error(
+                            &self.view,
+                            "no git remotes found; add a remote before pushing".to_owned(),
+                        );
+                    }
+                    [remote] => self.open_push_preview(target, remote.to_owned()),
+                    _ => {
+                        self.mode = InteractionMode::PushRemotePrompt {
+                            target,
+                            remotes,
+                            selected: 0,
+                        };
+                    }
                 }
-
-                self.mode = InteractionMode::PushRemotePrompt {
-                    target,
-                    remotes,
-                    selected: 0,
-                };
                 Ok(false)
             }
             Err(error) => {
@@ -978,28 +1044,19 @@ impl App {
     }
 
     fn open_push_preview(&mut self, target: JjGitPushTarget, remote: String) {
-        let status_context = match &target {
-            JjGitPushTarget::Status => Some(format!(
-                "status push uses jj default target for remote {remote}"
-            )),
-            _ => None,
-        };
+        let status_context = Some(push_status_context(&target, remote.as_str()));
         let push = match target {
             JjGitPushTarget::Bookmark(name) => JjGitPush::for_bookmark(name).with_remote(remote),
             JjGitPushTarget::Revision(name) => JjGitPush::for_revision(name).with_remote(remote),
             JjGitPushTarget::Status => JjGitPush::for_status().with_remote(remote),
         };
 
-        match push.run_preview() {
+        match self.load_push_preview(&push) {
             Ok(output) => {
                 let command_label = push.command_label(true);
                 self.mode = InteractionMode::PushPreview {
                     push,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
+                    output: ActionOutput::pending(command_label, output, status_context),
                 };
             }
             Err(error) => {
@@ -1233,17 +1290,20 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = push.command_label(false);
-        let result_message = match push.run() {
-            Ok(output) => match self.view.refresh() {
+        let result_message = match self.run_push(&push) {
+            Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
                     self.view.clamp(viewport_height);
-                    let message = output.message().to_owned();
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
+                    self.status = StatusLine::with_message(&self.view, output.as_str());
+                    output
                 }
                 Err(error) => {
                     self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("refresh failed: {error}")
+                    if output.is_empty() {
+                        format!("refresh failed: {error}")
+                    } else {
+                        format!("{output}\nrefresh failed: {error}")
+                    }
                 }
             },
             Err(error) => {
@@ -1886,6 +1946,20 @@ fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }
 
+fn push_status_context(target: &JjGitPushTarget, remote: &str) -> String {
+    match target {
+        JjGitPushTarget::Bookmark(name) => {
+            format!("bookmark push targets exact bookmark '{name}' on remote {remote}")
+        }
+        JjGitPushTarget::Revision(revision) => {
+            format!("graph push targets exact selected revision '{revision}' on remote {remote}")
+        }
+        JjGitPushTarget::Status => {
+            format!("status push uses jj default target resolution for remote {remote}")
+        }
+    }
+}
+
 fn action_output_visible_lines(viewport_height: u16) -> u16 {
     viewport_height.saturating_sub(1).max(1)
 }
@@ -2019,6 +2093,26 @@ mod tests {
         ))
     }
 
+    fn mock_no_remotes() -> Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+
+    fn mock_single_remote() -> Result<Vec<String>> {
+        Ok(vec!["origin".to_owned()])
+    }
+
+    fn mock_multiple_remotes() -> Result<Vec<String>> {
+        Ok(vec!["origin".to_owned(), "upstream".to_owned()])
+    }
+
+    fn mock_push_preview_success(push: &JjGitPush) -> Result<String> {
+        Ok(format!("preview: {}", push.command_label(true)))
+    }
+
+    fn mock_push_success(push: &JjGitPush) -> Result<String> {
+        Ok(format!("pushed: {}", push.command_label(false)))
+    }
+
     fn mock_resolve_current_change_id(revset: &str) -> Result<String> {
         assert_eq!(revset, "@");
         Ok("new-working-copy".to_owned())
@@ -2030,6 +2124,10 @@ mod tests {
 
     fn mock_refresh_ok(_view: &mut ViewState) -> Result<()> {
         Ok(())
+    }
+
+    fn mock_refresh_failure(_view: &mut ViewState) -> Result<()> {
+        Err(eyre!("view refresh failed"))
     }
 
     fn mock_reveal_graph_change_error(
@@ -2074,6 +2172,12 @@ mod tests {
             operation_recovery_run: mock_operation_recovery_success,
             #[cfg(test)]
             resolve_revision: mock_resolve_current_change_id,
+            #[cfg(test)]
+            git_remotes_load: mock_multiple_remotes,
+            #[cfg(test)]
+            push_preview_run: mock_push_preview_success,
+            #[cfg(test)]
+            push_run: mock_push_success,
             #[cfg(test)]
             refresh_view: mock_refresh_ok,
             #[cfg(test)]
@@ -2176,6 +2280,179 @@ mod tests {
     }
 
     #[test]
+    fn open_push_prompt_skips_remote_prompt_for_single_remote() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.git_remotes_load = mock_single_remote;
+
+        assert!(!app.open_push_prompt().unwrap());
+
+        let output = match &app.mode {
+            InteractionMode::PushPreview { push, output } => {
+                assert_eq!(push.remote(), Some("origin"));
+                output
+            }
+            _ => panic!("expected push preview mode"),
+        };
+        assert_eq!(
+            output.command_label(),
+            "jj git push --dry-run --remote origin --revision abcdef"
+        );
+        assert_eq!(
+            output.status_context().map(String::as_str),
+            Some("graph push targets exact selected revision 'abcdef' on remote origin")
+        );
+    }
+
+    #[test]
+    fn open_push_prompt_keeps_remote_prompt_for_multiple_remotes() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.git_remotes_load = mock_multiple_remotes;
+
+        assert!(!app.open_push_prompt().unwrap());
+
+        match &app.mode {
+            InteractionMode::PushRemotePrompt {
+                target,
+                remotes,
+                selected,
+            } => {
+                assert_eq!(target, &JjGitPushTarget::Revision("abcdef".to_owned()));
+                assert_eq!(remotes, &["origin".to_owned(), "upstream".to_owned()]);
+                assert_eq!(*selected, 0);
+            }
+            _ => panic!("expected push remote prompt"),
+        }
+    }
+
+    #[test]
+    fn open_push_prompt_reports_no_remote_error() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.git_remotes_load = mock_no_remotes;
+
+        assert!(!app.open_push_prompt().unwrap());
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "no git remotes found; add a remote before pushing"
+        );
+    }
+
+    #[test]
+    fn open_push_prompt_reports_unsupported_view_error() {
+        let mut app = test_app(ViewState::OperationLog(
+            crate::operation_log::OperationLogView::test_new(Vec::new()),
+        ));
+
+        assert!(!app.open_push_prompt().unwrap());
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "push is only available from graph, status, or bookmarks views"
+        );
+    }
+
+    #[test]
+    fn push_preview_context_names_status_default_resolution() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+
+        app.open_push_preview(JjGitPushTarget::Status, "origin".to_owned());
+
+        let output = match &app.mode {
+            InteractionMode::PushPreview { output, .. } => output,
+            _ => panic!("expected push preview mode"),
+        };
+        assert_eq!(
+            output.status_context().map(String::as_str),
+            Some("status push uses jj default target resolution for remote origin")
+        );
+        assert_eq!(
+            output.command_label(),
+            "jj git push --dry-run --remote origin"
+        );
+    }
+
+    #[test]
+    fn push_preview_context_names_exact_bookmark() {
+        let mut app = test_app(ViewState::Bookmarks(
+            crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+                Vec::new(),
+                "feature".to_owned(),
+                Some("abcdef".to_owned()),
+                None,
+            )]),
+        ));
+
+        app.open_push_preview(
+            JjGitPushTarget::Bookmark("feature".to_owned()),
+            "origin".to_owned(),
+        );
+
+        let output = match &app.mode {
+            InteractionMode::PushPreview { output, .. } => output,
+            _ => panic!("expected push preview mode"),
+        };
+        assert_eq!(
+            output.status_context().map(String::as_str),
+            Some("bookmark push targets exact bookmark 'feature' on remote origin")
+        );
+        assert_eq!(
+            output.command_label(),
+            "jj git push --dry-run --remote origin --bookmark feature"
+        );
+    }
+
+    #[test]
+    fn push_result_keeps_context_until_closed() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::PushPreview {
+            push: JjGitPush::for_revision("abcdef".to_owned()).with_remote("origin"),
+            output: ActionOutput::pending(
+                "jj git push --dry-run --remote origin --revision abcdef".to_owned(),
+                "preview only".to_owned(),
+                Some(
+                    "graph push targets exact selected revision 'abcdef' on remote origin"
+                        .to_owned(),
+                ),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::PushPreview { output, .. } => output,
+            _ => panic!("expected push result mode"),
+        };
+        assert!(output.completed());
+        assert_eq!(
+            output.status_context().map(String::as_str),
+            Some("graph push targets exact selected revision 'abcdef' on remote origin")
+        );
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("pushed: jj git push --remote origin --revision abcdef")
+        );
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+    }
+
+    #[test]
     fn push_preview_entering_cancel_restores_normal_mode() {
         let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
             crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
@@ -2198,6 +2475,39 @@ mod tests {
     }
 
     #[test]
+    fn push_confirm_success_with_refresh_error_keeps_output() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.refresh_view = mock_refresh_failure;
+        app.mode = InteractionMode::PushPreview {
+            push: JjGitPush::for_revision("abcdef".to_owned()).with_remote("origin"),
+            output: ActionOutput::pending(
+                "jj git push --dry-run --remote origin --revision abcdef".to_owned(),
+                "preview only".to_owned(),
+                Some(
+                    "graph push targets exact selected revision 'abcdef' on remote origin"
+                        .to_owned(),
+                ),
+            ),
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::PushPreview { output, .. } => output,
+            _ => panic!("expected push result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("pushed: jj git push --remote origin --revision abcdef"));
+        assert!(body.contains("refresh failed: view refresh failed"));
+        assert_eq!(app.status.message(), "view refresh failed");
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+    }
+
+    #[test]
     fn push_preview_completion_stays_until_closed() {
         let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
             crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
@@ -2207,7 +2517,7 @@ mod tests {
             output: ActionOutput::finished(
                 "jj git push --remote origin".to_owned(),
                 "pushed".to_owned(),
-                Some("status push uses jj default target for remote origin".to_owned()),
+                Some("status push uses jj default target resolution for remote origin".to_owned()),
             ),
         };
         app.status = StatusLine::with_message(&app.view, "pushed");

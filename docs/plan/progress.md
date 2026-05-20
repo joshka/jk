@@ -304,3 +304,32 @@
   multi-select ordering is now graph-row order rather than toggle order, which is tested but still
   depends on the rendered graph and metadata streams staying paired.
 - Next slice: TBD after review of exact-parent mutation flows
+
+## Packet 19: Push Flow Simplification
+
+- Files changed: `src/app.rs`, `src/jj.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: push now skips remote selection when `jj git remote list` reports exactly one remote and
+  opens the existing scrollable push preview directly for that remote. Multiple remotes still open
+  the push-specific remote picker, and no-remotes or unsupported-view paths remain disabled with
+  readable status errors. Preview/result context now names the target semantics explicitly: status
+  pushes use jj default target resolution for the selected remote, bookmark pushes target the exact
+  selected bookmark name, and graph pushes target the exact selected revision.
+- Verification: `cargo check`; focused `cargo test push`; full `cargo test`; disposable remote-less
+  jj proof under `/tmp/jk-packet19-proof.NfYfy6`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt --check`; `just md-check`
+- Manual proof: disposable repo `/tmp/jk-packet19-proof.NfYfy6` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, `jj --no-pager git remote list` returned no
+  remotes, and `jj --no-pager git push --dry-run` reported
+  `Warning: No bookmarks/tags found in the default push revset: remote_bookmarks(remote=origin)..@`
+  followed by `Nothing changed.`
+- Validation note: `just check` was attempted after Packet 19 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused push tests, full `cargo test`, `rustup run nightly cargo fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Remaining risk: status-context push still delegates target choice to jj's default push resolution
+  for the selected remote; `jk` makes that delegation visible but does not precompute the exact
+  bookmark or revision jj will select. Preview and result bodies preserve successful raw jj CLI
+  output and may be followed by a local `refresh failed: ...` line if the post-push refresh step
+  fails.
+- Next slice: Packet 20 README/User Docs Refresh
