@@ -89,7 +89,8 @@ bookmark/sync hints, and renderable status sections together.
 ## Entry Points
 
 - dedicated status shortcut
-- command mode
+- direct startup via `jk status`
+- command mode is deferred until that surface exists
 - return point after mutation flows
 
 ## Open Design Choice

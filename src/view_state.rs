@@ -13,6 +13,7 @@ use crate::graph::GraphView;
 use crate::jj::{JjCommand, LogViewMode, ViewSpec};
 use crate::search::SearchQuery;
 use crate::show::ShowView;
+use crate::status::StatusView;
 use crate::tui::StatusHints;
 
 /// The currently active top-level view.
@@ -20,6 +21,7 @@ pub enum ViewState {
     Graph(GraphView),
     Show(ShowView),
     Diff(DiffView),
+    Status(StatusView),
 }
 
 impl ViewState {
@@ -28,6 +30,7 @@ impl ViewState {
             JjCommand::Default | JjCommand::Log => Ok(Self::Graph(GraphView::load(spec)?)),
             JjCommand::Show => Ok(Self::Show(ShowView::load(spec)?)),
             JjCommand::Diff => Ok(Self::Diff(DiffView::load(spec)?)),
+            JjCommand::Status => Ok(Self::Status(StatusView::load(spec)?)),
         }
     }
 
@@ -36,6 +39,7 @@ impl ViewState {
             Self::Graph(view) => view.render(frame, area, search),
             Self::Show(view) => view.render(frame, area, search),
             Self::Diff(view) => view.render(frame, area, search),
+            Self::Status(view) => view.render(frame, area, search),
         }
     }
 
@@ -44,6 +48,7 @@ impl ViewState {
             Self::Graph(view) => view.bindings(),
             Self::Show(view) => view.bindings(),
             Self::Diff(view) => view.bindings(),
+            Self::Status(view) => view.bindings(),
         }
     }
 
@@ -52,6 +57,7 @@ impl ViewState {
             Self::Graph(view) => view.execute(command, context),
             Self::Show(view) => view.execute(command, context),
             Self::Diff(view) => view.execute(command, context),
+            Self::Status(view) => view.execute(command, context),
         }
     }
 
@@ -60,6 +66,7 @@ impl ViewState {
             Self::Graph(view) => view.refresh(),
             Self::Show(view) => view.refresh(),
             Self::Diff(view) => view.refresh(),
+            Self::Status(view) => view.refresh(),
         }
     }
 
@@ -68,6 +75,7 @@ impl ViewState {
             Self::Graph(view) => view.clamp(),
             Self::Show(view) => view.clamp(viewport_height),
             Self::Diff(view) => view.clamp(viewport_height),
+            Self::Status(view) => view.clamp(viewport_height),
         }
     }
 
@@ -76,6 +84,7 @@ impl ViewState {
             Self::Graph(view) => view.spec(),
             Self::Show(view) => view.spec(),
             Self::Diff(view) => view.spec(),
+            Self::Status(view) => view.spec(),
         }
     }
 
@@ -84,6 +93,7 @@ impl ViewState {
             Self::Graph(_) => StatusHints::Graph,
             Self::Show(_) => StatusHints::ShowDocument,
             Self::Diff(_) => StatusHints::DiffDocument,
+            Self::Status(_) => StatusHints::Status,
         }
     }
 
@@ -92,6 +102,7 @@ impl ViewState {
             Self::Graph(_) => HelpContext::Graph,
             Self::Show(_) => HelpContext::Show,
             Self::Diff(_) => HelpContext::Diff,
+            Self::Status(_) => HelpContext::Status,
         }
     }
 
@@ -104,6 +115,7 @@ impl ViewState {
             Self::Graph(_) => 0,
             Self::Show(view) => view.scroll_offset(),
             Self::Diff(view) => view.scroll_offset(),
+            Self::Status(view) => view.scroll_offset(),
         }
     }
 
@@ -112,27 +124,28 @@ impl ViewState {
             Self::Graph(_) => {}
             Self::Show(view) => view.set_scroll_offset(viewport_height, scroll_offset),
             Self::Diff(view) => view.set_scroll_offset(viewport_height, scroll_offset),
+            Self::Status(view) => view.set_scroll_offset(viewport_height, scroll_offset),
         }
     }
 
     pub fn graph_item_count(&self) -> Option<usize> {
         match self {
             Self::Graph(view) => Some(view.item_count()),
-            Self::Show(_) | Self::Diff(_) => None,
+            Self::Show(_) | Self::Diff(_) | Self::Status(_) => None,
         }
     }
 
     pub fn graph_mode_label(&self) -> Option<&str> {
         match self {
             Self::Graph(view) => Some(view.mode_label()),
-            Self::Show(_) | Self::Diff(_) => None,
+            Self::Show(_) | Self::Diff(_) | Self::Status(_) => None,
         }
     }
 
     pub fn set_graph_mode(&mut self, mode: LogViewMode) -> Result<()> {
         match self {
             Self::Graph(view) => view.set_mode(mode),
-            Self::Show(_) | Self::Diff(_) => Ok(()),
+            Self::Show(_) | Self::Diff(_) | Self::Status(_) => Ok(()),
         }
     }
 
@@ -143,7 +156,7 @@ impl ViewState {
     ) -> Result<bool> {
         match self {
             Self::Graph(view) => view.reveal_change_id(change_id, fallback_mode),
-            Self::Show(_) | Self::Diff(_) => Ok(false),
+            Self::Show(_) | Self::Diff(_) | Self::Status(_) => Ok(false),
         }
     }
 
@@ -152,6 +165,7 @@ impl ViewState {
             Self::Graph(view) => view.line_count(),
             Self::Show(view) => view.line_count(),
             Self::Diff(view) => view.line_count(),
+            Self::Status(view) => view.line_count(),
         }
     }
 }

@@ -63,6 +63,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('?'), Command::Help),
     Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
     Binding::new(KeyPattern::char('W'), Command::PromptLogRevset),
+    Binding::new(KeyPattern::char('S'), Command::OpenStatus),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
     Binding::new(KeyPattern::char('y'), Command::Copy),
     Binding::new(KeyPattern::char('v'), Command::ViewFormat),
@@ -160,6 +161,10 @@ impl App {
             }
             Command::PromptLogRevset => {
                 self.open_log_revset_prompt();
+                Ok(true)
+            }
+            Command::OpenStatus => {
+                self.open_status()?;
                 Ok(true)
             }
             Command::Fetch => {
@@ -524,8 +529,20 @@ impl App {
         let spec = match command {
             JjCommand::Show => ViewSpec::show(revset, self.diff_format),
             JjCommand::Diff => ViewSpec::diff(revset, self.diff_format),
-            JjCommand::Default | JjCommand::Log => return Ok(()),
+            JjCommand::Default | JjCommand::Log | JjCommand::Status => return Ok(()),
         };
+        self.push_view(spec)
+    }
+
+    fn open_status(&mut self) -> Result<()> {
+        if matches!(self.view.command(), JjCommand::Status) {
+            return Ok(());
+        }
+
+        self.push_view(ViewSpec::new(JjCommand::Status, Vec::new()))
+    }
+
+    fn push_view(&mut self, spec: ViewSpec) -> Result<()> {
         let next = ViewState::load(spec)?;
         let previous = std::mem::replace(&mut self.view, next);
         self.stack.push(previous);
@@ -602,8 +619,9 @@ fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
         "log" => Ok(ViewSpec::new(JjCommand::Log, rest.to_vec())),
         "show" => Ok(ViewSpec::new(JjCommand::Show, rest.to_vec())),
         "diff" => Ok(ViewSpec::new(JjCommand::Diff, rest.to_vec())),
+        "status" => Ok(ViewSpec::new(JjCommand::Status, rest.to_vec())),
         unknown => Err(eyre!(
-            "unsupported jk command '{unknown}'. Expected one of: log, show, diff"
+            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status"
         )),
     }
 }
@@ -724,8 +742,16 @@ mod tests {
     }
 
     #[test]
+    fn parses_status_startup_view() {
+        let spec = initial_view(vec!["status".into()]).unwrap();
+
+        assert_eq!(spec.command(), JjCommand::Status);
+        assert!(spec.args().is_empty());
+    }
+
+    #[test]
     fn rejects_unknown_startup_command() {
-        assert!(initial_view(vec!["status".into()]).is_err());
+        assert!(initial_view(vec!["bookmarks".into()]).is_err());
     }
 
     #[test]

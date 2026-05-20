@@ -18,6 +18,7 @@ pub enum JjCommand {
     Log,
     Show,
     Diff,
+    Status,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -104,6 +105,7 @@ impl JjCommand {
             Self::Log => "jj log",
             Self::Show => "jj show",
             Self::Diff => "jj diff",
+            Self::Status => "jj status",
         }
     }
 
@@ -113,6 +115,7 @@ impl JjCommand {
             Self::Log => Some("log"),
             Self::Show => Some("show"),
             Self::Diff => Some("diff"),
+            Self::Status => Some("status"),
         }
     }
 
@@ -219,6 +222,7 @@ impl ViewSpec {
             JjCommand::Log => "jk log",
             JjCommand::Show => "jk show",
             JjCommand::Diff => "jk diff",
+            JjCommand::Status => "jk status",
         };
 
         let args = self.display_args();
@@ -243,7 +247,7 @@ impl ViewSpec {
         self.target.clone().or_else(|| match self.command {
             JjCommand::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
             JjCommand::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
-            JjCommand::Default | JjCommand::Log => None,
+            JjCommand::Default | JjCommand::Log | JjCommand::Status => None,
         })
     }
 
@@ -418,6 +422,10 @@ pub fn load_compact_log_context(revset: &str) -> Result<Vec<Line<'static>>> {
         .next()
         .map(|item| item.lines().into_iter().take(2).collect())
         .unwrap_or_default())
+}
+
+pub fn document_plain_text(lines: &[Line<'static>]) -> String {
+    lines.iter().map(line_text).collect::<Vec<_>>().join("\n")
 }
 
 fn run_jj(spec: &ViewSpec, color: ColorMode) -> Result<std::process::Output> {

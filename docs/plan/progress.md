@@ -63,3 +63,16 @@
   manual proof, but not yet by an app-level mocked command-runner test around the whole direct
   action path
 - Next slice: Slice 6: Status Screen First Pass
+
+## Slice 6: Status Screen First Pass
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/main.rs`, `src/status.rs`,
+  `src/tui.rs`, `src/view_state.rs`, `docs/plan/implementation-slices.md`,
+  `docs/plan/screens/status.md`, `docs/plan/progress.md`
+- Verification: focused `cargo test status::`, `cargo test parses_status_startup_view`, and
+  `cargo test help_overlay_text_renders_generated_sections`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `markdownlint-cli2 docs/plan/progress.md`
+- Remaining risk: the native status screen now has a dedicated shortcut and direct `jk status`
+  startup path, but command-mode entry remains deferred because that app surface is not yet present,
+  and recommended planning keeps command mode secondary
+- Next slice: Slice 7: Operation Log First Pass

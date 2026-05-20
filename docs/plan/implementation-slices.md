@@ -181,7 +181,7 @@ Validation:
 
 ## Slice 6: Status Screen First Pass
 
-Goal: make working-copy triage useful without overcommitting to file actions.
+Goal: make working-copy triage useful without overcommitting to file actions or command mode.
 
 Recommended scope:
 
@@ -193,11 +193,12 @@ Recommended scope:
 
 Acceptance criteria:
 
-- status opens from a stable shortcut and command mode;
+- status opens from a stable shortcut and direct startup;
 - refresh preserves scroll/section when possible;
 - clean, dirty, and conflict output remain readable;
 - fetch can be launched from status when implemented;
-- no file mutation action depends on parsed prose.
+- command-mode entry stays deferred until the app grows that surface, and no file mutation action
+  depends on parsed prose.
 
 Validation:
 

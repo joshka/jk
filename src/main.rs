@@ -9,6 +9,7 @@ mod rendered_jj;
 mod search;
 mod selection;
 mod show;
+mod status;
 mod sticky_file_view;
 mod tui;
 mod view_state;

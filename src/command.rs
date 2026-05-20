@@ -15,6 +15,7 @@ pub enum Command {
     Help,
     SearchPrompt,
     PromptLogRevset,
+    OpenStatus,
     Fetch,
     Copy,
     ViewFormat,
@@ -123,6 +124,7 @@ pub enum HelpContext {
     Graph,
     Show,
     Diff,
+    Status,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -285,6 +287,7 @@ fn help_metadata(
         Command::PromptLogRevset => {
             (context == HelpContext::Graph).then_some((HelpSectionKind::Direct, "custom revset"))
         }
+        Command::OpenStatus => Some((HelpSectionKind::Global, "status")),
         Command::Fetch => Some((HelpSectionKind::Direct, "fetch")),
         Command::Copy => Some((HelpSectionKind::Global, "copy")),
         Command::ViewFormat => Some((HelpSectionKind::Global, "view format")),
@@ -314,14 +317,14 @@ fn view_help_metadata(
         ViewCommand::OpenShow => {
             let action = match context {
                 HelpContext::Graph | HelpContext::Diff => "open show",
-                HelpContext::Show => return None,
+                HelpContext::Show | HelpContext::Status => return None,
             };
             Some((HelpSectionKind::Direct, action))
         }
         ViewCommand::OpenDiff => {
             let action = match context {
                 HelpContext::Graph | HelpContext::Show => "open diff",
-                HelpContext::Diff => return None,
+                HelpContext::Diff | HelpContext::Status => return None,
             };
             Some((HelpSectionKind::Direct, action))
         }
