@@ -3063,3 +3063,85 @@ belong here.
   cannot safely control an arbitrary user-configured editor without risking a blocked session. The
   implemented proof covers controlled failure, inherited stdio, terminal suspension, wait, and
   restore.
+
+## 2026-05-20 App Refactor Completion Gate Planning
+
+- Thread id: `019e474c-a3ef-7bb2-9a08-be3177606707`.
+
+- Model / routing: gpt-5.5 high, because this pass is about module boundaries, ownership coherence,
+  and follow-up planning rather than mechanical prose cleanup.
+
+- Scope given: perform bounded assessment/docs work only, avoid Rust edits, and make the next app
+  refactor phase impossible to skip after Packet 34 acceptance. The requested gate should not use
+  500 LOC as a hard target, but it should prevent `src/app.rs` from remaining a large mixed owner.
+
+- Context read: `AGENTS.md`, `docs/development/rules/refactoring.md`, and
+  `docs/development/rules/change-shape.md`. The relevant rule pressure is to identify the owning
+  module before editing, extract only real concepts, preserve unowned work, and avoid
+  line-count-only refactors.
+
+- Line-count evidence:
+
+  ```text
+       841 src/app.rs
+       389 src/app/action_flow.rs
+      1813 src/app/action_lifecycle.rs
+       642 src/app/mode_input.rs
+       193 src/app/navigation.rs
+       362 src/app/services.rs
+      4521 src/app/tests.rs
+  ```
+
+- Ownership evidence: `src/app.rs` now holds the terminal event loop, global binding dispatch,
+  pending-prefix handling, service-forwarding helpers, refresh/fetch handling, copy/action/view menu
+  entry, view-effect application, custom revset handling, new-trunk handling, and diff-format
+  reload. The app submodules now own action-output key flow, action lifecycle, modal/prompt key
+  input, startup/navigation, side-effect services, and app tests.
+
+- Planning outcome: `docs/plan/next-implementation-slices.md` now adds a Post-Packet-34 App Module
+  Coherence Gate before Packet 35. The gate requires gpt-5.5 high implementation/review, uses
+  concept ownership and cognitive load as the acceptance criteria, and treats 500-700 LOC as a
+  reasonable post-pass target band with about 750 LOC as a soft review trigger, not as a hard rule.
+
+- Progress outcome: `docs/plan/progress.md` now records the gate as the next recommended slice and
+  states that the current about-841-line `src/app.rs` is acceptable temporarily but should not be
+  treated as refactor completion until the gate either extracts remaining modal/action/view-menu
+  policy or records why no clearer owner exists.
+
+- Validation: `just md-check` is the required validation for this docs-only pass.
+
+### 2026-05-20 (Packet 34/app-gate scope repair)
+
+- Slice / task: docs-only repair of mixed Packet 34 and gate scope in
+  `plzltlkx Plan app coherence gate`.
+- Model / routing: gpt-5.5 high, because this pass was about review repair, scope hygiene, and
+  jj-change topology rather than code changes.
+- Observable outcome: the initial 5.5 review `019e4750-9d7f-7be2-a0ce-8ab112a771f7` found no split
+  behavior blockers, but it did flag a medium scope/atomicity issue because the Post-Packet-34 App
+  Module Coherence Gate docs were mixed into Packet 34. Main orchestration created child change
+  `plzltlkx Plan app coherence gate` from parent `sxolvtpo`; mini worker
+  `019e4753-c94b-7ca0-a304-d0664acbabf3` removed the gate hunks from the Packet 34 parent, and mini
+  worker `019e4755-aecd-7631-b475-1424c1c9deb6` restored the gate docs in the child docs-only
+  change.
+- Final review / validation: final 5.5 review `019e4757-73ed-7ca3-a3c4-0980e50f1daf` reported no
+  blocking findings; the Packet 34 parent no longer contains gate text, and the child is docs-only
+  with the gate. Both docs workers ran `just md-check`; the second also ran `just md-fmt`.
+- Validation trail: `cargo check` passed with the known `ViewSpec::bookmarks` and
+  `FileListItem::row_text` warnings; focused `cargo test split -- --test-threads=1`,
+  `cargo test action_menu -- --test-threads=1`, `cargo test app::tests::split -- --test-threads=1`,
+  and `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 437
+  passed / 2 ignored; `rustup run nightly cargo fmt --check` passed with existing rustfmt config
+  warnings; `just md-check` passed; `cargo clippy -- -D warnings` still failed on the known
+  dead-code warnings plus `collapsible_if` in `src/bookmarks.rs`, `src/graph.rs`, and
+  `src/operation_log.rs`.
+- Residual risk: no live arbitrary default diff-editor cancel/complete proof.
+- Evidence basis:
+  - Thread: `019e4759-24dd-7190-aaef-2dbe72bbc2f9`
+  - Date: `2026-05-20`
+  - Commands: `jj --no-pager status`, `jj --no-pager log`, `jj --no-pager diff`, `sed`,
+    `cargo check`, `cargo test split -- --test-threads=1`,
+    `cargo test action_menu -- --test-threads=1`,
+    `cargo test app::tests::split -- --test-threads=1`,
+    `cargo test jj_actions::tests::split -- --test-threads=1`, full `cargo test`,
+    `rustup run nightly cargo fmt --check`, `just md-check`, `cargo clippy -- -D warnings`
+  - Files: `docs/plan/progress.md`, `docs/process-observations.md`

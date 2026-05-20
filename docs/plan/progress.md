@@ -1111,8 +1111,8 @@
   bookmark prompt with input `x`, and `?`, `g`, `j` running graph `g` fallback before routing `j` to
   move down. Existing exact help `gf` coverage still passes.
 - Verification: `cargo test help_prefix -- --test-threads=1`;
-  `cargo test help_menu   -- --test-threads=1`; `cargo test prefix -- --test-threads=1`;
-  `cargo test command::tests   -- --test-threads=1`; `cargo check`; full `cargo test`;
+  `cargo test help_menu -- --test-threads=1`; `cargo test prefix -- --test-threads=1`;
+  `cargo test command::tests -- --test-threads=1`; `cargo check`; full `cargo test`;
   `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-fmt`;
   `just md-check`; attempted `cargo clippy -- -D warnings`.
 - Validation note: `cargo check` still reports the pre-existing dead-code warnings for
@@ -1777,6 +1777,27 @@
   `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test`;
   `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-check`.
 
+- Scope repair: initial 5.5 review `019e4750-9d7f-7be2-a0ce-8ab112a771f7` found no split behavior
+  blockers, but it did flag a medium scope/atomicity issue because the Post-Packet-34 App Module
+  Coherence Gate docs were mixed into Packet 34. Main orchestration created child jj change
+  `plzltlkx Plan app coherence gate`, edited parent `sxolvtpo`, mini worker
+  `019e4753-c94b-7ca0-a304-d0664acbabf3` removed the gate hunks from the Packet 34 parent, and mini
+  worker `019e4755-aecd-7631-b475-1424c1c9deb6` restored the gate docs in the child. Both docs
+  workers ran `just md-check`; the second also ran `just md-fmt`.
+
+- Final 5.5 review `019e4757-73ed-7ca3-a3c4-0980e50f1daf` reported no blocking findings: the Packet
+  34 parent no longer contains gate text, and the child is docs-only with the gate.
+
+- Post-repair validation: `cargo check` passed with the known `ViewSpec::bookmarks` and
+  `FileListItem::row_text` warnings; `cargo test split -- --test-threads=1`;
+  `cargo test   action_menu -- --test-threads=1`;
+  `cargo test app::tests::split -- --test-threads=1`;
+  `cargo   test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 437
+  passed / 2 ignored; `rustup run nightly cargo fmt --check` passed with existing rustfmt config
+  warnings; `just md-check` passed; `cargo clippy -- -D warnings` still failed on the known
+  dead-code warnings plus `collapsible_if` in `src/bookmarks.rs`, `src/graph.rs`, and
+  `src/operation_log.rs`.
+
 - Warning / blocker status: `cargo check` and `cargo run` still report the existing dead-code
   warnings for `ViewSpec::bookmarks` and `FileListItem::row_text`. `cargo clippy -- -D warnings`
   remains blocked by those two dead-code warnings plus the known `collapsible_if` findings in
@@ -1793,6 +1814,39 @@
   session. The controlled failure proof covers terminal suspension, inherited stdio, wait, and
   restore; human/editor-level behavior should still be reviewed manually.
 
-- Next recommended slice: Packet 35: Duplicate Guided Flow. Packet 34 added the split flow on top of
-  the already reduced app surface, so the next rewrite packet should keep the split and duplicate
-  flows separate while continuing to watch `src/app.rs` for future coherence work.
+- Next recommended slice: Post-Packet-34 App Module Coherence Gate before Packet 35 or another
+  rewrite/action packet adds more app dispatch. Packet 34 left `src/app.rs` at about 841 LOC after
+  substantial decomposition into app submodules; that is acceptable temporarily but should not be
+  treated as completion until a gpt-5.5 high coherence pass confirms the file is only terminal-loop
+  and thin app-level routing, or extracts any remaining modal/action/view-menu policy to a clearer
+  owner.
+
+## 2026-05-20 App Refactor Completion Gate Planning
+
+- Files changed: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+
+- Planning outcome: added a required Post-Packet-34 App Module Coherence Gate before Packet 35. The
+  gate uses concept ownership and reader cognitive load as acceptance criteria, with line count only
+  as a soft review signal.
+
+- Evidence: current app-module line counts are:
+
+  ```text
+       841 src/app.rs
+       389 src/app/action_flow.rs
+      1813 src/app/action_lifecycle.rs
+       642 src/app/mode_input.rs
+       193 src/app/navigation.rs
+       362 src/app/services.rs
+      4521 src/app/tests.rs
+  ```
+
+- Target rationale: the plan now treats 500-700 LOC as a reasonable post-pass target band for
+  `src/app.rs`, with about 750 LOC as a soft review trigger. The threshold is not a hard target; a
+  larger file is acceptable only when the remaining methods are a coherent terminal loop and thin
+  app-level routing.
+
+- Remaining risk: no Rust refactor was performed in this planning pass. The app refactor should not
+  be marked complete until the gate is implemented or a gpt-5.5 high review explicitly records why
+  no further extraction is warranted.

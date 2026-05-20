@@ -1042,6 +1042,63 @@ Audit result from 2026-05-20:
   noninteractive failure behavior, explicit post-command status/result visibility, and evidence that
   the flow does not pretend to be an in-app patch editor.
 
+### Post-Packet-34 Gate: App Module Coherence
+
+- Goal: accept the current app-decomposition work only after one more app-module coherence pass
+  decides whether `src/app.rs` is now an orchestration owner or still a large mixed owner.
+- Timing: run this gate after Packet 34 implementation and review are accepted, before Packet 35 or
+  another rewrite/action packet adds more dispatch, modal, or action lifecycle behavior. If Packet
+  34 review asks for app-structure repair, fold this gate into that repair instead of treating it as
+  a later cleanup.
+- Owner concept: app-level orchestration boundaries, especially terminal event loop, global binding
+  dispatch, service seams, mode lifecycle delegation, view-effect application, view menu handling,
+  refresh/reveal policy, and residual action/result setup.
+- Expected write set: start with `src/app.rs`, `src/app/*.rs`, focused moved tests, and ownership
+  docs. Update `docs/agent/architecture.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`; update this file only if the pass promotes a separate follow-up
+  packet instead of completing the gate.
+- Non-goals: no new user-visible commands, no Packet 35 duplicate flow, no broad key redesign, no
+  behavior change beyond preserving the current Packet 34 behavior while moving code to clearer
+  owners, and no extraction whose only rationale is hitting an arbitrary line count.
+- Current evidence: after Packet 34 worker changes, `wc -l` reports about 841 lines in `src/app.rs`,
+  389 in `src/app/action_flow.rs`, 1813 in `src/app/action_lifecycle.rs`, 642 in
+  `src/app/mode_input.rs`, 193 in `src/app/navigation.rs`, and 362 in `src/app/services.rs`. This is
+  a major improvement from the pre-decomposition `app.rs`, so it is acceptable as a temporary
+  landing zone, but it should not be treated as the refactor being done if `src/app.rs` still owns
+  modal detail, service forwarding, action result construction, or view-menu policy instead of
+  event-loop orchestration.
+- Target threshold: prefer `src/app.rs` in the 500-700 LOC range after the pass, with a soft
+  review-trigger above about 750 LOC. The number is not the acceptance criterion; it is a warning
+  signal that the file may still be forcing readers to keep unrelated binding, modal, service, and
+  view-transition details in one place. A slightly larger file is acceptable only if it reads as a
+  clear terminal loop plus thin app-level routing and the remaining methods have no better named
+  owner.
+- Acceptance criteria:
+  - a gpt-5.5 high implementation/review pass records whether remaining `src/app.rs` methods are
+    terminal loop / app routing or detailed policy owned by another module;
+  - modal/prompt key reducers stay under `src/app/mode_input.rs` or another explicit mode owner;
+  - action preview/result lifecycle stays under `src/app/action_lifecycle.rs`,
+    `src/app/action_flow.rs`, or a narrower action owner instead of returning to `src/app.rs`;
+  - service forwarding is either justified as a thin seam, moved behind a smaller helper, or
+    documented as the cheapest way to keep test seams readable;
+  - view-menu and diff-format handling are either justified as global app policy or moved to a
+    clearer view-selection owner;
+  - tests move with any extracted owner and Packet 34 split behavior remains unchanged;
+  - progress docs state whether the app refactor is complete, still temporary, or needs a named
+    follow-up packet.
+- Validation: `wc -l src/app.rs src/app/*.rs` before and after; focused app tests for moved
+  contracts; Packet 34 split tests if action lifecycle or mode input changes; full `cargo test`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; `cargo clippy -- -D warnings` or an
+  explicit unchanged-blocker report if baseline warnings still block it.
+- Docs/fragility updates: update architecture and progress/process docs for ownership changes. No
+  fragility-register update is needed unless the pass changes a rendered-output, parser, or `jj`
+  command semantic assumption.
+- Suggested agent/model routing: gpt-5.5 high implementation and gpt-5.5 high review. This is a
+  maintainability and concept-coherence gate, not a mechanical LOC trim.
+- Review prompt: review the app-module coherence pass for concept ownership, reader locality,
+  cognitive load, preservation of Packet 34 behavior, test movement, line-count evidence as a soft
+  signal only, and whether future rewrite packets can avoid broad `src/app.rs` edits.
+
 ### Packet 35: Duplicate Guided Flow
 
 - Goal: add a preview-first `jj duplicate` flow for exact selected changes.
@@ -1332,6 +1389,10 @@ Audit result from 2026-05-20:
 
 ### Packet 32 Scheduling Notes
 
+- Immediate next recommended packet after Packet 34 acceptance: Post-Packet-34 App Module Coherence
+  Gate. Packet 34 added the split flow on top of the already reduced app surface, so the next
+  implementation should decide whether the remaining `src/app.rs` responsibilities are truly
+  orchestration or still detailed modal/action/view policy.
 - Historical scheduling note: before Packet 34, the immediate recommendation was the Pre-Packet-34
   Interruption Packet A maintainability/UI interruption because Packet 33 had shipped operation-log
   recovery for exact operation ids and the user requested app decomposition before Split Guided
