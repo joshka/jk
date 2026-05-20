@@ -84,6 +84,23 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::AbandonPreview { output } => {
+            let title = action_output_title("Abandon", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
+        Overlay::AbandonConfirm { input, output } => {
+            let title = "Abandon confirm";
+            let area = action_output_area_with_footer(
+                frame.area(),
+                title,
+                output,
+                &abandon_confirm_footer_text(input),
+            );
+            frame.render_widget(Clear, area);
+            render_abandon_confirm(frame, area, title, input, output);
+        }
         Overlay::RolePrompt { prompt, selected } => {
             let area = centered_area(frame.area(), 54, prompt.options().len() as u16 + 4);
             frame.render_widget(Clear, area);
@@ -123,6 +140,13 @@ pub enum Overlay<'a> {
         output: &'a ActionOutput,
     },
     RebasePreview {
+        output: &'a ActionOutput,
+    },
+    AbandonPreview {
+        output: &'a ActionOutput,
+    },
+    AbandonConfirm {
+        input: &'a str,
         output: &'a ActionOutput,
     },
     RolePrompt {
@@ -480,6 +504,47 @@ fn render_action_output(frame: &mut Frame<'_>, area: Rect, title: &str, output: 
     }
 }
 
+fn render_abandon_confirm(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    title: &str,
+    input: &str,
+    output: &ActionOutput,
+) {
+    let block = Block::bordered().title(title.to_owned());
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 {
+        return;
+    }
+
+    let footer_height = u16::from(inner.height > 1);
+    let body_area = Rect {
+        x: inner.x,
+        y: inner.y,
+        width: inner.width,
+        height: inner.height.saturating_sub(footer_height),
+    };
+    if body_area.height > 0 {
+        let scroll = output.scroll().min(usize::from(u16::MAX)) as u16;
+        frame.render_widget(
+            Paragraph::new(output.body_lines().join("\n")).scroll((scroll, 0)),
+            body_area,
+        );
+    }
+
+    if footer_height > 0 {
+        let footer_area = Rect {
+            x: inner.x,
+            y: inner.y + inner.height - 1,
+            width: inner.width,
+            height: 1,
+        };
+        frame.render_widget(abandon_confirm_footer(input), footer_area);
+    }
+}
+
 fn action_output_footer(completed: bool) -> Paragraph<'static> {
     let primary = if completed {
         line![key("Enter"), " close  "]
@@ -499,13 +564,27 @@ fn action_output_footer(completed: bool) -> Paragraph<'static> {
     Paragraph::new(Line::from(spans)).style(Style::default().fg(Color::Gray))
 }
 
+fn abandon_confirm_footer(input: &str) -> Paragraph<'static> {
+    Paragraph::new(Line::from(abandon_confirm_footer_text(input)))
+        .style(Style::default().fg(Color::Gray))
+}
+
 fn action_output_area(area: Rect, title: &str, output: &ActionOutput) -> Rect {
-    let lines = output.body_lines();
     let footer = action_output_footer_text(output.completed());
+    action_output_area_with_footer(area, title, output, &footer)
+}
+
+fn action_output_area_with_footer(
+    area: Rect,
+    title: &str,
+    output: &ActionOutput,
+    footer: &str,
+) -> Rect {
+    let lines = output.body_lines();
     let width = lines
         .iter()
         .map(|line| line_width(line))
-        .chain([line_width(&footer), line_width(title)])
+        .chain([line_width(footer), line_width(title)])
         .max()
         .unwrap_or(0)
         .max(44)
@@ -522,6 +601,10 @@ fn action_output_footer_text(completed: bool) -> String {
     } else {
         "Enter confirm  Esc/q cancel  j/k scroll  PgUp/PgDn page  g/G ends".to_owned()
     }
+}
+
+fn abandon_confirm_footer_text(input: &str) -> String {
+    format!("type exact id: {input}  Enter confirm  Esc cancel  arrows/page scroll")
 }
 
 fn line_width(line: &str) -> usize {
@@ -729,6 +812,54 @@ mod tests {
           line 3
           line 4
         Enter confirm  Esc/q cancel  j/k s
+        ");
+    }
+
+    #[test]
+    fn abandon_confirm_render_shows_typed_exact_id_footer() {
+        let output = ActionOutput::pending(
+            "jj abandon change-a".to_owned(),
+            "change: change-a\ntitle: Edit change\ndiff summary:\nM src/main.rs\n\nundo path: jj undo"
+                .to_owned(),
+            None,
+        );
+
+        let mut terminal = Terminal::new(TestBackend::new(64, 8)).unwrap();
+        terminal
+            .draw(|frame| {
+                render_abandon_confirm(
+                    frame,
+                    Rect {
+                        x: 0,
+                        y: 0,
+                        width: 64,
+                        height: 8,
+                    },
+                    "Abandon confirm",
+                    "change",
+                    &output,
+                );
+            })
+            .unwrap();
+
+        let rendered = (1..7)
+            .map(|y| {
+                (1..63)
+                    .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+                    .collect::<String>()
+                    .trim_end()
+                    .to_owned()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        insta::assert_snapshot!(rendered, @r"
+        command: jj abandon change-a
+        output:
+          change: change-a
+          title: Edit change
+          diff summary:
+        type exact id: change  Enter confirm  Esc cancel  arrows/page
         ");
     }
 }

@@ -177,3 +177,33 @@
   compact hint mix is intentionally conservative and may still need per-view tuning if later
   terminal work wants a different balance
 - Next slice: Packet 15: General Abandon From Exact Change Targets
+
+## Packet 15: General Abandon From Exact Change Targets
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `cargo check`; focused `cargo test abandon -- --test-threads=1`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; disposable-repo manual
+  `jj --no-pager abandon <change-id>` for one empty change and one non-empty change under
+  `/tmp/jk-packet15-proof.7gHoJv`, each followed by `jj --no-pager undo`; `just md-check`
+- Validation note: `just check` was attempted, but the local wrapper stopped at `cargo +nightly fmt`
+  with `no such command: +nightly`; the equivalent `rustup run nightly cargo fmt --check` passed
+- Remaining risk: the flow is exact for graph single-row targets and blocks
+  selected-source/multi-target abandon, but empty-versus-non-empty detection still depends on
+  `jj diff -r <revision> --summary` stdout and the preview title depends on a narrow
+  `description.first_line()` template
+- Next slice: TBD after review of exact-target mutation flows
+
+## Packet 15: 5.5 Review Repair
+
+- Files changed: `src/app.rs`, `src/jj.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `cargo test abandon -- --test-threads=1`; focused app and `jj` abandon command shape
+  tests; `cargo check`; full `cargo test`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt --check`; `jj --no-pager help -k revsets`;
+  `jj --no-pager help abandon`; `jj --no-pager help log`; disposable-repo exact revset syntax probe
+  under `/tmp/jk-exact-change.*`; `just md-check`
+- Remaining risk: empty-preview abandon now rechecks immediately before execution and falls back to
+  typed exact-revision confirmation if the target becomes non-empty, but the final recheck and
+  `jj abandon` remain separate `jj` invocations rather than one atomic transaction
+- Next slice: TBD after review of exact-target mutation flows

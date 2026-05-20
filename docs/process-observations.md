@@ -5,6 +5,109 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-19 (Packet 15 5.5 review repair)
+
+- Slice / task: Implement the bounded 5.5 review repair for the guided exact-target `jj abandon`
+  flow.
+
+- Worker / model: `019e441d-f423-75b1-be8c-af924802cd68` / `gpt-5` (Codex).
+
+- Scope given: preserve unrelated edits, stay primarily within `src/jj.rs` and `src/app.rs`,
+  revalidate empty abandon previews immediately before execution, switch to typed confirmation if
+  the recheck sees non-empty content, preserve recheck failures in `ActionOutput`, verify exact
+  change-id revset syntax from `jj help`, and update progress, fragility, and process notes.
+
+- Observable outcome: abandon execution, diff-summary probes, and title lookup now use
+  `exactly(change_id("..."), 1)` for the carried graph-row change id while labels and prompts keep
+  showing the readable carried revision; empty-preview Enter performs a fresh preview check before
+  `jj abandon`; non-empty recheck drift opens the typed exact-revision confirmation path; recheck
+  errors stay visible as completed action output.
+
+- Evidence basis:
+  - Thread: `019e441d-f423-75b1-be8c-af924802cd68`
+  - Date: `2026-05-19` from local `date +%F`
+  - `jj` manual evidence: `jj --no-pager help -k revsets` states symbol resolution prioritizes tags,
+    bookmarks, and Git refs before commit/change ids, and documents `change_id(prefix)` and
+    `exactly(x, count)`; `jj --no-pager help abandon` shows abandon accepts revset arguments;
+    `jj --no-pager help log` points revision syntax to the revsets help topic.
+  - Disposable syntax proof: a `/tmp/jk-exact-change.*` jj repo resolved
+    `exactly(change_id("<full-id>"), 1)` back to the same full change id and accepted the same exact
+    revset in `jj diff -r ... --summary`.
+  - Commands:
+    - `jj --no-pager status`
+    - `jj --no-pager help -k revsets`
+    - `jj --no-pager help abandon`
+    - `jj --no-pager help log`
+    - `cargo test abandon -- --test-threads=1`
+    - `cargo test empty_abandon_rechecks_before_running_and_requires_confirmation_after_drift -- --test-threads=1`
+    - `cargo test abandon_plan_uses_exact_revision_command_shape -- --test-threads=1`
+    - `cargo test abandon_diff_summary_probe_uses_revision_summary -- --test-threads=1`
+    - `cargo test abandon_title_probe_uses_exact_change_id_revset -- --test-threads=1`
+    - `cargo check`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-check`
+  - Files: `src/app.rs`, `src/jj.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
+### 2026-05-19 (Packet 15 abandon exact-target flow)
+
+- Slice / task: Implement Packet 15 general abandon from exact change targets.
+
+- Worker / model: `019e440c-4c27-7893-a08f-fdeb54c02c7b` / `gpt-5` (Codex).
+
+- Scope given: add a guided `jj abandon` flow only where the selected change target is exact,
+  require stronger typed confirmation for non-empty changes, keep `jj undo` visible after success,
+  preserve Packet 13 `ActionOutput` readability for failures, update packet docs, and run mutation
+  proof only in a disposable `/tmp` jj repo.
+
+- Observable outcome: graph single-row action menus now carry an exact abandon revision into an
+  abandon preview; empty `jj diff --summary` previews run on Enter, non-empty previews move to a
+  typed exact-id confirmation mode, wrong input does not run the command, success refreshes the
+  active view and includes `jj undo`, and failures remain readable in a completed `ActionOutput`.
+
+- Evidence basis:
+  - Thread: `019e440c-4c27-7893-a08f-fdeb54c02c7b`
+  - Date: `2026-05-19`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `cargo check`
+    - `cargo test abandon -- --test-threads=1`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `mktemp -d /tmp/jk-packet15-proof.XXXXXX`
+    - `jj --no-pager git init --colocate .`
+    - `jj --no-pager config set --repo signing.behavior drop`
+    - `printf 'base\n' > README.md`
+    - `jj --no-pager desc --message 'Add base file'`
+    - `jj --no-pager new`
+    - `jj --no-pager desc --message 'Empty proof change'`
+    - `jj --no-pager diff -r skwrlkxvptpyzsmtlmxrumtmzomnkxvx --summary`
+    - `jj --no-pager log -r skwrlkxvptpyzsmtlmxrumtmzomnkxvx --no-graph` with the
+      `description.first_line()` template
+    - `jj --no-pager abandon skwrlkxvptpyzsmtlmxrumtmzomnkxvx`
+    - `jj --no-pager undo`
+    - `printf 'feature\n' > feature.txt`
+    - `jj --no-pager desc --message 'Nonempty proof change'`
+    - `jj --no-pager diff -r skwrlkxvptpyzsmtlmxrumtmzomnkxvx --summary`
+    - `jj --no-pager log -r skwrlkxvptpyzsmtlmxrumtmzomnkxvx --no-graph` with the
+      `description.first_line()` template
+    - `jj --no-pager abandon skwrlkxvptpyzsmtlmxrumtmzomnkxvx`
+    - `jj --no-pager undo`
+    - `just md-fmt`
+    - `just md-check`
+    - `just check`
+  - Disposable proof repo: `/tmp/jk-packet15-proof.7gHoJv`
+  - Proof cwd discipline: all listed `jj` proof commands after repo creation ran with process cwd
+    set to `/tmp/jk-packet15-proof.7gHoJv`
+  - Validation note: `just check` stopped at `cargo +nightly fmt` with `no such command: +nightly`;
+    `rustup run nightly cargo fmt --check` passed separately.
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`, `src/tui.rs`,
+    `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-19 (Packet 13 action output overlay)
 
 - Slice / task: Implement Packet 13 scrollable action output overlay.

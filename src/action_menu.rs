@@ -124,6 +124,7 @@ impl RolePrompt {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FollowUp {
     StatusMessage(String),
+    ExactRevision { revision: String },
     RolePrompt(RolePrompt),
 }
 
@@ -245,12 +246,20 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         action.label(),
         short_id(revision)
     );
-    let message = format!("{} {}", label, PREVIEW_REQUIRED_MARKER);
+    let follow_up = match action {
+        ActionKind::Abandon => FollowUp::ExactRevision {
+            revision: revision.to_owned(),
+        },
+        ActionKind::Split | ActionKind::Rebase | ActionKind::Squash => {
+            let message = format!("{} {}", label, PREVIEW_REQUIRED_MARKER);
+            FollowUp::StatusMessage(message)
+        }
+    };
     ActionMenuItem {
         action,
         label,
         safety_tier: SafetyTier::PreviewFirst,
-        follow_up: FollowUp::StatusMessage(message),
+        follow_up,
     }
 }
 
@@ -309,6 +318,11 @@ mod tests {
             menu.items()[0].follow_up(),
             FollowUp::StatusMessage(message)
                 if message.ends_with(PREVIEW_REQUIRED_MARKER)
+        ));
+        assert!(matches!(
+            menu.items()[1].follow_up(),
+            FollowUp::ExactRevision { revision }
+                if revision == "0000000011111111222222223333333344444444"
         ));
     }
 
@@ -376,5 +390,21 @@ mod tests {
         let menu = build_action_menu(&context);
 
         assert!(menu.is_empty());
+    }
+
+    #[test]
+    fn multi_source_menu_excludes_abandon() {
+        let context =
+            ExactActionContext::with_current("ccccdddd1111111111111111111111111111111111")
+                .with_sources(["aaaabbbb1111111111111111111111111111111111"]);
+        let menu = build_action_menu(&context);
+
+        let actions = menu
+            .items()
+            .iter()
+            .map(ActionMenuItem::action)
+            .collect::<Vec<_>>();
+
+        assert_eq!(actions, vec![ActionKind::Rebase, ActionKind::Squash]);
     }
 }

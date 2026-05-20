@@ -93,6 +93,7 @@ const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
 const BOOKMARK_COMMAND_WORDS: [&str; 2] = ["bookmark", "list"];
 const BOOKMARK_METADATA_TEMPLATE: &str = r#"name ++ "\t" ++ if(self.normal_target(), self.normal_target().change_id(), "") ++ "\t" ++ if(self.normal_target(), self.normal_target().commit_id(), "") ++ "\n""#;
 const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
+const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
 const OPERATION_LOG_LIMIT: &str = "100";
 
@@ -280,6 +281,173 @@ impl JjRebasePlan {
         self.sources.retain(|source| !source.trim().is_empty());
         self
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjAbandonPlan {
+    revision: String,
+}
+
+impl JjAbandonPlan {
+    pub fn new(revision: impl Into<String>) -> Self {
+        Self {
+            revision: revision.into(),
+        }
+    }
+
+    pub fn revision(&self) -> &str {
+        &self.revision
+    }
+
+    pub fn command_label(&self) -> String {
+        format!("jj abandon {}", self.revision)
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        vec!["abandon".to_owned(), self.exact_change_id_revset()]
+    }
+
+    pub fn diff_summary_label(&self) -> String {
+        format!("jj diff -r {} --summary", self.revision)
+    }
+
+    pub fn diff_summary_argv(&self) -> Vec<String> {
+        vec![
+            "diff".to_owned(),
+            "-r".to_owned(),
+            self.exact_change_id_revset(),
+            "--summary".to_owned(),
+        ]
+    }
+
+    pub fn run_preview(&self) -> Result<JjAbandonPreview> {
+        let summary = run_direct_args_stdout(self.diff_summary_argv(), &self.diff_summary_label())?;
+        let title = self.load_title().ok().flatten();
+
+        Ok(JjAbandonPreview::new(self.revision.clone(), title, summary))
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(self.command_argv(), &self.command_label(), "abandoned")
+    }
+
+    fn load_title(&self) -> Result<Option<String>> {
+        let mut jj = base_command(ColorMode::Never);
+        jj.args(self.title_argv());
+
+        let output = jj.output()?;
+        if !output.status.success() {
+            return Err(eyre!(
+                "{} title failed: {}",
+                self.revision,
+                summarize_output(&output.stdout, &output.stderr, "could not read title")
+            ));
+        }
+
+        let title = String::from_utf8(output.stdout)?.trim().to_owned();
+        Ok((!title.is_empty()).then_some(title))
+    }
+
+    fn title_argv(&self) -> Vec<String> {
+        vec![
+            "log".to_owned(),
+            "-r".to_owned(),
+            self.exact_change_id_revset(),
+            "--no-graph".to_owned(),
+            "-T".to_owned(),
+            DESCRIPTION_FIRST_LINE_TEMPLATE.to_owned(),
+        ]
+    }
+
+    fn exact_change_id_revset(&self) -> String {
+        exact_change_id_revset(&self.revision)
+    }
+}
+
+fn exact_change_id_revset(change_id: &str) -> String {
+    format!(
+        "exactly(change_id({}), 1)",
+        revset_string_literal(change_id)
+    )
+}
+
+fn revset_string_literal(value: &str) -> String {
+    let mut quoted = String::with_capacity(value.len() + 2);
+    quoted.push('"');
+    for character in value.chars() {
+        match character {
+            '\\' => quoted.push_str("\\\\"),
+            '"' => quoted.push_str("\\\""),
+            '\n' => quoted.push_str("\\n"),
+            '\r' => quoted.push_str("\\r"),
+            '\t' => quoted.push_str("\\t"),
+            _ => quoted.push(character),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjAbandonPreview {
+    revision: String,
+    title: Option<String>,
+    summary: String,
+    change_state: AbandonChangeState,
+}
+
+impl JjAbandonPreview {
+    pub fn new(revision: String, title: Option<String>, summary: String) -> Self {
+        let change_state = if summary.trim().is_empty() {
+            AbandonChangeState::Empty
+        } else {
+            AbandonChangeState::NonEmpty
+        };
+
+        Self {
+            revision,
+            title,
+            summary,
+            change_state,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn revision(&self) -> &str {
+        &self.revision
+    }
+
+    pub fn is_empty_change(&self) -> bool {
+        self.change_state == AbandonChangeState::Empty
+    }
+
+    pub fn preview_text(&self) -> String {
+        let title = self.title.as_deref().unwrap_or("<no description>");
+        let summary = if self.summary.trim().is_empty() {
+            "empty change".to_owned()
+        } else {
+            self.summary.trim().to_owned()
+        };
+        let confirmation = if self.is_empty_change() {
+            "press Enter to abandon this empty change".to_owned()
+        } else {
+            format!(
+                "type exact revision '{}' before abandon runs",
+                self.revision
+            )
+        };
+
+        format!(
+            "change: {}\ntitle: {}\ndiff summary:\n{}\n\neffect: abandon removes the selected change from the visible history; recovery stays available through jj undo\nconfirmation: {}\nundo path: jj undo",
+            self.revision, title, summary, confirmation
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AbandonChangeState {
+    Empty,
+    NonEmpty,
 }
 
 #[allow(dead_code)]
@@ -981,6 +1149,22 @@ fn run_direct_args(
     Ok(CommandOutput {
         message: summarize_output(&output.stdout, &output.stderr, success_fallback),
     })
+}
+
+fn run_direct_args_stdout(args: Vec<String>, label: &str) -> Result<String> {
+    let mut jj = base_command(ColorMode::Never);
+    jj.args(args);
+
+    let output = jj.output()?;
+    if !output.status.success() {
+        return Err(eyre!(
+            "{} failed: {}",
+            label,
+            summarize_output(&output.stdout, &output.stderr, "command failed")
+        ));
+    }
+
+    Ok(String::from_utf8(output.stdout)?)
 }
 
 fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<Vec<RevisionMetadata>> {
@@ -2030,6 +2214,108 @@ mod tests {
         assert!(preview.contains("destination: dest"));
         assert!(preview.contains("graph effect: rebases the selected revisions"));
         assert!(preview.contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn abandon_plan_uses_exact_revision_command_shape() {
+        let abandon = JjAbandonPlan::new("tvykuurwpnwzzqulzrvwvmxxotnlywqw");
+
+        assert_eq!(
+            abandon.command_argv(),
+            vec![
+                "abandon",
+                "exactly(change_id(\"tvykuurwpnwzzqulzrvwvmxxotnlywqw\"), 1)"
+            ]
+        );
+        assert_eq!(
+            abandon.command_label(),
+            "jj abandon tvykuurwpnwzzqulzrvwvmxxotnlywqw"
+        );
+    }
+
+    #[test]
+    fn abandon_diff_summary_probe_uses_revision_summary() {
+        let abandon = JjAbandonPlan::new("tvykuurwpnwzzqulzrvwvmxxotnlywqw");
+
+        assert_eq!(
+            abandon.diff_summary_argv(),
+            vec![
+                "diff",
+                "-r",
+                "exactly(change_id(\"tvykuurwpnwzzqulzrvwvmxxotnlywqw\"), 1)",
+                "--summary"
+            ]
+        );
+        assert_eq!(
+            abandon.diff_summary_label(),
+            "jj diff -r tvykuurwpnwzzqulzrvwvmxxotnlywqw --summary"
+        );
+    }
+
+    #[test]
+    fn abandon_title_probe_uses_exact_change_id_revset() {
+        let abandon = JjAbandonPlan::new("tvykuurwpnwzzqulzrvwvmxxotnlywqw");
+
+        assert_eq!(
+            abandon.title_argv(),
+            vec![
+                "log",
+                "-r",
+                "exactly(change_id(\"tvykuurwpnwzzqulzrvwvmxxotnlywqw\"), 1)",
+                "--no-graph",
+                "-T",
+                DESCRIPTION_FIRST_LINE_TEMPLATE,
+            ]
+        );
+    }
+
+    #[test]
+    fn exact_change_id_revset_quotes_literal_prefix() {
+        assert_eq!(
+            exact_change_id_revset("abc\"\\"),
+            "exactly(change_id(\"abc\\\"\\\\\"), 1)"
+        );
+    }
+
+    #[test]
+    fn abandon_preview_classifies_empty_summary_as_empty_change() {
+        let preview = JjAbandonPreview::new(
+            "change-id".to_owned(),
+            Some("Start feature".to_owned()),
+            "\n".to_owned(),
+        );
+
+        assert!(preview.is_empty_change());
+        assert_eq!(preview.revision(), "change-id");
+        assert!(preview.preview_text().contains("title: Start feature"));
+        assert!(
+            preview
+                .preview_text()
+                .contains("diff summary:\nempty change")
+        );
+        assert!(
+            preview
+                .preview_text()
+                .contains("press Enter to abandon this empty change")
+        );
+        assert!(preview.preview_text().contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn abandon_preview_classifies_non_empty_summary_as_strong_confirm() {
+        let preview = JjAbandonPreview::new(
+            "change-id".to_owned(),
+            Some("Edit files".to_owned()),
+            "M src/main.rs\nA README.md\n".to_owned(),
+        );
+
+        assert!(!preview.is_empty_change());
+        let text = preview.preview_text();
+        assert!(text.contains("change: change-id"));
+        assert!(text.contains("title: Edit files"));
+        assert!(text.contains("M src/main.rs\nA README.md"));
+        assert!(text.contains("type exact revision 'change-id' before abandon runs"));
+        assert!(text.contains("undo path: jj undo"));
     }
 
     #[test]

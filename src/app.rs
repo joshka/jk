@@ -22,8 +22,9 @@ use crate::command::{
 };
 use crate::copy::CopyOption;
 use crate::jj::{
-    DiffFormat, JjCommand, JjGitPush, JjGitPushTarget, JjRebasePlan, LogViewMode, ViewSpec,
-    git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
+    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjGitPush, JjGitPushTarget,
+    JjRebasePlan, LogViewMode, ViewSpec, git_fetch, git_remotes, new_trunk,
+    resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -31,6 +32,10 @@ use crate::view_state::ViewState;
 
 #[cfg(test)]
 type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
+#[cfg(test)]
+type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
+#[cfg(test)]
+type AbandonRun = fn(&JjAbandonPlan) -> Result<String>;
 #[cfg(test)]
 type RefreshView = fn(&mut ViewState) -> Result<()>;
 #[cfg(test)]
@@ -53,6 +58,10 @@ struct App {
     should_quit: bool,
     #[cfg(test)]
     rebase_run: RebaseRun,
+    #[cfg(test)]
+    abandon_preview_load: AbandonPreviewLoad,
+    #[cfg(test)]
+    abandon_run: AbandonRun,
     #[cfg(test)]
     refresh_view: RefreshView,
     #[cfg(test)]
@@ -82,6 +91,16 @@ enum InteractionMode {
     },
     RebasePreview {
         rebase: JjRebasePlan,
+        output: ActionOutput,
+    },
+    AbandonPreview {
+        abandon: JjAbandonPlan,
+        preview: JjAbandonPreview,
+        output: ActionOutput,
+    },
+    AbandonConfirm {
+        abandon: JjAbandonPlan,
+        input: String,
         output: ActionOutput,
     },
     PushRemotePrompt {
@@ -121,6 +140,16 @@ fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {
 }
 
 #[cfg(test)]
+fn default_abandon_preview_load(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
+    abandon.run_preview()
+}
+
+#[cfg(test)]
+fn default_abandon_run(abandon: &JjAbandonPlan) -> Result<String> {
+    abandon.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
 fn default_refresh_view(view: &mut ViewState) -> Result<()> {
     view.refresh()
 }
@@ -155,6 +184,10 @@ impl App {
             #[cfg(test)]
             rebase_run: default_rebase_run,
             #[cfg(test)]
+            abandon_preview_load: default_abandon_preview_load,
+            #[cfg(test)]
+            abandon_run: default_abandon_run,
+            #[cfg(test)]
             refresh_view: default_refresh_view,
             #[cfg(test)]
             reveal_graph_change: default_reveal_graph_change,
@@ -169,6 +202,26 @@ impl App {
     #[cfg(not(test))]
     fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
         rebase.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn load_abandon_preview(&self, abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
+        (self.abandon_preview_load)(abandon)
+    }
+
+    #[cfg(not(test))]
+    fn load_abandon_preview(&self, abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
+        abandon.run_preview()
+    }
+
+    #[cfg(test)]
+    fn run_abandon(&self, abandon: &JjAbandonPlan) -> Result<String> {
+        (self.abandon_run)(abandon)
+    }
+
+    #[cfg(not(test))]
+    fn run_abandon(&self, abandon: &JjAbandonPlan) -> Result<String> {
+        abandon.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -463,6 +516,24 @@ impl App {
                                         StatusLine::with_message(&self.view, message.as_str());
                                     self.mode = InteractionMode::Normal;
                                 }
+                                FollowUp::ExactRevision { revision } => {
+                                    let action = action.action();
+                                    let revision = revision.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    match action {
+                                        ActionKind::Abandon => {
+                                            self.open_abandon_preview(JjAbandonPlan::new(revision));
+                                        }
+                                        ActionKind::Split
+                                        | ActionKind::Rebase
+                                        | ActionKind::Squash => {
+                                            self.status = StatusLine::with_message(
+                                                &self.view,
+                                                "preview not yet implemented",
+                                            );
+                                        }
+                                    }
+                                }
                                 FollowUp::RolePrompt(prompt) => {
                                     self.mode = InteractionMode::RolePrompt {
                                         action: action.action(),
@@ -537,15 +608,15 @@ impl App {
                     )
                 };
                 let visible_lines = action_output_visible_lines(viewport_height);
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') => {
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
                         self.mode = InteractionMode::Normal;
                         if !completed {
                             self.status =
                                 StatusLine::with_message(&self.view, "rebase cancelled".to_owned());
                         }
                     }
-                    KeyCode::Enter => {
+                    ActionOutputKey::Primary => {
                         if completed {
                             self.mode = InteractionMode::Normal;
                             return Ok(true);
@@ -553,12 +624,92 @@ impl App {
 
                         self.confirm_rebase(rebase, status_context, viewport_height);
                     }
-                    KeyCode::Char('j') | KeyCode::Down => output.scroll_down(visible_lines),
-                    KeyCode::Char('k') | KeyCode::Up => output.scroll_up(),
-                    KeyCode::Char(' ') | KeyCode::PageDown => output.page_down(visible_lines),
-                    KeyCode::Char('b') | KeyCode::PageUp => output.page_up(visible_lines),
-                    KeyCode::Char('g') | KeyCode::Home => output.scroll_to_top(),
-                    KeyCode::Char('G') | KeyCode::End => output.scroll_to_bottom(visible_lines),
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::AbandonPreview {
+                abandon,
+                preview,
+                output,
+            } => {
+                let (abandon, preview, status_context, completed) = {
+                    (
+                        abandon.clone(),
+                        preview.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                "abandon cancelled".to_owned(),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        if preview.is_empty_change() {
+                            self.confirm_empty_abandon_after_recheck(
+                                abandon,
+                                status_context,
+                                viewport_height,
+                            );
+                        } else {
+                            self.mode = InteractionMode::AbandonConfirm {
+                                abandon,
+                                input: String::new(),
+                                output: output.clone(),
+                            };
+                        }
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::AbandonConfirm {
+                abandon,
+                input,
+                output,
+            } => {
+                let (abandon_plan, status_context) =
+                    (abandon.clone(), output.status_context().cloned());
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match code {
+                    KeyCode::Esc => {
+                        self.mode = InteractionMode::Normal;
+                        self.status =
+                            StatusLine::with_message(&self.view, "abandon cancelled".to_owned());
+                    }
+                    KeyCode::Enter => {
+                        if input == abandon.revision() {
+                            self.confirm_abandon(abandon_plan, status_context, viewport_height);
+                        } else {
+                            self.status = StatusLine::error(
+                                &self.view,
+                                "confirmation did not match; abandon not run".to_owned(),
+                            );
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        input.pop();
+                    }
+                    KeyCode::Char(character) => input.push(character),
+                    KeyCode::Down => output.scroll_down(visible_lines),
+                    KeyCode::Up => output.scroll_up(),
+                    KeyCode::PageDown => output.page_down(visible_lines),
+                    KeyCode::PageUp => output.page_up(visible_lines),
+                    KeyCode::Home => output.scroll_to_top(),
+                    KeyCode::End => output.scroll_to_bottom(visible_lines),
                     _ => {}
                 }
                 Ok(true)
@@ -605,15 +756,15 @@ impl App {
                     )
                 };
                 let visible_lines = action_output_visible_lines(viewport_height);
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') => {
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
                         self.mode = InteractionMode::Normal;
                         if !completed {
                             self.status =
                                 StatusLine::with_message(&self.view, "push cancelled".to_owned());
                         }
                     }
-                    KeyCode::Enter => {
+                    ActionOutputKey::Primary => {
                         if completed {
                             self.mode = InteractionMode::Normal;
                             return Ok(true);
@@ -621,13 +772,7 @@ impl App {
 
                         self.confirm_push(push, status_context, viewport_height);
                     }
-                    KeyCode::Char('j') | KeyCode::Down => output.scroll_down(visible_lines),
-                    KeyCode::Char('k') | KeyCode::Up => output.scroll_up(),
-                    KeyCode::Char(' ') | KeyCode::PageDown => output.page_down(visible_lines),
-                    KeyCode::Char('b') | KeyCode::PageUp => output.page_up(visible_lines),
-                    KeyCode::Char('g') | KeyCode::Home => output.scroll_to_top(),
-                    KeyCode::Char('G') | KeyCode::End => output.scroll_to_bottom(visible_lines),
-                    _ => {}
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
                 }
                 Ok(true)
             }
@@ -776,6 +921,39 @@ impl App {
         }
     }
 
+    fn open_abandon_preview(&mut self, abandon: JjAbandonPlan) {
+        let status_context = Some(format!(
+            "abandon exact revision {} from {}",
+            abandon.revision(),
+            self.view.spec().app_label()
+        ));
+
+        match self.load_abandon_preview(&abandon) {
+            Ok(preview) => {
+                let command_label = abandon.command_label();
+                self.mode = InteractionMode::AbandonPreview {
+                    abandon,
+                    output: ActionOutput::pending(
+                        command_label,
+                        preview.preview_text(),
+                        status_context,
+                    ),
+                    preview,
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = abandon.diff_summary_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::AbandonPreview {
+                    abandon,
+                    preview: JjAbandonPreview::new(String::new(), None, String::new()),
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
     fn confirm_push(
         &mut self,
         push: JjGitPush,
@@ -805,6 +983,73 @@ impl App {
         self.mode = InteractionMode::PushPreview {
             push,
             output: ActionOutput::finished(command_label, result_message, status_context),
+        }
+    }
+
+    fn confirm_abandon(
+        &mut self,
+        abandon: JjAbandonPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = abandon.command_label();
+        let result_message = match self.run_abandon(&abandon) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = format!("{} | jj undo", output.trim());
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("{} | refresh failed: {error} | jj undo", output.trim())
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::AbandonPreview {
+            abandon,
+            preview: JjAbandonPreview::new(String::new(), None, String::new()),
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    fn confirm_empty_abandon_after_recheck(
+        &mut self,
+        abandon: JjAbandonPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        match self.load_abandon_preview(&abandon) {
+            Ok(preview) if preview.is_empty_change() => {
+                self.confirm_abandon(abandon, status_context, viewport_height);
+            }
+            Ok(preview) => {
+                let message = "change is no longer empty; type exact revision to confirm abandon";
+                self.status = StatusLine::error(&self.view, message.to_owned());
+                let command_label = abandon.command_label();
+                let output = format!("{message}\n\n{}", preview.preview_text());
+                self.mode = InteractionMode::AbandonConfirm {
+                    abandon,
+                    input: String::new(),
+                    output: ActionOutput::pending(command_label, output, status_context),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                self.status = StatusLine::error(&self.view, message.clone());
+                let command_label = abandon.diff_summary_label();
+                self.mode = InteractionMode::AbandonPreview {
+                    abandon,
+                    preview: JjAbandonPreview::new(String::new(), None, String::new()),
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
         }
     }
 
@@ -1028,6 +1273,10 @@ impl App {
             InteractionMode::LogRevsetPrompt(input) => {
                 StatusLine::with_message(&self.view, format!("revset: {input}"))
             }
+            InteractionMode::AbandonConfirm { input, .. } => StatusLine::with_message(
+                &self.view,
+                format!("type exact revision to confirm abandon: {input}"),
+            ),
             _ => self.status.clone(),
         }
     }
@@ -1060,6 +1309,10 @@ impl App {
                 selected: *selected,
             },
             InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
+            InteractionMode::AbandonPreview { output, .. } => Overlay::AbandonPreview { output },
+            InteractionMode::AbandonConfirm { input, output, .. } => {
+                Overlay::AbandonConfirm { input, output }
+            }
             InteractionMode::PushRemotePrompt {
                 remotes, selected, ..
             } => Overlay::PushRemotePrompt {
@@ -1320,6 +1573,50 @@ fn action_output_visible_lines(viewport_height: u16) -> u16 {
     viewport_height.saturating_sub(1).max(1)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ActionOutputKey {
+    Primary,
+    Cancel,
+    Handled,
+    Ignored,
+}
+
+fn handle_action_output_key(
+    code: KeyCode,
+    output: &mut ActionOutput,
+    visible_lines: u16,
+) -> ActionOutputKey {
+    match code {
+        KeyCode::Enter => ActionOutputKey::Primary,
+        KeyCode::Esc | KeyCode::Char('q') => ActionOutputKey::Cancel,
+        KeyCode::Char('j') | KeyCode::Down => {
+            output.scroll_down(visible_lines);
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            output.scroll_up();
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char(' ') | KeyCode::PageDown => {
+            output.page_down(visible_lines);
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('b') | KeyCode::PageUp => {
+            output.page_up(visible_lines);
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('g') | KeyCode::Home => {
+            output.scroll_to_top();
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('G') | KeyCode::End => {
+            output.scroll_to_bottom(visible_lines);
+            ActionOutputKey::Handled
+        }
+        _ => ActionOutputKey::Ignored,
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum StatusKind {
     Ready,
@@ -1330,9 +1627,59 @@ pub enum StatusKind {
 mod tests {
     use super::*;
     use crate::action_menu::RolePromptOption;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static ABANDON_DRIFT_RECHECK_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static ABANDON_FAILED_RECHECK_CALLS: AtomicUsize = AtomicUsize::new(0);
 
     fn mock_rebase_success(_: &JjRebasePlan) -> Result<String> {
         Ok("rebased".to_owned())
+    }
+
+    fn mock_empty_abandon_preview(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
+        Ok(JjAbandonPreview::new(
+            abandon.revision().to_owned(),
+            Some("Empty change".to_owned()),
+            String::new(),
+        ))
+    }
+
+    fn mock_non_empty_abandon_preview(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
+        Ok(JjAbandonPreview::new(
+            abandon.revision().to_owned(),
+            Some("Edit change".to_owned()),
+            "M src/main.rs\n".to_owned(),
+        ))
+    }
+
+    fn mock_abandon_preview_drifts_to_non_empty(
+        abandon: &JjAbandonPlan,
+    ) -> Result<JjAbandonPreview> {
+        if ABANDON_DRIFT_RECHECK_CALLS.fetch_add(1, Ordering::SeqCst) == 0 {
+            mock_empty_abandon_preview(abandon)
+        } else {
+            mock_non_empty_abandon_preview(abandon)
+        }
+    }
+
+    fn mock_abandon_preview_recheck_failure(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
+        if ABANDON_FAILED_RECHECK_CALLS.fetch_add(1, Ordering::SeqCst) == 0 {
+            mock_empty_abandon_preview(abandon)
+        } else {
+            Err(eyre!("jj diff -r change-a --summary failed: disappeared"))
+        }
+    }
+
+    fn mock_abandon_success(_: &JjAbandonPlan) -> Result<String> {
+        Ok("abandoned".to_owned())
+    }
+
+    fn mock_abandon_failure(_: &JjAbandonPlan) -> Result<String> {
+        Err(eyre!("jj abandon change-a failed: first line\nsecond line"))
+    }
+
+    fn panic_abandon_run(_: &JjAbandonPlan) -> Result<String> {
+        panic!("abandon should not run without exact confirmation")
     }
 
     fn mock_refresh_ok(_view: &mut ViewState) -> Result<()> {
@@ -1361,6 +1708,10 @@ mod tests {
             should_quit: false,
             #[cfg(test)]
             rebase_run: mock_rebase_success,
+            #[cfg(test)]
+            abandon_preview_load: mock_empty_abandon_preview,
+            #[cfg(test)]
+            abandon_run: mock_abandon_success,
             #[cfg(test)]
             refresh_view: mock_refresh_ok,
             #[cfg(test)]
@@ -1742,6 +2093,309 @@ mod tests {
         assert_eq!(
             preview_output,
             "command: jj rebase -r source-a -o dest\ncontext: rebase from 1 source(s) into dest from jk | source(s): source-a\noutput:\n  command: jj rebase -r source-a -o dest\n  \n  source: source-a\n  \n  destination: dest\n  \n  graph effect: rebases the selected revisions onto the destination and preserves dependencies within the selected set\n  \n  undo path: jj undo"
+        );
+    }
+
+    #[test]
+    fn abandon_action_menu_enter_opens_preview_with_exact_target() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.abandon_preview_load = mock_non_empty_abandon_preview;
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::with_current("change-a"),
+            ),
+            selected: 1,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let (revision, command_label, body) = match &app.mode {
+            InteractionMode::AbandonPreview {
+                abandon, output, ..
+            } => (
+                abandon.revision().to_owned(),
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected abandon preview mode"),
+        };
+        assert_eq!(revision, "change-a");
+        assert_eq!(command_label, "jj abandon change-a");
+        assert!(body.contains("change: change-a"));
+        assert!(body.contains("title: Edit change"));
+    }
+
+    #[test]
+    fn empty_abandon_preview_enter_runs_and_keeps_undo_visible() {
+        let preview = JjAbandonPreview::new(
+            "change-a".to_owned(),
+            Some("Empty change".to_owned()),
+            String::new(),
+        );
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::AbandonPreview {
+            abandon: JjAbandonPlan::new("change-a"),
+            output: ActionOutput::pending(
+                "jj abandon change-a".to_owned(),
+                preview.preview_text(),
+                Some("abandon exact revision change-a from jk".to_owned()),
+            ),
+            preview,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::AbandonPreview { output, .. } => output,
+            _ => panic!("expected abandon result mode"),
+        };
+        assert!(output.completed());
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("abandoned | jj undo")
+        );
+        assert_eq!(app.status.message(), "abandoned | jj undo");
+    }
+
+    #[test]
+    fn empty_abandon_rechecks_before_running_and_requires_confirmation_after_drift() {
+        ABANDON_DRIFT_RECHECK_CALLS.store(1, Ordering::SeqCst);
+        let preview = JjAbandonPreview::new(
+            "change-a".to_owned(),
+            Some("Empty change".to_owned()),
+            String::new(),
+        );
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.abandon_preview_load = mock_abandon_preview_drifts_to_non_empty;
+        app.abandon_run = panic_abandon_run;
+        app.mode = InteractionMode::AbandonPreview {
+            abandon: JjAbandonPlan::new("change-a"),
+            output: ActionOutput::pending(
+                "jj abandon change-a".to_owned(),
+                preview.preview_text(),
+                Some("abandon exact revision change-a from jk".to_owned()),
+            ),
+            preview,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let (input, body) = match &app.mode {
+            InteractionMode::AbandonConfirm { input, output, .. } => {
+                (input.as_str(), output.body_lines().join("\n"))
+            }
+            _ => panic!("expected abandon confirmation after recheck drift"),
+        };
+        assert_eq!(input, "");
+        assert!(body.contains("change is no longer empty"));
+        assert!(body.contains("M src/main.rs"));
+        assert_eq!(
+            app.status.message(),
+            "change is no longer empty; type exact revision to confirm abandon"
+        );
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+        assert_eq!(
+            app.status.message(),
+            "confirmation did not match; abandon not run"
+        );
+
+        app.abandon_run = mock_abandon_success;
+        for character in "change-a".chars() {
+            app.handle_mode_key(crossterm::event::KeyCode::Char(character), 12)
+                .unwrap();
+        }
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::AbandonPreview { output, .. } => output,
+            _ => panic!("expected abandon result mode"),
+        };
+        assert!(output.completed());
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("abandoned | jj undo")
+        );
+    }
+
+    #[test]
+    fn empty_abandon_recheck_failure_stays_readable_without_running() {
+        ABANDON_FAILED_RECHECK_CALLS.store(1, Ordering::SeqCst);
+        let preview = JjAbandonPreview::new(
+            "change-a".to_owned(),
+            Some("Empty change".to_owned()),
+            String::new(),
+        );
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.abandon_preview_load = mock_abandon_preview_recheck_failure;
+        app.abandon_run = panic_abandon_run;
+        app.mode = InteractionMode::AbandonPreview {
+            abandon: JjAbandonPlan::new("change-a"),
+            output: ActionOutput::pending(
+                "jj abandon change-a".to_owned(),
+                preview.preview_text(),
+                None,
+            ),
+            preview,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::AbandonPreview { output, .. } => output,
+            _ => panic!("expected readable abandon recheck failure"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("jj diff -r change-a --summary failed: disappeared"));
+        assert_eq!(
+            app.status.message(),
+            "jj diff -r change-a --summary failed: disappeared"
+        );
+    }
+
+    #[test]
+    fn non_empty_abandon_requires_exact_typed_revision() {
+        let preview = JjAbandonPreview::new(
+            "change-a".to_owned(),
+            Some("Edit change".to_owned()),
+            "M src/main.rs\n".to_owned(),
+        );
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.abandon_run = panic_abandon_run;
+        app.mode = InteractionMode::AbandonPreview {
+            abandon: JjAbandonPlan::new("change-a"),
+            output: ActionOutput::pending(
+                "jj abandon change-a".to_owned(),
+                preview.preview_text(),
+                Some("abandon exact revision change-a from jk".to_owned()),
+            ),
+            preview,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+        assert!(matches!(app.mode, InteractionMode::AbandonConfirm { .. }));
+
+        app.handle_mode_key(crossterm::event::KeyCode::Char('x'), 12)
+            .unwrap();
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+        assert_eq!(
+            app.status.message(),
+            "confirmation did not match; abandon not run"
+        );
+
+        app.abandon_run = mock_abandon_success;
+        app.handle_mode_key(crossterm::event::KeyCode::Backspace, 12)
+            .unwrap();
+        for character in "change-a".chars() {
+            app.handle_mode_key(crossterm::event::KeyCode::Char(character), 12)
+                .unwrap();
+        }
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::AbandonPreview { output, .. } => output,
+            _ => panic!("expected abandon result mode"),
+        };
+        assert!(output.completed());
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("abandoned | jj undo")
+        );
+    }
+
+    #[test]
+    fn abandon_cancel_restores_normal_mode_and_selection() {
+        let mut graph = crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+            crate::jj::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+        ]);
+        graph.execute(
+            ViewCommand::MoveDown,
+            CommandContext {
+                viewport_height: 12,
+                search: None,
+            },
+        );
+        let preview = JjAbandonPreview::new("second".to_owned(), None, String::new());
+        let mut app = test_app(ViewState::Graph(graph));
+        app.mode = InteractionMode::AbandonPreview {
+            abandon: JjAbandonPlan::new("second"),
+            output: ActionOutput::pending(
+                "jj abandon second".to_owned(),
+                preview.preview_text(),
+                None,
+            ),
+            preview,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+            .unwrap();
+
+        let ViewState::Graph(graph) = &app.view else {
+            panic!("expected graph view");
+        };
+        assert_eq!(graph.selected_revision(), Some("second"));
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "abandon cancelled");
+    }
+
+    #[test]
+    fn abandon_failure_keeps_full_error_output_readable() {
+        let preview = JjAbandonPreview::new("change-a".to_owned(), None, String::new());
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.abandon_run = mock_abandon_failure;
+        app.mode = InteractionMode::AbandonPreview {
+            abandon: JjAbandonPlan::new("change-a"),
+            output: ActionOutput::pending(
+                "jj abandon change-a".to_owned(),
+                preview.preview_text(),
+                None,
+            ),
+            preview,
+        };
+
+        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::AbandonPreview { output, .. } => output,
+            _ => panic!("expected abandon result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("jj abandon change-a failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj abandon change-a failed: first line\nsecond line"
         );
     }
 
