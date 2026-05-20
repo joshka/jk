@@ -19,7 +19,7 @@ use crate::command::{
     project_help,
 };
 use crate::copy::CopyOption;
-use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
+use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec, git_fetch};
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
 use crate::view_state::ViewState;
@@ -61,6 +61,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('?'), Command::Help),
     Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
     Binding::new(KeyPattern::char('W'), Command::PromptLogRevset),
+    Binding::new(KeyPattern::char('f'), Command::Fetch),
     Binding::new(KeyPattern::char('y'), Command::Copy),
     Binding::new(KeyPattern::char('v'), Command::ViewFormat),
     Binding::new(KeyPattern::char('r'), Command::Refresh),
@@ -159,6 +160,10 @@ impl App {
                 self.open_log_revset_prompt();
                 Ok(true)
             }
+            Command::Fetch => {
+                self.fetch(viewport_height);
+                Ok(false)
+            }
             Command::Copy => {
                 self.open_copy_menu(viewport_height);
                 Ok(true)
@@ -196,6 +201,22 @@ impl App {
                 self.view.clamp(viewport_height);
                 self.status = StatusLine::ready(&self.view);
             }
+            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+        }
+    }
+
+    fn fetch(&mut self, viewport_height: u16) {
+        match git_fetch() {
+            Ok(output) => match self.view.refresh() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    self.status = StatusLine::with_message(
+                        &self.view,
+                        format!("fetch: {}", output.message()),
+                    );
+                }
+                Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+            },
             Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
         }
     }

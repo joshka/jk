@@ -90,6 +90,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
         StatusHints::Graph => line![
             key("q"),
             " quit  ",
+            key("f"),
+            " fetch  ",
             key("r"),
             " refresh  ",
             key("j/k"),
@@ -117,6 +119,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
         StatusHints::ShowDocument => line![
             key("q"),
             " quit  ",
+            key("f"),
+            " fetch  ",
             key("r"),
             " refresh  ",
             key("j/k"),
@@ -140,6 +144,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
         StatusHints::DiffDocument => line![
             key("q"),
             " quit  ",
+            key("f"),
+            " fetch  ",
             key("r"),
             " refresh  ",
             key("j/k"),

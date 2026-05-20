@@ -15,6 +15,7 @@ pub enum Command {
     Help,
     SearchPrompt,
     PromptLogRevset,
+    Fetch,
     Copy,
     ViewFormat,
     Refresh,
@@ -282,6 +283,7 @@ fn help_metadata(
         Command::PromptLogRevset => {
             (context == HelpContext::Graph).then_some((HelpSectionKind::Direct, "custom revset"))
         }
+        Command::Fetch => Some((HelpSectionKind::Direct, "fetch")),
         Command::Copy => Some((HelpSectionKind::Global, "copy")),
         Command::ViewFormat => Some((HelpSectionKind::Global, "view format")),
         Command::Refresh => Some((HelpSectionKind::Global, "refresh")),

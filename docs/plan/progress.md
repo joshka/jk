@@ -40,3 +40,13 @@
 - Remaining risk: the status bar still uses concise handwritten hint text, while the help overlay is
   now the generated source of truth for exact bindings
 - Next slice: Slice 4: Direct `jj git fetch`
+
+## Slice 4: Direct `jj git fetch`
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/tui.rs`, `docs/plan/progress.md`
+- Verification: full `cargo test` before and after `rustup run nightly cargo fmt`; disposable-repo
+  manual `jj --no-pager git fetch` run with signing disabled in the temporary Git repo;
+  `just   md-check`
+- Remaining risk: fetch output is summarized into the one-line status area rather than preserved in
+  a dedicated output view, so unusually verbose fetch output may be harder to inspect
+- Next slice: Slice 5: Direct `jj new trunk`

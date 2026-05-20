@@ -82,6 +82,18 @@ impl LogViewMode {
 const TRUNK_WORK_REVSET: &str = "trunk().. | trunk()";
 const RECENT_WORK_REVSET: &str = "latest(mutable(), 20) | @ | trunk()";
 const ALL_REPO_REVSET: &str = "all()";
+const FETCH_ARGS: [&str; 2] = ["git", "fetch"];
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommandOutput {
+    message: String,
+}
+
+impl CommandOutput {
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
 
 impl JjCommand {
     pub fn label(self) -> &'static str {
@@ -299,6 +311,10 @@ fn revset_from_log_args(args: &[String]) -> Option<&str> {
     option_value(args, &["-r", "--revisions"], &["--revisions="])
 }
 
+pub fn git_fetch() -> Result<CommandOutput> {
+    run_direct_command(&FETCH_ARGS, "jj git fetch", "fetched")
+}
+
 fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }
@@ -400,6 +416,24 @@ fn run_jj(spec: &ViewSpec, color: ColorMode) -> Result<std::process::Output> {
     Ok(output)
 }
 
+fn run_direct_command(args: &[&str], label: &str, success_fallback: &str) -> Result<CommandOutput> {
+    let mut jj = base_command(ColorMode::Never);
+    jj.args(args);
+
+    let output = jj.output()?;
+    if !output.status.success() {
+        return Err(eyre!(
+            "{} failed: {}",
+            label,
+            summarize_output(&output.stdout, &output.stderr, "command failed")
+        ));
+    }
+
+    Ok(CommandOutput {
+        message: summarize_output(&output.stdout, &output.stderr, success_fallback),
+    })
+}
+
 fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<Vec<RevisionMetadata>> {
     let mut jj = base_command(ColorMode::Never);
 
@@ -429,6 +463,25 @@ fn base_command(color: ColorMode) -> Command {
         .env_remove("NO_COLOR")
         .env_remove("PAGER");
     jj
+}
+
+fn summarize_output(stdout: &[u8], stderr: &[u8], fallback: &str) -> String {
+    let mut parts = Vec::new();
+    let stdout = String::from_utf8_lossy(stdout);
+    let stderr = String::from_utf8_lossy(stderr);
+
+    if !stdout.trim().is_empty() {
+        parts.push(stdout.trim().to_owned());
+    }
+    if !stderr.trim().is_empty() {
+        parts.push(stderr.trim().to_owned());
+    }
+
+    if parts.is_empty() {
+        fallback.to_owned()
+    } else {
+        parts.join(" | ")
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -919,5 +972,20 @@ mod tests {
         );
 
         assert_eq!(LogViewMode::from_spec(&spec), LogViewMode::Recent);
+    }
+
+    #[test]
+    fn fetch_command_args_are_stable() {
+        assert_eq!(FETCH_ARGS, ["git", "fetch"]);
+    }
+
+    #[test]
+    fn summarize_output_prefers_real_output_over_fallback() {
+        assert_eq!(
+            summarize_output(b"fetched origin\n", b"", "fetched"),
+            "fetched origin"
+        );
+        assert_eq!(summarize_output(b"", b"warning\n", "fetched"), "warning");
+        assert_eq!(summarize_output(b"", b"", "fetched"), "fetched");
     }
 }
