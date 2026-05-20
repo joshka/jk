@@ -66,8 +66,18 @@ would be more honest and maintainable.
 
 Keep modules aligned with user-visible concepts:
 
-- `app.rs` owns terminal event loop, app-level modes, key dispatch, modal state, view stack,
-  refresh, and cross-view transitions.
+- `app.rs` owns terminal event loop, app-level key dispatch, mode lifecycle transitions, view stack,
+  refresh, command confirmation/result application, and cross-view transitions. It should route
+  screen and action contracts to their owner modules instead of growing new detailed policy.
+- `app_screen.rs` owns app-level modal and prompt state, including help, copy, view-format,
+  action-menu, role-prompt, text-prompt, action-preview/result, push-remote, operation-action, and
+  working-copy navigation screens. It projects the current `InteractionMode` into status-line text
+  and `tui::Overlay` values.
+- `app_status.rs` owns status-line construction, status kind, title/message/hint storage, and
+  per-view item-count wording.
+- `action_output.rs` owns action preview/result body projection, scroll state, visible-line
+  calculation, and preview/result key handling. `app.rs` decides what an accepted or cancelled
+  action means; `action_output.rs` decides how output panes move.
 - `command.rs` owns binding metadata and the command/effect vocabulary shared between app-level
   dispatch and individual views.
 - `jj.rs` owns `jj` command construction, view specs, diff-format arguments, and conversion from
@@ -87,6 +97,28 @@ Keep modules aligned with user-visible concepts:
 
 Add a module only when it gives a real concept a local home. Do not split code just to make files
 smaller if the resulting reader path becomes less direct.
+
+## Screen And Action Contracts
+
+Every active app screen should have one explicit owner for each part of its contract:
+
+- Keys: `app.rs` owns global dispatch and mode transitions; view modules own view-local bindings;
+  `action_output.rs` owns scrolling keys inside action preview/result output.
+- Screen state: `app_screen.rs` owns modal and prompt variants. New prompt or overlay state should
+  start there unless it is view-local state that belongs in a view module.
+- Overlay projection: `app_screen.rs` converts screen state to `tui::Overlay`; `tui.rs` renders the
+  overlay chrome without deciding app behavior.
+- Status projection: `app_status.rs` constructs durable ready/error status lines from the active
+  view; `app_screen.rs` supplies transient prompt status text while a mode is active.
+- Command execution: `jj.rs` owns command construction and execution wrappers. `app.rs` owns when a
+  command is run, how results refresh or reveal views, and what status/result screen follows.
+- View behavior: view modules execute `ViewCommand` into `ViewEffect`; `app.rs` applies global
+  effects such as opening screens, copying, pushing views, refreshing, or changing search state.
+
+Future UI packets should name the smallest owner that matches the contract. For example, a new
+action-result scroll key belongs in `action_output.rs`; a new modal projection belongs in
+`app_screen.rs` plus `tui.rs`; a new graph navigation behavior belongs in `graph.rs` or
+`view_state.rs`; and only the orchestration glue should land in `app.rs`.
 
 ## View Architecture
 

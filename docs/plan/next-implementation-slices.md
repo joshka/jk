@@ -581,10 +581,19 @@ packets in parallel when their expected write sets overlap. If packet A introduc
 future prompts should use those new owner files instead of sending unrelated work back through
 `src/app.rs`.
 
+After the first Packet A extraction is accepted, run a bounded module-coherence audit before
+starting broad follow-up refactors. The audit should look for the same low-cognitive-load and
+high-coherence pressure that motivated the `app.rs` extraction, not reopen the already accepted
+screen, status, and action-output split.
+
 #### Interruption Packet A: App Decomposition And Screen Contracts
 
 - Goal: decompose the oversized app orchestration surface and define screen/action contracts before
   adding Split Guided Flow.
+- Current implementation note: first extraction has landed for modal/screen projection, status-line
+  construction, and action-output key handling. Remaining Packet A follow-ups should consider
+  command-runner injection, startup parsing, and the app test module only if they preserve behavior
+  and strengthen the same ownership map.
 - Owner concept: app-level event dispatch, screen ownership, action execution contracts, prompt and
   overlay lifecycle, and maintainability guidance for future UI work.
 - Expected write set: `src/app.rs`, new focused app/screen/action modules if introduced,
@@ -616,6 +625,42 @@ future prompts should use those new owner files instead of sending unrelated wor
 - Review prompt: review Interruption Packet A for concept coherence, reduced cognitive load,
   behavior preservation, screen/action contract clarity, test ownership, documentation updates,
   warning discipline, and whether follow-up packets can proceed without broad `src/app.rs` edits.
+
+#### Interruption Packet A Follow-Up: Module Coherence Audit
+
+- Goal: inspect other large or concept-mixed modules for the same maintainability pressure surfaced
+  by `app.rs`, and turn only well-evidenced split candidates into future bounded packets.
+- Owner concept: maintainability planning, module ownership, and cognitive-load reduction across
+  current large files.
+- Expected write set: planning and architecture docs first:
+  `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+  `docs/process-observations.md`, and optionally `docs/agent/architecture.md` if the audit records
+  durable owner-map updates. Rust edits are not part of the audit unless the user explicitly
+  promotes a split candidate into its own implementation packet.
+- Candidate order: start with `src/jj.rs` because it is the largest remaining non-`app.rs` module by
+  current line count and mixes command construction, rendered-output loading, metadata contracts,
+  and parsing-adjacent helpers. Inspect `src/tui.rs`, `src/graph.rs`, `src/command.rs`,
+  `src/action_menu.rs`, and `src/view_state.rs` next as secondary candidates. Treat
+  `src/rendered_jj.rs`, `src/operation_log.rs`, and `src/bookmarks.rs` as optional context only if
+  the primary candidates expose ownership dependencies on them.
+- Non-goals: no immediate broad refactor, no behavior change, no Packet 34 Split Guided Flow, no
+  warning-cleanup sweep, no line-count target, no moving code only because a file is large, and no
+  blocking acceptance of the first Packet A extraction.
+- Acceptance criteria: the audit identifies each candidate module's owning concepts, concept seams
+  that are already named in code or docs, possible split candidates, reasons to avoid splitting, and
+  validation needs for any promoted implementation packet. It should explicitly distinguish
+  high-value splits from files that are large but conceptually coherent enough to leave alone.
+- Validation: documentation-only audit uses `just md-check` and a manual consistency check against
+  current module ownership notes. Any future implementation packet promoted by the audit must define
+  its own focused Rust tests and validation before code is changed.
+- Docs/fragility updates: update `progress.md` and `process-observations.md`; update
+  `fragility-register.md` only if the audit records a parser, rendered-output, or command semantic
+  assumption that should guide a future implementation packet.
+- Suggested agent/model routing: gpt-5.5 high for the audit and gpt-5.5 high review. This is design
+  and review work over module boundaries, not mechanical line-count cleanup.
+- Review prompt: review the module-coherence audit for evidence, boundedness, owner concept clarity,
+  non-goals, validation requirements, and whether each promoted split candidate is small enough for
+  a subagent without overlapping the current Packet A extraction.
 
 #### Interruption Packet B: Navigation And View Entry Contracts
 

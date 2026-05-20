@@ -1,8 +1,8 @@
-//! Terminal event loop and app-level modes.
+//! Terminal event loop and app-level orchestration.
 //!
 //! Feature slices own their view behavior. The app owns cross-cutting concerns:
-//! key dispatch, modal state, the view stack, search state, and the selected
-//! diff format used when opening detail views.
+//! key dispatch, mode transitions, the view stack, search state, and the
+//! selected diff format used when opening detail views.
 
 use std::env;
 use std::ffi::OsString;
@@ -13,14 +13,16 @@ use color_eyre::eyre::eyre;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::DefaultTerminal;
 
-use crate::action_menu::{ActionKind, ActionMenu, FollowUp, RolePrompt, build_action_menu};
-use crate::action_output::ActionOutput;
+use crate::action_menu::{ActionKind, FollowUp, RolePrompt, build_action_menu};
+use crate::action_output::{
+    ActionOutput, ActionOutputKey, action_output_visible_lines, handle_action_output_key,
+};
+use crate::app_screen::{InteractionMode, view_formats};
+use crate::app_status::{StatusKind, StatusLine};
 use crate::clipboard;
 use crate::command::{
     Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect, find_binding,
-    project_help,
 };
-use crate::copy::CopyOption;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
@@ -30,7 +32,7 @@ use crate::jj::{
     git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
-use crate::tui::{self, Overlay, StatusHints};
+use crate::tui;
 use crate::view_state::ViewState;
 
 #[cfg(test)]
@@ -137,106 +139,6 @@ struct App {
     refresh_view: RefreshView,
     #[cfg(test)]
     reveal_graph_change: RevealGraphChange,
-}
-
-enum InteractionMode {
-    Normal,
-    Help,
-    SearchPrompt(String),
-    LogRevsetPrompt(String),
-    CopyMenu {
-        options: Vec<CopyOption>,
-        selected: usize,
-    },
-    ViewMenu {
-        selected: usize,
-    },
-    ActionMenu {
-        menu: ActionMenu,
-        selected: usize,
-    },
-    RolePrompt {
-        action: ActionKind,
-        prompt: RolePrompt,
-        selected: usize,
-    },
-    DescribePrompt {
-        target: JjDescribeTarget,
-        input: String,
-    },
-    CommitPrompt(String),
-    BookmarkNamePrompt {
-        kind: JjBookmarkMutationKind,
-        target: JjBookmarkTarget,
-        input: String,
-    },
-    DescribePreview {
-        describe: JjDescribePlan,
-        output: ActionOutput,
-    },
-    CommitPreview {
-        commit: JjCommitPlan,
-        output: ActionOutput,
-    },
-    BookmarkMutationPreview {
-        mutation: JjBookmarkMutationPlan,
-        output: ActionOutput,
-    },
-    NewPreview {
-        new_change: JjNewPlan,
-        output: ActionOutput,
-    },
-    RebasePreview {
-        rebase: JjRebasePlan,
-        output: ActionOutput,
-    },
-    RestorePreview {
-        restore: JjRestorePlan,
-        output: ActionOutput,
-    },
-    RevertPreview {
-        revert: JjRevertPlan,
-        output: ActionOutput,
-    },
-    SquashPreview {
-        squash: JjSquashPlan,
-        output: ActionOutput,
-    },
-    AbsorbPreview {
-        absorb: JjAbsorbPlan,
-        output: ActionOutput,
-    },
-    AbandonPreview {
-        abandon: JjAbandonPlan,
-        preview: JjAbandonPreview,
-        output: ActionOutput,
-    },
-    AbandonConfirm {
-        abandon: JjAbandonPlan,
-        input: String,
-        output: ActionOutput,
-    },
-    PushRemotePrompt {
-        target: JjGitPushTarget,
-        remotes: Vec<String>,
-        selected: usize,
-    },
-    PushPreview {
-        push: JjGitPush,
-        output: ActionOutput,
-    },
-    OperationRecoveryPreview {
-        recovery: JjOperationRecovery,
-        output: ActionOutput,
-    },
-    OperationTargetPreview {
-        target: JjOperationTarget,
-        output: ActionOutput,
-    },
-    WorkingCopyNavigationPreview {
-        navigation: JjWorkingCopyNavigationPlan,
-        output: ActionOutput,
-    },
 }
 
 const APP_BINDINGS: &[Binding] = &[
@@ -681,11 +583,11 @@ impl App {
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.should_quit {
             terminal.draw(|frame| {
-                let status = self.render_status();
+                let status = self.mode.status_line(&self.view, &self.status);
                 let areas: tui::Areas = tui::areas(frame.area());
                 tui::render_chrome(frame, areas, &status);
                 self.view.render(frame, areas.main, self.search.as_ref());
-                tui::render_overlay(frame, &status, self.overlay());
+                tui::render_overlay(frame, &status, self.mode.overlay(&self.view, APP_BINDINGS));
             })?;
 
             if event::poll(Duration::from_millis(200))? {
@@ -711,7 +613,7 @@ impl App {
         }
 
         let refresh_status = self.handle_normal_key(key, viewport_height)?;
-        if refresh_status && matches!(self.status.kind, StatusKind::Ready) {
+        if refresh_status && matches!(self.status.kind(), StatusKind::Ready) {
             self.status = StatusLine::ready(&self.view);
         }
 
@@ -973,10 +875,8 @@ impl App {
             InteractionMode::ActionMenu { menu, selected } => {
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down => {
-                        if *selected + 1 < menu.items().len() {
-                            *selected += 1;
-                        }
+                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < menu.items().len() => {
+                        *selected += 1;
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
                         *selected = selected.saturating_sub(1);
@@ -1095,10 +995,10 @@ impl App {
             } => {
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down => {
-                        if *selected + 1 < prompt.options().len() {
-                            *selected += 1;
-                        }
+                    KeyCode::Char('j') | KeyCode::Down
+                        if *selected + 1 < prompt.options().len() =>
+                    {
+                        *selected += 1;
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
                         *selected = selected.saturating_sub(1);
@@ -1603,10 +1503,8 @@ impl App {
             } => {
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down => {
-                        if *selected + 1 < remotes.len() {
-                            *selected += 1;
-                        }
+                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < remotes.len() => {
+                        *selected += 1;
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
                         *selected = selected.saturating_sub(1);
@@ -3289,7 +3187,7 @@ impl App {
     fn open_view_menu(&mut self) {
         let selected = view_formats()
             .iter()
-            .position(|option| option.format == self.diff_format)
+            .position(|option| option.format() == self.diff_format)
             .unwrap_or(0);
         self.mode = InteractionMode::ViewMenu { selected };
     }
@@ -3365,107 +3263,6 @@ impl App {
         self.view.set_scroll_offset(viewport_height, scroll_offset);
         self.status = StatusLine::ready(&self.view);
         Ok(())
-    }
-
-    fn render_status(&self) -> StatusLine {
-        match &self.mode {
-            InteractionMode::SearchPrompt(input) => {
-                StatusLine::with_message(&self.view, format!("/{input}"))
-            }
-            InteractionMode::LogRevsetPrompt(input) => {
-                StatusLine::with_message(&self.view, format!("revset: {input}"))
-            }
-            InteractionMode::DescribePrompt { target, input } => StatusLine::with_message(
-                &self.view,
-                format!("describe {}: {input}", target.label()),
-            ),
-            InteractionMode::CommitPrompt(input) => {
-                StatusLine::with_message(&self.view, format!("commit @: {input}"))
-            }
-            InteractionMode::BookmarkNamePrompt {
-                kind,
-                target,
-                input,
-            } => StatusLine::with_message(
-                &self.view,
-                format!("bookmark {} {}: {input}", kind.label(), target.label()),
-            ),
-            InteractionMode::AbandonConfirm { input, .. } => StatusLine::with_message(
-                &self.view,
-                format!("type exact revision to confirm abandon: {input}"),
-            ),
-            _ => self.status.clone(),
-        }
-    }
-
-    fn overlay(&self) -> Overlay<'_> {
-        match &self.mode {
-            InteractionMode::Help => Overlay::Help {
-                sections: project_help(
-                    APP_BINDINGS,
-                    self.view.bindings(),
-                    self.view.help_context(),
-                ),
-            },
-            InteractionMode::CopyMenu { options, selected } => Overlay::CopyMenu {
-                options,
-                selected: *selected,
-            },
-            InteractionMode::ViewMenu { selected } => Overlay::ViewMenu {
-                options: view_formats(),
-                selected: *selected,
-            },
-            InteractionMode::ActionMenu { menu, selected } => Overlay::ActionMenu {
-                menu,
-                selected: *selected,
-            },
-            InteractionMode::RolePrompt {
-                prompt, selected, ..
-            } => Overlay::RolePrompt {
-                prompt,
-                selected: *selected,
-            },
-            InteractionMode::DescribePreview { output, .. } => Overlay::DescribePreview { output },
-            InteractionMode::CommitPreview { output, .. } => Overlay::CommitPreview { output },
-            InteractionMode::BookmarkMutationPreview { output, .. } => {
-                Overlay::BookmarkMutationPreview { output }
-            }
-            InteractionMode::NewPreview { output, .. } => Overlay::NewPreview { output },
-            InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
-            InteractionMode::RestorePreview { output, .. } => Overlay::RestorePreview { output },
-            InteractionMode::RevertPreview { output, .. } => Overlay::RevertPreview { output },
-            InteractionMode::SquashPreview { output, .. } => Overlay::SquashPreview { output },
-            InteractionMode::AbsorbPreview { output, .. } => Overlay::AbsorbPreview { output },
-            InteractionMode::AbandonPreview { output, .. } => Overlay::AbandonPreview { output },
-            InteractionMode::AbandonConfirm { input, output, .. } => {
-                Overlay::AbandonConfirm { input, output }
-            }
-            InteractionMode::PushRemotePrompt {
-                remotes, selected, ..
-            } => Overlay::PushRemotePrompt {
-                remotes,
-                selected: *selected,
-            },
-            InteractionMode::PushPreview { output, .. } => Overlay::PushPreview { output },
-            InteractionMode::OperationRecoveryPreview { output, .. } => {
-                Overlay::OperationRecoveryPreview { output }
-            }
-            InteractionMode::OperationTargetPreview { output, .. } => {
-                Overlay::OperationTargetPreview { output }
-            }
-            InteractionMode::WorkingCopyNavigationPreview { navigation, output } => {
-                Overlay::WorkingCopyNavigationPreview {
-                    title: navigation.overlay_title(),
-                    output,
-                }
-            }
-            InteractionMode::Normal
-            | InteractionMode::SearchPrompt(_)
-            | InteractionMode::LogRevsetPrompt(_)
-            | InteractionMode::DescribePrompt { .. }
-            | InteractionMode::CommitPrompt(_)
-            | InteractionMode::BookmarkNamePrompt { .. } => Overlay::None,
-        }
     }
 
     fn push_detail(&mut self, command: JjCommand, revset: String) -> Result<()> {
@@ -3583,35 +3380,6 @@ impl App {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ViewFormatOption {
-    label: &'static str,
-    format: DiffFormat,
-}
-
-impl ViewFormatOption {
-    pub fn label(self) -> &'static str {
-        self.label
-    }
-
-    pub fn format(self) -> DiffFormat {
-        self.format
-    }
-}
-
-pub fn view_formats() -> &'static [ViewFormatOption] {
-    &[
-        ViewFormatOption {
-            label: "default jj diff",
-            format: DiffFormat::Default,
-        },
-        ViewFormatOption {
-            label: "git diff (--git)",
-            format: DiffFormat::Git,
-        },
-    ]
-}
-
 fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
     let args = args
         .into_iter()
@@ -3642,111 +3410,6 @@ fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
         unknown => Err(eyre!(
             "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, resolve, bookmarks, operation-log"
         )),
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct StatusLine {
-    title: String,
-    message: String,
-    kind: StatusKind,
-    hints: StatusHints,
-}
-
-impl StatusLine {
-    fn ready(view: &ViewState) -> Self {
-        let message = if let Some(item_count) = view.item_count() {
-            item_count_message(view, item_count)
-        } else {
-            format!(
-                "{}/{} lines",
-                view.scroll_offset()
-                    .saturating_add(1)
-                    .min(view.document_line_count()),
-                view.document_line_count()
-            )
-        };
-        Self {
-            title: view.spec().app_label(),
-            message,
-            kind: StatusKind::Ready,
-            hints: view.status_hints(),
-        }
-    }
-
-    fn error(view: &ViewState, message: String) -> Self {
-        Self {
-            title: view.spec().app_label(),
-            message,
-            kind: StatusKind::Error,
-            hints: view.status_hints(),
-        }
-    }
-
-    fn with_message(view: &ViewState, message: impl Into<String>) -> Self {
-        Self {
-            title: view.spec().app_label(),
-            message: message.into(),
-            kind: StatusKind::Ready,
-            hints: view.status_hints(),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn test(
-        title: impl Into<String>,
-        message: impl Into<String>,
-        kind: StatusKind,
-        hints: StatusHints,
-    ) -> Self {
-        Self {
-            title: title.into(),
-            message: message.into(),
-            kind,
-            hints,
-        }
-    }
-
-    pub fn title(&self) -> &str {
-        &self.title
-    }
-
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-
-    pub fn kind(&self) -> &StatusKind {
-        &self.kind
-    }
-
-    pub fn hints(&self) -> StatusHints {
-        self.hints
-    }
-}
-
-fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
-    let base = format!("{item_count} items");
-    match mode_label {
-        Some(mode_label) => format!("{base} | {mode_label}"),
-        None => base,
-    }
-}
-
-fn item_count_message(view: &ViewState, item_count: usize) -> String {
-    match view.command() {
-        JjCommand::Resolve => format!("{item_count} conflicts"),
-        JjCommand::FileList => format!("{item_count} files"),
-        JjCommand::Bookmarks => format!("{item_count} bookmarks"),
-        JjCommand::OperationLog => format!("{item_count} operations"),
-        JjCommand::Default | JjCommand::Log => {
-            graph_status_message(item_count, view.graph_mode_label())
-        }
-        JjCommand::Show
-        | JjCommand::Diff
-        | JjCommand::Status
-        | JjCommand::FileShow
-        | JjCommand::OperationShow
-        | JjCommand::OperationDiff => format!("{item_count} items"),
     }
 }
 
@@ -3819,60 +3482,6 @@ fn bookmark_status_context(mutation: &JjBookmarkMutationPlan, view_label: &str) 
             view_label
         ),
     }
-}
-
-fn action_output_visible_lines(viewport_height: u16) -> u16 {
-    viewport_height.saturating_sub(1).max(1)
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ActionOutputKey {
-    Primary,
-    Cancel,
-    Handled,
-    Ignored,
-}
-
-fn handle_action_output_key(
-    code: KeyCode,
-    output: &mut ActionOutput,
-    visible_lines: u16,
-) -> ActionOutputKey {
-    match code {
-        KeyCode::Enter => ActionOutputKey::Primary,
-        KeyCode::Esc | KeyCode::Char('q') => ActionOutputKey::Cancel,
-        KeyCode::Char('j') | KeyCode::Down => {
-            output.scroll_down(visible_lines);
-            ActionOutputKey::Handled
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            output.scroll_up();
-            ActionOutputKey::Handled
-        }
-        KeyCode::Char(' ') | KeyCode::PageDown => {
-            output.page_down(visible_lines);
-            ActionOutputKey::Handled
-        }
-        KeyCode::Char('b') | KeyCode::PageUp => {
-            output.page_up(visible_lines);
-            ActionOutputKey::Handled
-        }
-        KeyCode::Char('g') | KeyCode::Home => {
-            output.scroll_to_top();
-            ActionOutputKey::Handled
-        }
-        KeyCode::Char('G') | KeyCode::End => {
-            output.scroll_to_bottom(visible_lines);
-            ActionOutputKey::Handled
-        }
-        _ => ActionOutputKey::Ignored,
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum StatusKind {
-    Ready,
-    Error,
 }
 
 #[cfg(test)]
@@ -4344,15 +3953,6 @@ mod tests {
     #[test]
     fn rejects_unknown_startup_command() {
         assert!(initial_view(vec!["bookmark".into()]).is_err());
-    }
-
-    #[test]
-    fn graph_status_message_includes_mode_label() {
-        assert_eq!(
-            graph_status_message(4, Some("trunk work")),
-            "4 items | trunk work"
-        );
-        assert_eq!(graph_status_message(4, None), "4 items");
     }
 
     #[test]

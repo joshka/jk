@@ -12,7 +12,8 @@ use ratatui_macros::{line, span, vertical};
 
 use crate::action_menu::{ActionMenu, RolePrompt};
 use crate::action_output::ActionOutput;
-use crate::app::{StatusKind, StatusLine, ViewFormatOption};
+use crate::app_screen::ViewFormatOption;
+use crate::app_status::{StatusKind, StatusLine};
 use crate::command::HelpSection;
 use crate::copy::CopyOption;
 
@@ -818,7 +819,7 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use crate::action_output::ActionOutput;
-    use crate::app::{StatusKind, StatusLine};
+    use crate::app_status::{StatusKind, StatusLine};
     use crate::command::{HelpRow, HelpSectionKind};
 
     use super::*;

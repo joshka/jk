@@ -3,6 +3,8 @@
 //! The active action output is modal state, not view history. It keeps raw command output readable
 //! while preserving the underlying view selection and search state.
 
+use crossterm::event::KeyCode;
+
 #[derive(Clone, Debug)]
 pub(crate) struct ActionOutput {
     command_label: String,
@@ -109,6 +111,54 @@ impl ActionOutput {
     }
 }
 
+pub(crate) fn action_output_visible_lines(viewport_height: u16) -> u16 {
+    viewport_height.saturating_sub(1).max(1)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ActionOutputKey {
+    Primary,
+    Cancel,
+    Handled,
+    Ignored,
+}
+
+pub(crate) fn handle_action_output_key(
+    code: KeyCode,
+    output: &mut ActionOutput,
+    visible_lines: u16,
+) -> ActionOutputKey {
+    match code {
+        KeyCode::Enter => ActionOutputKey::Primary,
+        KeyCode::Esc | KeyCode::Char('q') => ActionOutputKey::Cancel,
+        KeyCode::Char('j') | KeyCode::Down => {
+            output.scroll_down(visible_lines);
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            output.scroll_up();
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char(' ') | KeyCode::PageDown => {
+            output.page_down(visible_lines);
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('b') | KeyCode::PageUp => {
+            output.page_up(visible_lines);
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('g') | KeyCode::Home => {
+            output.scroll_to_top();
+            ActionOutputKey::Handled
+        }
+        KeyCode::Char('G') | KeyCode::End => {
+            output.scroll_to_bottom(visible_lines);
+            ActionOutputKey::Handled
+        }
+        _ => ActionOutputKey::Ignored,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +210,36 @@ mod tests {
                 "  third",
             ]
         );
+    }
+
+    #[test]
+    fn key_handling_maps_preview_commands_and_scrolls_output() {
+        let mut output = output_with_lines(8);
+
+        assert_eq!(
+            handle_action_output_key(KeyCode::PageDown, &mut output, 4),
+            ActionOutputKey::Handled
+        );
+        assert_eq!(output.scroll(), 4);
+
+        assert_eq!(
+            handle_action_output_key(KeyCode::Enter, &mut output, 4),
+            ActionOutputKey::Primary
+        );
+        assert_eq!(
+            handle_action_output_key(KeyCode::Esc, &mut output, 4),
+            ActionOutputKey::Cancel
+        );
+        assert_eq!(
+            handle_action_output_key(KeyCode::Char('x'), &mut output, 4),
+            ActionOutputKey::Ignored
+        );
+    }
+
+    #[test]
+    fn visible_lines_never_drop_below_one() {
+        assert_eq!(action_output_visible_lines(0), 1);
+        assert_eq!(action_output_visible_lines(1), 1);
+        assert_eq!(action_output_visible_lines(5), 4);
     }
 }

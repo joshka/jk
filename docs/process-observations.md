@@ -5,6 +5,67 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Interruption Packet A follow-up module audit planning)
+
+- Slice / task: docs-only follow-up in jj change `Decompose app screen contracts`.
+- User request: after the Packet A `app.rs` extraction, explicitly record that other large or
+  concept-mixed files should be checked for similar low-cognitive-load and high-coherence pressure.
+- Observable outcome: `docs/plan/next-implementation-slices.md` now adds a Packet A follow-up
+  module-coherence audit. The audit starts with `src/jj.rs` as the most obvious candidate by current
+  size and treats `src/tui.rs`, `src/graph.rs`, `src/command.rs`, `src/action_menu.rs`, and
+  `src/view_state.rs` as secondary candidates.
+- Planning boundary: the audit is design/review work only. It must identify owning concepts, split
+  candidates, non-goals, acceptance criteria, validation, and subagent-ready follow-up packets, but
+  it does not require immediate broad refactors and does not block accepting the first Packet A
+  screen/status/action-output extraction.
+- Model routing: the audit and review are routed to `gpt-5.5 high` because the work is about module
+  boundaries and concept coherence rather than mechanical line-count reduction.
+- Validation: `just md-check`
+- Docs / fragility: `docs/plan/fragility-register.md` unchanged because this planning update adds no
+  parser, rendered-output, or command semantic assumptions.
+- Evidence basis:
+  - Thread: `019e45b3-1824-7822-9902-fff704ae689d`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `printenv CODEX_THREAD_ID`, `date +%F`, `wc -l src/*.rs | sort -nr | head -20`, `rg`,
+    `sed`, `just md-check`
+  - Files: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
+### 2026-05-20 (Interruption Packet A implementation)
+
+- Slice / task: implement Interruption Packet A in jj change `Decompose app screen contracts`.
+- Scope: behavior-preserving extraction from oversized `src/app.rs`; no new commands, no Packet 34
+  split flow, no key remapping, no parser or `jj` command semantic changes.
+- Observable outcome: `src/app_screen.rs` now owns app-level modal/prompt state plus status/overlay
+  projection; `src/app_status.rs` owns status-line construction and count wording;
+  `src/action_output.rs` owns action preview/result visible-line and key-handling behavior.
+  `src/app.rs` keeps orchestration, mode transitions, command-result application, and view-stack
+  behavior.
+- Architecture outcome: `docs/agent/architecture.md` now records the screen/action ownership map and
+  routes future keys, overlays, status projection, command execution, and view behavior to
+  non-overlapping owners where possible.
+- Validation: focused `cargo test app_`; focused `cargo test action_output`; full `cargo test`;
+  `cargo check`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
+  `just md-fmt`; `just md-check`; attempted `cargo clippy -- -D warnings`; attempted `just check`.
+- Warning / blocker status: `cargo check` passes but still reports existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy with
+  `-D warnings` remains blocked by those dead-code warnings plus pre-existing collapsible-if
+  warnings in `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`. `just check` still
+  stops at the known local `cargo +nightly fmt` wrapper issue with `no such command: +nightly`.
+- Docs / fragility: `docs/plan/fragility-register.md` remains unchanged because this extraction did
+  not add or modify parser, rendered-output, or command semantic assumptions.
+- Evidence basis:
+  - Thread: `019e45a9-a7fd-7b12-b932-0da3e6153997`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `jj --no-pager status`, `cargo test app_`, `cargo test action_output`, `cargo test`,
+    `cargo check`, `cargo clippy -- -D warnings`, `rustup run nightly cargo fmt`,
+    `rustup run nightly cargo fmt --check`, `just md-fmt`, `just md-check`, `just check`,
+    `printenv CODEX_THREAD_ID`, `date +%F`
+  - Files: `src/action_output.rs`, `src/app.rs`, `src/app_screen.rs`, `src/app_status.rs`,
+    `src/main.rs`, `src/tui.rs`, `docs/agent/architecture.md`,
+    `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Pre-Packet-34 maintainability interruption)
 
 - Slice / task: docs-only planning update in jj change `Plan maintainability interruption`.

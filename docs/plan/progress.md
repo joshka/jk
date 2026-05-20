@@ -856,3 +856,61 @@
   A must land first so later UI repair packets can avoid defaulting every change back through
   `src/app.rs`.
 - Next slice: Pre-Packet-34 Interruption Packet A: App Decomposition And Screen Contracts
+
+## Pre-Packet-34 Interruption Packet A: App Decomposition And Screen Contracts
+
+- Files changed: `src/action_output.rs`, `src/app.rs`, `src/app_screen.rs`, `src/app_status.rs`,
+  `src/main.rs`, `src/tui.rs`, `docs/agent/architecture.md`,
+  `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`
+- Behavior: app dispatch remains the orchestration owner, but modal/screen state and overlay/status
+  projection now live in `app_screen.rs`; status-line construction and per-view count wording now
+  live in `app_status.rs`; action preview/result scroll-key handling now lives in
+  `action_output.rs`. No new user-visible commands, key remapping, parser behavior, or `jj` command
+  semantics were introduced.
+- Architecture contract: `docs/agent/architecture.md` now names owners for keys, screen state,
+  overlay projection, status projection, command execution, and view behavior so later interruption
+  packets can route work to a narrower owner instead of defaulting to `src/app.rs`.
+- Verification: focused `cargo test app_`; focused `cargo test action_output`; full `cargo test`;
+  `cargo check`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
+  `just md-fmt`; `just md-check`.
+- Validation note: `cargo check` still reports pre-existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  `cargo clippy -- -D warnings` remains blocked by those dead-code warnings plus pre-existing
+  collapsible-if warnings in `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+  `just check` was attempted and still stopped at the known local `cargo +nightly fmt` wrapper issue
+  with `no such command: +nightly`; equivalent direct Rust formatting, full tests, cargo check, and
+  Markdown checks were run. Interactive `cargo run` smoke was not run because the TUI blocks for
+  input and the current warning state already prevents a no-warning smoke.
+- Docs/fragility updates: `docs/plan/fragility-register.md` unchanged because the extraction did not
+  change parser, rendered-output, or command semantic assumptions.
+- Remaining risk: this is the first coherent Packet A extraction, not full app decomposition.
+  Command-runner injection, startup parsing, and the large app test module remain candidates for
+  later Packet A follow-up once this screen/status/action-output ownership boundary is reviewed.
+  Other large modules may carry similar concept-mixing pressure and should be audited separately
+  after the current extraction is accepted.
+- Next slice: accept or repair the current Packet A extraction, then run the Packet A follow-up
+  module-coherence audit before starting broad refactors in other large files.
+
+## Packet A Follow-Up Planning: Module Coherence Audit
+
+- Files changed: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`
+- Behavior: planning docs now record a bounded follow-up audit for large or concept-mixed modules
+  after the current `app.rs` extraction is reviewed. The audit starts with `src/jj.rs` as the most
+  obvious candidate by current size, then inspects `src/tui.rs`, `src/graph.rs`, `src/command.rs`,
+  `src/action_menu.rs`, and `src/view_state.rs` as secondary candidates.
+- Product boundary: this does not claim implementation work, require immediate broad refactors, or
+  block acceptance of the first Packet A extraction. The audit must identify owning concepts, split
+  candidates, reasons not to split, non-goals, acceptance criteria, validation, and subagent-ready
+  follow-up packets before any Rust code is changed.
+- Validation: `just md-check`
+- Validation note: no Rust validation was run because this is a docs-only planning update.
+- Docs/fragility updates: `docs/plan/fragility-register.md` unchanged because this update introduces
+  no parser, rendered-output, or command semantic assumptions.
+- Remaining risk: the candidate list is size-informed, not proof that a split is needed. The audit
+  must distinguish files that are merely large from files where mixed ownership increases cognitive
+  load or blocks future packets.
+- Next slice: run the module-coherence audit with `gpt-5.5 high` design/review after current Packet
+  A acceptance, or continue with the next interruption packet if the audit finds no promotable
+  split.
