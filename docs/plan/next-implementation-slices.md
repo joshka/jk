@@ -662,6 +662,103 @@ screen, status, and action-output split.
   non-goals, validation requirements, and whether each promoted split candidate is small enough for
   a subagent without overlapping the current Packet A extraction.
 
+Audit result from 2026-05-20:
+
+- `src/jj.rs`: high-value split candidate. The module currently owns action/mutation command plans
+  and preview text, `ViewSpec` and view-mode command shape, direct `jj` process execution, rendered
+  row item models, metadata-template loading, row grouping, and parsers in one file. The
+  cognitive-load issue is not line count alone; future command packets must scan unrelated
+  rendered-output and view-spec code to review an action-plan change, while parser or row-loading
+  changes must share a test module with every command-builder contract. Promote the command-plan
+  extraction below first.
+- `src/tui.rs`: large but coherent enough for now. It owns shared chrome and overlay rendering as
+  documented. The main pressure is repeated action-output overlay arms and repeated selected-list
+  styling, which can be cleaned locally when a UI packet touches overlay presentation. Do not split
+  it before a concrete rendering change.
+- `src/graph.rs`: large but conceptually coherent. It owns graph selection, search, refresh
+  preservation, graph-mode switching, exact change-id selection, and graph-to-action-menu context.
+  The action-menu handoff is view policy rather than a separate owner today. Leave it intact until
+  Packet B navigation work proves a smaller view-entry contract is needed.
+- `src/command.rs`: moderately mixed but acceptable. It combines command/effect vocabulary,
+  key-pattern metadata, and generated-help projection, which are intentionally coupled by the
+  current architecture. Revisit only if Packet B adds multi-character grammar or help projection
+  grows enough to make command vocabulary harder to audit.
+- `src/action_menu.rs`: coherent. It owns preview-first action vocabulary, exact action contexts,
+  role prompts, menu labels, and follow-up values without executing commands. Watch it as more
+  mutation families arrive, but do not split before the next command-plan extraction clarifies the
+  boundary with `jj` command builders.
+- `src/view_state.rs`: coherent dispatcher with one growth point. The routing methods are repetitive
+  by design, while `push_target`, `bookmark_target`, `selected_local_bookmark_name`, and
+  `exact_restore_revert_context` are cross-view target contracts. Keep them here for now; consider a
+  later target-contract extraction only if Packet B or later action packets add several more
+  cross-view target methods.
+
+#### Interruption Packet A1: Extract `jj` Action Plans
+
+- Goal: move preview-first `jj` action/mutation command plans out of `src/jj.rs` while preserving
+  the existing public API through compatibility re-exports if needed.
+- Owner concept: `jj` command-plan contracts for preview-first actions, including argv shape,
+  labels, preview summaries, direct execution, exact change-id revsets, exact bookmark patterns, and
+  fallback result wording.
+- Expected write set: `src/jj.rs`, one new focused module such as `src/jj_actions.rs` or an
+  equivalent owner-named file, `src/main.rs` for the module declaration, focused moved tests from
+  the current `src/jj.rs` test module, `docs/agent/architecture.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Non-goals: no command semantic changes, no output/parser extraction, no `ViewSpec` redesign, no
+  broad call-site churn, no new user-visible commands, no Packet 34 Split Guided Flow, and no
+  warning-cleanup sweep.
+- Acceptance criteria: action-plan types and methods for operation recovery/target actions, git
+  push, new, describe, commit, edit/next/prev, restore, revert, bookmark mutations, rebase, squash,
+  absorb, and abandon have a coherent owner outside the row-loading/parser code; existing imports
+  still compile or are updated mechanically; command argv, preview text, fallback messages, and
+  exact quoting behavior are unchanged; `src/jj.rs` remains a smaller facade for view specs,
+  loading, process boundaries, and rendered-output conversion until a later packet moves those
+  concepts.
+- Validation: focused command-construction tests moved with the command-plan owner; focused abandon,
+  restore/revert, bookmark, operation, push, and working-copy navigation tests; full `cargo test`;
+  `cargo check`; `rustup run nightly cargo fmt --check`; `just md-check`; `just check` when the
+  local wrapper is healthy, otherwise report the known wrapper failure and equivalent checks.
+- Docs/fragility updates: update architecture ownership notes and progress/process docs. Update
+  `fragility-register.md` only if the extraction changes a parser, rendered-output assumption, or
+  command semantic contract; a behavior-preserving move should leave it unchanged.
+- Suggested agent/model routing: gpt-5.5 high implementation and gpt-5.5 high review because this is
+  a cross-module Rust extraction with many mutation command contracts and high regression risk.
+- Review prompt: review Packet A1 for behavior preservation, command argv exactness, preview/result
+  wording stability, public API churn, test ownership, and whether `src/jj.rs` now separates command
+  plans from rendered-output loading enough for later packets.
+
+#### Interruption Packet A2: Extract `jj` Rendered Row Loading
+
+- Goal: after Packet A1 lands, separate rendered `jj` row item models, metadata pairing, loaders,
+  and parsers from remaining `ViewSpec` and process-boundary code.
+- Owner concept: conversion from rendered `jj` output plus narrow metadata-template streams into the
+  selectable rows used by graph, bookmark, file-list, resolve, and operation-log views.
+- Expected write set: `src/jj.rs`, one new focused module such as `src/jj_rows.rs`, `src/main.rs`
+  for the module declaration, moved parser/row tests from `src/jj.rs`, `docs/agent/architecture.md`,
+  `docs/plan/progress.md`, `docs/plan/fragility-register.md` only for newly clarified or changed
+  soft contracts, and `docs/process-observations.md`.
+- Non-goals: no command-plan changes, no `rendered_jj.rs` sticky-file extraction, no lower-level
+  `jj_lib` integration, no new parser assumptions, no behavior changes to row grouping or metadata
+  pairing, and no Packet 34 Split Guided Flow.
+- Acceptance criteria: `LogItem`, `BookmarkItem`, `FileListItem`, `ResolveEntry`, and
+  `OperationLogItem` plus their load/group/parse helpers live under one row-loading owner; row
+  grouping, bookmark metadata pairing, operation-id pairing, resolve JSON parsing, file-list path
+  preservation, and ANSI-to-Ratatui conversion behavior are unchanged; `ViewSpec` continues to own
+  command identity and navigation target provenance; parser tests move with the parser owner and
+  still document graceful degradation.
+- Validation: focused row/parser tests for log grouping, bookmark pairing, operation-log id
+  grouping, resolve JSON degradation, file-list path preservation, and view-spec navigation
+  contracts left in `src/jj.rs`; full `cargo test`; `cargo check`;
+  `rustup run nightly cargo fmt --check`; `just md-check`.
+- Docs/fragility updates: review existing fragility entries for row-order metadata pairing and
+  rendered-output parsing. Update only if the extraction changes wording, adds a new assumption, or
+  reveals a current undocumented soft contract with precise code/test evidence.
+- Suggested agent/model routing: gpt-5.5 high implementation and gpt-5.5 high review because this
+  touches rendered-output contracts and parser tests.
+- Review prompt: review Packet A2 for parser behavior preservation, metadata pairing exactness,
+  graceful degradation, test locality, and whether `src/jj.rs` now reads as a small
+  process/view-spec facade rather than a mixed parser and command-plan module.
+
 #### Interruption Packet B: Navigation And View Entry Contracts
 
 - Goal: make view entry and directional navigation coherent before new rewrite flows add more keys.

@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Interruption Packet A follow-up module coherence audit)
+
+- Slice / task: docs-only module-coherence audit in jj change `Audit module coherence`.
+- User request: after Packet A extracted `app.rs` responsibilities into focused app/screen/status
+  modules, inspect other large or concept-mixed files for similar low-cognitive-load and
+  high-coherence pressure, starting with `src/jj.rs`, then `src/tui.rs`, `src/graph.rs`,
+  `src/command.rs`, `src/action_menu.rs`, and `src/view_state.rs`.
+- Observable outcome: `docs/plan/next-implementation-slices.md` now records audit findings for each
+  inspected module and promotes two bounded follow-up packets: Packet A1 extracts `jj` action-plan
+  command contracts, and Packet A2 extracts rendered row loading and parser contracts after A1
+  lands.
+- Audit finding: `src/jj.rs` is the only immediate high-value split candidate. The evidence is the
+  current outline showing action/mutation plans, `ViewSpec` and view-mode command shape, direct
+  process execution, rendered row item models, metadata-template loading, row grouping, and parsers
+  in one 4,572-line module with one large mixed test module. The other inspected files are large or
+  repetitive in places but remain coherent enough to defer until a concrete UI/navigation/action
+  packet touches them.
+- Planning boundary: no Rust files were edited, no behavior changed, and
+  `docs/plan/fragility-register.md` was left unchanged because the audit did not discover a new
+  undocumented parser, rendered-output, or command semantic assumption.
+- Validation: `just md-check`
+- Evidence basis:
+  - Thread: `019e45b8-9a19-7fc1-b0d5-4915841d79b6`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `jj --no-pager status`, `wc -l`, `rg`, `sed`, `printenv CODEX_THREAD_ID`, `date +%F`,
+    `just md-check`
+  - Files: `src/jj.rs`, `src/tui.rs`, `src/graph.rs`, `src/command.rs`, `src/action_menu.rs`,
+    `src/view_state.rs`, `src/rendered_jj.rs`, `docs/plan/next-implementation-slices.md`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Interruption Packet A follow-up module audit planning)
 
 - Slice / task: docs-only follow-up in jj change `Decompose app screen contracts`.

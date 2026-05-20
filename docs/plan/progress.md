@@ -914,3 +914,32 @@
 - Next slice: run the module-coherence audit with `gpt-5.5 high` design/review after current Packet
   A acceptance, or continue with the next interruption packet if the audit finds no promotable
   split.
+
+## Packet A Follow-Up: Module Coherence Audit
+
+- Files changed: `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`
+- Behavior: audited the largest and most likely concept-mixed modules after the Packet A `app.rs`
+  extraction: `src/jj.rs`, `src/tui.rs`, `src/graph.rs`, `src/command.rs`, `src/action_menu.rs`, and
+  `src/view_state.rs`, with `src/rendered_jj.rs` checked as context for row/rendered-output
+  ownership. The audit promotes `src/jj.rs` as the only immediate high-value split candidate and
+  records two bounded follow-up packets: Packet A1 for `jj` action-plan extraction and Packet A2 for
+  rendered row loading/parser extraction after A1 lands.
+- Findings: `src/jj.rs` mixes command-plan contracts, `ViewSpec` and view-mode command shape, direct
+  process execution, selectable rendered row models, metadata pairing, row grouping, and parsers in
+  one file, so future command packets and parser packets force reviewers through unrelated concepts.
+  `src/tui.rs`, `src/graph.rs`, `src/command.rs`, `src/action_menu.rs`, and `src/view_state.rs` are
+  large or repetitive in places but still coherent enough to leave intact until a concrete
+  UI/navigation/action packet changes their owning concepts.
+- Product boundary: this was a design/audit step only. No Rust files were edited, no behavior was
+  changed, Packet 34 remains postponed, and no fragility-register entry was added because the audit
+  did not discover a new undocumented parser, rendered-output, or command semantic assumption.
+- Validation: `just md-check`
+- Validation note: no Rust validation was run because this is a docs-only audit.
+- Docs/fragility updates: `docs/plan/next-implementation-slices.md` now contains the audit findings
+  and subagent-ready Packet A1/A2 prompts. `docs/plan/fragility-register.md` remains unchanged.
+- Remaining risk: Packet A1 is behavior-preserving but will still be a broad Rust move across many
+  command-plan tests. Packet A2 should wait until A1 lands so parser and row-loading ownership can
+  be reviewed without simultaneous command-plan churn.
+- Next slice: Interruption Packet A1: Extract `jj` Action Plans, unless Packet A review requests
+  repair of the existing app screen/status/action-output extraction first.
