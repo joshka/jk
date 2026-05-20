@@ -1098,3 +1098,11 @@ belong here.
   split into smaller imports, fields, mode, and helper edits. Two early focused-test invocations
   used multiple Cargo filters and failed with `unexpected argument`; the relevant tests were rerun
   with one filter or covered by full `cargo test`.
+
+## 2026-05-20 Packet 23 5.5 Review
+
+- Thread id: `019e449d-65f7-7933-9042-514c91d01aef`.
+- Reviewer / model: `gpt-5.5` (high).
+- 5.5 review outcome: no blocking findings.
+- Follow-up note: a focused status-view app test was added to cover `D` targeting `@` and previewing
+  with `jj describe @ --message <message>`.

@@ -10,6 +10,8 @@ use ratatui::layout::Rect;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
+#[cfg(test)]
+use crate::jj::JjCommand;
 use crate::jj::{ViewSpec, document_plain_text};
 use crate::search::SearchQuery;
 use crate::sticky_file_view::{self, StickyFileDocument};
@@ -214,6 +216,21 @@ impl StatusView {
             Vec::new()
         } else {
             vec![CopyOption::new("status text", text)]
+        }
+    }
+}
+
+#[cfg(test)]
+impl StatusView {
+    pub(crate) fn test_new(lines: &[&str]) -> Self {
+        Self {
+            spec: ViewSpec::new(JjCommand::Status, Vec::new()),
+            document: StickyFileDocument::new(crate::rendered_jj::DocumentLines::new(
+                lines
+                    .iter()
+                    .map(|line| ratatui::text::Line::from((*line).to_owned()))
+                    .collect::<Vec<_>>(),
+            )),
         }
     }
 }

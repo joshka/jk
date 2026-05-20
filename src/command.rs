@@ -21,6 +21,8 @@ pub enum Command {
     OpenOperationLog,
     OperationUndo,
     OperationRedo,
+    Describe,
+    Commit,
     Fetch,
     Push,
     Copy,
@@ -88,6 +90,8 @@ impl Command {
             | Self::OpenStatus
             | Self::OpenBookmarks
             | Self::OpenOperationLog
+            | Self::Describe
+            | Self::Commit
             | Self::Fetch
             | Self::Push
             | Self::Copy
@@ -332,6 +336,21 @@ fn help_metadata(
         Command::OpenStatus => Some((HelpSectionKind::Global, "status")),
         Command::OpenBookmarks => Some((HelpSectionKind::Global, "bookmarks")),
         Command::OpenOperationLog => Some((HelpSectionKind::Global, "operation log")),
+        Command::Describe => match context {
+            HelpContext::Graph => Some((HelpSectionKind::Preview, "describe selected revision")),
+            HelpContext::Status => Some((HelpSectionKind::Preview, "describe @")),
+            _ => None,
+        },
+        Command::Commit => match context {
+            HelpContext::Graph => Some((
+                HelpSectionKind::Preview,
+                "commit @ and create new change (ignores selection)",
+            )),
+            HelpContext::Status => {
+                Some((HelpSectionKind::Preview, "commit @ and create new change"))
+            }
+            _ => None,
+        },
         Command::OperationUndo => (context == HelpContext::OperationLog).then_some((
             HelpSectionKind::Preview,
             "undo last repo operation (global)",
@@ -535,6 +554,39 @@ mod tests {
                 .rows()
                 .iter()
                 .any(|row| row.keys() == "p" && row.action().contains("push"))
+        }));
+    }
+
+    #[test]
+    fn project_help_exposes_describe_and_commit_in_honest_contexts() {
+        let global = [
+            Binding::new(KeyPattern::char('D'), Command::Describe),
+            Binding::new(KeyPattern::char('C'), Command::Commit),
+        ];
+
+        let graph_help = project_help(&global, &[], HelpContext::Graph);
+        let status_help = project_help(&global, &[], HelpContext::Status);
+        let show_help = project_help(&global, &[], HelpContext::Show);
+
+        assert_eq!(graph_help[0].title(), "Preview / Confirm");
+        assert_eq!(
+            graph_help[0].rows()[0],
+            HelpRow::new("D", "describe selected revision")
+        );
+        assert_eq!(
+            graph_help[0].rows()[1],
+            HelpRow::new("C", "commit @ and create new change (ignores selection)")
+        );
+        assert_eq!(status_help[0].rows()[0], HelpRow::new("D", "describe @"));
+        assert_eq!(
+            status_help[0].rows()[1],
+            HelpRow::new("C", "commit @ and create new change")
+        );
+        assert!(!show_help.iter().any(|section| {
+            section
+                .rows()
+                .iter()
+                .any(|row| row.keys() == "D" || row.keys() == "C")
         }));
     }
 

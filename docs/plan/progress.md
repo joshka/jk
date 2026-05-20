@@ -386,3 +386,42 @@
   does not simulate a before/after graph or detect whether the destination remains visible until
   after the command refreshes.
 - Next slice: Packet 23: Describe And Commit Flows
+
+## Packet 23: Describe And Commit Flows
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`
+- Behavior: `D` opens a description prompt from graph rows with exact change ids and from status as
+  `@`. Non-empty input opens a scrollable preview that shows the target, message, noninteractive
+  command shape, and `jj undo`; empty input and cancel return to normal mode without running jj.
+  Graph targets execute through an exact `change_id()` revset, while status uses the visible `@`
+  target.
+- Final 5.5 review outcome: no blocking findings; the status describe path was tightened with an
+  app-level test for a status `D` prompt that targets `@` and opens the expected
+  `jj describe @ --message <message>` preview.
+- Behavior: `C` opens a commit prompt from graph or status, but the preview and generated help state
+  that `jj commit` always targets `@` and ignores graph selection. Confirmation runs
+  `jj commit --message <message>`, refreshes afterward, keeps the new-working-copy-on-top effect
+  visible, and preserves success or failure output in `ActionOutput`.
+- Command shapes: describe uses `jj describe <target> --message <message>`, with graph targets
+  represented as `exactly(change_id("<id>"), 1)` and status targets represented as `@`. Commit uses
+  `jj commit --message <message>` with no revision argument.
+- Verification: `cargo check`; focused `cargo test describe --no-fail-fast`;
+  `cargo test commit --no-fail-fast`; full `cargo test`; `jj --no-pager describe --help`;
+  `jj --no-pager commit --help`; disposable-repo describe/commit/undo proof under
+  `/tmp/jk-packet23-proof.UW66K1`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt --check`; `just md-check`
+- Validation note: an early focused-test invocation accidentally passed multiple Cargo test-name
+  filters and failed with `unexpected argument`; the affected describe and commit filters were then
+  run separately and passed.
+- Validation note: `just md-check` initially found Panache formatting diffs in the touched docs;
+  `just md-fmt` reformatted them and the rerun passed.
+- Validation note: `just check` was attempted after Packet 23 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused describe/commit tests, full `cargo test`, `rustup run nightly cargo fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Remaining risk: graph describe targets are exact because they come from template-derived graph row
+  change ids, but status describe and commit intentionally delegate to jj's dynamic `@` at execution
+  time. Commit from graph is deliberately selection-independent and may still surprise users who do
+  not read the preview; help and preview text call out that selected graph rows are not arguments.
+- Next slice: Packet 24: Bookmark Mutation Flows

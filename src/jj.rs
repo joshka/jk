@@ -297,6 +297,23 @@ pub struct JjNewPlan {
     parents: Vec<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JjDescribeTarget {
+    ExactChange(String),
+    CurrentWorkingCopy,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjDescribePlan {
+    target: JjDescribeTarget,
+    message: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjCommitPlan {
+    message: String,
+}
+
 impl JjNewPlan {
     pub fn new(parents: Vec<String>) -> Self {
         Self { parents }.normalize()
@@ -360,6 +377,135 @@ impl JjNewPlan {
     fn normalize(mut self) -> Self {
         self.parents.retain(|parent| !parent.trim().is_empty());
         self
+    }
+}
+
+impl JjDescribeTarget {
+    pub fn exact_change(change_id: impl Into<String>) -> Self {
+        Self::ExactChange(change_id.into())
+    }
+
+    pub fn current_working_copy() -> Self {
+        Self::CurrentWorkingCopy
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            Self::ExactChange(change_id) => change_id,
+            Self::CurrentWorkingCopy => "@",
+        }
+    }
+
+    pub fn exact_change_id(&self) -> Option<&str> {
+        match self {
+            Self::ExactChange(change_id) => Some(change_id),
+            Self::CurrentWorkingCopy => None,
+        }
+    }
+
+    fn command_arg(&self) -> String {
+        match self {
+            Self::ExactChange(change_id) => exact_change_id_revset(change_id),
+            Self::CurrentWorkingCopy => "@".to_owned(),
+        }
+    }
+
+    fn preview_target(&self) -> String {
+        match self {
+            Self::ExactChange(change_id) => format!("exact selected revision {change_id}"),
+            Self::CurrentWorkingCopy => "current working-copy change (@)".to_owned(),
+        }
+    }
+}
+
+impl JjDescribePlan {
+    pub fn new(target: JjDescribeTarget, message: impl Into<String>) -> Self {
+        Self {
+            target,
+            message: message.into(),
+        }
+    }
+
+    pub fn target(&self) -> &JjDescribeTarget {
+        &self.target
+    }
+
+    pub fn command_label(&self) -> String {
+        format!(
+            "jj describe {} --message {}",
+            self.target.label(),
+            self.message
+        )
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        vec![
+            "describe".to_owned(),
+            self.target.command_arg(),
+            "--message".to_owned(),
+            self.message.clone(),
+        ]
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(self.command_argv(), &self.command_label(), "described")
+    }
+
+    pub fn preview_summary(&self) -> String {
+        format!(
+            "command: {}\n\ntarget: {}\nmessage: {}\n\neffect: updates only the target change description without opening an editor\nconfirmation: press Enter to run jj describe\nundo path: jj undo",
+            self.command_label(),
+            self.target.preview_target(),
+            self.message,
+        )
+    }
+}
+
+impl JjCommitPlan {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    pub fn command_label(&self) -> String {
+        format!("jj commit --message {}", self.message)
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        vec![
+            "commit".to_owned(),
+            "--message".to_owned(),
+            self.message.clone(),
+        ]
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(),
+            &self.command_label(),
+            "committed current working-copy change",
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        format!(
+            "command: {}\n\ntarget: current working-copy change (@)\nmessage: {}\n\neffect: updates @ with the message and creates a new working-copy change on top\nselection: selected graph rows are not arguments to jj commit\nconfirmation: press Enter to run jj commit\nundo path: jj undo",
+            self.command_label(),
+            self.message,
+        )
     }
 }
 
@@ -2040,6 +2186,70 @@ mod tests {
                 .filter(|line| line.starts_with("parent: "))
                 .collect::<Vec<_>>(),
             vec!["parent: parent-a", "parent: parent-b", "parent: parent-c"]
+        );
+    }
+
+    #[test]
+    fn describe_plan_targets_exact_change_before_message() {
+        let plan = JjDescribePlan::new(
+            JjDescribeTarget::exact_change("abcdefghijklmnopqrstuvwxzyabcdef"),
+            "New description",
+        );
+
+        assert_eq!(
+            plan.command_argv(),
+            vec![
+                "describe",
+                "exactly(change_id(\"abcdefghijklmnopqrstuvwxzyabcdef\"), 1)",
+                "--message",
+                "New description"
+            ]
+        );
+        assert_eq!(
+            plan.command_label(),
+            "jj describe abcdefghijklmnopqrstuvwxzyabcdef --message New description"
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("target: exact selected revision")
+        );
+        assert!(plan.preview_summary().contains("without opening an editor"));
+    }
+
+    #[test]
+    fn describe_plan_can_target_current_working_copy() {
+        let plan = JjDescribePlan::new(JjDescribeTarget::current_working_copy(), "Describe @");
+
+        assert_eq!(
+            plan.command_argv(),
+            vec!["describe", "@", "--message", "Describe @"]
+        );
+        assert_eq!(plan.command_label(), "jj describe @ --message Describe @");
+        assert!(
+            plan.preview_summary()
+                .contains("current working-copy change (@)")
+        );
+    }
+
+    #[test]
+    fn commit_plan_uses_message_without_revision_argument() {
+        let plan = JjCommitPlan::new("Commit working copy");
+
+        assert_eq!(
+            plan.command_argv(),
+            vec!["commit", "--message", "Commit working copy"]
+        );
+        assert_eq!(
+            plan.command_label(),
+            "jj commit --message Commit working copy"
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("target: current working-copy change (@)")
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("selected graph rows are not arguments")
         );
     }
 

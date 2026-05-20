@@ -22,9 +22,10 @@ use crate::command::{
 };
 use crate::copy::CopyOption;
 use crate::jj::{
-    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjGitPush, JjGitPushTarget, JjNewPlan,
-    JjOperationRecovery, JjOperationRecoveryKind, JjRebasePlan, JjSquashPlan, LogViewMode,
-    ViewSpec, git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
+    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjCommitPlan, JjDescribePlan,
+    JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationRecoveryKind, JjRebasePlan, JjSquashPlan, LogViewMode, ViewSpec, git_fetch,
+    git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -36,6 +37,10 @@ type NewRun = fn(&JjNewPlan) -> Result<String>;
 type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
 #[cfg(test)]
 type SquashRun = fn(&JjSquashPlan) -> Result<String>;
+#[cfg(test)]
+type DescribeRun = fn(&JjDescribePlan) -> Result<String>;
+#[cfg(test)]
+type CommitRun = fn(&JjCommitPlan) -> Result<String>;
 #[cfg(test)]
 type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 #[cfg(test)]
@@ -77,6 +82,10 @@ struct App {
     #[cfg(test)]
     squash_run: SquashRun,
     #[cfg(test)]
+    describe_run: DescribeRun,
+    #[cfg(test)]
+    commit_run: CommitRun,
+    #[cfg(test)]
     abandon_preview_load: AbandonPreviewLoad,
     #[cfg(test)]
     abandon_run: AbandonRun,
@@ -116,6 +125,19 @@ enum InteractionMode {
         action: ActionKind,
         prompt: RolePrompt,
         selected: usize,
+    },
+    DescribePrompt {
+        target: JjDescribeTarget,
+        input: String,
+    },
+    CommitPrompt(String),
+    DescribePreview {
+        describe: JjDescribePlan,
+        output: ActionOutput,
+    },
+    CommitPreview {
+        commit: JjCommitPlan,
+        output: ActionOutput,
     },
     NewPreview {
         new_change: JjNewPlan,
@@ -163,6 +185,8 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('S'), Command::OpenStatus),
     Binding::new(KeyPattern::char('B'), Command::OpenBookmarks),
     Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
+    Binding::new(KeyPattern::char('D'), Command::Describe),
+    Binding::new(KeyPattern::char('C'), Command::Commit),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
     Binding::new(KeyPattern::char('y'), Command::Copy),
     Binding::new(KeyPattern::char('p'), Command::Push),
@@ -187,6 +211,16 @@ fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {
 #[cfg(test)]
 fn default_squash_run(squash: &JjSquashPlan) -> Result<String> {
     squash.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_describe_run(describe: &JjDescribePlan) -> Result<String> {
+    describe.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_commit_run(commit: &JjCommitPlan) -> Result<String> {
+    commit.run().map(|output| output.message().to_owned())
 }
 
 #[cfg(test)]
@@ -263,6 +297,10 @@ impl App {
             #[cfg(test)]
             squash_run: default_squash_run,
             #[cfg(test)]
+            describe_run: default_describe_run,
+            #[cfg(test)]
+            commit_run: default_commit_run,
+            #[cfg(test)]
             abandon_preview_load: default_abandon_preview_load,
             #[cfg(test)]
             abandon_run: default_abandon_run,
@@ -311,6 +349,26 @@ impl App {
     #[cfg(not(test))]
     fn run_squash(&self, squash: &JjSquashPlan) -> Result<String> {
         squash.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_describe(&self, describe: &JjDescribePlan) -> Result<String> {
+        (self.describe_run)(describe)
+    }
+
+    #[cfg(not(test))]
+    fn run_describe(&self, describe: &JjDescribePlan) -> Result<String> {
+        describe.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_commit(&self, commit: &JjCommitPlan) -> Result<String> {
+        (self.commit_run)(commit)
+    }
+
+    #[cfg(not(test))]
+    fn run_commit(&self, commit: &JjCommitPlan) -> Result<String> {
+        commit.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -487,6 +545,14 @@ impl App {
                 if let Some(kind) = binding.command().operation_recovery() {
                     self.open_operation_recovery_preview(kind);
                 }
+                Ok(false)
+            }
+            Command::Describe => {
+                self.open_describe_prompt();
+                Ok(false)
+            }
+            Command::Commit => {
+                self.open_commit_prompt();
                 Ok(false)
             }
             Command::Fetch => {
@@ -764,6 +830,121 @@ impl App {
                         }
                     }
                     _ => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::DescribePrompt { target, input } => {
+                match code {
+                    KeyCode::Esc => {
+                        self.mode = InteractionMode::Normal;
+                        self.status =
+                            StatusLine::with_message(&self.view, "describe cancelled".to_owned());
+                    }
+                    KeyCode::Enter => {
+                        let message = input.trim().to_owned();
+                        let target = target.clone();
+                        self.mode = InteractionMode::Normal;
+                        if message.is_empty() {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                "describe cancelled: empty description".to_owned(),
+                            );
+                        } else {
+                            self.open_describe_preview(JjDescribePlan::new(target, message));
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        input.pop();
+                    }
+                    KeyCode::Char(character) => input.push(character),
+                    _ => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::CommitPrompt(input) => {
+                match code {
+                    KeyCode::Esc => {
+                        self.mode = InteractionMode::Normal;
+                        self.status =
+                            StatusLine::with_message(&self.view, "commit cancelled".to_owned());
+                    }
+                    KeyCode::Enter => {
+                        let message = input.trim().to_owned();
+                        self.mode = InteractionMode::Normal;
+                        if message.is_empty() {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                "commit cancelled: empty description".to_owned(),
+                            );
+                        } else {
+                            self.open_commit_preview(JjCommitPlan::new(message));
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        input.pop();
+                    }
+                    KeyCode::Char(character) => input.push(character),
+                    _ => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::DescribePreview { describe, output } => {
+                let (describe, status_context, completed) = {
+                    (
+                        describe.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                "describe cancelled".to_owned(),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_describe(describe, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::CommitPreview { commit, output } => {
+                let (commit, status_context, completed) = {
+                    (
+                        commit.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status =
+                                StatusLine::with_message(&self.view, "commit cancelled".to_owned());
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_commit(commit, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
                 }
                 Ok(true)
             }
@@ -1059,6 +1240,59 @@ impl App {
         }
     }
 
+    fn open_describe_prompt(&mut self) {
+        let target = match self.view.command() {
+            JjCommand::Default | JjCommand::Log => match self.view.push_target() {
+                Ok(Some(JjGitPushTarget::Revision(revision))) => {
+                    JjDescribeTarget::exact_change(revision)
+                }
+                Ok(_) | Err(_) => {
+                    self.status = StatusLine::error(
+                        &self.view,
+                        "describe from graph requires a selected row with an exact revision"
+                            .to_owned(),
+                    );
+                    return;
+                }
+            },
+            JjCommand::Status => JjDescribeTarget::current_working_copy(),
+            JjCommand::Show
+            | JjCommand::Diff
+            | JjCommand::FileList
+            | JjCommand::FileShow
+            | JjCommand::Bookmarks
+            | JjCommand::OperationLog
+            | JjCommand::OperationShow
+            | JjCommand::OperationDiff => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    "describe is only available from graph or status views".to_owned(),
+                );
+                return;
+            }
+        };
+
+        self.mode = InteractionMode::DescribePrompt {
+            target,
+            input: String::new(),
+        };
+    }
+
+    fn open_commit_prompt(&mut self) {
+        if matches!(
+            self.view.command(),
+            JjCommand::Default | JjCommand::Log | JjCommand::Status
+        ) {
+            self.mode = InteractionMode::CommitPrompt(String::new());
+        } else {
+            self.status = StatusLine::error(
+                &self.view,
+                "commit is only available from graph or status because jj commit always acts on @"
+                    .to_owned(),
+            );
+        }
+    }
+
     fn open_push_prompt(&mut self) -> Result<bool> {
         let target = match self.view.push_target() {
             Ok(Some(target)) => target,
@@ -1145,6 +1379,67 @@ impl App {
             ),
             recovery,
         };
+    }
+
+    fn open_describe_preview(&mut self, describe: JjDescribePlan) {
+        let status_context = Some(format!(
+            "describe {} from {}",
+            describe.target().label(),
+            self.view.spec().app_label()
+        ));
+
+        match describe.run_preview() {
+            Ok(output) => {
+                let command_label = describe.command_label();
+                self.mode = InteractionMode::DescribePreview {
+                    describe,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = describe.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::DescribePreview {
+                    describe,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
+    fn open_commit_preview(&mut self, commit: JjCommitPlan) {
+        let status_context = Some(format!(
+            "commit current working-copy change (@) from {}",
+            self.view.spec().app_label()
+        ));
+
+        match commit.run_preview() {
+            Ok(output) => {
+                let command_label = commit.command_label();
+                self.mode = InteractionMode::CommitPreview {
+                    commit,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = commit.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::CommitPreview {
+                    commit,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
     }
 
     fn open_new_preview(&mut self, new_change: JjNewPlan) {
@@ -1304,6 +1599,113 @@ impl App {
                 };
             }
         }
+    }
+
+    fn confirm_describe(
+        &mut self,
+        describe: JjDescribePlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = describe.command_label();
+        let reveal_change_id = describe.target().exact_change_id().map(str::to_owned);
+        let result_message = match self.run_describe(&describe) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let mut reveal_error = None;
+                    let revealed_in_recent = match reveal_change_id.as_deref() {
+                        Some(change_id) => {
+                            match self.reveal_graph_change(change_id, LogViewMode::Recent) {
+                                Ok(switched_modes) => {
+                                    self.view.clamp(viewport_height);
+                                    Some(switched_modes)
+                                }
+                                Err(error) => {
+                                    self.status = StatusLine::error(&self.view, error.to_string());
+                                    reveal_error = Some(format!(
+                                        "{} | reveal failed: {} | jj undo",
+                                        output.trim(),
+                                        error
+                                    ));
+                                    None
+                                }
+                            }
+                        }
+                        None => None,
+                    };
+
+                    let message = match revealed_in_recent {
+                        Some(switched_modes) => {
+                            if switched_modes {
+                                format!("{} | showing recent work | jj undo", output.trim())
+                            } else {
+                                format!("{} | jj undo", output.trim())
+                            }
+                        }
+                        None => match reveal_error.as_deref() {
+                            Some(message) => message.to_owned(),
+                            None => format!("{} | jj undo", output.trim()),
+                        },
+                    };
+                    if reveal_error.is_none() {
+                        self.status = StatusLine::with_message(&self.view, message.as_str());
+                    }
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("{} | refresh failed: {error} | jj undo", output.trim())
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::DescribePreview {
+            describe,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    fn confirm_commit(
+        &mut self,
+        commit: JjCommitPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = commit.command_label();
+        let result_message = match self.run_commit(&commit) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = format!(
+                        "{} | new working-copy change created on top | jj undo",
+                        output.trim()
+                    );
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!(
+                        "{} | refresh failed: {error} | new working-copy change created on top | jj undo",
+                        output.trim()
+                    )
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::CommitPreview {
+            commit,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
     }
 
     fn confirm_new_change(
@@ -1809,6 +2211,13 @@ impl App {
             InteractionMode::LogRevsetPrompt(input) => {
                 StatusLine::with_message(&self.view, format!("revset: {input}"))
             }
+            InteractionMode::DescribePrompt { target, input } => StatusLine::with_message(
+                &self.view,
+                format!("describe {}: {input}", target.label()),
+            ),
+            InteractionMode::CommitPrompt(input) => {
+                StatusLine::with_message(&self.view, format!("commit @: {input}"))
+            }
             InteractionMode::AbandonConfirm { input, .. } => StatusLine::with_message(
                 &self.view,
                 format!("type exact revision to confirm abandon: {input}"),
@@ -1844,6 +2253,8 @@ impl App {
                 prompt,
                 selected: *selected,
             },
+            InteractionMode::DescribePreview { output, .. } => Overlay::DescribePreview { output },
+            InteractionMode::CommitPreview { output, .. } => Overlay::CommitPreview { output },
             InteractionMode::NewPreview { output, .. } => Overlay::NewPreview { output },
             InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
             InteractionMode::SquashPreview { output, .. } => Overlay::SquashPreview { output },
@@ -1863,7 +2274,9 @@ impl App {
             }
             InteractionMode::Normal
             | InteractionMode::SearchPrompt(_)
-            | InteractionMode::LogRevsetPrompt(_) => Overlay::None,
+            | InteractionMode::LogRevsetPrompt(_)
+            | InteractionMode::DescribePrompt { .. }
+            | InteractionMode::CommitPrompt(_) => Overlay::None,
         }
     }
 
@@ -2224,6 +2637,22 @@ mod tests {
         Err(eyre!("jj squash failed: first line\nsecond line"))
     }
 
+    fn mock_describe_success(describe: &JjDescribePlan) -> Result<String> {
+        Ok(format!("described {}", describe.target().label()))
+    }
+
+    fn mock_describe_failure(_: &JjDescribePlan) -> Result<String> {
+        Err(eyre!("jj describe failed: first line\nsecond line"))
+    }
+
+    fn mock_commit_success(_: &JjCommitPlan) -> Result<String> {
+        Ok("committed working copy".to_owned())
+    }
+
+    fn mock_commit_failure(_: &JjCommitPlan) -> Result<String> {
+        Err(eyre!("jj commit failed: first line\nsecond line"))
+    }
+
     fn mock_empty_abandon_preview(abandon: &JjAbandonPlan) -> Result<JjAbandonPreview> {
         Ok(JjAbandonPreview::new(
             abandon.revision().to_owned(),
@@ -2338,6 +2767,16 @@ mod tests {
         Ok(true)
     }
 
+    fn mock_reveal_described_change_in_recent(
+        _view: &mut ViewState,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        assert_eq!(change_id, "change-a");
+        assert_eq!(fallback_mode, LogViewMode::Recent);
+        Ok(false)
+    }
+
     fn mock_reveal_squash_destination_in_recent(
         _view: &mut ViewState,
         change_id: &str,
@@ -2364,6 +2803,10 @@ mod tests {
             rebase_run: mock_rebase_success,
             #[cfg(test)]
             squash_run: mock_squash_success,
+            #[cfg(test)]
+            describe_run: mock_describe_success,
+            #[cfg(test)]
+            commit_run: mock_commit_success,
             #[cfg(test)]
             abandon_preview_load: mock_empty_abandon_preview,
             #[cfg(test)]
@@ -2810,6 +3253,355 @@ mod tests {
         };
         assert_eq!(graph.selected_revision(), Some("second"));
         assert!(matches!(app.mode, InteractionMode::Normal));
+    }
+
+    #[test]
+    fn describe_prompt_types_backspaces_and_opens_preview_for_exact_graph_target() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+            .unwrap();
+        for character in "Mesx".chars() {
+            app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        }
+        app.handle_mode_key(KeyCode::Backspace, 12).unwrap();
+        app.handle_mode_key(KeyCode::Char('g'), 12).unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (describe, output) = match &app.mode {
+            InteractionMode::DescribePreview { describe, output } => (describe, output),
+            _ => panic!("expected describe preview"),
+        };
+        assert_eq!(
+            describe.target(),
+            &JjDescribeTarget::ExactChange("change-a".to_owned())
+        );
+        assert_eq!(
+            output.command_label(),
+            "jj describe change-a --message Mesg"
+        );
+        let body = output.body_lines().join("\n");
+        assert!(body.contains("target: exact selected revision change-a"));
+        assert!(body.contains("message: Mesg"));
+        assert!(body.contains("without opening an editor"));
+    }
+
+    #[test]
+    fn describe_prompt_types_and_opens_preview_for_status_target() {
+        let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[
+            "working copy changes:",
+            "M src/app.rs",
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+            .unwrap();
+        for character in "Message".chars() {
+            app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        }
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (describe, output) = match &app.mode {
+            InteractionMode::DescribePreview { describe, output } => (describe, output),
+            _ => panic!("expected describe preview"),
+        };
+        assert_eq!(describe.target(), &JjDescribeTarget::CurrentWorkingCopy);
+        assert_eq!(output.command_label(), "jj describe @ --message Message");
+        let body = output.body_lines().join("\n");
+        assert!(body.contains("target: current working-copy change (@)"));
+        assert!(body.contains("message: Message"));
+        assert!(body.contains("without opening an editor"));
+    }
+
+    #[test]
+    fn describe_prompt_cancel_and_empty_input_do_not_open_preview() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "describe cancelled");
+
+        app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "describe cancelled: empty description"
+        );
+    }
+
+    #[test]
+    fn describe_requires_exact_graph_target_and_rejects_unsupported_context() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), None, None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "describe from graph requires a selected row with an exact revision"
+        );
+
+        let mut app = test_app(ViewState::Bookmarks(
+            crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+                Vec::new(),
+                "main".to_owned(),
+                Some("change-a".to_owned()),
+                None,
+            )]),
+        ));
+
+        app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert_eq!(
+            app.status.message(),
+            "describe is only available from graph or status views"
+        );
+    }
+
+    #[test]
+    fn describe_confirm_success_refreshes_reveals_and_keeps_undo_visible() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.reveal_graph_change = mock_reveal_described_change_in_recent;
+        app.mode = InteractionMode::DescribePreview {
+            describe: JjDescribePlan::new(
+                JjDescribeTarget::exact_change("change-a"),
+                "New description",
+            ),
+            output: ActionOutput::pending(
+                "jj describe change-a --message New description".to_owned(),
+                "preview only".to_owned(),
+                Some("describe change-a from jk".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::DescribePreview { output, .. } => output,
+            _ => panic!("expected describe result"),
+        };
+        assert!(output.completed());
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("described change-a | jj undo")
+        );
+        assert_eq!(app.status.message(), "described change-a | jj undo");
+    }
+
+    #[test]
+    fn describe_failure_and_refresh_failure_remain_inspectable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.describe_run = mock_describe_failure;
+        app.mode = InteractionMode::DescribePreview {
+            describe: JjDescribePlan::new(JjDescribeTarget::exact_change("change-a"), "New"),
+            output: ActionOutput::pending(
+                "jj describe change-a --message New".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::DescribePreview { output, .. } => output,
+            _ => panic!("expected describe result"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("jj describe failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj describe failed: first line\nsecond line"
+        );
+
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.refresh_view = mock_refresh_failure;
+        app.mode = InteractionMode::DescribePreview {
+            describe: JjDescribePlan::new(JjDescribeTarget::exact_change("change-a"), "New"),
+            output: ActionOutput::pending(
+                "jj describe change-a --message New".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::DescribePreview { output, .. } => output,
+            _ => panic!("expected describe result"),
+        };
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("described change-a | refresh failed: view refresh failed | jj undo")
+        );
+        assert_eq!(app.status.message(), "view refresh failed");
+    }
+
+    #[test]
+    fn commit_prompt_is_honest_about_current_working_copy_target() {
+        let mut graph = crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("historical".to_owned()), None),
+            crate::jj::LogItem::new(Vec::new(), Some("selected-row".to_owned()), None),
+        ]);
+        graph.execute(
+            ViewCommand::MoveDown,
+            CommandContext {
+                viewport_height: 12,
+                search: None,
+            },
+        );
+        let mut app = test_app(ViewState::Graph(graph));
+
+        app.handle_normal_key(key(KeyCode::Char('C'), KeyModifiers::NONE), 12)
+            .unwrap();
+        for character in "Commitx".chars() {
+            app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        }
+        app.handle_mode_key(KeyCode::Backspace, 12).unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::CommitPreview { output, .. } => output,
+            _ => panic!("expected commit preview"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(output.command_label(), "jj commit --message Commit");
+        assert!(body.contains("target: current working-copy change (@)"));
+        assert!(body.contains("selected graph rows are not arguments"));
+        assert!(!body.contains("selected-row"));
+    }
+
+    #[test]
+    fn commit_prompt_cancel_and_empty_input_do_not_open_preview() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('C'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "commit cancelled");
+
+        app.handle_normal_key(key(KeyCode::Char('C'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "commit cancelled: empty description");
+    }
+
+    #[test]
+    fn commit_confirm_success_and_failure_keep_output_readable() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::CommitPreview {
+            commit: JjCommitPlan::new("Commit"),
+            output: ActionOutput::pending(
+                "jj commit --message Commit".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::CommitPreview { output, .. } => output,
+            _ => panic!("expected commit result"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(
+            body.contains(
+                "committed working copy | new working-copy change created on top | jj undo"
+            )
+        );
+        assert_eq!(
+            app.status.message(),
+            "committed working copy | new working-copy change created on top | jj undo"
+        );
+
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.commit_run = mock_commit_failure;
+        app.mode = InteractionMode::CommitPreview {
+            commit: JjCommitPlan::new("Commit"),
+            output: ActionOutput::pending(
+                "jj commit --message Commit".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::CommitPreview { output, .. } => output,
+            _ => panic!("expected commit result"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("jj commit failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj commit failed: first line\nsecond line"
+        );
+    }
+
+    #[test]
+    fn commit_refresh_failure_keeps_undo_and_new_working_copy_effect_visible() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.refresh_view = mock_refresh_failure;
+        app.mode = InteractionMode::CommitPreview {
+            commit: JjCommitPlan::new("Commit"),
+            output: ActionOutput::pending(
+                "jj commit --message Commit".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::CommitPreview { output, .. } => output,
+            _ => panic!("expected commit result"),
+        };
+        assert!(output.body_lines().join("\n").contains(
+            "committed working copy | refresh failed: view refresh failed | new working-copy change created on top | jj undo"
+        ));
+        assert_eq!(app.status.message(), "view refresh failed");
     }
 
     #[test]

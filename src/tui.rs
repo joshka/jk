@@ -85,6 +85,18 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::DescribePreview { output } => {
+            let title = action_output_title("Describe", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
+        Overlay::CommitPreview { output } => {
+            let title = action_output_title("Commit", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::RebasePreview { output } => {
             let title = action_output_title("Rebase", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -161,6 +173,12 @@ pub enum Overlay<'a> {
     NewPreview {
         output: &'a ActionOutput,
     },
+    DescribePreview {
+        output: &'a ActionOutput,
+    },
+    CommitPreview {
+        output: &'a ActionOutput,
+    },
     OperationRecoveryPreview {
         output: &'a ActionOutput,
     },
@@ -233,6 +251,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " select  ",
             key("a"),
             " action  ",
+            key("D/C"),
+            " describe/commit  ",
             key("f/p/r"),
             " fetch/push/refresh  ",
             key("?"),
@@ -300,6 +320,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " search  ",
             key("y"),
             " copy  ",
+            key("D/C"),
+            " describe/commit @  ",
             key("h"),
             " back  ",
             key("?"),
