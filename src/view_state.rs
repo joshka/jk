@@ -17,6 +17,7 @@ use crate::graph::GraphView;
 use crate::jj::{JjBookmarkTarget, JjCommand, JjGitPushTarget, LogViewMode, ViewSpec};
 use crate::operation_detail::OperationDetailView;
 use crate::operation_log::OperationLogView;
+use crate::resolve::ResolveView;
 use crate::search::SearchQuery;
 use crate::show::ShowView;
 use crate::status::StatusView;
@@ -28,6 +29,7 @@ pub enum ViewState {
     Show(ShowView),
     Diff(DiffView),
     Status(StatusView),
+    Resolve(ResolveView),
     FileList(FileListView),
     FileShow(FileShowView),
     Bookmarks(BookmarksView),
@@ -42,6 +44,7 @@ impl ViewState {
             JjCommand::Show => Ok(Self::Show(ShowView::load(spec)?)),
             JjCommand::Diff => Ok(Self::Diff(DiffView::load(spec)?)),
             JjCommand::Status => Ok(Self::Status(StatusView::load(spec)?)),
+            JjCommand::Resolve => Ok(Self::Resolve(ResolveView::load(spec)?)),
             JjCommand::FileList => Ok(Self::FileList(FileListView::load(spec)?)),
             JjCommand::FileShow => Ok(Self::FileShow(FileShowView::load(spec)?)),
             JjCommand::Bookmarks => Ok(Self::Bookmarks(BookmarksView::load(spec)?)),
@@ -58,6 +61,7 @@ impl ViewState {
             Self::Show(view) => view.render(frame, area, search),
             Self::Diff(view) => view.render(frame, area, search),
             Self::Status(view) => view.render(frame, area, search),
+            Self::Resolve(view) => view.render(frame, area, search),
             Self::FileList(view) => view.render(frame, area, search),
             Self::FileShow(view) => view.render(frame, area, search),
             Self::Bookmarks(view) => view.render(frame, area, search),
@@ -72,6 +76,7 @@ impl ViewState {
             Self::Show(view) => view.bindings(),
             Self::Diff(view) => view.bindings(),
             Self::Status(view) => view.bindings(),
+            Self::Resolve(view) => view.bindings(),
             Self::FileList(view) => view.bindings(),
             Self::FileShow(view) => view.bindings(),
             Self::Bookmarks(view) => view.bindings(),
@@ -86,6 +91,7 @@ impl ViewState {
             Self::Show(view) => view.execute(command, context),
             Self::Diff(view) => view.execute(command, context),
             Self::Status(view) => view.execute(command, context),
+            Self::Resolve(view) => view.execute(command, context),
             Self::FileList(view) => view.execute(command, context),
             Self::FileShow(view) => view.execute(command, context),
             Self::Bookmarks(view) => view.execute(command, context),
@@ -100,6 +106,7 @@ impl ViewState {
             Self::Show(view) => view.refresh(),
             Self::Diff(view) => view.refresh(),
             Self::Status(view) => view.refresh(),
+            Self::Resolve(view) => view.refresh(),
             Self::FileList(view) => view.refresh(),
             Self::FileShow(view) => view.refresh(),
             Self::Bookmarks(view) => view.refresh(),
@@ -114,6 +121,7 @@ impl ViewState {
             Self::Show(view) => view.clamp(viewport_height),
             Self::Diff(view) => view.clamp(viewport_height),
             Self::Status(view) => view.clamp(viewport_height),
+            Self::Resolve(view) => view.clamp(),
             Self::FileList(view) => view.clamp(),
             Self::FileShow(view) => view.clamp(viewport_height),
             Self::Bookmarks(view) => view.clamp(),
@@ -128,6 +136,7 @@ impl ViewState {
             Self::Show(view) => view.spec(),
             Self::Diff(view) => view.spec(),
             Self::Status(view) => view.spec(),
+            Self::Resolve(view) => view.spec(),
             Self::FileList(view) => view.spec(),
             Self::FileShow(view) => view.spec(),
             Self::Bookmarks(view) => view.spec(),
@@ -142,6 +151,7 @@ impl ViewState {
             Self::Show(_) => StatusHints::ShowDocument,
             Self::Diff(_) => StatusHints::DiffDocument,
             Self::Status(_) => StatusHints::Status,
+            Self::Resolve(_) => StatusHints::Resolve,
             Self::FileList(_) => StatusHints::FileList,
             Self::FileShow(_) => StatusHints::FileShowDocument,
             Self::Bookmarks(_) => StatusHints::Bookmarks,
@@ -156,6 +166,7 @@ impl ViewState {
             Self::Show(_) => HelpContext::Show,
             Self::Diff(_) => HelpContext::Diff,
             Self::Status(_) => HelpContext::Status,
+            Self::Resolve(_) => HelpContext::Resolve,
             Self::FileList(_) => HelpContext::FileList,
             Self::FileShow(_) => HelpContext::FileShow,
             Self::Bookmarks(_) => HelpContext::Bookmarks,
@@ -174,6 +185,7 @@ impl ViewState {
             Self::Show(view) => view.scroll_offset(),
             Self::Diff(view) => view.scroll_offset(),
             Self::Status(view) => view.scroll_offset(),
+            Self::Resolve(_) => 0,
             Self::FileList(_) => 0,
             Self::FileShow(view) => view.scroll_offset(),
             Self::Bookmarks(_) => 0,
@@ -188,6 +200,7 @@ impl ViewState {
             Self::Show(view) => view.set_scroll_offset(viewport_height, scroll_offset),
             Self::Diff(view) => view.set_scroll_offset(viewport_height, scroll_offset),
             Self::Status(view) => view.set_scroll_offset(viewport_height, scroll_offset),
+            Self::Resolve(_) => {}
             Self::FileList(_) => {}
             Self::FileShow(view) => view.set_scroll_offset(viewport_height, scroll_offset),
             Self::Bookmarks(_) => {}
@@ -199,6 +212,7 @@ impl ViewState {
     pub fn item_count(&self) -> Option<usize> {
         match self {
             Self::Graph(view) => Some(view.item_count()),
+            Self::Resolve(view) => Some(view.item_count()),
             Self::FileList(view) => Some(view.item_count()),
             Self::Bookmarks(view) => Some(view.item_count()),
             Self::OperationLog(view) => Some(view.item_count()),
@@ -216,6 +230,7 @@ impl ViewState {
             Self::Show(_)
             | Self::Diff(_)
             | Self::Status(_)
+            | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
@@ -230,6 +245,7 @@ impl ViewState {
             Self::Show(_)
             | Self::Diff(_)
             | Self::Status(_)
+            | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
@@ -248,6 +264,7 @@ impl ViewState {
             Self::Show(_)
             | Self::Diff(_)
             | Self::Status(_)
+            | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
@@ -262,6 +279,7 @@ impl ViewState {
             Self::Show(view) => view.line_count(),
             Self::Diff(view) => view.line_count(),
             Self::Status(view) => view.line_count(),
+            Self::Resolve(view) => view.line_count(),
             Self::FileList(view) => view.line_count(),
             Self::FileShow(view) => view.line_count(),
             Self::Bookmarks(view) => view.line_count(),
@@ -297,6 +315,7 @@ impl ViewState {
             Self::Status(_) => Ok(Some(JjGitPushTarget::Status)),
             Self::Show(_)
             | Self::Diff(_)
+            | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::OperationLog(_)
@@ -320,6 +339,7 @@ impl ViewState {
             Self::Status(_) => Ok(Some(JjBookmarkTarget::current_working_copy())),
             Self::Show(_)
             | Self::Diff(_)
+            | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
@@ -342,6 +362,7 @@ impl ViewState {
             | Self::Show(_)
             | Self::Diff(_)
             | Self::Status(_)
+            | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::OperationLog(_)
@@ -405,6 +426,7 @@ impl ViewState {
                 ))
             }
             Self::Status(_)
+            | Self::Resolve(_)
             | Self::Bookmarks(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),

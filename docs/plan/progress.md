@@ -610,3 +610,44 @@
 - Final 5.5 re-review accepted Packet 27 after the bookmark provenance repair, with only
   non-blocking cleanup items fixed.
 - Next slice: Packet 28: Resolve Screen And Conflict Flow
+
+## Packet 28: Resolve Screen And Conflict Flow
+
+- Files changed: `Cargo.toml`, `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/main.rs`,
+  `src/resolve.rs`, `src/tui.rs`, `src/view_state.rs`, `docs/plan/screens/resolve.md`,
+  `docs/plan/progress.md`, `docs/plan/fragility-register.md`, and `docs/process-observations.md`
+- Behavior: `jk resolve` now opens a focused conflict list screen, and global `R` opens the same
+  screen from other views. The list is read-only, path-first, and uses a narrow
+  `self.conflicted_files()` template contract instead of rendered `jj resolve --list`. Each row
+  shows the conflicted path, `file_type`, and `side_count`. Search, copy, refresh, help, item
+  counts, and back behavior follow the existing selectable-list pattern. `Enter` and `l` inspect the
+  selected conflict with `jj file show -r <resolve-target-or-@> <path>` when an exact path is known,
+  and otherwise report a clear status message.
+- Command shape: conflict listing uses
+  `jj log --no-graph -r <target-or-@> --color=never -T   'self.conflicted_files()...'` and parses
+  one JSON object per conflicted file. The first pass does not run `jj resolve <path>`, launch
+  external merge tools, mark conflicts resolved, infer paths from rendered headings, or mutate
+  files.
+- Refresh/result behavior: clean repos open as `0 conflicts` instead of a failure state. Refresh
+  preserves selection by exact path when possible and clamps cleanly when rows disappear. Copy
+  offers the exact path when known and always offers displayed row text. Malformed JSON lines
+  degrade into readable non-inspectable rows instead of panicking.
+- Verification: `cargo check`; focused `cargo test resolve -- --test-threads=1`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`
+- Validation note: `just check` was attempted after Packet 28 validation but still failed
+  immediately at the known `cargo +nightly fmt` wrapper step. Equivalent checks were run separately:
+  `cargo check`, focused resolve tests, full `cargo test`, `rustup run nightly cargo   fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Manual proof: disposable repos `/tmp/jk-packet28-clean.VYKte2` and `/tmp/jk-packet28-proof.Ice7He`
+  were initialized with `jj --no-pager git init`. In the clean repo, running the chosen listing
+  command against `@` produced no output and exited successfully. In the conflicted repo, two
+  sibling edits to `file.txt` were merged into a conflicted working copy and the same listing
+  command produced `{"path":"file.txt","file_type":"conflict","side_count":2}`. A rerun after an
+  initial over-escaped shell proof confirmed the newline-sensitive one-object-per-line contract.
+- Remaining risk: Packet 28 depends on `jj 0.41` template method names and on `entry.path()`
+  continuing to expose an exact path string suitable for read-only inspection. Guided resolve
+  actions still need a stronger contract before `jk` can safely launch `jj resolve <path>` or build
+  exact conflict-scoped filesets.
+- Final 5.5 re-review accepted Packet 28 after the default `@` target normalization, with no
+  findings.
+- Next slice: Packet 29: Day-To-Day Tutorial Set

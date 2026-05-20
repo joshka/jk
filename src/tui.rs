@@ -22,6 +22,7 @@ pub enum StatusHints {
     ShowDocument,
     DiffDocument,
     Status,
+    Resolve,
     FileList,
     FileShowDocument,
     Bookmarks,
@@ -367,11 +368,25 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             key("?"),
             " help",
         ],
-        (StatusHints::FileList, true) => line![
+        (StatusHints::Resolve, true) | (StatusHints::FileList, true) => line![
             key("q"),
             " quit  ",
             key("j/k"),
             " move  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::Resolve, false) => line![
+            key("q"),
+            " quit  ",
+            key("j/k"),
+            " move  ",
+            key("Enter/l"),
+            " inspect  ",
+            key("/"),
+            " search  ",
+            key("y"),
+            " copy  ",
             key("?"),
             " help",
         ],
@@ -891,6 +906,21 @@ mod tests {
         assert_snapshot!(render_chrome_snapshot(&status, 100), @r"
         title|jk file list
         status|1 files  q quit  j/k move  Enter/l open  / search  y copy  ? help
+        ");
+    }
+
+    #[test]
+    fn resolve_status_hints_advertise_inspect_without_external_resolve() {
+        let status = StatusLine::test(
+            "jk resolve",
+            "1 conflicts",
+            StatusKind::Ready,
+            StatusHints::Resolve,
+        );
+
+        assert_snapshot!(render_chrome_snapshot(&status, 100), @r"
+        title|jk resolve
+        status|1 conflicts  q quit  j/k move  Enter/l inspect  / search  y copy  ? help
         ");
     }
 

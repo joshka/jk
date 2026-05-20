@@ -13,6 +13,7 @@ mod jj;
 mod operation_detail;
 mod operation_log;
 mod rendered_jj;
+mod resolve;
 mod search;
 mod selection;
 mod show;

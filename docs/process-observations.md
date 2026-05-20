@@ -5,6 +5,76 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 28 resolve screen and conflict flow)
+
+- Slice / task: Implement Packet 28 first-pass `jk resolve` conflict list screen in the current jj
+  working-copy change `Add resolve screen and conflict flow`.
+- Worker / model: `019e4516-0fd4-74e0-855a-6e8c6d2e735f` / `gpt-5` (Codex).
+- Scope given: stay in the current project checkout without jj/git mutations there, keep the screen
+  read-only, use a narrow machine-oriented conflict listing contract instead of rendered
+  `jj resolve --list`, open clean repos as an empty list, wire a global `R` entry path, and update
+  resolve, progress, fragility, and process docs.
+- Exploration handoff facts: one explorer recommended `jj resolve --list`, but the jj-semantics
+  exploration proved that `self.conflicted_files()` on `jj log --no-graph -r @` exposes exact
+  `path`, `file_type`, and `conflict_side_count()` fields while clean repos still succeed with empty
+  output. Packet 28 chose that template contract so the screen stays read-only and does not treat
+  clean repos as failures.
+- Observable outcome: `jk resolve` and global `R` now open a dedicated conflict list screen backed
+  by `src/resolve.rs`. Rows are path-first, show `file_type` and `side_count`, support search, copy,
+  refresh, help, and back, preserve selection by exact path on refresh, and open
+  `jj file show -r <resolve-target-or-@> <path>` with `Enter` or `l` when an exact path is known.
+  Unknown or malformed rows remain readable and copyable but do not invent inspect paths. The first
+  pass does not launch external resolvers or mutate files.
+- 5.5 finding / repair: `ViewSpec::resolve(None)` and startup `jk resolve` previously emitted no
+  explicit `-r` target, so `jk resolve`/global `R` could reuse the shell's default `jj log` revset.
+  That is now repaired by normalizing default resolve specs to `-r @`, so detail navigation from
+  resolve also defaults to `@`.
+- Manual proof outcome: disposable clean repo `/tmp/jk-packet28-clean.VYKte2` was initialized with
+  `jj --no-pager git init`, and the chosen conflict-listing command produced no output against `@`
+  while exiting successfully. Disposable conflicted repo `/tmp/jk-packet28-proof.Ice7He` was
+  initialized the same way, then a base `file.txt`, a left edit, a right sibling edit, and a merge
+  working copy were created. Running the chosen listing command there produced
+  `{"path":"file.txt","file_type":"conflict","side_count":2}`, and
+  `jj --no-pager status --color   never` reported the same `file.txt    2-sided conflict` path.
+- Rework / blockers: the first disposable conflicted-repo proof over-escaped the template newline in
+  the shell command and printed a literal `\n` suffix. Rerunning the command with the exact template
+  spelling fixed the proof output. `just check` still fails immediately at the known
+  `cargo +nightly fmt` wrapper step.
+- Evidence basis:
+  - Thread: `019e4516-0fd4-74e0-855a-6e8c6d2e735f`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `jj --no-pager status`
+    - `cargo check`
+    - `cargo test resolve -- --test-threads=1`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-check`
+    - `just check`
+  - Manual proof commands, all with cwd in the disposable repo under `/tmp`:
+    - `jj --no-pager git init`
+    - `jj --no-pager config set --repo signing.behavior drop`
+    - `jj --no-pager log --no-graph -r @ --color=never -T 'self.conflicted_files()...'`
+    - `printf 'base\n' > file.txt`
+    - `jj --no-pager file track file.txt`
+    - `jj --no-pager describe -m 'packet 28 base'`
+    - `jj --no-pager new -m 'packet 28 left'`
+    - `printf 'left\n' > file.txt`
+    - `jj --no-pager log -r @ --no-graph -T 'change_id ++ "\n"'`
+    - `jj --no-pager new @- -m 'packet 28 right'`
+    - `printf 'right\n' > file.txt`
+    - `jj --no-pager new <left-change-id> <right-change-id> -m 'packet 28 conflict'`
+    - `jj --no-pager status --color never`
+  - Files: `Cargo.toml`, `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/main.rs`,
+    `src/resolve.rs`, `src/tui.rs`, `src/view_state.rs`, `docs/plan/screens/resolve.md`,
+    `docs/plan/progress.md`, `docs/plan/fragility-register.md`, `docs/process-observations.md`
+- Final 5.5 re-review accepted Packet 28 after target normalization; `serde_json` was judged
+  justified and scoped, with residual risk in `jj 0.41` template methods and read-only path
+  exactness.
+
 ### 2026-05-20 (Packet 27 restore/revert guided flows)
 
 - Slice / task: Implement Packet 27 preview-first restore and revert guided flows from exact

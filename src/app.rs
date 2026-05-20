@@ -229,6 +229,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
     Binding::new(KeyPattern::char('W'), Command::PromptLogRevset),
     Binding::new(KeyPattern::char('S'), Command::OpenStatus),
+    Binding::new(KeyPattern::char('R'), Command::OpenResolve),
     Binding::new(KeyPattern::char('B'), Command::OpenBookmarks),
     Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
     Binding::new(KeyPattern::char('D'), Command::Describe),
@@ -690,6 +691,10 @@ impl App {
             }
             Command::OpenStatus => {
                 self.open_status()?;
+                Ok(true)
+            }
+            Command::OpenResolve => {
+                self.open_resolve()?;
                 Ok(true)
             }
             Command::OpenBookmarks => {
@@ -1669,6 +1674,7 @@ impl App {
             JjCommand::Status => JjDescribeTarget::current_working_copy(),
             JjCommand::Show
             | JjCommand::Diff
+            | JjCommand::Resolve
             | JjCommand::FileList
             | JjCommand::FileShow
             | JjCommand::Bookmarks
@@ -3059,6 +3065,7 @@ impl App {
             JjCommand::Default
             | JjCommand::Log
             | JjCommand::Status
+            | JjCommand::Resolve
             | JjCommand::FileList
             | JjCommand::Bookmarks
             | JjCommand::OperationLog
@@ -3079,6 +3086,14 @@ impl App {
         }
 
         self.push_view(ViewSpec::new(JjCommand::Status, Vec::new()))
+    }
+
+    fn open_resolve(&mut self) -> Result<()> {
+        if matches!(self.view.command(), JjCommand::Resolve) {
+            return Ok(());
+        }
+
+        self.push_view(ViewSpec::resolve(None))
     }
 
     fn open_operation_log(&mut self) -> Result<()> {
@@ -3175,10 +3190,17 @@ fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
         "show" => Ok(ViewSpec::new(JjCommand::Show, rest.to_vec())),
         "diff" => Ok(ViewSpec::new(JjCommand::Diff, rest.to_vec())),
         "status" => Ok(ViewSpec::new(JjCommand::Status, rest.to_vec())),
+        "resolve" => {
+            if rest.is_empty() {
+                Ok(ViewSpec::resolve(None))
+            } else {
+                Ok(ViewSpec::new(JjCommand::Resolve, rest.to_vec()))
+            }
+        }
         "bookmarks" => Ok(ViewSpec::new(JjCommand::Bookmarks, rest.to_vec())),
         "operation-log" => Ok(ViewSpec::new(JjCommand::OperationLog, rest.to_vec())),
         unknown => Err(eyre!(
-            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, bookmarks, operation-log"
+            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, resolve, bookmarks, operation-log"
         )),
     }
 }
@@ -3272,6 +3294,7 @@ fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
 
 fn item_count_message(view: &ViewState, item_count: usize) -> String {
     match view.command() {
+        JjCommand::Resolve => format!("{item_count} conflicts"),
         JjCommand::FileList => format!("{item_count} files"),
         JjCommand::Bookmarks => format!("{item_count} bookmarks"),
         JjCommand::OperationLog => format!("{item_count} operations"),
@@ -3768,6 +3791,35 @@ mod tests {
 
         assert_eq!(spec.command(), JjCommand::Status);
         assert!(spec.args().is_empty());
+    }
+
+    #[test]
+    fn parses_resolve_startup_view() {
+        let spec = initial_view(vec!["resolve".into(), "-r".into(), "main".into()]).unwrap();
+
+        assert_eq!(spec.command(), JjCommand::Resolve);
+        assert_eq!(spec.args(), ["-r", "main"]);
+        assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
+    }
+
+    #[test]
+    fn parses_default_resolve_startup_view() {
+        let spec = initial_view(vec!["resolve".into()]).unwrap();
+
+        assert_eq!(spec.command(), JjCommand::Resolve);
+        assert_eq!(spec.args(), ["-r", "@"]);
+        assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+    }
+
+    #[test]
+    fn open_resolve_uses_default_target() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+
+        app.open_resolve().unwrap();
+
+        assert_eq!(app.view.spec().command(), JjCommand::Resolve);
+        assert_eq!(app.view.spec().args(), ["-r", "@"]);
+        assert_eq!(app.view.spec().navigation_revset().as_deref(), Some("@"));
     }
 
     #[test]
@@ -5143,6 +5195,52 @@ mod tests {
         assert_eq!(exact.exact_change_target(), Some("change-a"));
         assert_eq!(direct.navigation_revset().as_deref(), Some("main"));
         assert_eq!(direct.exact_change_target(), None);
+    }
+
+    #[test]
+    fn file_show_navigation_from_resolve_uses_resolve_revision() {
+        let app = test_app(ViewState::Resolve(
+            crate::resolve::ResolveView::test_with_spec(
+                ViewSpec::resolve(Some("main".to_owned())),
+                vec![crate::jj::ResolveEntry::parsed(
+                    Some("src/main.rs".to_owned()),
+                    Some("file".to_owned()),
+                    Some(3),
+                )],
+            ),
+        ));
+
+        let file_show = app
+            .detail_spec(JjCommand::FileShow, "src/main.rs".to_owned())
+            .unwrap();
+
+        assert_eq!(file_show.command(), JjCommand::FileShow);
+        assert_eq!(file_show.args(), ["-r", "main", "src/main.rs"]);
+        assert_eq!(file_show.navigation_revset().as_deref(), Some("main"));
+        assert_eq!(file_show.exact_change_target(), None);
+    }
+
+    #[test]
+    fn file_show_navigation_from_default_resolve_uses_current_revision() {
+        let app = test_app(ViewState::Resolve(
+            crate::resolve::ResolveView::test_with_spec(
+                ViewSpec::resolve(None),
+                vec![crate::jj::ResolveEntry::parsed(
+                    Some("src/main.rs".to_owned()),
+                    Some("file".to_owned()),
+                    Some(3),
+                )],
+            ),
+        ));
+
+        let file_show = app
+            .detail_spec(JjCommand::FileShow, "src/main.rs".to_owned())
+            .unwrap();
+
+        assert_eq!(file_show.command(), JjCommand::FileShow);
+        assert_eq!(file_show.args(), ["-r", "@", "src/main.rs"]);
+        assert_eq!(file_show.navigation_revset().as_deref(), Some("@"));
+        assert_eq!(file_show.exact_change_target(), None);
     }
 
     #[test]

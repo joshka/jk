@@ -786,6 +786,7 @@ dependencies = [
  "insta",
  "ratatui",
  "ratatui-macros",
+ "serde_json",
 ]
 
 [[package]]

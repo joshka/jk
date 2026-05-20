@@ -17,6 +17,7 @@ pub enum Command {
     SearchPrompt,
     PromptLogRevset,
     OpenStatus,
+    OpenResolve,
     OpenBookmarks,
     OpenOperationLog,
     OperationUndo,
@@ -92,6 +93,7 @@ impl Command {
             | Self::SearchPrompt
             | Self::PromptLogRevset
             | Self::OpenStatus
+            | Self::OpenResolve
             | Self::OpenBookmarks
             | Self::OpenOperationLog
             | Self::Describe
@@ -172,6 +174,7 @@ pub enum HelpContext {
     Show,
     Diff,
     Status,
+    Resolve,
     FileList,
     FileShow,
     Bookmarks,
@@ -342,6 +345,7 @@ fn help_metadata(
             (context == HelpContext::Graph).then_some((HelpSectionKind::Direct, "custom revset"))
         }
         Command::OpenStatus => Some((HelpSectionKind::Global, "status")),
+        Command::OpenResolve => Some((HelpSectionKind::Global, "resolve")),
         Command::OpenBookmarks => Some((HelpSectionKind::Global, "bookmarks")),
         Command::OpenOperationLog => Some((HelpSectionKind::Global, "operation log")),
         Command::Describe => match context {
@@ -422,6 +426,7 @@ fn view_help_metadata(
             let action = match context {
                 HelpContext::Show | HelpContext::Diff | HelpContext::Status => "open file list",
                 HelpContext::Graph
+                | HelpContext::Resolve
                 | HelpContext::FileList
                 | HelpContext::FileShow
                 | HelpContext::Bookmarks
@@ -433,6 +438,7 @@ fn view_help_metadata(
         ViewCommand::OpenItem => {
             let action = match context {
                 HelpContext::FileList => "open file",
+                HelpContext::Resolve => "inspect conflict",
                 HelpContext::Graph
                 | HelpContext::Show
                 | HelpContext::Diff
@@ -450,6 +456,7 @@ fn view_help_metadata(
                 HelpContext::Bookmarks => "open show",
                 HelpContext::OperationLog | HelpContext::OperationDetail => "operation show",
                 HelpContext::Show
+                | HelpContext::Resolve
                 | HelpContext::Status
                 | HelpContext::FileList
                 | HelpContext::FileShow => return None,
@@ -462,6 +469,7 @@ fn view_help_metadata(
                 HelpContext::OperationLog | HelpContext::OperationDetail => "operation diff",
                 HelpContext::Bookmarks
                 | HelpContext::Diff
+                | HelpContext::Resolve
                 | HelpContext::Status
                 | HelpContext::FileList
                 | HelpContext::FileShow => return None,
@@ -701,6 +709,25 @@ mod tests {
         assert_eq!(
             sections[0].rows()[1],
             HelpRow::new("C-r", "redo most recently undone operation (global)")
+        );
+    }
+
+    #[test]
+    fn resolve_help_exposes_global_entry_and_inspect_action() {
+        let global = [Binding::new(KeyPattern::char('R'), Command::OpenResolve)];
+        let view = [Binding::new(
+            KeyPattern::code(KeyCode::Enter),
+            Command::View(ViewCommand::OpenItem),
+        )];
+
+        let sections = project_help(&global, &view, HelpContext::Resolve);
+
+        assert_eq!(sections[0].title(), "Global");
+        assert_eq!(sections[0].rows()[0], HelpRow::new("R", "resolve"));
+        assert_eq!(sections[1].title(), "Direct Actions");
+        assert_eq!(
+            sections[1].rows()[0],
+            HelpRow::new("Enter", "inspect conflict")
         );
     }
 

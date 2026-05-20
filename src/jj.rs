@@ -11,6 +11,7 @@ use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use ratatui::text::Line;
+use serde_json::Value;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjCommand {
@@ -19,6 +20,7 @@ pub enum JjCommand {
     Show,
     Diff,
     Status,
+    Resolve,
     FileList,
     FileShow,
     Bookmarks,
@@ -98,6 +100,7 @@ const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
 const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
 const OPERATION_LOG_LIMIT: &str = "100";
+const RESOLVE_CONFLICT_TEMPLATE: &str = r#"self.conflicted_files().map(|entry| "{\"path\":" ++ json(entry.path()) ++ ",\"file_type\":" ++ json(entry.file_type()) ++ ",\"side_count\":" ++ json(entry.conflict_side_count()) ++ "}\n").join("")"#;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
@@ -1394,6 +1397,7 @@ impl JjCommand {
             Self::Show => "jj show",
             Self::Diff => "jj diff",
             Self::Status => "jj status",
+            Self::Resolve => "jj resolve",
             Self::FileList => "jj file list",
             Self::FileShow => "jj file show",
             Self::Bookmarks => "jj bookmark list",
@@ -1410,6 +1414,7 @@ impl JjCommand {
             Self::Show => &["show"],
             Self::Diff => &["diff"],
             Self::Status => &["status"],
+            Self::Resolve => &["log"],
             Self::FileList => &["file", "list"],
             Self::FileShow => &["file", "show"],
             Self::Bookmarks => &BOOKMARK_COMMAND_WORDS,
@@ -1427,6 +1432,7 @@ impl JjCommand {
             | Self::Show
             | Self::Diff
             | Self::Status
+            | Self::Resolve
             | Self::FileList
             | Self::FileShow
             | Self::Bookmarks
@@ -1527,6 +1533,20 @@ impl ViewSpec {
             target_is_exact_change: true,
             path: None,
             diff_format,
+        }
+    }
+
+    pub fn resolve(revset: Option<String>) -> Self {
+        let revset = revset.unwrap_or_else(|| "@".to_owned());
+        let args = vec!["-r".to_owned(), revset.clone()];
+
+        Self {
+            command: JjCommand::Resolve,
+            args,
+            target: Some(revset),
+            target_is_exact_change: false,
+            path: None,
+            diff_format: DiffFormat::Default,
         }
     }
 
@@ -1660,6 +1680,7 @@ impl ViewSpec {
             JjCommand::Show => "jk show",
             JjCommand::Diff => "jk diff",
             JjCommand::Status => "jk status",
+            JjCommand::Resolve => "jk resolve",
             JjCommand::FileList => "jk file list",
             JjCommand::FileShow => "jk file show",
             JjCommand::Bookmarks => "jk bookmarks",
@@ -1679,6 +1700,7 @@ impl ViewSpec {
         self.target.clone().or_else(|| match self.command {
             JjCommand::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
             JjCommand::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
+            JjCommand::Resolve => Some(revision_arg(&self.args).unwrap_or("@").to_owned()),
             JjCommand::FileList => Some(revision_arg(&self.args).unwrap_or("@").to_owned()),
             JjCommand::FileShow => Some(
                 revision_arg(self.file_show_context_args())
@@ -1720,6 +1742,7 @@ impl ViewSpec {
         self.target
             .clone()
             .or_else(|| match self.command {
+                JjCommand::Resolve => revision_arg(&self.args).map(str::to_owned),
                 JjCommand::FileList => revision_arg(&self.args).map(str::to_owned),
                 JjCommand::FileShow => {
                     revision_arg(self.file_show_context_args()).map(str::to_owned)
@@ -1980,6 +2003,55 @@ impl FileListItem {
     }
 }
 
+/// One conflicted path reported by the resolve template contract.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolveEntry {
+    path: Option<String>,
+    file_type: Option<String>,
+    side_count: Option<usize>,
+    raw_line: Option<String>,
+}
+
+impl ResolveEntry {
+    pub fn parsed(
+        path: Option<String>,
+        file_type: Option<String>,
+        side_count: Option<usize>,
+    ) -> Self {
+        Self {
+            path,
+            file_type,
+            side_count,
+            raw_line: None,
+        }
+    }
+
+    pub fn unparsed(raw_line: String) -> Self {
+        Self {
+            path: None,
+            file_type: None,
+            side_count: None,
+            raw_line: Some(raw_line),
+        }
+    }
+
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
+    }
+
+    pub fn file_type(&self) -> Option<&str> {
+        self.file_type.as_deref()
+    }
+
+    pub fn side_count(&self) -> Option<usize> {
+        self.side_count
+    }
+
+    pub fn raw_line(&self) -> Option<&str> {
+        self.raw_line.as_deref()
+    }
+}
+
 /// One selectable operation item parsed from rendered operation-log output.
 #[derive(Clone, Debug)]
 pub struct OperationLogItem {
@@ -2036,6 +2108,15 @@ pub fn load_bookmark_entries(spec: &ViewSpec) -> Result<Vec<BookmarkItem>> {
     let lines = output.stdout.into_text()?.lines;
     let metadata = run_jj_bookmark_metadata(spec)?;
     Ok(pair_bookmark_lines(lines, metadata))
+}
+
+pub fn load_resolve_entries(spec: &ViewSpec) -> Result<Vec<ResolveEntry>> {
+    Ok(
+        run_jj_template_lines(spec, RESOLVE_CONFLICT_TEMPLATE, true)?
+            .into_iter()
+            .map(|line| parse_resolve_entry_line(&line))
+            .collect(),
+    )
 }
 
 pub fn load_file_list_entries(spec: &ViewSpec) -> Result<Vec<FileListItem>> {
@@ -2144,27 +2225,39 @@ fn run_direct_args_stdout(args: Vec<String>, label: &str) -> Result<String> {
 }
 
 fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<Vec<RevisionMetadata>> {
-    Ok(run_jj_template_lines(spec, template)?
+    Ok(run_jj_template_lines(spec, template, false)?
         .into_iter()
         .filter_map(|line| parse_metadata_line(&line))
         .collect())
 }
 
 fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
-    Ok(run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE)?
-        .into_iter()
-        .filter_map(|line| parse_bookmark_metadata_line(&line))
-        .collect())
+    Ok(
+        run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE, false)?
+            .into_iter()
+            .filter_map(|line| parse_bookmark_metadata_line(&line))
+            .collect(),
+    )
 }
 
-fn run_jj_template_lines(spec: &ViewSpec, template: &str) -> Result<Vec<String>> {
+fn run_jj_template_lines(spec: &ViewSpec, template: &str, no_graph: bool) -> Result<Vec<String>> {
     let mut jj = base_command(ColorMode::Never);
-    jj.args(jj_command_args(spec, Some(template), false));
+    jj.args(jj_command_args(spec, Some(template), no_graph));
 
     let output = jj.output()?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(eyre!("{} metadata failed: {}", spec.label(), stderr.trim()));
+        let metadata_label = if matches!(spec.command(), JjCommand::Resolve) {
+            "jj log resolve metadata".to_owned()
+        } else {
+            spec.label().to_owned()
+        };
+
+        return Err(eyre!(
+            "{} metadata failed: {}",
+            metadata_label,
+            stderr.trim()
+        ));
     }
 
     let stdout = String::from_utf8(output.stdout)?;
@@ -2453,8 +2546,32 @@ fn parse_operation_id_line(line: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+fn parse_resolve_entry_line(line: &str) -> ResolveEntry {
+    let raw_line = line.to_owned();
+    let Ok(Value::Object(fields)) = serde_json::from_str::<Value>(line) else {
+        return ResolveEntry::unparsed(raw_line);
+    };
+
+    ResolveEntry::parsed(
+        string_field(&fields, "path"),
+        string_field(&fields, "file_type"),
+        integer_field(&fields, "side_count"),
+    )
+}
+
 fn parse_file_list_path(line: &str) -> Option<String> {
     (!line.is_empty()).then(|| line.to_owned())
+}
+
+fn string_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<String> {
+    fields.get(name).and_then(Value::as_str).map(str::to_owned)
+}
+
+fn integer_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<usize> {
+    fields
+        .get(name)
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
 }
 
 fn show_revset_arg(args: &[String]) -> Option<&str> {
@@ -3031,6 +3148,87 @@ mod tests {
 
         assert_eq!(spec.show_context_revset(), "@");
         assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+    }
+
+    #[test]
+    fn resolve_command_defaults_to_current_revision() {
+        let spec = ViewSpec::resolve(None);
+
+        assert_eq!(spec.command(), JjCommand::Resolve);
+        assert_eq!(spec.args(), ["-r", "@"]);
+        assert_eq!(
+            jj_command_args(&spec, Some(RESOLVE_CONFLICT_TEMPLATE), true),
+            vec![
+                "log",
+                "--no-graph",
+                "-T",
+                RESOLVE_CONFLICT_TEMPLATE,
+                "-r",
+                "@",
+            ]
+        );
+        assert_eq!(spec.label(), "jj resolve -r @");
+        assert_eq!(spec.app_label(), "jk resolve -r @");
+        assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+        assert_eq!(spec.show_context_revset(), "@");
+    }
+
+    #[test]
+    fn resolve_command_uses_log_template_contract_without_graph() {
+        let spec = ViewSpec::resolve(Some("main".to_owned()));
+
+        assert_eq!(spec.command(), JjCommand::Resolve);
+        assert_eq!(spec.args(), ["-r", "main"]);
+        assert_eq!(spec.exact_change_target(), None);
+        assert_eq!(
+            jj_command_args(&spec, Some(RESOLVE_CONFLICT_TEMPLATE), true),
+            vec![
+                "log",
+                "--no-graph",
+                "-T",
+                RESOLVE_CONFLICT_TEMPLATE,
+                "-r",
+                "main",
+            ]
+        );
+        assert_eq!(spec.label(), "jj resolve -r main");
+        assert_eq!(spec.app_label(), "jk resolve -r main");
+        assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
+        assert_eq!(spec.show_context_revset(), "main");
+    }
+
+    #[test]
+    fn resolve_entry_parser_keeps_exact_fields() {
+        let entry = parse_resolve_entry_line(
+            r#"{"path":"dir/space file.txt","file_type":"file","side_count":3}"#,
+        );
+
+        assert_eq!(
+            entry,
+            ResolveEntry::parsed(
+                Some("dir/space file.txt".to_owned()),
+                Some("file".to_owned()),
+                Some(3),
+            )
+        );
+    }
+
+    #[test]
+    fn resolve_entry_parser_degrades_invalid_json_to_unparsed_row() {
+        let entry = parse_resolve_entry_line("{not json");
+
+        assert_eq!(entry, ResolveEntry::unparsed("{not json".to_owned()));
+    }
+
+    #[test]
+    fn resolve_entry_parser_allows_missing_exact_path() {
+        let entry =
+            parse_resolve_entry_line(r#"{"path":null,"file_type":"symlink","side_count":2}"#);
+
+        assert_eq!(
+            entry,
+            ResolveEntry::parsed(None, Some("symlink".to_owned()), Some(2))
+        );
     }
 
     #[test]

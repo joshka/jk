@@ -4,14 +4,34 @@
 
 The resolve screen is the conflict-oriented utility surface.
 
+Packet 28 keeps this first pass read-only. It helps users inspect conflicted paths without launching
+merge tools, mutating files, or pretending to own `jj`'s conflict semantics.
+
 ## Source Command
 
-- `jj resolve`
+- Primary list contract:
+
+  ```sh
+  jj log --no-graph -r @ --color=never -T 'self.conflicted_files().map(|entry| "{\"path\":"
+  ++ json(entry.path()) ++ ",\"file_type\":" ++ json(entry.file_type()) ++ ",\"side_count\":"
+  ++ json(entry.conflict_side_count()) ++ "}\n").join("")'
+  ```
+
+- Inspect selected path:
+
+  ```sh
+  jj file show -r <resolve-target-or-@> <path>
+  ```
+
+The screen does not shell out to `jj resolve --list` because clean repos need to open as an empty
+list instead of as a command failure.
 
 ## View Model
 
 - list-first surface
-- conflict details may open into dedicated follow-up views or external tools
+- path-first selectable items
+- empty clean repos render as `0 conflicts`
+- detail inspection reuses `jj file show`
 
 ## Priority
 
@@ -21,52 +41,63 @@ semantics before guided resolution can be safe.
 ## Core Information
 
 - conflicted paths
-- enough context to identify the conflict target quickly
-- obvious next actions for resolution
+- `file_type` from `self.conflicted_files()`
+- `side_count` from `self.conflicted_files()`
+- enough context to inspect the conflict target quickly
 
 ## Primary Interactions
 
 - move between conflict items
-- inspect selected conflict context
-- launch resolution-related flows
+- inspect the selected conflict path with `jj file show`
 - refresh
 - go back
 
 ## Selection Model
 
 - selection unit: conflict item or conflicted path
-- conflict identity, path state, and available resolution actions must be semantic data
+- refresh preserves selection by exact conflicted path when possible
 - multi-select is not a first-wave need; resolve flows should start with one conflict at a time
 
 ## Interaction Details
 
 - Movement: move by conflict item.
-- Inspect: open selected conflict context in a dedicated detail view or external tool.
-- Launch resolution: resolution flows should clearly state which path/conflict they target.
+- Inspect: `Enter` and `l` open `jj file show -r <resolve-target-or-@> <path>` when the selected row
+  carries an exact path.
+- Unknown path: rows with malformed or partial metadata stay readable and copyable, but inspect
+  shows a clear status error instead of inventing a path.
 - Refresh: preserve selected conflicted path when possible.
-- Completion: after a resolution action, refresh and either stay on remaining conflicts or return to
-  status if all conflicts are resolved.
+- Copy: offer the exact path when known and always offer the displayed row text.
+- Search: search wraps by conflict item, not by individual line.
 
-## Shortcut Candidates
+## Bindings
 
 - `j`/`k`, arrows: move conflict selection
-- `Enter`: inspect conflict context
-- `r`: refresh
-- `R`: launch resolution flow
+- `Enter`, `l`: inspect selected conflict path
+- `n` / `N`: next or previous search match
+- `R`: open resolve from other views
 - `y`: copy path
+- `r`: refresh
 - `h`, `Esc`: back
 
 ## Integration Notes
 
-Conflict state is too semantic to duplicate casually. Use rendered output for the first list view,
-but prefer `jj` APIs or structured data before building guided resolution flows that need exact
-conflict contents, path state, or merge behavior.
+Conflict state is too semantic to duplicate casually. Packet 28 uses a narrow machine-oriented
+template contract for the list and leaves rendered `jj file show` output as the inspection surface.
+Guided resolution actions should move to stronger `jj` APIs or structured contracts before `jk`
+tries to mutate conflicted files.
 
-The preferred contract exposes conflicted path, conflict kind, available resolution state,
-renderable row text, and launchable resolution targets together.
+This screen explicitly does not:
+
+- launch `jj resolve <path>`;
+- open an external merge tool;
+- mark conflicts resolved;
+- offer `:ours`, `:theirs`, or automatic resolution;
+- infer exact paths from rendered sticky headings or prose;
+- turn conflict rows into mutation-capable filesets.
 
 ## Acceptance Criteria
 
-- conflict state is visible and actionable
-- the screen stays focused on resolution rather than becoming a generic file browser
-- guided resolution does not infer conflict semantics from rendered prose
+- conflict state is visible as a focused list of conflicted paths
+- clean repos open as an empty list instead of a failure state
+- inspection stays read-only and path-exact when possible
+- guided resolution remains deferred until the contract is strong enough for safe mutation
