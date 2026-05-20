@@ -28,6 +28,7 @@ pub enum Command {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewCommand {
     CycleMode,
+    NewTrunk,
     MoveDown,
     MoveUp,
     PageDown,
@@ -203,6 +204,7 @@ pub enum ViewEffect {
     Handled,
     StatusMessage(String),
     StatusError(String),
+    RunNewTrunk,
     OpenDetail(JjCommand, String),
     SearchMoved,
     SearchStarted { matches: usize },
@@ -300,6 +302,7 @@ fn view_help_metadata(
 ) -> Option<(HelpSectionKind, &'static str)> {
     match command {
         ViewCommand::CycleMode => Some((HelpSectionKind::Direct, "cycle view mode")),
+        ViewCommand::NewTrunk => Some((HelpSectionKind::Direct, "new from trunk (jj undo)")),
         ViewCommand::MoveDown => Some((HelpSectionKind::View, "move down")),
         ViewCommand::MoveUp => Some((HelpSectionKind::View, "move up")),
         ViewCommand::PageDown => Some((HelpSectionKind::View, "page down")),

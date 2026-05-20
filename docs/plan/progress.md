@@ -50,3 +50,16 @@
 - Remaining risk: fetch output is summarized into the one-line status area rather than preserved in
   a dedicated output view, so unusually verbose fetch output may be harder to inspect
 - Next slice: Slice 5: Direct `jj new trunk`
+
+## Slice 5: Direct `jj new trunk`
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/diff.rs`, `src/graph.rs`, `src/jj.rs`,
+  `src/show.rs`, `src/tui.rs`, `src/view_state.rs`, `docs/plan/progress.md`
+- Verification: full `cargo test`, then review-driven follow-up tests for the graph visibility
+  fallback, another full `cargo test`, `rustup run nightly cargo fmt`, disposable-repo manual
+  `jj --no-pager new 'trunk()'` run after cloning a temporary remote with a configured `main`
+  branch, and `just md-check`
+- Remaining risk: the exact-target validation and mode fallback are covered by helper tests and
+  manual proof, but not yet by an app-level mocked command-runner test around the whole direct
+  action path
+- Next slice: Slice 6: Status Screen First Pass

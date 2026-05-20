@@ -19,7 +19,9 @@ use crate::command::{
     project_help,
 };
 use crate::copy::CopyOption;
-use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec, git_fetch};
+use crate::jj::{
+    DiffFormat, JjCommand, LogViewMode, ViewSpec, git_fetch, new_trunk, resolve_exact_change_id,
+};
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
 use crate::view_state::ViewState;
@@ -190,7 +192,7 @@ impl App {
             }
             Command::View(command) => {
                 let effect = self.execute_view(command, viewport_height);
-                self.apply_view_effect(effect)
+                self.apply_view_effect(effect, viewport_height)
             }
         }
     }
@@ -358,7 +360,7 @@ impl App {
         )
     }
 
-    fn apply_view_effect(&mut self, effect: ViewEffect) -> Result<bool> {
+    fn apply_view_effect(&mut self, effect: ViewEffect, viewport_height: u16) -> Result<bool> {
         match effect {
             ViewEffect::Ignored | ViewEffect::Handled => Ok(true),
             ViewEffect::StatusMessage(message) => {
@@ -367,6 +369,10 @@ impl App {
             }
             ViewEffect::StatusError(message) => {
                 self.status = StatusLine::error(&self.view, message);
+                Ok(false)
+            }
+            ViewEffect::RunNewTrunk => {
+                self.run_new_trunk(viewport_height);
                 Ok(false)
             }
             ViewEffect::OpenDetail(command, revset) => {
@@ -414,6 +420,51 @@ impl App {
 
         match self.view.set_graph_mode(LogViewMode::CustomRevset(revset)) {
             Ok(()) => self.status = StatusLine::with_message(&self.view, "mode: custom revset"),
+            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+        }
+    }
+
+    fn run_new_trunk(&mut self, viewport_height: u16) {
+        if let Err(error) = resolve_exact_change_id("trunk()") {
+            self.status = StatusLine::error(&self.view, error.to_string());
+            return;
+        }
+
+        match new_trunk() {
+            Ok(_) => {
+                let new_change_id = match resolve_exact_change_id("@") {
+                    Ok(change_id) => change_id,
+                    Err(error) => {
+                        self.status = StatusLine::error(&self.view, error.to_string());
+                        return;
+                    }
+                };
+                match self.view.refresh() {
+                    Ok(()) => {
+                        self.view.clamp(viewport_height);
+                        let revealed_in_recent = match self
+                            .view
+                            .reveal_graph_change(&new_change_id, LogViewMode::Recent)
+                        {
+                            Ok(switched_modes) => {
+                                self.view.clamp(viewport_height);
+                                switched_modes
+                            }
+                            Err(error) => {
+                                self.status = StatusLine::error(&self.view, error.to_string());
+                                return;
+                            }
+                        };
+                        let message = if revealed_in_recent {
+                            "created new change from trunk | showing recent work | jj undo"
+                        } else {
+                            "created new change from trunk | jj undo"
+                        };
+                        self.status = StatusLine::with_message(&self.view, message);
+                    }
+                    Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+                }
+            }
             Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
         }
     }

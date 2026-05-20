@@ -18,6 +18,7 @@ use crate::selection::Selection;
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('w'), Command::View(ViewCommand::CycleMode)),
+    Binding::new(KeyPattern::char('c'), Command::View(ViewCommand::NewTrunk)),
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Down),
@@ -93,6 +94,7 @@ impl GraphView {
                 Ok(mode) => ViewEffect::StatusMessage(format!("mode: {}", mode.label())),
                 Err(error) => ViewEffect::StatusError(error.to_string()),
             },
+            ViewCommand::NewTrunk => ViewEffect::RunNewTrunk,
             ViewCommand::MoveDown => {
                 self.select_next();
                 ViewEffect::Handled
@@ -175,6 +177,26 @@ impl GraphView {
         self.mode.label()
     }
 
+    pub fn select_change_id(&mut self, change_id: &str) -> bool {
+        let Some(index) = self
+            .entries
+            .iter()
+            .position(|entry| entry.action_id() == Some(change_id))
+        else {
+            return false;
+        };
+        self.selection.set(index, self.entries.len());
+        true
+    }
+
+    pub fn reveal_change_id(
+        &mut self,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        self.reveal_change_id_with_loader(change_id, fallback_mode, load_entries)
+    }
+
     pub fn item_count(&self) -> usize {
         self.entries.len()
     }
@@ -254,6 +276,26 @@ impl GraphView {
         let next_mode = self.mode.next();
         self.set_mode(next_mode.clone())?;
         Ok(next_mode)
+    }
+
+    fn reveal_change_id_with_loader(
+        &mut self,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+        load: impl Fn(&ViewSpec) -> Result<Vec<LogItem>>,
+    ) -> Result<bool> {
+        if self.select_change_id(change_id) {
+            return Ok(false);
+        }
+
+        self.switch_mode_with_loader(fallback_mode, load)?;
+        if self.select_change_id(change_id) {
+            Ok(true)
+        } else {
+            Err(color_eyre::eyre::eyre!(
+                "refreshed graph did not include the new working-copy change"
+            ))
+        }
     }
 
     fn switch_mode_with_loader(
@@ -457,5 +499,71 @@ mod tests {
         assert_eq!(view.spec(), &previous_spec);
         assert_eq!(view.mode, previous_mode);
         assert_eq!(view.current_revset(), Some("first"));
+    }
+
+    #[test]
+    fn select_change_id_moves_selection_to_matching_row() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("first"), None),
+            log_item("second", Some("second"), None),
+        ]);
+
+        assert!(view.select_change_id("second"));
+        assert_eq!(view.current_revset(), Some("second"));
+        assert!(!view.select_change_id("missing"));
+        assert_eq!(view.current_revset(), Some("second"));
+    }
+
+    #[test]
+    fn reveal_change_id_keeps_current_mode_when_change_is_visible() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("first"), None),
+            log_item("second", Some("second"), None),
+        ]);
+
+        let switched = view
+            .reveal_change_id_with_loader("second", LogViewMode::Recent, |_| {
+                panic!("fallback mode should not load when the change is already visible");
+            })
+            .unwrap();
+
+        assert!(!switched);
+        assert_eq!(view.current_revset(), Some("second"));
+        assert_eq!(view.mode_label(), "default work");
+    }
+
+    #[test]
+    fn reveal_change_id_switches_mode_when_current_mode_hides_change() {
+        let mut view = graph_view(vec![log_item("trunk", Some("trunk"), None)]);
+
+        let switched = view
+            .reveal_change_id_with_loader("new", LogViewMode::Recent, |_| {
+                Ok(vec![
+                    log_item("new", Some("new"), None),
+                    log_item("trunk", Some("trunk"), None),
+                ])
+            })
+            .unwrap();
+
+        assert!(switched);
+        assert_eq!(view.current_revset(), Some("new"));
+        assert_eq!(view.mode_label(), "recent work");
+    }
+
+    #[test]
+    fn reveal_change_id_errors_when_fallback_mode_still_hides_change() {
+        let mut view = graph_view(vec![log_item("trunk", Some("trunk"), None)]);
+
+        let error = view
+            .reveal_change_id_with_loader("new", LogViewMode::Recent, |_| {
+                Ok(vec![log_item("trunk", Some("trunk"), None)])
+            })
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "refreshed graph did not include the new working-copy change"
+        );
+        assert_eq!(view.mode_label(), "recent work");
     }
 }

@@ -136,6 +136,17 @@ impl ViewState {
         }
     }
 
+    pub fn reveal_graph_change(
+        &mut self,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+    ) -> Result<bool> {
+        match self {
+            Self::Graph(view) => view.reveal_change_id(change_id, fallback_mode),
+            Self::Show(_) | Self::Diff(_) => Ok(false),
+        }
+    }
+
     pub fn document_line_count(&self) -> usize {
         match self {
             Self::Graph(view) => view.line_count(),

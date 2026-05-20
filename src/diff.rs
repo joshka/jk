@@ -95,6 +95,7 @@ impl DiffView {
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::CycleMode => ViewEffect::Ignored,
+            ViewCommand::NewTrunk => ViewEffect::Ignored,
             ViewCommand::MoveDown => {
                 self.scroll_down(context.viewport_height, 1);
                 ViewEffect::Handled

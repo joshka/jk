@@ -83,6 +83,8 @@ const TRUNK_WORK_REVSET: &str = "trunk().. | trunk()";
 const RECENT_WORK_REVSET: &str = "latest(mutable(), 20) | @ | trunk()";
 const ALL_REPO_REVSET: &str = "all()";
 const FETCH_ARGS: [&str; 2] = ["git", "fetch"];
+const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
+const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
@@ -315,6 +317,24 @@ pub fn git_fetch() -> Result<CommandOutput> {
     run_direct_command(&FETCH_ARGS, "jj git fetch", "fetched")
 }
 
+pub fn new_trunk() -> Result<CommandOutput> {
+    run_direct_command(&NEW_TRUNK_ARGS, "jj new trunk()", "created new change")
+}
+
+pub fn resolve_exact_change_id(revset: &str) -> Result<String> {
+    let mut jj = base_command(ColorMode::Never);
+    jj.args(["log", "-r", revset, "-T", CHANGE_ID_TEMPLATE]);
+
+    let output = jj.output()?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(eyre!("{} failed: {}", revset, stderr.trim()));
+    }
+
+    parse_exact_change_id(&String::from_utf8(output.stdout)?)
+        .map_err(|error| eyre!("{} {}", revset, error))
+}
+
 fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }
@@ -482,6 +502,23 @@ fn summarize_output(stdout: &[u8], stderr: &[u8], fallback: &str) -> String {
     } else {
         parts.join(" | ")
     }
+}
+
+fn parse_exact_change_id(output: &str) -> Result<String> {
+    let mut ids = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_owned);
+
+    let Some(change_id) = ids.next() else {
+        return Err(eyre!("did not resolve to any revisions"));
+    };
+    if ids.next().is_some() {
+        return Err(eyre!("resolved to multiple revisions"));
+    }
+
+    Ok(change_id)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -980,6 +1017,11 @@ mod tests {
     }
 
     #[test]
+    fn new_trunk_command_args_are_stable() {
+        assert_eq!(NEW_TRUNK_ARGS, ["new", "trunk()"]);
+    }
+
+    #[test]
     fn summarize_output_prefers_real_output_over_fallback() {
         assert_eq!(
             summarize_output(b"fetched origin\n", b"", "fetched"),
@@ -987,5 +1029,12 @@ mod tests {
         );
         assert_eq!(summarize_output(b"", b"warning\n", "fetched"), "warning");
         assert_eq!(summarize_output(b"", b"", "fetched"), "fetched");
+    }
+
+    #[test]
+    fn parse_exact_change_id_requires_exactly_one_result() {
+        assert_eq!(parse_exact_change_id("abc\n").unwrap(), "abc");
+        assert!(parse_exact_change_id("").is_err());
+        assert!(parse_exact_change_id("abc\ndef\n").is_err());
     }
 }

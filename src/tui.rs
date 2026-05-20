@@ -102,6 +102,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " show  ",
             key("d"),
             " diff  ",
+            key("c"),
+            " new/undo  ",
             key("w"),
             " mode  ",
             key("W"),
