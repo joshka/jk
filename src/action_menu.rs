@@ -147,6 +147,12 @@ pub enum FollowUp {
     RevertExactTarget {
         revision: String,
     },
+    OperationRestoreExactTarget {
+        operation_id: String,
+    },
+    OperationRevertExactTarget {
+        operation_id: String,
+    },
     NewParents {
         parents: Vec<String>,
     },
@@ -166,6 +172,20 @@ pub struct ActionMenuItem {
 }
 
 impl ActionMenuItem {
+    pub fn new(
+        action: ActionKind,
+        label: impl Into<String>,
+        safety_tier: SafetyTier,
+        follow_up: FollowUp,
+    ) -> Self {
+        Self {
+            action,
+            label: label.into(),
+            safety_tier,
+            follow_up,
+        }
+    }
+
     pub fn action(&self) -> ActionKind {
         self.action
     }

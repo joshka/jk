@@ -79,8 +79,8 @@ or stay deferred until the exact target, preview, and recovery story is obvious.
 - `operation log`: `native screen`. Central recovery surface.
 - `operation show`: `utility screen`. Drill-down from operation log.
 - `operation diff`: `utility screen`. Drill-down from operation log.
-- `operation restore`: `planned`. Recovery follow-up from the operation log.
-- `operation revert`: `planned`. Recovery follow-up from the operation log.
+- `operation restore`: `guided flow`. Recovery from an exact selected operation-log id.
+- `operation revert`: `guided flow`. Recovery from an exact selected operation-log id.
 - `operation integrate`: `passthrough`. Specialized.
 - `operation abandon`: `defer`. Too dangerous for early UI.
 
@@ -139,11 +139,12 @@ Short version:
 - Shipped utility screens: `bookmarks`, `file list/show`, `resolve`, `operation show`,
   `operation diff`.
 - Shipped guided flows: `edit`, `next`, `prev`, `describe`, `commit`, `rebase`, `squash`, `abandon`,
-  `restore`, `revert`, `absorb`, `bookmark set/create/move/delete`, `undo`, `redo`, `git push`.
+  `restore`, `revert`, `operation restore`, `operation revert`, `absorb`,
+  `bookmark set/create/move/delete`, `undo`, `redo`, `git push`.
 - Shipped direct actions: `jj git fetch` and `jj new trunk`.
 - Planned utility or guided work: `evolog`, `root`, `workspace`, `split`, `duplicate`,
-  `operation restore/revert`, `bookmark rename/forget/track/untrack`, `tag`, `file search`,
-  `file annotate`, `file track/untrack/chmod`.
+  `bookmark rename/forget/track/untrack`, `tag`, `file search`, `file annotate`,
+  `file track/untrack/chmod`.
 - Everything else stays passthrough or deferred until the core loop is strong.
 
 When a command needs native structure, check [`integration-strategy.md`](integration-strategy.md)

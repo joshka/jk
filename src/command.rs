@@ -506,6 +506,7 @@ fn view_help_metadata(
                 | HelpContext::Diff
                 | HelpContext::FileList
                 | HelpContext::FileShow
+                | HelpContext::OperationLog
         )
         .then_some((
             HelpSectionKind::Preview,
@@ -748,6 +749,22 @@ mod tests {
         assert_eq!(
             sections[0].rows()[1],
             HelpRow::new("C-r", "redo most recently undone operation (global)")
+        );
+    }
+
+    #[test]
+    fn operation_help_exposes_exact_id_action_menu_separately_from_global_recovery() {
+        let view = [Binding::new(
+            KeyPattern::char('a'),
+            Command::View(ViewCommand::OpenActionMenu),
+        )];
+
+        let sections = project_help(&[], &view, HelpContext::OperationLog);
+
+        assert_eq!(sections[0].title(), "Preview / Confirm");
+        assert_eq!(
+            sections[0].rows()[0],
+            HelpRow::new("a", "open action menu (preview required)")
         );
     }
 

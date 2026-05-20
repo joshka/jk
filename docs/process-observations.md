@@ -1769,3 +1769,36 @@ belong here.
   - `just md-check`
 - Rework status: an attempted grouped `cargo test` invocation used invalid cargo syntax for multiple
   test filters and did not run; the same proof was rerun with valid individual filters.
+
+## 2026-05-20 Packet 33 Operation Restore/Revert
+
+- Thread id: `019e4584-b370-7cf2-a074-4ee102f9ad38`.
+- Slice / task: Implement explicit preview-first `jj operation restore <op-id>` and
+  `jj operation revert <op-id>` recovery flows from operation-log rows with exact ids.
+- Starting state: `jj --no-pager status` reported an empty fresh working copy change named
+  `Add operation restore revert flow`; no project-checkout jj mutation proof commands were run.
+- Implementation evidence: `src/operation_log.rs` now builds restore/revert actions only from a
+  selected `OperationLogItem::operation_id()`. `src/jj.rs` now has exact operation-target command
+  construction for `operation restore` and `operation revert`. `src/app.rs` routes both actions
+  through scrollable preview/result `ActionOutput`.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test operation_ -- --test-threads=1`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - attempted `just check`, which stopped at `cargo +nightly fmt` with `no such command: +nightly`
+  - disposable proof repo `/tmp/jk-packet33-proof.0vmUMi`
+- Disposable proof details: inside `/tmp/jk-packet33-proof.0vmUMi`, `jj operation restore <op-id>`
+  restored the working copy description from `changed file` to `base change`, `jj undo` recovered
+  `changed file`, `jj operation revert <op-id>` reverted a temporary describe operation back to
+  `changed file`, `jj undo` recovered `temporary bad description`, and
+  `jj operation revert not-an-operation-id` exited with status 1 and a readable invalid-operation-id
+  error.
+- Rework status: an initial focused validation command was started in parallel with `cargo check`,
+  which caused temporary Cargo file-lock waiting but both checks completed successfully.
+- Rework status: an attempted grouped `cargo test` invocation used invalid cargo syntax for multiple
+  exact test names and did not run; the same proof was rerun with the valid `operation_` filter.
+- Rework status: `just md-check` initially found Panache formatting diffs in `docs/plan/progress.md`
+  and `docs/plan/fragility-register.md`; `just md-fmt` reformatted those files and the rerun passed.

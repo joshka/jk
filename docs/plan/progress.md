@@ -802,3 +802,30 @@
   bookmark tracking and forget, the read-only tag list metadata contract, and workspace support
   still require per-packet exploration before code is written.
 - Next slice: Packet 33: Operation Restore/Revert From Operation Log
+
+## Packet 33: Operation Restore/Revert From Operation Log
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/command.rs`, `src/jj.rs`,
+  `src/operation_log.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+  `docs/plan/workflows/recover.md`, and `docs/process-observations.md`
+- Behavior: operation-log rows with paired exact operation ids now expose a preview-first action
+  menu for `jj operation restore <op-id>` and `jj operation revert <op-id>`. Rows without an
+  operation id keep the actions disabled with a clear status message. Previews show the exact
+  operation id, exact command, effect wording, confirmation requirement, and `jj undo` recovery
+  path. Confirmed success and failure stay in scrollable `ActionOutput`; success refreshes the
+  operation log and refreshes stacked repo views where practical.
+- Product boundary: global `jj undo`/`jj redo` remain separate recovery actions whose preview and
+  help text say the selected operation-log row is not an argument.
+- Validation: `cargo check`; focused `cargo test operation_ -- --test-threads=1`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-check`;
+  disposable `/tmp/jk-packet33-proof.0vmUMi` proof for `jj operation restore <op-id>`, `jj undo`
+  recovery, `jj operation revert <op-id>`, `jj undo` recovery, and invalid operation-id failure with
+  every mutating proof command run after `cd` into that disposable repo.
+- Validation note: `just check` was attempted and still stopped at the known local
+  `cargo +nightly fmt` wrapper issue with `no such command: +nightly`; the equivalent direct Rust
+  format check, full tests, and Markdown check passed.
+- Remaining risk: operation ids still depend on row-order pairing between rendered operation-log
+  rows and the separate `self.id()` template stream; restore/revert command semantics are covered by
+  installed `jj` behavior and command-construction tests, but no transaction graph simulation is
+  attempted.
+- Next slice: Packet 34: Split Guided Flow

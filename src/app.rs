@@ -25,9 +25,9 @@ use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
     JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationRecoveryKind, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan,
-    JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec, git_fetch,
-    git_remotes, new_trunk, resolve_exact_change_id,
+    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
+    git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -61,6 +61,8 @@ type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 type AbandonRun = fn(&JjAbandonPlan) -> Result<String>;
 #[cfg(test)]
 type OperationRecoveryRun = fn(&JjOperationRecovery) -> Result<String>;
+#[cfg(test)]
+type OperationTargetRun = fn(&JjOperationTarget) -> Result<String>;
 #[cfg(test)]
 type WorkingCopyNavigationRun = fn(&JjWorkingCopyNavigationPlan) -> Result<String>;
 #[cfg(test)]
@@ -119,6 +121,8 @@ struct App {
     abandon_run: AbandonRun,
     #[cfg(test)]
     operation_recovery_run: OperationRecoveryRun,
+    #[cfg(test)]
+    operation_target_run: OperationTargetRun,
     #[cfg(test)]
     working_copy_navigation_run: WorkingCopyNavigationRun,
     #[cfg(test)]
@@ -223,6 +227,10 @@ enum InteractionMode {
     },
     OperationRecoveryPreview {
         recovery: JjOperationRecovery,
+        output: ActionOutput,
+    },
+    OperationTargetPreview {
+        target: JjOperationTarget,
         output: ActionOutput,
     },
     WorkingCopyNavigationPreview {
@@ -332,6 +340,11 @@ fn default_operation_recovery_run(recovery: &JjOperationRecovery) -> Result<Stri
 }
 
 #[cfg(test)]
+fn default_operation_target_run(target: &JjOperationTarget) -> Result<String> {
+    target.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
 fn default_working_copy_navigation_run(navigation: &JjWorkingCopyNavigationPlan) -> Result<String> {
     navigation.run().map(|output| output.message().to_owned())
 }
@@ -416,6 +429,8 @@ impl App {
             abandon_run: default_abandon_run,
             #[cfg(test)]
             operation_recovery_run: default_operation_recovery_run,
+            #[cfg(test)]
+            operation_target_run: default_operation_target_run,
             #[cfg(test)]
             working_copy_navigation_run: default_working_copy_navigation_run,
             #[cfg(test)]
@@ -575,6 +590,16 @@ impl App {
     #[cfg(not(test))]
     fn run_operation_recovery(&self, recovery: &JjOperationRecovery) -> Result<String> {
         recovery.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_operation_target(&self, target: &JjOperationTarget) -> Result<String> {
+        (self.operation_target_run)(target)
+    }
+
+    #[cfg(not(test))]
+    fn run_operation_target(&self, target: &JjOperationTarget) -> Result<String> {
+        target.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -1015,6 +1040,20 @@ impl App {
                                     let revision = revision.clone();
                                     self.mode = InteractionMode::Normal;
                                     self.open_revert_preview(JjRevertPlan::new(revision));
+                                }
+                                FollowUp::OperationRestoreExactTarget { operation_id } => {
+                                    let operation_id = operation_id.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    self.open_operation_target_preview(JjOperationTarget::restore(
+                                        operation_id,
+                                    ));
+                                }
+                                FollowUp::OperationRevertExactTarget { operation_id } => {
+                                    let operation_id = operation_id.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    self.open_operation_target_preview(JjOperationTarget::revert(
+                                        operation_id,
+                                    ));
                                 }
                                 FollowUp::NewParents { parents } => {
                                     let parents = parents.clone();
@@ -1650,6 +1689,37 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::OperationTargetPreview { target, output } => {
+                let (target, status_context, completed) = {
+                    (
+                        target.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                format!("operation {} cancelled", target.status_action()),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_operation_target(target, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
             InteractionMode::WorkingCopyNavigationPreview { navigation, output } => {
                 let (navigation, status_context, completed) = {
                     (
@@ -1710,7 +1780,10 @@ impl App {
     }
 
     fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
-        if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
+        if matches!(
+            self.view.command(),
+            JjCommand::Default | JjCommand::Log | JjCommand::OperationLog
+        ) {
             let effect = self.execute_view(ViewCommand::OpenActionMenu, viewport_height);
             return self.apply_view_effect(effect, viewport_height);
         }
@@ -1944,6 +2017,38 @@ impl App {
             ),
             recovery,
         };
+    }
+
+    fn open_operation_target_preview(&mut self, target: JjOperationTarget) {
+        let status_context = Some(format!(
+            "operation {} exact id {} from {}",
+            target.status_action(),
+            target.operation_id(),
+            self.view.spec().app_label()
+        ));
+
+        match target.run_preview() {
+            Ok(output) => {
+                let command_label = target.command_label();
+                self.mode = InteractionMode::OperationTargetPreview {
+                    target,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = target.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::OperationTargetPreview {
+                    target,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
     }
 
     fn open_graph_working_copy_navigation_preview(&mut self, kind: JjWorkingCopyNavigationKind) {
@@ -2652,6 +2757,72 @@ impl App {
         };
     }
 
+    fn confirm_operation_target(
+        &mut self,
+        target: JjOperationTarget,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = target.command_label();
+        let result_message = match self.run_operation_target(&target) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    match self.refresh_stacked_repo_views(viewport_height) {
+                        Ok(()) => {
+                            let message = format!("{} | jj undo", output.trim());
+                            self.status = StatusLine::with_message(&self.view, message.as_str());
+                            message
+                        }
+                        Err(error) => {
+                            self.status = StatusLine::error(&self.view, error.to_string());
+                            format!(
+                                "{} | stacked view refresh failed: {error} | jj undo",
+                                output.trim()
+                            )
+                        }
+                    }
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("{} | refresh failed: {error} | jj undo", output.trim())
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::OperationTargetPreview {
+            target,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    fn refresh_stacked_repo_views(&mut self, viewport_height: u16) -> Result<()> {
+        for view in &mut self.stack {
+            match view.command() {
+                JjCommand::Default
+                | JjCommand::Log
+                | JjCommand::Status
+                | JjCommand::Bookmarks
+                | JjCommand::OperationLog => {
+                    view.refresh()?;
+                    view.clamp(viewport_height);
+                }
+                JjCommand::Show
+                | JjCommand::Diff
+                | JjCommand::Resolve
+                | JjCommand::FileList
+                | JjCommand::FileShow
+                | JjCommand::OperationShow
+                | JjCommand::OperationDiff => {}
+            }
+        }
+        Ok(())
+    }
+
     fn confirm_working_copy_navigation(
         &mut self,
         navigation: JjWorkingCopyNavigationPlan,
@@ -3279,6 +3450,9 @@ impl App {
             InteractionMode::OperationRecoveryPreview { output, .. } => {
                 Overlay::OperationRecoveryPreview { output }
             }
+            InteractionMode::OperationTargetPreview { output, .. } => {
+                Overlay::OperationTargetPreview { output }
+            }
             InteractionMode::WorkingCopyNavigationPreview { navigation, output } => {
                 Overlay::WorkingCopyNavigationPreview {
                     title: navigation.overlay_title(),
@@ -3869,6 +4043,21 @@ mod tests {
         ))
     }
 
+    fn mock_operation_target_success(target: &JjOperationTarget) -> Result<String> {
+        Ok(format!(
+            "operation {} {}\nnew operation recorded",
+            target.status_action(),
+            target.operation_id()
+        ))
+    }
+
+    fn mock_operation_target_failure(target: &JjOperationTarget) -> Result<String> {
+        Err(eyre!(
+            "{} failed: first line\nsecond line",
+            target.command_label()
+        ))
+    }
+
     fn mock_working_copy_navigation_success(
         navigation: &JjWorkingCopyNavigationPlan,
     ) -> Result<String> {
@@ -4038,6 +4227,8 @@ mod tests {
             abandon_run: mock_abandon_success,
             #[cfg(test)]
             operation_recovery_run: mock_operation_recovery_success,
+            #[cfg(test)]
+            operation_target_run: mock_operation_target_success,
             #[cfg(test)]
             working_copy_navigation_run: mock_working_copy_navigation_success,
             #[cfg(test)]
@@ -6896,6 +7087,131 @@ mod tests {
         assert_eq!(
             app.status.message(),
             "jj redo failed: no operation to redo available\nhint: run the opposite recovery command first"
+        );
+    }
+
+    #[test]
+    fn operation_action_menu_requires_exact_operation_id() {
+        let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj::OperationLogItem::new(vec![ratatui::text::Line::from("@  current")], None),
+        ]);
+        let mut app = test_app(ViewState::OperationLog(operation_log));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "operation recovery actions unavailable: selected row has no operation id"
+        );
+    }
+
+    #[test]
+    fn operation_restore_preview_can_cancel_or_confirm_success() {
+        let operation_id = "e".repeat(128);
+        let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj::OperationLogItem::new(
+                vec![ratatui::text::Line::from("@  selected")],
+                Some(operation_id.clone()),
+            ),
+        ]);
+        let mut app = test_app(ViewState::OperationLog(operation_log));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::OperationTargetPreview { target, output } => {
+                assert_eq!(target.kind(), crate::jj::JjOperationTargetKind::Restore);
+                assert_eq!(target.operation_id(), operation_id.as_str());
+                output
+            }
+            _ => panic!("expected operation target preview"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(
+            output.command_label(),
+            format!("jj operation restore {operation_id}")
+        );
+        assert!(body.contains(&format!("operation id: {operation_id}")));
+        assert!(body.contains(&format!("command: jj operation restore {operation_id}")));
+        assert!(body.contains(&format!(
+            "confirmation: press Enter to run jj operation restore {operation_id}"
+        )));
+
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "operation restore cancelled");
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::OperationTargetPreview { output, .. } => output,
+            _ => panic!("expected operation restore result"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains(&format!("operation restore {operation_id}")));
+        assert!(body.contains("new operation recorded | jj undo"));
+        assert_eq!(
+            app.status.message(),
+            format!("operation restore {operation_id}\nnew operation recorded | jj undo")
+        );
+    }
+
+    #[test]
+    fn operation_revert_preview_confirm_failure_keeps_output_readable() {
+        let operation_id = "f".repeat(128);
+        let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj::OperationLogItem::new(
+                vec![ratatui::text::Line::from("@  selected")],
+                Some(operation_id.clone()),
+            ),
+        ]);
+        let mut app = test_app(ViewState::OperationLog(operation_log));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Down, 12).unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::OperationTargetPreview { target, output } => {
+                assert_eq!(target.kind(), crate::jj::JjOperationTargetKind::Revert);
+                assert_eq!(target.operation_id(), operation_id.as_str());
+                output
+            }
+            _ => panic!("expected operation target preview"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(
+            output.command_label(),
+            format!("jj operation revert {operation_id}")
+        );
+        assert!(body.contains(&format!("operation id: {operation_id}")));
+        assert!(body.contains("revert exactly the selected operation by applying its inverse"));
+
+        app.operation_target_run = mock_operation_target_failure;
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::OperationTargetPreview { output, .. } => output,
+            _ => panic!("expected operation revert result"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains(&format!(
+            "jj operation revert {operation_id} failed: first line"
+        )));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            format!("jj operation revert {operation_id} failed: first line\nsecond line")
         );
     }
 

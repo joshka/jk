@@ -884,9 +884,9 @@ specific regression or polish packet is accepted later.
 
 ### Packet 32 Scheduling Notes
 
-- Immediate next recommended packet: Packet 33, because operation restore/revert extends the shipped
-  operation-log recovery anchor and depends on already-shipped operation ids, operation detail,
-  undo/redo, and scrollable action output.
+- Immediate next recommended packet: Packet 34, because Packet 33 shipped operation-log recovery for
+  exact operation ids, and packet-shaped flows now use the same exactness and preview conventions
+  for subsequent rewrite work.
 - Packets 34 and 35 should stay separate. `split` has editor/process uncertainty, while `duplicate`
   is a graph rewrite with different target and refresh behavior.
 - Packets 36, 38, and 39 must not be collapsed. Forget and tracking mutations need explicit metadata
@@ -932,7 +932,7 @@ Media review should follow Ratatui guidance:
   | Status and fetch         | Completed Slice 4 and 6, Packet 14                  | status docs/media after decluttering                           |
   | Action output visibility | Packet 13                                           | persistent action history remains out of scope                 |
   | Abandon change flow      | Packet 15                                           | multi-select and advanced/bulk abandon flows                   |
-  | Operation recovery       | Completed Slice 7, Packets 16 and 17                | operation restore/revert and integrate                         |
+  | Operation recovery       | Completed Slice 7, Packets 16, 17, and 33           | operation integrate                                            |
   | Create new work          | Completed Slice 5, Packet 18                        | describe-on-create and richer revset prompt                    |
   | Push/sync                | Completed Slice 11, Packet 19                       | host-specific flows, force pushes, deeper tracking UI          |
   | README and release docs  | Packets 20, 21, and 29                              | published hosted media after captures are reviewed             |
@@ -940,7 +940,7 @@ Media review should follow Ratatui guidance:
   | Describe/commit          | Packet 23                                           | editor integration and advanced metadata editing               |
   | Bookmarks                | Completed Slice 8, Packet 24                        | tags and advanced remote-tracking semantics                    |
   | Absorb                   | Packet 25                                           | patch-level explanations beyond CLI output                     |
-  | Restore/revert           | Packet 27                                           | operation restore/revert and patch editor                      |
+  | Restore/revert           | Packets 27 and 33                                   | patch editor                                                   |
   | Resolve conflicts        | Packet 28                                           | full merge editor                                              |
   | Working-copy navigation  | Packet 30                                           | richer stack-aware movement policy                             |
   | Strong command coverage  | Packets 31 and 32                                   | low-frequency passthrough commands remain intentionally scoped |
@@ -979,9 +979,9 @@ operation-log flow when `jj` supports that recovery shape.
 
 ### Operation Recovery Follow-Ups
 
-- After Packets 16 and 17, plan `operation restore` and `operation revert` from the operation-log
-  context. Consider `operation integrate` later. Keep `operation abandon` deferred unless there is a
-  strong product reason and a much stricter safety contract.
+- Packet 33 implemented `operation restore` and `operation revert` from the operation-log context.
+  Consider `operation integrate` later. Keep `operation abandon` deferred unless there is a strong
+  product reason and a much stricter safety contract.
 - Prerequisites: operation detail/diff views, exact operation ids, result output that remains
   inspectable, and clear language distinguishing restore, revert, undo, redo, and integrate.
 - Promotion evidence: exploration against `jj operation --help`, command-construction tests,

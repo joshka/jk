@@ -53,8 +53,6 @@ Planned follow-ups:
 
 - `split`
 - `duplicate`
-- `operation restore`
-- `operation revert`
 
 Deferred:
 
@@ -115,11 +113,8 @@ Shipped today:
 - `op diff`
 - `undo`
 - `redo`
-
-Planned follow-ups:
-
-- `op restore`
-- `op revert`
+- `operation restore`
+- `operation revert`
 
 Deferred:
 

@@ -168,6 +168,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::OperationTargetPreview { output } => {
+            let title = action_output_title("Operation action", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::WorkingCopyNavigationPreview { title, output } => {
             let title = action_output_title(title, output);
             let area = action_output_area(frame.area(), &title, output);
@@ -214,6 +220,9 @@ pub enum Overlay<'a> {
         output: &'a ActionOutput,
     },
     OperationRecoveryPreview {
+        output: &'a ActionOutput,
+    },
+    OperationTargetPreview {
         output: &'a ActionOutput,
     },
     WorkingCopyNavigationPreview {
@@ -491,6 +500,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " show  ",
             key("d"),
             " diff  ",
+            key("a"),
+            " action  ",
             key("/"),
             " search  ",
             key("y"),
@@ -900,7 +911,7 @@ mod tests {
 
         assert_snapshot!(render_chrome_snapshot(&status, 120), @r"
         title|jk operation-log
-        status|19 operations  q quit  j/k move  u undo  C-r redo  s show  d diff  / search  y copy id  ? help
+        status|19 operations  q quit  j/k move  u undo  C-r redo  s show  d diff  a action  / search  y copy id  ? help
         ");
     }
 

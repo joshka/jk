@@ -113,9 +113,21 @@ pub enum JjOperationRecoveryKind {
     Redo,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JjOperationTargetKind {
+    Restore,
+    Revert,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjOperationRecovery {
     kind: JjOperationRecoveryKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjOperationTarget {
+    kind: JjOperationTargetKind,
+    operation_id: String,
 }
 
 impl JjOperationRecovery {
@@ -180,6 +192,104 @@ impl JjOperationRecovery {
             self.command_label(),
             self.status_action(),
         )
+    }
+}
+
+impl JjOperationTargetKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Restore => "restore",
+            Self::Revert => "revert",
+        }
+    }
+
+    fn success_fallback(self) -> &'static str {
+        match self {
+            Self::Restore => "restored operation",
+            Self::Revert => "reverted operation",
+        }
+    }
+}
+
+impl JjOperationTarget {
+    pub fn restore(operation_id: impl Into<String>) -> Self {
+        Self {
+            kind: JjOperationTargetKind::Restore,
+            operation_id: operation_id.into(),
+        }
+    }
+
+    pub fn revert(operation_id: impl Into<String>) -> Self {
+        Self {
+            kind: JjOperationTargetKind::Revert,
+            operation_id: operation_id.into(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn kind(&self) -> JjOperationTargetKind {
+        self.kind
+    }
+
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
+
+    pub fn status_action(&self) -> &'static str {
+        self.kind.label()
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        let action = match self.kind {
+            JjOperationTargetKind::Restore => "restore",
+            JjOperationTargetKind::Revert => "revert",
+        };
+        vec![
+            "operation".to_owned(),
+            action.to_owned(),
+            self.operation_id.clone(),
+        ]
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput {
+            message: self.preview_summary(),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(),
+            &self.command_label(),
+            self.kind.success_fallback(),
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        let effect = match self.kind {
+            JjOperationTargetKind::Restore => {
+                "effect: restore the repository state to the selected operation by creating a new operation"
+            }
+            JjOperationTargetKind::Revert => {
+                "effect: revert exactly the selected operation by applying its inverse"
+            }
+        };
+
+        [
+            format!("command: {}", self.command_label()),
+            String::new(),
+            format!("operation id: {}", self.operation_id),
+            effect.to_owned(),
+            "selection: the selected operation-log row supplies this exact operation id".to_owned(),
+            format!("confirmation: press Enter to run {}", self.command_label()),
+            "recovery: jj undo".to_owned(),
+        ]
+        .join("\n")
     }
 }
 
@@ -3705,6 +3815,64 @@ mod tests {
                 .preview_text()
                 .contains("selected operation-log row is not an argument")
         );
+    }
+
+    #[test]
+    fn operation_restore_command_targets_exact_operation_id() {
+        let operation_id = operation_id('e');
+        let target = JjOperationTarget::restore(operation_id.clone());
+
+        assert_eq!(target.kind(), JjOperationTargetKind::Restore);
+        assert_eq!(target.operation_id(), operation_id.as_str());
+        assert_eq!(
+            target.command_argv(),
+            ["operation", "restore", operation_id.as_str()]
+        );
+        assert_eq!(
+            target.command_label(),
+            format!("jj operation restore {operation_id}")
+        );
+        assert!(
+            target
+                .preview_summary()
+                .contains(&format!("operation id: {operation_id}"))
+        );
+        assert!(target.preview_summary().contains(
+            "restore the repository state to the selected operation by creating a new operation"
+        ));
+        assert!(target.preview_summary().contains(&format!(
+            "confirmation: press Enter to run jj operation restore {operation_id}"
+        )));
+    }
+
+    #[test]
+    fn operation_revert_command_targets_exact_operation_id() {
+        let operation_id = operation_id('f');
+        let target = JjOperationTarget::revert(operation_id.clone());
+
+        assert_eq!(target.kind(), JjOperationTargetKind::Revert);
+        assert_eq!(target.operation_id(), operation_id.as_str());
+        assert_eq!(
+            target.command_argv(),
+            ["operation", "revert", operation_id.as_str()]
+        );
+        assert_eq!(
+            target.command_label(),
+            format!("jj operation revert {operation_id}")
+        );
+        assert!(
+            target
+                .preview_summary()
+                .contains(&format!("operation id: {operation_id}"))
+        );
+        assert!(
+            target
+                .preview_summary()
+                .contains("revert exactly the selected operation by applying its inverse")
+        );
+        assert!(target.preview_summary().contains(&format!(
+            "confirmation: press Enter to run jj operation revert {operation_id}"
+        )));
     }
 
     #[test]

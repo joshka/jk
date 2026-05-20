@@ -2,8 +2,9 @@
 //!
 //! The first pass keeps the operation log close to rendered `jj` output while
 //! carrying exact operation ids separately for copy, search, and refresh
-//! stability. Recovery actions are supported as global undo/redo operations on the repo
-//! cursor, not as selected-row actions.
+//! stability. Recovery includes global `jj undo`/`jj redo` on the repository cursor
+//! and selected-row `jj operation restore`/`jj operation revert` flows using exact
+//! operation ids.
 
 use color_eyre::Result;
 use ratatui::Frame;
@@ -11,6 +12,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{List, ListItem, ListState};
 
+use crate::action_menu::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{OperationLogItem, ViewSpec, load_operation_log_entries};
@@ -51,6 +53,10 @@ pub const BINDINGS: &[Binding] = &[
     Binding::new(
         KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
+    ),
+    Binding::new(
+        KeyPattern::char('a'),
+        Command::View(ViewCommand::OpenActionMenu),
     ),
     Binding::new(KeyPattern::char('u'), Command::OperationUndo),
     Binding::new(
@@ -148,7 +154,17 @@ impl OperationLogView {
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
-            ViewCommand::ToggleSelect | ViewCommand::OpenActionMenu => ViewEffect::Ignored,
+            ViewCommand::OpenActionMenu => self
+                .selected_operation_id()
+                .map(operation_action_menu)
+                .map(ViewEffect::OpenActionMenu)
+                .unwrap_or_else(|| {
+                    ViewEffect::StatusMessage(
+                        "operation recovery actions unavailable: selected row has no operation id"
+                            .to_owned(),
+                    )
+                }),
+            ViewCommand::ToggleSelect => ViewEffect::Ignored,
             ViewCommand::CycleMode
             | ViewCommand::NewTrunk
             | ViewCommand::PageDown
@@ -251,6 +267,26 @@ impl OperationLogView {
     }
 }
 
+fn operation_action_menu(operation_id: String) -> ActionMenu {
+    let short_operation_id = short_id(&operation_id).to_owned();
+    ActionMenu::new(vec![
+        ActionMenuItem::new(
+            ActionKind::Restore,
+            format!("restore repository to operation {short_operation_id}"),
+            SafetyTier::PreviewFirst,
+            FollowUp::OperationRestoreExactTarget {
+                operation_id: operation_id.clone(),
+            },
+        ),
+        ActionMenuItem::new(
+            ActionKind::Revert,
+            format!("revert operation {short_operation_id}"),
+            SafetyTier::PreviewFirst,
+            FollowUp::OperationRevertExactTarget { operation_id },
+        ),
+    ])
+}
+
 fn entry_list(entries: &[OperationLogItem], search: Option<&SearchQuery>) -> List<'static> {
     let items = entries
         .iter()
@@ -288,6 +324,10 @@ fn restore_selection(
     }
 
     selection.set(previous_index, entries.len());
+}
+
+fn short_id(id: &str) -> &str {
+    id.get(..8).unwrap_or(id)
 }
 
 #[cfg(test)]
@@ -457,6 +497,60 @@ mod tests {
                 "operation diff unavailable: selected row has no operation id".to_owned()
             )
         );
+    }
+
+    #[test]
+    fn operation_recovery_action_menu_requires_exact_operation_id() {
+        let mut view = operation_log_view(vec![operation_item(&["@  current"], None)]);
+
+        assert_eq!(
+            view.execute(
+                ViewCommand::OpenActionMenu,
+                CommandContext {
+                    viewport_height: 10,
+                    search: None,
+                },
+            ),
+            ViewEffect::StatusMessage(
+                "operation recovery actions unavailable: selected row has no operation id"
+                    .to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn operation_recovery_action_menu_uses_selected_operation_id() {
+        let operation_id = "b".repeat(128);
+        let mut view =
+            operation_log_view(vec![operation_item(&["@  current"], Some(&operation_id))]);
+
+        let effect = view.execute(
+            ViewCommand::OpenActionMenu,
+            CommandContext {
+                viewport_height: 10,
+                search: None,
+            },
+        );
+
+        let ViewEffect::OpenActionMenu(menu) = effect else {
+            panic!("expected operation action menu");
+        };
+        assert_eq!(menu.items().len(), 2);
+        assert_eq!(menu.items()[0].action(), ActionKind::Restore);
+        assert_eq!(
+            menu.items()[0].label(),
+            "restore repository to operation bbbbbbbb"
+        );
+        assert!(matches!(
+            menu.items()[0].follow_up(),
+            FollowUp::OperationRestoreExactTarget { operation_id: id } if id == &operation_id
+        ));
+        assert_eq!(menu.items()[1].action(), ActionKind::Revert);
+        assert_eq!(menu.items()[1].label(), "revert operation bbbbbbbb");
+        assert!(matches!(
+            menu.items()[1].follow_up(),
+            FollowUp::OperationRevertExactTarget { operation_id: id } if id == &operation_id
+        ));
     }
 
     #[test]

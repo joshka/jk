@@ -26,8 +26,6 @@ Planned follow-ups:
 
 - `split`
 - `duplicate`
-- `operation restore`
-- `operation revert`
 
 Deferred:
 

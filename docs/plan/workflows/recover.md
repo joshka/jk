@@ -11,13 +11,14 @@ Shipped today:
 - `operation log`
 - `operation show`
 - `operation diff`
+- `operation restore`
+- `operation revert`
 - `undo`
 - `redo`
 
 Planned follow-ups:
 
-- `operation restore`
-- `operation revert`
+- none currently scheduled in this workflow spec
 
 Passthrough / CLI-first:
 
