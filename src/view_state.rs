@@ -10,7 +10,7 @@ use ratatui::layout::Rect;
 use crate::command::{Binding, CommandContext, ViewCommand, ViewEffect};
 use crate::diff::DiffView;
 use crate::graph::GraphView;
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{JjCommand, LogViewMode, ViewSpec};
 use crate::search::SearchQuery;
 use crate::show::ShowView;
 use crate::tui::StatusHints;
@@ -111,6 +111,20 @@ impl ViewState {
         match self {
             Self::Graph(view) => Some(view.item_count()),
             Self::Show(_) | Self::Diff(_) => None,
+        }
+    }
+
+    pub fn graph_mode_label(&self) -> Option<&str> {
+        match self {
+            Self::Graph(view) => Some(view.mode_label()),
+            Self::Show(_) | Self::Diff(_) => None,
+        }
+    }
+
+    pub fn set_graph_mode(&mut self, mode: LogViewMode) -> Result<()> {
+        match self {
+            Self::Graph(view) => view.set_mode(mode),
+            Self::Show(_) | Self::Diff(_) => Ok(()),
         }
     }
 

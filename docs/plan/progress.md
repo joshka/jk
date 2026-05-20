@@ -20,3 +20,13 @@
 - Remaining risk: refresh preservation is keyed only by change id, so rows without a parsed change
   id still fall back to index clamping by design
 - Next slice: Slice 2: View Mode Infrastructure
+
+## Slice 2: View Mode Infrastructure
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/diff.rs`, `src/graph.rs`, `src/jj.rs`,
+  `src/show.rs`, `src/tui.rs`, `src/view_state.rs`, `docs/plan/progress.md`
+- Verification: full `cargo test` before and after `rustup run nightly cargo fmt`, then
+  `just md-check`
+- Remaining risk: custom revset entry now exists through a lightweight graph-only prompt (`W`), but
+  it does not yet offer history, editing helpers, or generated help text
+- Next slice: Slice 3: Generated Help and Keymap

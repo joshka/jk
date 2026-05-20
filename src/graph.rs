@@ -12,11 +12,12 @@ use ratatui::widgets::{List, ListItem, ListState};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{JjCommand, LogItem, ViewSpec, load_entries};
+use crate::jj::{JjCommand, LogItem, LogViewMode, ViewSpec, load_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 
 pub const BINDINGS: &[Binding] = &[
+    Binding::new(KeyPattern::char('w'), Command::View(ViewCommand::CycleMode)),
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Down),
@@ -56,6 +57,8 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Selectable graph output from `jj` or `jj log`.
 pub struct GraphView {
+    home_command: JjCommand,
+    mode: LogViewMode,
     spec: ViewSpec,
     entries: Vec<LogItem>,
     selection: Selection,
@@ -63,7 +66,12 @@ pub struct GraphView {
 
 impl GraphView {
     pub fn load(spec: ViewSpec) -> Result<Self> {
+        let home_command = spec.command();
+        let mode = LogViewMode::from_spec(&spec);
+
         Ok(Self {
+            home_command,
+            mode,
             entries: load_entries(&spec)?,
             spec,
             selection: Selection::default(),
@@ -81,6 +89,10 @@ impl GraphView {
 
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
+            ViewCommand::CycleMode => match self.cycle_mode() {
+                Ok(mode) => ViewEffect::StatusMessage(format!("mode: {}", mode.label())),
+                Err(error) => ViewEffect::StatusError(error.to_string()),
+            },
             ViewCommand::MoveDown => {
                 self.select_next();
                 ViewEffect::Handled
@@ -159,6 +171,10 @@ impl GraphView {
         &self.spec
     }
 
+    pub fn mode_label(&self) -> &str {
+        self.mode.label()
+    }
+
     pub fn item_count(&self) -> usize {
         self.entries.len()
     }
@@ -228,6 +244,51 @@ impl GraphView {
 
     pub fn select_last(&mut self) {
         self.selection.last(self.entries.len());
+    }
+
+    pub fn set_mode(&mut self, mode: LogViewMode) -> Result<()> {
+        self.switch_mode_with_loader(mode, load_entries)
+    }
+
+    fn cycle_mode(&mut self) -> Result<LogViewMode> {
+        let next_mode = self.mode.next();
+        self.set_mode(next_mode.clone())?;
+        Ok(next_mode)
+    }
+
+    fn switch_mode_with_loader(
+        &mut self,
+        mode: LogViewMode,
+        load: impl Fn(&ViewSpec) -> Result<Vec<LogItem>>,
+    ) -> Result<()> {
+        let previous_spec = self.spec.clone();
+        let previous_mode = self.mode.clone();
+        let previous_index = self.selection.index();
+        let previous_change_id = self
+            .entries
+            .get(previous_index)
+            .and_then(LogItem::action_id)
+            .map(str::to_owned);
+        let spec = ViewSpec::for_log_mode(self.home_command, &mode);
+        let entries = match load(&spec) {
+            Ok(entries) => entries,
+            Err(error) => {
+                self.spec = previous_spec;
+                self.mode = previous_mode;
+                return Err(error);
+            }
+        };
+
+        self.spec = spec;
+        self.mode = mode;
+        self.entries = entries;
+        restore_selection(
+            &mut self.selection,
+            &self.entries,
+            previous_index,
+            previous_change_id,
+        );
+        Ok(())
     }
 }
 
@@ -304,6 +365,8 @@ mod tests {
 
     fn graph_view(entries: Vec<LogItem>) -> GraphView {
         GraphView {
+            home_command: JjCommand::Default,
+            mode: LogViewMode::Default,
             spec: ViewSpec::new(JjCommand::Log, Vec::new()),
             entries,
             selection: Selection::default(),
@@ -354,5 +417,45 @@ mod tests {
         restore_selection(&mut selection, &entries, 3, Some("missing".to_owned()));
 
         assert_eq!(selection.index(), 0);
+    }
+
+    #[test]
+    fn switch_mode_preserves_selection_by_change_id() {
+        let mut view = graph_view(vec![
+            log_item("first", Some("first"), None),
+            log_item("second", Some("second"), None),
+        ]);
+        view.selection.set(1, view.entries.len());
+
+        view.switch_mode_with_loader(LogViewMode::Trunk, |_| {
+            Ok(vec![
+                log_item("second", Some("second"), None),
+                log_item("third", Some("third"), None),
+            ])
+        })
+        .unwrap();
+
+        assert_eq!(view.selection.index(), 0);
+        assert_eq!(view.current_revset(), Some("second"));
+        assert_eq!(view.mode_label(), "trunk work");
+    }
+
+    #[test]
+    fn switch_mode_error_keeps_prior_view_state() {
+        let mut view = graph_view(vec![log_item("first", Some("first"), None)]);
+        let previous_spec = view.spec().clone();
+        let previous_mode = view.mode.clone();
+
+        let error = view
+            .switch_mode_with_loader(
+                LogViewMode::CustomRevset("not-a-revset(".to_owned()),
+                |_| Err(color_eyre::eyre::eyre!("invalid revset")),
+            )
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "invalid revset");
+        assert_eq!(view.spec(), &previous_spec);
+        assert_eq!(view.mode, previous_mode);
+        assert_eq!(view.current_revset(), Some("first"));
     }
 }

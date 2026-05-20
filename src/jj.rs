@@ -20,6 +20,69 @@ pub enum JjCommand {
     Diff,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LogViewMode {
+    Default,
+    Trunk,
+    Recent,
+    All,
+    CustomRevset(String),
+}
+
+impl LogViewMode {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Default => "default work",
+            Self::Trunk => "trunk work",
+            Self::Recent => "recent work",
+            Self::All => "repo overview",
+            Self::CustomRevset(_) => "custom revset",
+        }
+    }
+
+    pub fn next(&self) -> Self {
+        match self {
+            Self::Default => Self::Trunk,
+            Self::Trunk => Self::Recent,
+            Self::Recent => Self::All,
+            Self::All | Self::CustomRevset(_) => Self::Default,
+        }
+    }
+
+    pub fn from_spec(spec: &ViewSpec) -> Self {
+        if spec.command == JjCommand::Default {
+            return Self::Default;
+        }
+
+        revset_from_log_args(&spec.args)
+            .map(Self::from_revset)
+            .unwrap_or(Self::Default)
+    }
+
+    fn from_revset(revset: &str) -> Self {
+        match revset {
+            TRUNK_WORK_REVSET => Self::Trunk,
+            RECENT_WORK_REVSET => Self::Recent,
+            ALL_REPO_REVSET => Self::All,
+            _ => Self::CustomRevset(revset.to_owned()),
+        }
+    }
+
+    fn args(&self) -> Vec<String> {
+        match self {
+            Self::Default => Vec::new(),
+            Self::Trunk => vec!["-r".to_owned(), TRUNK_WORK_REVSET.to_owned()],
+            Self::Recent => vec!["-r".to_owned(), RECENT_WORK_REVSET.to_owned()],
+            Self::All => vec!["-r".to_owned(), ALL_REPO_REVSET.to_owned()],
+            Self::CustomRevset(revset) => vec!["-r".to_owned(), revset.clone()],
+        }
+    }
+}
+
+const TRUNK_WORK_REVSET: &str = "trunk().. | trunk()";
+const RECENT_WORK_REVSET: &str = "latest(mutable(), 20) | @ | trunk()";
+const ALL_REPO_REVSET: &str = "all()";
+
 impl JjCommand {
     pub fn label(self) -> &'static str {
         match self {
@@ -110,6 +173,13 @@ impl ViewSpec {
             args: diff_format_args(diff_format, ["-r".to_owned(), revset.clone()]),
             target: Some(revset),
             diff_format,
+        }
+    }
+
+    pub fn for_log_mode(home_command: JjCommand, mode: &LogViewMode) -> Self {
+        match mode {
+            LogViewMode::Default => Self::new(home_command, Vec::new()),
+            _ => Self::new(JjCommand::Log, mode.args()),
         }
     }
 
@@ -223,6 +293,10 @@ fn diff_format_args(
         .map(str::to_owned)
         .chain(args)
         .collect()
+}
+
+fn revset_from_log_args(args: &[String]) -> Option<&str> {
+    option_value(args, &["-r", "--revisions"], &["--revisions="])
 }
 
 fn short_id(id: &str) -> &str {
@@ -809,5 +883,41 @@ mod tests {
 
         assert_eq!(spec.diff_format(), DiffFormat::Default);
         assert_eq!(spec.args(), ["--tool=:git"]);
+    }
+
+    #[test]
+    fn log_view_mode_uses_plain_default_command() {
+        let spec = ViewSpec::for_log_mode(JjCommand::Default, &LogViewMode::Default);
+
+        assert_eq!(spec.command(), JjCommand::Default);
+        assert!(spec.args().is_empty());
+    }
+
+    #[test]
+    fn log_view_mode_uses_explicit_revset_for_named_modes() {
+        let spec = ViewSpec::for_log_mode(JjCommand::Default, &LogViewMode::Trunk);
+
+        assert_eq!(spec.command(), JjCommand::Log);
+        assert_eq!(spec.args(), ["-r", TRUNK_WORK_REVSET]);
+    }
+
+    #[test]
+    fn log_view_mode_parses_custom_revset_from_log_spec() {
+        let spec = ViewSpec::new(JjCommand::Log, vec!["-r".to_owned(), "::".to_owned()]);
+
+        assert_eq!(
+            LogViewMode::from_spec(&spec),
+            LogViewMode::CustomRevset("::".to_owned())
+        );
+    }
+
+    #[test]
+    fn log_view_mode_recognizes_named_recent_revset() {
+        let spec = ViewSpec::new(
+            JjCommand::Log,
+            vec!["-r".to_owned(), RECENT_WORK_REVSET.to_owned()],
+        );
+
+        assert_eq!(LogViewMode::from_spec(&spec), LogViewMode::Recent);
     }
 }

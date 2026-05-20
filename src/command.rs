@@ -14,6 +14,7 @@ pub enum Command {
     Quit,
     Help,
     SearchPrompt,
+    PromptLogRevset,
     Copy,
     ViewFormat,
     Refresh,
@@ -25,6 +26,7 @@ pub enum Command {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewCommand {
+    CycleMode,
     MoveDown,
     MoveUp,
     PageDown,
@@ -104,6 +106,8 @@ impl CommandContext<'_> {
 pub enum ViewEffect {
     Ignored,
     Handled,
+    StatusMessage(String),
+    StatusError(String),
     OpenDetail(JjCommand, String),
     SearchMoved,
     SearchStarted { matches: usize },

@@ -96,6 +96,10 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " show  ",
             key("d"),
             " diff  ",
+            key("w"),
+            " mode  ",
+            key("W"),
+            " revset  ",
             key("L"),
             " log  ",
             key("J"),
@@ -161,8 +165,8 @@ fn help_overlay(hints: StatusHints) -> Paragraph<'static> {
         StatusHints::Graph => text![
             "q/Esc quit    r refresh    ? close help",
             "j/k move      g/G ends     h back",
-            "l/s show      d diff       L log",
-            "J jj          v view"
+            "l/s show      d diff       w mode",
+            "W revset      J jj         v view"
         ],
         StatusHints::ShowDocument => text![
             "q/Esc quit    r refresh    ? close help",

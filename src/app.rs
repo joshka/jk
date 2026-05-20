@@ -18,7 +18,7 @@ use crate::command::{
     Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect, find_binding,
 };
 use crate::copy::CopyOption;
-use crate::jj::{DiffFormat, JjCommand, ViewSpec};
+use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
 use crate::view_state::ViewState;
@@ -44,6 +44,7 @@ enum InteractionMode {
     Normal,
     Help,
     SearchPrompt(String),
+    LogRevsetPrompt(String),
     CopyMenu {
         options: Vec<CopyOption>,
         selected: usize,
@@ -58,6 +59,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::code(KeyCode::Esc), Command::Quit),
     Binding::new(KeyPattern::char('?'), Command::Help),
     Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
+    Binding::new(KeyPattern::char('W'), Command::PromptLogRevset),
     Binding::new(KeyPattern::char('y'), Command::Copy),
     Binding::new(KeyPattern::char('v'), Command::ViewFormat),
     Binding::new(KeyPattern::char('r'), Command::Refresh),
@@ -152,6 +154,10 @@ impl App {
                 self.mode = InteractionMode::SearchPrompt(String::new());
                 Ok(true)
             }
+            Command::PromptLogRevset => {
+                self.open_log_revset_prompt();
+                Ok(true)
+            }
             Command::Copy => {
                 self.open_copy_menu(viewport_height);
                 Ok(true)
@@ -231,6 +237,22 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::LogRevsetPrompt(input) => {
+                match code {
+                    KeyCode::Esc => self.mode = InteractionMode::Normal,
+                    KeyCode::Enter => {
+                        let revset = std::mem::take(input);
+                        self.mode = InteractionMode::Normal;
+                        self.apply_custom_log_revset(revset);
+                    }
+                    KeyCode::Backspace => {
+                        input.pop();
+                    }
+                    KeyCode::Char(character) => input.push(character),
+                    _ => {}
+                }
+                Ok(true)
+            }
             InteractionMode::CopyMenu { options, selected } => {
                 match code {
                     KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
@@ -298,6 +320,12 @@ impl App {
         }
     }
 
+    fn open_log_revset_prompt(&mut self) {
+        if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
+            self.mode = InteractionMode::LogRevsetPrompt(String::new());
+        }
+    }
+
     fn execute_view(&mut self, command: ViewCommand, viewport_height: u16) -> ViewEffect {
         self.view.execute(
             command,
@@ -311,6 +339,14 @@ impl App {
     fn apply_view_effect(&mut self, effect: ViewEffect) -> Result<bool> {
         match effect {
             ViewEffect::Ignored | ViewEffect::Handled => Ok(true),
+            ViewEffect::StatusMessage(message) => {
+                self.status = StatusLine::with_message(&self.view, message);
+                Ok(false)
+            }
+            ViewEffect::StatusError(message) => {
+                self.status = StatusLine::error(&self.view, message);
+                Ok(false)
+            }
             ViewEffect::OpenDetail(command, revset) => {
                 self.push_detail(command, revset)?;
                 Ok(true)
@@ -348,6 +384,18 @@ impl App {
         self.mode = InteractionMode::ViewMenu { selected };
     }
 
+    fn apply_custom_log_revset(&mut self, revset: String) {
+        if revset.trim().is_empty() {
+            self.status = StatusLine::ready(&self.view);
+            return;
+        }
+
+        match self.view.set_graph_mode(LogViewMode::CustomRevset(revset)) {
+            Ok(()) => self.status = StatusLine::with_message(&self.view, "mode: custom revset"),
+            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+        }
+    }
+
     fn apply_diff_format(&mut self, diff_format: DiffFormat, viewport_height: u16) -> Result<()> {
         self.diff_format = diff_format;
         if !matches!(self.view.command(), JjCommand::Show | JjCommand::Diff) {
@@ -369,6 +417,9 @@ impl App {
             InteractionMode::SearchPrompt(input) => {
                 StatusLine::with_message(&self.view, format!("/{input}"))
             }
+            InteractionMode::LogRevsetPrompt(input) => {
+                StatusLine::with_message(&self.view, format!("revset: {input}"))
+            }
             _ => self.status.clone(),
         }
     }
@@ -384,7 +435,9 @@ impl App {
                 options: view_formats(),
                 selected: *selected,
             },
-            InteractionMode::Normal | InteractionMode::SearchPrompt(_) => Overlay::None,
+            InteractionMode::Normal
+            | InteractionMode::SearchPrompt(_)
+            | InteractionMode::LogRevsetPrompt(_) => Overlay::None,
         }
     }
 
@@ -487,7 +540,7 @@ pub struct StatusLine {
 impl StatusLine {
     fn ready(view: &ViewState) -> Self {
         let message = if let Some(item_count) = view.graph_item_count() {
-            format!("{item_count} items")
+            graph_status_message(item_count, view.graph_mode_label())
         } else {
             format!(
                 "{}/{} lines",
@@ -540,6 +593,14 @@ impl StatusLine {
     }
 }
 
+fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
+    let base = format!("{item_count} items");
+    match mode_label {
+        Some(mode_label) => format!("{base} | {mode_label}"),
+        None => base,
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum StatusKind {
     Ready,
@@ -586,5 +647,14 @@ mod tests {
     #[test]
     fn rejects_unknown_startup_command() {
         assert!(initial_view(vec!["status".into()]).is_err());
+    }
+
+    #[test]
+    fn graph_status_message_includes_mode_label() {
+        assert_eq!(
+            graph_status_message(4, Some("trunk work")),
+            "4 items | trunk work"
+        );
+        assert_eq!(graph_status_message(4, None), "4 items");
     }
 }
