@@ -10,7 +10,7 @@ mechanism.
 - compact dedicated screens or overlays
 - low chrome
 - scrollable if needed
-- not a global command dashboard
+- not a free-form command palette
 
 ## Priority
 
@@ -36,17 +36,18 @@ The keymap surface should explain:
 
 ## Primary Interactions
 
-- scroll or page
-- search, if useful
-- open from anywhere and dismiss cleanly
+- open from anywhere
+- press a listed command key to execute it and close the menu
+- dismiss cleanly without executing a command
 
 ## Interaction Details
 
-- Context: help opened from a view should show global keys plus that view's local keys first.
+- Context: help opened from a view should show only commands available for that view.
 - Currentness: keymap content should be generated from binding metadata where possible, not copied
   into static prose that can drift.
 - Scope: help should explain the active screen, navigation loop, search, copy, refresh, and
   available guided flows. It should not become a replacement for `jj help`.
+- Grouping: command rows should be grouped by user operation rather than raw key order.
 - Consistency: help should make shared key meanings obvious across screens, especially movement,
   search, refresh, copy, open, back, and mutation prefixes or confirmations.
 - Dismissal: closing help returns to the exact prior view state without changing selection or
@@ -58,7 +59,7 @@ The keymap surface should explain:
 
 - `?`: open help/keymap
 - `/`: search within help if help becomes long
-- `j`/`k`, arrows: scroll
+- listed command keys: execute that command and close the menu
 - `a` (log): open the log action menu
 - `Esc`, `q`, `?`: dismiss
 

@@ -514,16 +514,26 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
 }
 
 fn help_overlay(content: Text<'static>) -> Paragraph<'static> {
-    Paragraph::new(content).block(Block::bordered().title("Help"))
+    Paragraph::new(content).block(Block::bordered().title("Command menu"))
 }
 
 fn help_overlay_text(sections: &[HelpSection]) -> Text<'static> {
-    let mut lines = Vec::new();
+    let mut lines = vec![
+        Line::styled(
+            "Menu".to_owned(),
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+        ),
+        line![
+            span!(Modifier::BOLD; "Esc, q, ?"),
+            "  ",
+            span!("close menu"),
+        ],
+    ];
 
-    for (index, section) in sections.iter().enumerate() {
-        if index > 0 {
-            lines.push(Line::default());
-        }
+    for section in sections {
+        lines.push(Line::default());
         lines.push(Line::styled(
             section.title().to_owned(),
             Style::default()
@@ -851,14 +861,14 @@ mod tests {
     fn help_overlay_text_renders_generated_sections() {
         let text = help_overlay_text(&[
             HelpSection::new(
-                HelpSectionKind::Global,
-                vec![HelpRow::new("q, Esc", "quit"), HelpRow::new("?", "help")],
+                HelpSectionKind::Views,
+                vec![HelpRow::new("S", "status"), HelpRow::new("v", "view menu")],
             ),
             HelpSection::new(
-                HelpSectionKind::Direct,
+                HelpSectionKind::Actions,
                 vec![
-                    HelpRow::new("w", "cycle view mode"),
-                    HelpRow::new("-", "none yet"),
+                    HelpRow::new("D", "describe selected revision"),
+                    HelpRow::new("p", "push selected revision"),
                 ],
             ),
         ]);
@@ -876,13 +886,16 @@ mod tests {
             .join("\n");
 
         insta::assert_snapshot!(rendered, @r"
-        Global
-        q, Esc  quit
-        ?  help
+        Menu
+        Esc, q, ?  close menu
 
-        Direct Actions
-        w  cycle view mode
-        -  none yet
+        View Switching
+        S  status
+        v  view menu
+
+        Action Previews
+        D  describe selected revision
+        p  push selected revision
         ");
     }
 

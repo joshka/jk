@@ -2107,3 +2107,100 @@ belong here.
   `just md-check`; `cargo clippy -- -D warnings` remains blocked by six known issues (three
   dead-code warnings and three `collapsible_if` findings).
 - Next slice: `Interruption Packet C: Help Leader Menu`.
+
+## 2026-05-20 Interruption Packet C Help Leader Menu
+
+- Thread id: `019e45ec-cf64-7103-939a-0c2ea69e2c4a`.
+- Slice / task: turn the generated help overlay into a keyboard-driven leader-style command menu on
+  top of accepted Packet B.
+- Starting state: `jj --no-pager status` reported an empty working copy at
+  `zqoytxpu 6e7634dd (empty) Implement help leader menu`, with parent
+  `nutzpkvo db3810b9 Implement view entry contracts`.
+- Explorer evidence used: Packet B already had generated help rows filtered by `HelpContext` in
+  `src/command.rs`, modal projection in `src/app_screen.rs`, and a reusable `execute_binding` path
+  in `src/app.rs`. Packet C reused those owners instead of adding a separate command palette.
+- Observable outcome: `src/command.rs` now exposes a help-aware binding matcher that uses the same
+  metadata as generated help. The metadata groups rows by navigation, view switching, search/copy,
+  repository actions, action previews, recovery, and app commands.
+- Observable outcome: `src/app.rs` now routes Help-mode key events through full `KeyEvent` values,
+  closes on `Esc`, `q`, or `?`, executes visible command bindings through existing dispatch, and
+  reuses Packet B prefix matching for multi-key options such as graph `gf`.
+- Observable outcome: `src/tui.rs` renders the help overlay as a command menu with an explicit close
+  row separate from generated command metadata.
+- Documentation outcome: `README.md`, `docs/plan/screens/help-keymap.md`, and
+  `docs/tutorials/daily-loop.md` now describe the generated command menu rather than a passive help
+  overlay.
+- Rework / stuck points: the first focused test command tried to pass multiple Cargo test filters in
+  one invocation and Cargo rejected it with `unexpected argument`; the same coverage was rerun as
+  valid focused `command::tests`, `help_menu`, and TUI single-test filters.
+- Code quality note: preserving `q` as a modal close key means quit is intentionally not advertised
+  as a help-menu command. That keeps existing modal behavior and satisfies the close-option
+  contract, but users still quit from normal mode through the status-line `q` hint.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test command::tests`
+  - `cargo test help_menu`
+  - `cargo test tui::tests::help_overlay_text_renders_generated_sections`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-fmt`
+  - `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+- Validation note: `cargo check` still reports the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy with
+  `-D warnings` remains blocked by those warnings plus existing `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Model routing note: 5.5 high was justified for this slice because the important work was keeping
+  generated metadata, hidden-command availability, multi-key prefix behavior, modal close behavior,
+  and existing app dispatch aligned without turning `app.rs` into a second command owner.
+
+## 2026-05-20 Packet C Review Repair
+
+- Thread id: `019e45ec-cf64-7103-939a-0c2ea69e2c4a`.
+- Scope: repair only the Packet C P1 findings about Help-mode pending-prefix fallback routing.
+- Review finding evidence: `handle_pending_help_key` used `flush_expired_pending_command()` and then
+  unconditionally called `handle_normal_key_at()`, so an expired Help fallback that opened a prompt
+  did not pass the suffix into that prompt. The nonmatching-suffix path also reported
+  `unknown help command prefix` and stayed in Help instead of executing the fallback and routing the
+  suffix.
+- Repair outcome: Help pending-prefix fallback now executes through `execute_help_binding`, which
+  closes Help before running the existing binding dispatch. Both expired and nonmatching suffix
+  paths then use the existing mode-aware `handle_key_after_prefix_fallback` helper.
+- Regression coverage: `expired_help_prefix_runs_fallback_before_routing_next_key_to_opened_mode`
+  proves `?`, `b`, expired deadline, `x` opens the bookmark prompt with input `x`.
+  `help_prefix_nonmatching_suffix_runs_fallback_then_routes_suffix` proves `?`, `g`, `j` runs graph
+  `g` fallback and routes `j` afterward. Existing
+  `help_menu_supports_multikey_options_and_fallbacks` keeps exact `gf` coverage.
+- Focused validation run during repair:
+  - `cargo test help_prefix -- --test-threads=1`
+  - `cargo test help_menu -- --test-threads=1`
+  - `cargo test prefix -- --test-threads=1`
+  - `cargo test command::tests -- --test-threads=1`
+  - `rustup run nightly cargo fmt`
+- Full repair validation:
+  - `cargo check`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-fmt`
+  - `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+- Validation note: `cargo check` still reports the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Full `cargo test` passed
+  with 364 tests. Clippy with `-D warnings` remains blocked by those warnings plus existing
+  `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Final 5.5 acceptance: `gpt-5.5` accepted Packet C as-is after repair with no blocking findings.
+  Final checks confirmed that expired Help-prefixes execute pending fallback first and route
+  suffixes via `handle_key_after_prefix_fallback`, nonmatching suffixes follow the same
+  visible-fallback path, helper dispatch remains mode-aware (normal vs active modal), and idle
+  Help-prefix expiry shares that same fallback path.
+- Validation:
+  - `cargo check` passed with existing dead-code warnings.
+  - `cargo test help_prefix -- --test-threads=1` passed.
+  - full `cargo test` passed with 364 tests.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt warnings.
+  - `just md-check` passed.
+  - `cargo clippy -- -D warnings` remains blocked by six known issues (three dead-code, three
+    `collapsible_if`).
+- Non-blocking follow-up: add direct idle Help-prefix timeout coverage with no suffix.
+- Next slice: `Interruption Packet D: Action Menu, Popovers, And Selection Presentation`.

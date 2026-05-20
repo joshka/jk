@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::DefaultTerminal;
 
 use crate::action_menu::{ActionKind, FollowUp, RolePrompt, build_action_menu};
@@ -22,7 +22,7 @@ use crate::app_status::{StatusKind, StatusLine};
 use crate::clipboard;
 use crate::command::{
     Binding, BindingMatch, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect,
-    match_binding_sequence,
+    match_binding_sequence, match_help_binding_sequence,
 };
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
@@ -666,7 +666,7 @@ impl App {
             return Ok(());
         }
 
-        if self.handle_mode_key(key.code, viewport_height)? {
+        if self.handle_mode_key_event(key, viewport_height)? {
             return Ok(());
         }
 
@@ -780,15 +780,7 @@ impl App {
             return Ok(());
         }
 
-        let fallback = self
-            .pending_command
-            .take()
-            .and_then(|pending| pending.fallback);
-        if let Some(binding) = fallback {
-            self.run_binding_with_status_refresh(binding, viewport_height)?;
-        } else {
-            self.status = StatusLine::ready(&self.view);
-        }
+        self.run_pending_fallback(viewport_height)?;
         Ok(())
     }
 
@@ -797,7 +789,13 @@ impl App {
             .pending_command
             .take()
             .and_then(|pending| pending.fallback);
-        if let Some(binding) = fallback {
+        if matches!(self.mode, InteractionMode::Help) {
+            if let Some(binding) = fallback {
+                self.execute_help_binding(binding, viewport_height)?;
+            } else {
+                self.status = StatusLine::with_message(&self.view, "unknown help command prefix");
+            }
+        } else if let Some(binding) = fallback {
             self.run_binding_with_status_refresh(binding, viewport_height)?;
         } else {
             self.status = StatusLine::ready(&self.view);
@@ -826,7 +824,7 @@ impl App {
         if matches!(self.mode, InteractionMode::Normal) {
             self.handle_normal_key_at(key, viewport_height, now)
         } else {
-            self.handle_mode_key(key.code, viewport_height)
+            self.handle_mode_key_event(key, viewport_height)
         }
     }
 
@@ -966,18 +964,23 @@ impl App {
         }
     }
 
+    #[cfg(test)]
     fn handle_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
+        self.handle_mode_key_event(
+            KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
+            viewport_height,
+        )
+    }
+
+    fn handle_mode_key_event(&mut self, key: KeyEvent, viewport_height: u16) -> Result<bool> {
+        if matches!(self.mode, InteractionMode::Help) {
+            return self.handle_help_key(key, viewport_height);
+        }
+
+        let code = key.code;
         match &mut self.mode {
             InteractionMode::Normal => Ok(false),
-            InteractionMode::Help => {
-                match code {
-                    KeyCode::Char('?') | KeyCode::Char('q') | KeyCode::Esc => {
-                        self.mode = InteractionMode::Normal;
-                    }
-                    _ => {}
-                }
-                Ok(true)
-            }
+            InteractionMode::Help => unreachable!("help mode is handled before borrowing mode"),
             InteractionMode::SearchPrompt(input) => {
                 match code {
                     KeyCode::Esc => self.mode = InteractionMode::Normal,
@@ -1852,6 +1855,108 @@ impl App {
                 Ok(true)
             }
         }
+    }
+
+    fn handle_help_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        viewport_height: u16,
+    ) -> Result<bool> {
+        if is_help_close_key(key) {
+            self.pending_command = None;
+            self.mode = InteractionMode::Normal;
+            return Ok(true);
+        }
+
+        if self.pending_command.is_some() {
+            return self.handle_pending_help_key(key, viewport_height, Instant::now());
+        }
+
+        let keys = [key];
+        let context = self.view.help_context();
+        let Some(binding_match) =
+            match_help_binding_sequence(&[APP_BINDINGS, self.view.bindings()], &keys, context)
+        else {
+            self.status = StatusLine::with_message(&self.view, "not available from help menu");
+            return Ok(true);
+        };
+
+        match binding_match {
+            BindingMatch::Exact(binding) => {
+                self.execute_help_binding(binding, viewport_height)?;
+                Ok(true)
+            }
+            BindingMatch::Prefix { fallback } => {
+                self.pending_command = Some(PendingCommand {
+                    keys: keys.to_vec(),
+                    fallback,
+                    deadline: Instant::now() + COMMAND_PREFIX_TIMEOUT,
+                });
+                self.status = StatusLine::with_message(
+                    &self.view,
+                    format!("help: {}", binding_key_label(&keys)),
+                );
+                Ok(true)
+            }
+        }
+    }
+
+    fn handle_pending_help_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        viewport_height: u16,
+        now: Instant,
+    ) -> Result<bool> {
+        if self
+            .pending_command
+            .as_ref()
+            .is_some_and(|pending| now >= pending.deadline)
+        {
+            self.run_pending_fallback(viewport_height)?;
+            return self.handle_key_after_prefix_fallback(key, viewport_height, now);
+        }
+
+        let Some(mut pending) = self.pending_command.take() else {
+            return Ok(true);
+        };
+        pending.keys.push(key);
+
+        match match_help_binding_sequence(
+            &[APP_BINDINGS, self.view.bindings()],
+            &pending.keys,
+            self.view.help_context(),
+        ) {
+            Some(BindingMatch::Exact(binding)) => {
+                self.execute_help_binding(binding, viewport_height)?;
+            }
+            Some(BindingMatch::Prefix { fallback }) => {
+                self.status = StatusLine::with_message(
+                    &self.view,
+                    format!("help: {}", binding_key_label(&pending.keys)),
+                );
+                self.pending_command = Some(PendingCommand {
+                    keys: pending.keys,
+                    fallback,
+                    deadline: now + COMMAND_PREFIX_TIMEOUT,
+                });
+            }
+            None => {
+                if let Some(fallback) = pending.fallback {
+                    self.execute_help_binding(fallback, viewport_height)?;
+                    return self.handle_key_after_prefix_fallback(key, viewport_height, now);
+                }
+
+                self.status = StatusLine::with_message(&self.view, "unknown help command prefix");
+            }
+        }
+
+        Ok(true)
+    }
+
+    fn execute_help_binding(&mut self, binding: Binding, viewport_height: u16) -> Result<()> {
+        self.pending_command = None;
+        self.mode = InteractionMode::Normal;
+        self.run_binding_with_status_refresh(binding, viewport_height)
     }
 
     fn open_copy_menu(&mut self, viewport_height: u16) {
@@ -3692,6 +3797,14 @@ fn binding_key_label(keys: &[crossterm::event::KeyEvent]) -> String {
         .join("")
 }
 
+fn is_help_close_key(key: KeyEvent) -> bool {
+    key.modifiers.is_empty()
+        && matches!(
+            key.code,
+            KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
+        )
+}
+
 fn push_status_context(target: &JjGitPushTarget, remote: &str) -> String {
     match target {
         JjGitPushTarget::Bookmark(name) => {
@@ -3741,6 +3854,7 @@ fn bookmark_status_context(mutation: &JjBookmarkMutationPlan, view_label: &str) 
 mod tests {
     use super::*;
     use crate::action_menu::RolePromptOption;
+    use crate::tui::Overlay;
     use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -4088,6 +4202,14 @@ mod tests {
         Ok(true)
     }
 
+    fn graph_item(change_id: &str) -> crate::jj::LogItem {
+        crate::jj::LogItem::new(
+            vec![ratatui::text::Line::from(change_id.to_owned())],
+            Some(change_id.to_owned()),
+            None,
+        )
+    }
+
     fn test_app(view: ViewState) -> App {
         App {
             status: StatusLine::ready(&view),
@@ -4310,6 +4432,136 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(status_rows.contains(&("f", "fetch")));
         assert!(!status_rows.contains(&("f, gf", "fetch")));
+    }
+
+    #[test]
+    fn help_menu_executes_listed_command_and_closes() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert!(matches!(app.mode, InteractionMode::Help));
+
+        app.handle_mode_key(KeyCode::Char('S'), 12).unwrap();
+
+        assert_eq!(app.view.command(), JjCommand::Status);
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert!(app.pending_command.is_none());
+    }
+
+    #[test]
+    fn help_menu_close_key_closes_without_executing() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+        assert_eq!(app.view.command(), JjCommand::Default);
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert!(app.pending_command.is_none());
+    }
+
+    #[test]
+    fn help_menu_does_not_execute_hidden_commands() {
+        let show = crate::show::ShowView::test_new(ViewSpec::show(
+            "change-a".to_owned(),
+            DiffFormat::Default,
+        ));
+        let mut app = test_app(ViewState::Show(show));
+
+        app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Char('D'), 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Help));
+        assert_eq!(app.view.command(), JjCommand::Show);
+        assert_eq!(app.status.message(), "not available from help menu");
+    }
+
+    #[test]
+    fn help_menu_supports_multikey_options_and_fallbacks() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.git_fetch_run = mock_fetch_success;
+
+        app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Char('g'), 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Help));
+        assert!(app.pending_command.is_some());
+
+        app.handle_mode_key(KeyCode::Char('f'), 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert!(app.pending_command.is_none());
+        assert_eq!(app.status.message(), "fetch: fetched");
+    }
+
+    #[test]
+    fn expired_help_prefix_runs_fallback_before_routing_next_key_to_opened_mode() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            graph_item("change-a"),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Char('b'), 12).unwrap();
+        app.pending_command.as_mut().unwrap().deadline = Instant::now() - Duration::from_millis(1);
+
+        app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
+
+        assert!(app.pending_command.is_none());
+        let InteractionMode::BookmarkNamePrompt { input, .. } = &app.mode else {
+            panic!("expired bare b fallback should open bookmark prompt");
+        };
+        assert_eq!(input, "x");
+    }
+
+    #[test]
+    fn help_prefix_nonmatching_suffix_runs_fallback_then_routes_suffix() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            graph_item("first"),
+            graph_item("second"),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Char('g'), 12).unwrap();
+        app.handle_mode_key(KeyCode::Char('j'), 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert!(app.pending_command.is_none());
+        assert_eq!(app.graph_selected_revision().as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn help_menu_projection_groups_commands_by_user_operation() {
+        let view = ViewState::Graph(crate::graph::GraphView::test_new(vec![]));
+        let mode = InteractionMode::Help;
+
+        let Overlay::Help { sections } = mode.overlay(&view, APP_BINDINGS) else {
+            panic!("help mode should project a help overlay");
+        };
+
+        let titles = sections
+            .iter()
+            .map(crate::command::HelpSection::title)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            titles,
+            vec![
+                "Navigation",
+                "View Switching",
+                "Search / Copy",
+                "Repository Actions",
+                "Action Previews",
+                "App",
+            ]
+        );
     }
 
     #[test]

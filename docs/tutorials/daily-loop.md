@@ -44,5 +44,5 @@ previewed mutation paths, so check help/previews before confirming.
 ## When To Use Help
 
 - Press `?` whenever the screen changes or you forget the current bindings.
-- The generated help overlay is the quickest way to confirm the current key surface without reading
-  the source.
+- The generated command menu is the quickest way to confirm and run the current key surface without
+  reading the source.

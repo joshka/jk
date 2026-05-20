@@ -281,19 +281,25 @@ pub enum HelpContext {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HelpSectionKind {
-    Global,
-    View,
-    Direct,
-    Preview,
+    Navigation,
+    Views,
+    SearchCopy,
+    RepositoryActions,
+    Actions,
+    Recovery,
+    App,
 }
 
 impl HelpSectionKind {
     pub fn title(self) -> &'static str {
         match self {
-            Self::Global => "Global",
-            Self::View => "Current View",
-            Self::Direct => "Direct Actions",
-            Self::Preview => "Preview / Confirm",
+            Self::Navigation => "Navigation",
+            Self::Views => "View Switching",
+            Self::SearchCopy => "Search / Copy",
+            Self::RepositoryActions => "Repository Actions",
+            Self::Actions => "Action Previews",
+            Self::Recovery => "Recovery",
+            Self::App => "App",
         }
     }
 }
@@ -379,6 +385,24 @@ pub fn match_binding_sequence(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
 ) -> Option<BindingMatch> {
+    match_binding_sequence_by(binding_groups, keys, |_| true)
+}
+
+pub fn match_help_binding_sequence(
+    binding_groups: &[&[Binding]],
+    keys: &[KeyEvent],
+    context: HelpContext,
+) -> Option<BindingMatch> {
+    match_binding_sequence_by(binding_groups, keys, |binding| {
+        command_is_visible_in_help(binding.command(), context)
+    })
+}
+
+fn match_binding_sequence_by(
+    binding_groups: &[&[Binding]],
+    keys: &[KeyEvent],
+    is_available: impl Fn(Binding) -> bool,
+) -> Option<BindingMatch> {
     if keys.is_empty() {
         return None;
     }
@@ -388,6 +412,10 @@ pub fn match_binding_sequence(
 
     for bindings in binding_groups {
         for binding in *bindings {
+            if !is_available(*binding) {
+                continue;
+            }
+
             if !binding.key.matches_prefix(keys) {
                 continue;
             }
@@ -416,22 +444,22 @@ pub fn project_help(
     let view_rows = collect_help_rows(view_bindings, context);
 
     [
-        HelpSectionKind::Global,
-        HelpSectionKind::View,
-        HelpSectionKind::Direct,
-        HelpSectionKind::Preview,
+        HelpSectionKind::Navigation,
+        HelpSectionKind::Views,
+        HelpSectionKind::SearchCopy,
+        HelpSectionKind::RepositoryActions,
+        HelpSectionKind::Actions,
+        HelpSectionKind::Recovery,
+        HelpSectionKind::App,
     ]
     .into_iter()
     .filter_map(|kind| {
-        let mut rows = global_rows
+        let rows = global_rows
             .iter()
             .chain(&view_rows)
             .filter(|(row_kind, _)| *row_kind == kind)
             .map(|(_, row)| row.clone())
             .collect::<Vec<_>>();
-        if kind == HelpSectionKind::Preview && rows.is_empty() {
-            rows.push(HelpRow::new("-", "none yet"));
-        }
         (!rows.is_empty()).then(|| HelpSection::new(kind, rows))
     })
     .collect()
@@ -463,86 +491,89 @@ fn collect_help_rows(
     rows.into_iter().map(|(kind, _, row)| (kind, row)).collect()
 }
 
+fn command_is_visible_in_help(command: Command, context: HelpContext) -> bool {
+    help_metadata(command, context).is_some()
+}
+
 fn help_metadata(
     command: Command,
     context: HelpContext,
 ) -> Option<(HelpSectionKind, &'static str)> {
     match command {
-        Command::Quit => Some((HelpSectionKind::Global, "quit")),
-        Command::Help => Some((HelpSectionKind::Global, "help")),
-        Command::SearchPrompt => Some((HelpSectionKind::Global, "search")),
+        Command::Quit | Command::Help => None,
+        Command::SearchPrompt => Some((HelpSectionKind::SearchCopy, "search")),
         Command::PromptLogRevset => {
-            (context == HelpContext::Graph).then_some((HelpSectionKind::Direct, "custom revset"))
+            (context == HelpContext::Graph).then_some((HelpSectionKind::Views, "custom revset"))
         }
-        Command::OpenStatus => Some((HelpSectionKind::Global, "status")),
-        Command::OpenResolve => Some((HelpSectionKind::Global, "resolve")),
-        Command::OpenBookmarks => Some((HelpSectionKind::Global, "bookmarks")),
-        Command::OpenOperationLog => Some((HelpSectionKind::Global, "operation log")),
+        Command::OpenStatus => Some((HelpSectionKind::Views, "status")),
+        Command::OpenResolve => Some((HelpSectionKind::Views, "resolve")),
+        Command::OpenBookmarks => Some((HelpSectionKind::Views, "bookmarks")),
+        Command::OpenOperationLog => Some((HelpSectionKind::Views, "operation log")),
         Command::Edit => (context == HelpContext::Graph)
-            .then_some((HelpSectionKind::Preview, "edit selected revision")),
+            .then_some((HelpSectionKind::Actions, "edit selected revision")),
         Command::NextEdit => (context == HelpContext::Graph).then_some((
-            HelpSectionKind::Preview,
+            HelpSectionKind::Actions,
             "next editable change from @ (ignores selection)",
         )),
         Command::PrevEdit => (context == HelpContext::Graph).then_some((
-            HelpSectionKind::Preview,
+            HelpSectionKind::Actions,
             "previous editable change from @ (ignores selection)",
         )),
         Command::Describe => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Preview, "describe selected revision")),
-            HelpContext::Status => Some((HelpSectionKind::Preview, "describe @")),
+            HelpContext::Graph => Some((HelpSectionKind::Actions, "describe selected revision")),
+            HelpContext::Status => Some((HelpSectionKind::Actions, "describe @")),
             _ => None,
         },
         Command::Commit => match context {
             HelpContext::Graph => Some((
-                HelpSectionKind::Preview,
+                HelpSectionKind::Actions,
                 "commit @ and create new change (ignores selection)",
             )),
             HelpContext::Status => {
-                Some((HelpSectionKind::Preview, "commit @ and create new change"))
+                Some((HelpSectionKind::Actions, "commit @ and create new change"))
             }
             _ => None,
         },
         Command::BookmarkCreate => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Preview, "create bookmark here")),
-            HelpContext::Status => Some((HelpSectionKind::Preview, "create bookmark at @")),
+            HelpContext::Graph => Some((HelpSectionKind::Actions, "create bookmark here")),
+            HelpContext::Status => Some((HelpSectionKind::Actions, "create bookmark at @")),
             _ => None,
         },
         Command::BookmarkSet => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Preview, "set bookmark here")),
-            HelpContext::Status => Some((HelpSectionKind::Preview, "set bookmark to @")),
+            HelpContext::Graph => Some((HelpSectionKind::Actions, "set bookmark here")),
+            HelpContext::Status => Some((HelpSectionKind::Actions, "set bookmark to @")),
             _ => None,
         },
         Command::BookmarkMove => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Preview, "move bookmark here")),
-            HelpContext::Status => Some((HelpSectionKind::Preview, "move bookmark to @")),
+            HelpContext::Graph => Some((HelpSectionKind::Actions, "move bookmark here")),
+            HelpContext::Status => Some((HelpSectionKind::Actions, "move bookmark to @")),
             _ => None,
         },
         Command::BookmarkDelete => match context {
-            HelpContext::Bookmarks => Some((HelpSectionKind::Preview, "delete local bookmark")),
+            HelpContext::Bookmarks => Some((HelpSectionKind::Actions, "delete local bookmark")),
             _ => None,
         },
         Command::OperationUndo => (context == HelpContext::OperationLog).then_some((
-            HelpSectionKind::Preview,
+            HelpSectionKind::Recovery,
             "undo last repo operation (global)",
         )),
         Command::OperationRedo => (context == HelpContext::OperationLog).then_some((
-            HelpSectionKind::Preview,
+            HelpSectionKind::Recovery,
             "redo most recently undone operation (global)",
         )),
         Command::Push => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Preview, "push selected revision")),
-            HelpContext::Bookmarks => Some((HelpSectionKind::Preview, "push selected bookmark")),
-            HelpContext::Status => Some((HelpSectionKind::Preview, "push status")),
+            HelpContext::Graph => Some((HelpSectionKind::Actions, "push selected revision")),
+            HelpContext::Bookmarks => Some((HelpSectionKind::Actions, "push selected bookmark")),
+            HelpContext::Status => Some((HelpSectionKind::Actions, "push status")),
             _ => None,
         },
-        Command::Fetch => Some((HelpSectionKind::Direct, "fetch")),
-        Command::Copy => Some((HelpSectionKind::Global, "copy")),
-        Command::ViewFormat => Some((HelpSectionKind::Global, "view menu")),
-        Command::Refresh => Some((HelpSectionKind::Global, "refresh")),
-        Command::Back => Some((HelpSectionKind::Global, "back")),
-        Command::SwitchLog => Some((HelpSectionKind::Global, "log")),
-        Command::SwitchDefault => Some((HelpSectionKind::Global, "jj")),
+        Command::Fetch => Some((HelpSectionKind::RepositoryActions, "fetch")),
+        Command::Copy => Some((HelpSectionKind::SearchCopy, "copy")),
+        Command::ViewFormat => Some((HelpSectionKind::Views, "view menu")),
+        Command::Refresh => Some((HelpSectionKind::App, "refresh")),
+        Command::Back => Some((HelpSectionKind::Views, "back")),
+        Command::SwitchLog => Some((HelpSectionKind::Views, "log")),
+        Command::SwitchDefault => Some((HelpSectionKind::Views, "jj")),
         Command::View(command) => view_help_metadata(command, context),
     }
 }
@@ -552,16 +583,19 @@ fn view_help_metadata(
     context: HelpContext,
 ) -> Option<(HelpSectionKind, &'static str)> {
     match command {
-        ViewCommand::CycleMode => Some((HelpSectionKind::Direct, "cycle view mode")),
-        ViewCommand::NewTrunk => Some((HelpSectionKind::Direct, "new from trunk (jj undo)")),
-        ViewCommand::MoveDown => Some((HelpSectionKind::View, "move down")),
-        ViewCommand::MoveUp => Some((HelpSectionKind::View, "move up")),
-        ViewCommand::PageDown => Some((HelpSectionKind::View, "page down")),
-        ViewCommand::PageUp => Some((HelpSectionKind::View, "page up")),
-        ViewCommand::MoveFirst => Some((HelpSectionKind::View, "jump to first")),
-        ViewCommand::MoveLast => Some((HelpSectionKind::View, "jump to last")),
-        ViewCommand::NextFile => Some((HelpSectionKind::View, "next file")),
-        ViewCommand::PreviousFile => Some((HelpSectionKind::View, "previous file")),
+        ViewCommand::CycleMode => Some((HelpSectionKind::Views, "cycle view mode")),
+        ViewCommand::NewTrunk => Some((
+            HelpSectionKind::RepositoryActions,
+            "new from trunk (jj undo)",
+        )),
+        ViewCommand::MoveDown => Some((HelpSectionKind::Navigation, "move down")),
+        ViewCommand::MoveUp => Some((HelpSectionKind::Navigation, "move up")),
+        ViewCommand::PageDown => Some((HelpSectionKind::Navigation, "page down")),
+        ViewCommand::PageUp => Some((HelpSectionKind::Navigation, "page up")),
+        ViewCommand::MoveFirst => Some((HelpSectionKind::Navigation, "jump to first")),
+        ViewCommand::MoveLast => Some((HelpSectionKind::Navigation, "jump to last")),
+        ViewCommand::NextFile => Some((HelpSectionKind::Navigation, "next file")),
+        ViewCommand::PreviousFile => Some((HelpSectionKind::Navigation, "previous file")),
         ViewCommand::OpenFiles => {
             let action = match context {
                 HelpContext::Show | HelpContext::Diff | HelpContext::Status => "open file list",
@@ -573,7 +607,7 @@ fn view_help_metadata(
                 | HelpContext::OperationLog
                 | HelpContext::OperationDetail => return None,
             };
-            Some((HelpSectionKind::Direct, action))
+            Some((HelpSectionKind::Views, action))
         }
         ViewCommand::OpenItem => {
             let action = match context {
@@ -588,7 +622,7 @@ fn view_help_metadata(
                 | HelpContext::OperationLog
                 | HelpContext::OperationDetail => return None,
             };
-            Some((HelpSectionKind::Direct, action))
+            Some((HelpSectionKind::Views, action))
         }
         ViewCommand::OpenShow => {
             let action = match context {
@@ -601,7 +635,7 @@ fn view_help_metadata(
                 | HelpContext::FileList
                 | HelpContext::FileShow => return None,
             };
-            Some((HelpSectionKind::Direct, action))
+            Some((HelpSectionKind::Views, action))
         }
         ViewCommand::OpenDiff => {
             let action = match context {
@@ -614,13 +648,13 @@ fn view_help_metadata(
                 | HelpContext::FileList
                 | HelpContext::FileShow => return None,
             };
-            Some((HelpSectionKind::Direct, action))
+            Some((HelpSectionKind::Views, action))
         }
         ViewCommand::StartSearch => None,
-        ViewCommand::NextSearchMatch => Some((HelpSectionKind::View, "next match")),
-        ViewCommand::PreviousSearchMatch => Some((HelpSectionKind::View, "previous match")),
+        ViewCommand::NextSearchMatch => Some((HelpSectionKind::SearchCopy, "next match")),
+        ViewCommand::PreviousSearchMatch => Some((HelpSectionKind::SearchCopy, "previous match")),
         ViewCommand::ToggleSelect => (context == HelpContext::Graph).then_some((
-            HelpSectionKind::Preview,
+            HelpSectionKind::Actions,
             "toggle exact revision selection (preview target)",
         )),
         ViewCommand::OpenActionMenu => matches!(
@@ -633,7 +667,7 @@ fn view_help_metadata(
                 | HelpContext::OperationLog
         )
         .then_some((
-            HelpSectionKind::Preview,
+            HelpSectionKind::Actions,
             "open action menu (preview required)",
         )),
         ViewCommand::Copy => None,
@@ -746,8 +780,8 @@ mod tests {
     #[test]
     fn project_help_groups_bindings_by_command() {
         let global = [
-            Binding::new(KeyPattern::char('q'), Command::Quit),
-            Binding::new(KeyPattern::code(KeyCode::Esc), Command::Quit),
+            Binding::new(KeyPattern::char('r'), Command::Refresh),
+            Binding::new(KeyPattern::code(KeyCode::Char('R')), Command::Refresh),
         ];
         let view = [Binding::new(
             KeyPattern::char('s'),
@@ -756,11 +790,44 @@ mod tests {
 
         let sections = project_help(&global, &view, HelpContext::Graph);
 
-        assert_eq!(sections[0].title(), "Global");
-        assert_eq!(sections[0].rows()[0], HelpRow::new("q, Esc", "quit"));
-        assert_eq!(sections[1].title(), "Direct Actions");
-        assert_eq!(sections[1].rows()[0], HelpRow::new("s", "open show"));
-        assert_eq!(sections[2].rows()[0], HelpRow::new("-", "none yet"));
+        assert_eq!(sections[0].title(), "View Switching");
+        assert_eq!(sections[0].rows()[0], HelpRow::new("s", "open show"));
+        assert_eq!(sections[1].title(), "App");
+        assert_eq!(sections[1].rows()[0], HelpRow::new("r, R", "refresh"));
+    }
+
+    #[test]
+    fn help_binding_match_uses_visible_help_metadata() {
+        let bindings = [
+            Binding::new(KeyPattern::char('q'), Command::Quit),
+            Binding::new(KeyPattern::char('D'), Command::Describe),
+            Binding::new(KeyPattern::char('S'), Command::OpenStatus),
+        ];
+
+        assert_eq!(
+            match_help_binding_sequence(
+                &[&bindings],
+                &[key(KeyCode::Char('S'), KeyModifiers::NONE)],
+                HelpContext::Show,
+            ),
+            Some(BindingMatch::Exact(bindings[2]))
+        );
+        assert_eq!(
+            match_help_binding_sequence(
+                &[&bindings],
+                &[key(KeyCode::Char('D'), KeyModifiers::NONE)],
+                HelpContext::Show,
+            ),
+            None
+        );
+        assert_eq!(
+            match_help_binding_sequence(
+                &[&bindings],
+                &[key(KeyCode::Char('q'), KeyModifiers::NONE)],
+                HelpContext::Graph,
+            ),
+            None
+        );
     }
 
     #[test]
@@ -772,12 +839,12 @@ mod tests {
         let bookmarks_help = project_help(&global, &[], HelpContext::Bookmarks);
         let show_help = project_help(&global, &[], HelpContext::Show);
 
-        assert_eq!(graph_help[0].title(), "Preview / Confirm");
+        assert_eq!(graph_help[0].title(), "Action Previews");
         assert_eq!(
             graph_help[0].rows()[0],
             HelpRow::new("p", "push selected revision")
         );
-        assert_eq!(status_help[0].title(), "Preview / Confirm");
+        assert_eq!(status_help[0].title(), "Action Previews");
         assert_eq!(status_help[0].rows()[0], HelpRow::new("p", "push status"));
         assert_eq!(
             bookmarks_help[0].rows()[0],
@@ -802,7 +869,7 @@ mod tests {
         let status_help = project_help(&global, &[], HelpContext::Status);
         let show_help = project_help(&global, &[], HelpContext::Show);
 
-        assert_eq!(graph_help[0].title(), "Preview / Confirm");
+        assert_eq!(graph_help[0].title(), "Action Previews");
         assert_eq!(
             graph_help[0].rows()[0],
             HelpRow::new("D", "describe selected revision")
@@ -835,7 +902,7 @@ mod tests {
         let graph_help = project_help(&[], &view, HelpContext::Graph);
         let show_help = project_help(&[], &view, HelpContext::Show);
 
-        assert_eq!(graph_help[0].title(), "Preview / Confirm");
+        assert_eq!(graph_help[0].title(), "Action Previews");
         assert_eq!(
             graph_help[0].rows(),
             &[
@@ -844,7 +911,7 @@ mod tests {
                 HelpRow::new("[", "previous editable change from @ (ignores selection)"),
             ]
         );
-        assert_eq!(show_help[0].rows(), &[HelpRow::new("-", "none yet")]);
+        assert!(show_help.is_empty());
     }
 
     #[test]
@@ -898,7 +965,7 @@ mod tests {
 
         let sections = project_help(&[], &view, HelpContext::OperationLog);
 
-        assert_eq!(sections[0].title(), "Direct Actions");
+        assert_eq!(sections[0].title(), "View Switching");
         assert_eq!(sections[0].rows()[0], HelpRow::new("s", "operation show"));
         assert_eq!(sections[0].rows()[1], HelpRow::new("d", "operation diff"));
     }
@@ -915,7 +982,7 @@ mod tests {
 
         let sections = project_help(&[], &view, HelpContext::OperationLog);
 
-        assert_eq!(sections[0].title(), "Preview / Confirm");
+        assert_eq!(sections[0].title(), "Recovery");
         assert_eq!(
             sections[0].rows()[0],
             HelpRow::new("u", "undo last repo operation (global)")
@@ -935,7 +1002,7 @@ mod tests {
 
         let sections = project_help(&[], &view, HelpContext::OperationLog);
 
-        assert_eq!(sections[0].title(), "Preview / Confirm");
+        assert_eq!(sections[0].title(), "Action Previews");
         assert_eq!(
             sections[0].rows()[0],
             HelpRow::new("a", "open action menu (preview required)")
@@ -952,11 +1019,10 @@ mod tests {
 
         let sections = project_help(&global, &view, HelpContext::Resolve);
 
-        assert_eq!(sections[0].title(), "Global");
+        assert_eq!(sections[0].title(), "View Switching");
         assert_eq!(sections[0].rows()[0], HelpRow::new("R", "resolve"));
-        assert_eq!(sections[1].title(), "Direct Actions");
         assert_eq!(
-            sections[1].rows()[0],
+            sections[0].rows()[1],
             HelpRow::new("Enter", "inspect conflict")
         );
     }

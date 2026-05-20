@@ -55,10 +55,11 @@ cargo run -- operation-log
 
 ## Help And Keys
 
-Press `?` for the generated in-app help overlay. It reflects the current bindings for the active
-view, which is the quickest way to see the exact key surface without consulting the source.
+Press `?` for the generated in-app command menu. It reflects the current bindings for the active
+view, and pressing a listed key runs that command. Use `Esc`, `q`, or `?` to close the menu without
+running a command.
 
-Global keys:
+Global keys outside menus:
 
 - `q` or `Esc` quits;
 - `/` starts search;
