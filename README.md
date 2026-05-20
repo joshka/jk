@@ -115,6 +115,7 @@ redo.
 ## Media And Captures
 
 - Generated screenshots, GIFs, and demo repos are not committed.
+- The tracked capture specs and setup notes live in [`docs/demo/`](docs/demo/README.md).
 - If capture artifacts are added later, keep the generated output under ignored `target/vhs` or host
   it externally.
 

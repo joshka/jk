@@ -21,3 +21,20 @@ test:
 
 run:
     cargo run
+
+demo-setup:
+    sh docs/demo/setup-demo-repo.sh static-log
+    sh docs/demo/setup-demo-repo.sh operation-recovery
+
+demo-static-log: demo-setup
+    cargo build --quiet
+    vhs docs/demo/static-log.tape
+
+demo-operation-recovery: demo-setup
+    cargo build --quiet
+    vhs docs/demo/operation-recovery.tape
+
+demo: demo-setup
+    cargo build --quiet
+    vhs docs/demo/static-log.tape
+    vhs docs/demo/operation-recovery.tape

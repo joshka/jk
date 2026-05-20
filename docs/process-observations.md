@@ -5,6 +5,33 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 21 VHS specs without committed GIFs)
+
+- Slice / task: Implement Packet 21 VHS specs without committed GIFs.
+- Thread / model: `019e4473-d045-7301-bbec-2edd53394a7d` / `gpt-5.4-mini`.
+- Scope given: add tracked capture specs and deterministic demo setup without editing Rust source or
+  committing generated media.
+- Observable outcome: `docs/demo/` now contains tracked VHS tape specs and a reusable repo setup
+  helper, `Justfile` recipes render captures into ignored `target/vhs`, and the README points to the
+  tracked specs without implying rendered media already ships in the repository.
+- Evidence basis:
+  - Thread: `019e4473-d045-7301-bbec-2edd53394a7d`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `jj --no-pager log -r @ -T 'description.first_line() ++ "\n"'`
+    - `just demo-setup`
+    - `vhs validate docs/demo/*.tape`
+    - `just demo-static-log`
+    - `just demo-operation-recovery`
+    - `just md-check`
+  - Validation note: `vhs` was available locally as `vhs version 0.11.0`.
+  - Files: `README.md`, `Justfile`, `docs/demo/README.md`, `docs/demo/operation-recovery.tape`,
+    `docs/demo/setup-demo-repo.sh`, `docs/demo/static-log.tape`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+  - Validation note: the render gates wrote only under `target/demo-repos/` and `target/vhs/`.
+
 ### 2026-05-20 (Packet 20 README/user docs refresh)
 
 - Slice / task: Implement Packet 20 README/User Docs Refresh.

@@ -343,3 +343,16 @@
   binding, so it will need another refresh when shipped keys or startup views expand, and Packet 21
   will need to add capture specs before the media policy section can point at concrete artifacts
 - Next slice: Packet 21: VHS Specs Without Committed GIFs
+
+## Packet 21: VHS Specs Without Committed GIFs
+
+- Files changed: `README.md`, `Justfile`, `docs/demo/README.md`,
+  `docs/demo/operation-recovery.tape`, `docs/demo/setup-demo-repo.sh`, `docs/demo/static-log.tape`,
+  `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `just demo-setup`; `vhs validate docs/demo/*.tape`; `just demo-static-log`;
+  `just demo-operation-recovery`; `just md-check`
+- Remaining risk: the captures now have tracked specs and deterministic repo setup, but the rendered
+  media still depends on current jj output shape, terminal rendering, and VHS/ffmpeg behavior when
+  the tapes are rerun, so the output still needs external publication review before it becomes a
+  user-facing artifact
+- Next slice: Packet 22: Squash Preview Flow
