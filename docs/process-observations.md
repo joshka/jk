@@ -2867,3 +2867,123 @@ belong here.
 - Review outcome: gpt-5.5 high review `019e4717-5e19-7c20-8a26-db2d1c312b06` found no findings,
   verified the existing `Command::output()` / `ratatui::run` boundary and Packet 34c / 34 gating,
   and ran `jj --no-pager split --help` but did not rerun `just md-check`.
+
+## 2026-05-20 Packet 34c Interactive Split Runner
+
+- Thread id: `019e471a-9e74-78c1-aa7f-7a79de3fd17a`.
+
+- Scope given: implement the smallest process-boundary primitive for future Packet 34 to hand
+  interactive `jj split` to jj's diff editor, without adding split UI, `JjSplitPlan`, an in-app
+  patch editor, or any active-repo mutation proof. Any mutation/manual proof had to use a disposable
+  `/tmp` jj repo with mutation commands run from that repo's `cwd`.
+
+- Observable outcome: `src/interactive_process.rs` now owns `InteractiveCommand`,
+  `run_with_ratatui_terminal`, the test-seamed `run_interactive_command`, inherited-stdio process
+  spawning, terminal suspension/restoration, nonzero status reporting, and a restore guard for
+  panic-adjacent spawner failures. `src/jj.rs` now has `interactive_jj_command` for
+  `jj --no-pager <args...>` inherited-stdio commands. Existing captured command paths were left
+  unchanged.
+
+- Restoration behavior: fake-lifecycle tests prove restore is attempted after spawn errors, nonzero
+  command statuses, suspension failures, restore failures, and spawner panic unwinding. Restore
+  failures are reported as errors instead of being treated as command success.
+
+- Disposable proof repo: `/tmp/jk-packet34c-proof.Grlzej`.
+
+- Proof commands run with `/tmp/jk-packet34c-proof.Grlzej` as `cwd`:
+
+  ```sh
+  jj --no-pager git init
+  printf 'one\ntwo\n' > split.txt
+  jj --no-pager file track split.txt
+  jj --no-pager status
+  ```
+
+- Runner proof commands run from `/Users/joshka/local/jk`, with the child `jj` cwd set by the runner
+  to `/tmp/jk-packet34c-proof.Grlzej`:
+
+  ```sh
+  JK_INTERACTIVE_PROOF_REPO=/tmp/jk-packet34c-proof.Grlzej \
+    cargo test real_runner_reports_jj_failure_from_tmp_repo -- --ignored --test-threads=1
+
+  JK_INTERACTIVE_PROOF_REPO=/tmp/jk-packet34c-proof.Grlzej \
+    cargo test real_ratatui_runner_reports_jj_failure_from_tmp_repo \
+      -- --ignored --nocapture --test-threads=1
+  ```
+
+- Proof output summary: both runner proofs executed `jj --no-pager split --tool false` in the `/tmp`
+  repo and returned a clean nonzero child status. The `Error: Failed to edit diff` text was observed
+  as inherited child terminal output while the app terminal was suspended, not as captured runner
+  result text. The PTY proof emitted the expected alternate-screen enter/leave control sequences and
+  completed without leaving the shell stuck in the app terminal state.
+
+- Live-editor proof note: default diff-editor split cancellation/completion was not attempted. The
+  Codex PTY can prove terminal suspension and inherited stdio, but it cannot safely drive an
+  arbitrary user-configured diff editor without risking a blocked manual session.
+
+- Validation / proof run:
+  - `cargo check`
+  - `cargo test interactive_process -- --test-threads=1`
+  - `cargo test interactive_jj_command_inherits_stdio_and_keeps_no_pager -- --test-threads=1`
+  - `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - `cargo clippy -- -D warnings`
+  - PTY `cargo run`, quit with `q`
+  - `/tmp` proof commands listed above
+
+- Warning / blocker status: `cargo check` passes with existing warnings for `ViewSpec::bookmarks`
+  and `FileListItem::row_text`. `cargo clippy -- -D warnings` remains blocked by those dead-code
+  warnings plus the known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`, and
+  `src/operation_log.rs`. The PTY `cargo run` smoke rendered and quit cleanly but was not
+  warning-free because of the same two `cargo check` warnings.
+
+- Review expectation: review Packet 34c for terminal lifecycle correctness, inherited stdio,
+  restoration on success/failure/panic-adjacent paths, exact `/tmp` proof cwd discipline, tests,
+  docs, and whether it is small enough for Packet 34 to depend on without absorbing split UI
+  behavior.
+
+- Evidence basis:
+  - Thread: `019e471a-9e74-78c1-aa7f-7a79de3fd17a`
+  - Date: `2026-05-20` from local `date +%F`
+  - Files: `src/interactive_process.rs`, `src/jj.rs`, `src/main.rs`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
+## 2026-05-20 Packet 34c Review Repair
+
+- Thread id: `019e4738-060b-7470-9c58-cdae70df0daf`.
+
+- Scope given: repair Packet 34c review findings without expanding into product split UI, without
+  `JjSplitPlan` or action-menu changes, and without running jj/git stack mutation commands in this
+  repository. Any mutation/manual proof must remain in a disposable `/tmp` jj repo.
+
+- Review findings recorded: Packet 34c had overstated output visibility by blurring inherited child
+  terminal output with captured runner result text. Inherited stdio can print while Ratatui is
+  suspended, but once the alternate screen is restored that output may no longer be visible. The
+  current runner preserves child status on nonzero exit; it does not capture child stderr.
+
+- Repair outcome: `docs/plan/next-implementation-slices.md` now requires future Packet 34 to design
+  explicit post-command status/result visibility instead of relying on inherited child output.
+  `docs/plan/progress.md` and this file clarify that `Error: Failed to edit diff` was observed child
+  terminal output from `jj --no-pager split --tool false`, not captured runner result text.
+
+- Test repair: `src/interactive_process.rs` ignored proof tests now canonicalize the proof repo and
+  canonical `/tmp` before accepting `JK_INTERACTIVE_PROOF_REPO`, rejecting paths that resolve
+  outside temp storage such as `/tmp/../Users/...`. The real Ratatui ignored proof now asserts that
+  the runner result is a clean child nonzero status and explicitly fails if the result contains
+  terminal restore failure wording.
+
+- Final 5.5 re-review: `019e473c-f2f0-7ab2-b936-9d0261910255` (`gpt-5.5`, high) reported no findings
+  and verified the repaired output visibility wording, canonical `/tmp` proof path validation, and
+  clean restore-status assertion.
+
+- Validation / proof run:
+  - `cargo test interactive_process -- --test-threads=1` passed with 7 passed, 2 ignored.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed.
+  - `cargo check` passed with existing dead-code warnings for `ViewSpec::bookmarks` and
+    `FileListItem::row_text`.
+  - Ignored live-terminal proofs were not rerun; the repair tightened their checks only.
+
+- No product split UI, `JjSplitPlan`, action-menu changes, or active-repo mutation proof were added.

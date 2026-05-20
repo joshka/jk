@@ -983,8 +983,10 @@ Audit result from 2026-05-20:
   - a confirmed interactive command path leaves raw mode and the alternate screen before spawning
     the child process, then restores the Ratatui terminal before returning to the event loop;
   - the child process inherits stdin, stdout, and stderr instead of using `Command::output()`;
-  - failures while spawning, waiting, or restoring the terminal surface readable status or result
-    text without leaving the app in raw/alternate-screen limbo;
+  - failures while spawning, waiting, or restoring the terminal return readable runner status
+    without leaving the app in raw/alternate-screen limbo;
+  - inherited child stdout/stderr is treated as live terminal handoff output, not captured result
+    text that remains visible after the alternate screen is restored;
   - the runner is testable without launching a real editor, with unit tests covering command
     construction, inherited-stdio intent, and restore-on-error behavior where practical;
   - the final manual proof uses only disposable `/tmp` jj repositories and runs every mutation from
@@ -1021,22 +1023,24 @@ Audit result from 2026-05-20:
   preview shows the exact command and says when `jj` will launch an editor or interactive selector;
   no-fileset split is described as delegating patch selection to `jj`'s diff editor and possible
   description editor, not as an in-app patch editor; cancel before execution is supported;
-  post-command success and failure output are readable; the graph refresh reveals the relevant
-  working copy or split result when possible; unsupported noninteractive environments fail through
-  readable `jj` output rather than local guessing.
+  post-command success and failure status/results are readable through an explicit app surface,
+  because inherited child output may no longer be visible after Ratatui restores the alternate
+  screen; the graph refresh reveals the relevant working copy or split result when possible;
+  unsupported noninteractive environments fail through readable app status/result text and may also
+  print `jj` output while the terminal is suspended.
 - Validation: command-construction tests for supported split shapes; view-level preview, cancel,
-  confirm, and result tests; output/result tests for interactive-editor failure text; either
-  terminal/editor handoff proof through the Packet 34c runner or explicit tests proving the command
-  stays preview-only until that runner exists; disposable `/tmp` jj repo proof for any feasible
-  mutation or failure path, with mutations run from the proof repo's `cwd`; `cargo check`; focused
-  rewrite tests; full `cargo test` and `just check` when practical.
+  confirm, and result tests; result/status tests that distinguish clean child nonzero status from
+  terminal restore failures; either terminal/editor handoff proof through the Packet 34c runner or
+  explicit tests proving the command stays preview-only until that runner exists; disposable `/tmp`
+  jj repo proof for any feasible mutation or failure path, with mutations run from the proof repo's
+  `cwd`; `cargo check`; focused rewrite tests; full `cargo test` and `just check` when practical.
 - Docs/fragility updates: record the editor/process boundary and any command-output assumptions;
   update `progress.md`.
 - Suggested agent/model routing: gpt-5.5 high implementation and review, because Packet 34a showed
   command shape is clear while interactive editor semantics remain the key risk.
 - Review prompt: review Packet 34 for honest split/editor semantics, exact target handling,
-  noninteractive failure behavior, output preservation, and evidence that the flow does not pretend
-  to be an in-app patch editor.
+  noninteractive failure behavior, explicit post-command status/result visibility, and evidence that
+  the flow does not pretend to be an in-app patch editor.
 
 ### Packet 35: Duplicate Guided Flow
 

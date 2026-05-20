@@ -10,6 +10,8 @@ use std::process::Command;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
+use crate::interactive_process::InteractiveCommand;
+
 #[allow(unused_imports)]
 pub use crate::jj_actions::JjOperationTargetKind;
 pub use crate::jj_actions::{
@@ -681,6 +683,13 @@ pub(crate) fn run_direct_args_stdout(args: Vec<String>, label: &str) -> Result<S
     Ok(String::from_utf8(output.stdout)?)
 }
 
+#[allow(dead_code)]
+pub(crate) fn interactive_jj_command(args: Vec<String>, label: &str) -> InteractiveCommand {
+    let mut command = InteractiveCommand::new("jj", label);
+    command.arg("--no-pager").args(args);
+    command
+}
+
 pub(crate) fn run_jj_template_lines(
     spec: &ViewSpec,
     template: &str,
@@ -878,6 +887,8 @@ fn option_value<'a>(
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
+
     use super::*;
     use crate::jj_rows::{OPERATION_ID_TEMPLATE, RESOLVE_CONFLICT_TEMPLATE};
 
@@ -1303,6 +1314,33 @@ mod tests {
         assert_eq!(
             JjGitFetch::for_remote("origin").command_argv(),
             vec!["git", "fetch", "--remote", "exact:origin"]
+        );
+    }
+
+    #[test]
+    fn interactive_jj_command_inherits_stdio_and_keeps_no_pager() {
+        let command = interactive_jj_command(
+            vec![
+                "split".to_owned(),
+                "--revision".to_owned(),
+                "exactly(change_id(\"abc\"), 1)".to_owned(),
+            ],
+            "jj split",
+        );
+
+        assert_eq!(command.program(), OsStr::new("jj"));
+        assert_eq!(
+            command.argv(),
+            vec![
+                OsStr::new("--no-pager"),
+                OsStr::new("split"),
+                OsStr::new("--revision"),
+                OsStr::new("exactly(change_id(\"abc\"), 1)"),
+            ]
+        );
+        assert_eq!(
+            command.stdio_intent(),
+            crate::interactive_process::StdioIntent::Inherit
         );
     }
 

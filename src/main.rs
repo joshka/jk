@@ -11,6 +11,7 @@ mod diff;
 mod file_list;
 mod file_show;
 mod graph;
+mod interactive_process;
 mod jj;
 mod jj_actions;
 mod jj_rows;
