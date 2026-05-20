@@ -3298,3 +3298,72 @@ belong here.
   that row-order mismatch fails closed, that local bookmark delete still works only for explicit
   local metadata, and that Packet 38/39 tracking actions remain disabled until they add state-gated
   command planning.
+
+### 2026-05-20 (post-Packet-36 app module refactor gate)
+
+- Slice / task: implement the post-Packet-36 app-module refactor gate in
+  `rxrqruxs Refactor app action lifecycle modules`.
+
+- Thread id: `019e479c-db98-7a42-9113-ee2247cd617f`.
+
+- Model / routing: gpt-5.5 high by user request, because the task is a module-boundary and
+  behavior-preserving refactor gate.
+
+- Context read: `AGENTS.md`, `docs/development/rules/refactoring.md`,
+  `docs/development/rules/change-shape.md`, `docs/development/rules/testing.md`,
+  `docs/development/rules/agent-workflow.md`, `docs/agent/architecture.md`, `docs/agent/testing.md`,
+  `docs/agent/workflow.md`, the Rust maintainability guide, `src/app.rs`, app submodules,
+  `src/app_screen.rs`, `src/view_state.rs`, `src/jj_actions.rs`, `docs/plan/progress.md`,
+  `docs/plan/fragility-register.md`, and this file.
+
+- Observable outcome: `src/app.rs` remained 505 LOC and orchestration-only. The oversized
+  `src/app/action_lifecycle.rs` became a 10-line module root with child modules for entry/prompt
+  setup, preview opening, general completions, rewrite completions, and shared wording helpers. The
+  oversized app test file became a 15-line module root with behavior-focused child modules and
+  shared support fixtures.
+
+- Line-count evidence:
+
+  ```text
+  Before:
+       505 src/app.rs
+      2045 src/app/action_lifecycle.rs
+      4744 src/app/tests.rs
+
+  After:
+       505 src/app.rs
+        10 src/app/action_lifecycle.rs
+       584 src/app/action_lifecycle/completion.rs
+       362 src/app/action_lifecycle/entry.rs
+       694 src/app/action_lifecycle/preview.rs
+       417 src/app/action_lifecycle/rewrite_completion.rs
+        70 src/app/action_lifecycle/shared.rs
+        15 src/app/tests.rs
+       303 src/app/tests/abandon_actions.rs
+       392 src/app/tests/bookmark_actions.rs
+       532 src/app/tests/command_navigation.rs
+       351 src/app/tests/describe_commit_actions.rs
+       533 src/app/tests/detail_restore_actions.rs
+       349 src/app/tests/operation_actions.rs
+       529 src/app/tests/rewrite_actions.rs
+       539 src/app/tests/support.rs
+       479 src/app/tests/sync_actions.rs
+       778 src/app/tests/working_copy_actions.rs
+  ```
+
+- Validation trail: `cargo check`; `cargo test app:: -- --test-threads=1`; focused Packet 34/35/36
+  coverage with `cargo test split -- --test-threads=1`, `cargo test duplicate -- --test-threads=1`,
+  and `cargo test bookmark -- --test-threads=1`; full `cargo test`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; and attempted
+  `cargo clippy -- -D warnings`.
+
+- Baseline note: `cargo check` still reports the known `ViewSpec::bookmarks` and
+  `FileListItem::row_text` warnings. `cargo clippy -- -D warnings` remains blocked by known baseline
+  findings unless handled separately.
+
+- Fragility-register decision: no `docs/plan/fragility-register.md` update was needed because the
+  refactor did not change rendered-output parsing, jj command construction, side-channel metadata,
+  or any other soft external contract.
+
+- Residual risk: no manual TUI smoke was run for this structural refactor. Existing app/action tests
+  and full test coverage are the behavioral proof for the unchanged user-facing flows.

@@ -2004,3 +2004,60 @@
 - Next recommended slice: review Packet 36 for metadata truthfulness, row-order mismatch behavior,
   default-output ambiguity, and preservation of existing local bookmark delete behavior before
   Packet 37 rename or Packet 38/39 remote-tracking mutations.
+
+## 2026-05-20 Post-Packet-36 App Module Refactor Gate
+
+- Files changed: `src/app/action_lifecycle.rs`, `src/app/action_lifecycle/*.rs`, `src/app/tests.rs`,
+  `src/app/tests/*.rs`, `docs/plan/progress.md`, and `docs/process-observations.md`.
+
+- Gate outcome: the post-Packet-36 refactor gate is implemented without changing user-visible
+  behavior. `src/app.rs` stays at 505 LOC and remains terminal-loop and app-level routing only.
+  `src/app/action_lifecycle.rs` is now a 10-line module root, with lifecycle ownership split into
+  action entry/prompt setup, preview opening, general completions, rewrite completions, and small
+  shared wording helpers.
+
+- Test outcome: `src/app/tests.rs` is now a 15-line module root. App tests are split by behavior
+  group, with shared fixtures and service seams isolated in `src/app/tests/support.rs`.
+
+- Line-count evidence:
+
+  ```text
+  Before:
+       505 src/app.rs
+      2045 src/app/action_lifecycle.rs
+      4744 src/app/tests.rs
+
+  After:
+       505 src/app.rs
+        10 src/app/action_lifecycle.rs
+       584 src/app/action_lifecycle/completion.rs
+       362 src/app/action_lifecycle/entry.rs
+       694 src/app/action_lifecycle/preview.rs
+       417 src/app/action_lifecycle/rewrite_completion.rs
+        70 src/app/action_lifecycle/shared.rs
+        15 src/app/tests.rs
+       303 src/app/tests/abandon_actions.rs
+       392 src/app/tests/bookmark_actions.rs
+       532 src/app/tests/command_navigation.rs
+       351 src/app/tests/describe_commit_actions.rs
+       533 src/app/tests/detail_restore_actions.rs
+       349 src/app/tests/operation_actions.rs
+       529 src/app/tests/rewrite_actions.rs
+       539 src/app/tests/support.rs
+       479 src/app/tests/sync_actions.rs
+       778 src/app/tests/working_copy_actions.rs
+  ```
+
+- Validation: `cargo check`; `cargo test app:: -- --test-threads=1`; focused Packet 34/35/36
+  coverage with `cargo test split -- --test-threads=1`, `cargo test duplicate -- --test-threads=1`,
+  and `cargo test bookmark -- --test-threads=1`; full `cargo test`; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; and attempted
+  `cargo clippy -- -D warnings`.
+
+- Warning / blocker status: `cargo check` still reports the known `ViewSpec::bookmarks` and
+  `FileListItem::row_text` warnings. `cargo clippy -- -D warnings` remains blocked by known baseline
+  findings outside this refactor unless they are fixed separately.
+
+- Remaining risk: this is a structural refactor over app action lifecycle and tests. The proof is
+  compiler and test coverage rather than manual TUI driving, because no behavior or terminal
+  interaction contract intentionally changed.
