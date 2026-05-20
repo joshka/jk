@@ -104,6 +104,82 @@ pub struct CommandOutput {
     message: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JjOperationRecoveryKind {
+    Undo,
+    Redo,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjOperationRecovery {
+    kind: JjOperationRecoveryKind,
+}
+
+impl JjOperationRecovery {
+    pub fn new(kind: JjOperationRecoveryKind) -> Self {
+        Self { kind }
+    }
+
+    #[cfg(test)]
+    pub fn kind(&self) -> JjOperationRecoveryKind {
+        self.kind
+    }
+
+    pub fn command_label(&self) -> &'static str {
+        match self.kind {
+            JjOperationRecoveryKind::Undo => "jj undo",
+            JjOperationRecoveryKind::Redo => "jj redo",
+        }
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        match self.kind {
+            JjOperationRecoveryKind::Undo => vec!["undo".to_owned()],
+            JjOperationRecoveryKind::Redo => vec!["redo".to_owned()],
+        }
+    }
+
+    pub fn preview_text(&self) -> &'static str {
+        match self.kind {
+            JjOperationRecoveryKind::Undo => concat!(
+                "effect: globally undo the last operation in the current repository\n",
+                "selection: the selected operation-log row is not an argument\n",
+                "redo path: jj redo\n",
+                "confirmation: press Enter to run jj undo",
+            ),
+            JjOperationRecoveryKind::Redo => concat!(
+                "effect: globally redo the most recently undone operation in the current ",
+                "repository\n",
+                "selection: the selected operation-log row is not an argument\n",
+                "failure path: jj may report that no redo is available\n",
+                "confirmation: press Enter to run jj redo",
+            ),
+        }
+    }
+
+    pub fn success_hint(&self) -> &'static str {
+        match self.kind {
+            JjOperationRecoveryKind::Undo => "jj redo",
+            JjOperationRecoveryKind::Redo => "jj undo",
+        }
+    }
+
+    pub fn status_action(&self) -> &'static str {
+        match self.kind {
+            JjOperationRecoveryKind::Undo => "undo",
+            JjOperationRecoveryKind::Redo => "redo",
+        }
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(),
+            self.command_label(),
+            self.status_action(),
+        )
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjGitPushTarget {
@@ -2004,6 +2080,36 @@ mod tests {
             ]
         );
         assert_eq!(spec.app_label(), "jk operation diff --operation bbbbbbbb");
+    }
+
+    #[test]
+    fn operation_undo_command_has_no_operation_id_argument() {
+        let recovery = JjOperationRecovery::new(JjOperationRecoveryKind::Undo);
+        let selected_operation_id = operation_id('c');
+
+        assert_eq!(recovery.command_label(), "jj undo");
+        assert_eq!(recovery.command_argv(), ["undo"]);
+        assert!(!recovery.command_argv().contains(&selected_operation_id));
+        assert!(
+            recovery
+                .preview_text()
+                .contains("selected operation-log row is not an argument")
+        );
+    }
+
+    #[test]
+    fn operation_redo_command_has_no_operation_id_argument() {
+        let recovery = JjOperationRecovery::new(JjOperationRecoveryKind::Redo);
+        let selected_operation_id = operation_id('d');
+
+        assert_eq!(recovery.command_label(), "jj redo");
+        assert_eq!(recovery.command_argv(), ["redo"]);
+        assert!(!recovery.command_argv().contains(&selected_operation_id));
+        assert!(
+            recovery
+                .preview_text()
+                .contains("selected operation-log row is not an argument")
+        );
     }
 
     #[test]

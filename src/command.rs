@@ -7,7 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::action_menu::ActionMenu;
 use crate::copy::CopyOption;
-use crate::jj::JjCommand;
+use crate::jj::{JjCommand, JjOperationRecoveryKind};
 use crate::search::SearchQuery;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -19,6 +19,8 @@ pub enum Command {
     OpenStatus,
     OpenBookmarks,
     OpenOperationLog,
+    OperationUndo,
+    OperationRedo,
     Fetch,
     Push,
     Copy,
@@ -71,6 +73,31 @@ impl Binding {
 
     pub fn command(self) -> Command {
         self.command
+    }
+}
+
+impl Command {
+    pub fn operation_recovery(self) -> Option<JjOperationRecoveryKind> {
+        match self {
+            Self::OperationUndo => Some(JjOperationRecoveryKind::Undo),
+            Self::OperationRedo => Some(JjOperationRecoveryKind::Redo),
+            Self::Quit
+            | Self::Help
+            | Self::SearchPrompt
+            | Self::PromptLogRevset
+            | Self::OpenStatus
+            | Self::OpenBookmarks
+            | Self::OpenOperationLog
+            | Self::Fetch
+            | Self::Push
+            | Self::Copy
+            | Self::ViewFormat
+            | Self::Refresh
+            | Self::Back
+            | Self::SwitchLog
+            | Self::SwitchDefault
+            | Self::View(_) => None,
+        }
     }
 }
 
@@ -305,6 +332,14 @@ fn help_metadata(
         Command::OpenStatus => Some((HelpSectionKind::Global, "status")),
         Command::OpenBookmarks => Some((HelpSectionKind::Global, "bookmarks")),
         Command::OpenOperationLog => Some((HelpSectionKind::Global, "operation log")),
+        Command::OperationUndo => (context == HelpContext::OperationLog).then_some((
+            HelpSectionKind::Preview,
+            "undo last repo operation (global)",
+        )),
+        Command::OperationRedo => (context == HelpContext::OperationLog).then_some((
+            HelpSectionKind::Preview,
+            "redo most recently undone operation (global)",
+        )),
         Command::Push => match context {
             HelpContext::Graph => Some((HelpSectionKind::Preview, "push selected revision")),
             HelpContext::Bookmarks => Some((HelpSectionKind::Preview, "push selected bookmark")),
@@ -515,6 +550,29 @@ mod tests {
         assert_eq!(sections[0].title(), "Direct Actions");
         assert_eq!(sections[0].rows()[0], HelpRow::new("s", "operation show"));
         assert_eq!(sections[0].rows()[1], HelpRow::new("d", "operation diff"));
+    }
+
+    #[test]
+    fn operation_help_exposes_global_undo_and_redo_recovery_actions() {
+        let view = [
+            Binding::new(KeyPattern::char('u'), Command::OperationUndo),
+            Binding::new(
+                KeyPattern::modified_char('r', KeyModifiers::CONTROL),
+                Command::OperationRedo,
+            ),
+        ];
+
+        let sections = project_help(&[], &view, HelpContext::OperationLog);
+
+        assert_eq!(sections[0].title(), "Preview / Confirm");
+        assert_eq!(
+            sections[0].rows()[0],
+            HelpRow::new("u", "undo last repo operation (global)")
+        );
+        assert_eq!(
+            sections[0].rows()[1],
+            HelpRow::new("C-r", "redo most recently undone operation (global)")
+        );
     }
 
     fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {

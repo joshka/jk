@@ -23,8 +23,8 @@ use crate::command::{
 use crate::copy::CopyOption;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjCommand, JjGitPush, JjGitPushTarget,
-    JjRebasePlan, LogViewMode, ViewSpec, git_fetch, git_remotes, new_trunk,
-    resolve_exact_change_id,
+    JjOperationRecovery, JjOperationRecoveryKind, JjRebasePlan, LogViewMode, ViewSpec, git_fetch,
+    git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -36,6 +36,8 @@ type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
 type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 #[cfg(test)]
 type AbandonRun = fn(&JjAbandonPlan) -> Result<String>;
+#[cfg(test)]
+type OperationRecoveryRun = fn(&JjOperationRecovery) -> Result<String>;
 #[cfg(test)]
 type RefreshView = fn(&mut ViewState) -> Result<()>;
 #[cfg(test)]
@@ -62,6 +64,8 @@ struct App {
     abandon_preview_load: AbandonPreviewLoad,
     #[cfg(test)]
     abandon_run: AbandonRun,
+    #[cfg(test)]
+    operation_recovery_run: OperationRecoveryRun,
     #[cfg(test)]
     refresh_view: RefreshView,
     #[cfg(test)]
@@ -112,6 +116,10 @@ enum InteractionMode {
         push: JjGitPush,
         output: ActionOutput,
     },
+    OperationRecoveryPreview {
+        recovery: JjOperationRecovery,
+        output: ActionOutput,
+    },
 }
 
 const APP_BINDINGS: &[Binding] = &[
@@ -147,6 +155,11 @@ fn default_abandon_preview_load(abandon: &JjAbandonPlan) -> Result<JjAbandonPrev
 #[cfg(test)]
 fn default_abandon_run(abandon: &JjAbandonPlan) -> Result<String> {
     abandon.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_operation_recovery_run(recovery: &JjOperationRecovery) -> Result<String> {
+    recovery.run().map(|output| output.message().to_owned())
 }
 
 #[cfg(test)]
@@ -188,6 +201,8 @@ impl App {
             #[cfg(test)]
             abandon_run: default_abandon_run,
             #[cfg(test)]
+            operation_recovery_run: default_operation_recovery_run,
+            #[cfg(test)]
             refresh_view: default_refresh_view,
             #[cfg(test)]
             reveal_graph_change: default_reveal_graph_change,
@@ -222,6 +237,16 @@ impl App {
     #[cfg(not(test))]
     fn run_abandon(&self, abandon: &JjAbandonPlan) -> Result<String> {
         abandon.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_operation_recovery(&self, recovery: &JjOperationRecovery) -> Result<String> {
+        (self.operation_recovery_run)(recovery)
+    }
+
+    #[cfg(not(test))]
+    fn run_operation_recovery(&self, recovery: &JjOperationRecovery) -> Result<String> {
+        recovery.run().map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -331,6 +356,12 @@ impl App {
             Command::OpenOperationLog => {
                 self.open_operation_log()?;
                 Ok(true)
+            }
+            Command::OperationUndo | Command::OperationRedo => {
+                if let Some(kind) = binding.command().operation_recovery() {
+                    self.open_operation_recovery_preview(kind);
+                }
+                Ok(false)
             }
             Command::Fetch => {
                 self.fetch(viewport_height);
@@ -776,6 +807,37 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::OperationRecoveryPreview { recovery, output } => {
+                let (recovery, status_context, completed) = {
+                    (
+                        recovery.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                format!("{} cancelled", recovery.status_action()),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_operation_recovery(recovery, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
         }
     }
 
@@ -875,6 +937,23 @@ impl App {
                 };
             }
         }
+    }
+
+    fn open_operation_recovery_preview(&mut self, kind: JjOperationRecoveryKind) {
+        let recovery = JjOperationRecovery::new(kind);
+        let status_context = Some(format!(
+            "global current-repo {} from {}",
+            recovery.status_action(),
+            self.view.spec().app_label()
+        ));
+        self.mode = InteractionMode::OperationRecoveryPreview {
+            output: ActionOutput::pending(
+                recovery.command_label().to_owned(),
+                recovery.preview_text().to_owned(),
+                status_context,
+            ),
+            recovery,
+        };
     }
 
     fn open_rebase_preview(&mut self, rebase: JjRebasePlan) {
@@ -984,6 +1063,42 @@ impl App {
             push,
             output: ActionOutput::finished(command_label, result_message, status_context),
         }
+    }
+
+    fn confirm_operation_recovery(
+        &mut self,
+        recovery: JjOperationRecovery,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = recovery.command_label().to_owned();
+        let result_message = match self.run_operation_recovery(&recovery) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = format!("{} | {}", output.trim(), recovery.success_hint());
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!(
+                        "{} | refresh failed: {error} | {}",
+                        output.trim(),
+                        recovery.success_hint()
+                    )
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::OperationRecoveryPreview {
+            recovery,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
     }
 
     fn confirm_abandon(
@@ -1320,6 +1435,9 @@ impl App {
                 selected: *selected,
             },
             InteractionMode::PushPreview { output, .. } => Overlay::PushPreview { output },
+            InteractionMode::OperationRecoveryPreview { output, .. } => {
+                Overlay::OperationRecoveryPreview { output }
+            }
             InteractionMode::Normal
             | InteractionMode::SearchPrompt(_)
             | InteractionMode::LogRevsetPrompt(_) => Overlay::None,
@@ -1632,6 +1750,7 @@ pub enum StatusKind {
 mod tests {
     use super::*;
     use crate::action_menu::RolePromptOption;
+    use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static ABANDON_DRIFT_RECHECK_CALLS: AtomicUsize = AtomicUsize::new(0);
@@ -1683,6 +1802,21 @@ mod tests {
         Err(eyre!("jj abandon change-a failed: first line\nsecond line"))
     }
 
+    fn mock_operation_recovery_success(recovery: &JjOperationRecovery) -> Result<String> {
+        Ok(match recovery.kind() {
+            JjOperationRecoveryKind::Undo => "undone operation".to_owned(),
+            JjOperationRecoveryKind::Redo => "redone operation".to_owned(),
+        })
+    }
+
+    fn mock_operation_recovery_failure(recovery: &JjOperationRecovery) -> Result<String> {
+        Err(eyre!(
+            "{} failed: no operation to {} available\nhint: run the opposite recovery command first",
+            recovery.command_label(),
+            recovery.status_action()
+        ))
+    }
+
     fn panic_abandon_run(_: &JjAbandonPlan) -> Result<String> {
         panic!("abandon should not run without exact confirmation")
     }
@@ -1718,9 +1852,20 @@ mod tests {
             #[cfg(test)]
             abandon_run: mock_abandon_success,
             #[cfg(test)]
+            operation_recovery_run: mock_operation_recovery_success,
+            #[cfg(test)]
             refresh_view: mock_refresh_ok,
             #[cfg(test)]
             reveal_graph_change: default_reveal_graph_change,
+        }
+    }
+
+    fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
         }
     }
 
@@ -2421,6 +2566,112 @@ mod tests {
         );
         assert!(matches!(app.mode, InteractionMode::Normal));
         assert_eq!(app.status.message(), "no remote selected for push");
+    }
+
+    #[test]
+    fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
+        let selected_operation_id = "b".repeat(128);
+        let mut operation_log = crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj::OperationLogItem::new(
+                vec![ratatui::text::Line::from("@  current")],
+                Some("a".repeat(128)),
+            ),
+            crate::jj::OperationLogItem::new(
+                vec![ratatui::text::Line::from("○  selected")],
+                Some(selected_operation_id.clone()),
+            ),
+        ]);
+        operation_log.execute(
+            ViewCommand::MoveDown,
+            CommandContext {
+                viewport_height: 12,
+                search: None,
+            },
+        );
+        let mut app = test_app(ViewState::OperationLog(operation_log));
+
+        app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::OperationRecoveryPreview { recovery, output } => {
+                assert_eq!(recovery.kind(), JjOperationRecoveryKind::Undo);
+                output
+            }
+            _ => panic!("expected operation recovery preview"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(output.command_label(), "jj undo");
+        assert!(body.contains("global current-repo undo from jk operation log"));
+        assert!(body.contains("selected operation-log row is not an argument"));
+        assert!(!body.contains(&selected_operation_id));
+    }
+
+    #[test]
+    fn operation_recovery_preview_can_cancel_or_confirm_success() {
+        let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj::OperationLogItem::new(
+                vec![ratatui::text::Line::from("@  current")],
+                Some("a".repeat(128)),
+            ),
+        ]);
+        let mut app = test_app(ViewState::OperationLog(operation_log));
+
+        app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "undo cancelled");
+
+        app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::OperationRecoveryPreview { output, .. } => output,
+            _ => panic!("expected operation recovery result"),
+        };
+        assert!(output.completed());
+        assert!(
+            output
+                .body_lines()
+                .join("\n")
+                .contains("undone operation | jj redo")
+        );
+        assert_eq!(app.status.message(), "undone operation | jj redo");
+    }
+
+    #[test]
+    fn operation_redo_failure_keeps_command_output_readable() {
+        let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj::OperationLogItem::new(
+                vec![ratatui::text::Line::from("@  current")],
+                Some("a".repeat(128)),
+            ),
+        ]);
+        let mut app = test_app(ViewState::OperationLog(operation_log));
+        app.operation_recovery_run = mock_operation_recovery_failure;
+
+        app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::CONTROL), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::OperationRecoveryPreview { recovery, output } => {
+                assert_eq!(recovery.kind(), JjOperationRecoveryKind::Redo);
+                output
+            }
+            _ => panic!("expected operation recovery result"),
+        };
+        let body = output.body_lines().join("\n");
+        assert_eq!(output.command_label(), "jj redo");
+        assert!(output.completed());
+        assert!(body.contains("jj redo failed: no operation to redo available"));
+        assert!(body.contains("hint: run the opposite recovery command first"));
+        assert_eq!(
+            app.status.message(),
+            "jj redo failed: no operation to redo available\nhint: run the opposite recovery command first"
+        );
     }
 
     #[test]

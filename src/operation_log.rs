@@ -2,8 +2,8 @@
 //!
 //! The first pass keeps the operation log close to rendered `jj` output while
 //! carrying exact operation ids separately for copy, search, and refresh
-//! stability. Recovery actions stay out of scope until previews and
-//! confirmations exist.
+//! stability. Recovery actions are supported as global undo/redo operations on the repo
+//! cursor, not as selected-row actions.
 
 use color_eyre::Result;
 use ratatui::Frame;
@@ -51,6 +51,11 @@ pub const BINDINGS: &[Binding] = &[
     Binding::new(
         KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
+    ),
+    Binding::new(KeyPattern::char('u'), Command::OperationUndo),
+    Binding::new(
+        KeyPattern::modified_char('r', crossterm::event::KeyModifiers::CONTROL),
+        Command::OperationRedo,
     ),
 ];
 
@@ -451,6 +456,24 @@ mod tests {
             ViewEffect::StatusMessage(
                 "operation diff unavailable: selected row has no operation id".to_owned()
             )
+        );
+    }
+
+    #[test]
+    fn bindings_expose_global_recovery_without_view_execution_target() {
+        assert_eq!(
+            BINDINGS
+                .iter()
+                .find(|binding| binding.command() == Command::OperationUndo)
+                .map(|binding| binding.command()),
+            Some(Command::OperationUndo)
+        );
+        assert_eq!(
+            BINDINGS
+                .iter()
+                .find(|binding| binding.command() == Command::OperationRedo)
+                .map(|binding| binding.command()),
+            Some(Command::OperationRedo)
         );
     }
 }

@@ -113,6 +113,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::OperationRecoveryPreview { output } => {
+            let title = action_output_title("Operation recovery", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
     }
 }
 
@@ -138,6 +144,9 @@ pub enum Overlay<'a> {
         selected: usize,
     },
     PushPreview {
+        output: &'a ActionOutput,
+    },
+    OperationRecoveryPreview {
         output: &'a ActionOutput,
     },
     RebasePreview {
@@ -355,6 +364,10 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " quit  ",
             key("j/k"),
             " move  ",
+            key("u"),
+            " undo  ",
+            key("C-r"),
+            " redo  ",
             key("?"),
             " help",
         ],
@@ -363,6 +376,10 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " quit  ",
             key("j/k"),
             " move  ",
+            key("u"),
+            " undo  ",
+            key("C-r"),
+            " redo  ",
             key("s"),
             " show  ",
             key("d"),
@@ -774,9 +791,9 @@ mod tests {
             StatusHints::OperationLog,
         );
 
-        assert_snapshot!(render_chrome_snapshot(&status, 80), @r"
+        assert_snapshot!(render_chrome_snapshot(&status, 120), @r"
         title|jk operation-log
-        status|19 operations  q quit  j/k move  s show  d diff  / search  y copy id  ? help
+        status|19 operations  q quit  j/k move  u undo  C-r redo  s show  d diff  / search  y copy id  ? help
         ");
     }
 

@@ -234,3 +234,41 @@
   behavior currently mirrors pushed-detail transition semantics and is covered by a view-level
   show/diff switch test plus app-level back-from-detail coverage.
 - Next slice: Packet 17: Undo/Redo From Operation Log
+
+## Packet 17: Undo/Redo From Operation Log
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/operation_log.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Behavior: operation-log `u` opens a scrollable preview for global `jj undo`, and `C-r` opens the
+  same flow for global `jj redo`. The preview, generated help, result output, and tests all state
+  that these actions operate on the current repo's undo/redo cursor and do not use the selected
+  operation-log row as an argument.
+- Final 5.5 review follow-up: fixed remaining Packet 17 issues by adding concise `u`/`C-r` recovery
+  hints to the operation-log status bar and updating stale operation-log docs so recovery is global
+  and repo-cursor based.
+- Verification: `cargo check`; focused `cargo test operation_log`,
+  `cargo test operation_undo_command_has_no_operation_id_argument`,
+  `cargo test operation_redo_command_has_no_operation_id_argument`, `cargo test operation_recovery`,
+  `cargo test operation_redo_failure_keeps_command_output_readable`,
+  `cargo test operation_help_exposes_global_undo_and_redo_recovery_actions`; full `cargo test`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-check`
+- Manual proof: disposable repo `/tmp/jk-packet17-proof.cPqScq` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a `describe` mutation set the working-copy
+  description to `packet 17 proof mutation`, `jj --no-pager undo` restored the previous
+  no-description state, and `jj --no-pager redo` restored `packet 17 proof mutation`. The command
+  shapes used for recovery were exactly `jj --no-pager undo` and `jj --no-pager redo`.
+- Help proof: `jj --no-pager help undo` shows `Usage: jj undo [OPTIONS]` and describes undo as
+  restoring older operations when repeated; `jj --no-pager help redo` shows
+  `Usage: jj redo [OPTIONS]` and describes redo as the counterpart after one or more undos.
+- Validation note: the first formatter check was started in parallel with the formatter run, so it
+  reported the diff that the formatter was applying. A sequential
+  `rustup run nightly cargo fmt --check` passed afterward.
+- Validation note: `just check` was attempted after Packet 17 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused operation recovery tests, full `cargo test`,
+  `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Remaining risk: the flow intentionally delegates all transaction selection to `jj undo` and
+  `jj redo`, so it does not preview which concrete operation will be undone or redone beyond showing
+  the raw jj result afterward. Redo availability is not precomputed; unavailable redo is attempted
+  and shown as readable jj error output.
+- Next slice: TBD after review of operation recovery flows

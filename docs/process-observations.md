@@ -5,6 +5,66 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 17 operation undo/redo)
+
+- Slice / task: Implement Packet 17 undo/redo access from the operation log.
+
+- Worker / model: `019e4439-abba-71f1-8429-01fdf6fb8276` / `gpt-5` (Codex).
+
+- Scope given: preserve unrelated edits, stay primarily within operation-log, app, jj command, TUI,
+  command/help, and plan/process docs, expose `jj undo` and `jj redo` from recovery context, keep
+  semantics global, avoid selected-operation restore/revert behavior, add tests, and prove behavior
+  in an isolated `/tmp` jj repo.
+
+- Observable outcome: operation-log `u` now opens a scrollable ActionOutput preview for global
+  `jj undo`, and `C-r` opens the same flow for global `jj redo`. Preview text, help text, and app
+  tests explicitly state that the selected operation-log row is not an argument. Successful recovery
+  refreshes the current view and leaves the completed output readable; failed redo output remains in
+  the same completed output modal.
+
+- Manual proof outcome: disposable repo `/tmp/jk-packet17-proof.cPqScq` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a `describe` mutation changed the working-copy
+  description to `packet 17 proof mutation`, `jj --no-pager undo` restored the previous empty
+  description, and `jj --no-pager redo` restored `packet 17 proof mutation`.
+
+- Final 5.5 review feedback on Packet 17 identified one remaining discoverability/wording gap: the
+  operation-log status bar did not expose global undo/redo keys and the operation-log module comment
+  still said recovery was out of scope. This repair addressed both by adding `u` and `C-r` status
+  hints and updating module docs to say recovery actions are global repo-cursor operations.
+
+- Evidence basis:
+  - Thread: `019e4439-abba-71f1-8429-01fdf6fb8276`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `jj --no-pager status`
+    - `cargo check`
+    - `cargo test operation_log`
+    - `cargo test operation_undo_command_has_no_operation_id_argument`
+    - `cargo test operation_redo_command_has_no_operation_id_argument`
+    - `cargo test operation_recovery`
+    - `cargo test operation_redo_failure_keeps_command_output_readable`
+    - `cargo test operation_help_exposes_global_undo_and_redo_recovery_actions`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `jj --no-pager help undo`
+    - `jj --no-pager help redo`
+    - `just md-check`
+    - `just check`
+  - Manual proof commands, all with cwd `/tmp/jk-packet17-proof.cPqScq`:
+    - `jj --no-pager git init`
+    - `jj --no-pager describe -m 'packet 17 proof mutation'`
+    - `jj --no-pager log -r @ --no-graph -T 'description.first_line() ++ "\n"'`
+    - `jj --no-pager undo`
+    - `jj --no-pager redo`
+  - Validation note: the first formatter check was run concurrently with the formatter run and
+    reported the in-flight diff; the sequential rerun of `rustup run nightly cargo fmt --check`
+    passed.
+  - Validation note: `just check` failed immediately at `cargo +nightly fmt` with
+    `no such command: +nightly`; the equivalent checks listed above passed separately.
+  - Files: `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/operation_log.rs`, `src/tui.rs`,
+    `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 16 operation detail views)
 
 - Slice / task: Implement Packet 16 operation show/diff detail from operation-log rows.
