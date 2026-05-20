@@ -870,7 +870,9 @@ mod tests {
             vec![
                 "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
-                "abandon selected revision aaaaaaaa"
+                "abandon selected revision aaaaaaaa",
+                "restore selected revision aaaaaaaa",
+                "revert selected revision aaaaaaaa into @"
             ]
         );
     }
@@ -905,7 +907,9 @@ mod tests {
                 "new child of aaaaaaaa",
                 "rebase 1 source revision into destination bbbbbbbb",
                 "squash 1 source revision into destination bbbbbbbb",
-                "absorb current revision bbbbbbbb into 1 candidate destination"
+                "absorb current revision bbbbbbbb into 1 candidate destination",
+                "restore selected revision bbbbbbbb",
+                "revert selected revision bbbbbbbb into @"
             ]
         );
     }
@@ -971,7 +975,9 @@ mod tests {
             vec![
                 "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
-                "abandon selected revision aaaaaaaa"
+                "abandon selected revision aaaaaaaa",
+                "restore selected revision aaaaaaaa",
+                "revert selected revision aaaaaaaa into @"
             ]
         );
     }

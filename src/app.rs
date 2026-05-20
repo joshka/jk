@@ -13,7 +13,7 @@ use color_eyre::eyre::eyre;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::DefaultTerminal;
 
-use crate::action_menu::{ActionKind, ActionMenu, FollowUp, RolePrompt};
+use crate::action_menu::{ActionKind, ActionMenu, FollowUp, RolePrompt, build_action_menu};
 use crate::action_output::ActionOutput;
 use crate::clipboard;
 use crate::command::{
@@ -25,8 +25,8 @@ use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
     JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationRecoveryKind, JjRebasePlan, JjSquashPlan, LogViewMode, ViewSpec, git_fetch,
-    git_remotes, new_trunk, resolve_exact_change_id,
+    JjOperationRecoveryKind, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan, LogViewMode,
+    ViewSpec, git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -40,6 +40,14 @@ type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
 type SquashRun = fn(&JjSquashPlan) -> Result<String>;
 #[cfg(test)]
 type AbsorbRun = fn(&JjAbsorbPlan) -> Result<String>;
+#[cfg(test)]
+type RestoreRun = fn(&JjRestorePlan) -> Result<String>;
+#[cfg(test)]
+type RevertRun = fn(&JjRevertPlan) -> Result<String>;
+#[cfg(test)]
+type RestorePreviewLoad = fn(&JjRestorePlan) -> Result<String>;
+#[cfg(test)]
+type RevertPreviewLoad = fn(&JjRevertPlan) -> Result<String>;
 #[cfg(test)]
 type DescribeRun = fn(&JjDescribePlan) -> Result<String>;
 #[cfg(test)]
@@ -88,6 +96,14 @@ struct App {
     squash_run: SquashRun,
     #[cfg(test)]
     absorb_run: AbsorbRun,
+    #[cfg(test)]
+    restore_run: RestoreRun,
+    #[cfg(test)]
+    revert_run: RevertRun,
+    #[cfg(test)]
+    restore_preview_load: RestorePreviewLoad,
+    #[cfg(test)]
+    revert_preview_load: RevertPreviewLoad,
     #[cfg(test)]
     describe_run: DescribeRun,
     #[cfg(test)]
@@ -163,6 +179,14 @@ enum InteractionMode {
     },
     RebasePreview {
         rebase: JjRebasePlan,
+        output: ActionOutput,
+    },
+    RestorePreview {
+        restore: JjRestorePlan,
+        output: ActionOutput,
+    },
+    RevertPreview {
+        revert: JjRevertPlan,
         output: ActionOutput,
     },
     SquashPreview {
@@ -241,6 +265,30 @@ fn default_squash_run(squash: &JjSquashPlan) -> Result<String> {
 #[cfg(test)]
 fn default_absorb_run(absorb: &JjAbsorbPlan) -> Result<String> {
     absorb.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_restore_run(restore: &JjRestorePlan) -> Result<String> {
+    restore.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_revert_run(revert: &JjRevertPlan) -> Result<String> {
+    revert.run().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_restore_preview_load(restore: &JjRestorePlan) -> Result<String> {
+    restore
+        .run_preview()
+        .map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
+fn default_revert_preview_load(revert: &JjRevertPlan) -> Result<String> {
+    revert
+        .run_preview()
+        .map(|output| output.message().to_owned())
 }
 
 #[cfg(test)]
@@ -334,6 +382,14 @@ impl App {
             #[cfg(test)]
             absorb_run: default_absorb_run,
             #[cfg(test)]
+            restore_run: default_restore_run,
+            #[cfg(test)]
+            revert_run: default_revert_run,
+            #[cfg(test)]
+            restore_preview_load: default_restore_preview_load,
+            #[cfg(test)]
+            revert_preview_load: default_revert_preview_load,
+            #[cfg(test)]
             describe_run: default_describe_run,
             #[cfg(test)]
             commit_run: default_commit_run,
@@ -398,6 +454,50 @@ impl App {
     #[cfg(not(test))]
     fn run_absorb(&self, absorb: &JjAbsorbPlan) -> Result<String> {
         absorb.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_restore(&self, restore: &JjRestorePlan) -> Result<String> {
+        (self.restore_run)(restore)
+    }
+
+    #[cfg(not(test))]
+    fn run_restore(&self, restore: &JjRestorePlan) -> Result<String> {
+        restore.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn run_revert(&self, revert: &JjRevertPlan) -> Result<String> {
+        (self.revert_run)(revert)
+    }
+
+    #[cfg(not(test))]
+    fn run_revert(&self, revert: &JjRevertPlan) -> Result<String> {
+        revert.run().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn load_restore_preview(&self, restore: &JjRestorePlan) -> Result<String> {
+        (self.restore_preview_load)(restore)
+    }
+
+    #[cfg(not(test))]
+    fn load_restore_preview(&self, restore: &JjRestorePlan) -> Result<String> {
+        restore
+            .run_preview()
+            .map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
+    fn load_revert_preview(&self, revert: &JjRevertPlan) -> Result<String> {
+        (self.revert_preview_load)(revert)
+    }
+
+    #[cfg(not(test))]
+    fn load_revert_preview(&self, revert: &JjRevertPlan) -> Result<String> {
+        revert
+            .run_preview()
+            .map(|output| output.message().to_owned())
     }
 
     #[cfg(test)]
@@ -659,6 +759,7 @@ impl App {
                 self.switch_to_default()?;
                 Ok(true)
             }
+            Command::View(ViewCommand::OpenActionMenu) => self.open_action_menu(viewport_height),
             Command::View(command) => {
                 let effect = self.execute_view(command, viewport_height);
                 self.apply_view_effect(effect, viewport_height)
@@ -824,6 +925,8 @@ impl App {
                                         }
                                         ActionKind::New
                                         | ActionKind::Split
+                                        | ActionKind::Restore
+                                        | ActionKind::Revert
                                         | ActionKind::Rebase
                                         | ActionKind::Squash
                                         | ActionKind::Absorb => {
@@ -833,6 +936,28 @@ impl App {
                                             );
                                         }
                                     }
+                                }
+                                FollowUp::RestoreExactTarget { revision, path } => {
+                                    let revision = revision.clone();
+                                    let path = path.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    match path {
+                                        Some(path) => {
+                                            self.open_restore_preview(JjRestorePlan::for_path(
+                                                revision, path,
+                                            ));
+                                        }
+                                        None => {
+                                            self.open_restore_preview(JjRestorePlan::for_revision(
+                                                revision,
+                                            ));
+                                        }
+                                    }
+                                }
+                                FollowUp::RevertExactTarget { revision } => {
+                                    let revision = revision.clone();
+                                    self.mode = InteractionMode::Normal;
+                                    self.open_revert_preview(JjRevertPlan::new(revision));
                                 }
                                 FollowUp::NewParents { parents } => {
                                     let parents = parents.clone();
@@ -913,6 +1038,8 @@ impl App {
                             },
                             ActionKind::New
                             | ActionKind::Split
+                            | ActionKind::Restore
+                            | ActionKind::Revert
                             | ActionKind::Abandon
                             | ActionKind::Absorb => {
                                 self.status =
@@ -1163,6 +1290,66 @@ impl App {
                         }
 
                         self.confirm_rebase(rebase, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::RestorePreview { restore, output } => {
+                let (restore, status_context, completed) = {
+                    (
+                        restore.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status = StatusLine::with_message(
+                                &self.view,
+                                "restore cancelled".to_owned(),
+                            );
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_restore(restore, status_context, viewport_height);
+                    }
+                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::RevertPreview { revert, output } => {
+                let (revert, status_context, completed) = {
+                    (
+                        revert.clone(),
+                        output.status_context().cloned(),
+                        output.completed(),
+                    )
+                };
+                let visible_lines = action_output_visible_lines(viewport_height);
+                match handle_action_output_key(code, output, visible_lines) {
+                    ActionOutputKey::Cancel => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status =
+                                StatusLine::with_message(&self.view, "revert cancelled".to_owned());
+                        }
+                    }
+                    ActionOutputKey::Primary => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_revert(revert, status_context, viewport_height);
                     }
                     ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
                 }
@@ -1427,6 +1614,41 @@ impl App {
         if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
             self.mode = InteractionMode::LogRevsetPrompt(String::new());
         }
+    }
+
+    fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
+        if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
+            let effect = self.execute_view(ViewCommand::OpenActionMenu, viewport_height);
+            return self.apply_view_effect(effect, viewport_height);
+        }
+
+        let context = match self.view.exact_restore_revert_context() {
+            Ok(Some(context)) => context,
+            Ok(None) => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    "action menu is only available from graph, show, diff, file list, or file show"
+                        .to_owned(),
+                );
+                return Ok(false);
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                return Ok(false);
+            }
+        };
+
+        let menu = build_action_menu(&context);
+        if menu.is_empty() {
+            self.status = StatusLine::error(
+                &self.view,
+                "no preview actions available for exact restore/revert context".to_owned(),
+            );
+            return Ok(false);
+        }
+
+        self.mode = InteractionMode::ActionMenu { menu, selected: 0 };
+        Ok(false)
     }
 
     fn open_describe_prompt(&mut self) {
@@ -1782,6 +2004,63 @@ impl App {
                 self.status = StatusLine::error(&self.view, message.clone());
                 self.mode = InteractionMode::RebasePreview {
                     rebase,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
+    fn open_restore_preview(&mut self, restore: JjRestorePlan) {
+        let target = restore
+            .path()
+            .map(|path| format!("path {path} from {}", restore.revision()))
+            .unwrap_or_else(|| format!("revision {}", restore.revision()));
+        let status_context = Some(format!(
+            "restore {target} from {}",
+            self.view.spec().app_label()
+        ));
+
+        match self.load_restore_preview(&restore) {
+            Ok(output) => {
+                let command_label = restore.command_label();
+                self.mode = InteractionMode::RestorePreview {
+                    restore,
+                    output: ActionOutput::pending(command_label, output, status_context),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = restore.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::RestorePreview {
+                    restore,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
+    fn open_revert_preview(&mut self, revert: JjRevertPlan) {
+        let status_context = Some(format!(
+            "revert revision {} into @ from {}",
+            revert.revision(),
+            self.view.spec().app_label()
+        ));
+
+        match self.load_revert_preview(&revert) {
+            Ok(output) => {
+                let command_label = revert.command_label();
+                self.mode = InteractionMode::RevertPreview {
+                    revert,
+                    output: ActionOutput::pending(command_label, output, status_context),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = revert.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::RevertPreview {
+                    revert,
                     output: ActionOutput::finished(command_label, message, status_context),
                 };
             }
@@ -2331,6 +2610,70 @@ impl App {
         }
     }
 
+    fn confirm_restore(
+        &mut self,
+        restore: JjRestorePlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = restore.command_label();
+        let result_message = match self.run_restore(&restore) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = format!("{} | jj undo", output.trim());
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("{} | refresh failed: {error} | jj undo", output.trim())
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::RestorePreview {
+            restore,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    fn confirm_revert(
+        &mut self,
+        revert: JjRevertPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = revert.command_label();
+        let result_message = match self.run_revert(&revert) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = format!("{} | jj undo", output.trim());
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("{} | refresh failed: {error} | jj undo", output.trim())
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::RevertPreview {
+            revert,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
     fn confirm_rebase(
         &mut self,
         rebase: JjRebasePlan,
@@ -2652,6 +2995,8 @@ impl App {
             }
             InteractionMode::NewPreview { output, .. } => Overlay::NewPreview { output },
             InteractionMode::RebasePreview { output, .. } => Overlay::RebasePreview { output },
+            InteractionMode::RestorePreview { output, .. } => Overlay::RestorePreview { output },
+            InteractionMode::RevertPreview { output, .. } => Overlay::RevertPreview { output },
             InteractionMode::SquashPreview { output, .. } => Overlay::SquashPreview { output },
             InteractionMode::AbsorbPreview { output, .. } => Overlay::AbsorbPreview { output },
             InteractionMode::AbandonPreview { output, .. } => Overlay::AbandonPreview { output },
@@ -2678,11 +3023,38 @@ impl App {
     }
 
     fn push_detail(&mut self, command: JjCommand, revset: String) -> Result<()> {
+        let Some(spec) = self.detail_spec(command, revset) else {
+            return Ok(());
+        };
+        self.push_view(spec)
+    }
+
+    fn detail_spec(&self, command: JjCommand, revset: String) -> Option<ViewSpec> {
+        let source_has_exact_target = self.view_has_exact_detail_target();
         let spec = match command {
-            JjCommand::Show => ViewSpec::show(revset, self.diff_format),
-            JjCommand::Diff => ViewSpec::diff(revset, self.diff_format),
+            JjCommand::Show => {
+                let spec = ViewSpec::show(revset, self.diff_format);
+                if source_has_exact_target {
+                    spec
+                } else {
+                    spec.without_exact_change_target()
+                }
+            }
+            JjCommand::Diff => {
+                let spec = ViewSpec::diff(revset, self.diff_format);
+                if source_has_exact_target {
+                    spec
+                } else {
+                    spec.without_exact_change_target()
+                }
+            }
             JjCommand::FileShow => {
-                ViewSpec::file_show(self.view.spec().navigation_revset(), revset)
+                let spec = ViewSpec::file_show(self.view.spec().navigation_revset(), revset);
+                if self.view.spec().has_exact_change_target() {
+                    spec.with_exact_change_target()
+                } else {
+                    spec
+                }
             }
             JjCommand::Default
             | JjCommand::Log
@@ -2691,9 +3063,14 @@ impl App {
             | JjCommand::Bookmarks
             | JjCommand::OperationLog
             | JjCommand::OperationShow
-            | JjCommand::OperationDiff => return Ok(()),
+            | JjCommand::OperationDiff => return None,
         };
-        self.push_view(spec)
+        Some(spec)
+    }
+
+    fn view_has_exact_detail_target(&self) -> bool {
+        matches!(self.view.command(), JjCommand::Default | JjCommand::Log)
+            || self.view.spec().has_exact_change_target()
     }
 
     fn open_status(&mut self) -> Result<()> {
@@ -3077,6 +3454,47 @@ mod tests {
         Err(eyre!("jj absorb failed: first line\nsecond line"))
     }
 
+    fn mock_restore_success(restore: &JjRestorePlan) -> Result<String> {
+        Ok(match restore.path() {
+            Some(path) => format!("restored {} from {}", path, restore.revision()),
+            None => format!("restored {}", restore.revision()),
+        })
+    }
+
+    fn mock_restore_failure(_: &JjRestorePlan) -> Result<String> {
+        Err(eyre!("jj restore failed: first line\nsecond line"))
+    }
+
+    fn mock_restore_preview_success(restore: &JjRestorePlan) -> Result<String> {
+        Ok(match restore.path() {
+            Some(path) => format!(
+                "target revision: {}\nselected path: {}\nexact fileset: root-file:\"{}\"\nundo path: jj undo",
+                restore.revision(),
+                path,
+                path
+            ),
+            None => format!(
+                "target revision: {}\nundo path: jj undo",
+                restore.revision()
+            ),
+        })
+    }
+
+    fn mock_revert_success(revert: &JjRevertPlan) -> Result<String> {
+        Ok(format!("reverted {}", revert.revision()))
+    }
+
+    fn mock_revert_failure(_: &JjRevertPlan) -> Result<String> {
+        Err(eyre!("jj revert failed: first line\nsecond line"))
+    }
+
+    fn mock_revert_preview_success(revert: &JjRevertPlan) -> Result<String> {
+        Ok(format!(
+            "target revision: {}\nforward diff:\nM src/main.rs\nundo path: jj undo",
+            revert.revision()
+        ))
+    }
+
     fn mock_describe_success(describe: &JjDescribePlan) -> Result<String> {
         Ok(format!("described {}", describe.target().label()))
     }
@@ -3267,6 +3685,14 @@ mod tests {
             squash_run: mock_squash_success,
             #[cfg(test)]
             absorb_run: mock_absorb_success,
+            #[cfg(test)]
+            restore_run: mock_restore_success,
+            #[cfg(test)]
+            revert_run: mock_revert_success,
+            #[cfg(test)]
+            restore_preview_load: mock_restore_preview_success,
+            #[cfg(test)]
+            revert_preview_load: mock_revert_preview_success,
             #[cfg(test)]
             describe_run: mock_describe_success,
             #[cfg(test)]
@@ -4540,6 +4966,394 @@ mod tests {
         assert_eq!(
             app.status.message(),
             "jj new failed: first line\nsecond line"
+        );
+    }
+
+    #[test]
+    fn detail_action_menu_from_exact_show_offers_restore_and_revert() {
+        let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
+        )));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        let actions = match &app.mode {
+            InteractionMode::ActionMenu { menu, .. } => menu
+                .items()
+                .iter()
+                .map(|item| item.action())
+                .collect::<Vec<_>>(),
+            _ => panic!("expected detail action menu"),
+        };
+        assert_eq!(actions, vec![ActionKind::Restore, ActionKind::Revert]);
+    }
+
+    #[test]
+    fn detail_action_menu_from_exact_file_list_offers_path_restore_first() {
+        let mut app = test_app(ViewState::FileList(
+            crate::file_list::FileListView::test_with_spec(
+                ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
+                    .with_exact_change_target(),
+                vec![crate::jj::FileListItem::new(
+                    Vec::new(),
+                    "src/main.rs".to_owned(),
+                )],
+            ),
+        ));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        let menu = match &app.mode {
+            InteractionMode::ActionMenu { menu, .. } => menu,
+            _ => panic!("expected detail action menu"),
+        };
+        let actions = menu
+            .items()
+            .iter()
+            .map(|item| item.action())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            actions,
+            vec![ActionKind::Restore, ActionKind::Restore, ActionKind::Revert]
+        );
+        assert!(matches!(
+            menu.items()[0].follow_up(),
+            FollowUp::RestoreExactTarget { revision, path }
+                if revision == "change-a" && path.as_deref() == Some("src/main.rs")
+        ));
+    }
+
+    #[test]
+    fn open_action_menu_rejects_direct_show_startup_revset() {
+        let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]),
+        )));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "restore/revert from jk show main requires an exact graph-derived revision target"
+        );
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+    }
+
+    #[test]
+    fn open_action_menu_rejects_bookmark_derived_show() {
+        let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::show("change-a".to_owned(), DiffFormat::Default)
+                .without_exact_change_target(),
+        )));
+
+        app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "restore/revert from jk show change-a requires an exact graph-derived revision target"
+        );
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+    }
+
+    #[test]
+    fn detail_navigation_marks_graph_targets_exact() {
+        let app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(
+            Vec::new(),
+        )));
+
+        let show = app
+            .detail_spec(JjCommand::Show, "change-a".to_owned())
+            .unwrap();
+        let diff = app
+            .detail_spec(JjCommand::Diff, "change-a".to_owned())
+            .unwrap();
+
+        assert_eq!(show.exact_change_target(), Some("change-a"));
+        assert_eq!(diff.exact_change_target(), Some("change-a"));
+    }
+
+    #[test]
+    fn detail_navigation_from_bookmarks_is_not_exact() {
+        let app = test_app(ViewState::Bookmarks(
+            crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+                Vec::new(),
+                "feature".to_owned(),
+                Some("change-a".to_owned()),
+                None,
+            )]),
+        ));
+
+        let show = app
+            .detail_spec(JjCommand::Show, "change-a".to_owned())
+            .unwrap();
+        let diff = app
+            .detail_spec(JjCommand::Diff, "change-a".to_owned())
+            .unwrap();
+
+        assert_eq!(show.exact_change_target(), None);
+        assert_eq!(diff.exact_change_target(), None);
+    }
+
+    #[test]
+    fn detail_navigation_preserves_inexact_direct_startup_revsets() {
+        let app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]),
+        )));
+
+        let diff = app.detail_spec(JjCommand::Diff, "main".to_owned()).unwrap();
+
+        assert_eq!(diff.navigation_revset().as_deref(), Some("main"));
+        assert_eq!(diff.exact_change_target(), None);
+    }
+
+    #[test]
+    fn file_show_navigation_preserves_source_exactness_only() {
+        let exact_app = test_app(ViewState::FileList(
+            crate::file_list::FileListView::test_with_spec(
+                ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
+                    .with_exact_change_target(),
+                vec![crate::jj::FileListItem::new(
+                    Vec::new(),
+                    "src/main.rs".to_owned(),
+                )],
+            ),
+        ));
+        let direct_app = test_app(ViewState::FileList(
+            crate::file_list::FileListView::test_with_spec(
+                ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned())),
+                vec![crate::jj::FileListItem::new(
+                    Vec::new(),
+                    "src/main.rs".to_owned(),
+                )],
+            ),
+        ));
+
+        let exact = exact_app
+            .detail_spec(JjCommand::FileShow, "src/main.rs".to_owned())
+            .unwrap();
+        let direct = direct_app
+            .detail_spec(JjCommand::FileShow, "src/main.rs".to_owned())
+            .unwrap();
+
+        assert_eq!(exact.exact_change_target(), Some("change-a"));
+        assert_eq!(direct.navigation_revset().as_deref(), Some("main"));
+        assert_eq!(direct.exact_change_target(), None);
+    }
+
+    #[test]
+    fn open_action_menu_rejects_unsupported_status_view() {
+        let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[])));
+
+        app.open_action_menu(12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "action menu is only available from graph, show, diff, file list, or file show"
+        );
+        assert!(matches!(app.status.kind(), StatusKind::Error));
+    }
+
+    #[test]
+    fn restore_action_menu_enter_opens_path_preview() {
+        let mut app = test_app(ViewState::FileList(
+            crate::file_list::FileListView::test_with_spec(
+                ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
+                    .with_exact_change_target(),
+                vec![crate::jj::FileListItem::new(
+                    Vec::new(),
+                    "src/main.rs".to_owned(),
+                )],
+            ),
+        ));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::detail("change-a")
+                    .with_selected_path("src/main.rs"),
+            ),
+            selected: 0,
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (path, command_label, body) = match &app.mode {
+            InteractionMode::RestorePreview { restore, output } => (
+                restore.path().map(str::to_owned),
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected restore preview mode"),
+        };
+        assert_eq!(path.as_deref(), Some("src/main.rs"));
+        assert_eq!(
+            command_label,
+            "jj restore --changes-in exactly(change_id(\"change-a\"), 1) root-file:\"src/main.rs\""
+        );
+        assert!(body.contains("target revision: change-a"));
+        assert!(body.contains("selected path: src/main.rs"));
+        assert!(body.contains("undo path: jj undo"));
+    }
+
+    #[test]
+    fn restore_preview_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
+        )));
+        app.mode = InteractionMode::RestorePreview {
+            restore: JjRestorePlan::for_revision("change-a"),
+            output: ActionOutput::pending(
+                "jj restore --changes-in exactly(change_id(\"change-a\"), 1)".to_owned(),
+                "preview only".to_owned(),
+                Some("restore preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "restore cancelled");
+    }
+
+    #[test]
+    fn restore_confirm_success_and_failure_keep_output_readable() {
+        let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
+        )));
+        app.mode = InteractionMode::RestorePreview {
+            restore: JjRestorePlan::for_path("change-a", "src/main.rs"),
+            output: ActionOutput::pending(
+                "jj restore --changes-in exactly(change_id(\"change-a\"), 1) root-file:\"src/main.rs\"".to_owned(),
+                "preview only".to_owned(),
+                Some("restore preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::RestorePreview { output, .. } => output,
+            _ => panic!("expected restore result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("restored src/main.rs from change-a | jj undo"));
+        assert_eq!(
+            app.status.message(),
+            "restored src/main.rs from change-a | jj undo"
+        );
+
+        app.restore_run = mock_restore_failure;
+        app.mode = InteractionMode::RestorePreview {
+            restore: JjRestorePlan::for_revision("change-a"),
+            output: ActionOutput::pending(
+                "jj restore --changes-in exactly(change_id(\"change-a\"), 1)".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::RestorePreview { output, .. } => output,
+            _ => panic!("expected restore result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("jj restore failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj restore failed: first line\nsecond line"
+        );
+    }
+
+    #[test]
+    fn revert_action_menu_enter_opens_preview_and_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
+        )));
+        app.mode = InteractionMode::ActionMenu {
+            menu: crate::action_menu::build_action_menu(
+                &crate::action_menu::ExactActionContext::detail("change-a"),
+            ),
+            selected: 1,
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let (command_label, body) = match &app.mode {
+            InteractionMode::RevertPreview { output, .. } => (
+                output.command_label().to_owned(),
+                output.body_lines().join("\n"),
+            ),
+            _ => panic!("expected revert preview mode"),
+        };
+        assert_eq!(
+            command_label,
+            "jj revert -r exactly(change_id(\"change-a\"), 1) -o @"
+        );
+        assert!(body.contains("target revision: change-a"));
+
+        app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "revert cancelled");
+    }
+
+    #[test]
+    fn revert_confirm_success_and_failure_keep_output_readable() {
+        let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+            ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
+        )));
+        app.mode = InteractionMode::RevertPreview {
+            revert: JjRevertPlan::new("change-a"),
+            output: ActionOutput::pending(
+                "jj revert -r exactly(change_id(\"change-a\"), 1) -o @".to_owned(),
+                "preview only".to_owned(),
+                Some("revert preview context".to_owned()),
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::RevertPreview { output, .. } => output,
+            _ => panic!("expected revert result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("reverted change-a | jj undo"));
+        assert_eq!(app.status.message(), "reverted change-a | jj undo");
+
+        app.revert_run = mock_revert_failure;
+        app.mode = InteractionMode::RevertPreview {
+            revert: JjRevertPlan::new("change-a"),
+            output: ActionOutput::pending(
+                "jj revert -r exactly(change_id(\"change-a\"), 1) -o @".to_owned(),
+                "preview only".to_owned(),
+                None,
+            ),
+        };
+
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        let output = match &app.mode {
+            InteractionMode::RevertPreview { output, .. } => output,
+            _ => panic!("expected revert result mode"),
+        };
+        let body = output.body_lines().join("\n");
+        assert!(output.completed());
+        assert!(body.contains("jj revert failed: first line"));
+        assert!(body.contains("second line"));
+        assert_eq!(
+            app.status.message(),
+            "jj revert failed: first line\nsecond line"
         );
     }
 

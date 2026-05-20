@@ -66,6 +66,10 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
     ),
+    Binding::new(
+        KeyPattern::char('a'),
+        Command::View(ViewCommand::OpenActionMenu),
+    ),
 ];
 
 /// Rendered `jj file show` output plus scroll state for one exact path.

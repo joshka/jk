@@ -320,6 +320,17 @@ pub struct JjCommitPlan {
     message: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjRestorePlan {
+    revision: String,
+    path: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjRevertPlan {
+    revision: String,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjBookmarkMutationKind {
     Create,
@@ -533,6 +544,178 @@ impl JjCommitPlan {
             self.command_label(),
             self.message,
         )
+    }
+}
+
+impl JjRestorePlan {
+    pub fn for_revision(revision: impl Into<String>) -> Self {
+        Self {
+            revision: revision.into(),
+            path: None,
+        }
+    }
+
+    pub fn for_path(revision: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            revision: revision.into(),
+            path: Some(path.into()),
+        }
+    }
+
+    pub fn revision(&self) -> &str {
+        &self.revision
+    }
+
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        let mut argv = vec![
+            "restore".to_owned(),
+            "--changes-in".to_owned(),
+            exact_change_id_revset(&self.revision),
+        ];
+        if let Some(path) = &self.path {
+            argv.push(root_file_fileset(path));
+        }
+        argv
+    }
+
+    pub fn preview_diff_label(&self) -> String {
+        let label_args = self.preview_diff_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn preview_diff_argv(&self) -> Vec<String> {
+        let mut argv = vec![
+            "diff".to_owned(),
+            "-r".to_owned(),
+            exact_change_id_revset(&self.revision),
+        ];
+        if let Some(path) = &self.path {
+            argv.push(root_file_fileset(path));
+        }
+        argv
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        let forward_diff =
+            run_direct_args_stdout(self.preview_diff_argv(), &self.preview_diff_label())?;
+        Ok(CommandOutput {
+            message: self.preview_summary(&forward_diff),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(self.command_argv(), &self.command_label(), "restored")
+    }
+
+    pub fn preview_summary(&self, forward_diff: &str) -> String {
+        let mut lines = vec![
+            format!("target revision: {}", self.revision),
+            format!("command: {}", self.command_label()),
+        ];
+
+        match &self.path {
+            Some(path) => {
+                lines.push(format!("selected path: {path}"));
+                lines.push(format!("exact fileset: {}", root_file_fileset(path)));
+                lines.push(
+                    "effect: restore removes the selected path's forward diff from that exact revision"
+                        .to_owned(),
+                );
+            }
+            None => lines.push(
+                "effect: restore removes the selected revision's forward diff from that exact revision"
+                    .to_owned(),
+            ),
+        }
+
+        lines.extend([
+            format!("preview source: {}", self.preview_diff_label()),
+            "honesty: the output below is the forward diff that jj restore removes; jk is not simulating the final graph".to_owned(),
+            "confirmation: press Enter to run jj restore".to_owned(),
+            "undo path: jj undo".to_owned(),
+            String::new(),
+            "forward diff:".to_owned(),
+            forward_diff.trim_end().to_owned(),
+        ]);
+
+        lines.join("\n")
+    }
+}
+
+impl JjRevertPlan {
+    pub fn new(revision: impl Into<String>) -> Self {
+        Self {
+            revision: revision.into(),
+        }
+    }
+
+    pub fn revision(&self) -> &str {
+        &self.revision
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        vec![
+            "revert".to_owned(),
+            "-r".to_owned(),
+            exact_change_id_revset(&self.revision),
+            "-o".to_owned(),
+            "@".to_owned(),
+        ]
+    }
+
+    pub fn preview_diff_label(&self) -> String {
+        let label_args = self.preview_diff_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn preview_diff_argv(&self) -> Vec<String> {
+        vec![
+            "diff".to_owned(),
+            "-r".to_owned(),
+            exact_change_id_revset(&self.revision),
+        ]
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        let forward_diff =
+            run_direct_args_stdout(self.preview_diff_argv(), &self.preview_diff_label())?;
+        Ok(CommandOutput {
+            message: self.preview_summary(&forward_diff),
+        })
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(self.command_argv(), &self.command_label(), "reverted")
+    }
+
+    pub fn preview_summary(&self, forward_diff: &str) -> String {
+        [
+            format!("target revision: {}", self.revision),
+            format!("command: {}", self.command_label()),
+            "effect: revert reverse-applies the selected revision's forward diff into @".to_owned(),
+            format!("preview source: {}", self.preview_diff_label()),
+            "honesty: the output below is the forward diff that jj revert reverse-applies into @; jk is not simulating the final graph".to_owned(),
+            "confirmation: press Enter to run jj revert".to_owned(),
+            "undo path: jj undo".to_owned(),
+            String::new(),
+            "forward diff:".to_owned(),
+            forward_diff.trim_end().to_owned(),
+        ]
+        .join("\n")
     }
 }
 
@@ -1080,6 +1263,10 @@ fn exact_change_id_revset(change_id: &str) -> String {
     )
 }
 
+fn root_file_fileset(path: &str) -> String {
+    format!("root-file:{}", revset_string_literal(path))
+}
+
 fn revset_string_literal(value: &str) -> String {
     let mut quoted = String::with_capacity(value.len() + 2);
     quoted.push('"');
@@ -1284,12 +1471,15 @@ impl DiffFormat {
 ///
 /// `args` preserve the command line passed to jj. `target` is set for views
 /// opened from the graph, where navigation should use a jj change id rather
-/// than the commit id printed beside it.
+/// than the commit id printed beside it. `target_is_exact_change` records
+/// whether the target came from an exact graph change id instead of
+/// from parsing a direct startup revset such as `main` or `@`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ViewSpec {
     command: JjCommand,
     args: Vec<String>,
     target: Option<String>,
+    target_is_exact_change: bool,
     path: Option<String>,
     diff_format: DiffFormat,
 }
@@ -1301,6 +1491,7 @@ impl ViewSpec {
             command,
             args,
             target: None,
+            target_is_exact_change: false,
             path: None,
             diff_format,
         }
@@ -1311,6 +1502,7 @@ impl ViewSpec {
             command: JjCommand::Bookmarks,
             args,
             target: None,
+            target_is_exact_change: false,
             path: None,
             diff_format: DiffFormat::Default,
         }
@@ -1321,6 +1513,7 @@ impl ViewSpec {
             command: JjCommand::Show,
             args: diff_format_args(diff_format, [revset.clone()]),
             target: Some(revset),
+            target_is_exact_change: true,
             path: None,
             diff_format,
         }
@@ -1331,6 +1524,7 @@ impl ViewSpec {
             command: JjCommand::Diff,
             args: diff_format_args(diff_format, ["-r".to_owned(), revset.clone()]),
             target: Some(revset),
+            target_is_exact_change: true,
             path: None,
             diff_format,
         }
@@ -1346,6 +1540,7 @@ impl ViewSpec {
             command: JjCommand::FileList,
             args,
             target: revset,
+            target_is_exact_change: false,
             path: selected_path,
             diff_format: DiffFormat::Default,
         }
@@ -1361,6 +1556,7 @@ impl ViewSpec {
             command: JjCommand::FileShow,
             args,
             target: revset,
+            target_is_exact_change: false,
             path: Some(path),
             diff_format: DiffFormat::Default,
         }
@@ -1371,6 +1567,7 @@ impl ViewSpec {
             command: JjCommand::OperationShow,
             args: vec![operation_id.clone()],
             target: Some(operation_id),
+            target_is_exact_change: false,
             path: None,
             diff_format: DiffFormat::Default,
         }
@@ -1381,6 +1578,7 @@ impl ViewSpec {
             command: JjCommand::OperationDiff,
             args: vec!["--operation".to_owned(), operation_id.clone()],
             target: Some(operation_id),
+            target_is_exact_change: false,
             path: None,
             diff_format: DiffFormat::Default,
         }
@@ -1423,6 +1621,28 @@ impl ViewSpec {
 
     pub fn target(&self) -> Option<&str> {
         self.target.as_deref()
+    }
+
+    pub fn exact_change_target(&self) -> Option<&str> {
+        if self.target_is_exact_change {
+            self.target.as_deref()
+        } else {
+            None
+        }
+    }
+
+    pub fn has_exact_change_target(&self) -> bool {
+        self.exact_change_target().is_some()
+    }
+
+    pub fn with_exact_change_target(mut self) -> Self {
+        self.target_is_exact_change = self.target.is_some();
+        self
+    }
+
+    pub fn without_exact_change_target(mut self) -> Self {
+        self.target_is_exact_change = false;
+        self
     }
 
     pub fn path(&self) -> Option<&str> {
@@ -2608,6 +2828,101 @@ mod tests {
     }
 
     #[test]
+    fn restore_plan_uses_exact_change_revset_for_revision_restore() {
+        let restore = JjRestorePlan::for_revision("change-a");
+
+        assert_eq!(
+            restore.command_argv(),
+            vec![
+                "restore",
+                "--changes-in",
+                "exactly(change_id(\"change-a\"), 1)"
+            ]
+        );
+        assert_eq!(
+            restore.preview_diff_argv(),
+            vec!["diff", "-r", "exactly(change_id(\"change-a\"), 1)"]
+        );
+        assert_eq!(
+            restore.command_label(),
+            "jj restore --changes-in exactly(change_id(\"change-a\"), 1)"
+        );
+
+        let preview = restore.preview_summary("M src/main.rs\n");
+        assert!(preview.contains("target revision: change-a"));
+        assert!(preview.contains("effect: restore removes the selected revision's forward diff"));
+        assert!(preview.contains("preview source: jj diff -r exactly(change_id(\"change-a\"), 1)"));
+        assert!(preview.contains("jk is not simulating the final graph"));
+        assert!(preview.contains("confirmation: press Enter to run jj restore"));
+        assert!(preview.contains("undo path: jj undo"));
+        assert!(preview.contains("forward diff:\nM src/main.rs"));
+    }
+
+    #[test]
+    fn restore_plan_uses_root_file_fileset_for_exact_paths() {
+        let restore = JjRestorePlan::for_path("change-a", "dir/with spaces/quo\"te\\[glob]?*");
+
+        assert_eq!(
+            restore.command_argv(),
+            vec![
+                "restore",
+                "--changes-in",
+                "exactly(change_id(\"change-a\"), 1)",
+                "root-file:\"dir/with spaces/quo\\\"te\\\\[glob]?*\""
+            ]
+        );
+        assert_eq!(
+            restore.preview_diff_argv(),
+            vec![
+                "diff",
+                "-r",
+                "exactly(change_id(\"change-a\"), 1)",
+                "root-file:\"dir/with spaces/quo\\\"te\\\\[glob]?*\""
+            ]
+        );
+
+        let preview = restore.preview_summary("A dir/with spaces/quo\"te\\[glob]?*\n");
+        assert!(preview.contains("selected path: dir/with spaces/quo\"te\\[glob]?*"));
+        assert!(
+            preview.contains("exact fileset: root-file:\"dir/with spaces/quo\\\"te\\\\[glob]?*\"")
+        );
+        assert!(preview.contains("effect: restore removes the selected path's forward diff"));
+    }
+
+    #[test]
+    fn revert_plan_uses_exact_change_revset_and_working_copy_destination() {
+        let revert = JjRevertPlan::new("change-a");
+
+        assert_eq!(
+            revert.command_argv(),
+            vec![
+                "revert",
+                "-r",
+                "exactly(change_id(\"change-a\"), 1)",
+                "-o",
+                "@"
+            ]
+        );
+        assert_eq!(
+            revert.preview_diff_argv(),
+            vec!["diff", "-r", "exactly(change_id(\"change-a\"), 1)"]
+        );
+        assert_eq!(
+            revert.command_label(),
+            "jj revert -r exactly(change_id(\"change-a\"), 1) -o @"
+        );
+
+        let preview = revert.preview_summary("M src/main.rs\n");
+        assert!(preview.contains("target revision: change-a"));
+        assert!(preview.contains("reverse-applies the selected revision's forward diff into @"));
+        assert!(preview.contains("preview source: jj diff -r exactly(change_id(\"change-a\"), 1)"));
+        assert!(preview.contains("jk is not simulating the final graph"));
+        assert!(preview.contains("confirmation: press Enter to run jj revert"));
+        assert!(preview.contains("undo path: jj undo"));
+        assert!(preview.contains("forward diff:\nM src/main.rs"));
+    }
+
+    #[test]
     fn bookmark_create_and_set_target_exact_changes_or_current_working_copy() {
         let create = JjBookmarkMutationPlan::create(
             "feature/name",
@@ -2681,6 +2996,7 @@ mod tests {
         assert_eq!(spec.command(), JjCommand::FileList);
         assert_eq!(spec.args(), ["-r", "main"]);
         assert_eq!(spec.path(), Some("src/main.rs"));
+        assert_eq!(spec.exact_change_target(), None);
         assert_eq!(
             jj_command_args(&spec, None, false),
             vec!["file", "list", "-r", "main"]
@@ -2698,6 +3014,7 @@ mod tests {
         assert_eq!(spec.command(), JjCommand::FileShow);
         assert_eq!(spec.args(), ["-r", "main", "src/main.rs"]);
         assert_eq!(spec.path(), Some("src/main.rs"));
+        assert_eq!(spec.exact_change_target(), None);
         assert_eq!(
             jj_command_args(&spec, None, false),
             vec!["file", "show", "-r", "main", "src/main.rs"]
@@ -3027,6 +3344,10 @@ mod tests {
             DiffFormat::Default,
         );
 
+        assert_eq!(
+            spec.exact_change_target(),
+            Some("tvykuurwpnwzzqulzrvwvmxxotnlywqw")
+        );
         assert_eq!(spec.app_label(), "jk show tvykuurw");
 
         let spec = ViewSpec::diff(
@@ -3034,7 +3355,27 @@ mod tests {
             DiffFormat::Default,
         );
 
+        assert_eq!(
+            spec.exact_change_target(),
+            Some("tvykuurwpnwzzqulzrvwvmxxotnlywqw")
+        );
         assert_eq!(spec.app_label(), "jk diff -r tvykuurw");
+    }
+
+    #[test]
+    fn exact_change_target_provenance_is_explicit() {
+        let direct = ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]);
+        assert_eq!(direct.navigation_revset().as_deref(), Some("main"));
+        assert_eq!(direct.exact_change_target(), None);
+
+        let file_list =
+            ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
+                .with_exact_change_target();
+        assert_eq!(file_list.exact_change_target(), Some("change-a"));
+
+        let file_show = ViewSpec::file_show(Some("change-a".to_owned()), "src/main.rs".to_owned())
+            .with_exact_change_target();
+        assert_eq!(file_show.exact_change_target(), Some("change-a"));
     }
 
     #[test]
@@ -3417,6 +3758,14 @@ mod tests {
         assert_eq!(
             exact_change_id_revset("abc\"\\"),
             "exactly(change_id(\"abc\\\"\\\\\"), 1)"
+        );
+    }
+
+    #[test]
+    fn root_file_fileset_quotes_spaces_quotes_backslashes_and_metacharacters() {
+        assert_eq!(
+            root_file_fileset("a b/\"c\"/d\\e[f]{g}(h)|i?*"),
+            "root-file:\"a b/\\\"c\\\"/d\\\\e[f]{g}(h)|i?*\""
         );
     }
 

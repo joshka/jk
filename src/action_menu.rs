@@ -26,6 +26,8 @@ pub enum ActionKind {
     New,
     Split,
     Abandon,
+    Restore,
+    Revert,
     Rebase,
     Squash,
     Absorb,
@@ -37,6 +39,8 @@ impl ActionKind {
             Self::New => "new",
             Self::Split => "split",
             Self::Abandon => "abandon",
+            Self::Restore => "restore",
+            Self::Revert => "revert",
             Self::Rebase => "rebase",
             Self::Squash => "squash",
             Self::Absorb => "absorb",
@@ -131,6 +135,13 @@ pub enum FollowUp {
     ExactRevision {
         revision: String,
     },
+    RestoreExactTarget {
+        revision: String,
+        path: Option<String>,
+    },
+    RevertExactTarget {
+        revision: String,
+    },
     NewParents {
         parents: Vec<String>,
     },
@@ -190,6 +201,8 @@ impl ActionMenu {
 pub struct ExactActionContext {
     current_revision: Option<String>,
     source_revisions: Vec<String>,
+    selected_path: Option<String>,
+    surface: ActionSurface,
 }
 
 impl ExactActionContext {
@@ -197,6 +210,17 @@ impl ExactActionContext {
         Self {
             current_revision: Some(current_revision.into()),
             source_revisions: Vec::new(),
+            selected_path: None,
+            surface: ActionSurface::Graph,
+        }
+    }
+
+    pub fn detail(current_revision: impl Into<String>) -> Self {
+        Self {
+            current_revision: Some(current_revision.into()),
+            source_revisions: Vec::new(),
+            selected_path: None,
+            surface: ActionSurface::Detail,
         }
     }
 
@@ -205,6 +229,8 @@ impl ExactActionContext {
         Self {
             current_revision: None,
             source_revisions: Vec::new(),
+            selected_path: None,
+            surface: ActionSurface::Graph,
         }
     }
 
@@ -217,6 +243,11 @@ impl ExactActionContext {
         self
     }
 
+    pub fn with_selected_path(mut self, path: impl Into<String>) -> Self {
+        self.selected_path = Some(path.into());
+        self
+    }
+
     pub fn current_revision(&self) -> Option<&str> {
         self.current_revision.as_deref()
     }
@@ -224,12 +255,25 @@ impl ExactActionContext {
     pub fn source_revisions(&self) -> &[String] {
         &self.source_revisions
     }
+
+    pub fn selected_path(&self) -> Option<&str> {
+        self.selected_path.as_deref()
+    }
+
+    fn is_detail_surface(&self) -> bool {
+        matches!(self.surface, ActionSurface::Detail)
+    }
 }
 
 pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     let Some(current_revision) = context.current_revision() else {
         return ActionMenu::default();
     };
+    let mutation_items = mutation_menu_items(current_revision, context.selected_path());
+
+    if context.is_detail_surface() {
+        return ActionMenu::new(mutation_items);
+    }
 
     let new_parents = if context.source_revisions().is_empty() {
         vec![current_revision.to_owned()]
@@ -246,7 +290,9 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
         let new = menu_item_for_new_parents(&new_parents);
         let split = menu_item_for_single_revision(ActionKind::Split, current_revision);
         let abandon = menu_item_for_single_revision(ActionKind::Abandon, current_revision);
-        return ActionMenu::new(vec![new, split, abandon]);
+        let mut items = vec![new, split, abandon];
+        items.extend(mutation_items);
+        return ActionMenu::new(items);
     }
 
     let selected_revisions = context
@@ -259,12 +305,14 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
         return ActionMenu::default();
     }
 
-    ActionMenu::new(vec![
+    let mut items = vec![
         menu_item_for_new_parents(&new_parents),
         menu_item_for_multirev_action(ActionKind::Rebase, &selected_revisions, current_revision),
         menu_item_for_multirev_action(ActionKind::Squash, &selected_revisions, current_revision),
         menu_item_for_absorb(current_revision, &selected_revisions),
-    ])
+    ];
+    items.extend(mutation_menu_items(current_revision, None));
+    ActionMenu::new(items)
 }
 
 fn menu_item_for_new_parents(parent_revisions: &[String]) -> ActionMenuItem {
@@ -295,6 +343,8 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         },
         ActionKind::New
         | ActionKind::Split
+        | ActionKind::Restore
+        | ActionKind::Revert
         | ActionKind::Rebase
         | ActionKind::Squash
         | ActionKind::Absorb => {
@@ -365,6 +415,48 @@ fn menu_item_for_absorb(source_revision: &str, destination_revisions: &[String])
     }
 }
 
+fn mutation_menu_items(current_revision: &str, selected_path: Option<&str>) -> Vec<ActionMenuItem> {
+    let mut items = Vec::new();
+    if let Some(path) = selected_path {
+        items.push(ActionMenuItem {
+            action: ActionKind::Restore,
+            label: format!("restore selected path from {}", short_id(current_revision)),
+            safety_tier: SafetyTier::PreviewFirst,
+            follow_up: FollowUp::RestoreExactTarget {
+                revision: current_revision.to_owned(),
+                path: Some(path.to_owned()),
+            },
+        });
+    }
+    items.push(ActionMenuItem {
+        action: ActionKind::Restore,
+        label: format!("restore selected revision {}", short_id(current_revision)),
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up: FollowUp::RestoreExactTarget {
+            revision: current_revision.to_owned(),
+            path: None,
+        },
+    });
+    items.push(ActionMenuItem {
+        action: ActionKind::Revert,
+        label: format!(
+            "revert selected revision {} into @",
+            short_id(current_revision)
+        ),
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up: FollowUp::RevertExactTarget {
+            revision: current_revision.to_owned(),
+        },
+    });
+    items
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ActionSurface {
+    Graph,
+    Detail,
+}
+
 fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }
@@ -374,17 +466,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn single_exact_revision_builds_preview_first_split_and_abandon_menu() {
+    fn single_exact_revision_builds_graph_menu_with_restore_and_revert() {
         let context = ExactActionContext::with_current("0000000011111111222222223333333344444444");
         let menu = build_action_menu(&context);
 
-        assert_eq!(menu.items().len(), 3);
+        assert_eq!(menu.items().len(), 5);
         assert_eq!(menu.items()[0].action(), ActionKind::New);
         assert_eq!(menu.items()[1].action(), ActionKind::Split);
         assert_eq!(menu.items()[2].action(), ActionKind::Abandon);
+        assert_eq!(menu.items()[3].action(), ActionKind::Restore);
+        assert_eq!(menu.items()[4].action(), ActionKind::Revert);
         assert!(menu.items()[0].safety_tier().is_preview_first());
         assert!(menu.items()[1].safety_tier().is_preview_first());
         assert!(menu.items()[2].safety_tier().is_preview_first());
+        assert!(menu.items()[3].safety_tier().is_preview_first());
+        assert!(menu.items()[4].safety_tier().is_preview_first());
         assert!(matches!(
             menu.items()[0].follow_up(),
             FollowUp::NewParents { parents }
@@ -400,6 +496,16 @@ mod tests {
             FollowUp::ExactRevision { revision }
                 if revision == "0000000011111111222222223333333344444444"
         ));
+        assert!(matches!(
+            menu.items()[3].follow_up(),
+            FollowUp::RestoreExactTarget { revision, path }
+                if revision == "0000000011111111222222223333333344444444" && path.is_none()
+        ));
+        assert!(matches!(
+            menu.items()[4].follow_up(),
+            FollowUp::RevertExactTarget { revision }
+                if revision == "0000000011111111222222223333333344444444"
+        ));
     }
 
     #[test]
@@ -412,7 +518,7 @@ mod tests {
                 ]);
         let menu = build_action_menu(&context);
 
-        assert_eq!(menu.items().len(), 4);
+        assert_eq!(menu.items().len(), 6);
         assert!(menu.items()[0].label().contains("new merge child"));
         assert!(
             menu.items()[1]
@@ -509,6 +615,16 @@ mod tests {
                     "eeeeffff2222222222222222222222222222222222".to_owned()
                 ]
         ));
+        assert!(matches!(
+            menu.items()[4].follow_up(),
+            FollowUp::RestoreExactTarget { revision, path }
+                if revision == "ccccdddd1111111111111111111111111111111111" && path.is_none()
+        ));
+        assert!(matches!(
+            menu.items()[5].follow_up(),
+            FollowUp::RevertExactTarget { revision }
+                if revision == "ccccdddd1111111111111111111111111111111111"
+        ));
     }
 
     #[test]
@@ -538,7 +654,9 @@ mod tests {
                 ActionKind::New,
                 ActionKind::Rebase,
                 ActionKind::Squash,
-                ActionKind::Absorb
+                ActionKind::Absorb,
+                ActionKind::Restore,
+                ActionKind::Revert
             ]
         );
     }
@@ -558,12 +676,58 @@ mod tests {
 
         assert_eq!(
             actions,
-            vec![ActionKind::New, ActionKind::Split, ActionKind::Abandon]
+            vec![
+                ActionKind::New,
+                ActionKind::Split,
+                ActionKind::Abandon,
+                ActionKind::Restore,
+                ActionKind::Revert
+            ]
         );
         assert!(matches!(
             menu.items()[0].follow_up(),
             FollowUp::NewParents { parents }
                 if parents == &vec!["ccccdddd1111111111111111111111111111111111".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn detail_context_offers_only_restore_and_revert() {
+        let menu = build_action_menu(&ExactActionContext::detail(
+            "ccccdddd1111111111111111111111111111111111",
+        ));
+
+        let actions = menu
+            .items()
+            .iter()
+            .map(ActionMenuItem::action)
+            .collect::<Vec<_>>();
+
+        assert_eq!(actions, vec![ActionKind::Restore, ActionKind::Revert]);
+    }
+
+    #[test]
+    fn detail_context_with_selected_path_offers_path_restore_first() {
+        let menu = build_action_menu(
+            &ExactActionContext::detail("ccccdddd1111111111111111111111111111111111")
+                .with_selected_path("src/quoted path.rs"),
+        );
+
+        let actions = menu
+            .items()
+            .iter()
+            .map(ActionMenuItem::action)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            actions,
+            vec![ActionKind::Restore, ActionKind::Restore, ActionKind::Revert]
+        );
+        assert!(matches!(
+            menu.items()[0].follow_up(),
+            FollowUp::RestoreExactTarget { revision, path }
+                if revision == "ccccdddd1111111111111111111111111111111111"
+                    && path.as_deref() == Some("src/quoted path.rs")
         ));
     }
 }

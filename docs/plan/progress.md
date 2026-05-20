@@ -563,3 +563,50 @@
 - The re-review ran `cargo test rebase -- --test-threads=1`.
 - Main-thread follow-up validation after the repair used a full `cargo test` and `just md-check`.
 - Next slice: Packet 27: Restore/Revert Guided Flows
+
+## Packet 27: Restore/Revert Guided Flows
+
+- Files changed: `src/action_menu.rs`, `src/app.rs`, `src/command.rs`, `src/diff.rs`,
+  `src/file_list.rs`, `src/file_show.rs`, `src/graph.rs`, `src/jj.rs`, `src/show.rs`, `src/tui.rs`,
+  `src/view_state.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`
+- Behavior: preview-first restore and revert flows now appear only from exact supported contexts.
+  Graph action menus add whole-revision `restore` and `revert` for the current exact row. Show and
+  diff views expose only revision-scoped restore/revert when the view carries a graph-derived exact
+  revision target. File-list and file-show add path-scoped restore ahead of revision-scoped
+  restore/revert when they already own both the exact graph-derived revision target and the exact
+  selected path.
+- Command shape: restore always uses `jj restore --changes-in exactly(change_id("<id>"), 1)` with an
+  optional exact `root-file:"<path>"` fileset. Revert always uses
+  `jj revert -r exactly(change_id("<id>"), 1) -o @`. The flow does not expose path-scoped revert,
+  arbitrary detail-view revsets, parsed sticky headings as mutation-grade paths, status file
+  actions, multi-select restore/revert, operation restore/revert, patch selection, or
+  `--no-integrate-operation`.
+- Preview/result behavior: restore previews show the exact revision, optional exact path and
+  `root-file:` fileset, the exact restore command, the forward `jj diff` that restore removes, the
+  Enter confirmation, and `jj undo`. Revert previews show the exact revision, the exact revert
+  command, the forward `jj diff` that revert reverse-applies into `@`, the Enter confirmation, and
+  `jj undo`. Successful confirmation refreshes the active view and keeps the completed result output
+  scrollable. Failures preserve the full multiline command output in the same overlay.
+- Verification: `cargo check`; focused `cargo test restore -- --test-threads=1`; focused
+  `cargo test revert -- --test-threads=1`; focused `cargo test action_menu -- --test-threads=1`;
+  full `cargo test`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`
+- Validation note: `just check` was attempted after Packet 27 validation but failed immediately at
+  the known `cargo +nightly fmt` wrapper step. Equivalent checks were run separately: `cargo check`,
+  focused restore/revert/action-menu tests, full `cargo test`, `rustup run nightly cargo fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Manual proof: disposable repo `/tmp/jk-packet27-proof.1FRehG` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a base change, a mutable source change touching
+  `path with spaces.txt` and `extra.txt`, and a revert-target working copy were created. Running
+  `jj --no-pager restore --changes-in 'exactly(change_id("<source>"), 1)' 'root-file:"path with spaces.txt"'`
+  removed only the selected path from the source change and rebased the descendant.
+  `jj --no-pager undo` restored the original two-file source diff. Running
+  `jj --no-pager revert -r 'exactly(change_id("<source>"), 1)' -o @` succeeded, and
+  `jj --no-pager op show -p --color never` showed the generated revert change and both reversed file
+  hunks. `jj --no-pager undo` restored the pre-revert operation state.
+- Remaining risk: path-scoped restore still depends on jj fileset string-literal semantics and on
+  `jj restore`'s descendant-rewrite behavior, while preview honesty still depends on users reading
+  the forward `jj diff` as command input rather than as a simulated final graph.
+- Final 5.5 re-review accepted Packet 27 after the bookmark provenance repair, with only
+  non-blocking cleanup items fixed.
+- Next slice: Packet 28: Resolve Screen And Conflict Flow

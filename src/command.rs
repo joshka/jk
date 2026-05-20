@@ -475,7 +475,15 @@ fn view_help_metadata(
             HelpSectionKind::Preview,
             "toggle exact revision selection (preview target)",
         )),
-        ViewCommand::OpenActionMenu => (context == HelpContext::Graph).then_some((
+        ViewCommand::OpenActionMenu => matches!(
+            context,
+            HelpContext::Graph
+                | HelpContext::Show
+                | HelpContext::Diff
+                | HelpContext::FileList
+                | HelpContext::FileShow
+        )
+        .then_some((
             HelpSectionKind::Preview,
             "open action menu (preview required)",
         )),

@@ -5,6 +5,111 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 27 restore/revert guided flows)
+
+- Slice / task: Implement Packet 27 preview-first restore and revert guided flows from exact
+  supported contexts.
+- Worker / model: `019e44ec-9b9a-70a3-b3bc-8dbe994636d7` / `gpt-5` (Codex).
+- Scope given: stay in the current jj change `Add restore and revert guided flows`, avoid jj/git
+  mutations in the project checkout, keep restore/revert exact to supported graph/detail/file
+  contexts, use `exactly(change_id(...), 1)` revsets and `root-file:` filesets, keep revert whole
+  revision only, and update progress, fragility, and process docs.
+- Exploration handoff facts: installed `jj 0.41.0` does not offer path-scoped revert arguments, so
+  the packet must not advertise or simulate them. Detail-view restore/revert targeting is only safe
+  when the view already carries a graph-derived exact revision target, and path restore is only safe
+  when the view already owns the exact selected path instead of reconstructing it from rendered
+  headings.
+- Observable outcome: `JjRestorePlan` and `JjRevertPlan` now build exact restore/revert commands,
+  restore path filesets quote through `root-file:"..."`, and previews show the exact mutation
+  command plus the forward `jj diff` that restore removes or revert reverse-applies. Graph action
+  menus gained whole-revision restore/revert, while show/diff/file-list/file-show now open
+  restore/revert action menus only when their `ViewSpec` target is an exact graph-derived revision.
+  File-list and file-show add path restore ahead of whole-revision restore/revert when they already
+  own the exact path.
+- Manual proof outcome: disposable repo `/tmp/jk-packet27-proof.1FRehG` was initialized with
+  `jj --no-pager git init`. From that repo's cwd, a base change, a mutable source change touching
+  `path with spaces.txt` and `extra.txt`, and a revert-target working copy were created. Path
+  restore with
+  `jj --no-pager restore --changes-in 'exactly(change_id("<source>"), 1)' 'root-file:"path with spaces.txt"'`
+  left only `extra.txt` in the source diff and `jj --no-pager undo` restored the original two-file
+  source diff. Revert with `jj --no-pager revert -r 'exactly(change_id("<source>"), 1)' -o @`
+  succeeded, and `jj --no-pager op show -p --color never` showed the generated revert change and
+  both reversed file hunks before `jj --no-pager undo` restored the prior operation state.
+- Rework / blockers: the first disposable-repo proof script extracted the source change id from
+  graph-shaped `jj log` output instead of `--no-graph`, so the revset literal accidentally included
+  `@` and graph glyphs and the proof command failed with `Invalid change ID prefix`. The rerun in a
+  fresh `/tmp` repo used `--no-graph` extraction and succeeded. `cargo check` still reports the
+  existing dead-code warnings for `FileShowView::new`, `ViewSpec::bookmarks`, and
+  `FileListItem::row_text`. `just check` still fails immediately at the known `cargo +nightly fmt`
+  wrapper step.
+- Evidence basis:
+  - Thread: `019e44ec-9b9a-70a3-b3bc-8dbe994636d7`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `printenv CODEX_THREAD_ID`
+    - `date +%F`
+    - `jj --no-pager status`
+    - `cargo check`
+    - `cargo test restore -- --test-threads=1`
+    - `cargo test revert -- --test-threads=1`
+    - `cargo test action_menu -- --test-threads=1`
+    - `cargo test`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-check`
+    - `just check`
+  - Manual proof commands, all with cwd `/tmp/jk-packet27-proof.1FRehG` or a fresh sibling proof
+    repo under `/tmp`:
+    - `jj --no-pager git init`
+    - `jj --no-pager config set --repo signing.behavior drop`
+    - `printf 'base\n' > 'path with spaces.txt'`
+    - `printf 'base extra\n' > extra.txt`
+    - `jj --no-pager file track 'path with spaces.txt' extra.txt`
+    - `jj --no-pager describe -m 'packet 27 base'`
+    - `jj --no-pager new -m 'packet 27 source change'`
+    - `printf 'base\nrestore me\n' > 'path with spaces.txt'`
+    - `printf 'base extra\nkeep me\n' > extra.txt`
+    - `jj --no-pager log -r @ --no-graph -T 'change_id ++ "\n"'`
+    - `jj --no-pager new -m 'packet 27 revert target'`
+    - `jj --no-pager diff -r 'exactly(change_id("<source>"), 1)' --summary --color never`
+    - `jj --no-pager restore --changes-in 'exactly(change_id("<source>"), 1)' 'root-file:"path with spaces.txt"'`
+    - `jj --no-pager undo`
+    - `jj --no-pager revert -r 'exactly(change_id("<source>"), 1)' -o @`
+    - `jj --no-pager op show -p --color never`
+    - `jj --no-pager undo`
+  - Files: `src/action_menu.rs`, `src/app.rs`, `src/command.rs`, `src/diff.rs`, `src/file_list.rs`,
+    `src/file_show.rs`, `src/graph.rs`, `src/jj.rs`, `src/show.rs`, `src/tui.rs`,
+    `src/view_state.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
+### 2026-05-20 (Packet 27 5.5 bookmark provenance repair)
+
+- Slice / task: Strip restore/revert exact provenance from bookmark-derived detail navigation.
+- Thread id: `019e450b-7cb8-78f0-85b9-a03a2c6b49a1`.
+- Scope given: keep bookmark -> show/file/detail navigation read-only, but ensure restore/revert
+  action menu and context availability requires graph-derived exact provenance only.
+- Repair approach: `src/app.rs` now no longer treats `Bookmarks` as an exact source when deciding
+  whether to preserve exact-target provenance while opening detail views. A follow-up regression
+  test verifies bookmark-opened detail specs have no exact change target and that bookmark-derived
+  show does not expose restore/revert action menu actions.
+- Validation / proof run:
+  - `cargo check`
+  - `cargo test detail_navigation_from_bookmarks_is_not_exact -- --test-threads=1`
+  - `cargo test action_menu -- --test-threads=1`
+  - `cargo test restore -- --test-threads=1`
+  - `cargo test revert -- --test-threads=1`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+- Follow-up main-thread validation rerun for Packet 27 completed with:
+  - full `cargo test` (294 passed)
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+
+### 2026-05-20 (Packet 27 5.5 final acceptance)
+
+- Final 5.5 re-review accepted Packet 27 after the comment/process-doc cleanup, with only
+  non-blocking cleanup items remaining.
+
 ### 2026-05-20 (Packet 26 rebase preview graph review)
 
 - Slice / task: Implement Packet 26 rebase preview polish and post-action review.
@@ -1326,3 +1431,31 @@ belong here.
 - Rework status: `just md-check` initially found Panache formatting diffs in
   `docs/plan/progress.md`, `docs/plan/fragility-register.md`, and `docs/process-observations.md`;
   `just md-fmt` reformatted those files and the rerun passed.
+
+## 2026-05-20 Packet 27 Exact Target Repair
+
+- Thread id: `019e4501-543c-71d2-8e0e-8d70c64f0647`.
+- Slice / task: Repair restore/revert gating so direct startup revsets such as `main` and `@` are
+  not treated as exact graph-derived change ids after show/diff/file-list/file-show navigation.
+- Starting state: `jj --no-pager status` reported existing Packet 27 edits across docs and Rust
+  modules; no jj/git mutation commands were run during this repair.
+- Repair approach: `src/jj.rs` now stores exact-change target provenance separately from the
+  displayed/navigation revset. `src/show.rs`, `src/diff.rs`, and `src/app.rs` preserve that
+  provenance only when navigating from an exact source, and `src/view_state.rs` requires it before
+  building restore/revert action contexts.
+- Validation / proof run during repair:
+  - `cargo check`
+  - `cargo test exact_restore_revert_context -- --test-threads=1`
+  - `cargo test detail_navigation -- --test-threads=1`
+  - `cargo test file_show_navigation_preserves_source_exactness_only -- --test-threads=1`
+  - `cargo test command_execution_opens_file_list_with -- --test-threads=1`
+  - `cargo test exact_change_target_provenance_is_explicit -- --test-threads=1`
+  - `cargo test open_action_menu_rejects_direct_show_startup_revset -- --test-threads=1`
+  - `cargo test detail_action_menu_from_exact -- --test-threads=1`
+  - `cargo test restore -- --test-threads=1`
+  - `cargo test revert -- --test-threads=1`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+- Rework status: an attempted grouped `cargo test` invocation used invalid cargo syntax for multiple
+  test filters and did not run; the same proof was rerun with valid individual filters.

@@ -54,6 +54,10 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
     ),
+    Binding::new(
+        KeyPattern::char('a'),
+        Command::View(ViewCommand::OpenActionMenu),
+    ),
 ];
 
 /// Selectable file list output from `jj file list`.
@@ -69,6 +73,15 @@ impl FileListView {
         Self {
             entries,
             spec: ViewSpec::file_list(None, None),
+            selection: Selection::default(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_with_spec(spec: ViewSpec, entries: Vec<FileListItem>) -> Self {
+        Self {
+            entries,
+            spec,
             selection: Selection::default(),
         }
     }
@@ -174,7 +187,7 @@ impl FileListView {
         self.entries.iter().map(FileListItem::line_count).sum()
     }
 
-    fn selected_path(&self) -> Option<&str> {
+    pub fn selected_path(&self) -> Option<&str> {
         self.entries
             .get(self.selection.index())
             .map(FileListItem::path)

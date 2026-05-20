@@ -73,6 +73,10 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::char('N'),
         Command::View(ViewCommand::PreviousSearchMatch),
     ),
+    Binding::new(
+        KeyPattern::char('a'),
+        Command::View(ViewCommand::OpenActionMenu),
+    ),
 ];
 
 /// Rendered `jj show` output plus sticky context and scroll state.
@@ -83,6 +87,15 @@ pub struct ShowView {
 }
 
 impl ShowView {
+    #[cfg(test)]
+    pub(crate) fn test_new(spec: ViewSpec) -> Self {
+        Self {
+            spec,
+            document: StickyFileDocument::new(crate::rendered_jj::DocumentLines::new(Vec::new())),
+            compact_context: Vec::new(),
+        }
+    }
+
     pub fn load(spec: ViewSpec) -> Result<Self> {
         let document = StickyFileDocument::load(&spec)?;
         let compact_context = load_compact_log_context(&spec.show_context_revset())?;
@@ -137,10 +150,18 @@ impl ShowView {
                 self.previous_file();
                 ViewEffect::Handled
             }
-            ViewCommand::OpenFiles => ViewEffect::OpenView(ViewSpec::file_list(
-                self.spec.navigation_revset(),
-                self.document.current_file_label().map(str::to_owned),
-            )),
+            ViewCommand::OpenFiles => {
+                let spec = ViewSpec::file_list(
+                    self.spec.navigation_revset(),
+                    self.document.current_file_label().map(str::to_owned),
+                );
+                let spec = if self.spec.has_exact_change_target() {
+                    spec.with_exact_change_target()
+                } else {
+                    spec
+                };
+                ViewEffect::OpenView(spec)
+            }
             ViewCommand::OpenDiff => self
                 .spec
                 .navigation_revset()
@@ -395,6 +416,34 @@ mod tests {
         assert_eq!(
             view.execute(ViewCommand::OpenDiff, context(None)),
             ViewEffect::OpenDetail(JjCommand::Diff, "main".to_owned())
+        );
+    }
+
+    #[test]
+    fn command_execution_opens_file_list_with_exact_target_provenance() {
+        let mut view = show_view(vec![line!("Added regular file Cargo.toml:")], 0);
+        view.spec = ViewSpec::show("change-a".to_owned(), crate::jj::DiffFormat::Default);
+
+        assert_eq!(
+            view.execute(ViewCommand::OpenFiles, context(None)),
+            ViewEffect::OpenView(
+                ViewSpec::file_list(Some("change-a".to_owned()), Some("Cargo.toml".to_owned()))
+                    .with_exact_change_target()
+            )
+        );
+    }
+
+    #[test]
+    fn command_execution_opens_file_list_with_inexact_direct_revset() {
+        let mut view = show_view(vec![line!("Added regular file Cargo.toml:")], 0);
+        view.spec = ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]);
+
+        assert_eq!(
+            view.execute(ViewCommand::OpenFiles, context(None)),
+            ViewEffect::OpenView(ViewSpec::file_list(
+                Some("main".to_owned()),
+                Some("Cargo.toml".to_owned())
+            ))
         );
     }
 

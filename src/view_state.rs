@@ -7,6 +7,7 @@ use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
+use crate::action_menu::ExactActionContext;
 use crate::bookmarks::BookmarksView;
 use crate::command::{Binding, CommandContext, HelpContext, ViewCommand, ViewEffect};
 use crate::diff::DiffView;
@@ -347,6 +348,68 @@ impl ViewState {
             | Self::OperationDetail(_) => Ok(None),
         }
     }
+
+    pub fn exact_restore_revert_context(&self) -> Result<Option<ExactActionContext>> {
+        match self {
+            Self::Graph(_) => Ok(None),
+            Self::Show(view) => view
+                .spec()
+                .exact_change_target()
+                .map(ExactActionContext::detail)
+                .map(Some)
+                .ok_or_else(|| {
+                    color_eyre::eyre::eyre!(
+                        "restore/revert from {} requires an exact graph-derived revision target",
+                        view.spec().app_label()
+                    )
+                }),
+            Self::Diff(view) => view
+                .spec()
+                .exact_change_target()
+                .map(ExactActionContext::detail)
+                .map(Some)
+                .ok_or_else(|| {
+                    color_eyre::eyre::eyre!(
+                        "restore/revert from {} requires an exact graph-derived revision target",
+                        view.spec().app_label()
+                    )
+                }),
+            Self::FileList(view) => {
+                let Some(revision) = view.spec().exact_change_target() else {
+                    return Err(color_eyre::eyre::eyre!(
+                        "restore/revert from {} requires an exact graph-derived revision target",
+                        view.spec().app_label()
+                    ));
+                };
+                let context = view
+                    .selected_path()
+                    .map(|path| ExactActionContext::detail(revision).with_selected_path(path))
+                    .unwrap_or_else(|| ExactActionContext::detail(revision));
+                Ok(Some(context))
+            }
+            Self::FileShow(view) => {
+                let Some(revision) = view.spec().exact_change_target() else {
+                    return Err(color_eyre::eyre::eyre!(
+                        "restore/revert from {} requires an exact graph-derived revision target",
+                        view.spec().app_label()
+                    ));
+                };
+                let Some(path) = view.spec().path() else {
+                    return Err(color_eyre::eyre::eyre!(
+                        "restore from {} requires an exact selected path",
+                        view.spec().app_label()
+                    ));
+                };
+                Ok(Some(
+                    ExactActionContext::detail(revision).with_selected_path(path),
+                ))
+            }
+            Self::Status(_)
+            | Self::Bookmarks(_)
+            | Self::OperationLog(_)
+            | Self::OperationDetail(_) => Ok(None),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -440,6 +503,88 @@ mod tests {
         assert_eq!(
             view.selected_local_bookmark_name().unwrap_err().to_string(),
             "delete requires a selected exact local bookmark"
+        );
+    }
+
+    #[test]
+    fn exact_restore_revert_context_uses_graph_derived_detail_target_and_path() {
+        let show = ViewState::Show(crate::show::ShowView::test_new(ViewSpec::show(
+            "abcdefg".to_owned(),
+            crate::jj::DiffFormat::Default,
+        )));
+        let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
+            ViewSpec::file_list(Some("abcdefg".to_owned()), Some("src/main.rs".to_owned()))
+                .with_exact_change_target(),
+            vec![crate::jj::FileListItem::new(
+                Vec::new(),
+                "src/main.rs".to_owned(),
+            )],
+        ));
+        let file_show = ViewState::FileShow(crate::file_show::FileShowView::new(
+            ViewSpec::file_show(Some("abcdefg".to_owned()), "src/main.rs".to_owned())
+                .with_exact_change_target(),
+            "src/main.rs",
+            crate::rendered_jj::DocumentLines::new(Vec::new()),
+        ));
+
+        assert_eq!(
+            show.exact_restore_revert_context().unwrap(),
+            Some(ExactActionContext::detail("abcdefg"))
+        );
+        assert_eq!(
+            file_list.exact_restore_revert_context().unwrap(),
+            Some(ExactActionContext::detail("abcdefg").with_selected_path("src/main.rs"))
+        );
+        assert_eq!(
+            file_show.exact_restore_revert_context().unwrap(),
+            Some(ExactActionContext::detail("abcdefg").with_selected_path("src/main.rs"))
+        );
+    }
+
+    #[test]
+    fn exact_restore_revert_context_rejects_direct_startup_detail_revsets() {
+        let show = ViewState::Show(crate::show::ShowView::test_new(ViewSpec::new(
+            JjCommand::Show,
+            vec!["main".to_owned()],
+        )));
+        let diff = ViewState::Diff(crate::diff::DiffView::test_new(ViewSpec::new(
+            JjCommand::Diff,
+            vec!["-r".to_owned(), "main".to_owned()],
+        )));
+        let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
+            ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned())),
+            vec![crate::jj::FileListItem::new(
+                Vec::new(),
+                "src/main.rs".to_owned(),
+            )],
+        ));
+        let file_show = ViewState::FileShow(crate::file_show::FileShowView::new(
+            ViewSpec::file_show(Some("main".to_owned()), "src/main.rs".to_owned()),
+            "src/main.rs",
+            crate::rendered_jj::DocumentLines::new(Vec::new()),
+        ));
+
+        assert_eq!(
+            show.exact_restore_revert_context().unwrap_err().to_string(),
+            "restore/revert from jk show main requires an exact graph-derived revision target"
+        );
+        assert_eq!(
+            diff.exact_restore_revert_context().unwrap_err().to_string(),
+            "restore/revert from jk diff -r main requires an exact graph-derived revision target"
+        );
+        assert_eq!(
+            file_list
+                .exact_restore_revert_context()
+                .unwrap_err()
+                .to_string(),
+            "restore/revert from jk file list -r main requires an exact graph-derived revision target"
+        );
+        assert_eq!(
+            file_show
+                .exact_restore_revert_context()
+                .unwrap_err()
+                .to_string(),
+            "restore/revert from jk file show -r main src/main.rs requires an exact graph-derived revision target"
         );
     }
 }
