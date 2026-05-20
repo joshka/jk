@@ -20,6 +20,7 @@ pub enum Command {
     OpenBookmarks,
     OpenOperationLog,
     Fetch,
+    Push,
     Copy,
     ViewFormat,
     Refresh,
@@ -303,6 +304,12 @@ fn help_metadata(
         Command::OpenStatus => Some((HelpSectionKind::Global, "status")),
         Command::OpenBookmarks => Some((HelpSectionKind::Global, "bookmarks")),
         Command::OpenOperationLog => Some((HelpSectionKind::Global, "operation log")),
+        Command::Push => match context {
+            HelpContext::Graph => Some((HelpSectionKind::Preview, "push selected revision")),
+            HelpContext::Bookmarks => Some((HelpSectionKind::Preview, "push selected bookmark")),
+            HelpContext::Status => Some((HelpSectionKind::Preview, "push status")),
+            _ => None,
+        },
         Command::Fetch => Some((HelpSectionKind::Direct, "fetch")),
         Command::Copy => Some((HelpSectionKind::Global, "copy")),
         Command::ViewFormat => Some((HelpSectionKind::Global, "view format")),
@@ -463,6 +470,34 @@ mod tests {
         assert_eq!(sections[1].title(), "Direct Actions");
         assert_eq!(sections[1].rows()[0], HelpRow::new("s", "open show"));
         assert_eq!(sections[2].rows()[0], HelpRow::new("-", "none yet"));
+    }
+
+    #[test]
+    fn project_help_exposes_push_only_in_supported_contexts() {
+        let global = [Binding::new(KeyPattern::char('p'), Command::Push)];
+
+        let graph_help = project_help(&global, &[], HelpContext::Graph);
+        let status_help = project_help(&global, &[], HelpContext::Status);
+        let bookmarks_help = project_help(&global, &[], HelpContext::Bookmarks);
+        let show_help = project_help(&global, &[], HelpContext::Show);
+
+        assert_eq!(graph_help[0].title(), "Preview / Confirm");
+        assert_eq!(
+            graph_help[0].rows()[0],
+            HelpRow::new("p", "push selected revision")
+        );
+        assert_eq!(status_help[0].title(), "Preview / Confirm");
+        assert_eq!(status_help[0].rows()[0], HelpRow::new("p", "push status"));
+        assert_eq!(
+            bookmarks_help[0].rows()[0],
+            HelpRow::new("p", "push selected bookmark")
+        );
+        assert!(!show_help.iter().any(|section| {
+            section
+                .rows()
+                .iter()
+                .any(|row| row.keys() == "p" && row.action().contains("push"))
+        }));
     }
 
     fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {

@@ -13,7 +13,7 @@ use crate::diff::DiffView;
 use crate::file_list::FileListView;
 use crate::file_show::FileShowView;
 use crate::graph::GraphView;
-use crate::jj::{JjCommand, LogViewMode, ViewSpec};
+use crate::jj::{JjCommand, JjGitPushTarget, LogViewMode, ViewSpec};
 use crate::operation_log::OperationLogView;
 use crate::search::SearchQuery;
 use crate::show::ShowView;
@@ -244,5 +244,81 @@ impl ViewState {
             Self::Bookmarks(view) => view.line_count(),
             Self::OperationLog(view) => view.line_count(),
         }
+    }
+
+    pub fn push_target(&self) -> Result<Option<JjGitPushTarget>> {
+        match self {
+            Self::Graph(view) => view
+                .selected_revision()
+                .map(|revision| JjGitPushTarget::Revision(revision.to_owned()))
+                .map_or_else(
+                    || {
+                        Err(color_eyre::eyre::eyre!(
+                            "push from graph requires a selected row with an exact revision"
+                        ))
+                    },
+                    |target| Ok(Some(target)),
+                ),
+            Self::Bookmarks(view) => view
+                .selected_bookmark_name()
+                .map(|name| JjGitPushTarget::Bookmark(name.to_owned()))
+                .map_or_else(
+                    || {
+                        Err(color_eyre::eyre::eyre!(
+                            "selected bookmark has no target name for push"
+                        ))
+                    },
+                    |target| Ok(Some(target)),
+                ),
+            Self::Status(_) => Ok(Some(JjGitPushTarget::Status)),
+            _ => Ok(None),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bookmarks;
+    use crate::graph;
+
+    #[test]
+    fn push_target_from_graph_uses_exact_revision() {
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
+            Vec::new(),
+            Some("abcdefg".to_owned()),
+            None,
+        )]));
+
+        assert_eq!(
+            view.push_target().unwrap(),
+            Some(JjGitPushTarget::Revision("abcdefg".to_owned()))
+        );
+    }
+
+    #[test]
+    fn push_target_from_graph_requires_exact_revision() {
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
+            Vec::new(),
+            None,
+            None,
+        )]));
+
+        assert_eq!(
+            view.push_target().unwrap_err().to_string(),
+            "push from graph requires a selected row with an exact revision"
+        );
+    }
+
+    #[test]
+    fn push_target_from_bookmarks_uses_selected_name() {
+        let view = ViewState::Bookmarks(bookmarks::BookmarksView::test_new(vec![
+            crate::jj::BookmarkItem::new(Vec::new(), "main".to_owned(), None, None),
+        ]));
+
+        assert_eq!(
+            view.push_target().unwrap(),
+            Some(JjGitPushTarget::Bookmark("main".to_owned()))
+        );
     }
 }

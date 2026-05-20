@@ -133,3 +133,14 @@
   slices; multi-select state is scoped to graph-based exact-change-id targeting and may still need
   additional pruning logic if downstream views carry stricter per-mode selection semantics
 - Next slice: Slice 11: Push Preview Flow
+
+## Slice 11: Push Preview Flow
+
+- Files changed: `src/app.rs`, `src/jj.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `cargo test push_preview`, `cargo test git_push`, manual
+  `jj --no-pager git remote list`, and `just md-check`
+- Remaining risk: status-driven push targets still rely on jj's default push resolution for the
+  chosen remote, and the preview/result text still comes from `jj` CLI output, so future
+  output-shape drift could require a parser or contract change
+- Next slice: Slice 12: Rebase Preview Flow

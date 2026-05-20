@@ -34,6 +34,8 @@ sibling checkout or generated scripts.
   choose the path that satisfies the goal and explain the tradeoff.
 - Keep durable context on disk. Put repository-specific facts, assumptions, decisions, and follow-up
   notes in tracked docs or ignored `AGENTS.override.md` files rather than relying on chat context.
+- Keep `docs/process-observations.md` current each turn with stable, file-backed or command-backed
+  evidence (thread id, date, and concrete references) before concluding user-facing work.
 - Prefer tools and checks over repeated prompting. If the same correction would be needed again,
   make it mechanical through code, tests, lint configuration, scripts, templates, or local guidance.
 - Distill conventions from accepted artifacts before inventing style. Start from nearby code, tests,
@@ -224,8 +226,8 @@ working and `just check` before handing off when practical.
 
 Be aware that `NO_COLOR` or similar ambient environment can interfere with insta coverage or
 ANSI-sensitive tests if it reaches `jj` calls. When a test depends on styled output, make the color
-expectation explicit, verify both content and presentation at the appropriate level, and
-investigate or correct color-handling leaks when snapshots stop exercising ANSI output.
+expectation explicit, verify both content and presentation at the appropriate level, and investigate
+or correct color-handling leaks when snapshots stop exercising ANSI output.
 
 For Markdown-only changes, run `just md-check`. For Rust formatting-only validation, run `just fmt`.
 

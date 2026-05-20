@@ -60,6 +60,15 @@ pub struct BookmarksView {
 }
 
 impl BookmarksView {
+    #[cfg(test)]
+    pub(crate) fn test_new(entries: Vec<BookmarkItem>) -> Self {
+        Self {
+            entries,
+            spec: ViewSpec::new(JjCommand::Bookmarks, Vec::new()),
+            selection: Selection::default(),
+        }
+    }
+
     pub fn load(spec: ViewSpec) -> Result<Self> {
         Ok(Self {
             entries: load_bookmark_entries(&spec)?,
@@ -161,6 +170,10 @@ impl BookmarksView {
 
     fn selected_entry(&self) -> Option<&BookmarkItem> {
         self.entries.get(self.selection.index())
+    }
+
+    pub fn selected_bookmark_name(&self) -> Option<&str> {
+        self.selected_entry().map(BookmarkItem::bookmark_name)
     }
 
     fn search_matches(&self, query: &SearchQuery) -> usize {
@@ -411,6 +424,21 @@ mod tests {
         .unwrap();
 
         assert_eq!(view.selection.index(), 0);
+    }
+
+    #[test]
+    fn selected_bookmark_name_returns_current_row() {
+        let view = bookmarks_view(vec![
+            bookmark_item(
+                &["@  feature", "│  target"],
+                "feature",
+                Some("a"),
+                Some("aa"),
+            ),
+            bookmark_item(&["○  second"], "second", Some("b"), Some("bb")),
+        ]);
+
+        assert_eq!(view.selected_bookmark_name(), Some("feature"));
     }
 
     #[test]

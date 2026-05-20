@@ -72,10 +72,65 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             frame.render_widget(action_menu(menu, selected), area);
         }
+        Overlay::PushRemotePrompt { remotes, selected } => {
+            let area = centered_area(frame.area(), 46, remotes.len() as u16 + 2);
+            frame.render_widget(Clear, area);
+            frame.render_widget(push_remote_prompt(remotes, selected), area);
+        }
         Overlay::RolePrompt { prompt, selected } => {
             let area = centered_area(frame.area(), 54, prompt.options().len() as u16 + 4);
             frame.render_widget(Clear, area);
             frame.render_widget(role_prompt(prompt, selected), area);
+        }
+        Overlay::PushPreview {
+            command_label,
+            preview_output,
+            status_context,
+            completed,
+        } => {
+            let preview_lines = vec![
+                format!("command: {command_label}"),
+                String::new(),
+                if completed {
+                    "result output:".to_owned()
+                } else {
+                    "preview output:".to_owned()
+                },
+            ];
+            let output_lines = preview_output
+                .lines()
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>();
+            let mut lines = Vec::with_capacity(
+                preview_lines.len()
+                    + output_lines.len()
+                    + if status_context.is_some() { 8 } else { 7 },
+            );
+            lines.extend(preview_lines);
+            if let Some(status_context) = status_context {
+                lines.push(String::new());
+                lines.push(status_context.to_owned());
+            }
+            lines.extend(output_lines);
+            lines.push(String::new());
+            let hint = if completed {
+                "Enter: close  Esc/q: close".to_owned()
+            } else {
+                "Enter: confirm  Esc/q: cancel".to_owned()
+            };
+            lines.push(hint);
+
+            let height = (lines.len() as u16).min(frame.area().height);
+            let width = lines
+                .iter()
+                .map(|line| line.len())
+                .max()
+                .unwrap_or(0)
+                .max(44)
+                .min(frame.area().width.into()) as u16;
+            let area = centered_area(frame.area(), width, height);
+            frame.render_widget(Clear, area);
+            frame.render_widget(push_preview(&lines), area);
         }
     }
 }
@@ -96,6 +151,16 @@ pub enum Overlay<'a> {
     ActionMenu {
         menu: &'a ActionMenu,
         selected: usize,
+    },
+    PushRemotePrompt {
+        remotes: &'a [String],
+        selected: usize,
+    },
+    PushPreview {
+        command_label: &'a str,
+        preview_output: &'a str,
+        status_context: Option<&'a String>,
+        completed: bool,
     },
     RolePrompt {
         prompt: &'a RolePrompt,
@@ -118,6 +183,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " quit  ",
             key("f"),
             " fetch  ",
+            key("p"),
+            " push  ",
             key("r"),
             " refresh  ",
             key("j/k"),
@@ -201,6 +268,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " quit  ",
             key("f"),
             " fetch  ",
+            key("p"),
+            " push  ",
             key("r"),
             " refresh  ",
             key("j/k"),
@@ -282,6 +351,8 @@ fn status_line(status: &StatusLine) -> Paragraph<'_> {
             " quit  ",
             key("f"),
             " fetch  ",
+            key("p"),
+            " push  ",
             key("r"),
             " refresh  ",
             key("j/k"),
@@ -418,6 +489,27 @@ fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
         })
         .collect::<Vec<_>>();
     List::new(items).block(Block::bordered().title("Action menu"))
+}
+
+fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
+    let items = remotes
+        .iter()
+        .enumerate()
+        .map(|(index, remote)| {
+            let style = if index == selected {
+                Style::default().bg(Color::Rgb(52, 54, 62))
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(remote.to_owned())).style(style)
+        })
+        .collect::<Vec<_>>();
+
+    List::new(items).block(Block::bordered().title("Push remote"))
+}
+
+fn push_preview(lines: &[String]) -> Paragraph<'static> {
+    Paragraph::new(lines.join("\n")).block(Block::bordered().title("Push preview"))
 }
 
 fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {

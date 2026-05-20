@@ -87,6 +87,7 @@ impl LogViewMode {
 const TRUNK_WORK_REVSET: &str = "trunk().. | trunk()";
 const RECENT_WORK_REVSET: &str = "latest(mutable(), 20) | @ | trunk()";
 const ALL_REPO_REVSET: &str = "all()";
+const JJ_GIT_REMOTE_ARGS: [&str; 3] = ["git", "remote", "list"];
 const FETCH_ARGS: [&str; 2] = ["git", "fetch"];
 const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
 const BOOKMARK_COMMAND_WORDS: [&str; 2] = ["bookmark", "list"];
@@ -98,6 +99,136 @@ const OPERATION_LOG_LIMIT: &str = "100";
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
     message: String,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JjGitPushTarget {
+    Bookmark(String),
+    Revision(String),
+    Status,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjGitPush {
+    target: JjGitPushTarget,
+    remote: Option<String>,
+}
+
+#[allow(dead_code)]
+impl JjGitPush {
+    pub fn for_bookmark(name: String) -> Self {
+        Self {
+            target: JjGitPushTarget::Bookmark(name),
+            remote: None,
+        }
+    }
+
+    pub fn for_revision(revset: String) -> Self {
+        Self {
+            target: JjGitPushTarget::Revision(revset),
+            remote: None,
+        }
+    }
+
+    pub fn for_status() -> Self {
+        Self {
+            target: JjGitPushTarget::Status,
+            remote: None,
+        }
+    }
+
+    pub fn with_remote(mut self, remote: impl Into<String>) -> Self {
+        self.remote = Some(remote.into());
+        self
+    }
+
+    pub fn remote(&self) -> Option<&str> {
+        self.remote.as_deref()
+    }
+
+    pub fn command_label(&self, dry_run: bool) -> String {
+        let label_args = self
+            .command_argv(dry_run)
+            .iter()
+            .map(|arg| arg.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self, dry_run: bool) -> Vec<String> {
+        let mut argv = vec!["git".to_owned(), "push".to_owned()];
+
+        if dry_run {
+            argv.push("--dry-run".to_owned());
+        }
+        if let Some(remote) = &self.remote {
+            argv.push("--remote".to_owned());
+            argv.push(remote.clone());
+        }
+
+        match &self.target {
+            JjGitPushTarget::Bookmark(name) => {
+                argv.push("--bookmark".to_owned());
+                argv.push(name.clone());
+            }
+            JjGitPushTarget::Revision(revset) => {
+                argv.push("--revision".to_owned());
+                argv.push(revset.clone());
+            }
+            JjGitPushTarget::Status => {}
+        }
+
+        argv
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(true),
+            &self.command_label(true),
+            "preview complete",
+        )
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(false),
+            &self.command_label(false),
+            "pushed",
+        )
+    }
+}
+
+#[allow(dead_code)]
+pub fn git_remotes() -> Result<Vec<String>> {
+    let mut jj = Command::new("jj");
+    jj.args(&JJ_GIT_REMOTE_ARGS[..]);
+
+    let output = jj.output()?;
+    if !output.status.success() {
+        return Err(eyre!(
+            "jj git remote list failed: {}",
+            summarize_output(&output.stdout, &output.stderr, "could not list git remotes")
+        ));
+    }
+
+    Ok(parse_git_remotes(std::str::from_utf8(&output.stdout)?))
+}
+
+#[allow(dead_code)]
+fn parse_git_remotes(stdout: &str) -> Vec<String> {
+    stdout
+        .lines()
+        .filter_map(|line| line.split_whitespace().next())
+        .filter(|name| !name.is_empty())
+        .fold(Vec::new(), |mut acc, name| {
+            if !acc.iter().any(|existing| existing == name) {
+                acc.push(name.to_owned());
+            }
+            acc
+        })
 }
 
 impl CommandOutput {
@@ -731,6 +862,29 @@ fn run_jj(spec: &ViewSpec, color: ColorMode) -> Result<std::process::Output> {
 }
 
 fn run_direct_command(args: &[&str], label: &str, success_fallback: &str) -> Result<CommandOutput> {
+    let mut jj = base_command(ColorMode::Never);
+    jj.args(args);
+
+    let output = jj.output()?;
+    if !output.status.success() {
+        return Err(eyre!(
+            "{} failed: {}",
+            label,
+            summarize_output(&output.stdout, &output.stderr, "command failed")
+        ));
+    }
+
+    Ok(CommandOutput {
+        message: summarize_output(&output.stdout, &output.stderr, success_fallback),
+    })
+}
+
+#[allow(dead_code)]
+fn run_direct_args(
+    args: Vec<String>,
+    label: &str,
+    success_fallback: &str,
+) -> Result<CommandOutput> {
     let mut jj = base_command(ColorMode::Never);
     jj.args(args);
 
@@ -1765,6 +1919,78 @@ mod tests {
     #[test]
     fn new_trunk_command_args_are_stable() {
         assert_eq!(NEW_TRUNK_ARGS, ["new", "trunk()"]);
+    }
+
+    #[test]
+    fn git_push_bookmark_args_include_dry_run_when_previewing() {
+        let push = JjGitPush::for_bookmark("main".to_owned()).with_remote("origin".to_owned());
+
+        assert_eq!(
+            push.command_argv(true),
+            vec![
+                "git",
+                "push",
+                "--dry-run",
+                "--remote",
+                "origin",
+                "--bookmark",
+                "main"
+            ]
+        );
+        assert_eq!(
+            push.command_label(false),
+            "jj git push --remote origin --bookmark main"
+        );
+        assert_eq!(
+            push.command_label(true),
+            "jj git push --dry-run --remote origin --bookmark main"
+        );
+        assert_eq!(
+            push.command_argv(false),
+            vec!["git", "push", "--remote", "origin", "--bookmark", "main"]
+        );
+    }
+
+    #[test]
+    fn git_push_revision_args_follow_revision_target() {
+        let push = JjGitPush::for_revision("main".to_owned()).with_remote("origin".to_owned());
+
+        assert_eq!(
+            push.command_argv(true),
+            vec![
+                "git",
+                "push",
+                "--dry-run",
+                "--remote",
+                "origin",
+                "--revision",
+                "main"
+            ]
+        );
+    }
+
+    #[test]
+    fn git_push_status_default_uses_remote_only_target() {
+        let push = JjGitPush::for_status().with_remote("origin".to_owned());
+
+        assert_eq!(
+            push.command_argv(false),
+            vec!["git", "push", "--remote", "origin"]
+        );
+    }
+
+    #[test]
+    fn git_push_keeps_status_target_with_no_remote_optional() {
+        assert_eq!(
+            JjGitPush::for_status().command_argv(true),
+            vec!["git", "push", "--dry-run"]
+        );
+    }
+
+    #[test]
+    fn parses_git_remotes_from_jj_remote_list_output() {
+        let stdout = "origin https://example.com/repo.git\nupstream git@github.com:org/repo.git\n";
+        assert_eq!(parse_git_remotes(stdout), vec!["origin", "upstream"]);
     }
 
     #[test]

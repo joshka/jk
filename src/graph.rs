@@ -83,6 +83,18 @@ pub struct GraphView {
 }
 
 impl GraphView {
+    #[cfg(test)]
+    pub(crate) fn test_new(entries: Vec<LogItem>) -> Self {
+        Self {
+            home_command: JjCommand::Default,
+            mode: LogViewMode::Default,
+            spec: ViewSpec::new(JjCommand::Default, Vec::new()),
+            entries,
+            selection: Selection::default(),
+            selected_change_ids: Vec::new(),
+        }
+    }
+
     pub fn load(spec: ViewSpec) -> Result<Self> {
         let home_command = spec.command();
         let mode = LogViewMode::from_spec(&spec);
@@ -244,6 +256,12 @@ impl GraphView {
             .get(self.selection.index())
             .and_then(LogItem::action_id)
             .or_else(|| self.spec.target())
+    }
+
+    pub fn selected_revision(&self) -> Option<&str> {
+        self.entries
+            .get(self.selection.index())
+            .and_then(LogItem::action_id)
     }
 
     pub fn search_matches(&self, query: &SearchQuery) -> usize {
@@ -921,5 +939,22 @@ mod tests {
         assert_eq!(selected[0].style, explicit_selection_style());
         assert_eq!(unselected[0].style, Style::default());
         assert_ne!(selected[0].style, unselected[0].style);
+    }
+
+    #[test]
+    fn selected_revision_uses_exact_row_revision() {
+        let view = GraphView {
+            home_command: JjCommand::Default,
+            mode: LogViewMode::Default,
+            spec: ViewSpec::new(JjCommand::Default, Vec::new()),
+            entries: vec![
+                log_item("@  has id", Some("abcd"), None),
+                log_item("○  no id", None, None),
+            ],
+            selection: Selection::default(),
+            selected_change_ids: Vec::new(),
+        };
+
+        assert_eq!(view.selected_revision(), Some("abcd"));
     }
 }

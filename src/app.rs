@@ -21,7 +21,8 @@ use crate::command::{
 };
 use crate::copy::CopyOption;
 use crate::jj::{
-    DiffFormat, JjCommand, LogViewMode, ViewSpec, git_fetch, new_trunk, resolve_exact_change_id,
+    DiffFormat, JjCommand, JjGitPush, JjGitPushTarget, LogViewMode, ViewSpec, git_fetch,
+    git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::search::SearchQuery;
 use crate::tui::{self, Overlay, StatusHints};
@@ -64,6 +65,18 @@ enum InteractionMode {
         prompt: RolePrompt,
         selected: usize,
     },
+    PushRemotePrompt {
+        target: JjGitPushTarget,
+        remotes: Vec<String>,
+        selected: usize,
+    },
+    PushPreview {
+        push: JjGitPush,
+        command_label: String,
+        preview_output: String,
+        status_context: Option<String>,
+        completed: bool,
+    },
 }
 
 const APP_BINDINGS: &[Binding] = &[
@@ -77,6 +90,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
     Binding::new(KeyPattern::char('y'), Command::Copy),
+    Binding::new(KeyPattern::char('p'), Command::Push),
     Binding::new(KeyPattern::char('v'), Command::ViewFormat),
     Binding::new(KeyPattern::char('r'), Command::Refresh),
     Binding::new(KeyPattern::char('h'), Command::Back),
@@ -190,6 +204,7 @@ impl App {
                 self.fetch(viewport_height);
                 Ok(false)
             }
+            Command::Push => self.open_push_prompt(),
             Command::Copy => {
                 self.open_copy_menu(viewport_height);
                 Ok(true)
@@ -404,6 +419,68 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::PushRemotePrompt {
+                target,
+                remotes,
+                selected,
+            } => {
+                match code {
+                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        if *selected + 1 < remotes.len() {
+                            *selected += 1;
+                        }
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        *selected = selected.saturating_sub(1);
+                    }
+                    KeyCode::Enter => {
+                        let target = target.clone();
+                        let selected_remote = remotes.get(*selected).cloned();
+                        self.mode = InteractionMode::Normal;
+                        match selected_remote {
+                            Some(remote) => self.open_push_preview(target, remote),
+                            None => {
+                                self.status = StatusLine::error(
+                                    &self.view,
+                                    "no remote selected for push".to_owned(),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            }
+            InteractionMode::PushPreview {
+                push,
+                command_label: _,
+                preview_output: _,
+                status_context,
+                completed,
+            } => {
+                let (push, status_context, completed) =
+                    { (push.clone(), status_context.clone(), *completed) };
+                match code {
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        self.mode = InteractionMode::Normal;
+                        if !completed {
+                            self.status =
+                                StatusLine::with_message(&self.view, "push cancelled".to_owned());
+                        }
+                    }
+                    KeyCode::Enter => {
+                        if completed {
+                            self.mode = InteractionMode::Normal;
+                            return Ok(true);
+                        }
+
+                        self.confirm_push(push, status_context, viewport_height);
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            }
         }
     }
 
@@ -425,6 +502,112 @@ impl App {
     fn open_log_revset_prompt(&mut self) {
         if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
             self.mode = InteractionMode::LogRevsetPrompt(String::new());
+        }
+    }
+
+    fn open_push_prompt(&mut self) -> Result<bool> {
+        let target = match self.view.push_target() {
+            Ok(Some(target)) => target,
+            Ok(None) => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    "push is only available from graph, status, or bookmarks views".to_owned(),
+                );
+                return Ok(false);
+            }
+            Err(message) => {
+                self.status = StatusLine::error(&self.view, message.to_string());
+                return Ok(false);
+            }
+        };
+
+        match git_remotes() {
+            Ok(remotes) => {
+                if remotes.is_empty() {
+                    self.status = StatusLine::error(
+                        &self.view,
+                        "no git remotes found; add a remote before pushing".to_owned(),
+                    );
+                    return Ok(false);
+                }
+
+                self.mode = InteractionMode::PushRemotePrompt {
+                    target,
+                    remotes,
+                    selected: 0,
+                };
+                Ok(false)
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                Ok(false)
+            }
+        }
+    }
+
+    fn open_push_preview(&mut self, target: JjGitPushTarget, remote: String) {
+        let status_context = match &target {
+            JjGitPushTarget::Status => Some(format!(
+                "status push uses jj default target for remote {remote}"
+            )),
+            _ => None,
+        };
+        let push = match target {
+            JjGitPushTarget::Bookmark(name) => JjGitPush::for_bookmark(name).with_remote(remote),
+            JjGitPushTarget::Revision(name) => JjGitPush::for_revision(name).with_remote(remote),
+            JjGitPushTarget::Status => JjGitPush::for_status().with_remote(remote),
+        };
+
+        match push.run_preview() {
+            Ok(output) => {
+                let command_label = push.command_label(true);
+                self.mode = InteractionMode::PushPreview {
+                    push,
+                    command_label,
+                    preview_output: output.message().to_owned(),
+                    status_context,
+                    completed: false,
+                };
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                self.mode = InteractionMode::Normal;
+            }
+        }
+    }
+
+    fn confirm_push(
+        &mut self,
+        push: JjGitPush,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = push.command_label(false);
+        let result_message = match push.run() {
+            Ok(output) => match self.view.refresh() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    let message = output.message().to_owned();
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!("refresh failed: {error}")
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::PushPreview {
+            push,
+            command_label,
+            preview_output: result_message,
+            status_context,
+            completed: true,
         }
     }
 
@@ -607,6 +790,24 @@ impl App {
             InteractionMode::RolePrompt { prompt, selected } => Overlay::RolePrompt {
                 prompt,
                 selected: *selected,
+            },
+            InteractionMode::PushRemotePrompt {
+                remotes, selected, ..
+            } => Overlay::PushRemotePrompt {
+                remotes,
+                selected: *selected,
+            },
+            InteractionMode::PushPreview {
+                command_label,
+                preview_output,
+                status_context,
+                completed,
+                ..
+            } => Overlay::PushPreview {
+                command_label: command_label.as_str(),
+                preview_output: preview_output.as_str(),
+                status_context: status_context.as_ref(),
+                completed: *completed,
             },
             InteractionMode::Normal
             | InteractionMode::SearchPrompt(_)
@@ -837,6 +1038,19 @@ pub enum StatusKind {
 mod tests {
     use super::*;
 
+    fn test_app(view: ViewState) -> App {
+        App {
+            status: StatusLine::ready(&view),
+            view,
+            stack: Vec::new(),
+            startup_log_args: None,
+            diff_format: DiffFormat::Default,
+            mode: InteractionMode::Normal,
+            search: None,
+            should_quit: false,
+        }
+    }
+
     #[test]
     fn parses_default_startup_view() {
         let spec = initial_view(Vec::new()).unwrap();
@@ -906,5 +1120,81 @@ mod tests {
             "4 items | trunk work"
         );
         assert_eq!(graph_status_message(4, None), "4 items");
+    }
+
+    #[test]
+    fn open_push_prompt_requires_exact_graph_revision() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), None, None),
+        ])));
+
+        assert!(!app.open_push_prompt().unwrap());
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(
+            app.status.message(),
+            "push from graph requires a selected row with an exact revision"
+        );
+    }
+
+    #[test]
+    fn push_preview_entering_cancel_restores_normal_mode() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::PushPreview {
+            push: JjGitPush::for_status().with_remote("origin"),
+            command_label: "jj git push --remote origin --revision abcdef".to_owned(),
+            preview_output: "preview only".to_owned(),
+            status_context: None,
+            completed: false,
+        };
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+                .is_ok()
+        );
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "push cancelled");
+    }
+
+    #[test]
+    fn push_preview_completion_stays_until_closed() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::PushPreview {
+            push: JjGitPush::for_status().with_remote("origin"),
+            command_label: "jj git push --remote origin".to_owned(),
+            preview_output: "pushed".to_owned(),
+            status_context: Some("status push uses jj default target for remote origin".to_owned()),
+            completed: true,
+        };
+        app.status = StatusLine::with_message(&app.view, "pushed");
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+                .is_ok()
+        );
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "pushed");
+    }
+
+    #[test]
+    fn push_remote_prompt_without_selection_stays_ready() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        ])));
+        app.mode = InteractionMode::PushRemotePrompt {
+            target: JjGitPushTarget::Revision("abcdef".to_owned()),
+            remotes: Vec::new(),
+            selected: 0,
+        };
+
+        assert!(
+            app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+                .is_ok()
+        );
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "no remote selected for push");
     }
 }
