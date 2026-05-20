@@ -11,7 +11,7 @@ use ratatui::widgets::{List, ListItem, ListState};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{BookmarkItem, JjCommand, ViewSpec, load_bookmark_entries};
+use crate::jj::{BookmarkItem, BookmarkRowState, JjCommand, ViewSpec, load_bookmark_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;
@@ -187,7 +187,7 @@ impl BookmarksView {
 
     pub fn selected_local_bookmark_name(&self) -> Option<&str> {
         self.selected_entry()
-            .filter(|entry| entry.is_local())
+            .filter(|entry| matches!(entry.state(), BookmarkRowState::Local { .. }))
             .map(BookmarkItem::bookmark_name)
     }
 
@@ -461,6 +461,16 @@ mod tests {
         let view = bookmarks_view(vec![remote]);
 
         assert_eq!(view.selected_bookmark_name(), Some("@origin"));
+        assert_eq!(view.selected_local_bookmark_name(), None);
+    }
+
+    #[test]
+    fn selected_local_bookmark_name_ignores_unknown_metadata_rows() {
+        let unknown = bookmark_item(&["maybe-local: abc"], "maybe-local", None, None)
+            .with_state(BookmarkRowState::Unknown);
+        let view = bookmarks_view(vec![unknown]);
+
+        assert_eq!(view.selected_bookmark_name(), Some("maybe-local"));
         assert_eq!(view.selected_local_bookmark_name(), None);
     }
 

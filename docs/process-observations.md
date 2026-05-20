@@ -5,6 +5,27 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 36 review repair)
+
+- Slice / task: repair Packet 36 bookmark tracking metadata review findings in
+  `kyqrnxtp Add bookmark tracking metadata`.
+- Thread id: `019e4798-185d-7771-bf0f-29756a8cac08`.
+- Observable outcome: `LocalBookmarkRemoteState::Tracked` now preserves whether an untracked remote
+  peer is also present, so local rows can distinguish tracked-only and tracked-plus-untracked remote
+  peer sets for later Packet 38/39 gating. The Packet 36 docs now separate passed checks from an
+  attempted clippy run that failed on the known baseline findings, and the post-repair full
+  `cargo test` count is recorded as 447 passed / 2 ignored.
+- Validation / proof run during repair:
+  - `cargo test jj_rows -- --test-threads=1`
+  - `cargo test bookmark -- --test-threads=1`
+  - `cargo check`
+  - `rustup run nightly cargo fmt --check`
+  - `cargo clippy -- -D warnings` attempted and failed on the known baseline findings
+  - `just md-check`
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Files: `src/jj_rows.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Post-Packet-34 app coherence gate)
 
 - Slice / task: implement the Post-Packet-34 App Module Coherence Gate in jj change
@@ -3239,3 +3260,41 @@ belong here.
 - Review note: check exact-source action availability, detail-view availability, multi-source
   exclusion, command labels, source fallback wording, full error output preservation, and
   `src/app.rs` remaining untouched by action lifecycle policy.
+
+### 2026-05-20 (Packet 36 bookmark tracking metadata contract)
+
+- Slice / task: implement Packet 36 in `kyqrnxtp Add bookmark tracking metadata`.
+- Thread id: `019e478a-c82a-7760-983a-4273cd2665f5`.
+- Model / routing: gpt-5.5 high, because the change defines a semantic bookmark state contract that
+  future forget/track/untrack mutations must trust instead of rendered labels.
+- Context read: `AGENTS.md`, `docs/development/rules/change-shape.md`,
+  `docs/development/rules/testing.md`, `docs/development/rules/boundary.md`,
+  `docs/agent/architecture.md`, `docs/agent/testing.md`, `docs/plan/next-implementation-slices.md`
+  Packet 36, `docs/plan/fragility-register.md`, and existing bookmark row/view tests.
+- Command evidence: `jj --no-pager bookmark list --help` documents `--all-remotes`, `--tracked`, and
+  template support; `jj --no-pager help -k templates` documents `CommitRef.remote()`, `tracked()`,
+  `tracking_present()`, `tracking_ahead_count()`, `tracking_behind_count()`, and `synced()`. A
+  current-repo `--all-remotes` sample confirmed JSON-safe template output for local rows, tracked
+  remote rows, and untracked remote rows without reading `@origin`-style labels.
+- Observable outcome: `src/jj_rows.rs` now emits bookmark metadata as JSONL and parses explicit
+  `name`, `remote`, `tracked`, `tracking_present`, `synced`, `target_change_id`, and
+  `target_commit_id` fields. `BookmarkItem` carries typed local, remote, and unknown row state;
+  `src/bookmarks.rs` gates local delete on the typed local state instead of `is_local()` over a
+  boolean flag.
+- Conservative degradation: missing metadata, malformed metadata, and row-count mismatch now produce
+  `BookmarkRowState::Unknown` rows with rendered labels preserved but target ids absent. Default
+  bookmark output is classified as visible-row coverage, so local rows remain tracking-ambiguous
+  unless `--all-remotes` proves local-only or tracked state.
+- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+  `cargo test bookmark -- --test-threads=1`; `cargo check`; full `cargo test` passed with 447 passed
+  / 2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
+  `just md-fmt`; and `just md-check`. `cargo clippy -- -D warnings` was attempted separately and
+  failed on the known baseline findings.
+- Baseline note: after Packet 36, `cargo check` still reports only the known warnings for
+  `ViewSpec::bookmarks` and `FileListItem::row_text`. `cargo clippy -- -D warnings` remains blocked
+  by the known baseline findings: those two dead-code warnings plus `collapsible_if` in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Review note: check that Packet 36 states are truthful for default versus `--all-remotes` output,
+  that row-order mismatch fails closed, that local bookmark delete still works only for explicit
+  local metadata, and that Packet 38/39 tracking actions remain disabled until they add state-gated
+  command planning.

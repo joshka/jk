@@ -1963,3 +1963,44 @@
 - Next recommended slice: review Packet 35 for exact source targeting, single-source menu policy,
   command shape, output preservation, source fallback wording, docs accuracy, and whether a future
   structured result contract is worth a separate packet before adding more rewrite flows.
+
+## Packet 36: Bookmark Tracking Metadata Contract
+
+- Files changed: `src/jj_rows.rs`, `src/bookmarks.rs`, `src/jj.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`.
+
+- Metadata/template shape: the bookmark metadata side channel now emits JSONL with `name`, `remote`,
+  `tracked`, `tracking_present`, `synced`, `target_change_id`, and `target_commit_id` from
+  `jj bookmark list -T`. Rendered bookmark labels are still preserved for presentation and fallback
+  row text.
+
+- Behavior: `BookmarkItem` now carries a typed row state. Local rows distinguish local-only,
+  tracked, untracked-remote-present, and ambiguous local tracking state. Remote rows carry the
+  remote name, tracked/untracked state, synced state, whether tracked local state is present, and
+  whether a local peer row is proven present, absent, or unknown.
+
+- Conservative policy: missing, malformed, or row-count-mismatched metadata becomes
+  `BookmarkRowState::Unknown`. Default bookmark output is treated as only visible-row coverage, so a
+  local row stays ambiguous unless `--all-remotes` output proves local-only/tracked state. Tracking
+  and forget mutations remain unimplemented and disabled; existing local delete remains gated on an
+  explicit local state rather than rendered labels.
+
+- Validation: `jj --no-pager bookmark list --help`; `jj --no-pager help -k templates`; manual
+  current-repo template sample with `--all-remotes`; `cargo test jj_rows -- --test-threads=1`;
+  `cargo test bookmark -- --test-threads=1`; `cargo check`; full `cargo test` passed with 447 passed
+  / 2 ignored after the review repair; `rustup run nightly cargo fmt`;
+  `rustup run nightly cargo   fmt --check`; `just md-fmt`; and `just md-check`.
+  `cargo clippy -- -D warnings` was attempted separately and failed on the known baseline findings.
+
+- Warning / blocker status: `cargo check` passes with the known `ViewSpec::bookmarks` and
+  `FileListItem::row_text` warnings. `cargo clippy -- -D warnings` remains blocked by the known
+  baseline findings: those two dead-code warnings plus `collapsible_if` in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`.
+
+- Remaining risk: row-order pairing is still a side-channel contract between two `jj bookmark list`
+  invocations. The packet now fails closed on count mismatch, but exact tracking actions still need
+  a dedicated gating pass before Packet 38 or Packet 39 enables forget/track/untrack mutations.
+
+- Next recommended slice: review Packet 36 for metadata truthfulness, row-order mismatch behavior,
+  default-output ambiguity, and preservation of existing local bookmark delete behavior before
+  Packet 37 rename or Packet 38/39 remote-tracking mutations.

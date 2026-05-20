@@ -22,8 +22,10 @@ pub use crate::jj_actions::{
     JjSplitPlan, JjSplitTarget, JjSquashPlan, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan,
 };
+#[allow(unused_imports)]
 pub use crate::jj_rows::{
-    BookmarkItem, FileListItem, LogItem, OperationLogItem, ResolveEntry, document_plain_text,
+    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, FileListItem, LocalBookmarkRemoteState,
+    LogItem, OperationLogItem, RemoteBookmarkTrackingState, ResolveEntry, document_plain_text,
     load_bookmark_entries, load_compact_log_context, load_entries, load_file_list_entries,
     load_operation_log_entries, load_resolve_entries,
 };
