@@ -104,3 +104,70 @@ Acceptance criteria:
 
 Recommendation: run this spike before making the log row parser support richer mutations. Do not
 block fetch, refresh, basic view modes, or read-only rendered-output screens on the spike.
+
+## Slice 0 Result
+
+The spike result is mixed:
+
+- `jj_cli` is viable today for the low-level pieces `jk` needs to preserve view fidelity:
+  `formatter::FormatRecorder`, `graphlog::{get_graphlog, GraphStyle}`, template renderers, and
+  `revset_util` are all public and compile from an external crate.
+- `jj_cli` is not yet a clean end-to-end external log-row renderer for `jk`. The actual `jj log`
+  flow lives in `commands/log.rs`, but `LogArgs` and `cmd_log()` are `pub(crate)`. The workspace and
+  settings path that makes template parsing and revset resolution convenient is routed through
+  `cli_util::{CommandHelper, WorkspaceCommandHelper}`, whose public methods are useful but whose
+  constructors are not public.
+- `jj_lib` remains the reliable semantic source for repo, revset, graph, and commit identity, but
+  using it alone would make `jk` reassemble more CLI behavior locally than this slice wants.
+
+### Probe Evidence
+
+This slice used two kinds of checks:
+
+1. A temporary scratch crate with path dependencies on the adjacent `../jj/cli` and `../jj/lib`
+   checkouts compiled and ran a minimal program using `jj_cli::formatter::FormatRecorder`,
+   `jj_cli::graphlog::get_graphlog`, and `jj_lib::graph::GraphEdge`. The probe rendered a curved
+   graph row as `@  change summary`, which matches the row prefix shape expected from `jj log`.
+1. Subprocess comparisons in this repo confirmed that:
+   - default `jj log` output keeps the compact configured row shape;
+   - `--config='ui.graph.style="ascii"'` switches graph glyphs as expected;
+   - a custom `-T 'change_id.shortest() ++ " " ++ description.first_line() ++ "\\n"'` template
+     materially changes the row text shape that `jk` would need to preserve.
+
+### Required Dependency Surface
+
+The smallest promising source-backed surface for a future adapter is:
+
+- `jj_cli::formatter::{FormatRecorder, Formatter}`;
+- `jj_cli::graphlog::{get_graphlog, GraphStyle}`;
+- `jj_cli::templater::TemplateRenderer`;
+- `jj_cli::commit_templater` and `jj_cli::template_builder` via public template parsing helpers;
+- `jj_cli::revset_util::RevsetExpressionEvaluator`;
+- `jj_cli::cli_util::WorkspaceCommandHelper` methods for `settings()`, `repo()`,
+  `commit_template_language()`, `parse_template()`, and `parse_revset()`;
+- `jj_lib::repo`, `jj_lib::revset`, `jj_lib::graph`, `jj_lib::commit`, and `jj_lib::workspace`.
+
+### Blocking Or Awkward Pieces
+
+- `jj_cli::commands::log::{LogArgs, cmd_log}` are crate-private, so `jk` cannot reuse the whole
+  command implementation directly.
+- `CommandHelper` and `WorkspaceCommandHelper` expose helpful methods, but the setup path that
+  produces them is not exposed as a simple external constructor.
+- `FormatRecorder` is public, but its recorded label operations are private. Replaying into Ratatui
+  spans would still need either a custom `Formatter` implementation in `jk` or a higher-level
+  style/spans adapter from upstream.
+- A `jk` adapter would still need to mirror some of `cmd_log()`'s orchestration: loading the
+  workspace, resolving the configured default revset, parsing the template, prioritizing graph rows,
+  and pairing rendered content with semantic commit identity.
+
+### Recommended Next Step
+
+Treat `jj_cli` as a promising rendering and formatting dependency, not yet as a drop-in replacement
+for the current subprocess path.
+
+For Slice 1, keep the narrowed subprocess-plus-template metadata approach and harden the row
+contract there. Revisit the code-native path only after one of these becomes true:
+
+- `jk` successfully compiles a small in-repo adapter that opens a workspace and drives the public
+  `jj_cli` helpers without copying `cmd_log()` wholesale; or
+- upstream exposes a higher-level UI-facing helper for workspace setup and log rendering.

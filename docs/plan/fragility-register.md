@@ -39,6 +39,17 @@ template language or presentation model.
   | Rewrite flows      | Preview output plus command planning                    | Prefer `jj` command previews; avoid duplicating revset/fileset semantics                  |
   | Sync flows         | Fetch/push stderr/stdout and bookmark state             | Prefer command passthrough until structured state is needed                               |
 
+## Source Integration Spike
+
+Slice 0 showed that `jj_cli` is promising but not yet a complete external log-rendering contract.
+
+  | Area                     | Current dependency or gap                                                                        | Risk                                                                       | Mitigation                                                                                           |
+  | ------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+  | Shared log rendering     | Public low-level `jj_cli` graph, formatter, and template pieces                                  | `jk` could still copy `cmd_log()` orchestration or depend on awkward setup | Keep Slice 1 on the narrowed subprocess path; only switch after a compiled in-repo adapter           |
+  | Workspace/template setup | `CommandHelper` and `WorkspaceCommandHelper` methods without a simple external construction path | External integration may depend on public-but-not-convenient APIs          | Treat this as upstream API evidence; avoid production dependency until setup is cleaner              |
+  | Style-to-span capture    | `FormatRecorder` exposes replay but not its recorded label ops                                   | `jk` may preserve text while still redoing style mapping locally           | Prefer a custom `Formatter` adapter over private-op inspection; request higher-level spans if needed |
+  | Default log semantics    | Configured revset, graph priority, and template wiring live in CLI command flow                  | Local recreation can drift from `jj` defaults and user config              | Mirror only the current narrow metadata template; revisit shared rendering later                     |
+
 ## Duplication Watchlist
 
 These areas are especially likely to drift if copied into `jk`:
