@@ -100,6 +100,18 @@ impl GraphView {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn test_with_spec(spec: ViewSpec, entries: Vec<LogItem>) -> Self {
+        Self {
+            home_command: spec.command(),
+            mode: LogViewMode::from_spec(&spec),
+            spec,
+            entries,
+            selection: Selection::default(),
+            selected_change_ids: Vec::new(),
+        }
+    }
+
     pub fn load(spec: ViewSpec) -> Result<Self> {
         let home_command = spec.command();
         let mode = LogViewMode::from_spec(&spec);

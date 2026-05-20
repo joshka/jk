@@ -1170,12 +1170,6 @@
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
     findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
     `src/graph.rs`, and `src/operation_log.rs`.
-- Fragility: `docs/plan/fragility-register.md` unchanged. Packet D introduced app-owned fallback
-  styles and keyboard metadata; it did not parse rendered `jj` output, infer colors from rendered
-  output, or change command semantics.
-- Remaining risk: shortcut letters are scoped to the action menu only and are now discoverable
-  there, but future command-menu work may want a single registry for all modal-local shortcuts.
-- Next slice: Interruption Packet E: Status File Actions.
 
 ### Packet D Review Repair
 
@@ -1256,3 +1250,188 @@
   suitable for status files, this should move to a stronger contract instead of expanding
   rendered-text inference.
 - Next slice: `Interruption Packet F: Fetch Remote Selection`.
+
+## App Decomposition Slice 1
+
+- Files changed: `src/app.rs`, `src/app/tests.rs`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Structure: the inline `#[cfg(test)] mod tests` from `src/app.rs` moved into the child module
+  `src/app/tests.rs`. `src/app.rs` now declares `#[cfg(test)] mod tests;`.
+- Scope control: production behavior was not refactored, and no visibility changes were needed
+  because the child test module can continue to use parent-private app items through `super::*`.
+- Size evidence: `src/app.rs` dropped from 7,779 lines to 3,854 lines; `src/app/tests.rs` contains
+  the extracted 3,899-line app behavior test module after rustfmt.
+- Validation:
+  - `cargo test app -- --test-threads=1` passed with 142 tests.
+  - `cargo check` passed with existing dead-code warnings.
+  - full `cargo test` passed with 387 tests.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+
+## App Decomposition Slice 2
+
+- Files changed: `src/app.rs`, `src/app/services.rs`, `src/app/tests.rs`, `docs/plan/progress.md`,
+  and `docs/process-observations.md`.
+- Structure: `src/app/services.rs` now owns `AppServices`, the app side-effect boundary for jj
+  mutation plans, previews, revision resolution, fetch/push helpers, view loading, view refresh, and
+  graph reveal. `App` owns one `services: AppServices` field instead of the previous set of
+  individual test-only runner fields.
+- Scope control: command argv and preview semantics stayed in the existing jj plan types.
+  `AppServices` only invokes those plans and returns their messages. `App` still decides when to
+  invoke side effects and how status, mode, stack, and view transitions follow.
+- Test surface: `src/app/tests.rs` uses a local `test_services()` helper for the standard app test
+  doubles and overrides individual service functions through `app.services.*` only where a test
+  needs a special failure, load, remote, or reveal behavior.
+- Review repair: `test_services()` now overrides `new_trunk_run` so graph new-from-trunk app tests
+  cannot fall through to the production default. A focused app test exercises graph `c` through
+  `ViewEffect::RunNewTrunk`, mocked trunk/current revision resolution, mocked reveal, and the
+  service call counter.
+- Rework: after moving the production helpers, the shared workspace briefly failed `cargo check`
+  because `App::load` did not initialize `services` and the old production wrappers still referenced
+  moved imports (`resolve_exact_change_id`, `git_fetch`, `git_remotes`, and `new_trunk`). The repair
+  routed those wrappers through `AppServices` and confirmed compilation before continuing cleanup.
+- Size evidence: before Slice 2, `wc -l` reported 3,854 lines in `src/app.rs` and 3,899 lines in
+  `src/app/tests.rs`. After Slice 2 and rustfmt, `src/app.rs` is 3,434 lines, `src/app/services.rs`
+  is 332 lines, and `src/app/tests.rs` is 3,887 lines.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test app -- --test-threads=1` passed with 143 tests after the review repair.
+  - full `cargo test` passed with 387 tests.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
+
+## App Decomposition Slice 3
+
+- Files changed: `src/app.rs`, `src/app/navigation.rs`, `src/app/tests.rs`, `docs/plan/progress.md`,
+  and `docs/process-observations.md`.
+- Structure: `src/app/navigation.rs` now owns startup argument parsing, `App::load`, detail view
+  spec construction, direct top-level view entry, push/pop back-stack transitions, and log/default
+  switching. `src/app.rs` still owns the event loop, dispatch, modal/action behavior, refresh, and
+  status decisions that are not navigation-specific.
+- Service boundary: initial app loading now creates `AppServices::default()` before loading the
+  first view and calls `services.load_view(initial_spec)`. Pushed and switched views continue to
+  load through `App::load_view_state`, which delegates to `AppServices`.
+- Scope control: existing app call sites still call `self.push_detail`, `self.open_status`,
+  `self.pop_view`, and related inherent methods. The moved methods use `pub(in crate::app)` so the
+  boundary stays app-internal without widening crate-level API.
+- Rework: the first extracted startup path still called `ViewState::load` directly. This was
+  adjusted before final validation so startup view loading also crosses the Slice 2 service
+  boundary.
+- Review repair: focused app tests now cover direct `L` and `J` dispatch. `L` proves startup
+  `jk log ...` args are reused and the back stack is cleared; `J` proves default view switching
+  ignores startup log args and clears the stack. The app test loader now preserves graph `ViewSpec`s
+  through a small `GraphView::test_with_spec` constructor so those assertions inspect the loaded
+  spec instead of only the view variant.
+- Size evidence: before Slice 3, `wc -l` reported 3,434 lines in `src/app.rs`, 332 lines in
+  `src/app/services.rs`, and 3,919 lines in `src/app/tests.rs`. After Slice 3 and rustfmt,
+  `src/app.rs` is 3,264 lines, `src/app/navigation.rs` is 193 lines, `src/app/services.rs` remains
+  332 lines, and `src/app/tests.rs` is 3,921 lines.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test app -- --test-threads=1` passed with 145 app-related tests after the review repair.
+  - full `cargo test` passed with 388 tests.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
+
+## App Decomposition Slice 4
+
+- Files changed: `src/app.rs`, `src/app/action_flow.rs`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Structure: `src/app/action_flow.rs` now owns the shared action-output-backed preview key flow. It
+  translates output keys into stay-open, close-completed, cancel-pending, and confirm-pending events
+  for describe, commit, bookmark mutation, new, rebase, restore, revert, squash, absorb, push,
+  operation recovery, operation target, and working-copy navigation previews.
+- Dispatch shape: `handle_mode_key_event` calls `handle_common_action_preview_key` before the main
+  `self.mode` match, so the repeated preview arms are no longer embedded in the modal dispatch.
+  Abandon preview and typed abandon confirmation intentionally stay in `src/app.rs` because their
+  recheck and exact-text confirmation behavior is action-specific.
+- Scope control: existing `confirm_*` methods stayed on `App`, action output scrolling stayed in
+  `action_output.rs`, and user-visible command output, cancellation messages, confirmation behavior,
+  and result-close behavior were preserved.
+- Size evidence: before Slice 4, `wc -l src/app.rs` reported 3,264 lines. After Slice 4 and rustfmt,
+  `src/app.rs` is 2,889 lines and `src/app/action_flow.rs` is 345 lines, for 3,234 lines across the
+  two files.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test app -- --test-threads=1` passed with 145 app-related tests.
+  - full `cargo test` passed with 390 tests.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
+
+## App Decomposition Slice 5
+
+- Files changed: `src/app.rs`, `src/app/action_flow.rs`, `src/app/action_lifecycle.rs`,
+  `src/app/tests.rs`, `docs/plan/progress.md`, and `docs/process-observations.md`.
+- Structure: `src/app/action_lifecycle.rs` now owns action menu follow-up application, action prompt
+  opening, preview opening, confirmation, result, stacked-view refresh, and abandon recheck flows
+  for the existing preview-first jj actions. Existing dispatch call sites still call inherent `App`
+  methods, but those methods now have an action-lifecycle home.
+- Action flow boundary: `src/app/action_flow.rs` stays focused on common action-output preview key
+  handling and confirmation dispatch. `src/app.rs` keeps modal/key dispatch, `execute_view`,
+  `apply_view_effect`, view-menu handling, `run_new_trunk`, and `apply_diff_format`.
+- Test boundary: `src/app/tests.rs` now imports action-output and action target types directly
+  instead of receiving them through broad `src/app.rs` imports. Assertions and mocked service
+  behavior were not weakened.
+- Size evidence: before Slice 5, `wc -l src/app.rs src/app/action_flow.rs` reported 2,889 lines in
+  `src/app.rs` and 345 lines in `src/app/action_flow.rs`. After Slice 5 and rustfmt, `src/app.rs` is
+  1,355 lines, `src/app/action_flow.rs` remains 345 lines, and `src/app/action_lifecycle.rs` is
+  1,563 lines.
+- Rework: the first mechanical move put the lifecycle methods into `action_flow.rs`, which made the
+  module too broad. The moved lifecycle code was split into `action_lifecycle.rs`, leaving
+  `action_flow.rs` as the common preview-key mapper from Slice 4.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test app -- --test-threads=1` passed with 145 app-related tests.
+  - full `cargo test` passed with 390 tests.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
+
+## App Decomposition Slice 6
+
+- Files changed: `src/app.rs`, `src/app/mode_input.rs`, `src/app/action_lifecycle.rs`,
+  `src/app/tests.rs`, `docs/plan/progress.md`, and `docs/process-observations.md`.
+- Structure: `src/app/mode_input.rs` now owns app modal input reduction for help, search, custom log
+  revsets, copy/view/action menus, role prompts, text prompts, abandon confirmation, push remote
+  selection, and handoff to common action-preview handling. `src/app.rs` keeps the terminal event
+  loop, pending normal command prefix handling, normal binding dispatch, view-effect application,
+  view-menu actions, refresh/fetch, and view-format reload behavior.
+- Boundary: action preview scrolling and confirmation dispatch still live in
+  `src/app/action_flow.rs`; selected action follow-ups, preview opening, result handling, and
+  stacked repo-view refresh still live in `src/app/action_lifecycle.rs`. The moved prompt-plan
+  helpers are visible only inside `crate::app` for existing behavior tests.
+- Coverage: operation target restore/revert tests now cover a non-empty repo-view stack refresh and
+  a stacked-refresh failure after the active operation log refresh succeeds. The tests assert the
+  refresh call count and keep the result output/status inspectable.
+- Size evidence: before Slice 6, `wc -l src/app.rs` reported 1,355 lines. After Slice 6 and rustfmt,
+  `src/app.rs` is 781 lines, `src/app/mode_input.rs` is 603 lines, `src/app/action_lifecycle.rs`
+  remains 1,563 lines, and `src/app/tests.rs` is 4,050 lines.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test app -- --test-threads=1` passed with 147 app-related tests.
+  - full `cargo test` passed with 392 tests.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
+    `src/graph.rs`, and `src/operation_log.rs`.
