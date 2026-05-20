@@ -1489,3 +1489,56 @@
 - Next recommended slice: Packet G: File Viewing And Wrap Modes, after review checks the fetch
   target wording, exact remote pattern contract, output preservation, and push remote selection
   regression coverage.
+
+## Interruption Packet G: File Viewing And Wrap Modes
+
+- Files changed: `src/sticky_file_view.rs`, `src/file_show.rs`, `src/show.rs`, `src/diff.rs`,
+  `src/command.rs`, `src/view_state.rs`, `src/app.rs`, `src/app/action_lifecycle.rs`,
+  `src/app/tests.rs`, list-style view modules updated for exhaustive ignored command handling,
+  `docs/plan/progress.md`, and `docs/process-observations.md`.
+- Behavior: show, diff, and file-show document views now default to the existing wrapped
+  `Wrap { trim: false }` rendering, expose `zw` to toggle no-wrap mode, and expose `zh` / `zl` for
+  horizontal movement in no-wrap mode. No-wrap mode clips long rendered lines instead of reflowing
+  them and clamps horizontal offset to the rendered document width for the current viewport width. A
+  follow-up review repair made the app/view clamp path width-aware so refreshes and terminal resizes
+  also clamp no-wrap horizontal offsets.
+- Ownership: `src/sticky_file_view.rs` owns the shared `DocumentDisplayMode` and `DocumentViewport`
+  policy, including Ratatui wrapping and horizontal scroll offset. File-show owns its
+  single-document viewport state directly; show and diff store viewport state inside
+  `StickyFileDocument`. `src/tui.rs` was not changed.
+- Coverage: `sticky_file_view` rendering tests cover wrapped Markdown-like long lines, no-wrap
+  clipping, horizontal offset revealing later columns, and sticky fixed/body rendering under
+  no-wrap. `file_show` tests cover toggle behavior, horizontal clamping, vertical scroll stability,
+  source-line search, refresh clamping, and exact-path copy. Show/diff tests cover copy/file labels
+  and file navigation under horizontal scroll. Follow-up clamp tests cover shared
+  `StickyFileDocument` content shrink, file-show refresh/content shrink, and show/diff viewport
+  width revalidation. `command.rs` tests prove generated help exposes wrap commands only in document
+  contexts.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `ViewSpec::bookmarks` and
+    `FileListItem::row_text`.
+  - `cargo test sticky_file_view` passed with 5 focused tests.
+  - `cargo test file_show` passed with 13 focused tests.
+  - `cargo test horizontal_scroll` passed with 4 focused tests.
+  - `cargo test document_help` passed with 1 focused test.
+  - The follow-up repair first attempted multiple Cargo test-name filters in one command; Cargo
+    rejected that invocation, and the focused clamp tests were rerun with the `horizontal_offset`
+    filter.
+  - `cargo test horizontal_offset` passed with 5 focused tests after the follow-up clamp repair.
+  - Plain `cargo test` passed with 417 tests. The earlier note about
+    `app::tests::operation_restore_confirm_refreshes_non_empty_repo_stack` was stale after the
+    app-test refresh counters were split; the parallel shared-counter race is no longer present in
+    this tree.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in `src/jj.rs` and
+    `src/jj_rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
+- Fragility: no rendered-output parser or ANSI assumptions changed, so
+  `docs/plan/fragility-register.md` was not updated.
+- Remaining risk: render-time viewport clamping is defensive, but persisted state is now also
+  clamped through refresh and resize paths. Review should still check terminal resize behavior in a
+  live TUI because unit tests cover the state contract rather than an end-to-end terminal session.
+- Next recommended slice: review Packet G for no-wrap ergonomics and consider whether document
+  status hints should advertise `zw` after the first user-facing pass.

@@ -102,6 +102,9 @@ impl OperationDetailView {
         match command {
             ViewCommand::CycleMode
             | ViewCommand::NewTrunk
+            | ViewCommand::ToggleWrap
+            | ViewCommand::ScrollLeft
+            | ViewCommand::ScrollRight
             | ViewCommand::NextFile
             | ViewCommand::PreviousFile
             | ViewCommand::OpenFiles
@@ -374,6 +377,7 @@ mod tests {
             ViewCommand::MoveDown,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: None,
             },
         );
@@ -421,6 +425,7 @@ mod tests {
                 ViewCommand::OpenDiff,
                 CommandContext {
                     viewport_height: 3,
+                    viewport_width: 80,
                     search: None,
                 },
             ),
@@ -431,6 +436,7 @@ mod tests {
                 ViewCommand::OpenShow,
                 CommandContext {
                     viewport_height: 3,
+                    viewport_width: 80,
                     search: None,
                 },
             ),
@@ -441,6 +447,7 @@ mod tests {
                 ViewCommand::OpenShow,
                 CommandContext {
                     viewport_height: 3,
+                    viewport_width: 80,
                     search: None,
                 },
             ),
@@ -451,6 +458,7 @@ mod tests {
                 ViewCommand::OpenDiff,
                 CommandContext {
                     viewport_height: 3,
+                    viewport_width: 80,
                     search: None,
                 },
             ),

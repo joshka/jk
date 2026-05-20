@@ -2675,3 +2675,63 @@ belong here.
   fetch behavior preservation, raw credential/error output preservation, command construction,
   action-output result visibility, `/tmp` proof quality, fragility-register accuracy, and absence of
   regressions to push remote selection.
+
+## 2026-05-20 Interruption Packet G
+
+- Thread id: `019e46df-ba8f-75d0-b799-128fc54cbbad`.
+- Model / agent: gpt-5.5 high implementing Packet G: File Viewing And Wrap Modes on working copy
+  `kyymqsnw Add file wrap modes`.
+- Starting state: `jj --no-pager status` reported an empty working copy at
+  `kyymqsnw Add file wrap modes`; no jj stack or description mutation commands were run.
+- Context loaded: `AGENTS.md`, the Packet G section of `docs/plan/next-implementation-slices.md`,
+  `docs/agent/architecture.md`, `docs/agent/testing.md`, `docs/agent/workflow.md`,
+  `docs/development/rules/refactoring.md`, `docs/development/rules/testing.md`,
+  `docs/development/rules/review.md`, and `~/.codex/guides/rust-maintainability.md`.
+- Observable outcome: `src/sticky_file_view.rs` now owns `DocumentDisplayMode` and
+  `DocumentViewport`, keeping wrapped rendering as the default and applying Ratatui horizontal
+  scroll only in no-wrap mode.
+- Observable outcome: `src/file_show.rs`, `src/show.rs`, and `src/diff.rs` wire document-local `zw`,
+  `zh`, and `zl` bindings to toggle wrap and move horizontally without changing source-line vertical
+  offsets, search, copy, or sticky file labels.
+- Observable outcome: `src/command.rs` exposes generated help metadata for the wrap commands only in
+  show, diff, and file-show contexts. Non-document view modules explicitly ignore the new commands
+  for exhaustive dispatch.
+- Observable outcome: a follow-up review repair made `ViewState::clamp` carry viewport width, clamps
+  document viewport state after refresh/content changes, and clamps active document views on
+  terminal resize events.
+- Rework / stuck point: an attempted focused `cargo test` invocation passed multiple test-name
+  filters in one command, which Cargo rejected. The focused test groups were rerun as separate
+  commands and passed.
+- Rework / stuck point: the follow-up clamp repair initially let search movement call a width-less
+  clamp path, which reset no-wrap horizontal offset. Search now clamps only vertical source-line
+  state; refresh, resize, explicit view clamp, and rendering own viewport-width clamping.
+- Rework / stuck point: an initial inline snapshot expected the wrong no-wrap horizontal slice for a
+  sticky file heading. The snapshot was corrected after inspecting the TestBackend output.
+- Validation run during implementation:
+  - `cargo check`
+  - `cargo test sticky_file_view`
+  - `cargo test file_show`
+  - `cargo test horizontal_scroll`
+  - `cargo test document_help`
+  - attempted plain `cargo test`
+  - isolated app refresh-counter test with `-- --test-threads=1`
+  - `cargo test -- --test-threads=1`
+  - follow-up `cargo test horizontal_offset`
+  - follow-up plain `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - follow-up `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+- Validation note: the earlier plain `cargo test` shared-counter failure was stale after app-test
+  refresh counters were split. After the follow-up repair, plain `cargo test` passed with 417 tests.
+- Validation note: `cargo check` still reports existing dead-code warnings for `ViewSpec::bookmarks`
+  and `FileListItem::row_text`.
+- Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
+  `src/jj.rs` and `src/jj_rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`.
+- Fragility note: no rendered-output parser, ANSI parsing, or file-heading assumptions changed; no
+  fragility-register update was made.
+- Review expectation: review Packet G for formatting preservation, no-wrap ergonomics,
+  horizontal/vertical scroll behavior, search/copy stability, sticky context, generated help
+  scoping, parser fragility, and whether document-display ownership stayed in
+  `src/sticky_file_view.rs`.

@@ -17,7 +17,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 static ABANDON_DRIFT_RECHECK_CALLS: AtomicUsize = AtomicUsize::new(0);
 static ABANDON_FAILED_RECHECK_CALLS: AtomicUsize = AtomicUsize::new(0);
 static NEW_TRUNK_CALLS: AtomicUsize = AtomicUsize::new(0);
-static OPERATION_TARGET_REFRESH_CALLS: AtomicUsize = AtomicUsize::new(0);
+static OPERATION_RESTORE_REFRESH_CALLS: AtomicUsize = AtomicUsize::new(0);
+static OPERATION_REVERT_REFRESH_CALLS: AtomicUsize = AtomicUsize::new(0);
 
 fn mock_new_success(new_change: &JjNewPlan) -> Result<String> {
     Ok(format!("new parents: {}", new_change.parents().join(",")))
@@ -308,13 +309,13 @@ fn mock_refresh_ok(_view: &mut ViewState) -> Result<()> {
     Ok(())
 }
 
-fn mock_counting_refresh_ok(_view: &mut ViewState) -> Result<()> {
-    OPERATION_TARGET_REFRESH_CALLS.fetch_add(1, Ordering::SeqCst);
+fn mock_operation_restore_counting_refresh_ok(_view: &mut ViewState) -> Result<()> {
+    OPERATION_RESTORE_REFRESH_CALLS.fetch_add(1, Ordering::SeqCst);
     Ok(())
 }
 
-fn mock_second_refresh_failure(_view: &mut ViewState) -> Result<()> {
-    if OPERATION_TARGET_REFRESH_CALLS.fetch_add(1, Ordering::SeqCst) == 0 {
+fn mock_operation_revert_second_refresh_failure(_view: &mut ViewState) -> Result<()> {
+    if OPERATION_REVERT_REFRESH_CALLS.fetch_add(1, Ordering::SeqCst) == 0 {
         Ok(())
     } else {
         Err(eyre!("view refresh failed"))
@@ -1125,6 +1126,7 @@ fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
         ViewCommand::MoveDown,
         CommandContext {
             viewport_height: 12,
+            viewport_width: 80,
             search: None,
         },
     );
@@ -1527,6 +1529,7 @@ fn closing_action_output_preserves_graph_selection() {
         ViewCommand::MoveDown,
         CommandContext {
             viewport_height: 12,
+            viewport_width: 80,
             search: None,
         },
     );
@@ -2073,6 +2076,7 @@ fn commit_prompt_is_honest_about_current_working_copy_target() {
         ViewCommand::MoveDown,
         CommandContext {
             viewport_height: 12,
+            viewport_width: 80,
             search: None,
         },
     );
@@ -3894,6 +3898,7 @@ fn abandon_cancel_restores_normal_mode_and_selection() {
         ViewCommand::MoveDown,
         CommandContext {
             viewport_height: 12,
+            viewport_width: 80,
             search: None,
         },
     );
@@ -3986,6 +3991,7 @@ fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
         ViewCommand::MoveDown,
         CommandContext {
             viewport_height: 12,
+            viewport_width: 80,
             search: None,
         },
     );
@@ -4150,7 +4156,7 @@ fn operation_restore_preview_can_cancel_or_confirm_success() {
 
 #[test]
 fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
-    OPERATION_TARGET_REFRESH_CALLS.store(0, Ordering::SeqCst);
+    OPERATION_RESTORE_REFRESH_CALLS.store(0, Ordering::SeqCst);
     let operation_id = "e".repeat(128);
     let operation_log =
         crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
@@ -4158,7 +4164,7 @@ fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
             Some(operation_id.clone()),
         )]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
-    app.services.refresh_view = mock_counting_refresh_ok;
+    app.services.refresh_view = mock_operation_restore_counting_refresh_ok;
     app.stack
         .push(ViewState::Status(crate::status::StatusView::test_new(&[
             "Working copy changes:",
@@ -4169,7 +4175,7 @@ fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
     app.handle_mode_key(KeyCode::Enter, 12).unwrap();
     app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
-    assert_eq!(OPERATION_TARGET_REFRESH_CALLS.load(Ordering::SeqCst), 2);
+    assert_eq!(OPERATION_RESTORE_REFRESH_CALLS.load(Ordering::SeqCst), 2);
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { output, .. } => output,
         _ => panic!("expected operation restore result"),
@@ -4189,7 +4195,7 @@ fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
 
 #[test]
 fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
-    OPERATION_TARGET_REFRESH_CALLS.store(0, Ordering::SeqCst);
+    OPERATION_REVERT_REFRESH_CALLS.store(0, Ordering::SeqCst);
     let operation_id = "f".repeat(128);
     let operation_log =
         crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
@@ -4197,7 +4203,7 @@ fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
             Some(operation_id.clone()),
         )]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
-    app.services.refresh_view = mock_second_refresh_failure;
+    app.services.refresh_view = mock_operation_revert_second_refresh_failure;
     app.stack
         .push(ViewState::Status(crate::status::StatusView::test_new(&[
             "Working copy changes:",
@@ -4209,7 +4215,7 @@ fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
     app.handle_mode_key(KeyCode::Enter, 12).unwrap();
     app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
-    assert_eq!(OPERATION_TARGET_REFRESH_CALLS.load(Ordering::SeqCst), 2);
+    assert_eq!(OPERATION_REVERT_REFRESH_CALLS.load(Ordering::SeqCst), 2);
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { output, .. } => output,
         _ => panic!("expected operation revert result"),

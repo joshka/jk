@@ -23,6 +23,7 @@ pub struct StickyFileDocument {
     lines: DocumentLines,
     anchors: Vec<FileAnchor>,
     scroll: StickyScroll,
+    viewport: DocumentViewport,
 }
 
 impl StickyFileDocument {
@@ -37,12 +38,12 @@ impl StickyFileDocument {
             lines,
             anchors,
             scroll: StickyScroll::default(),
+            viewport: DocumentViewport::default(),
         }
     }
 
     pub fn refresh(&mut self, spec: &ViewSpec) -> Result<()> {
-        self.lines = load_document(spec)?;
-        self.anchors = self.lines.file_anchors();
+        self.replace_lines(load_document(spec)?);
         Ok(())
     }
 
@@ -58,9 +59,18 @@ impl StickyFileDocument {
         self.scroll.offset()
     }
 
+    #[cfg(test)]
+    pub fn horizontal_offset(&self) -> usize {
+        self.viewport.horizontal_offset()
+    }
+
+    pub fn viewport(&self) -> DocumentViewport {
+        self.viewport
+    }
+
     pub fn set_scroll_offset(&mut self, viewport_height: u16, scroll_offset: usize) {
         self.scroll.set(scroll_offset, self.max_scroll_offset());
-        self.clamp(viewport_height);
+        self.clamp(viewport_height, u16::MAX);
     }
 
     pub fn scroll_to_top(&mut self) {
@@ -109,29 +119,44 @@ impl StickyFileDocument {
         });
     }
 
-    pub fn clamp(&mut self, _viewport_height: u16) {
+    pub fn clamp(&mut self, _viewport_height: u16, viewport_width: u16) {
         self.scroll.clamp(self.max_scroll_offset());
+        self.viewport.clamp(viewport_width, self.max_line_width());
+    }
+
+    pub fn toggle_wrap(&mut self, viewport_width: u16) {
+        self.viewport.toggle_wrap();
+        self.viewport.clamp(viewport_width, self.max_line_width());
+    }
+
+    pub fn scroll_left(&mut self, amount: usize) {
+        self.viewport.scroll_left(amount);
+    }
+
+    pub fn scroll_right(&mut self, viewport_width: u16, amount: usize) {
+        self.viewport
+            .scroll_right(viewport_width, amount, self.max_line_width());
     }
 
     pub fn search_matches(&self, query: &SearchQuery) -> usize {
         search_matches(&self.lines, query)
     }
 
-    pub fn next_match(&mut self, viewport_height: u16, query: &SearchQuery) -> bool {
+    pub fn next_match(&mut self, _viewport_height: u16, query: &SearchQuery) -> bool {
         let Some(offset) = next_matching_line(&self.lines, self.scroll.offset(), query) else {
             return false;
         };
         self.scroll.set(offset, self.max_scroll_offset());
-        self.clamp(viewport_height);
+        self.scroll.clamp(self.max_scroll_offset());
         true
     }
 
-    pub fn previous_match(&mut self, viewport_height: u16, query: &SearchQuery) -> bool {
+    pub fn previous_match(&mut self, _viewport_height: u16, query: &SearchQuery) -> bool {
         let Some(offset) = previous_matching_line(&self.lines, self.scroll.offset(), query) else {
             return false;
         };
         self.scroll.set(offset, self.max_scroll_offset());
-        self.clamp(viewport_height);
+        self.scroll.clamp(self.max_scroll_offset());
         true
     }
 
@@ -158,12 +183,90 @@ impl StickyFileDocument {
         self.line_count().saturating_sub(1)
     }
 
+    fn max_line_width(&self) -> usize {
+        max_line_width(self.lines.lines())
+    }
+
+    fn replace_lines(&mut self, lines: DocumentLines) {
+        self.lines = lines;
+        self.anchors = self.lines.file_anchors();
+    }
+
     fn projection_at(
         &self,
         scroll_offset: usize,
         prefix: impl IntoIterator<Item = Line<'static>>,
     ) -> PinnedDocument {
         project_with_active_file(&self.lines, &self.anchors, scroll_offset, prefix)
+    }
+}
+
+/// Display policy for rendered jj document text.
+///
+/// Wrapped mode preserves the original behavior: Ratatui wraps long lines with
+/// `trim: false`, keeping indentation and blank lines visible. No-wrap mode
+/// leaves the spans intact, clips at the viewport edge, and uses a horizontal
+/// offset owned by the document view state.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DocumentDisplayMode {
+    #[default]
+    Wrap,
+    NoWrap,
+}
+
+/// Viewport state for rendered document text.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct DocumentViewport {
+    display_mode: DocumentDisplayMode,
+    horizontal_offset: usize,
+}
+
+impl DocumentViewport {
+    pub fn display_mode(self) -> DocumentDisplayMode {
+        self.display_mode
+    }
+
+    pub fn horizontal_offset(self) -> usize {
+        match self.display_mode {
+            DocumentDisplayMode::Wrap => 0,
+            DocumentDisplayMode::NoWrap => self.horizontal_offset,
+        }
+    }
+
+    pub fn toggle_wrap(&mut self) {
+        self.display_mode = match self.display_mode {
+            DocumentDisplayMode::Wrap => DocumentDisplayMode::NoWrap,
+            DocumentDisplayMode::NoWrap => {
+                self.horizontal_offset = 0;
+                DocumentDisplayMode::Wrap
+            }
+        };
+    }
+
+    pub fn scroll_left(&mut self, amount: usize) {
+        if self.display_mode == DocumentDisplayMode::NoWrap {
+            self.horizontal_offset = self.horizontal_offset.saturating_sub(amount);
+        }
+    }
+
+    pub fn scroll_right(&mut self, viewport_width: u16, amount: usize, max_line_width: usize) {
+        if self.display_mode == DocumentDisplayMode::NoWrap {
+            self.horizontal_offset = self
+                .horizontal_offset
+                .saturating_add(amount)
+                .min(max_horizontal_offset(viewport_width, max_line_width));
+        }
+    }
+
+    pub fn clamp(&mut self, viewport_width: u16, max_line_width: usize) {
+        match self.display_mode {
+            DocumentDisplayMode::Wrap => self.horizontal_offset = 0,
+            DocumentDisplayMode::NoWrap => {
+                self.horizontal_offset = self
+                    .horizontal_offset
+                    .min(max_horizontal_offset(viewport_width, max_line_width));
+            }
+        }
     }
 }
 
@@ -239,15 +342,29 @@ pub fn render_document(
     document: PinnedDocument,
     search: Option<&SearchQuery>,
 ) {
+    render_document_with_viewport(frame, area, document, DocumentViewport::default(), search);
+}
+
+pub fn render_document_with_viewport(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    document: PinnedDocument,
+    mut viewport: DocumentViewport,
+    search: Option<&SearchQuery>,
+) {
     let fixed_lines = highlight_lines(document.fixed_lines().to_vec(), search);
     let body_lines = highlight_lines(document.body_lines().to_vec(), search);
+    viewport.clamp(
+        area.width,
+        max_projected_line_width(&fixed_lines, &body_lines),
+    );
     let [fixed_area, body_area] =
         document_areas(area, fixed_lines.len().min(u16::MAX as usize) as u16);
     if !fixed_lines.is_empty() {
-        frame.render_widget(document_widget(fixed_lines, 0), fixed_area);
+        frame.render_widget(document_widget(fixed_lines, 0, viewport), fixed_area);
     }
     frame.render_widget(
-        document_widget(body_lines, document.body_scroll_offset()),
+        document_widget(body_lines, document.body_scroll_offset(), viewport),
         body_area,
     );
 }
@@ -352,10 +469,20 @@ fn highlight_lines(lines: Vec<Line<'static>>, search: Option<&SearchQuery>) -> V
         .collect()
 }
 
-fn document_widget(lines: Vec<Line<'static>>, scroll_offset: usize) -> Paragraph<'static> {
-    Paragraph::new(lines)
-        .scroll((scroll_offset.min(u16::MAX as usize) as u16, 0))
-        .wrap(Wrap { trim: false })
+fn document_widget(
+    lines: Vec<Line<'static>>,
+    scroll_offset: usize,
+    viewport: DocumentViewport,
+) -> Paragraph<'static> {
+    let paragraph = Paragraph::new(lines).scroll((
+        scroll_offset.min(u16::MAX as usize) as u16,
+        viewport.horizontal_offset().min(u16::MAX as usize) as u16,
+    ));
+
+    match viewport.display_mode() {
+        DocumentDisplayMode::Wrap => paragraph.wrap(Wrap { trim: false }),
+        DocumentDisplayMode::NoWrap => paragraph,
+    }
 }
 
 fn document_areas(area: Rect, fixed_height: u16) -> [Rect; 2] {
@@ -389,6 +516,27 @@ fn projection_key(document: &PinnedDocument, viewport_height: u16) -> Vec<String
         .collect()
 }
 
+fn max_line_width(lines: &[Line<'_>]) -> usize {
+    lines
+        .iter()
+        .map(|line| line.width())
+        .max()
+        .unwrap_or_default()
+}
+
+fn max_projected_line_width(fixed_lines: &[Line<'_>], body_lines: &[Line<'_>]) -> usize {
+    fixed_lines
+        .iter()
+        .chain(body_lines)
+        .map(|line| line.width())
+        .max()
+        .unwrap_or_default()
+}
+
+fn max_horizontal_offset(viewport_width: u16, max_line_width: usize) -> usize {
+    max_line_width.saturating_sub(usize::from(viewport_width))
+}
+
 fn current_file_index(
     document: &DocumentLines,
     anchors: &[FileAnchor],
@@ -416,4 +564,141 @@ fn line_text(line: &Line<'_>) -> String {
         .iter()
         .map(|span| span.content.as_ref())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_snapshot;
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    use ratatui::text::Line;
+
+    use super::*;
+
+    #[test]
+    fn wrapped_rendering_preserves_existing_long_line_reflow() {
+        let rendered = render_document_rows(
+            12,
+            4,
+            pinned_document(&["- alpha beta gamma", "    indented"]),
+            DocumentViewport::default(),
+        );
+
+        assert_snapshot!(rendered, @r"
+- alpha beta
+gamma
+    indented
+");
+    }
+
+    #[test]
+    fn no_wrap_rendering_clips_long_lines() {
+        let mut viewport = DocumentViewport::default();
+        viewport.toggle_wrap();
+
+        let rendered = render_document_rows(
+            12,
+            3,
+            pinned_document(&["- alpha beta gamma", "    indented"]),
+            viewport,
+        );
+
+        assert_snapshot!(rendered, @r"
+- alpha beta
+    indented
+");
+    }
+
+    #[test]
+    fn no_wrap_horizontal_offset_reveals_later_columns() {
+        let mut viewport = DocumentViewport::default();
+        viewport.toggle_wrap();
+        viewport.scroll_right(10, 8, 20);
+
+        let rendered =
+            render_document_rows(10, 2, pinned_document(&["0123456789ABCDEFGHIJ"]), viewport);
+
+        assert_snapshot!(rendered, @"89ABCDEFGH");
+    }
+
+    #[test]
+    fn no_wrap_keeps_body_scroll_and_sticky_heading_separate() {
+        let document = DocumentLines::new(vec![
+            Line::from("Modified regular file src/long_file_name.rs:"),
+            Line::from("        1: 0123456789ABCDEFGHIJ"),
+            Line::from("        2: abcdefghijklmnop"),
+        ]);
+        let anchors = document.file_anchors();
+        let projection = project_with_active_file(&document, &anchors, 0, []);
+        let mut viewport = DocumentViewport::default();
+        viewport.toggle_wrap();
+        viewport.scroll_right(12, 8, 34);
+
+        let rendered = render_document_rows(12, 3, projection, viewport);
+
+        assert_snapshot!(rendered, @r"
+ regular fil
+1: 012345678
+2: abcdefghi
+        ");
+    }
+
+    #[test]
+    fn sticky_document_clamps_horizontal_offset_after_content_shrinks() {
+        let mut document =
+            StickyFileDocument::new(document_lines(&["0123456789ABCDEFGHIJ", "short"]));
+        document.toggle_wrap(10);
+        for _ in 0..20 {
+            document.scroll_right(10, 1);
+        }
+        assert_eq!(document.horizontal_offset(), 10);
+
+        document.replace_lines(document_lines(&["short"]));
+        document.clamp(3, 10);
+
+        assert_eq!(document.horizontal_offset(), 0);
+    }
+
+    fn pinned_document(lines: &[&str]) -> PinnedDocument {
+        let document = document_lines(lines);
+        project_with_active_file(&document, &[], 0, [])
+    }
+
+    fn document_lines(lines: &[&str]) -> DocumentLines {
+        DocumentLines::new(
+            lines
+                .iter()
+                .map(|line| Line::from((*line).to_owned()))
+                .collect(),
+        )
+    }
+
+    fn render_document_rows(
+        width: u16,
+        height: u16,
+        document: PinnedDocument,
+        viewport: DocumentViewport,
+    ) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal
+            .draw(|frame| {
+                render_document_with_viewport(frame, frame.area(), document, viewport, None);
+            })
+            .unwrap();
+
+        (0..height)
+            .map(|row| row_text(terminal.backend().buffer(), row, width))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .trim_end()
+            .to_owned()
+    }
+
+    fn row_text(buffer: &ratatui::buffer::Buffer, row: u16, width: u16) -> String {
+        (0..width)
+            .map(|column| buffer[(column, row)].symbol())
+            .collect::<String>()
+            .trim_end()
+            .to_owned()
+    }
 }

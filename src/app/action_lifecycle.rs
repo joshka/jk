@@ -18,7 +18,7 @@ use crate::jj::{
 };
 use crate::view_state::ViewState;
 
-use super::App;
+use super::{App, current_viewport_width};
 
 impl App {
     pub(super) fn apply_action_menu_item(&mut self, item: ActionMenuItem) {
@@ -846,13 +846,13 @@ impl App {
         let result_message = match self.run_describe(&describe) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let mut reveal_error = None;
                     let revealed_in_recent = match reveal_change_id.as_deref() {
                         Some(change_id) => {
                             match self.reveal_graph_change(change_id, LogViewMode::Recent) {
                                 Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height);
+                                    self.view.clamp(viewport_height, current_viewport_width());
                                     Some(switched_modes)
                                 }
                                 Err(error) => {
@@ -914,7 +914,7 @@ impl App {
         let result_message = match self.run_commit(&commit) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let message = format!(
                         "{} | new working-copy change created on top | jj undo",
                         output.trim()
@@ -952,7 +952,7 @@ impl App {
         let result_message = match self.run_bookmark_mutation(&mutation) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let message = format!("{} | jj undo", output.trim());
                     self.status = StatusLine::with_message(&self.view, message.as_str());
                     message
@@ -999,12 +999,12 @@ impl App {
 
                 match self.refresh_view_state() {
                     Ok(()) => {
-                        self.view.clamp(viewport_height);
+                        self.view.clamp(viewport_height, current_viewport_width());
                         let mut reveal_error = None;
                         let revealed_in_recent =
                             match self.reveal_graph_change(&new_change_id, LogViewMode::Recent) {
                                 Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height);
+                                    self.view.clamp(viewport_height, current_viewport_width());
                                     Some(switched_modes)
                                 }
                                 Err(error) => {
@@ -1064,7 +1064,7 @@ impl App {
         let result_message = match self.run_push(&push) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     self.status = StatusLine::with_message(&self.view, output.as_str());
                     output
                 }
@@ -1099,7 +1099,7 @@ impl App {
         let result_message = match self.run_git_fetch(&fetch) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     self.status = StatusLine::with_message(
                         &self.view,
                         fetch_status_message(&fetch, output.as_str()),
@@ -1137,7 +1137,7 @@ impl App {
         let result_message = match self.run_operation_recovery(&recovery) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let message = format!("{} | {}", output.trim(), recovery.success_hint());
                     self.status = StatusLine::with_message(&self.view, message.as_str());
                     message
@@ -1173,7 +1173,7 @@ impl App {
         let result_message = match self.run_operation_target(&target) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     match self.refresh_stacked_repo_views(viewport_height) {
                         Ok(()) => {
                             let message = format!("{} | jj undo", output.trim());
@@ -1215,7 +1215,7 @@ impl App {
                 | JjCommand::Bookmarks
                 | JjCommand::OperationLog => {
                     self.services.refresh_view(view)?;
-                    view.clamp(viewport_height);
+                    view.clamp(viewport_height, current_viewport_width());
                 }
                 JjCommand::Show
                 | JjCommand::Diff
@@ -1268,13 +1268,13 @@ impl App {
 
                 match self.refresh_view_state() {
                     Ok(()) => {
-                        self.view.clamp(viewport_height);
+                        self.view.clamp(viewport_height, current_viewport_width());
                         let mut reveal_error = None;
                         let revealed_in_recent = match self
                             .reveal_graph_change(&reveal_change_id, LogViewMode::Recent)
                         {
                             Ok(switched_modes) => {
-                                self.view.clamp(viewport_height);
+                                self.view.clamp(viewport_height, current_viewport_width());
                                 Some(switched_modes)
                             }
                             Err(error) => {
@@ -1334,7 +1334,7 @@ impl App {
         let result_message = match self.run_abandon(&abandon) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let message = format!("{} | jj undo", output.trim());
                     self.status = StatusLine::with_message(&self.view, message.as_str());
                     message
@@ -1401,7 +1401,7 @@ impl App {
         let result_message = match self.run_restore(&restore) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let message = format!("{} | jj undo", output.trim());
                     self.status = StatusLine::with_message(&self.view, message.as_str());
                     message
@@ -1433,7 +1433,7 @@ impl App {
         let result_message = match self.run_revert(&revert) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let message = format!("{} | jj undo", output.trim());
                     self.status = StatusLine::with_message(&self.view, message.as_str());
                     message
@@ -1466,13 +1466,13 @@ impl App {
         let result_message = match self.run_rebase(&rebase) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let mut reveal_error = None;
                     let revealed_in_recent = match primary_source.as_deref() {
                         Some(change_id) => {
                             match self.reveal_graph_change(change_id, LogViewMode::Recent) {
                                 Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height);
+                                    self.view.clamp(viewport_height, current_viewport_width());
                                     Some(switched_modes)
                                 }
                                 Err(error) => {
@@ -1541,12 +1541,12 @@ impl App {
         let result_message = match self.run_squash(&squash) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let mut reveal_error = None;
                     let revealed_in_recent =
                         match self.reveal_graph_change(&destination, LogViewMode::Recent) {
                             Ok(switched_modes) => {
-                                self.view.clamp(viewport_height);
+                                self.view.clamp(viewport_height, current_viewport_width());
                                 Some(switched_modes)
                             }
                             Err(error) => {
@@ -1605,7 +1605,7 @@ impl App {
         let result_message = match self.run_absorb(&absorb) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     let message = format!("{} | jj undo | jj op show -p", output.trim());
                     self.status = StatusLine::with_message(&self.view, message.as_str());
                     message

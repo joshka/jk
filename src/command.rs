@@ -53,6 +53,9 @@ pub enum ViewCommand {
     PageUp,
     MoveFirst,
     MoveLast,
+    ToggleWrap,
+    ScrollLeft,
+    ScrollRight,
     NextFile,
     PreviousFile,
     OpenFiles,
@@ -351,6 +354,7 @@ impl HelpSection {
 
 pub struct CommandContext<'a> {
     pub viewport_height: u16,
+    pub viewport_width: u16,
     pub search: Option<&'a SearchQuery>,
 }
 
@@ -597,6 +601,21 @@ fn view_help_metadata(
         ViewCommand::PageUp => Some((HelpSectionKind::Navigation, "page up")),
         ViewCommand::MoveFirst => Some((HelpSectionKind::Navigation, "jump to first")),
         ViewCommand::MoveLast => Some((HelpSectionKind::Navigation, "jump to last")),
+        ViewCommand::ToggleWrap => matches!(
+            context,
+            HelpContext::Show | HelpContext::Diff | HelpContext::FileShow
+        )
+        .then_some((HelpSectionKind::Views, "toggle wrap")),
+        ViewCommand::ScrollLeft => matches!(
+            context,
+            HelpContext::Show | HelpContext::Diff | HelpContext::FileShow
+        )
+        .then_some((HelpSectionKind::Navigation, "scroll left")),
+        ViewCommand::ScrollRight => matches!(
+            context,
+            HelpContext::Show | HelpContext::Diff | HelpContext::FileShow
+        )
+        .then_some((HelpSectionKind::Navigation, "scroll right")),
         ViewCommand::NextFile => Some((HelpSectionKind::Navigation, "next file")),
         ViewCommand::PreviousFile => Some((HelpSectionKind::Navigation, "previous file")),
         ViewCommand::OpenFiles => {
@@ -1011,6 +1030,36 @@ mod tests {
             sections[0].rows()[0],
             HelpRow::new("a", "open action menu (preview required)")
         );
+    }
+
+    #[test]
+    fn document_help_exposes_wrap_commands_only_in_document_contexts() {
+        const TOGGLE_WRAP: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('w')];
+        const SCROLL_LEFT: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('h')];
+        const SCROLL_RIGHT: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('l')];
+        let view = [
+            Binding::sequence(TOGGLE_WRAP, Command::View(ViewCommand::ToggleWrap)),
+            Binding::sequence(SCROLL_LEFT, Command::View(ViewCommand::ScrollLeft)),
+            Binding::sequence(SCROLL_RIGHT, Command::View(ViewCommand::ScrollRight)),
+        ];
+
+        let file_show_help = project_help(&[], &view, HelpContext::FileShow);
+        let graph_help = project_help(&[], &view, HelpContext::Graph);
+
+        assert_eq!(file_show_help[0].title(), "Navigation");
+        assert_eq!(
+            file_show_help[0].rows(),
+            &[
+                HelpRow::new("zh", "scroll left"),
+                HelpRow::new("zl", "scroll right"),
+            ]
+        );
+        assert_eq!(file_show_help[1].title(), "View Switching");
+        assert_eq!(
+            file_show_help[1].rows(),
+            &[HelpRow::new("zw", "toggle wrap")]
+        );
+        assert!(graph_help.is_empty());
     }
 
     #[test]

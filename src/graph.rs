@@ -197,6 +197,9 @@ impl GraphView {
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
             ViewCommand::PageDown
             | ViewCommand::PageUp
+            | ViewCommand::ToggleWrap
+            | ViewCommand::ScrollLeft
+            | ViewCommand::ScrollRight
             | ViewCommand::NextFile
             | ViewCommand::PreviousFile
             | ViewCommand::OpenFiles
@@ -590,6 +593,7 @@ mod tests {
     fn command_context() -> CommandContext<'static> {
         CommandContext {
             viewport_height: 0,
+            viewport_width: 80,
             search: None,
         }
     }

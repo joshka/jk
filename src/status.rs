@@ -112,6 +112,9 @@ impl StatusView {
         match command {
             ViewCommand::CycleMode
             | ViewCommand::NewTrunk
+            | ViewCommand::ToggleWrap
+            | ViewCommand::ScrollLeft
+            | ViewCommand::ScrollRight
             | ViewCommand::NextFile
             | ViewCommand::PreviousFile
             | ViewCommand::OpenShow
@@ -516,6 +519,7 @@ mod tests {
             ViewCommand::MoveDown,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: None,
             },
         );
@@ -525,6 +529,7 @@ mod tests {
             ViewCommand::MoveLast,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: None,
             },
         );
@@ -540,6 +545,7 @@ mod tests {
             ViewCommand::StartSearch,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: Some(&query),
             },
         );
@@ -663,6 +669,7 @@ mod tests {
             ViewCommand::MoveDown,
             CommandContext {
                 viewport_height: 4,
+                viewport_width: 80,
                 search: None,
             },
         );

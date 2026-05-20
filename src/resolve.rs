@@ -156,6 +156,9 @@ impl ResolveView {
             | ViewCommand::NewTrunk
             | ViewCommand::PageDown
             | ViewCommand::PageUp
+            | ViewCommand::ToggleWrap
+            | ViewCommand::ScrollLeft
+            | ViewCommand::ScrollRight
             | ViewCommand::NextFile
             | ViewCommand::PreviousFile
             | ViewCommand::OpenFiles
@@ -364,6 +367,7 @@ mod tests {
             ViewCommand::MoveLast,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: None,
             },
         );
@@ -373,6 +377,7 @@ mod tests {
             ViewCommand::MoveUp,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: None,
             },
         );
@@ -457,6 +462,7 @@ mod tests {
             ViewCommand::OpenItem,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: None,
             },
         );
@@ -479,6 +485,7 @@ mod tests {
             ViewCommand::OpenItem,
             CommandContext {
                 viewport_height: 3,
+                viewport_width: 80,
                 search: None,
             },
         );

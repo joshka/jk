@@ -86,6 +86,12 @@ const APP_BINDINGS: &[Binding] = &[
 const BOOKMARK_CREATE_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('c')];
 const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
 
+fn current_viewport_width() -> u16 {
+    crossterm::terminal::size()
+        .map(|(width, _)| width)
+        .unwrap_or(u16::MAX)
+}
+
 #[derive(Clone)]
 struct PendingCommand {
     keys: Vec<crossterm::event::KeyEvent>,
@@ -216,8 +222,16 @@ impl App {
     }
 
     fn handle_event(&mut self, event: Event, viewport_height: u16) -> Result<()> {
-        let Event::Key(key) = event else {
-            return Ok(());
+        let key = match event {
+            Event::Key(key) => key,
+            Event::Resize(width, height) => {
+                self.view.clamp(height.saturating_sub(2), width);
+                if matches!(self.status.kind(), StatusKind::Ready) {
+                    self.status = StatusLine::ready(&self.view);
+                }
+                return Ok(());
+            }
+            _ => return Ok(()),
         };
 
         if key.kind != KeyEventKind::Press {
@@ -506,7 +520,7 @@ impl App {
     fn refresh(&mut self, viewport_height: u16) {
         match self.refresh_view_state() {
             Ok(()) => {
-                self.view.clamp(viewport_height);
+                self.view.clamp(viewport_height, current_viewport_width());
                 self.status = StatusLine::ready(&self.view);
             }
             Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
@@ -520,7 +534,7 @@ impl App {
         let result_message = match self.run_git_fetch(&fetch) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height);
+                    self.view.clamp(viewport_height, current_viewport_width());
                     self.status = StatusLine::with_message(
                         &self.view,
                         action_lifecycle::fetch_status_message(&fetch, output.as_str()),
@@ -616,6 +630,7 @@ impl App {
             command,
             CommandContext {
                 viewport_height,
+                viewport_width: current_viewport_width(),
                 search: self.search.as_ref(),
             },
         )
@@ -752,11 +767,11 @@ impl App {
                 };
                 match self.refresh_view_state() {
                     Ok(()) => {
-                        self.view.clamp(viewport_height);
+                        self.view.clamp(viewport_height, current_viewport_width());
                         let revealed_in_recent =
                             match self.reveal_graph_change(&new_change_id, LogViewMode::Recent) {
                                 Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height);
+                                    self.view.clamp(viewport_height, current_viewport_width());
                                     switched_modes
                                 }
                                 Err(error) => {

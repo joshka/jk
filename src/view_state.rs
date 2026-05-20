@@ -115,15 +115,15 @@ impl ViewState {
         }
     }
 
-    pub fn clamp(&mut self, viewport_height: u16) {
+    pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
         match self {
             Self::Graph(view) => view.clamp(),
-            Self::Show(view) => view.clamp(viewport_height),
-            Self::Diff(view) => view.clamp(viewport_height),
+            Self::Show(view) => view.clamp(viewport_height, viewport_width),
+            Self::Diff(view) => view.clamp(viewport_height, viewport_width),
             Self::Status(view) => view.clamp(viewport_height),
             Self::Resolve(view) => view.clamp(),
             Self::FileList(view) => view.clamp(),
-            Self::FileShow(view) => view.clamp(viewport_height),
+            Self::FileShow(view) => view.clamp(viewport_height, viewport_width),
             Self::Bookmarks(view) => view.clamp(),
             Self::OperationLog(view) => view.clamp(),
             Self::OperationDetail(view) => view.clamp(viewport_height),

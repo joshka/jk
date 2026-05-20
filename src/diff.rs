@@ -14,6 +14,11 @@ use crate::rendered_jj::PinnedDocument;
 use crate::search::SearchQuery;
 use crate::sticky_file_view::{self, StickyFileDocument};
 
+const TOGGLE_WRAP_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('w')];
+const SCROLL_LEFT_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('h')];
+const SCROLL_RIGHT_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('l')];
+const HORIZONTAL_SCROLL_AMOUNT: usize = 1;
+
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
     Binding::new(
@@ -56,6 +61,9 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::code(crossterm::event::KeyCode::End),
         Command::View(ViewCommand::MoveLast),
     ),
+    Binding::sequence(TOGGLE_WRAP_KEYS, Command::View(ViewCommand::ToggleWrap)),
+    Binding::sequence(SCROLL_LEFT_KEYS, Command::View(ViewCommand::ScrollLeft)),
+    Binding::sequence(SCROLL_RIGHT_KEYS, Command::View(ViewCommand::ScrollRight)),
     Binding::new(KeyPattern::char(']'), Command::View(ViewCommand::NextFile)),
     Binding::new(
         KeyPattern::char('['),
@@ -102,7 +110,13 @@ impl DiffView {
     }
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
-        sticky_file_view::render_document(frame, area, self.projection(), search);
+        sticky_file_view::render_document_with_viewport(
+            frame,
+            area,
+            self.projection(),
+            self.document.viewport(),
+            search,
+        );
     }
 
     pub fn bindings(&self) -> &'static [Binding] {
@@ -113,6 +127,18 @@ impl DiffView {
         match command {
             ViewCommand::CycleMode => ViewEffect::Ignored,
             ViewCommand::NewTrunk => ViewEffect::Ignored,
+            ViewCommand::ToggleWrap => {
+                self.toggle_wrap(context.viewport_width);
+                ViewEffect::Handled
+            }
+            ViewCommand::ScrollLeft => {
+                self.scroll_left(HORIZONTAL_SCROLL_AMOUNT);
+                ViewEffect::Handled
+            }
+            ViewCommand::ScrollRight => {
+                self.scroll_right(context.viewport_width, HORIZONTAL_SCROLL_AMOUNT);
+                ViewEffect::Handled
+            }
             ViewCommand::MoveDown => {
                 self.scroll_down(context.viewport_height, 1);
                 ViewEffect::Handled
@@ -209,6 +235,11 @@ impl DiffView {
         self.document.scroll_offset()
     }
 
+    #[cfg(test)]
+    pub fn horizontal_offset(&self) -> usize {
+        self.document.horizontal_offset()
+    }
+
     pub fn set_scroll_offset(&mut self, viewport_height: u16, scroll_offset: usize) {
         self.document
             .set_scroll_offset(viewport_height, scroll_offset);
@@ -234,8 +265,20 @@ impl DiffView {
         }
     }
 
-    pub fn clamp(&mut self, _viewport_height: u16) {
-        self.document.clamp(_viewport_height);
+    pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
+        self.document.clamp(viewport_height, viewport_width);
+    }
+
+    pub fn toggle_wrap(&mut self, viewport_width: u16) {
+        self.document.toggle_wrap(viewport_width);
+    }
+
+    pub fn scroll_left(&mut self, amount: usize) {
+        self.document.scroll_left(amount);
+    }
+
+    pub fn scroll_right(&mut self, viewport_width: u16, amount: usize) {
+        self.document.scroll_right(viewport_width, amount);
     }
 
     pub fn search_matches(&self, query: &SearchQuery) -> usize {
@@ -490,6 +533,55 @@ mod tests {
         assert_eq!(file.value(), "Cargo.toml");
     }
 
+    #[test]
+    fn horizontal_scroll_keeps_file_navigation_on_source_anchors() {
+        let mut view = diff_view(
+            vec![
+                line!("Added regular file .gitignore:"),
+                line!("        1: /target"),
+                line!("Added regular file Cargo.toml:"),
+                line!("        1: 0123456789ABCDEFGHIJ"),
+            ],
+            0,
+        );
+
+        let _ = view.execute(ViewCommand::ToggleWrap, context_width(12, None));
+        let _ = view.execute(ViewCommand::ScrollRight, context_width(12, None));
+
+        view.next_file();
+
+        let file = view
+            .copy_options()
+            .into_iter()
+            .find(|option| option.label() == "file path")
+            .unwrap();
+
+        assert_eq!(view.scroll_offset(), 2);
+        assert_eq!(view.horizontal_offset(), 1);
+        assert_eq!(file.value(), "Cargo.toml");
+    }
+
+    #[test]
+    fn diff_clamp_revalidates_horizontal_offset_for_current_width() {
+        let mut view = diff_view(
+            vec![
+                line!("Added regular file Cargo.toml:"),
+                line!("        1: 0123456789ABCDEFGHIJ"),
+            ],
+            0,
+        );
+
+        let _ = view.execute(ViewCommand::ToggleWrap, context_width(12, None));
+        for _ in 0..20 {
+            let _ = view.execute(ViewCommand::ScrollRight, context_width(12, None));
+        }
+        assert!(view.horizontal_offset() > 0);
+
+        view.clamp(4, 80);
+
+        assert_eq!(view.horizontal_offset(), 0);
+    }
+
     fn diff_view(lines: Vec<Line<'static>>, scroll_offset: usize) -> DiffView {
         let document = DocumentLines::new(lines);
         let mut document = StickyFileDocument::new(document);
@@ -501,8 +593,13 @@ mod tests {
     }
 
     fn context(search: Option<&SearchQuery>) -> CommandContext<'_> {
+        context_width(80, search)
+    }
+
+    fn context_width(viewport_width: u16, search: Option<&SearchQuery>) -> CommandContext<'_> {
         CommandContext {
             viewport_height: 4,
+            viewport_width,
             search,
         }
     }
