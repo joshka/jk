@@ -11,9 +11,9 @@ use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
-    JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitPush, JjGitPushTarget,
-    JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan,
-    JjRestorePlan, JjRevertPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
+    JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitFetch, JjGitPush,
+    JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget,
+    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan, LogViewMode,
 };
 use crate::view_state::ViewState;
@@ -265,6 +265,73 @@ impl App {
             Err(error) => {
                 self.status = StatusLine::error(&self.view, error.to_string());
                 Ok(false)
+            }
+        }
+    }
+
+    pub(super) fn open_fetch_remote_prompt(&mut self) {
+        match self.load_git_remotes() {
+            Ok(remotes) => match remotes.as_slice() {
+                [] => {
+                    let message = "no git remotes found; run default fetch or add a remote before choosing one"
+                        .to_owned();
+                    self.status = StatusLine::error(&self.view, message.clone());
+                    self.mode = InteractionMode::FetchPreview {
+                        fetch: JjGitFetch::default_remotes(),
+                        output: ActionOutput::finished(
+                            "jj git remote list".to_owned(),
+                            message,
+                            Some("fetch remote selection found no remotes".to_owned()),
+                        ),
+                    };
+                }
+                [remote] => self.open_fetch_preview(remote.to_owned()),
+                _ => {
+                    self.mode = InteractionMode::FetchRemotePrompt {
+                        remotes,
+                        selected: 0,
+                    };
+                }
+            },
+            Err(error) => {
+                let message = error.to_string();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::FetchPreview {
+                    fetch: JjGitFetch::default_remotes(),
+                    output: ActionOutput::finished(
+                        "jj git remote list".to_owned(),
+                        message,
+                        Some("fetch remote selection failed to list remotes".to_owned()),
+                    ),
+                };
+            }
+        }
+    }
+
+    pub(super) fn open_fetch_preview(&mut self, remote: String) {
+        let fetch = JjGitFetch::for_remote(remote);
+        let status_context = Some(fetch_status_context(&fetch));
+
+        match fetch.run_preview() {
+            Ok(output) => {
+                let command_label = fetch.command_label();
+                self.mode = InteractionMode::FetchPreview {
+                    fetch,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = fetch.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::FetchPreview {
+                    fetch,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
             }
         }
     }
@@ -1022,6 +1089,44 @@ impl App {
         }
     }
 
+    pub(super) fn confirm_fetch(
+        &mut self,
+        fetch: JjGitFetch,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = fetch.command_label();
+        let result_message = match self.run_git_fetch(&fetch) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height);
+                    self.status = StatusLine::with_message(
+                        &self.view,
+                        fetch_status_message(&fetch, output.as_str()),
+                    );
+                    output
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    if output.is_empty() {
+                        format!("refresh failed: {error}")
+                    } else {
+                        format!("{output}\nrefresh failed: {error}")
+                    }
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::FetchPreview {
+            fetch,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        }
+    }
+
     pub(super) fn confirm_operation_recovery(
         &mut self,
         recovery: JjOperationRecovery,
@@ -1541,6 +1646,25 @@ fn push_status_context(target: &JjGitPushTarget, remote: &str) -> String {
         JjGitPushTarget::Status => {
             format!("status push uses jj default target resolution for remote {remote}")
         }
+    }
+}
+
+pub(super) fn fetch_status_context(fetch: &JjGitFetch) -> String {
+    match fetch.remote() {
+        Some(remote) => {
+            let pattern = fetch
+                .exact_remote_pattern()
+                .expect("remote-specific fetch has a remote pattern");
+            format!("fetch targets exact remote '{remote}' with pattern {pattern}")
+        }
+        None => "default fetch uses jj git fetch remote resolution".to_owned(),
+    }
+}
+
+pub(super) fn fetch_status_message(fetch: &JjGitFetch, output: &str) -> String {
+    match fetch.remote() {
+        Some(remote) => format!("fetch {remote}: {output}"),
+        None => format!("fetch: {output}"),
     }
 }
 

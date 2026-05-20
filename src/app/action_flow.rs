@@ -11,8 +11,8 @@ use crate::action_output::{
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::jj::{
-    JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjGitPush, JjNewPlan,
-    JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjGitFetch, JjGitPush,
+    JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
 
@@ -92,6 +92,10 @@ impl App {
                 push,
                 status_context,
             } => self.confirm_push(push, status_context, viewport_height),
+            ActionPreviewConfirmation::Fetch {
+                fetch,
+                status_context,
+            } => self.confirm_fetch(fetch, status_context, viewport_height),
             ActionPreviewConfirmation::OperationRecovery {
                 recovery,
                 status_context,
@@ -216,6 +220,16 @@ impl InteractionMode {
                     status_context,
                 },
             )),
+            Self::FetchPreview { fetch, output } => Some(action_preview_event(
+                code,
+                output,
+                visible_lines,
+                "fetch cancelled".to_owned(),
+                |status_context| ActionPreviewConfirmation::Fetch {
+                    fetch: fetch.clone(),
+                    status_context,
+                },
+            )),
             Self::OperationRecoveryPreview { recovery, output } => Some(action_preview_event(
                 code,
                 output,
@@ -299,6 +313,10 @@ enum ActionPreviewConfirmation {
     },
     Push {
         push: JjGitPush,
+        status_context: Option<String>,
+    },
+    Fetch {
+        fetch: JjGitFetch,
         status_context: Option<String>,
     },
     OperationRecovery {

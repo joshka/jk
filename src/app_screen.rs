@@ -11,7 +11,7 @@ use crate::copy::CopyOption;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
-    JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjDescribeTarget, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
     JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan,
     JjWorkingCopyNavigationPlan,
 };
@@ -99,6 +99,14 @@ pub(crate) enum InteractionMode {
         target: JjGitPushTarget,
         remotes: Vec<String>,
         selected: usize,
+    },
+    FetchRemotePrompt {
+        remotes: Vec<String>,
+        selected: usize,
+    },
+    FetchPreview {
+        fetch: JjGitFetch,
+        output: ActionOutput,
     },
     PushPreview {
         push: JjGitPush,
@@ -193,6 +201,11 @@ impl InteractionMode {
                 remotes,
                 selected: *selected,
             },
+            Self::FetchRemotePrompt { remotes, selected } => Overlay::FetchRemotePrompt {
+                remotes,
+                selected: *selected,
+            },
+            Self::FetchPreview { output, .. } => Overlay::FetchPreview { output },
             Self::PushPreview { output, .. } => Overlay::PushPreview { output },
             Self::OperationRecoveryPreview { output, .. } => {
                 Overlay::OperationRecoveryPreview { output }

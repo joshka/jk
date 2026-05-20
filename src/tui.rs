@@ -80,7 +80,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
         Overlay::PushRemotePrompt { remotes, selected } => {
             let area = centered_area(frame.area(), 46, remotes.len() as u16 + 2);
             frame.render_widget(Clear, area);
-            frame.render_widget(push_remote_prompt(remotes, selected), area);
+            frame.render_widget(remote_prompt("Push remote", remotes, selected), area);
+        }
+        Overlay::FetchRemotePrompt { remotes, selected } => {
+            let area = centered_area(frame.area(), 46, remotes.len() as u16 + 2);
+            frame.render_widget(Clear, area);
+            frame.render_widget(remote_prompt("Fetch remote", remotes, selected), area);
         }
         Overlay::NewPreview { output } => {
             let title = action_output_title("New change", output);
@@ -164,6 +169,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::FetchPreview { output } => {
+            let title = action_output_title("Fetch", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::OperationRecoveryPreview { output } => {
             let title = action_output_title("Operation recovery", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -206,7 +217,14 @@ pub enum Overlay<'a> {
         remotes: &'a [String],
         selected: usize,
     },
+    FetchRemotePrompt {
+        remotes: &'a [String],
+        selected: usize,
+    },
     PushPreview {
+        output: &'a ActionOutput,
+    },
+    FetchPreview {
         output: &'a ActionOutput,
     },
     NewPreview {
@@ -618,7 +636,7 @@ fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
     List::new(items).block(overlay_block(title))
 }
 
-fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
+fn remote_prompt(title: &'static str, remotes: &[String], selected: usize) -> List<'static> {
     let items = remotes
         .iter()
         .enumerate()
@@ -632,7 +650,7 @@ fn push_remote_prompt(remotes: &[String], selected: usize) -> List<'static> {
         })
         .collect::<Vec<_>>();
 
-    List::new(items).block(overlay_block("Push remote"))
+    List::new(items).block(overlay_block(title))
 }
 
 fn action_output_title(action: &str, output: &ActionOutput) -> String {

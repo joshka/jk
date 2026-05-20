@@ -20,8 +20,8 @@ use crate::command::{
 };
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
-    JjBookmarkMutationPlan, JjCommand, JjCommitPlan, JjDescribePlan, JjGitPush, JjNewPlan,
-    JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjBookmarkMutationPlan, JjCommand, JjCommitPlan, JjDescribePlan, JjGitFetch, JjGitPush,
+    JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
 };
 use crate::search::SearchQuery;
@@ -72,6 +72,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('='), Command::BookmarkSet),
     Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
+    Binding::new(KeyPattern::char('F'), Command::FetchRemote),
     Binding::new(KeyPattern::char('y'), Command::Copy),
     Binding::new(KeyPattern::char('p'), Command::Push),
     Binding::new(KeyPattern::char('v'), Command::ViewFormat),
@@ -164,8 +165,8 @@ impl App {
         self.services.resolve_revision(revset)
     }
 
-    fn run_git_fetch(&self) -> Result<String> {
-        self.services.run_git_fetch()
+    fn run_git_fetch(&self, fetch: &JjGitFetch) -> Result<String> {
+        self.services.run_git_fetch(fetch)
     }
 
     fn refresh_view_state(&mut self) -> Result<()> {
@@ -465,6 +466,10 @@ impl App {
                 self.fetch(viewport_height);
                 Ok(false)
             }
+            Command::FetchRemote => {
+                self.open_fetch_remote_prompt();
+                Ok(false)
+            }
             Command::Push => self.open_push_prompt(),
             Command::Copy => {
                 self.open_copy_menu(viewport_height);
@@ -509,16 +514,42 @@ impl App {
     }
 
     fn fetch(&mut self, viewport_height: u16) {
-        match self.run_git_fetch() {
+        let fetch = JjGitFetch::default_remotes();
+        let command_label = fetch.command_label();
+        let status_context = Some(action_lifecycle::fetch_status_context(&fetch));
+        let result_message = match self.run_git_fetch(&fetch) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
                     self.view.clamp(viewport_height);
-                    self.status = StatusLine::with_message(&self.view, format!("fetch: {output}"));
+                    self.status = StatusLine::with_message(
+                        &self.view,
+                        action_lifecycle::fetch_status_message(&fetch, output.as_str()),
+                    );
+                    output
                 }
-                Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    if output.is_empty() {
+                        format!("refresh failed: {error}")
+                    } else {
+                        format!("{output}\nrefresh failed: {error}")
+                    }
+                }
             },
-            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
-        }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::FetchPreview {
+            fetch,
+            output: crate::action_output::ActionOutput::finished(
+                command_label,
+                result_message,
+                status_context,
+            ),
+        };
     }
 
     fn open_copy_menu(&mut self, viewport_height: u16) {

@@ -228,6 +228,78 @@ pub struct JjGitPush {
     remote: Option<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjGitFetch {
+    remote: Option<String>,
+}
+
+impl JjGitFetch {
+    pub fn default_remotes() -> Self {
+        Self { remote: None }
+    }
+
+    pub fn for_remote(remote: impl Into<String>) -> Self {
+        Self {
+            remote: Some(remote.into()),
+        }
+    }
+
+    pub fn remote(&self) -> Option<&str> {
+        self.remote.as_deref()
+    }
+
+    pub fn exact_remote_pattern(&self) -> Option<String> {
+        self.remote
+            .as_deref()
+            .map(|remote| format!("exact:{remote}"))
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        let mut argv = vec!["git".to_owned(), "fetch".to_owned()];
+        if let Some(pattern) = self.exact_remote_pattern() {
+            argv.push("--remote".to_owned());
+            argv.push(pattern);
+        }
+        argv
+    }
+
+    pub fn preview_summary(&self) -> String {
+        match self.remote() {
+            Some(remote) => {
+                let pattern = self
+                    .exact_remote_pattern()
+                    .expect("remote-specific fetch has a remote pattern");
+                [
+                    format!("remote: {remote}"),
+                    format!("remote pattern: {pattern}"),
+                    "effect: fetch only the selected named remote".to_owned(),
+                    format!("confirmation: press Enter to run {}", self.command_label()),
+                ]
+                .join("\n")
+            }
+            None => [
+                "remote: jj default fetch resolution".to_owned(),
+                "effect: run jj git fetch without a remote override".to_owned(),
+                format!("confirmation: press Enter to run {}", self.command_label()),
+            ]
+            .join("\n"),
+        }
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput::new(self.preview_summary()))
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(self.command_argv(), &self.command_label(), "fetched")
+    }
+}
+
 #[allow(dead_code)]
 impl JjGitPush {
     pub fn for_bookmark(name: String) -> Self {
@@ -2306,6 +2378,35 @@ mod tests {
         assert_eq!(
             push.command_argv(true),
             vec!["git", "push", "--dry-run", "--bookmark", "main"]
+        );
+    }
+
+    #[test]
+    fn git_fetch_default_uses_jj_default_remote_resolution() {
+        let fetch = JjGitFetch::default_remotes();
+
+        assert_eq!(fetch.command_argv(), vec!["git", "fetch"]);
+        assert_eq!(fetch.command_label(), "jj git fetch");
+        assert!(fetch.exact_remote_pattern().is_none());
+    }
+
+    #[test]
+    fn git_fetch_remote_uses_exact_remote_pattern() {
+        let fetch = JjGitFetch::for_remote("origin");
+
+        assert_eq!(
+            fetch.command_argv(),
+            vec!["git", "fetch", "--remote", "exact:origin"]
+        );
+        assert_eq!(fetch.command_label(), "jj git fetch --remote exact:origin");
+        assert_eq!(
+            fetch.exact_remote_pattern().as_deref(),
+            Some("exact:origin")
+        );
+        assert!(
+            fetch
+                .preview_summary()
+                .contains("remote pattern: exact:origin")
         );
     }
 

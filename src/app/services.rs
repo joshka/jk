@@ -8,9 +8,9 @@ use color_eyre::Result;
 
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
-    JjDescribePlan, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan,
-    JjRestorePlan, JjRevertPlan, JjSquashPlan, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
-    git_fetch, git_remotes, new_trunk, resolve_exact_change_id,
+    JjDescribePlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget,
+    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
+    LogViewMode, ViewSpec, git_remotes, new_trunk, resolve_exact_change_id,
 };
 use crate::view_state::ViewState;
 
@@ -33,7 +33,7 @@ pub(in crate::app) type WorkingCopyNavigationRun =
     fn(&JjWorkingCopyNavigationPlan) -> Result<String>;
 pub(in crate::app) type ResolveRevision = fn(&str) -> Result<String>;
 pub(in crate::app) type NewTrunkRun = fn() -> Result<String>;
-pub(in crate::app) type GitFetchRun = fn() -> Result<String>;
+pub(in crate::app) type GitFetchRun = fn(&JjGitFetch) -> Result<String>;
 pub(in crate::app) type GitRemotesLoad = fn() -> Result<Vec<String>>;
 pub(in crate::app) type PushPreviewRun = fn(&JjGitPush) -> Result<String>;
 pub(in crate::app) type PushRun = fn(&JjGitPush) -> Result<String>;
@@ -157,8 +157,8 @@ impl AppServices {
         (self.new_trunk_run)()
     }
 
-    pub(in crate::app) fn run_git_fetch(&self) -> Result<String> {
-        (self.git_fetch_run)()
+    pub(in crate::app) fn run_git_fetch(&self, fetch: &JjGitFetch) -> Result<String> {
+        (self.git_fetch_run)(fetch)
     }
 
     pub(in crate::app) fn load_git_remotes(&self) -> Result<Vec<String>> {
@@ -299,8 +299,8 @@ fn default_new_trunk_run() -> Result<String> {
     new_trunk().map(|output| output.message().to_owned())
 }
 
-fn default_git_fetch_run() -> Result<String> {
-    git_fetch().map(|output| output.message().to_owned())
+fn default_git_fetch_run(fetch: &JjGitFetch) -> Result<String> {
+    fetch.run().map(|output| output.message().to_owned())
 }
 
 fn default_git_remotes_load() -> Result<Vec<String>> {

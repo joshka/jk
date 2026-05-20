@@ -438,6 +438,32 @@ impl App {
                 }
                 Ok(true)
             }
+            InteractionMode::FetchRemotePrompt { remotes, selected } => {
+                match code {
+                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
+                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < remotes.len() => {
+                        *selected += 1;
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        *selected = selected.saturating_sub(1);
+                    }
+                    KeyCode::Enter => {
+                        let selected_remote = remotes.get(*selected).cloned();
+                        self.mode = InteractionMode::Normal;
+                        match selected_remote {
+                            Some(remote) => self.open_fetch_preview(remote),
+                            None => {
+                                self.status = StatusLine::error(
+                                    &self.view,
+                                    "no remote selected for fetch".to_owned(),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(true)
+            }
             InteractionMode::DescribePreview { .. }
             | InteractionMode::CommitPreview { .. }
             | InteractionMode::BookmarkMutationPreview { .. }
@@ -447,6 +473,7 @@ impl App {
             | InteractionMode::RevertPreview { .. }
             | InteractionMode::SquashPreview { .. }
             | InteractionMode::AbsorbPreview { .. }
+            | InteractionMode::FetchPreview { .. }
             | InteractionMode::PushPreview { .. }
             | InteractionMode::OperationRecoveryPreview { .. }
             | InteractionMode::OperationTargetPreview { .. }

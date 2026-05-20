@@ -32,6 +32,7 @@ pub enum Command {
     BookmarkMove,
     BookmarkDelete,
     Fetch,
+    FetchRemote,
     Push,
     Copy,
     ViewFormat,
@@ -124,6 +125,7 @@ impl Command {
             | Self::BookmarkMove
             | Self::BookmarkDelete
             | Self::Fetch
+            | Self::FetchRemote
             | Self::Push
             | Self::Copy
             | Self::ViewFormat
@@ -568,6 +570,7 @@ fn help_metadata(
             _ => None,
         },
         Command::Fetch => Some((HelpSectionKind::RepositoryActions, "fetch")),
+        Command::FetchRemote => Some((HelpSectionKind::RepositoryActions, "fetch remote")),
         Command::Copy => Some((HelpSectionKind::SearchCopy, "copy")),
         Command::ViewFormat => Some((HelpSectionKind::Views, "view menu")),
         Command::Refresh => Some((HelpSectionKind::App, "refresh")),

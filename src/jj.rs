@@ -15,9 +15,9 @@ pub use crate::jj_actions::JjOperationTargetKind;
 pub use crate::jj_actions::{
     CommandOutput, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget,
-    JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind,
-    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan,
-    JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
+    JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
 };
 pub use crate::jj_rows::{
     BookmarkItem, FileListItem, LogItem, OperationLogItem, ResolveEntry, document_plain_text,
@@ -104,7 +104,6 @@ const TRUNK_WORK_REVSET: &str = "trunk().. | trunk()";
 const RECENT_WORK_REVSET: &str = "latest(mutable(), 20) | @ | trunk()";
 const ALL_REPO_REVSET: &str = "all()";
 const JJ_GIT_REMOTE_ARGS: [&str; 3] = ["git", "remote", "list"];
-const FETCH_ARGS: [&str; 2] = ["git", "fetch"];
 const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
 const BOOKMARK_COMMAND_WORDS: [&str; 2] = ["bookmark", "list"];
 const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
@@ -574,10 +573,6 @@ fn diff_format_args(
 
 fn revset_from_log_args(args: &[String]) -> Option<&str> {
     option_value(args, &["-r", "--revisions"], &["--revisions="])
-}
-
-pub fn git_fetch() -> Result<CommandOutput> {
-    run_direct_command(&FETCH_ARGS, "jj git fetch", "fetched")
 }
 
 pub fn new_trunk() -> Result<CommandOutput> {
@@ -1301,7 +1296,14 @@ mod tests {
 
     #[test]
     fn fetch_command_args_are_stable() {
-        assert_eq!(FETCH_ARGS, ["git", "fetch"]);
+        assert_eq!(
+            JjGitFetch::default_remotes().command_argv(),
+            vec!["git", "fetch"]
+        );
+        assert_eq!(
+            JjGitFetch::for_remote("origin").command_argv(),
+            vec!["git", "fetch", "--remote", "exact:origin"]
+        );
     }
 
     #[test]

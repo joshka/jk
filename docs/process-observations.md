@@ -2623,3 +2623,55 @@ belong here.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
   `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+
+## 2026-05-20 Interruption Packet F
+
+- Thread id: `019e46cc-ac65-7873-ac58-06519793bfac`.
+- Model / agent: gpt-5.5 high implementing Packet F: Fetch Remote Selection on working copy
+  `okkmlqkx Add fetch remote selection`.
+- Starting state: `jj --no-pager status` reported an empty working copy at
+  `okkmlqkx Add fetch remote selection`; no jj stack or description mutation commands were run.
+- Context loaded: `AGENTS.md`, the Packet F section of `docs/plan/next-implementation-slices.md`,
+  `docs/product-direction.md`, `docs/agent/architecture.md`, `docs/agent/testing.md`,
+  `docs/agent/workflow.md`, `docs/development/rules/refactoring.md`,
+  `docs/development/rules/testing.md`, `docs/development/rules/review.md`, and
+  `~/.codex/guides/rust-maintainability.md`.
+- Observable outcome: `src/jj_actions.rs` now has a `JjGitFetch` plan that distinguishes default
+  `jj git fetch` from remote-specific `jj git fetch --remote exact:<remote>`, with preview wording
+  that exposes the selected remote and exact pattern.
+- Observable outcome: `src/app.rs`, `src/app/action_lifecycle.rs`, `src/app/action_flow.rs`,
+  `src/app/mode_input.rs`, `src/app_screen.rs`, and `src/tui.rs` now route default fetch results,
+  remote-list selection, remote fetch preview, confirmation, result output, cancellation, and
+  completed-output closing through the existing action-output surface.
+- Observable outcome: `src/command.rs` and `src/graph.rs` keep `f` and graph `gf` as default fetch
+  while adding global `F` and graph `gr` for remote-specific fetch. This avoids making bare `f` wait
+  for a multi-key prefix timeout.
+- Rework / stuck point: the first validation pass left the obsolete `jj::git_fetch()` helper unused
+  after fetch execution moved to `JjGitFetch`; removing that helper kept the new implementation from
+  adding another dead-code warning. A later focused-test command used two Cargo filters at once and
+  was rerun as two separate commands.
+- Disposable proof: `/tmp/jk-fetch-proof.gmwDVS` proved installed `jj 0.41.0` accepts
+  `--remote exact:origin` and `--remote exact:upstream` in a repo with two remotes, and a separate
+  no-remote repo preserves the warning/error output for a nonmatching exact remote.
+- Validation run during implementation:
+  - `cargo check`
+  - `cargo test fetch -- --nocapture`
+  - `cargo test remote -- --nocapture`
+  - `cargo test git_fetch -- --nocapture`
+  - `cargo test app::tests -- --nocapture`
+  - `cargo test git_fetch_remote_uses_exact_remote_pattern -- --nocapture`
+  - `cargo test parses_git_remotes_from_jj_remote_list_output -- --nocapture`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+- Validation note: `cargo check` still reports the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+- Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
+  `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Review expectation: review Packet F for fetch target wording, exact remote pattern use, default
+  fetch behavior preservation, raw credential/error output preservation, command construction,
+  action-output result visibility, `/tmp` proof quality, fragility-register accuracy, and absence of
+  regressions to push remote selection.

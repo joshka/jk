@@ -1435,3 +1435,57 @@
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
     findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
     `src/graph.rs`, and `src/operation_log.rs`.
+
+## Interruption Packet F: Fetch Remote Selection
+
+- Files changed: `src/jj_actions.rs`, `src/jj.rs`, `src/app/services.rs`, `src/app.rs`,
+  `src/app/action_lifecycle.rs`, `src/app/action_flow.rs`, `src/app/mode_input.rs`,
+  `src/app_screen.rs`, `src/tui.rs`, `src/command.rs`, `src/graph.rs`, `src/app/tests.rs`,
+  `docs/plan/progress.md`, `docs/process-observations.md`, and `docs/plan/fragility-register.md`.
+- Behavior: default fetch remains a direct `jj git fetch` on `f` and graph `gf`, but the raw result
+  now stays inspectable in the shared action-output result overlay after the command runs. Explicit
+  remote fetch is available through global `F` and graph `gr`; one remote opens the fetch preview
+  directly, multiple remotes open a keyboard remote picker, and no-remotes or remote-list failures
+  produce readable status plus a completed output overlay.
+- Command contract: `JjGitFetch` owns default and remote-specific fetch argv construction. Remote
+  fetch passes `--remote exact:<remote>` so selected names from `jj git remote list` are not treated
+  as implicit glob patterns, and the preview/result context shows both the selected remote and exact
+  pattern.
+- Coverage: focused app tests cover direct default fetch result output, graph `gf`, graph `gr`,
+  global remote-fetch help metadata, one-remote skip, multi-remote selection, no-remote and
+  remote-list errors, remote preview confirmation, fetch failure output, refresh-failure output, and
+  push remote prompt regressions. Command tests cover default and remote fetch argv plus the
+  remote-list parser.
+- Disposable proof: `/tmp/jk-fetch-proof.gmwDVS` created bare `origin` and `upstream` remotes,
+  cloned them through `jj git clone`, added the second remote with `jj git remote add`, and proved
+  `jj --no-pager git fetch`, `jj --no-pager git fetch --remote exact:origin`, and
+  `jj --no-pager git fetch --remote exact:upstream`. A no-remote `/tmp` repo proved
+  `jj --no-pager git remote list` emits no rows and `jj --no-pager git fetch --remote exact:origin`
+  preserves the warning and error text: `No matching remotes for names: origin` and
+  `No git remotes to fetch from`.
+- Validation:
+  - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
+    `ViewSpec::bookmarks`, and `FileListItem::row_text`.
+  - `cargo test fetch -- --nocapture` passed with 14 focused tests.
+  - `cargo test remote -- --nocapture` passed with 18 focused tests.
+  - `cargo test git_fetch -- --nocapture` passed with 3 focused tests.
+  - `cargo test app::tests -- --nocapture` passed with 141 app tests.
+  - `cargo test git_fetch_remote_uses_exact_remote_pattern -- --nocapture` passed.
+  - `cargo test parses_git_remotes_from_jj_remote_list_output -- --nocapture` passed.
+  - full `cargo test` passed with 403 tests.
+  - `rustup run nightly cargo fmt` completed with existing rustfmt config warnings.
+  - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
+  - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
+  - `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
+    `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+    `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+- Rework: an attempted `cargo test` invocation used two test-name filters in one command, which
+  Cargo rejected. The focused `JjGitFetch` argv and remote parser tests were rerun as separate
+  commands and passed.
+- Remaining risk: remote names still come from the current `jj git remote list` text format and are
+  parsed as the first whitespace-delimited field. The selected remote is passed as an exact
+  `jj git fetch` string pattern and recorded in `docs/plan/fragility-register.md`, but a stronger
+  structured remote API would be preferable if sync flows expand.
+- Next recommended slice: Packet G: File Viewing And Wrap Modes, after review checks the fetch
+  target wording, exact remote pattern contract, output preservation, and push remote selection
+  regression coverage.

@@ -34,6 +34,7 @@ pub const BINDINGS: &[Binding] = &[
     ),
     Binding::new(KeyPattern::char('g'), Command::View(ViewCommand::MoveFirst)),
     Binding::sequence(GIT_FETCH_KEYS, Command::Fetch),
+    Binding::sequence(GIT_FETCH_REMOTE_KEYS, Command::FetchRemote),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Home),
         Command::View(ViewCommand::MoveFirst),
@@ -72,6 +73,7 @@ pub const BINDINGS: &[Binding] = &[
 ];
 
 const GIT_FETCH_KEYS: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('f')];
+const GIT_FETCH_REMOTE_KEYS: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('r')];
 
 fn explicit_selection_style() -> Style {
     theme::marked_row_style()
