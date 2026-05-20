@@ -48,6 +48,9 @@ sibling checkout or generated scripts.
   and semantic changes unless the coupling is necessary and documented.
 - Prefer build-preserving edits. Make changes along natural paths and run focused validation early
   so failures stay close to their cause.
+- Properly document and test implementation work. Record the behavior, constraints, and maintenance
+  context needed to understand the change, and leave focused proof in the owning tests or docs
+  instead of relying on chat context.
 - Choose validation by risk. Match proof to the changed surface: parser samples for parsers,
   navigation boundaries for TUI movement, rendered output checks for presentation, and docs checks
   for documentation.
@@ -212,8 +215,17 @@ Use the deeper agent guidance when the change touches the relevant area:
 Use Rust unit tests colocated with the module they describe. Prefer behavior-oriented test names,
 for example `document_search_wraps_without_reselecting_current_line`.
 
+Default to view-level tests for view behavior, especially when the contract includes both rendered
+content and presentation. Prefer assertions and snapshots that show the user-visible result in a
+maintainable way instead of only checking internal helpers.
+
 Use inline insta snapshots for multi-line rendered/projection transitions. Run focused tests while
 working and `just check` before handing off when practical.
+
+Be aware that `NO_COLOR` or similar ambient environment can interfere with insta coverage or
+ANSI-sensitive tests if it reaches `jj` calls. When a test depends on styled output, make the color
+expectation explicit, verify both content and presentation at the appropriate level, and
+investigate or correct color-handling leaks when snapshots stop exercising ANSI output.
 
 For Markdown-only changes, run `just md-check`. For Rust formatting-only validation, run `just fmt`.
 
