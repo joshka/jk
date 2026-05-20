@@ -5,6 +5,57 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 16 operation detail views)
+
+- Slice / task: Implement Packet 16 operation show/diff detail from operation-log rows.
+
+- Worker / model: `019e442a-1fd4-7e83-97c0-ade042bb574e` / `gpt-5` (Codex).
+
+- Scope given: preserve unrelated edits, stay primarily within the operation-log, view-state, app,
+  jj command, and TUI chrome surfaces, add rendered `jj operation show` and `jj operation diff`
+  detail drill-down, keep missing operation ids disabled/status-only, avoid undo/redo or operation
+  mutation behavior, and update progress, fragility, and process notes.
+
+- Observable outcome: operation-log `s`/Enter now opens `jj operation show <operation-id>` detail
+  and `d` opens `jj operation diff --operation <operation-id>` detail when the selected row carries
+  an operation id; rows without ids return status messages without opening a view; operation detail
+  views preserve rendered styled lines as a plain scroll/search/copy document and can switch between
+  show and diff for the same operation id.
+
+- 5.5 review summary: final review agent `019e4435-f6ce-7a42-94bb-ec62704e8940` (gpt-5 / Codex)
+  reported no code findings for Packet 16.
+
+- Reviewer residual gap: there is still no app-level stack-level test for
+  `operation log -> show -> diff -> back -> show -> back -> operation log`; current behavior follows
+  the existing pushed-detail transition semantics and is covered by a view-level show/diff switch
+  test and an app-level back-from-detail coverage test.
+
+- Evidence basis:
+  - Thread: `019e442a-1fd4-7e83-97c0-ade042bb574e`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands:
+    - `cargo check`
+    - `cargo test operation_log`
+    - `cargo test operation_detail`
+    - `cargo test operation_show_command_uses_positional_operation_id`
+    - `cargo test operation_diff_command_uses_operation_option`
+    - `cargo test back_from_operation_detail_returns_to_operation_log`
+    - `cargo test`
+    - `just check`
+    - `rustup run nightly cargo fmt`
+    - `rustup run nightly cargo fmt --check`
+    - `just md-check`
+  - Validation note: one early combined command-construction test invocation used multiple cargo
+    test filters and failed with `unexpected argument`; the one-filter command-construction tests
+    above passed separately.
+  - Validation note: `just check` failed immediately at the wrapper step `cargo +nightly fmt` with
+    `no such command: +nightly`; equivalent checks were run separately as a workaround:
+    `cargo check`, focused operation tests, full `cargo test`, `rustup run nightly cargo fmt`,
+    `rustup run nightly cargo fmt --check`, and `just md-check`.
+  - Files: `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/main.rs`, `src/operation_detail.rs`,
+    `src/operation_log.rs`, `src/tui.rs`, `src/view_state.rs`, `docs/plan/fragility-register.md`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
+
 ### 2026-05-19 (Packet 15 5.5 review repair)
 
 - Slice / task: Implement the bounded 5.5 review repair for the guided exact-target `jj abandon`

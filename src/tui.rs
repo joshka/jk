@@ -26,6 +26,7 @@ pub enum StatusHints {
     FileShowDocument,
     Bookmarks,
     OperationLog,
+    OperationDetailDocument,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -212,7 +213,8 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
         ],
         (StatusHints::ShowDocument, true)
         | (StatusHints::DiffDocument, true)
-        | (StatusHints::FileShowDocument, true) => line![
+        | (StatusHints::FileShowDocument, true)
+        | (StatusHints::OperationDetailDocument, true) => line![
             key("q"),
             " quit  ",
             key("j/k"),
@@ -307,6 +309,20 @@ fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
             " page  ",
             key("/"),
             " search  ",
+            key("h"),
+            " back  ",
+            key("?"),
+            " help",
+        ],
+        (StatusHints::OperationDetailDocument, false) => line![
+            key("q"),
+            " quit  ",
+            key("j/k"),
+            " scroll  ",
+            key("Space/C-b"),
+            " page  ",
+            key("s/d"),
+            " show/diff  ",
             key("h"),
             " back  ",
             key("?"),

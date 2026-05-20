@@ -137,6 +137,7 @@ pub enum HelpContext {
     FileShow,
     Bookmarks,
     OperationLog,
+    OperationDetail,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -343,7 +344,8 @@ fn view_help_metadata(
                 | HelpContext::FileList
                 | HelpContext::FileShow
                 | HelpContext::Bookmarks
-                | HelpContext::OperationLog => return None,
+                | HelpContext::OperationLog
+                | HelpContext::OperationDetail => return None,
             };
             Some((HelpSectionKind::Direct, action))
         }
@@ -356,7 +358,8 @@ fn view_help_metadata(
                 | HelpContext::Status
                 | HelpContext::FileShow
                 | HelpContext::Bookmarks
-                | HelpContext::OperationLog => return None,
+                | HelpContext::OperationLog
+                | HelpContext::OperationDetail => return None,
             };
             Some((HelpSectionKind::Direct, action))
         }
@@ -364,7 +367,7 @@ fn view_help_metadata(
             let action = match context {
                 HelpContext::Graph | HelpContext::Diff => "open show",
                 HelpContext::Bookmarks => "open show",
-                HelpContext::OperationLog => "operation show (not yet)",
+                HelpContext::OperationLog | HelpContext::OperationDetail => "operation show",
                 HelpContext::Show
                 | HelpContext::Status
                 | HelpContext::FileList
@@ -375,7 +378,7 @@ fn view_help_metadata(
         ViewCommand::OpenDiff => {
             let action = match context {
                 HelpContext::Graph | HelpContext::Show => "open diff",
-                HelpContext::OperationLog => "operation diff (not yet)",
+                HelpContext::OperationLog | HelpContext::OperationDetail => "operation diff",
                 HelpContext::Bookmarks
                 | HelpContext::Diff
                 | HelpContext::Status
@@ -498,6 +501,20 @@ mod tests {
                 .iter()
                 .any(|row| row.keys() == "p" && row.action().contains("push"))
         }));
+    }
+
+    #[test]
+    fn operation_help_exposes_show_and_diff_without_placeholder_text() {
+        let view = [
+            Binding::new(KeyPattern::char('s'), Command::View(ViewCommand::OpenShow)),
+            Binding::new(KeyPattern::char('d'), Command::View(ViewCommand::OpenDiff)),
+        ];
+
+        let sections = project_help(&[], &view, HelpContext::OperationLog);
+
+        assert_eq!(sections[0].title(), "Direct Actions");
+        assert_eq!(sections[0].rows()[0], HelpRow::new("s", "operation show"));
+        assert_eq!(sections[0].rows()[1], HelpRow::new("d", "operation diff"));
     }
 
     fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {

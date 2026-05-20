@@ -70,6 +70,15 @@ impl OperationLogView {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn test_new(entries: Vec<OperationLogItem>) -> Self {
+        Self {
+            spec: ViewSpec::new(crate::jj::JjCommand::OperationLog, Vec::new()),
+            entries,
+            selection: Selection::default(),
+        }
+    }
+
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
@@ -97,12 +106,22 @@ impl OperationLogView {
                 self.selection.last(self.entries.len());
                 ViewEffect::Handled
             }
-            ViewCommand::OpenShow => {
-                ViewEffect::StatusMessage("operation show not implemented yet".to_owned())
-            }
-            ViewCommand::OpenDiff => {
-                ViewEffect::StatusMessage("operation diff not implemented yet".to_owned())
-            }
+            ViewCommand::OpenShow => self
+                .selected_operation_id()
+                .map(|operation_id| ViewEffect::OpenView(ViewSpec::operation_show(operation_id)))
+                .unwrap_or_else(|| {
+                    ViewEffect::StatusMessage(
+                        "operation show unavailable: selected row has no operation id".to_owned(),
+                    )
+                }),
+            ViewCommand::OpenDiff => self
+                .selected_operation_id()
+                .map(|operation_id| ViewEffect::OpenView(ViewSpec::operation_diff(operation_id)))
+                .unwrap_or_else(|| {
+                    ViewEffect::StatusMessage(
+                        "operation diff unavailable: selected row has no operation id".to_owned(),
+                    )
+                }),
             ViewCommand::StartSearch => {
                 let Some(query) = context.search else {
                     return ViewEffect::Ignored;
@@ -199,6 +218,13 @@ impl OperationLogView {
         options
     }
 
+    fn selected_operation_id(&self) -> Option<String> {
+        self.entries
+            .get(self.selection.index())
+            .and_then(OperationLogItem::operation_id)
+            .map(str::to_owned)
+    }
+
     fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<OperationLogItem>>,
@@ -264,7 +290,6 @@ mod tests {
     use ratatui::text::Line;
 
     use super::*;
-    use crate::jj::JjCommand;
 
     fn operation_item(text: &[&str], operation_id: Option<&str>) -> OperationLogItem {
         OperationLogItem::new(
@@ -276,11 +301,7 @@ mod tests {
     }
 
     fn operation_log_view(entries: Vec<OperationLogItem>) -> OperationLogView {
-        OperationLogView {
-            spec: ViewSpec::new(JjCommand::OperationLog, Vec::new()),
-            entries,
-            selection: Selection::default(),
-        }
+        OperationLogView::test_new(entries)
     }
 
     #[test]
@@ -378,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn placeholders_are_non_mutating_status_messages() {
+    fn operation_show_and_diff_open_selected_operation_detail() {
         let mut view = operation_log_view(vec![operation_item(&["@  current"], Some("first"))]);
 
         assert_eq!(
@@ -389,7 +410,7 @@ mod tests {
                     search: None,
                 },
             ),
-            ViewEffect::StatusMessage("operation show not implemented yet".to_owned())
+            ViewEffect::OpenView(ViewSpec::operation_show("first".to_owned()))
         );
         assert_eq!(
             view.execute(
@@ -399,7 +420,37 @@ mod tests {
                     search: None,
                 },
             ),
-            ViewEffect::StatusMessage("operation diff not implemented yet".to_owned())
+            ViewEffect::OpenView(ViewSpec::operation_diff("first".to_owned()))
+        );
+    }
+
+    #[test]
+    fn operation_detail_actions_are_disabled_without_operation_id() {
+        let mut view = operation_log_view(vec![operation_item(&["@  current"], None)]);
+
+        assert_eq!(
+            view.execute(
+                ViewCommand::OpenShow,
+                CommandContext {
+                    viewport_height: 10,
+                    search: None,
+                },
+            ),
+            ViewEffect::StatusMessage(
+                "operation show unavailable: selected row has no operation id".to_owned()
+            )
+        );
+        assert_eq!(
+            view.execute(
+                ViewCommand::OpenDiff,
+                CommandContext {
+                    viewport_height: 10,
+                    search: None,
+                },
+            ),
+            ViewEffect::StatusMessage(
+                "operation diff unavailable: selected row has no operation id".to_owned()
+            )
         );
     }
 }

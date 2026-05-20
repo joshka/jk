@@ -1338,7 +1338,9 @@ impl App {
             | JjCommand::Status
             | JjCommand::FileList
             | JjCommand::Bookmarks
-            | JjCommand::OperationLog => return Ok(()),
+            | JjCommand::OperationLog
+            | JjCommand::OperationShow
+            | JjCommand::OperationDiff => return Ok(()),
         };
         self.push_view(spec)
     }
@@ -1548,9 +1550,12 @@ fn item_count_message(view: &ViewState, item_count: usize) -> String {
         JjCommand::Default | JjCommand::Log => {
             graph_status_message(item_count, view.graph_mode_label())
         }
-        JjCommand::Show | JjCommand::Diff | JjCommand::Status | JjCommand::FileShow => {
-            format!("{item_count} items")
-        }
+        JjCommand::Show
+        | JjCommand::Diff
+        | JjCommand::Status
+        | JjCommand::FileShow
+        | JjCommand::OperationShow
+        | JjCommand::OperationDiff => format!("{item_count} items"),
     }
 }
 
@@ -2416,5 +2421,30 @@ mod tests {
         );
         assert!(matches!(app.mode, InteractionMode::Normal));
         assert_eq!(app.status.message(), "no remote selected for push");
+    }
+
+    #[test]
+    fn back_from_operation_detail_returns_to_operation_log() {
+        let operation_id = "abcdef".to_owned();
+        let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj::OperationLogItem::new(
+                vec![ratatui::text::Line::from("@  current")],
+                Some(operation_id.clone()),
+            ),
+        ]);
+        let detail = crate::operation_detail::OperationDetailView::test_new(
+            ViewSpec::operation_show(operation_id),
+            crate::rendered_jj::DocumentLines::new(vec![ratatui::text::Line::from(
+                "operation details",
+            )]),
+        );
+        let mut app = test_app(ViewState::OperationDetail(detail));
+        app.stack.push(ViewState::OperationLog(operation_log));
+
+        app.pop_view();
+
+        assert!(matches!(app.view, ViewState::OperationLog(_)));
+        assert_eq!(app.status.title(), "jk operation log");
+        assert_eq!(app.status.message(), "1 operations");
     }
 }

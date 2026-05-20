@@ -207,3 +207,30 @@
   typed exact-revision confirmation if the target becomes non-empty, but the final recheck and
   `jj abandon` remain separate `jj` invocations rather than one atomic transaction
 - Next slice: TBD after review of exact-target mutation flows
+
+## Packet 16: Operation Show/Diff Detail
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/jj.rs`, `src/main.rs`,
+  `src/operation_detail.rs`, `src/operation_log.rs`, `src/tui.rs`, `src/view_state.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `cargo check`; focused `cargo test operation_log`, `cargo test operation_detail`,
+  `cargo test operation_show_command_uses_positional_operation_id`,
+  `cargo test operation_diff_command_uses_operation_option`,
+  `cargo test back_from_operation_detail_returns_to_operation_log`, full `cargo test`,
+  `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`, and `just md-check`
+- Validation note: an early combined command-construction test invocation used multiple cargo test
+  filters and failed with `unexpected argument`; the listed one-filter command-construction tests
+  were run separately and passed.
+- 5.5 review agent `019e4435-f6ce-7a42-94bb-ec62704e8940` (gpt-5) reported no code findings.
+- Validation note: `just check` was attempted after Packet 16 validation but failed immediately at
+  `cargo +nightly fmt` with `no such command: +nightly`. Equivalent checks were run separately:
+  `cargo check`, focused operation tests, full `cargo test`, `rustup run nightly cargo fmt`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Remaining risk: detail views intentionally do not parse operation transaction semantics, so copy
+  and search operate on rendered text only; command exactness depends on the documented
+  `jj operation show <operation-id>` and `jj operation diff --operation <operation-id>` shapes. A
+  final app-level stack assertion for
+  `operation log -> show -> diff -> back -> show -> back -> operation log` is still not covered;
+  behavior currently mirrors pushed-detail transition semantics and is covered by a view-level
+  show/diff switch test plus app-level back-from-detail coverage.
+- Next slice: Packet 17: Undo/Redo From Operation Log

@@ -23,6 +23,8 @@ pub enum JjCommand {
     FileShow,
     Bookmarks,
     OperationLog,
+    OperationShow,
+    OperationDiff,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -498,6 +500,8 @@ impl JjCommand {
             Self::FileShow => "jj file show",
             Self::Bookmarks => "jj bookmark list",
             Self::OperationLog => "jj operation log",
+            Self::OperationShow => "jj operation show",
+            Self::OperationDiff => "jj operation diff",
         }
     }
 
@@ -512,6 +516,8 @@ impl JjCommand {
             Self::FileShow => &["file", "show"],
             Self::Bookmarks => &BOOKMARK_COMMAND_WORDS,
             Self::OperationLog => &["operation", "log"],
+            Self::OperationShow => &["operation", "show"],
+            Self::OperationDiff => &["operation", "diff"],
         }
     }
 
@@ -525,7 +531,9 @@ impl JjCommand {
             | Self::Status
             | Self::FileList
             | Self::FileShow
-            | Self::Bookmarks => &[],
+            | Self::Bookmarks
+            | Self::OperationShow
+            | Self::OperationDiff => &[],
         }
     }
 
@@ -647,6 +655,26 @@ impl ViewSpec {
         }
     }
 
+    pub fn operation_show(operation_id: String) -> Self {
+        Self {
+            command: JjCommand::OperationShow,
+            args: vec![operation_id.clone()],
+            target: Some(operation_id),
+            path: None,
+            diff_format: DiffFormat::Default,
+        }
+    }
+
+    pub fn operation_diff(operation_id: String) -> Self {
+        Self {
+            command: JjCommand::OperationDiff,
+            args: vec!["--operation".to_owned(), operation_id.clone()],
+            target: Some(operation_id),
+            path: None,
+            diff_format: DiffFormat::Default,
+        }
+    }
+
     pub fn for_log_mode(home_command: JjCommand, mode: &LogViewMode) -> Self {
         match mode {
             LogViewMode::Default => Self::new(home_command, Vec::new()),
@@ -705,6 +733,8 @@ impl ViewSpec {
             JjCommand::FileShow => "jk file show",
             JjCommand::Bookmarks => "jk bookmarks",
             JjCommand::OperationLog => "jk operation log",
+            JjCommand::OperationShow => "jk operation show",
+            JjCommand::OperationDiff => "jk operation diff",
         }
     }
 
@@ -728,7 +758,9 @@ impl ViewSpec {
             | JjCommand::Log
             | JjCommand::Status
             | JjCommand::Bookmarks
-            | JjCommand::OperationLog => None,
+            | JjCommand::OperationLog
+            | JjCommand::OperationShow
+            | JjCommand::OperationDiff => None,
         })
     }
 
@@ -761,6 +793,7 @@ impl ViewSpec {
                 JjCommand::FileShow => {
                     revision_arg(self.file_show_context_args()).map(str::to_owned)
                 }
+                JjCommand::OperationShow | JjCommand::OperationDiff => None,
                 _ => show_revset_arg(&self.args).map(str::to_owned),
             })
             .unwrap_or_else(|| "@".to_owned())
@@ -1940,6 +1973,37 @@ mod tests {
                 OPERATION_ID_TEMPLATE,
             ]
         );
+    }
+
+    #[test]
+    fn operation_show_command_uses_positional_operation_id() {
+        let spec = ViewSpec::operation_show(operation_id('a'));
+
+        assert_eq!(spec.command(), JjCommand::OperationShow);
+        assert_eq!(spec.args(), [operation_id('a')]);
+        assert_eq!(
+            jj_command_args(&spec, None, false),
+            vec!["operation", "show", operation_id('a').as_str()]
+        );
+        assert_eq!(spec.app_label(), "jk operation show aaaaaaaa");
+    }
+
+    #[test]
+    fn operation_diff_command_uses_operation_option() {
+        let spec = ViewSpec::operation_diff(operation_id('b'));
+
+        assert_eq!(spec.command(), JjCommand::OperationDiff);
+        assert_eq!(spec.args(), ["--operation", operation_id('b').as_str()]);
+        assert_eq!(
+            jj_command_args(&spec, None, false),
+            vec![
+                "operation",
+                "diff",
+                "--operation",
+                operation_id('b').as_str()
+            ]
+        );
+        assert_eq!(spec.app_label(), "jk operation diff --operation bbbbbbbb");
     }
 
     #[test]
