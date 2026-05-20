@@ -61,8 +61,8 @@ semantics before guided resolution can be safe.
 ## Interaction Details
 
 - Movement: move by conflict item.
-- Inspect: `Enter` and `l` open `jj file show -r <resolve-target-or-@> <path>` when the selected row
-  carries an exact path.
+- Inspect: `Enter`, `l`, and `Right` open `jj file show -r <resolve-target-or-@> <path>` when the
+  selected row carries an exact path.
 - Unknown path: rows with malformed or partial metadata stay readable and copyable, but inspect
   shows a clear status error instead of inventing a path.
 - Refresh: preserve selected conflicted path when possible.
@@ -72,12 +72,12 @@ semantics before guided resolution can be safe.
 ## Bindings
 
 - `j`/`k`, arrows: move conflict selection
-- `Enter`, `l`: inspect selected conflict path
+- `Enter`, `l`, `Right`: inspect selected conflict path
 - `n` / `N`: next or previous search match
 - `R`: open resolve from other views
 - `y`: copy path
 - `r`: refresh
-- `h`, `Esc`: back
+- `h`, `Left`: back
 
 ## Integration Notes
 

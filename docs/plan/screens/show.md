@@ -69,7 +69,8 @@ sticky context, search, copy, refresh, and switching between related inspection 
 - `/`, `n`, `N`: search
 - `d`: switch to diff
 - `y`: copy menu
-- `h`, `Esc`: back
+- `l`, `Right`: open file list
+- `h`, `Left`: back
 - `r`: refresh
 
 ## Entry Points

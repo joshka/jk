@@ -10,9 +10,10 @@ use crate::command::{Binding, project_help};
 use crate::copy::CopyOption;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
-    JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget,
-    JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan,
-    JjRestorePlan, JjRevertPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
+    JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
+    JjDescribeTarget, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSquashPlan,
+    JjWorkingCopyNavigationPlan,
 };
 use crate::tui::Overlay;
 use crate::view_state::ViewState;
@@ -160,7 +161,7 @@ impl InteractionMode {
                 selected: *selected,
             },
             Self::ViewMenu { selected } => Overlay::ViewMenu {
-                options: view_formats(),
+                options: view_menu_options(),
                 selected: *selected,
             },
             Self::ActionMenu { menu, selected } => Overlay::ActionMenu {
@@ -216,30 +217,60 @@ impl InteractionMode {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ViewFormatOption {
+pub struct ViewMenuOption {
     label: &'static str,
-    format: DiffFormat,
+    action: ViewMenuAction,
 }
 
-impl ViewFormatOption {
+impl ViewMenuOption {
     pub fn label(self) -> &'static str {
         self.label
     }
 
-    pub fn format(self) -> DiffFormat {
-        self.format
+    pub fn action(self) -> ViewMenuAction {
+        self.action
     }
 }
 
-pub fn view_formats() -> &'static [ViewFormatOption] {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ViewMenuAction {
+    Open(JjCommand),
+    DiffFormat(DiffFormat),
+}
+
+pub fn view_menu_options() -> &'static [ViewMenuOption] {
     &[
-        ViewFormatOption {
-            label: "default jj diff",
-            format: DiffFormat::Default,
+        ViewMenuOption {
+            label: "log",
+            action: ViewMenuAction::Open(JjCommand::Log),
         },
-        ViewFormatOption {
-            label: "git diff (--git)",
-            format: DiffFormat::Git,
+        ViewMenuOption {
+            label: "jj default",
+            action: ViewMenuAction::Open(JjCommand::Default),
+        },
+        ViewMenuOption {
+            label: "status",
+            action: ViewMenuAction::Open(JjCommand::Status),
+        },
+        ViewMenuOption {
+            label: "resolve",
+            action: ViewMenuAction::Open(JjCommand::Resolve),
+        },
+        ViewMenuOption {
+            label: "bookmarks",
+            action: ViewMenuAction::Open(JjCommand::Bookmarks),
+        },
+        ViewMenuOption {
+            label: "operation log",
+            action: ViewMenuAction::Open(JjCommand::OperationLog),
+        },
+        ViewMenuOption {
+            label: "show/diff format: default jj",
+            action: ViewMenuAction::DiffFormat(DiffFormat::Default),
+        },
+        ViewMenuOption {
+            label: "show/diff format: git (--git)",
+            action: ViewMenuAction::DiffFormat(DiffFormat::Git),
         },
     ]
 }
@@ -273,16 +304,19 @@ mod tests {
     }
 
     #[test]
-    fn view_menu_projects_configured_diff_formats() {
+    fn view_menu_projects_configured_view_options() {
         let view = ViewState::Graph(GraphView::test_new(vec![]));
-        let mode = InteractionMode::ViewMenu { selected: 1 };
+        let mode = InteractionMode::ViewMenu { selected: 4 };
 
         let Overlay::ViewMenu { options, selected } = mode.overlay(&view, &[]) else {
             panic!("view menu mode should project a view menu overlay");
         };
 
-        assert_eq!(selected, 1);
-        assert_eq!(options[1].format(), DiffFormat::Git);
+        assert_eq!(selected, 4);
+        assert_eq!(
+            options[4].action(),
+            ViewMenuAction::Open(JjCommand::Bookmarks)
+        );
     }
 
     #[test]
@@ -296,8 +330,27 @@ mod tests {
     }
 
     #[test]
-    fn view_formats_keep_default_first() {
-        assert_eq!(view_formats()[0].format(), DiffFormat::Default);
-        assert_eq!(view_formats()[1].label(), "git diff (--git)");
+    fn view_menu_options_include_shipped_entries_and_diff_formats() {
+        let options = view_menu_options();
+        let actions = options
+            .iter()
+            .map(|option| option.action())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            actions,
+            vec![
+                ViewMenuAction::Open(JjCommand::Log),
+                ViewMenuAction::Open(JjCommand::Default),
+                ViewMenuAction::Open(JjCommand::Status),
+                ViewMenuAction::Open(JjCommand::Resolve),
+                ViewMenuAction::Open(JjCommand::Bookmarks),
+                ViewMenuAction::Open(JjCommand::OperationLog),
+                ViewMenuAction::DiffFormat(DiffFormat::Default),
+                ViewMenuAction::DiffFormat(DiffFormat::Git),
+            ]
+        );
+        assert_eq!(options[6].label(), "show/diff format: default jj");
+        assert_eq!(options[7].label(), "show/diff format: git (--git)");
     }
 }

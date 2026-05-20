@@ -6,7 +6,7 @@
 
 use std::env;
 use std::ffi::OsString;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
@@ -17,11 +17,12 @@ use crate::action_menu::{ActionKind, FollowUp, RolePrompt, build_action_menu};
 use crate::action_output::{
     ActionOutput, ActionOutputKey, action_output_visible_lines, handle_action_output_key,
 };
-use crate::app_screen::{InteractionMode, view_formats};
+use crate::app_screen::{InteractionMode, ViewMenuAction, view_menu_options};
 use crate::app_status::{StatusKind, StatusLine};
 use crate::clipboard;
 use crate::command::{
-    Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect, find_binding,
+    Binding, BindingMatch, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect,
+    match_binding_sequence,
 };
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
@@ -70,6 +71,8 @@ type WorkingCopyNavigationRun = fn(&JjWorkingCopyNavigationPlan) -> Result<Strin
 #[cfg(test)]
 type ResolveRevision = fn(&str) -> Result<String>;
 #[cfg(test)]
+type GitFetchRun = fn() -> Result<String>;
+#[cfg(test)]
 type GitRemotesLoad = fn() -> Result<Vec<String>>;
 #[cfg(test)]
 type PushPreviewRun = fn(&JjGitPush) -> Result<String>;
@@ -79,6 +82,8 @@ type PushRun = fn(&JjGitPush) -> Result<String>;
 type RefreshView = fn(&mut ViewState) -> Result<()>;
 #[cfg(test)]
 type RevealGraphChange = fn(&mut ViewState, &str, LogViewMode) -> Result<bool>;
+#[cfg(test)]
+type LoadView = fn(ViewSpec) -> Result<ViewState>;
 
 pub fn run() -> Result<()> {
     let mut app = App::load(env::args_os().skip(1).collect())?;
@@ -93,6 +98,7 @@ struct App {
     diff_format: DiffFormat,
     status: StatusLine,
     mode: InteractionMode,
+    pending_command: Option<PendingCommand>,
     search: Option<SearchQuery>,
     should_quit: bool,
     #[cfg(test)]
@@ -130,6 +136,8 @@ struct App {
     #[cfg(test)]
     resolve_revision: ResolveRevision,
     #[cfg(test)]
+    git_fetch_run: GitFetchRun,
+    #[cfg(test)]
     git_remotes_load: GitRemotesLoad,
     #[cfg(test)]
     push_preview_run: PushPreviewRun,
@@ -139,6 +147,8 @@ struct App {
     refresh_view: RefreshView,
     #[cfg(test)]
     reveal_graph_change: RevealGraphChange,
+    #[cfg(test)]
+    load_view: LoadView,
 }
 
 const APP_BINDINGS: &[Binding] = &[
@@ -154,6 +164,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('D'), Command::Describe),
     Binding::new(KeyPattern::char('C'), Command::Commit),
     Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
+    Binding::sequence(BOOKMARK_CREATE_KEYS, Command::BookmarkCreate),
     Binding::new(KeyPattern::char('='), Command::BookmarkSet),
     Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
     Binding::new(KeyPattern::char('f'), Command::Fetch),
@@ -166,6 +177,16 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('L'), Command::SwitchLog),
     Binding::new(KeyPattern::char('J'), Command::SwitchDefault),
 ];
+
+const BOOKMARK_CREATE_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('c')];
+const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
+
+#[derive(Clone)]
+struct PendingCommand {
+    keys: Vec<crossterm::event::KeyEvent>,
+    fallback: Option<Binding>,
+    deadline: Instant,
+}
 
 #[cfg(test)]
 fn default_new_run(new_change: &JjNewPlan) -> Result<String> {
@@ -257,6 +278,11 @@ fn default_resolve_revision(revset: &str) -> Result<String> {
 }
 
 #[cfg(test)]
+fn default_git_fetch_run() -> Result<String> {
+    git_fetch().map(|output| output.message().to_owned())
+}
+
+#[cfg(test)]
 fn default_git_remotes_load() -> Result<Vec<String>> {
     git_remotes()
 }
@@ -285,6 +311,11 @@ fn default_reveal_graph_change(
     view.reveal_graph_change(change_id, fallback_mode)
 }
 
+#[cfg(test)]
+fn default_load_view(spec: ViewSpec) -> Result<ViewState> {
+    ViewState::load(spec)
+}
+
 impl App {
     fn load(args: Vec<OsString>) -> Result<Self> {
         let initial_spec = initial_view(args)?;
@@ -301,6 +332,7 @@ impl App {
             diff_format,
             status,
             mode: InteractionMode::Normal,
+            pending_command: None,
             search: None,
             should_quit: false,
             #[cfg(test)]
@@ -338,6 +370,8 @@ impl App {
             #[cfg(test)]
             resolve_revision: default_resolve_revision,
             #[cfg(test)]
+            git_fetch_run: default_git_fetch_run,
+            #[cfg(test)]
             git_remotes_load: default_git_remotes_load,
             #[cfg(test)]
             push_preview_run: default_push_preview_run,
@@ -347,6 +381,8 @@ impl App {
             refresh_view: default_refresh_view,
             #[cfg(test)]
             reveal_graph_change: default_reveal_graph_change,
+            #[cfg(test)]
+            load_view: default_load_view,
         })
     }
 
@@ -531,6 +567,16 @@ impl App {
     }
 
     #[cfg(test)]
+    fn run_git_fetch(&self) -> Result<String> {
+        (self.git_fetch_run)()
+    }
+
+    #[cfg(not(test))]
+    fn run_git_fetch(&self) -> Result<String> {
+        git_fetch().map(|output| output.message().to_owned())
+    }
+
+    #[cfg(test)]
     fn refresh_view_state(&mut self) -> Result<()> {
         (self.refresh_view)(&mut self.view)
     }
@@ -548,6 +594,16 @@ impl App {
     #[cfg(not(test))]
     fn reveal_graph_change(&mut self, change_id: &str, fallback_mode: LogViewMode) -> Result<bool> {
         self.view.reveal_graph_change(change_id, fallback_mode)
+    }
+
+    #[cfg(test)]
+    fn load_view_state(&self, spec: ViewSpec) -> Result<ViewState> {
+        (self.load_view)(spec)
+    }
+
+    #[cfg(not(test))]
+    fn load_view_state(&self, spec: ViewSpec) -> Result<ViewState> {
+        ViewState::load(spec)
     }
 
     #[cfg(test)]
@@ -590,9 +646,11 @@ impl App {
                 tui::render_overlay(frame, &status, self.mode.overlay(&self.view, APP_BINDINGS));
             })?;
 
+            let viewport_height = terminal.size()?.height.saturating_sub(2);
             if event::poll(Duration::from_millis(200))? {
-                let viewport_height = terminal.size()?.height.saturating_sub(2);
                 self.handle_event(event::read()?, viewport_height)?;
+            } else {
+                self.flush_expired_pending_command(viewport_height)?;
             }
         }
 
@@ -625,12 +683,154 @@ impl App {
         key: crossterm::event::KeyEvent,
         viewport_height: u16,
     ) -> Result<bool> {
-        let Some(binding) =
-            find_binding(APP_BINDINGS, key).or_else(|| find_binding(self.view.bindings(), key))
+        self.handle_normal_key_at(key, viewport_height, Instant::now())
+    }
+
+    fn handle_normal_key_at(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        viewport_height: u16,
+        now: Instant,
+    ) -> Result<bool> {
+        if self.pending_command.is_some() {
+            return self.handle_pending_command_key(key, viewport_height, now);
+        }
+
+        let keys = [key];
+        let Some(binding_match) =
+            match_binding_sequence(&[APP_BINDINGS, self.view.bindings()], &keys)
         else {
             return Ok(true);
         };
 
+        match binding_match {
+            BindingMatch::Exact(binding) => self.execute_binding(binding, viewport_height),
+            BindingMatch::Prefix { fallback } => {
+                self.pending_command = Some(PendingCommand {
+                    keys: keys.to_vec(),
+                    fallback,
+                    deadline: now + COMMAND_PREFIX_TIMEOUT,
+                });
+                self.status = StatusLine::with_message(
+                    &self.view,
+                    format!("prefix: {}", binding_key_label(&keys)),
+                );
+                Ok(false)
+            }
+        }
+    }
+
+    fn handle_pending_command_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        viewport_height: u16,
+        now: Instant,
+    ) -> Result<bool> {
+        if self
+            .pending_command
+            .as_ref()
+            .is_some_and(|pending| now >= pending.deadline)
+        {
+            self.run_pending_fallback(viewport_height)?;
+            return self.handle_key_after_prefix_fallback(key, viewport_height, now);
+        }
+
+        if key.code == KeyCode::Esc {
+            self.pending_command = None;
+            self.status = StatusLine::with_message(&self.view, "prefix cancelled");
+            return Ok(false);
+        }
+
+        let Some(mut pending) = self.pending_command.take() else {
+            return Ok(true);
+        };
+        pending.keys.push(key);
+
+        match match_binding_sequence(&[APP_BINDINGS, self.view.bindings()], &pending.keys) {
+            Some(BindingMatch::Exact(binding)) => self.execute_binding(binding, viewport_height),
+            Some(BindingMatch::Prefix { fallback }) => {
+                self.status = StatusLine::with_message(
+                    &self.view,
+                    format!("prefix: {}", binding_key_label(&pending.keys)),
+                );
+                self.pending_command = Some(PendingCommand {
+                    keys: pending.keys,
+                    fallback,
+                    deadline: now + COMMAND_PREFIX_TIMEOUT,
+                });
+                Ok(false)
+            }
+            None => {
+                if let Some(fallback) = pending.fallback {
+                    self.run_binding_with_status_refresh(fallback, viewport_height)?;
+                    self.handle_key_after_prefix_fallback(key, viewport_height, now)
+                } else {
+                    self.status = StatusLine::with_message(&self.view, "unknown command prefix");
+                    Ok(false)
+                }
+            }
+        }
+    }
+
+    fn flush_expired_pending_command(&mut self, viewport_height: u16) -> Result<()> {
+        let Some(pending) = self.pending_command.as_ref() else {
+            return Ok(());
+        };
+        if Instant::now() < pending.deadline {
+            return Ok(());
+        }
+
+        let fallback = self
+            .pending_command
+            .take()
+            .and_then(|pending| pending.fallback);
+        if let Some(binding) = fallback {
+            self.run_binding_with_status_refresh(binding, viewport_height)?;
+        } else {
+            self.status = StatusLine::ready(&self.view);
+        }
+        Ok(())
+    }
+
+    fn run_pending_fallback(&mut self, viewport_height: u16) -> Result<()> {
+        let fallback = self
+            .pending_command
+            .take()
+            .and_then(|pending| pending.fallback);
+        if let Some(binding) = fallback {
+            self.run_binding_with_status_refresh(binding, viewport_height)?;
+        } else {
+            self.status = StatusLine::ready(&self.view);
+        }
+        Ok(())
+    }
+
+    fn run_binding_with_status_refresh(
+        &mut self,
+        binding: Binding,
+        viewport_height: u16,
+    ) -> Result<()> {
+        let refresh_status = self.execute_binding(binding, viewport_height)?;
+        if refresh_status && matches!(self.status.kind(), StatusKind::Ready) {
+            self.status = StatusLine::ready(&self.view);
+        }
+        Ok(())
+    }
+
+    fn handle_key_after_prefix_fallback(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        viewport_height: u16,
+        now: Instant,
+    ) -> Result<bool> {
+        if matches!(self.mode, InteractionMode::Normal) {
+            self.handle_normal_key_at(key, viewport_height, now)
+        } else {
+            self.handle_mode_key(key.code, viewport_height)
+        }
+    }
+
+    fn execute_binding(&mut self, binding: Binding, viewport_height: u16) -> Result<bool> {
         match binding.command() {
             Command::Quit => {
                 self.should_quit = true;
@@ -754,14 +954,11 @@ impl App {
     }
 
     fn fetch(&mut self, viewport_height: u16) {
-        match git_fetch() {
+        match self.run_git_fetch() {
             Ok(output) => match self.view.refresh() {
                 Ok(()) => {
                     self.view.clamp(viewport_height);
-                    self.status = StatusLine::with_message(
-                        &self.view,
-                        format!("fetch: {}", output.message()),
-                    );
+                    self.status = StatusLine::with_message(&self.view, format!("fetch: {output}"));
                 }
                 Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
             },
@@ -858,15 +1055,16 @@ impl App {
                         self.mode = InteractionMode::Normal;
                     }
                     KeyCode::Char('j') | KeyCode::Down => {
-                        *selected = (*selected + 1).min(view_formats().len().saturating_sub(1));
+                        *selected =
+                            (*selected + 1).min(view_menu_options().len().saturating_sub(1));
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
                         *selected = selected.saturating_sub(1);
                     }
                     KeyCode::Enter => {
-                        let diff_format = view_formats()[*selected].format();
+                        let action = view_menu_options()[*selected].action();
                         self.mode = InteractionMode::Normal;
-                        self.apply_diff_format(diff_format, viewport_height)?;
+                        self.apply_view_menu_action(action, viewport_height)?;
                     }
                     _ => {}
                 }
@@ -3185,11 +3383,53 @@ impl App {
     }
 
     fn open_view_menu(&mut self) {
-        let selected = view_formats()
+        let selected = view_menu_options()
             .iter()
-            .position(|option| option.format() == self.diff_format)
+            .position(|option| self.view_menu_option_is_current(option.action()))
             .unwrap_or(0);
         self.mode = InteractionMode::ViewMenu { selected };
+    }
+
+    fn view_menu_option_is_current(&self, action: ViewMenuAction) -> bool {
+        match action {
+            ViewMenuAction::Open(command) => self.view.command() == command,
+            ViewMenuAction::DiffFormat(format) => {
+                matches!(self.view.command(), JjCommand::Show | JjCommand::Diff)
+                    && self.diff_format == format
+            }
+        }
+    }
+
+    fn apply_view_menu_action(
+        &mut self,
+        action: ViewMenuAction,
+        viewport_height: u16,
+    ) -> Result<()> {
+        match action {
+            ViewMenuAction::Open(JjCommand::Log) => self.switch_to_log(),
+            ViewMenuAction::Open(JjCommand::Default) => self.switch_to_default(),
+            ViewMenuAction::Open(JjCommand::Status) => self.open_status(),
+            ViewMenuAction::Open(JjCommand::Resolve) => self.open_resolve(),
+            ViewMenuAction::Open(JjCommand::Bookmarks) => self.open_bookmarks(),
+            ViewMenuAction::Open(JjCommand::OperationLog) => self.open_operation_log(),
+            ViewMenuAction::DiffFormat(diff_format) => {
+                self.apply_diff_format(diff_format, viewport_height)
+            }
+            ViewMenuAction::Open(
+                JjCommand::Show
+                | JjCommand::Diff
+                | JjCommand::FileList
+                | JjCommand::FileShow
+                | JjCommand::OperationShow
+                | JjCommand::OperationDiff,
+            ) => {
+                self.status = StatusLine::with_message(
+                    &self.view,
+                    "view menu only opens top-level shipped views",
+                );
+                Ok(())
+            }
+        }
     }
 
     fn apply_custom_log_revset(&mut self, revset: String) {
@@ -3252,14 +3492,16 @@ impl App {
     fn apply_diff_format(&mut self, diff_format: DiffFormat, viewport_height: u16) -> Result<()> {
         self.diff_format = diff_format;
         if !matches!(self.view.command(), JjCommand::Show | JjCommand::Diff) {
-            self.status =
-                StatusLine::with_message(&self.view, format!("view: {}", diff_format.label()));
+            self.status = StatusLine::with_message(
+                &self.view,
+                format!("show/diff format: {}", diff_format.label()),
+            );
             return Ok(());
         }
 
         let scroll_offset = self.view.scroll_offset();
         let spec = self.view.spec().with_diff_format(diff_format);
-        self.view = ViewState::load(spec)?;
+        self.view = self.load_view_state(spec)?;
         self.view.set_scroll_offset(viewport_height, scroll_offset);
         self.status = StatusLine::ready(&self.view);
         Ok(())
@@ -3350,7 +3592,7 @@ impl App {
     }
 
     fn push_view(&mut self, spec: ViewSpec) -> Result<()> {
-        let next = ViewState::load(spec)?;
+        let next = self.load_view_state(spec)?;
         let previous = std::mem::replace(&mut self.view, next);
         self.stack.push(previous);
         self.status = StatusLine::ready(&self.view);
@@ -3367,14 +3609,14 @@ impl App {
     fn switch_to_log(&mut self) -> Result<()> {
         let args = self.startup_log_args.clone().unwrap_or_default();
         self.stack.clear();
-        self.view = ViewState::load(ViewSpec::new(JjCommand::Log, args))?;
+        self.view = self.load_view_state(ViewSpec::new(JjCommand::Log, args))?;
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }
 
     fn switch_to_default(&mut self) -> Result<()> {
         self.stack.clear();
-        self.view = ViewState::load(ViewSpec::new(JjCommand::Default, Vec::new()))?;
+        self.view = self.load_view_state(ViewSpec::new(JjCommand::Default, Vec::new()))?;
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }
@@ -3437,6 +3679,17 @@ fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjSquashPlan> {
 
 fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
+}
+
+fn binding_key_label(keys: &[crossterm::event::KeyEvent]) -> String {
+    keys.iter()
+        .map(|key| match key.code {
+            KeyCode::Char(character) if key.modifiers.is_empty() => character.to_string(),
+            KeyCode::Char(character) => format!("{:?}-{character}", key.modifiers),
+            _ => format!("{:?}", key.code),
+        })
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn push_status_context(target: &JjGitPushTarget, remote: &str) -> String {
@@ -3716,6 +3969,43 @@ mod tests {
         Ok("new-working-copy".to_owned())
     }
 
+    fn mock_fetch_success() -> Result<String> {
+        Ok("fetched".to_owned())
+    }
+
+    fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
+        let view = match spec.command() {
+            JjCommand::Default | JjCommand::Log => {
+                ViewState::Graph(crate::graph::GraphView::test_new(vec![]))
+            }
+            JjCommand::Show => ViewState::Show(crate::show::ShowView::test_new(spec)),
+            JjCommand::Diff => ViewState::Diff(crate::diff::DiffView::test_new(spec)),
+            JjCommand::Status => ViewState::Status(crate::status::StatusView::test_new(&[])),
+            JjCommand::Resolve => ViewState::Resolve(crate::resolve::ResolveView::test_new(vec![])),
+            JjCommand::FileList => {
+                ViewState::FileList(crate::file_list::FileListView::test_new(vec![]))
+            }
+            JjCommand::FileShow => ViewState::FileShow(crate::file_show::FileShowView::new(
+                spec,
+                "src/main.rs",
+                crate::rendered_jj::DocumentLines::new(Vec::new()),
+            )),
+            JjCommand::Bookmarks => {
+                ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![]))
+            }
+            JjCommand::OperationLog => {
+                ViewState::OperationLog(crate::operation_log::OperationLogView::test_new(vec![]))
+            }
+            JjCommand::OperationShow | JjCommand::OperationDiff => {
+                ViewState::OperationDetail(crate::operation_detail::OperationDetailView::test_new(
+                    spec,
+                    crate::rendered_jj::DocumentLines::new(Vec::new()),
+                ))
+            }
+        };
+        Ok(view)
+    }
+
     fn panic_abandon_run(_: &JjAbandonPlan) -> Result<String> {
         panic!("abandon should not run without exact confirmation")
     }
@@ -3806,6 +4096,7 @@ mod tests {
             startup_log_args: None,
             diff_format: DiffFormat::Default,
             mode: InteractionMode::Normal,
+            pending_command: None,
             search: None,
             should_quit: false,
             #[cfg(test)]
@@ -3843,6 +4134,8 @@ mod tests {
             #[cfg(test)]
             resolve_revision: mock_resolve_current_change_id,
             #[cfg(test)]
+            git_fetch_run: default_git_fetch_run,
+            #[cfg(test)]
             git_remotes_load: mock_multiple_remotes,
             #[cfg(test)]
             push_preview_run: mock_push_preview_success,
@@ -3852,6 +4145,8 @@ mod tests {
             refresh_view: mock_refresh_ok,
             #[cfg(test)]
             reveal_graph_change: default_reveal_graph_change,
+            #[cfg(test)]
+            load_view: default_load_view,
         }
     }
 
@@ -3953,6 +4248,266 @@ mod tests {
     #[test]
     fn rejects_unknown_startup_command() {
         assert!(initial_view(vec!["bookmark".into()]).is_err());
+    }
+
+    #[test]
+    fn direct_view_entry_keys_open_shipped_top_level_views() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('S'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(app.view.command(), JjCommand::Status);
+        assert!(app.pending_command.is_none());
+
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('B'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(app.view.command(), JjCommand::Bookmarks);
+        assert!(app.pending_command.is_none());
+
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('O'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(app.view.command(), JjCommand::OperationLog);
+        assert!(app.pending_command.is_none());
+    }
+
+    #[test]
+    fn generated_help_uses_same_multikey_and_view_entry_bindings_as_dispatch() {
+        let sections = crate::command::project_help(
+            APP_BINDINGS,
+            crate::graph::BINDINGS,
+            crate::command::HelpContext::Graph,
+        );
+        let rows = sections
+            .iter()
+            .flat_map(|section| section.rows())
+            .map(|row| (row.keys(), row.action()))
+            .collect::<Vec<_>>();
+
+        assert!(rows.contains(&("S", "status")));
+        assert!(rows.contains(&("B", "bookmarks")));
+        assert!(rows.contains(&("O", "operation log")));
+        assert!(rows.contains(&("b, bc", "create bookmark here")));
+        assert!(rows.contains(&("f", "fetch")));
+        assert!(rows.contains(&("gf", "fetch")));
+        assert!(rows.contains(&("v", "view menu")));
+
+        let status_sections = crate::command::project_help(
+            APP_BINDINGS,
+            crate::status::BINDINGS,
+            crate::command::HelpContext::Status,
+        );
+        let status_rows = status_sections
+            .iter()
+            .flat_map(|section| section.rows())
+            .map(|row| (row.keys(), row.action()))
+            .collect::<Vec<_>>();
+        assert!(status_rows.contains(&("f", "fetch")));
+        assert!(!status_rows.contains(&("f, gf", "fetch")));
+    }
+
+    #[test]
+    fn view_menu_selects_shipped_top_level_views() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
+            .unwrap();
+        for _ in 0..3 {
+            app.handle_mode_key(KeyCode::Down, 12).unwrap();
+        }
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        assert_eq!(app.view.command(), JjCommand::Bookmarks);
+        assert!(matches!(app.mode, InteractionMode::Normal));
+
+        app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_mode_key(KeyCode::Down, 12).unwrap();
+        app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+        assert_eq!(app.view.command(), JjCommand::OperationLog);
+    }
+
+    #[test]
+    fn view_menu_diff_format_status_names_show_diff_scope() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+
+        app.apply_view_menu_action(ViewMenuAction::DiffFormat(DiffFormat::Git), 12)
+            .unwrap();
+
+        assert_eq!(app.status.message(), "show/diff format: git");
+    }
+
+    #[test]
+    fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert!(app.pending_command.is_some());
+        assert_eq!(app.status.message(), "prefix: b");
+
+        app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
+            .unwrap();
+        match &app.mode {
+            InteractionMode::BookmarkNamePrompt { input, .. } => assert_eq!(input, ""),
+            _ => panic!("expected bookmark name prompt"),
+        }
+        assert!(app.pending_command.is_none());
+    }
+
+    #[test]
+    fn multi_key_fetch_dispatches_from_git_prefix() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+        app.git_fetch_run = mock_fetch_success;
+
+        app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert!(app.pending_command.is_some());
+
+        app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert_eq!(app.status.message(), "fetch: fetched");
+        assert!(app.pending_command.is_none());
+    }
+
+    #[test]
+    fn git_fetch_prefix_does_not_delay_non_graph_g_navigation() {
+        let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[
+            "working copy changes:",
+            "M src/app.rs",
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(app.pending_command.is_none());
+        assert_eq!(app.status.message(), "1/2 lines");
+    }
+
+    #[test]
+    fn expired_bookmark_prefix_runs_fallback_before_next_key() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+
+        app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.pending_command.as_mut().unwrap().deadline = Instant::now() - Duration::from_millis(1);
+        app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        match &app.mode {
+            InteractionMode::BookmarkNamePrompt { input, .. } => assert_eq!(input, "c"),
+            _ => panic!("expected bookmark name prompt"),
+        }
+        assert!(app.pending_command.is_none());
+    }
+
+    #[test]
+    fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
+        let mut graph = crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+            crate::jj::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+        ]);
+        graph.execute(
+            ViewCommand::MoveDown,
+            CommandContext {
+                viewport_height: 12,
+                search: None,
+            },
+        );
+        let mut app = test_app(ViewState::Graph(graph));
+
+        app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.pending_command.as_mut().unwrap().deadline = Instant::now() - Duration::from_millis(1);
+        app.flush_expired_pending_command(12).unwrap();
+
+        let ViewState::Graph(graph) = &app.view else {
+            panic!("expected graph view");
+        };
+        assert_eq!(graph.selected_revision(), Some("first"));
+        assert!(app.pending_command.is_none());
+        assert_eq!(app.status.message(), "2 items | default work");
+    }
+
+    #[test]
+    fn command_prefix_cancel_does_not_run_global_escape() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+
+        app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_normal_key(key(KeyCode::Esc, KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert!(!app.should_quit);
+        assert!(app.pending_command.is_none());
+        assert!(matches!(app.mode, InteractionMode::Normal));
+        assert_eq!(app.status.message(), "prefix cancelled");
+    }
+
+    #[test]
+    fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
+        let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+            crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        ])));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('l'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(app.view.command(), JjCommand::Show);
+
+        app.handle_normal_key(key(KeyCode::Char('h'), KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(app.view.command(), JjCommand::Default);
+
+        let mut app = test_app(ViewState::Bookmarks(
+            crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+                Vec::new(),
+                "main".to_owned(),
+                Some("change-a".to_owned()),
+                None,
+            )]),
+        ));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Right, KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(app.view.command(), JjCommand::Show);
+
+        app.handle_normal_key(key(KeyCode::Left, KeyModifiers::NONE), 12)
+            .unwrap();
+        assert_eq!(app.view.command(), JjCommand::Bookmarks);
+    }
+
+    #[test]
+    fn operation_log_l_opens_operation_detail() {
+        let operation_id = "op123".to_owned();
+        let mut app = test_app(ViewState::OperationLog(
+            crate::operation_log::OperationLogView::test_new(vec![
+                crate::jj::OperationLogItem::new(
+                    vec![ratatui::text::Line::from("@  current")],
+                    Some(operation_id),
+                ),
+            ]),
+        ));
+        app.load_view = mock_load_view;
+
+        app.handle_normal_key(key(KeyCode::Char('l'), KeyModifiers::NONE), 12)
+            .unwrap();
+
+        assert_eq!(app.view.command(), JjCommand::OperationShow);
     }
 
     #[test]
@@ -4310,6 +4865,8 @@ mod tests {
 
         app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
             .unwrap();
+        app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
+            .unwrap();
         for character in "feature/name".chars() {
             app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
         }
@@ -4402,6 +4959,8 @@ mod tests {
 
         app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
             .unwrap();
+        app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
+            .unwrap();
         app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
         app.handle_mode_key(KeyCode::Esc, 12).unwrap();
         assert!(matches!(app.mode, InteractionMode::Normal));
@@ -4424,6 +4983,8 @@ mod tests {
         ])));
 
         app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+            .unwrap();
+        app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
             .unwrap();
         assert!(matches!(app.mode, InteractionMode::Normal));
         assert_eq!(

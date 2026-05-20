@@ -68,21 +68,36 @@ pub enum ViewCommand {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Binding {
-    key: KeyPattern,
+    key: KeySequence,
     command: Command,
 }
 
 impl Binding {
     pub const fn new(key: KeyPattern, command: Command) -> Self {
-        Self { key, command }
+        Self {
+            key: KeySequence::Single(key),
+            command,
+        }
     }
 
+    pub const fn sequence(keys: &'static [KeyPattern], command: Command) -> Self {
+        Self {
+            key: KeySequence::Multi(keys),
+            command,
+        }
+    }
+
+    #[cfg(test)]
     pub fn matches(self, key: KeyEvent) -> bool {
         self.key.matches(key)
     }
 
     pub fn command(self) -> Command {
         self.command
+    }
+
+    pub fn key_label(self) -> String {
+        self.key.label()
     }
 }
 
@@ -172,6 +187,82 @@ impl KeyPattern {
             format!("{}-{code}", key_modifier_label(self.modifiers))
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum KeySequence {
+    Single(KeyPattern),
+    Multi(&'static [KeyPattern]),
+}
+
+impl KeySequence {
+    #[cfg(test)]
+    fn matches(self, key: KeyEvent) -> bool {
+        match self {
+            Self::Single(pattern) => pattern.matches(key),
+            Self::Multi([pattern]) => pattern.matches(key),
+            Self::Multi(_) => false,
+        }
+    }
+
+    fn label(self) -> String {
+        match self {
+            Self::Single(pattern) => pattern.label(),
+            Self::Multi(patterns) if patterns.iter().all(|pattern| pattern.is_plain_char()) => {
+                patterns
+                    .iter()
+                    .filter_map(|pattern| pattern.plain_char())
+                    .collect()
+            }
+            Self::Multi(patterns) => patterns
+                .iter()
+                .map(|pattern| pattern.label())
+                .collect::<Vec<_>>()
+                .join(" "),
+        }
+    }
+
+    fn len(self) -> usize {
+        match self {
+            Self::Single(_) => 1,
+            Self::Multi(patterns) => patterns.len(),
+        }
+    }
+
+    fn matches_prefix(self, keys: &[KeyEvent]) -> bool {
+        if keys.len() > self.len() {
+            return false;
+        }
+
+        match self {
+            Self::Single(pattern) => keys
+                .first()
+                .is_some_and(|key| keys.len() == 1 && pattern.matches(*key)),
+            Self::Multi(patterns) => keys
+                .iter()
+                .zip(patterns)
+                .all(|(key, pattern)| pattern.matches(*key)),
+        }
+    }
+}
+
+impl KeyPattern {
+    fn is_plain_char(self) -> bool {
+        matches!(self.code, KeyCode::Char(_)) && self.modifiers.is_empty()
+    }
+
+    fn plain_char(self) -> Option<char> {
+        match self.code {
+            KeyCode::Char(character) if self.modifiers.is_empty() => Some(character),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BindingMatch {
+    Exact(Binding),
+    Prefix { fallback: Option<Binding> },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -276,11 +367,44 @@ pub enum ViewEffect {
     OpenActionMenu(ActionMenu),
 }
 
+#[cfg(test)]
 pub fn find_binding(bindings: &[Binding], key: KeyEvent) -> Option<Binding> {
     bindings
         .iter()
         .copied()
         .find(|binding| binding.matches(key))
+}
+
+pub fn match_binding_sequence(
+    binding_groups: &[&[Binding]],
+    keys: &[KeyEvent],
+) -> Option<BindingMatch> {
+    if keys.is_empty() {
+        return None;
+    }
+
+    let mut exact = None;
+    let mut has_prefix = false;
+
+    for bindings in binding_groups {
+        for binding in *bindings {
+            if !binding.key.matches_prefix(keys) {
+                continue;
+            }
+
+            if binding.key.len() == keys.len() {
+                exact.get_or_insert(*binding);
+            } else {
+                has_prefix = true;
+            }
+        }
+    }
+
+    if has_prefix {
+        Some(BindingMatch::Prefix { fallback: exact })
+    } else {
+        exact.map(BindingMatch::Exact)
+    }
 }
 
 pub fn project_help(
@@ -324,7 +448,7 @@ fn collect_help_rows(
         let Some((kind, action)) = help_metadata(command, context) else {
             continue;
         };
-        let key = binding.key.label();
+        let key = binding.key_label();
 
         if let Some((_, _, row)) = rows.iter_mut().find(|(row_kind, row_command, row)| {
             *row_kind == kind && *row_command == command && row.action == action
@@ -414,7 +538,7 @@ fn help_metadata(
         },
         Command::Fetch => Some((HelpSectionKind::Direct, "fetch")),
         Command::Copy => Some((HelpSectionKind::Global, "copy")),
-        Command::ViewFormat => Some((HelpSectionKind::Global, "view format")),
+        Command::ViewFormat => Some((HelpSectionKind::Global, "view menu")),
         Command::Refresh => Some((HelpSectionKind::Global, "refresh")),
         Command::Back => Some((HelpSectionKind::Global, "back")),
         Command::SwitchLog => Some((HelpSectionKind::Global, "log")),
@@ -556,6 +680,56 @@ mod tests {
             find_binding(&bindings, key(KeyCode::Char('q'), KeyModifiers::NONE))
                 .map(Binding::command),
             Some(Command::Quit)
+        );
+    }
+
+    #[test]
+    fn match_binding_sequence_reports_prefix_and_exact_fallback() {
+        const BOOKMARK_CREATE: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('c')];
+        let bindings = [
+            Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
+            Binding::sequence(BOOKMARK_CREATE, Command::BookmarkCreate),
+        ];
+
+        let pending =
+            match_binding_sequence(&[&bindings], &[key(KeyCode::Char('b'), KeyModifiers::NONE)]);
+        let complete = match_binding_sequence(
+            &[&bindings],
+            &[
+                key(KeyCode::Char('b'), KeyModifiers::NONE),
+                key(KeyCode::Char('c'), KeyModifiers::NONE),
+            ],
+        );
+
+        assert_eq!(
+            pending,
+            Some(BindingMatch::Prefix {
+                fallback: Some(bindings[0])
+            })
+        );
+        assert_eq!(complete, Some(BindingMatch::Exact(bindings[1])));
+        assert_eq!(bindings[1].key_label(), "bc");
+    }
+
+    #[test]
+    fn match_binding_sequence_allows_global_prefix_over_view_fallback() {
+        const GIT_FETCH: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('f')];
+        let global = [Binding::sequence(GIT_FETCH, Command::Fetch)];
+        let view = [Binding::new(
+            KeyPattern::char('g'),
+            Command::View(ViewCommand::MoveFirst),
+        )];
+
+        let pending = match_binding_sequence(
+            &[&global, &view],
+            &[key(KeyCode::Char('g'), KeyModifiers::NONE)],
+        );
+
+        assert_eq!(
+            pending,
+            Some(BindingMatch::Prefix {
+                fallback: Some(view[0])
+            })
         );
     }
 

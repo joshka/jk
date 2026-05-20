@@ -2000,3 +2000,110 @@ belong here.
   `ViewSpec::bookmarks`, and `FileListItem::row_text`, plus the known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 - Final 5.5 acceptance check found no findings and accepted Packet A2.
+
+## 2026-05-20 Interruption Packet B Navigation And View Entry
+
+- Thread id: `019e45d3-3af3-79e0-9c62-a110e1ce06e4`.
+- Slice / task: Implement Packet B view-entry, multi-key grammar, view-menu, and directional
+  navigation contracts on top of accepted Packet A2.
+- Starting state: `jj --no-pager status` reported an empty working copy at
+  `nutzpkvo e23f154d (empty) Implement view entry contracts`, with parent
+  `tpxlzkvv 8a108773 Extract jj rendered rows`.
+- Explorer evidence used: direct `S`, `B`, and `O` were already wired through `APP_BINDINGS`,
+  generated help, and startup parsing; implementation left that dispatch in place and added
+  regression coverage instead of rewriting it.
+- Observable outcome: `src/command.rs` now has a static key-sequence matcher shared by dispatch and
+  generated help. `src/app.rs` owns pending-prefix state, timeout fallback, Esc cancellation, and
+  screen-level tests for `bc` bookmark create, `gf` fetch, generated help agreement, direct
+  `S`/`B`/`O`, view-menu selection, and `l`/Right plus `h`/Left navigation.
+- Observable outcome: `src/app_screen.rs` now projects a shipped-view menu rather than a
+  diff-format-only menu, while preserving diff-format options as menu entries. `src/bookmarks.rs`
+  and `src/operation_log.rs` add `l`/Right detail entry; `src/show.rs`, `src/diff.rs`, and
+  `src/status.rs` add Right as file-list expansion.
+- Rework / stuck points: the first app test run exposed that existing bookmark-create tests typed
+  through `handle_mode_key` immediately after bare `b`; because bare `b` is now an ambiguous prefix,
+  those tests were corrected to use explicit `bc`, while a separate timeout test covers bare `b` as
+  fallback. The first view-menu test assumed selection started at `log`; current default graph view
+  selects `jj default`, so the test navigation was adjusted.
+- Rework / tool note: two attempted focused `cargo test` commands passed multiple test names in one
+  invocation, which Cargo rejected with `unexpected argument`; the same coverage was rerun through
+  valid focused app and single-test filters.
+- Rework / docs note: `just md-check` initially found a Panache wrapping diff in `README.md`;
+  `just md-fmt` reformatted it and the rerun passed.
+- Validation / proof run during implementation:
+  - `cargo check`
+  - `cargo test command -- --test-threads=1`
+  - `cargo test app::tests:: -- --test-threads=1`
+  - `cargo test generated_help_uses_same_multikey_and_view_entry_bindings_as_dispatch -- --test-threads=1`
+  - `cargo test view_menu_selects_shipped_top_level_views -- --test-threads=1`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-fmt`
+  - `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+  - attempted `just check`
+- Validation note: `cargo check` still reports the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy with
+  `-D warnings` remains blocked by those warnings plus existing `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`. `just check` still stops at the
+  known wrapper issue, `cargo +nightly fmt` with `no such command: +nightly`; the direct nightly
+  format check, full tests, cargo check, and Markdown checks passed.
+- Code quality concern: the prefix fallback behavior is intentionally conservative but creates a
+  short delay for ambiguous bare `b` and graph `g`; this is acceptable for Packet B because it makes
+  dispatch and help share the same grammar before more rewrite keys arrive, but Packet C should
+  decide whether a leader-style help/menu should absorb or remove those fallback ambiguities.
+- Model routing note: 5.5 high was justified for this slice. The hard part was not typing the
+  bindings but preserving working `S`/`B`/`O`, routing view-menu ownership through `app_screen.rs`,
+  keeping generated help and dispatch coupled, and documenting the intentional key-behavior change
+  without pulling in Packet 34 or command-palette scope.
+
+## 2026-05-20 Packet B Review Repair
+
+- Thread id: `019e45d3-3af3-79e0-9c62-a110e1ce06e4`.
+- Scope: repair only the Packet B review findings about prefix timeout semantics, stale timeout
+  status, `gf` scope, generated help wording for `v`, and diff-format view-menu truthfulness.
+- Review finding evidence: `handle_pending_command_key` previously appended the next key before
+  checking `PendingCommand::deadline`, so an expired `b` followed by `c` could still complete `bc`.
+  `flush_expired_pending_command` also ignored the `execute_binding` refresh-status bool, so idle
+  fallback could leave the stored `prefix: ...` status stale.
+- Repair outcome: pending-prefix key handling now checks expiry before consuming the next key,
+  executes the fallback first, and then routes the new key through normal mode or the newly opened
+  prompt. Idle timeout fallback now uses the same refresh-status helper as key-arrival fallback.
+- Repair outcome: `gf` moved out of global `APP_BINDINGS` and into graph bindings only. Generated
+  help now shows `gf` only for graph fetch, and a screen-level test proves status `g` remains
+  immediate top navigation with no pending prefix.
+- Repair outcome: generated help now names `v` as `view menu`. The view menu's diff-format labels
+  and non-show/diff status message now say `show/diff format`, avoiding the implication that those
+  entries switch the active top-level view outside show/diff.
+- Focused repair tests run:
+  - `cargo test app::tests:: -- --test-threads=1`
+  - `cargo test command -- --test-threads=1`
+  - `cargo test view_menu_options_include_shipped_entries_and_diff_formats -- --test-threads=1`
+- Full repair validation:
+  - `cargo check`
+  - full `cargo test`
+  - `rustup run nightly cargo fmt`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-fmt`
+  - `just md-check`
+  - attempted `cargo clippy -- -D warnings`
+  - attempted `just check`
+- Validation note: `cargo check` still reports the existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy with
+  `-D warnings` remains blocked by those warnings plus existing `collapsible_if` findings in
+  `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`. The `src/graph.rs` line number
+  shifted after adding graph-local `gf`. `just check` still stops at the known wrapper issue,
+  `cargo +nightly fmt` with `no such command: +nightly`.
+- Rework note: one attempted grouped `cargo test` invocation again used multiple test-name arguments
+  and Cargo rejected it with `unexpected argument`; the already-run focused app module and valid
+  single-test filter covered the repair assertions.
+- Final 5.5 acceptance: `gpt-5.5` accepted Packet B as-is after repair with no blocking findings.
+  Final checks confirmed: `PendingCommand::deadline` is evaluated before consuming the next key,
+  idle fallback uses the same status-refresh helper, `gf` is graph-local, help names `v` as
+  `view menu`, and diff-format entries say `show/diff format`. Validation included `cargo check`
+  (existing dead-code warnings), full `cargo test` (356 passing tests),
+  `rustup run nightly cargo fmt --check` (existing rustfmt config warnings only), and
+  `just md-check`; `cargo clippy -- -D warnings` remains blocked by six known issues (three
+  dead-code warnings and three `collapsible_if` findings).
+- Next slice: `Interruption Packet C: Help Leader Menu`.

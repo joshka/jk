@@ -28,7 +28,8 @@ previewed mutation paths, so check help/previews before confirming.
 
 ## Fetch And Push
 
-- Press `f` for `jj git fetch`.
+- Press `f` for `jj git fetch`. From the graph view, `gf` is also available; other views keep `g` as
+  immediate top navigation.
 - Press `p` for the guided push flow.
 - Fetch is direct and low risk.
 - Push is previewed before it runs, and the preview makes the target choice explicit when `jj` will

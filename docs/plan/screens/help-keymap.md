@@ -60,7 +60,7 @@ The keymap surface should explain:
 - `/`: search within help if help becomes long
 - `j`/`k`, arrows: scroll
 - `a` (log): open the log action menu
-- `Esc`, `q`, `h`: dismiss
+- `Esc`, `q`, `?`: dismiss
 
 ## Acceptance Criteria
 

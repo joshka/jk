@@ -47,7 +47,7 @@ Priority 3. Tags are useful but lower frequency than bookmarks and working-copy 
 - `d`: delete flow
 - `y`: copy tag name or target
 - `r`: refresh
-- `h`, `Esc`: back
+- `h`, `Left`: back
 
 ## Integration Notes
 

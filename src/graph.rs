@@ -32,6 +32,7 @@ pub const BINDINGS: &[Binding] = &[
         Command::View(ViewCommand::MoveUp),
     ),
     Binding::new(KeyPattern::char('g'), Command::View(ViewCommand::MoveFirst)),
+    Binding::sequence(GIT_FETCH_KEYS, Command::Fetch),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Home),
         Command::View(ViewCommand::MoveFirst),
@@ -68,6 +69,8 @@ pub const BINDINGS: &[Binding] = &[
         Command::View(ViewCommand::OpenActionMenu),
     ),
 ];
+
+const GIT_FETCH_KEYS: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('f')];
 
 fn explicit_selection_style() -> Style {
     Style::default()

@@ -88,8 +88,8 @@ or stay deferred until the exact target, preview, and recovery story is obvious.
 
 - `bookmark list`: `utility screen`. Strong fit from prototype ideas.
 - `bookmark set`: `guided flow`. Shipped from graph exact rows and status (`=`) using current `@`.
-- `bookmark create`: `guided flow`. Shipped from graph exact rows and status (`@`) as bookmark name
-  prompts.
+- `bookmark create`: `guided flow`. Shipped from graph exact rows and status (`@`) as `bc` bookmark
+  name prompts, with bare `b` kept as a timed fallback while multi-key grammar settles.
 - `bookmark move`: `guided flow`. Shipped from graph exact rows and status (`@`) as bookmark name
   prompts.
 - `bookmark rename`: `planned`. Not a current home.
@@ -114,7 +114,8 @@ or stay deferred until the exact target, preview, and recovery story is obvious.
 
 ## Git And Remote Sync
 
-- `git fetch`: `direct action`. Common and low-risk enough to stay direct.
+- `git fetch`: `direct action`. Common and low-risk enough to stay direct from `f`, with `gf`
+  available from graph so other views keep `g` as immediate top navigation.
 - `git push`: `guided flow`. Preview and confirmation matter.
 - other `jj git` commands: `passthrough`. Likely too broad for early native UI.
 

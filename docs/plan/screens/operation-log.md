@@ -59,13 +59,13 @@ too far.
 ## Shortcut Candidates
 
 - `j`/`k`, arrows: move operation selection
-- `Enter`, `s`: open operation show
+- `Enter`, `s`, `l`, `Right`: open operation show
 - `d`: open operation diff
 - `u`: undo flow
-- `R`: redo flow
+- `Ctrl-r`: redo flow
 - `r`: refresh
 - `y`: copy operation id
-- `h`, `Esc`: back
+- `h`, `Left`: back
 
 ## Safety Model
 

@@ -64,6 +64,10 @@ pub const BINDINGS: &[Binding] = &[
         Command::View(ViewCommand::PreviousFile),
     ),
     Binding::new(KeyPattern::char('l'), Command::View(ViewCommand::OpenFiles)),
+    Binding::new(
+        KeyPattern::code(crossterm::event::KeyCode::Right),
+        Command::View(ViewCommand::OpenFiles),
+    ),
     Binding::new(KeyPattern::char('d'), Command::View(ViewCommand::OpenDiff)),
     Binding::new(
         KeyPattern::char('n'),

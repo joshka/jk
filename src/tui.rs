@@ -12,7 +12,7 @@ use ratatui_macros::{line, span, vertical};
 
 use crate::action_menu::{ActionMenu, RolePrompt};
 use crate::action_output::ActionOutput;
-use crate::app_screen::ViewFormatOption;
+use crate::app_screen::ViewMenuOption;
 use crate::app_status::{StatusKind, StatusLine};
 use crate::command::HelpSection;
 use crate::copy::CopyOption;
@@ -194,7 +194,7 @@ pub enum Overlay<'a> {
         selected: usize,
     },
     ViewMenu {
-        options: &'a [ViewFormatOption],
+        options: &'a [ViewMenuOption],
         selected: usize,
     },
     ActionMenu {
@@ -558,7 +558,7 @@ fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
     List::new(items).block(Block::bordered().title("Copy"))
 }
 
-fn view_menu(options: &[ViewFormatOption], selected: usize) -> List<'static> {
+fn view_menu(options: &[ViewMenuOption], selected: usize) -> List<'static> {
     let items = options
         .iter()
         .enumerate()

@@ -60,6 +60,10 @@ pub const BINDINGS: &[Binding] = &[
     ),
     Binding::new(KeyPattern::char('l'), Command::View(ViewCommand::OpenFiles)),
     Binding::new(
+        KeyPattern::code(crossterm::event::KeyCode::Right),
+        Command::View(ViewCommand::OpenFiles),
+    ),
+    Binding::new(
         KeyPattern::char('n'),
         Command::View(ViewCommand::NextSearchMatch),
     ),

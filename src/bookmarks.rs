@@ -38,6 +38,11 @@ pub const BINDINGS: &[Binding] = &[
         Command::View(ViewCommand::MoveLast),
     ),
     Binding::new(KeyPattern::char('s'), Command::View(ViewCommand::OpenShow)),
+    Binding::new(KeyPattern::char('l'), Command::View(ViewCommand::OpenShow)),
+    Binding::new(
+        KeyPattern::code(crossterm::event::KeyCode::Right),
+        Command::View(ViewCommand::OpenShow),
+    ),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Enter),
         Command::View(ViewCommand::OpenShow),

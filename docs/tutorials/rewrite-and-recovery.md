@@ -42,7 +42,7 @@
 ## Operation Recovery
 
 - Press `O` to open the operation log.
-- Use `s` or `Enter` for operation show.
+- Use `s`, `l`, `Right`, or `Enter` for operation show.
 - Use `d` for operation diff.
 - Use `u` for undo.
 - Use `Ctrl-r` for redo.

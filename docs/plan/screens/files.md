@@ -70,13 +70,13 @@ on exact path identity and benefit from established document navigation behavior
 ## Shortcut Candidates
 
 - `j`/`k`, arrows: move path or scroll file
-- `Enter`: open selected file
+- `Enter`, `l`, `Right`: open selected file
 - `/`, `n`, `N`: search
 - `y`: copy path or selected text
 - `t`: track/untrack flow where valid
 - `x`: chmod flow where valid
 - `r`: refresh
-- `h`, `Esc`: back
+- `h`, `Left`: back
 
 ## Integration Notes
 

@@ -56,15 +56,14 @@ focused ref-state utility surface.
 ## Shortcut Candidates
 
 - `j`/`k`, arrows: move bookmark selection
-- `Enter`: open target in log/show when available
-- `s`: set or move flow
-- `c`: create flow
+- `Enter`, `s`, `l`, `Right`: open target in show when available
+- `bc`: create flow from graph or status
 - `r`: refresh
 - `R`: rename flow
-- `d`: delete flow
+- `x`: delete local bookmark flow
 - `t`: track/untrack flow
 - `y`: copy bookmark name or target
-- `h`, `Esc`: back
+- `h`, `Left`: back
 
 ## Integration Notes
 

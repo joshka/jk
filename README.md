@@ -14,7 +14,7 @@ history, drilling into `show`/`diff`, checking status, and returning without lea
 - one-active-view navigation with `show`/`diff` drill-down, back, refresh, and search;
 - focused utility views for files, bookmarks, status, and operation history;
 - copy menus for selected revisions, files, bookmarks, and operation-log rows;
-- direct `jj` actions for fetch (`f`) and graph `c` / `jj new trunk`;
+- direct `jj` actions for fetch (`f`, plus `gf` from graph) and graph `c` / `jj new trunk`;
 - preview/result-gated (guided) mutation flows for push, operation undo/redo, graph action-menu
   `new`, abandon, rebase, and related action-menu flows where implemented.
 
@@ -73,7 +73,7 @@ Global keys:
 - `f` fetches;
 - `p` opens push;
 - `y` opens the copy menu;
-- `v` opens the diff-format menu;
+- `v` opens the view menu;
 - `W` prompts for a custom graph revset.
 
 Graph view:
@@ -84,6 +84,8 @@ Graph view:
 - `d` opens `diff`;
 - `Space` toggles exact revision selection for preview-first actions;
 - `a` opens the action menu;
+- `bc` creates a bookmark at the selected change, with bare `b` kept as a timed fallback;
+- `gf` fetches from the graph view; other views keep `g` as immediate top navigation;
 - `c` creates a new working-copy change from trunk;
 - `w` cycles the graph log mode.
 
@@ -93,20 +95,20 @@ Show and diff views:
 - `Space`, `PageDown`, and `Ctrl-f` page down;
 - `Shift-Space`, `PageUp`, and `Ctrl-b` page up;
 - `[` and `]` jump between files;
-- `l` opens the file list;
+- `l` or `Right` opens the file list;
 - `s` switches from diff to show;
 - `d` switches from show to diff.
 
-Bookmarks and operation log are item-based views. Bookmarks open the selected change with `s` or
-`Enter` when a target change id is present. Operation log opens operation `show` with `s` or
-`Enter`, operation `diff` with `d`, and global repo recovery with `u` for undo and `Ctrl-r` for
-redo.
+Bookmarks and operation log are item-based views. Bookmarks open the selected change with `s`, `l`,
+`Right`, or `Enter` when a target change id is present. Operation log opens operation `show` with
+`s`, `l`, `Right`, or `Enter`, operation `diff` with `d`, and global repo recovery with `u` for undo
+and `Ctrl-r` for redo.
 
 ## Safety Notes
 
-- Direct low-friction mutation actions (`f` and `c`) execute immediately and show the resulting
-  status/output from `jj`; where recovery is available, `jj`-level undo is still the intended
-  fallback.
+- Direct low-friction mutation actions (`f`, graph `gf`, and `c`) execute immediately and show the
+  resulting status/output from `jj`; where recovery is available, `jj`-level undo is still the
+  intended fallback.
 - Guided flows (for example push, operation undo/redo, graph action-menu `new`, abandon, and rebase)
   show preview or result text before execution.
 - Where `jj` exposes an exact target, `jk` keeps that target exact instead of guessing from a label.

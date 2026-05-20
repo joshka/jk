@@ -70,12 +70,12 @@ Likely selectable units:
 - `j`/`k`, arrows: move or scroll
 - `[`/`]`: previous/next section
 - `/`, `n`, `N`: search
-- `Enter`: open selected file/detail when selection exists
+- `l`, `Right`: open file list
 - `f`: fetch
 - `p`: push flow
 - `y`: copy selected path or identifier
 - `r`: refresh
-- `h`, `Esc`: back
+- `h`, `Left`: back
 
 ## Integration Notes
 

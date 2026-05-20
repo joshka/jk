@@ -64,9 +64,10 @@ search, copy, diff-format control, and switch-to-show behavior.
 - `[`/`]`: previous/next file
 - `/`, `n`, `N`: search
 - `s`: switch to show
-- `v`: diff-format menu
+- `l`, `Right`: open file list
+- `v`: view menu, including diff-format options
 - `y`: copy menu
-- `h`, `Esc`: back
+- `h`, `Left`: back
 - `r`: refresh
 
 ## Entry Points

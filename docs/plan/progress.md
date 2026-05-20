@@ -999,3 +999,66 @@
   `jj_rows.rs` directly if the module boundary remains accepted.
 - Final 5.5 acceptance found no findings for Packet A2.
 - Next slice: Interruption Packet B: Navigation And View Entry Contracts.
+
+## Interruption Packet B: Navigation And View Entry Contracts
+
+- Files changed: `src/app.rs`, `src/app_screen.rs`, `src/bookmarks.rs`, `src/command.rs`,
+  `src/diff.rs`, `src/operation_log.rs`, `src/show.rs`, `src/status.rs`, `src/tui.rs`, `README.md`,
+  `docs/plan/command-inventory.md`, `docs/plan/screens/bookmarks.md`, `docs/plan/screens/diff.md`,
+  `docs/plan/screens/files.md`, `docs/plan/screens/help-keymap.md`,
+  `docs/plan/screens/operation-log.md`, `docs/plan/screens/resolve.md`, `docs/plan/screens/show.md`,
+  `docs/plan/screens/status.md`, `docs/plan/screens/tags.md`, `docs/plan/screens/workspaces.md`,
+  `docs/tutorials/bookmarks-and-conflicts.md`, `docs/tutorials/daily-loop.md`,
+  `docs/tutorials/rewrite-and-recovery.md`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Behavior: direct `S`, `B`, and `O` view-entry bindings remain the existing dispatch path and now
+  have screen-level regression coverage. `v` now opens a real view menu for shipped top-level views
+  (`log`, default `jj`, status, resolve, bookmarks, and operation log) plus the existing diff-format
+  choices. Bookmarks and operation log now treat `l`/Right like Enter for selected-row detail, and
+  show, diff, and status treat Right like `l` for file-list expansion. `h`/Left continue to pop the
+  view stack.
+- Command grammar: `command.rs` now supports single-key and multi-key static bindings through the
+  same metadata used by generated help. `bc` dispatches bookmark create. `gf` dispatches fetch from
+  graph only, so non-graph `g` bindings keep immediate top navigation. Bare `b` and graph `g` remain
+  timed fallbacks while those prefixes are ambiguous.
+- Test coverage: command metadata tests cover exact sequence completion and exact fallback from a
+  prefix. App-level tests cover direct `S`/`B`/`O`, generated help rows for `b, bc`, graph-only
+  `gf`, and `v` view menu, view-menu selection, prefix completion, key-arrival timeout fallback,
+  idle timeout status refresh, Esc cancellation, non-graph immediate `g`, and `l`/Right detail
+  expansion with `h`/Left back-out.
+- Documentation: README, tutorials, command inventory, and current screen notes now describe shipped
+  view-menu, `bc`/`gf`, Right expansion, and `h`/Left back behavior. Stale `Esc`-as-back and status
+  `Enter` file-open claims were removed from the touched docs.
+- Verification: `cargo check`; focused command and app tests; focused single-test checks for
+  generated help and view-menu selection; full `cargo test`; nightly Rust formatting and formatting
+  check; `just md-fmt`; `just md-check`; attempted `cargo clippy -- -D warnings`; attempted
+  `just check`.
+- Validation note: `cargo check` still reports the pre-existing dead-code warnings for
+  `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy remains blocked
+  by those warnings plus the pre-existing `collapsible_if` findings in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`. `just check` remains blocked by the known local
+  wrapper issue: `cargo +nightly fmt` exits with `no such command: +nightly`; the direct nightly
+  format check, full tests, cargo check, and Markdown checks passed. Direct nightly formatting still
+  prints the existing local rustfmt configuration warnings about unstable options but exits
+  successfully.
+- Review repair: fixed timeout expiry when the next key arrives after the deadline, fixed idle
+  timeout status refresh, narrowed `gf` from global to graph-only, changed generated help metadata
+  for `v` from `view format` to `view menu`, and made diff-format view-menu labels/status explicitly
+  name their show/diff scope.
+- Review repair validation: focused app, command, and view-menu option tests; `cargo check`; full
+  `cargo test`; nightly Rust formatting and formatting check; `just md-fmt`; `just md-check`;
+  attempted `cargo clippy -- -D warnings`; attempted `just check`.
+- Final 5.5 acceptance evidence: timeout now checks `PendingCommand::deadline` before consuming the
+  pending key, idle timeout fallback uses the same status-refresh helper as key-arrival fallback,
+  `gf` is graph-local, help now shows `v` as `view menu`, and diff-format labels/status say
+  `show/diff format`.
+- Final 5.5 verification: `cargo check` passed with existing dead-code warnings; full `cargo test`
+  passed with 356 tests; `rustup run nightly cargo fmt --check` passed with existing rustfmt config
+  warnings; `just md-check` passed; `cargo clippy -- -D warnings` remains blocked by six known
+  issues (three dead-code, three `collapsible_if`).
+- Remaining risk: the prefix grammar intentionally introduces a short delay for ambiguous bare `b`
+  and graph `g` fallback behavior. This is covered by timeout tests and documented as a transition
+  contract, but a future help-leader or command-menu packet should decide whether the bare fallback
+  keys stay long-term.
+- Next slice: Interruption Packet C: Help Leader Menu, with attention to the new multi-key prefix
+  contract and avoiding another broad shortcut redesign.

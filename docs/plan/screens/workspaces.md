@@ -53,7 +53,7 @@ use proves central for `jk`.
 - `u`: update-stale flow
 - `y`: copy workspace path or name
 - `r`: refresh
-- `h`, `Esc`: back
+- `h`, `Left`: back
 
 ## Integration Notes
 
