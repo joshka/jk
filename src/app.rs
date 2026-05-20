@@ -394,6 +394,10 @@ impl App {
                 self.push_detail(command, revset)?;
                 Ok(true)
             }
+            ViewEffect::OpenView(spec) => {
+                self.push_view(spec)?;
+                Ok(true)
+            }
             ViewEffect::SearchMoved => {
                 if let Some(query) = &self.search {
                     self.status =
@@ -539,9 +543,13 @@ impl App {
         let spec = match command {
             JjCommand::Show => ViewSpec::show(revset, self.diff_format),
             JjCommand::Diff => ViewSpec::diff(revset, self.diff_format),
+            JjCommand::FileShow => {
+                ViewSpec::file_show(self.view.spec().navigation_revset(), revset)
+            }
             JjCommand::Default
             | JjCommand::Log
             | JjCommand::Status
+            | JjCommand::FileList
             | JjCommand::Bookmarks
             | JjCommand::OperationLog => return Ok(()),
         };
@@ -732,12 +740,15 @@ fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
 
 fn item_count_message(view: &ViewState, item_count: usize) -> String {
     match view.command() {
+        JjCommand::FileList => format!("{item_count} files"),
         JjCommand::Bookmarks => format!("{item_count} bookmarks"),
         JjCommand::OperationLog => format!("{item_count} operations"),
         JjCommand::Default | JjCommand::Log => {
             graph_status_message(item_count, view.graph_mode_label())
         }
-        JjCommand::Show | JjCommand::Diff | JjCommand::Status => format!("{item_count} items"),
+        JjCommand::Show | JjCommand::Diff | JjCommand::Status | JjCommand::FileShow => {
+            format!("{item_count} items")
+        }
     }
 }
 

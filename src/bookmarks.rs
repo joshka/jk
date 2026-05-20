@@ -131,6 +131,8 @@ impl BookmarksView {
             | ViewCommand::PageUp
             | ViewCommand::NextFile
             | ViewCommand::PreviousFile
+            | ViewCommand::OpenFiles
+            | ViewCommand::OpenItem
             | ViewCommand::OpenDiff => ViewEffect::Ignored,
         }
     }

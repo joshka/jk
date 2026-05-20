@@ -1,9 +1,8 @@
-//! `jj operation log` view state, rendering, and item-based navigation.
+//! `jj file list` view state, rendering, and item-based navigation.
 //!
-//! The first pass keeps the operation log close to rendered `jj` output while
-//! carrying exact operation ids separately for copy, search, and refresh
-//! stability. Recovery actions stay out of scope until previews and
-//! confirmations exist.
+//! The list stays path-first and keeps exact path identity alongside the
+//! rendered row text. That lets refresh, copy, and drill-down behavior use the
+//! selected path directly instead of reconstructing it from display labels.
 
 use color_eyre::Result;
 use ratatui::Frame;
@@ -13,7 +12,7 @@ use ratatui::widgets::{List, ListItem, ListState};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{OperationLogItem, ViewSpec, load_operation_log_entries};
+use crate::jj::{FileListItem, JjCommand, ViewSpec, load_file_list_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 
@@ -38,12 +37,15 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::code(crossterm::event::KeyCode::End),
         Command::View(ViewCommand::MoveLast),
     ),
-    Binding::new(KeyPattern::char('s'), Command::View(ViewCommand::OpenShow)),
+    Binding::new(KeyPattern::char('l'), Command::View(ViewCommand::OpenItem)),
+    Binding::new(
+        KeyPattern::code(crossterm::event::KeyCode::Right),
+        Command::View(ViewCommand::OpenItem),
+    ),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Enter),
-        Command::View(ViewCommand::OpenShow),
+        Command::View(ViewCommand::OpenItem),
     ),
-    Binding::new(KeyPattern::char('d'), Command::View(ViewCommand::OpenDiff)),
     Binding::new(
         KeyPattern::char('n'),
         Command::View(ViewCommand::NextSearchMatch),
@@ -54,20 +56,26 @@ pub const BINDINGS: &[Binding] = &[
     ),
 ];
 
-/// Selectable rendered operation-log output.
-pub struct OperationLogView {
+/// Selectable file list output from `jj file list`.
+pub struct FileListView {
     spec: ViewSpec,
-    entries: Vec<OperationLogItem>,
+    entries: Vec<FileListItem>,
     selection: Selection,
 }
 
-impl OperationLogView {
+impl FileListView {
     pub fn load(spec: ViewSpec) -> Result<Self> {
-        Ok(Self {
-            entries: load_operation_log_entries(&spec)?,
+        let mut view = Self {
+            entries: load_file_list_entries(&spec)?,
             spec,
             selection: Selection::default(),
-        })
+        };
+        if let Some(path) = view.spec.path()
+            && let Some(index) = view.entries.iter().position(|entry| entry.path() == path)
+        {
+            view.selection.set(index, view.entries.len());
+        }
+        Ok(view)
     }
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
@@ -97,12 +105,12 @@ impl OperationLogView {
                 self.selection.last(self.entries.len());
                 ViewEffect::Handled
             }
-            ViewCommand::OpenShow => {
-                ViewEffect::StatusMessage("operation show not implemented yet".to_owned())
-            }
-            ViewCommand::OpenDiff => {
-                ViewEffect::StatusMessage("operation diff not implemented yet".to_owned())
-            }
+            ViewCommand::OpenItem => self
+                .selected_path()
+                .map(|path| ViewEffect::OpenDetail(JjCommand::FileShow, path.to_owned()))
+                .unwrap_or_else(|| {
+                    ViewEffect::StatusMessage("selected file list is empty".to_owned())
+                }),
             ViewCommand::StartSearch => {
                 let Some(query) = context.search else {
                     return ViewEffect::Ignored;
@@ -131,12 +139,13 @@ impl OperationLogView {
             | ViewCommand::NextFile
             | ViewCommand::PreviousFile
             | ViewCommand::OpenFiles
-            | ViewCommand::OpenItem => ViewEffect::Ignored,
+            | ViewCommand::OpenShow
+            | ViewCommand::OpenDiff => ViewEffect::Ignored,
         }
     }
 
     pub fn refresh(&mut self) -> Result<()> {
-        self.refresh_with_loader(load_operation_log_entries)
+        self.refresh_with_loader(load_file_list_entries)
     }
 
     pub fn clamp(&mut self) {
@@ -152,7 +161,13 @@ impl OperationLogView {
     }
 
     pub fn line_count(&self) -> usize {
-        self.entries.iter().map(OperationLogItem::line_count).sum()
+        self.entries.iter().map(FileListItem::line_count).sum()
+    }
+
+    fn selected_path(&self) -> Option<&str> {
+        self.entries
+            .get(self.selection.index())
+            .map(FileListItem::path)
     }
 
     fn search_matches(&self, query: &SearchQuery) -> usize {
@@ -186,40 +201,30 @@ impl OperationLogView {
     }
 
     fn copy_options(&self) -> Vec<CopyOption> {
-        let Some(entry) = self.entries.get(self.selection.index()) else {
-            return Vec::new();
-        };
-
-        let mut options = Vec::new();
-        if let Some(operation_id) = entry.operation_id() {
-            options.push(CopyOption::new("operation id", operation_id));
-        }
-        options.push(CopyOption::new("row text", entry.row_text()));
-        options
+        self.selected_path()
+            .map(|path| vec![CopyOption::new("file path", path)])
+            .unwrap_or_default()
     }
 
     fn refresh_with_loader(
         &mut self,
-        load: impl Fn(&ViewSpec) -> Result<Vec<OperationLogItem>>,
+        load: impl Fn(&ViewSpec) -> Result<Vec<FileListItem>>,
     ) -> Result<()> {
         let previous_index = self.selection.index();
-        let previous_operation_id = self
-            .entries
-            .get(previous_index)
-            .and_then(OperationLogItem::operation_id)
-            .map(str::to_owned);
+        let previous_path = self.selected_path().map(str::to_owned);
+
         self.entries = load(&self.spec)?;
         restore_selection(
             &mut self.selection,
             &self.entries,
             previous_index,
-            previous_operation_id,
+            previous_path,
         );
         Ok(())
     }
 }
 
-fn entry_list(entries: &[OperationLogItem], search: Option<&SearchQuery>) -> List<'static> {
+fn entry_list(entries: &[FileListItem], search: Option<&SearchQuery>) -> List<'static> {
     let items = entries
         .iter()
         .map(|entry| {
@@ -241,18 +246,15 @@ fn entry_list(entries: &[OperationLogItem], search: Option<&SearchQuery>) -> Lis
 
 fn restore_selection(
     selection: &mut Selection,
-    entries: &[OperationLogItem],
+    entries: &[FileListItem],
     previous_index: usize,
-    previous_operation_id: Option<String>,
+    previous_path: Option<String>,
 ) {
-    if let Some(operation_id) = previous_operation_id {
-        if let Some(index) = entries
-            .iter()
-            .position(|entry| entry.operation_id() == Some(operation_id.as_str()))
-        {
-            selection.set(index, entries.len());
-            return;
-        }
+    if let Some(path) = previous_path
+        && let Some(index) = entries.iter().position(|entry| entry.path() == path)
+    {
+        selection.set(index, entries.len());
+        return;
     }
 
     selection.set(previous_index, entries.len());
@@ -263,62 +265,45 @@ mod tests {
     use ratatui::text::Line;
 
     use super::*;
-    use crate::jj::JjCommand;
 
-    fn operation_item(text: &[&str], operation_id: Option<&str>) -> OperationLogItem {
-        OperationLogItem::new(
-            text.iter()
-                .map(|line| Line::from((*line).to_owned()))
-                .collect::<Vec<_>>(),
-            operation_id.map(str::to_owned),
-        )
+    fn file_item(path: &str) -> FileListItem {
+        FileListItem::new(vec![Line::from(path.to_owned())], path.to_owned())
     }
 
-    fn operation_log_view(entries: Vec<OperationLogItem>) -> OperationLogView {
-        OperationLogView {
-            spec: ViewSpec::new(JjCommand::OperationLog, Vec::new()),
-            entries,
+    fn file_list_view(paths: &[&str]) -> FileListView {
+        FileListView {
+            spec: ViewSpec::file_list(None, None),
+            entries: paths.iter().map(|path| file_item(path)).collect(),
             selection: Selection::default(),
         }
     }
 
     #[test]
-    fn copy_options_include_exact_operation_id_when_known() {
-        let view = operation_log_view(vec![operation_item(
-            &["@  current", "│  describe commit"],
-            Some(
-                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            ),
-        )]);
-
-        let options = view.copy_options();
-
-        assert_eq!(options.len(), 2);
-        assert_eq!(options[0].label(), "operation id");
-        assert_eq!(options[0].value().len(), 128);
-        assert_eq!(options[1].value(), "@  current\n│  describe commit");
-    }
-
-    #[test]
-    fn movement_is_operation_item_based() {
-        let mut view = operation_log_view(vec![
-            operation_item(&["@  current", "│  args: jj describe"], Some("a")),
-            operation_item(&["○  previous"], Some("b")),
-        ]);
+    fn file_list_moves_by_path_item() {
+        let mut view = file_list_view(&["alpha", "beta", "gamma"]);
 
         view.execute(
-            ViewCommand::MoveDown,
+            ViewCommand::MoveLast,
             CommandContext {
-                viewport_height: 10,
+                viewport_height: 3,
                 search: None,
             },
         );
+        assert_eq!(view.selection.index(), 2);
 
-        assert_eq!(view.selection.index(), 1);
         view.execute(
             ViewCommand::MoveUp,
             CommandContext {
-                viewport_height: 10,
+                viewport_height: 3,
+                search: None,
+            },
+        );
+        assert_eq!(view.selection.index(), 1);
+
+        view.execute(
+            ViewCommand::MoveFirst,
+            CommandContext {
+                viewport_height: 3,
                 search: None,
             },
         );
@@ -326,79 +311,76 @@ mod tests {
     }
 
     #[test]
-    fn refresh_preserves_selected_operation_id() {
-        let mut view = operation_log_view(vec![
-            operation_item(&["@  current"], Some("first")),
-            operation_item(&["○  previous"], Some("second")),
-        ]);
-        view.selection.set(1, view.entries.len());
+    fn file_list_search_wraps_without_reselecting_current_item() {
+        let mut view = file_list_view(&["alpha", "target one", "beta", "target two"]);
+        view.selection.set(1, view.item_count());
+        let query = SearchQuery::new("target".to_owned()).unwrap();
+
+        assert!(view.next_match(&query));
+        assert_eq!(view.selection.index(), 3);
+
+        assert!(view.previous_match(&query));
+        assert_eq!(view.selection.index(), 1);
+    }
+
+    #[test]
+    fn file_list_copy_uses_exact_path() {
+        let mut view = file_list_view(&["src/space file.txt", "docs/readme.md"]);
+        view.selection.set(0, view.item_count());
+
+        let options = view.copy_options();
+
+        assert_eq!(
+            options,
+            vec![CopyOption::new("file path", "src/space file.txt")]
+        );
+    }
+
+    #[test]
+    fn file_list_refresh_preserves_selected_path_when_possible() {
+        let mut view = file_list_view(&["alpha", "beta", "gamma"]);
+        view.selection.set(1, view.item_count());
 
         view.refresh_with_loader(|_| {
             Ok(vec![
-                operation_item(&["@  second"], Some("second")),
-                operation_item(&["○  third"], Some("third")),
+                file_item("gamma"),
+                file_item("beta"),
+                file_item("delta"),
             ])
         })
         .unwrap();
 
-        assert_eq!(view.selection.index(), 0);
-        assert_eq!(view.entries[0].operation_id(), Some("second"));
+        assert_eq!(view.selection.index(), 1);
+        assert_eq!(view.selected_path(), Some("beta"));
     }
 
     #[test]
-    fn refresh_clamps_when_selected_operation_disappears() {
-        let mut view = operation_log_view(vec![
-            operation_item(&["@  current"], Some("first")),
-            operation_item(&["○  previous"], Some("second")),
-        ]);
-        view.selection.set(1, view.entries.len());
+    fn file_list_refresh_clamps_when_selected_path_disappears() {
+        let mut view = file_list_view(&["alpha", "beta", "gamma"]);
+        view.selection.set(2, view.item_count());
 
-        view.refresh_with_loader(|_| Ok(vec![operation_item(&["@  current"], Some("first"))]))
+        view.refresh_with_loader(|_| Ok(vec![file_item("alpha")]))
             .unwrap();
 
         assert_eq!(view.selection.index(), 0);
+        assert_eq!(view.selected_path(), Some("alpha"));
     }
 
     #[test]
-    fn search_wraps_by_operation_item() {
-        let mut view = operation_log_view(vec![
-            operation_item(&["@  current", "│  args: jj describe"], Some("first")),
-            operation_item(&["○  previous", "│  snapshot working copy"], Some("second")),
-            operation_item(&["○  oldest", "│  snapshot before describe"], Some("third")),
-        ]);
-        view.selection.set(1, view.entries.len());
-        let query = SearchQuery::new("describe".to_owned()).unwrap();
+    fn file_list_open_selected_file_uses_exact_path() {
+        let mut view = file_list_view(&["src/space file.txt"]);
 
-        assert_eq!(view.search_matches(&query), 2);
-        assert!(view.next_match(&query));
-        assert_eq!(view.selection.index(), 2);
-        assert!(view.next_match(&query));
-        assert_eq!(view.selection.index(), 0);
-    }
-
-    #[test]
-    fn placeholders_are_non_mutating_status_messages() {
-        let mut view = operation_log_view(vec![operation_item(&["@  current"], Some("first"))]);
-
-        assert_eq!(
-            view.execute(
-                ViewCommand::OpenShow,
-                CommandContext {
-                    viewport_height: 10,
-                    search: None,
-                },
-            ),
-            ViewEffect::StatusMessage("operation show not implemented yet".to_owned())
+        let effect = view.execute(
+            ViewCommand::OpenItem,
+            CommandContext {
+                viewport_height: 3,
+                search: None,
+            },
         );
+
         assert_eq!(
-            view.execute(
-                ViewCommand::OpenDiff,
-                CommandContext {
-                    viewport_height: 10,
-                    search: None,
-                },
-            ),
-            ViewEffect::StatusMessage("operation diff not implemented yet".to_owned())
+            effect,
+            ViewEffect::OpenDetail(JjCommand::FileShow, "src/space file.txt".to_owned())
         );
     }
 }

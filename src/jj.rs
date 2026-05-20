@@ -19,6 +19,8 @@ pub enum JjCommand {
     Show,
     Diff,
     Status,
+    FileList,
+    FileShow,
     Bookmarks,
     OperationLog,
 }
@@ -112,6 +114,8 @@ impl JjCommand {
             Self::Show => "jj show",
             Self::Diff => "jj diff",
             Self::Status => "jj status",
+            Self::FileList => "jj file list",
+            Self::FileShow => "jj file show",
             Self::Bookmarks => "jj bookmark list",
             Self::OperationLog => "jj operation log",
         }
@@ -124,6 +128,8 @@ impl JjCommand {
             Self::Show => &["show"],
             Self::Diff => &["diff"],
             Self::Status => &["status"],
+            Self::FileList => &["file", "list"],
+            Self::FileShow => &["file", "show"],
             Self::Bookmarks => &BOOKMARK_COMMAND_WORDS,
             Self::OperationLog => &["operation", "log"],
         }
@@ -137,6 +143,8 @@ impl JjCommand {
             | Self::Show
             | Self::Diff
             | Self::Status
+            | Self::FileList
+            | Self::FileShow
             | Self::Bookmarks => &[],
         }
     }
@@ -183,6 +191,7 @@ pub struct ViewSpec {
     command: JjCommand,
     args: Vec<String>,
     target: Option<String>,
+    path: Option<String>,
     diff_format: DiffFormat,
 }
 
@@ -193,6 +202,7 @@ impl ViewSpec {
             command,
             args,
             target: None,
+            path: None,
             diff_format,
         }
     }
@@ -202,6 +212,7 @@ impl ViewSpec {
             command: JjCommand::Bookmarks,
             args,
             target: None,
+            path: None,
             diff_format: DiffFormat::Default,
         }
     }
@@ -211,6 +222,7 @@ impl ViewSpec {
             command: JjCommand::Show,
             args: diff_format_args(diff_format, [revset.clone()]),
             target: Some(revset),
+            path: None,
             diff_format,
         }
     }
@@ -220,7 +232,38 @@ impl ViewSpec {
             command: JjCommand::Diff,
             args: diff_format_args(diff_format, ["-r".to_owned(), revset.clone()]),
             target: Some(revset),
+            path: None,
             diff_format,
+        }
+    }
+
+    pub fn file_list(revset: Option<String>, selected_path: Option<String>) -> Self {
+        let args = revset
+            .as_ref()
+            .map(|revset| vec!["-r".to_owned(), revset.clone()])
+            .unwrap_or_default();
+
+        Self {
+            command: JjCommand::FileList,
+            args,
+            target: revset,
+            path: selected_path,
+            diff_format: DiffFormat::Default,
+        }
+    }
+
+    pub fn file_show(revset: Option<String>, path: String) -> Self {
+        let args = revset
+            .as_ref()
+            .map(|revset| vec!["-r".to_owned(), revset.clone(), path.clone()])
+            .unwrap_or_else(|| vec![path.clone()]);
+
+        Self {
+            command: JjCommand::FileShow,
+            args,
+            target: revset,
+            path: Some(path),
+            diff_format: DiffFormat::Default,
         }
     }
 
@@ -240,23 +283,16 @@ impl ViewSpec {
     }
 
     pub fn label(&self) -> String {
+        let command = self.label_prefix();
         if self.args.is_empty() {
-            self.command.label().to_owned()
+            command.to_owned()
         } else {
-            format!("{} {}", self.command.label(), self.args.join(" "))
+            format!("{} {}", command, self.args.join(" "))
         }
     }
 
     pub fn app_label(&self) -> String {
-        let command = match self.command {
-            JjCommand::Default => "jk",
-            JjCommand::Log => "jk log",
-            JjCommand::Show => "jk show",
-            JjCommand::Diff => "jk diff",
-            JjCommand::Status => "jk status",
-            JjCommand::Bookmarks => "jk bookmarks",
-            JjCommand::OperationLog => "jk operation log",
-        };
+        let command = self.app_label_prefix();
 
         let args = self.display_args();
         if args.is_empty() {
@@ -270,6 +306,28 @@ impl ViewSpec {
         self.target.as_deref()
     }
 
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
+    }
+
+    fn label_prefix(&self) -> &'static str {
+        self.command.label()
+    }
+
+    fn app_label_prefix(&self) -> &'static str {
+        match self.command {
+            JjCommand::Default => "jk",
+            JjCommand::Log => "jk log",
+            JjCommand::Show => "jk show",
+            JjCommand::Diff => "jk diff",
+            JjCommand::Status => "jk status",
+            JjCommand::FileList => "jk file list",
+            JjCommand::FileShow => "jk file show",
+            JjCommand::Bookmarks => "jk bookmarks",
+            JjCommand::OperationLog => "jk operation log",
+        }
+    }
+
     /// Returns the revset to use when opening another detail view from this one.
     ///
     /// Navigated views already know their change id target. Direct startup views
@@ -280,6 +338,12 @@ impl ViewSpec {
         self.target.clone().or_else(|| match self.command {
             JjCommand::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
             JjCommand::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
+            JjCommand::FileList => Some(revision_arg(&self.args).unwrap_or("@").to_owned()),
+            JjCommand::FileShow => Some(
+                revision_arg(self.file_show_context_args())
+                    .unwrap_or("@")
+                    .to_owned(),
+            ),
             JjCommand::Default
             | JjCommand::Log
             | JjCommand::Status
@@ -293,7 +357,7 @@ impl ViewSpec {
     }
 
     pub fn with_diff_format(&self, diff_format: DiffFormat) -> Self {
-        if matches!(self.command, JjCommand::Bookmarks) {
+        if !matches!(self.command, JjCommand::Show | JjCommand::Diff) {
             return self.clone();
         }
 
@@ -312,7 +376,13 @@ impl ViewSpec {
     pub fn show_context_revset(&self) -> String {
         self.target
             .clone()
-            .or_else(|| show_revset_arg(&self.args).map(str::to_owned))
+            .or_else(|| match self.command {
+                JjCommand::FileList => revision_arg(&self.args).map(str::to_owned),
+                JjCommand::FileShow => {
+                    revision_arg(self.file_show_context_args()).map(str::to_owned)
+                }
+                _ => show_revset_arg(&self.args).map(str::to_owned),
+            })
             .unwrap_or_else(|| "@".to_owned())
     }
 
@@ -321,16 +391,46 @@ impl ViewSpec {
             return self.args.clone();
         };
 
-        self.args
-            .iter()
-            .map(|arg| {
-                if arg == target {
-                    short_id(target).to_owned()
-                } else {
-                    arg.to_owned()
-                }
-            })
-            .collect()
+        if matches!(self.command, JjCommand::FileShow)
+            && self.path.is_some()
+            && !self.args.is_empty()
+        {
+            let split = self.args.len() - 1;
+            let mut display_args = self.args[..split]
+                .iter()
+                .map(|arg| {
+                    if arg == target {
+                        short_id(target).to_owned()
+                    } else {
+                        arg.to_owned()
+                    }
+                })
+                .collect::<Vec<_>>();
+            display_args.push(self.args[split].clone());
+            display_args
+        } else {
+            self.args
+                .iter()
+                .map(|arg| {
+                    if arg == target {
+                        short_id(target).to_owned()
+                    } else {
+                        arg.to_owned()
+                    }
+                })
+                .collect()
+        }
+    }
+
+    fn file_show_context_args(&self) -> &[String] {
+        if matches!(self.command, JjCommand::FileShow)
+            && self.path.is_some()
+            && !self.args.is_empty()
+        {
+            &self.args[..self.args.len() - 1]
+        } else {
+            &self.args
+        }
     }
 }
 
@@ -491,6 +591,39 @@ impl BookmarkItem {
     }
 }
 
+/// One selectable file item parsed from rendered file-list output.
+#[derive(Clone, Debug)]
+pub struct FileListItem {
+    lines: Vec<Line<'static>>,
+    path: String,
+}
+
+impl FileListItem {
+    pub fn new(lines: Vec<Line<'static>>, path: String) -> Self {
+        Self { lines, path }
+    }
+
+    pub fn lines(&self) -> Vec<Line<'static>> {
+        self.lines.clone()
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn row_text(&self) -> String {
+        self.lines
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 /// One selectable operation item parsed from rendered operation-log output.
 #[derive(Clone, Debug)]
 pub struct OperationLogItem {
@@ -547,6 +680,19 @@ pub fn load_bookmark_entries(spec: &ViewSpec) -> Result<Vec<BookmarkItem>> {
     let lines = output.stdout.into_text()?.lines;
     let metadata = run_jj_bookmark_metadata(spec)?;
     Ok(pair_bookmark_lines(lines, metadata))
+}
+
+pub fn load_file_list_entries(spec: &ViewSpec) -> Result<Vec<FileListItem>> {
+    let output = run_jj(spec, ColorMode::Always)?;
+    let lines = output.stdout.into_text()?.lines;
+
+    Ok(lines
+        .into_iter()
+        .filter_map(|line| {
+            let path = parse_file_list_path(&line_text(&line))?;
+            Some(FileListItem::new(vec![line], path))
+        })
+        .collect())
 }
 
 pub fn load_operation_log_entries(spec: &ViewSpec) -> Result<Vec<OperationLogItem>> {
@@ -645,9 +791,7 @@ fn run_operation_log_ids(spec: &ViewSpec) -> Result<Vec<Option<String>>> {
 }
 
 fn jj_command_args(spec: &ViewSpec, template: Option<&str>, no_graph: bool) -> Vec<String> {
-    let mut args = spec
-        .command
-        .command_words()
+    let mut args = command_words(spec)
         .iter()
         .map(|arg| (*arg).to_owned())
         .collect::<Vec<_>>();
@@ -666,6 +810,10 @@ fn jj_command_args(spec: &ViewSpec, template: Option<&str>, no_graph: bool) -> V
     }
     args.extend(spec.args.iter().cloned());
     args
+}
+
+fn command_words(spec: &ViewSpec) -> &'static [&'static str] {
+    spec.command.command_words()
 }
 
 fn base_command(color: ColorMode) -> Command {
@@ -898,6 +1046,10 @@ fn parse_operation_id_line(line: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+fn parse_file_list_path(line: &str) -> Option<String> {
+    (!line.is_empty()).then(|| line.to_owned())
+}
+
 fn show_revset_arg(args: &[String]) -> Option<&str> {
     let mut skip_next = false;
 
@@ -948,6 +1100,10 @@ fn show_option_takes_value(arg: &str) -> bool {
 fn diff_revset_arg(args: &[String]) -> Option<&str> {
     option_value(args, &["-r", "--revisions"], &["--revisions="])
         .or_else(|| option_value(args, &["-t", "--to"], &["--to="]))
+}
+
+fn revision_arg(args: &[String]) -> Option<&str> {
+    option_value(args, &["-r", "--revision"], &["--revision="])
 }
 
 fn option_value<'a>(
@@ -1175,6 +1331,71 @@ mod tests {
     }
 
     #[test]
+    fn file_list_command_uses_file_words_and_keeps_selected_path_out_of_args() {
+        let spec = ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned()));
+
+        assert_eq!(spec.command(), JjCommand::FileList);
+        assert_eq!(spec.args(), ["-r", "main"]);
+        assert_eq!(spec.path(), Some("src/main.rs"));
+        assert_eq!(
+            jj_command_args(&spec, None, false),
+            vec!["file", "list", "-r", "main"]
+        );
+        assert_eq!(spec.label(), "jj file list -r main");
+        assert_eq!(spec.app_label(), "jk file list -r main");
+        assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
+        assert_eq!(spec.show_context_revset(), "main");
+    }
+
+    #[test]
+    fn file_show_command_keeps_exact_path_identity() {
+        let spec = ViewSpec::file_show(Some("main".to_owned()), "src/main.rs".to_owned());
+
+        assert_eq!(spec.command(), JjCommand::FileShow);
+        assert_eq!(spec.args(), ["-r", "main", "src/main.rs"]);
+        assert_eq!(spec.path(), Some("src/main.rs"));
+        assert_eq!(
+            jj_command_args(&spec, None, false),
+            vec!["file", "show", "-r", "main", "src/main.rs"]
+        );
+        assert_eq!(spec.label(), "jj file show -r main src/main.rs");
+        assert_eq!(spec.app_label(), "jk file show -r main src/main.rs");
+        assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
+        assert_eq!(spec.show_context_revset(), "main");
+    }
+
+    #[test]
+    fn file_show_context_revset_defaults_to_current_revision() {
+        let spec = ViewSpec::file_show(None, "src/main.rs".to_owned());
+
+        assert_eq!(spec.show_context_revset(), "@");
+        assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
+    }
+
+    #[test]
+    fn file_list_path_parser_preserves_exact_text() {
+        assert_eq!(
+            parse_file_list_path("src/path with spaces"),
+            Some("src/path with spaces".to_owned())
+        );
+        assert_eq!(parse_file_list_path(""), None);
+    }
+
+    #[test]
+    fn file_list_item_preserves_row_lines_and_path() {
+        let lines = b"src/path with spaces\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let item = FileListItem::new(lines, "src/path with spaces".to_owned());
+
+        assert_eq!(item.line_count(), 1);
+        assert_eq!(item.path(), "src/path with spaces");
+        assert_eq!(item.row_text(), "src/path with spaces");
+    }
+
+    #[test]
     fn parses_bookmark_metadata_lines() {
         assert_eq!(
             parse_bookmark_metadata_line(
@@ -1300,6 +1521,15 @@ mod tests {
                 OPERATION_ID_TEMPLATE,
             ]
         );
+    }
+
+    #[test]
+    fn file_views_ignore_diff_format_toggle() {
+        let show_spec = ViewSpec::file_show(Some("main".to_owned()), "src/main.rs".to_owned());
+        let list_spec = ViewSpec::file_list(Some("main".to_owned()), None);
+
+        assert_eq!(show_spec.with_diff_format(DiffFormat::Git), show_spec);
+        assert_eq!(list_spec.with_diff_format(DiffFormat::Git), list_spec);
     }
 
     fn metadata(change_id: &str, commit_id: &str) -> RevisionMetadata {

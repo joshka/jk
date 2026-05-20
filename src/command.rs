@@ -40,6 +40,8 @@ pub enum ViewCommand {
     MoveLast,
     NextFile,
     PreviousFile,
+    OpenFiles,
+    OpenItem,
     OpenShow,
     OpenDiff,
     StartSearch,
@@ -127,6 +129,8 @@ pub enum HelpContext {
     Show,
     Diff,
     Status,
+    FileList,
+    FileShow,
     Bookmarks,
     OperationLog,
 }
@@ -212,6 +216,7 @@ pub enum ViewEffect {
     StatusError(String),
     RunNewTrunk,
     OpenDetail(JjCommand, String),
+    OpenView(crate::jj::ViewSpec),
     SearchMoved,
     SearchStarted { matches: usize },
     CopyOptions(Vec<CopyOption>),
@@ -320,12 +325,39 @@ fn view_help_metadata(
         ViewCommand::MoveLast => Some((HelpSectionKind::View, "jump to last")),
         ViewCommand::NextFile => Some((HelpSectionKind::View, "next file")),
         ViewCommand::PreviousFile => Some((HelpSectionKind::View, "previous file")),
+        ViewCommand::OpenFiles => {
+            let action = match context {
+                HelpContext::Show | HelpContext::Diff | HelpContext::Status => "open file list",
+                HelpContext::Graph
+                | HelpContext::FileList
+                | HelpContext::FileShow
+                | HelpContext::Bookmarks
+                | HelpContext::OperationLog => return None,
+            };
+            Some((HelpSectionKind::Direct, action))
+        }
+        ViewCommand::OpenItem => {
+            let action = match context {
+                HelpContext::FileList => "open file",
+                HelpContext::Graph
+                | HelpContext::Show
+                | HelpContext::Diff
+                | HelpContext::Status
+                | HelpContext::FileShow
+                | HelpContext::Bookmarks
+                | HelpContext::OperationLog => return None,
+            };
+            Some((HelpSectionKind::Direct, action))
+        }
         ViewCommand::OpenShow => {
             let action = match context {
                 HelpContext::Graph | HelpContext::Diff => "open show",
                 HelpContext::Bookmarks => "open show",
                 HelpContext::OperationLog => "operation show (not yet)",
-                HelpContext::Show | HelpContext::Status => return None,
+                HelpContext::Show
+                | HelpContext::Status
+                | HelpContext::FileList
+                | HelpContext::FileShow => return None,
             };
             Some((HelpSectionKind::Direct, action))
         }
@@ -333,7 +365,11 @@ fn view_help_metadata(
             let action = match context {
                 HelpContext::Graph | HelpContext::Show => "open diff",
                 HelpContext::OperationLog => "operation diff (not yet)",
-                HelpContext::Bookmarks | HelpContext::Diff | HelpContext::Status => return None,
+                HelpContext::Bookmarks
+                | HelpContext::Diff
+                | HelpContext::Status
+                | HelpContext::FileList
+                | HelpContext::FileShow => return None,
             };
             Some((HelpSectionKind::Direct, action))
         }

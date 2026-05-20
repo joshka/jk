@@ -1,8 +1,8 @@
-//! `jj status` view state, rendering, and scroll navigation.
+//! `jj file show` document view state, rendering, and scroll navigation.
 //!
-//! The first pass stays close to rendered `jj status` output. It is a
-//! scroll-oriented triage surface with refresh, search, fetch, and copy, but
-//! no mutation-capable file actions that would require exact path contracts.
+//! This is a single-file document surface. It keeps the selected exact path
+//! alongside the rendered text so copy and refresh behavior can stay tied to
+//! the same file without relying on displayed labels.
 
 use color_eyre::Result;
 use ratatui::Frame;
@@ -10,9 +10,11 @@ use ratatui::layout::Rect;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{ViewSpec, document_plain_text};
-use crate::search::SearchQuery;
-use crate::sticky_file_view::{self, StickyFileDocument};
+use crate::jj::ViewSpec;
+use crate::rendered_jj::{DocumentLines, project_with_active_file};
+use crate::search::{SearchQuery, line_matches};
+use crate::sticky_file_view;
+use crate::sticky_file_view::{load_document, next_matching_line, previous_matching_line};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
@@ -56,7 +58,6 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::code(crossterm::event::KeyCode::End),
         Command::View(ViewCommand::MoveLast),
     ),
-    Binding::new(KeyPattern::char('l'), Command::View(ViewCommand::OpenFiles)),
     Binding::new(
         KeyPattern::char('n'),
         Command::View(ViewCommand::NextSearchMatch),
@@ -67,16 +68,32 @@ pub const BINDINGS: &[Binding] = &[
     ),
 ];
 
-/// Rendered `jj status` output plus plain document scroll state.
-pub struct StatusView {
+/// Rendered `jj file show` output plus scroll state for one exact path.
+pub struct FileShowView {
     spec: ViewSpec,
-    document: StickyFileDocument,
+    path: String,
+    document: DocumentLines,
+    scroll_offset: usize,
 }
 
-impl StatusView {
+impl FileShowView {
     pub fn load(spec: ViewSpec) -> Result<Self> {
-        let document = StickyFileDocument::load(&spec)?;
-        Ok(Self { spec, document })
+        let path = file_show_path(&spec);
+        Ok(Self {
+            path,
+            document: load_document(&spec)?,
+            spec,
+            scroll_offset: 0,
+        })
+    }
+
+    pub fn new(spec: ViewSpec, path: impl Into<String>, document: DocumentLines) -> Self {
+        Self {
+            spec,
+            path: path.into(),
+            document,
+            scroll_offset: 0,
+        }
     }
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
@@ -93,6 +110,8 @@ impl StatusView {
             | ViewCommand::NewTrunk
             | ViewCommand::NextFile
             | ViewCommand::PreviousFile
+            | ViewCommand::OpenFiles
+            | ViewCommand::OpenItem
             | ViewCommand::OpenShow
             | ViewCommand::OpenDiff => ViewEffect::Ignored,
             ViewCommand::MoveDown => {
@@ -119,7 +138,6 @@ impl StatusView {
                 self.scroll_to_bottom(context.viewport_height);
                 ViewEffect::Handled
             }
-            ViewCommand::OpenFiles => ViewEffect::OpenView(ViewSpec::file_list(None, None)),
             ViewCommand::StartSearch => {
                 let Some(query) = context.search else {
                     return ViewEffect::Ignored;
@@ -141,17 +159,15 @@ impl StatusView {
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
-            ViewCommand::OpenItem => ViewEffect::Ignored,
         }
     }
 
     pub fn refresh(&mut self) -> Result<()> {
-        self.document.refresh(&self.spec)?;
-        Ok(())
+        self.refresh_with_loader(load_document)
     }
 
     pub fn projection(&self) -> crate::rendered_jj::PinnedDocument {
-        self.document.projection([])
+        project_with_active_file(&self.document, &[], self.scroll_offset, std::iter::empty())
     }
 
     pub fn spec(&self) -> &ViewSpec {
@@ -163,186 +179,152 @@ impl StatusView {
     }
 
     pub fn scroll_offset(&self) -> usize {
-        self.document.scroll_offset()
+        self.scroll_offset
     }
 
-    pub fn set_scroll_offset(&mut self, viewport_height: u16, scroll_offset: usize) {
-        self.document
-            .set_scroll_offset(viewport_height, scroll_offset);
+    pub fn set_scroll_offset(&mut self, _viewport_height: u16, scroll_offset: usize) {
+        self.scroll_offset = scroll_offset.min(self.max_scroll_offset());
     }
 
     pub fn scroll_to_top(&mut self) {
-        self.document.scroll_to_top();
+        self.scroll_offset = 0;
     }
 
-    pub fn scroll_to_bottom(&mut self, viewport_height: u16) {
-        self.document.scroll_to_bottom(viewport_height, Vec::new);
+    pub fn scroll_to_bottom(&mut self, _viewport_height: u16) {
+        self.scroll_offset = self.max_scroll_offset();
     }
 
-    pub fn scroll_down(&mut self, viewport_height: u16, amount: usize) {
-        for _ in 0..amount {
-            self.document.scroll_down(viewport_height, 1, Vec::new);
-        }
+    pub fn scroll_down(&mut self, _viewport_height: u16, amount: usize) {
+        self.scroll_offset = self
+            .scroll_offset
+            .saturating_add(amount)
+            .min(self.max_scroll_offset());
     }
 
-    pub fn scroll_up(&mut self, viewport_height: u16, amount: usize) {
-        for _ in 0..amount {
-            self.document.scroll_up(viewport_height, 1, Vec::new);
-        }
+    pub fn scroll_up(&mut self, _viewport_height: u16, amount: usize) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(amount);
     }
 
-    pub fn clamp(&mut self, viewport_height: u16) {
-        self.document.clamp(viewport_height);
+    pub fn clamp(&mut self, _viewport_height: u16) {
+        self.scroll_offset = self.scroll_offset.min(self.max_scroll_offset());
     }
 
     pub fn search_matches(&self, query: &SearchQuery) -> usize {
-        self.document.search_matches(query)
+        self.document
+            .lines()
+            .iter()
+            .filter(|line| line_matches(line, query))
+            .count()
     }
 
     pub fn next_match(&mut self, viewport_height: u16, query: &SearchQuery) -> bool {
-        self.document.next_match(viewport_height, query)
+        let Some(offset) = next_matching_line(&self.document, self.scroll_offset, query) else {
+            return false;
+        };
+        self.scroll_offset = offset;
+        self.clamp(viewport_height);
+        true
     }
 
     pub fn previous_match(&mut self, viewport_height: u16, query: &SearchQuery) -> bool {
-        self.document.previous_match(viewport_height, query)
+        let Some(offset) = previous_matching_line(&self.document, self.scroll_offset, query) else {
+            return false;
+        };
+        self.scroll_offset = offset;
+        self.clamp(viewport_height);
+        true
     }
 
-    fn copy_options(&self) -> Vec<CopyOption> {
-        let text = document_plain_text(self.projection().body_lines());
-        if text.is_empty() {
-            Vec::new()
-        } else {
-            vec![CopyOption::new("status text", text)]
-        }
+    pub fn copy_options(&self) -> Vec<CopyOption> {
+        vec![CopyOption::new("file path", self.path.as_str())]
     }
+
+    fn max_scroll_offset(&self) -> usize {
+        self.line_count().saturating_sub(1)
+    }
+
+    fn refresh_with_loader(
+        &mut self,
+        load: impl Fn(&ViewSpec) -> Result<DocumentLines>,
+    ) -> Result<()> {
+        self.document = load(&self.spec)?;
+        self.clamp(0);
+        Ok(())
+    }
+}
+
+fn file_show_path(spec: &ViewSpec) -> String {
+    spec.path()
+        .map(str::to_owned)
+        .or_else(|| spec.target().map(str::to_owned))
+        .or_else(|| spec.args().last().cloned())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
     use ratatui::text::Line;
 
     use super::*;
     use crate::jj::JjCommand;
-    use crate::sticky_file_view::lines_text;
 
-    fn status_view(lines: &[&str]) -> StatusView {
-        StatusView {
-            spec: ViewSpec::new(JjCommand::Status, Vec::new()),
-            document: StickyFileDocument::new(crate::rendered_jj::DocumentLines::new(
+    fn file_show_view(path: &str, lines: &[&str]) -> FileShowView {
+        FileShowView::new(
+            ViewSpec::new(JjCommand::FileShow, Vec::new()),
+            path,
+            DocumentLines::new(
                 lines
                     .iter()
                     .map(|line| Line::from((*line).to_owned()))
                     .collect::<Vec<_>>(),
-            )),
-        }
+            ),
+        )
     }
 
     #[test]
-    fn copy_options_use_full_status_text() {
-        let view = status_view(&["Working copy changes:", "M src/app.rs"]);
+    fn file_show_projection_is_plain_document() {
+        let view = file_show_view("src/lib.rs", &["alpha", "beta"]);
+
+        let projection = view.projection();
+
+        assert!(projection.fixed_lines().is_empty());
+        assert_eq!(projection.body_lines().len(), 2);
+        assert_eq!(projection.body_scroll_offset(), 0);
+    }
+
+    #[test]
+    fn file_show_search_wraps_without_reselecting_current_line() {
+        let mut view = file_show_view("src/lib.rs", &["alpha", "target one", "beta", "target two"]);
+        view.set_scroll_offset(3, 1);
+        let query = SearchQuery::new("target".to_owned()).unwrap();
+
+        assert!(view.next_match(3, &query));
+        assert_eq!(view.scroll_offset(), 3);
+
+        assert!(view.previous_match(3, &query));
+        assert_eq!(view.scroll_offset(), 1);
+    }
+
+    #[test]
+    fn file_show_copy_uses_exact_path() {
+        let view = file_show_view("src/space file.txt", &["alpha"]);
 
         let options = view.copy_options();
 
-        assert_eq!(options.len(), 1);
-        assert_eq!(options[0].label(), "status text");
-        assert_eq!(options[0].value(), "Working copy changes:\nM src/app.rs");
+        assert_eq!(
+            options,
+            vec![CopyOption::new("file path", "src/space file.txt")]
+        );
     }
 
     #[test]
-    fn status_navigation_scrolls_through_document() {
-        let mut view = status_view(&["one", "two", "three"]);
+    fn file_show_refresh_clamps_scroll_after_content_shrinks() {
+        let mut view = file_show_view("src/lib.rs", &["alpha", "beta", "gamma"]);
+        view.set_scroll_offset(3, 2);
 
-        view.execute(
-            ViewCommand::MoveDown,
-            CommandContext {
-                viewport_height: 3,
-                search: None,
-            },
-        );
-        assert_eq!(view.scroll_offset(), 1);
-
-        view.execute(
-            ViewCommand::MoveLast,
-            CommandContext {
-                viewport_height: 3,
-                search: None,
-            },
-        );
-        assert_eq!(view.scroll_offset(), 1);
-    }
-
-    #[test]
-    fn status_search_moves_to_next_match() {
-        let mut view = status_view(&["first", "beta", "third", "beta again"]);
-        let query = SearchQuery::new("beta".to_owned()).unwrap();
-
-        let effect = view.execute(
-            ViewCommand::StartSearch,
-            CommandContext {
-                viewport_height: 3,
-                search: Some(&query),
-            },
-        );
-
-        assert_eq!(effect, ViewEffect::SearchStarted { matches: 2 });
-        assert_eq!(view.scroll_offset(), 1);
-    }
-
-    #[test]
-    fn clamp_preserves_readable_scroll_after_document_shrinks() {
-        let mut view = status_view(&["one", "two", "three"]);
-        view.scroll_to_bottom(3);
-        assert_eq!(view.scroll_offset(), 1);
-
-        view.document =
-            StickyFileDocument::new(crate::rendered_jj::DocumentLines::new(vec![Line::from(
-                "one".to_owned(),
-            )]));
-        view.clamp(3);
+        view.refresh_with_loader(|_| Ok(DocumentLines::new(vec![Line::from("alpha")])))
+            .unwrap();
 
         assert_eq!(view.scroll_offset(), 0);
-    }
-
-    #[test]
-    fn status_projection_keeps_rendered_sections_readable() {
-        let view = status_view(&[
-            "The working copy has conflicts:",
-            "UU src/app.rs",
-            "",
-            "Working copy changes:",
-            "M src/status.rs",
-            "A docs/plan/progress.md",
-            "",
-            "Working copy  (@) : yostqsxw 12345678 Slice 6 work",
-            "Parent commit (@-): mzvwutkl 87654321 Prior change",
-        ]);
-
-        let projection = view.projection();
-        let rendered = format!(
-            "[fixed]\n{}\n[body @{}]\n{}",
-            if projection.fixed_lines().is_empty() {
-                "<none>".to_owned()
-            } else {
-                lines_text(projection.fixed_lines())
-            },
-            projection.body_scroll_offset(),
-            lines_text(projection.body_lines())
-        );
-
-        assert_snapshot!(rendered, @r"
-        [fixed]
-        <none>
-        [body @0]
-        The working copy has conflicts:
-        UU src/app.rs
-
-        Working copy changes:
-        M src/status.rs
-        A docs/plan/progress.md
-
-        Working copy  (@) : yostqsxw 12345678 Slice 6 work
-        Parent commit (@-): mzvwutkl 87654321 Prior change
-        ");
     }
 }

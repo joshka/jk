@@ -4,6 +4,8 @@ mod clipboard;
 mod command;
 mod copy;
 mod diff;
+mod file_list;
+mod file_show;
 mod graph;
 mod jj;
 mod operation_log;

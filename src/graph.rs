@@ -143,7 +143,9 @@ impl GraphView {
             ViewCommand::PageDown
             | ViewCommand::PageUp
             | ViewCommand::NextFile
-            | ViewCommand::PreviousFile => ViewEffect::Ignored,
+            | ViewCommand::PreviousFile
+            | ViewCommand::OpenFiles
+            | ViewCommand::OpenItem => ViewEffect::Ignored,
         }
     }
 

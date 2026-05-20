@@ -106,3 +106,18 @@
   a separate metadata template stream by row order while remote/tracking semantics stay deliberately
   non-semantic in this first pass
 - Next slice: Slice 9: File List And File Show
+
+## Slice 9: File List And File Show
+
+- Files changed: `src/app.rs`, `src/command.rs`, `src/diff.rs`, `src/file_list.rs`,
+  `src/file_show.rs`, `src/jj.rs`, `src/main.rs`, `src/show.rs`, `src/status.rs`, `src/tui.rs`,
+  `src/view_state.rs`, `src/graph.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/implementation-slices.md`, `docs/plan/progress.md`, `docs/plan/screens.md`,
+  `docs/plan/screens/files.md`
+- Verification: `panache format --check docs/plan/progress.md` and `markdownlint-cli2` run on
+  `docs/plan/fragility-register.md`, `docs/plan/implementation-slices.md`, `docs/plan/progress.md`,
+  `docs/plan/screens.md`, `docs/plan/screens/files.md`
+- Remaining risk: file-list identity still comes from rendered path text, so any `jj file list`
+  formatting changes can affect exact-path extraction and selection semantics until structured or
+  templated output is introduced
+- Next slice: Slice 10: Action Menu And Multi-Select

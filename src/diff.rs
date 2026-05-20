@@ -61,6 +61,7 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::char('['),
         Command::View(ViewCommand::PreviousFile),
     ),
+    Binding::new(KeyPattern::char('l'), Command::View(ViewCommand::OpenFiles)),
     Binding::new(KeyPattern::char('s'), Command::View(ViewCommand::OpenShow)),
     Binding::new(
         KeyPattern::char('n'),
@@ -128,6 +129,10 @@ impl DiffView {
                 self.previous_file();
                 ViewEffect::Handled
             }
+            ViewCommand::OpenFiles => ViewEffect::OpenView(ViewSpec::file_list(
+                self.spec.navigation_revset(),
+                self.document.current_file_label().map(str::to_owned),
+            )),
             ViewCommand::OpenShow => self
                 .spec
                 .navigation_revset()
@@ -154,7 +159,7 @@ impl DiffView {
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
-            ViewCommand::OpenDiff => ViewEffect::Ignored,
+            ViewCommand::OpenItem | ViewCommand::OpenDiff => ViewEffect::Ignored,
         }
     }
 

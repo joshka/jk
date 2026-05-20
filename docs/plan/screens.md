@@ -100,7 +100,8 @@ These are not the product center, but they fit the single-view model well:
 - compact help
 - compact keymap
 
-These screens should stay focused, low-chrome, and history-aware. They should not turn into a
+These screens should stay focused, low-chrome, and history-aware. The file list and file show pair
+is the path-first file inspection surface around show, diff, and status. They should not turn into a
 multi-pane repository dashboard.
 
 ## Non-Screens By Default

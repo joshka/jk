@@ -265,24 +265,24 @@ Goal: add file inspection around show/diff/status without mutation-capable path 
 Recommended scope:
 
 - add file list view for a revision or current context;
-- add file show document view for selected path;
-- preserve exact path identity;
+- add file show document view for the selected exact path;
+- keep exact path identity in view state and copy/open actions;
 - support search, copy path, refresh, and back;
 - defer track/untrack/chmod until exact path/fileset contracts exist.
 
 Acceptance criteria:
 
-- file list opens from show/diff/status context where exact target exists;
+- file list opens from show/diff/status context where an exact path is available;
 - file show opens selected exact path;
-- search and copy work;
-- refresh preserves selected path when possible;
-- no mutation action depends on display labels.
+- file-list refresh preserves selected path when possible and falls back cleanly if the path
+  disappears;
+- search and copy work in both screens;
+- no mutation action depends on display labels or reconstructed paths.
 
 Validation:
 
-- path identity tests;
-- file-list movement tests;
-- file-show document tests;
+- file-list movement, copy, open, and refresh tests;
+- file-show scroll, search, copy, and refresh tests;
 - `cargo test`.
 
 ## Slice 10: Action Menu And Multi-Select

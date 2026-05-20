@@ -24,7 +24,7 @@ This is a family rather than one screen:
 
 ## View Model
 
-- file list should remain list-first
+- file list should stay path-first
 - file show and annotate should be dedicated detail screens
 - inline file preview under file list may be worth exploring later
 
@@ -40,6 +40,12 @@ on exact path identity and benefit from established document navigation behavior
 - search within file-oriented screens where useful
 - copy file path
 - launch file actions when the current context supports them
+
+## Entry Points
+
+- from show, diff, or status when an exact path is available
+- direct startup via `jk file list` or `jk file show`
+- from file list into file show on the selected exact path
 
 ## Selection Model
 
@@ -79,7 +85,9 @@ should not rely on loosely parsed file labels when exact paths or fileset behavi
 structured output, narrow templates, or `jj_lib` before mutation flows expand.
 
 The preferred contract exposes exact path, file status, revision context, display label, and
-renderable styled row or document spans together.
+renderable styled row or document spans together. File list should carry the exact path separately
+from any display label, and file show should preserve the selected exact path in view state so copy
+and refresh stay anchored to the same file.
 
 ## Acceptance Criteria
 
