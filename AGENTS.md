@@ -171,14 +171,14 @@ improves the reader path for a concrete change.
 Use the repository `just` commands:
 
 - `just check`: run nightly rustfmt, Panache Markdown checks, `cargo check`, and `cargo test`.
-- `just fmt`: run `cargo +nightly fmt`.
+- `just fmt`: run `rustup run nightly cargo fmt`.
 - `just md-fmt`: run `panache format README.md AGENTS.md docs`.
 - `just md-check`: run Panache format and lint checks for Markdown.
 - `just test`: run `cargo test`.
 - `just run`: run the TUI with `cargo run`.
 
-Use `cargo +nightly fmt` before finishing Rust changes. Markdown is formatted with Panache,
-configured in [`panache.toml`](panache.toml) for GFM, 100-column reflow.
+Use `rustup run nightly cargo fmt` before finishing Rust changes. Markdown is formatted with
+Panache, configured in [`panache.toml`](panache.toml) for GFM, 100-column reflow.
 
 ## Coding Style & Naming Conventions
 

@@ -59,7 +59,12 @@ While editing:
 Before handoff:
 
 - run focused tests for the touched behavior;
+- for Rust changes, run `cargo clippy -- -D warnings` or the repository's documented equivalent, and
+  list the exact blockers if clippy is not clean;
+- run a `cargo run` smoke when it is practical for the change, and state whether that smoke was
+  warning-free or why it was skipped;
 - run `just check` when practical;
+- if the local `just check` wrapper is broken, report the direct commands you ran instead;
 - run Panache format and lint checks for Markdown-only or doc-heavy changes;
 - report any validation gap directly.
 
@@ -92,3 +97,5 @@ and review workflow expected for jk."
 ```
 
 Use imperative, concise descriptions. Keep unrelated changes separate, and do not rewrite user work.
+Keep the title line at 50 characters or fewer, leave a blank line before the body, and wrap the body
+at 72 columns.

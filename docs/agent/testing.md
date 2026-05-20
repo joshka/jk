@@ -91,6 +91,11 @@ Before handoff, run the project gate when practical:
 just check
 ```
 
+For Rust packets, include `cargo clippy -- -D warnings` or the repository's documented equivalent
+unless you are reporting exact, unchanged blockers from the current baseline. Include a `cargo run`
+smoke when it is practical to do so, and say whether that smoke was warning-free or skipped with a
+reason.
+
 For Rust formatting-only validation:
 
 ```sh
@@ -110,6 +115,16 @@ just md-check
 ```
 
 If a check cannot be run, state that explicitly in the final note.
+
+If a local checkout still has the stale `cargo +nightly fmt` wrapper problem, run the direct
+equivalent commands instead:
+
+```sh
+rustup run nightly cargo fmt --check
+cargo check
+cargo test
+just md-check
+```
 
 ## Test Naming
 

@@ -5,6 +5,40 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Interruption Packet H validation discipline)
+
+- Slice / task: docs/tooling packet for warning-free build discipline and commit-message rules in jj
+  change `Document validation discipline`.
+- User request: make finished implementation packets report warning-free build status clearly,
+  require Rust packets to include `cargo clippy -- -D warnings` or an equivalent, and keep
+  commit-message length guidance visible in the repo-local workflow docs.
+- Observable outcome: `docs/agent/workflow.md` now tells handoffs to report exact clippy blockers,
+  say whether a `cargo run` smoke was warning-free or skipped, and preserve the 50-character title /
+  72-column body rule for `jj desc`. `docs/agent/testing.md` now names the clippy and `cargo run`
+  proof expectations and the direct fallback commands if the local `just check` wrapper regresses
+  again. `docs/plan/next-implementation-slices.md` now makes those expectations part of the Packet H
+  acceptance criteria.
+- Tooling outcome: `Justfile` `fmt` now uses `rustup run nightly cargo fmt`, which matches the
+  direct equivalent already used elsewhere in the repo and removes the stale `cargo +nightly fmt`
+  failure mode from `just check`.
+- Follow-up repair: root `AGENTS.md` now points its `just fmt` and Rust formatting guidance at
+  `rustup run nightly cargo fmt`, keeping the repo-local guidance aligned with the working
+  `Justfile`.
+- Validation / proof run during implementation:
+  - `just md-check`
+  - `just check`
+- Validation note: no `cargo run` smoke was run because this packet changed docs and validation
+  tooling only, not runtime behavior.
+- Residual risk: repo-wide warning-free proofs still depend on the current Rust baseline being
+  cleaned up or explicitly documented as blocked in future handoffs.
+- Evidence basis:
+  - Thread: `019e46fa-5682-7e20-b58f-c9c7f8f18c54`
+  - Date: `2026-05-20` from local `date +%F`
+  - Commands: `sed`, `rg`, `printenv CODEX_THREAD_ID`, `date +%F`, `just md-check`, `just check`
+  - Files: `Justfile`, `docs/agent/workflow.md`, `docs/agent/testing.md`,
+    `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Interruption Packet D action menu presentation)
 
 - Slice / task: implement Interruption Packet D in jj change `Improve action menu presentation`.

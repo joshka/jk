@@ -1490,6 +1490,18 @@
   target wording, exact remote pattern contract, output preservation, and push remote selection
   regression coverage.
 
+## Interruption Packet H
+
+- Files changed: `Justfile`, `docs/agent/workflow.md`, `docs/agent/testing.md`,
+  `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+- Verification: `just md-check`; `just check`
+- Validation note: no `cargo run` smoke was run because this packet changed docs and validation
+  tooling only, not runtime behavior.
+- Residual risk: the repo still has known Rust warnings and clippy blockers in the current baseline,
+  so future handoffs must continue to list exact blockers and whether they are unchanged when a
+  truly warning-free proof is not available.
+- Next recommended slice: Packet 17: Undo/Redo From Operation Log.
+
 ## Interruption Packet G: File Viewing And Wrap Modes
 
 - Files changed: `src/sticky_file_view.rs`, `src/file_show.rs`, `src/show.rs`, `src/diff.rs`,

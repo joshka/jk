@@ -3,7 +3,7 @@ set dotenv-load
 default: check
 
 fmt:
-    cargo +nightly fmt
+    rustup run nightly cargo fmt
 
 md-fmt:
     panache format README.md AGENTS.md docs

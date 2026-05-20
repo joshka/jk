@@ -916,11 +916,14 @@ Audit result from 2026-05-20:
 - Non-goals: no Rust behavior changes, no dependency churn unless required by the chosen lint gate,
   no Git workflow examples, and no rewrite of historical progress entries that were true at the
   time.
-- Acceptance criteria: finished implementation packets require `cargo run` to be warning-free when a
-  smoke run is practical; Rust packets include `cargo clippy -- -D warnings` or an explicit
-  repository equivalent; commit descriptions follow the 50-character title and 72-column body
-  guidance already used in the repo's jj workflow; handoffs report validation proof and any skipped
-  no-warning checks.
+- Acceptance criteria:
+  - finished implementation packets require a warning-free `cargo run` smoke when practical, or a
+    clear reason why it was skipped;
+  - Rust packets include `cargo clippy -- -D warnings` or the repository's documented equivalent;
+  - if baseline blockers remain, handoffs list the exact blockers and whether they are unchanged;
+  - commit descriptions follow the 50-character title and 72-column body guidance already used in
+    the repo's jj workflow;
+  - handoffs report validation proof, skipped checks, and no-warning status explicitly.
 - Validation: `just md-check`; run any new or changed validation recipe; no Rust tests required
   unless validation tooling touches Rust build configuration.
 - Docs/fragility updates: update `progress.md`; no fragility-register update unless validation
@@ -928,8 +931,8 @@ Audit result from 2026-05-20:
 - Suggested agent/model routing: documentation/tooling worker with maintainer review; use gpt-5.5
   high review if the packet changes the standard finished-check contract for all future agents.
 - Review prompt: review validation discipline for command accuracy, jj terminology, warning policy,
-  commit-message rules, and whether future packets have a mechanical way to prove no-warning
-  behavior.
+  commit-message rules, exact blocker reporting, and whether future packets have a mechanical way to
+  prove or explicitly skip no-warning behavior.
 
 ### Packet 34: Split Guided Flow
 
