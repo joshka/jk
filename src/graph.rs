@@ -905,6 +905,7 @@ mod tests {
                 "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
                 "abandon selected revision aaaaaaaa",
+                "duplicate selected revision aaaaaaaa",
                 "restore selected revision aaaaaaaa",
                 "revert selected revision aaaaaaaa into @"
             ]
@@ -1035,6 +1036,7 @@ mod tests {
                 "new child of aaaaaaaa",
                 "split selected revision aaaaaaaa",
                 "abandon selected revision aaaaaaaa",
+                "duplicate selected revision aaaaaaaa",
                 "restore selected revision aaaaaaaa",
                 "revert selected revision aaaaaaaa into @"
             ]

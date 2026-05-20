@@ -93,6 +93,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::DuplicatePreview { output } => {
+            let title = action_output_title("Duplicate", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::DescribePreview { output } => {
             let title = action_output_title("Describe", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -234,6 +240,9 @@ pub enum Overlay<'a> {
         output: &'a ActionOutput,
     },
     NewPreview {
+        output: &'a ActionOutput,
+    },
+    DuplicatePreview {
         output: &'a ActionOutput,
     },
     DescribePreview {
@@ -1026,7 +1035,7 @@ mod tests {
             &crate::action_menu::ExactActionContext::with_current("change-a"),
         );
 
-        let rendered = render_widget_rows(48, 8, |frame| {
+        let rendered = render_widget_rows(48, 9, |frame| {
             frame.render_widget(action_menu(&menu, 1), frame.area());
         });
 
@@ -1036,6 +1045,7 @@ mod tests {
         │n  new child of change-a                      │
         │s  split selected revision change-a           │
         │x  abandon selected revision change-a         │
+        │d  duplicate selected revision change-a       │
         │r  restore selected revision change-a         │
         │v  revert selected revision change-a into @   │
         └──────────────────────────────────────────────┘

@@ -11,9 +11,9 @@ use crate::copy::CopyOption;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
-    JjDescribeTarget, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
-    JjWorkingCopyNavigationPlan,
+    JjDescribeTarget, JjDuplicatePlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan,
+    JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan,
+    JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
 use crate::tui::Overlay;
 use crate::view_state::ViewState;
@@ -63,6 +63,10 @@ pub(crate) enum InteractionMode {
     },
     NewPreview {
         new_change: JjNewPlan,
+        output: ActionOutput,
+    },
+    DuplicatePreview {
+        duplicate: JjDuplicatePlan,
         output: ActionOutput,
     },
     RebasePreview {
@@ -192,6 +196,7 @@ impl InteractionMode {
                 Overlay::BookmarkMutationPreview { output }
             }
             Self::NewPreview { output, .. } => Overlay::NewPreview { output },
+            Self::DuplicatePreview { output, .. } => Overlay::DuplicatePreview { output },
             Self::RebasePreview { output, .. } => Overlay::RebasePreview { output },
             Self::SplitPreview { output, .. } => Overlay::SplitPreview { output },
             Self::RestorePreview { output, .. } => Overlay::RestorePreview { output },

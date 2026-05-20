@@ -3198,3 +3198,44 @@ belong here.
     `cargo test jj_actions::tests::split -- --test-threads=1`, full `cargo test`,
     `rustup run nightly cargo fmt --check`, `just md-check`, `cargo clippy -- -D warnings`
   - Files: `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet 35 duplicate guided flow)
+
+- Slice / task: implement Packet 35, a preview-first `jj duplicate` flow for exact selected changes.
+- Thread id: `019e4767-b5ad-7db3-97c8-6c4748879808`.
+- Model / routing: gpt-5.5 high, because the change crosses command planning, action-menu
+  availability, app preview/result lifecycle, tests, docs, and real `jj` command proof.
+- Context read: `AGENTS.md`, `docs/development/rules/change-shape.md`,
+  `docs/development/rules/testing.md`, `docs/development/rules/boundary.md`,
+  `docs/agent/architecture.md`, `docs/agent/testing.md`, `docs/plan/next-implementation-slices.md`
+  Packet 35, and latest Packet 34/app-refactor entries in `docs/plan/progress.md`.
+- Command evidence: `jj --no-pager duplicate --help` documents
+  `jj duplicate [OPTIONS] [REVSETS]...`. Packet 35 therefore uses one positional exact source
+  revset: `jj duplicate exactly(change_id("<id>"), 1)`.
+- Source-count decision: multi-source duplicate stays excluded. The CLI accepts multiple revsets,
+  but this packet keeps one exact source because result selection and topology semantics are easier
+  to review safely as a bounded first flow.
+- Reveal/output decision: `/tmp` proof showed current duplicate stdout includes a new change id, but
+  the implementation does not parse that human output. Graph success can reveal and select the
+  original source in recent work as a fallback; detail success refreshes the active view without a
+  graph reveal. `jj undo` and `jj op show -p` stay visible.
+- Repair note: detail-view duplicate success now reports only an active-view refresh and does not
+  reuse the graph source-selection wording when `ViewState::reveal_graph_change()` is a no-op.
+- Disposable proof: `/tmp/jk-packet35-proof.oveqWn` was initialized and mutated only from that repo
+  cwd. `jj --no-pager duplicate 'exactly(change_id("qwzxmoltolmpywqvnzouwlpprynkryqk"), 1)'`
+  succeeded, and `jj --no-pager undo` restored the previous operation. No duplicate or undo command
+  was run from `/Users/joshka/local/jk`.
+- Validation trail: `cargo check`; `cargo test duplicate -- --test-threads=1`;
+  `cargo test action_menu -- --test-threads=1`;
+  `cargo test app::tests::duplicate -- --test-threads=1`;
+  `cargo test app::tests::split -- --test-threads=1`;
+  `cargo test jj_actions::tests::duplicate -- --test-threads=1`;
+  `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 443
+  passed / 2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
+  `just md-fmt`; `just md-check`; and `just check`.
+- Clippy note: `cargo clippy -- -D warnings` remains blocked by the known baseline findings:
+  `ViewSpec::bookmarks`, `FileListItem::row_text`, and `collapsible_if` in `src/bookmarks.rs`,
+  `src/graph.rs`, and `src/operation_log.rs`.
+- Review note: check exact-source action availability, detail-view availability, multi-source
+  exclusion, command labels, source fallback wording, full error output preservation, and
+  `src/app.rs` remaining untouched by action lifecycle policy.

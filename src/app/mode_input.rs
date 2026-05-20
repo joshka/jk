@@ -241,6 +241,7 @@ impl App {
                             ActionKind::Edit
                             | ActionKind::New
                             | ActionKind::Split
+                            | ActionKind::Duplicate
                             | ActionKind::Restore
                             | ActionKind::Revert
                             | ActionKind::Abandon
@@ -494,6 +495,7 @@ impl App {
             | InteractionMode::CommitPreview { .. }
             | InteractionMode::BookmarkMutationPreview { .. }
             | InteractionMode::NewPreview { .. }
+            | InteractionMode::DuplicatePreview { .. }
             | InteractionMode::RebasePreview { .. }
             | InteractionMode::SplitPreview { .. }
             | InteractionMode::RestorePreview { .. }

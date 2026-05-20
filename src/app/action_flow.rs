@@ -12,9 +12,9 @@ use crate::action_output::{
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::jj::{
-    JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjGitFetch, JjGitPush,
-    JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
+    JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjDuplicatePlan,
+    JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan,
+    JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
 
 use super::App;
@@ -76,6 +76,10 @@ impl App {
                 new_change,
                 status_context,
             } => self.confirm_new_change(new_change, status_context, viewport_height),
+            ActionPreviewConfirmation::Duplicate {
+                duplicate,
+                status_context,
+            } => self.confirm_duplicate(duplicate, status_context, viewport_height),
             ActionPreviewConfirmation::Rebase {
                 rebase,
                 status_context,
@@ -169,6 +173,16 @@ impl InteractionMode {
                 "new change cancelled".to_owned(),
                 |status_context| ActionPreviewConfirmation::New {
                     new_change: new_change.clone(),
+                    status_context,
+                },
+            )),
+            Self::DuplicatePreview { duplicate, output } => Some(action_preview_event(
+                code,
+                output,
+                visible_lines,
+                "duplicate cancelled".to_owned(),
+                |status_context| ActionPreviewConfirmation::Duplicate {
+                    duplicate: duplicate.clone(),
                     status_context,
                 },
             )),
@@ -311,6 +325,10 @@ enum ActionPreviewConfirmation {
     },
     New {
         new_change: JjNewPlan,
+        status_context: Option<String>,
+    },
+    Duplicate {
+        duplicate: JjDuplicatePlan,
         status_context: Option<String>,
     },
     Rebase {

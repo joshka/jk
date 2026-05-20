@@ -10,8 +10,8 @@ use ratatui::DefaultTerminal;
 
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
-    JjDescribePlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget,
-    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
+    JjDescribePlan, JjDuplicatePlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery,
+    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
     JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec, git_remotes, new_trunk,
     resolve_exact_change_id,
 };
@@ -20,6 +20,7 @@ use crate::view_state::ViewState;
 use super::App;
 
 pub(in crate::app) type NewRun = fn(&JjNewPlan) -> Result<String>;
+pub(in crate::app) type DuplicateRun = fn(&JjDuplicatePlan) -> Result<String>;
 pub(in crate::app) type RebaseRun = fn(&JjRebasePlan) -> Result<String>;
 pub(in crate::app) type SplitRun = fn(Option<&mut DefaultTerminal>, &JjSplitPlan) -> Result<String>;
 pub(in crate::app) type SquashRun = fn(&JjSquashPlan) -> Result<String>;
@@ -49,6 +50,7 @@ pub(in crate::app) type LoadView = fn(ViewSpec) -> Result<ViewState>;
 
 pub(in crate::app) struct AppServices {
     pub(in crate::app) new_run: NewRun,
+    pub(in crate::app) duplicate_run: DuplicateRun,
     pub(in crate::app) rebase_run: RebaseRun,
     pub(in crate::app) split_run: SplitRun,
     pub(in crate::app) squash_run: SquashRun,
@@ -79,6 +81,10 @@ pub(in crate::app) struct AppServices {
 impl AppServices {
     pub(in crate::app) fn run_new_change(&self, new_change: &JjNewPlan) -> Result<String> {
         (self.new_run)(new_change)
+    }
+
+    pub(in crate::app) fn run_duplicate(&self, duplicate: &JjDuplicatePlan) -> Result<String> {
+        (self.duplicate_run)(duplicate)
     }
 
     pub(in crate::app) fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
@@ -211,6 +217,10 @@ impl App {
         self.services.run_new_change(new_change)
     }
 
+    pub(in crate::app) fn run_duplicate(&self, duplicate: &JjDuplicatePlan) -> Result<String> {
+        self.services.run_duplicate(duplicate)
+    }
+
     pub(in crate::app) fn run_rebase(&self, rebase: &JjRebasePlan) -> Result<String> {
         self.services.run_rebase(rebase)
     }
@@ -336,6 +346,7 @@ impl Default for AppServices {
     fn default() -> Self {
         Self {
             new_run: default_new_run,
+            duplicate_run: default_duplicate_run,
             rebase_run: default_rebase_run,
             split_run: default_split_run,
             squash_run: default_squash_run,
@@ -367,6 +378,10 @@ impl Default for AppServices {
 
 fn default_new_run(new_change: &JjNewPlan) -> Result<String> {
     new_change.run().map(|output| output.message().to_owned())
+}
+
+fn default_duplicate_run(duplicate: &JjDuplicatePlan) -> Result<String> {
+    duplicate.run().map(|output| output.message().to_owned())
 }
 
 fn default_rebase_run(rebase: &JjRebasePlan) -> Result<String> {

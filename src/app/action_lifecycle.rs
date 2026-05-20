@@ -14,10 +14,10 @@ use crate::app_status::StatusLine;
 use crate::command::ViewCommand;
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
-    JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitFetch, JjGitPush,
-    JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget,
-    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSplitTarget, JjSquashPlan,
-    JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode,
+    JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan, JjGitFetch,
+    JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind,
+    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSplitTarget,
+    JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode,
 };
 use crate::view_state::ViewState;
 
@@ -79,6 +79,7 @@ impl App {
                     ActionKind::Edit
                     | ActionKind::New
                     | ActionKind::Split
+                    | ActionKind::Duplicate
                     | ActionKind::Restore
                     | ActionKind::Revert
                     | ActionKind::Rebase
@@ -97,6 +98,11 @@ impl App {
             FollowUp::SplitCurrentWorkingCopy => {
                 self.mode = InteractionMode::Normal;
                 self.open_split_preview(JjSplitPlan::current_working_copy());
+            }
+            FollowUp::DuplicateExactTarget { revision } => {
+                let revision = revision.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_duplicate_preview(JjDuplicatePlan::exact_change(revision));
             }
             FollowUp::EditExactTarget { revision } => {
                 let revision = revision.clone();
@@ -693,6 +699,37 @@ impl App {
         }
     }
 
+    pub(super) fn open_duplicate_preview(&mut self, duplicate: JjDuplicatePlan) {
+        let status_context = Some(format!(
+            "duplicate exact source {} from {}",
+            duplicate.source(),
+            self.view.spec().app_label()
+        ));
+
+        match duplicate.run_preview() {
+            Ok(output) => {
+                let command_label = duplicate.command_label();
+                self.mode = InteractionMode::DuplicatePreview {
+                    duplicate,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = duplicate.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::DuplicatePreview {
+                    duplicate,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
     pub(super) fn run_new_trunk(&mut self, viewport_height: u16) {
         if let Err(error) = self.resolve_revision("trunk()") {
             self.status = StatusLine::error(&self.view, error.to_string());
@@ -1209,6 +1246,85 @@ impl App {
             new_change,
             output: ActionOutput::finished(command_label, result_message, status_context),
         };
+    }
+
+    pub(super) fn confirm_duplicate(
+        &mut self,
+        duplicate: JjDuplicatePlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = duplicate.command_label();
+        let result_message = match self.run_duplicate(&duplicate) {
+            Ok(output) => self.finish_successful_duplicate(&duplicate, output, viewport_height),
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::DuplicatePreview {
+            duplicate,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    fn finish_successful_duplicate(
+        &mut self,
+        duplicate: &JjDuplicatePlan,
+        output: String,
+        viewport_height: u16,
+    ) -> String {
+        match self.refresh_view_state() {
+            Ok(()) => {
+                self.view.clamp(viewport_height, current_viewport_width());
+                let reveal_result = match &self.view {
+                    ViewState::Graph(_) => {
+                        Some(self.reveal_graph_change(duplicate.source(), LogViewMode::Recent))
+                    }
+                    _ => None,
+                };
+
+                match reveal_result {
+                    Some(Ok(switched_modes)) => {
+                        self.view.clamp(viewport_height, current_viewport_width());
+                        let message = if switched_modes {
+                            "duplicate completed | showing recent work fallback for source | jj undo | jj op show -p"
+                        } else {
+                            "duplicate completed | source selected as fallback | jj undo | jj op show -p"
+                        };
+                        self.status = StatusLine::with_message(&self.view, message);
+                        format!(
+                            "{}\nrefresh: active view refreshed\nreveal: selected original source {} because jk does not parse duplicate output for the new change id\nrecovery: jj undo\nreview: jj op show -p",
+                            output.trim(),
+                            duplicate.source()
+                        )
+                    }
+                    Some(Err(error)) => {
+                        self.status = StatusLine::error(&self.view, error.to_string());
+                        format!(
+                            "{}\nrefresh: active view refreshed\nreveal: source fallback failed: {error}\nrecovery: jj undo\nreview: jj op show -p",
+                            output.trim()
+                        )
+                    }
+                    None => {
+                        let message = "duplicate completed | active view refreshed | source reveal unavailable | jj undo | jj op show -p";
+                        self.status = StatusLine::with_message(&self.view, message);
+                        format!(
+                            "{}\nrefresh: active view refreshed\nreveal: source fallback not attempted because the active view cannot reveal graph changes\nrecovery: jj undo\nreview: jj op show -p",
+                            output.trim()
+                        )
+                    }
+                }
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                format!(
+                    "{}\nrefresh: failed: {error}\nrecovery: jj undo\nreview: jj op show -p",
+                    output.trim()
+                )
+            }
+        }
     }
 
     pub(super) fn confirm_push(

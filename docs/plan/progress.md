@@ -1911,3 +1911,55 @@
   app-owned mutation/action preview lifecycle. Future rewrite packets should add behavior there, or
   split a narrower action owner when a concrete sub-lifecycle becomes independently readable, rather
   than putting action policy back into `src/app.rs`.
+
+## Packet 35: Duplicate Guided Flow
+
+- Files changed: `src/action_menu.rs`, `src/app/action_flow.rs`, `src/app/action_lifecycle.rs`,
+  `src/app/mode_input.rs`, `src/app/services.rs`, `src/app/tests.rs`, `src/app_screen.rs`,
+  `src/graph.rs`, `src/jj.rs`, `src/jj_actions.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`.
+
+- Behavior: action menus now expose duplicate only for one exact selected graph or detail-view
+  revision target. Multi-source graph menus intentionally exclude duplicate; Packet 35 does not
+  implement bulk/range duplicate, duplicate-and-rebase, bookmark movement, or target guessing from
+  rendered labels.
+
+- Command contract: `JjDuplicatePlan` runs one positional exact revset:
+  `jj duplicate exactly(change_id("<id>"), 1)`. This shape was checked against
+  `jj --no-pager duplicate --help`, which documents `[REVSETS]...` positional duplicate sources.
+
+- Result visibility: confirmation uses the normal captured-output runner, so stdout/stderr from
+  `jj duplicate` are preserved in the action output surface on both success and failure. Success
+  refreshes the active view, then reveals the original source in recent work when the active view
+  can actually run graph reveal logic. Detail views refresh without claiming a graph reveal that
+  never ran. The result and status keep `jj undo` and `jj op show -p` visible.
+
+- Disposable proof: `/tmp/jk-packet35-proof.oveqWn` was initialized with `jj --no-pager git init`.
+  From that repo's cwd, `file.txt` was created, tracked, and described. From the same proof repo
+  cwd, `jj --no-pager duplicate 'exactly(change_id("qwzxmoltolmpywqvnzouwlpprynkryqk"), 1)'`
+  succeeded and printed `Duplicated fb0ff0e682c1 as qqrwmtko d5ff99ef source change`; a follow-up
+  `jj --no-pager undo` restored the pre-duplicate operation. No duplicate or undo command was run
+  from `/Users/joshka/local/jk`.
+
+- Validation: `jj --no-pager duplicate --help`; disposable `/tmp` duplicate and undo proof;
+  `cargo check` passed with the known `ViewSpec::bookmarks` and `FileListItem::row_text` warnings;
+  `cargo test duplicate -- --test-threads=1`; `cargo test action_menu -- --test-threads=1`;
+  `cargo test app::tests::duplicate -- --test-threads=1`;
+  `cargo test app::tests::split -- --test-threads=1`;
+  `cargo test jj_actions::tests::duplicate -- --test-threads=1`;
+  `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 443
+  passed / 2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
+  `just md-fmt`; `just md-check`; and `just check`.
+
+- Warning / blocker status: `cargo clippy -- -D warnings` remains blocked by the known baseline
+  findings: dead code for `ViewSpec::bookmarks` and `FileListItem::row_text`, plus `collapsible_if`
+  in `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
+
+- Remaining risk: exact reveal of the duplicated change is not implemented because that would parse
+  current human `jj duplicate` output. The bounded fallback is visible in preview, result text, and
+  the fragility register. A future packet can add a narrow parser or structured result contract if
+  exact duplicate reveal becomes important.
+
+- Next recommended slice: review Packet 35 for exact source targeting, single-source menu policy,
+  command shape, output preservation, source fallback wording, docs accuracy, and whether a future
+  structured result contract is worth a separate packet before adding more rewrite flows.

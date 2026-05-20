@@ -9,10 +9,10 @@ use crate::app::mode_input::{rebase_plan_from_prompt, squash_plan_from_prompt};
 use crate::app_screen::ViewMenuAction;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan,
-    JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjGitFetch,
-    JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind,
-    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
-    JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
+    JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan,
+    JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
 };
 use crate::tui::Overlay;
 use color_eyre::eyre::eyre;
@@ -31,6 +31,17 @@ fn mock_new_success(new_change: &JjNewPlan) -> Result<String> {
 
 fn mock_new_failure(_: &JjNewPlan) -> Result<String> {
     Err(eyre!("jj new failed: first line\nsecond line"))
+}
+
+fn mock_duplicate_success(duplicate: &JjDuplicatePlan) -> Result<String> {
+    Ok(format!("Duplicated source {}", duplicate.source()))
+}
+
+fn mock_duplicate_failure(duplicate: &JjDuplicatePlan) -> Result<String> {
+    Err(eyre!(
+        "{} failed: first line\nsecond line",
+        duplicate.command_label()
+    ))
 }
 
 fn mock_rebase_success(_: &JjRebasePlan) -> Result<String> {
@@ -394,6 +405,24 @@ fn mock_reveal_rebased_source_in_recent(
     Ok(true)
 }
 
+fn mock_reveal_duplicate_source_in_recent(
+    _view: &mut ViewState,
+    change_id: &str,
+    fallback_mode: LogViewMode,
+) -> Result<bool> {
+    assert_eq!(change_id, "change-a");
+    assert_eq!(fallback_mode, LogViewMode::Recent);
+    Ok(true)
+}
+
+fn mock_reveal_graph_change_unexpected(
+    _view: &mut ViewState,
+    _change_id: &str,
+    _fallback_mode: LogViewMode,
+) -> Result<bool> {
+    panic!("unexpected graph reveal attempt from detail duplicate");
+}
+
 fn mock_reveal_squash_destination_in_recent(
     _view: &mut ViewState,
     change_id: &str,
@@ -443,6 +472,7 @@ fn default_reveal_graph_change(
 fn test_services() -> AppServices {
     let mut services = AppServices::default();
     services.new_run = mock_new_success;
+    services.duplicate_run = mock_duplicate_success;
     services.rebase_run = mock_rebase_success;
     services.split_run = mock_split_success_service;
     services.squash_run = mock_squash_success;
@@ -2516,6 +2546,182 @@ fn split_action_menu_enter_opens_exact_target_preview() {
 }
 
 #[test]
+fn duplicate_action_menu_enter_opens_exact_source_preview() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(
+            vec![ratatui::text::Line::from("○  change")],
+            Some("change-a".to_owned()),
+            None,
+        ),
+    ])));
+    app.mode = InteractionMode::ActionMenu {
+        menu: crate::action_menu::build_action_menu(
+            &crate::action_menu::ExactActionContext::with_current("change-a"),
+        ),
+        selected: 4,
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let (source, command_label, body) = match &app.mode {
+        InteractionMode::DuplicatePreview { duplicate, output } => (
+            duplicate.source().to_owned(),
+            output.command_label().to_owned(),
+            output.body_lines().join("\n"),
+        ),
+        _ => panic!("expected duplicate preview"),
+    };
+    assert_eq!(source, "change-a");
+    assert_eq!(
+        command_label,
+        "jj duplicate exactly(change_id(\"change-a\"), 1)"
+    );
+    assert!(body.contains("source revision: change-a"));
+    assert!(body.contains("source count: 1 exact selected change"));
+    assert!(body.contains("does not parse duplicate output for the new change id"));
+    assert!(body.contains("recovery: jj undo"));
+}
+
+#[test]
+fn duplicate_preview_cancel_preserves_graph_selection() {
+    let mut graph = crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::jj::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+    ]);
+    graph.execute(
+        ViewCommand::MoveDown,
+        CommandContext {
+            viewport_height: 12,
+            viewport_width: 80,
+            search: None,
+        },
+    );
+    let mut app = test_app(ViewState::Graph(graph));
+    app.mode = InteractionMode::DuplicatePreview {
+        duplicate: JjDuplicatePlan::exact_change("second"),
+        output: ActionOutput::pending(
+            "jj duplicate exactly(change_id(\"second\"), 1)".to_owned(),
+            "preview only".to_owned(),
+            Some("duplicate preview context".to_owned()),
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+
+    let ViewState::Graph(graph) = &app.view else {
+        panic!("expected graph view");
+    };
+    assert_eq!(graph.selected_revision(), Some("second"));
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert_eq!(app.status.message(), "duplicate cancelled");
+}
+
+#[test]
+fn duplicate_confirm_success_refreshes_and_uses_recent_source_fallback() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    ])));
+    app.services.reveal_graph_change = mock_reveal_duplicate_source_in_recent;
+    app.mode = InteractionMode::DuplicatePreview {
+        duplicate: JjDuplicatePlan::exact_change("change-a"),
+        output: ActionOutput::pending(
+            "jj duplicate exactly(change_id(\"change-a\"), 1)".to_owned(),
+            "preview only".to_owned(),
+            Some("duplicate exact source change-a from jk".to_owned()),
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::DuplicatePreview { output, .. } => output,
+        _ => panic!("expected duplicate result"),
+    };
+    let body = output.body_lines().join("\n");
+    assert!(output.completed());
+    assert!(body.contains("Duplicated source change-a"));
+    assert!(body.contains("refresh: active view refreshed"));
+    assert!(body.contains(
+        "reveal: selected original source change-a because jk does not parse duplicate output"
+    ));
+    assert_eq!(
+        app.status.message(),
+        "duplicate completed | showing recent work fallback for source | jj undo | jj op show -p"
+    );
+}
+
+#[test]
+fn duplicate_confirm_success_from_exact_detail_view_refreshes_without_graph_reveal() {
+    let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
+        ViewSpec::show("change-a".to_owned(), DiffFormat::Default).with_exact_change_target(),
+    )));
+    app.services.reveal_graph_change = mock_reveal_graph_change_unexpected;
+    app.mode = InteractionMode::DuplicatePreview {
+        duplicate: JjDuplicatePlan::exact_change("change-a"),
+        output: ActionOutput::pending(
+            "jj duplicate exactly(change_id(\"change-a\"), 1)".to_owned(),
+            "preview only".to_owned(),
+            Some("duplicate exact source change-a from jk".to_owned()),
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::DuplicatePreview { output, .. } => output,
+        _ => panic!("expected duplicate result"),
+    };
+    let body = output.body_lines().join("\n");
+    assert!(output.completed());
+    assert!(body.contains("Duplicated source change-a"));
+    assert!(body.contains("refresh: active view refreshed"));
+    assert!(body.contains(
+        "reveal: source fallback not attempted because the active view cannot reveal graph changes"
+    ));
+    assert!(body.contains("recovery: jj undo"));
+    assert!(body.contains("review: jj op show -p"));
+    assert_eq!(
+        app.status.message(),
+        "duplicate completed | active view refreshed | source reveal unavailable | jj undo | jj op show -p"
+    );
+}
+
+#[test]
+fn duplicate_failure_keeps_full_error_output_readable() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    ])));
+    app.services.duplicate_run = mock_duplicate_failure;
+    app.mode = InteractionMode::DuplicatePreview {
+        duplicate: JjDuplicatePlan::exact_change("change-a"),
+        output: ActionOutput::pending(
+            "jj duplicate exactly(change_id(\"change-a\"), 1)".to_owned(),
+            "preview only".to_owned(),
+            None,
+        ),
+    };
+
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    let output = match &app.mode {
+        InteractionMode::DuplicatePreview { output, .. } => output,
+        _ => panic!("expected duplicate result"),
+    };
+    let body = output.body_lines().join("\n");
+    assert_eq!(
+        output.command_label(),
+        "jj duplicate exactly(change_id(\"change-a\"), 1)"
+    );
+    assert!(output.completed());
+    assert!(body.contains("jj duplicate exactly(change_id(\"change-a\"), 1) failed: first line"));
+    assert!(body.contains("second line"));
+    assert_eq!(
+        app.status.message(),
+        "jj duplicate exactly(change_id(\"change-a\"), 1) failed: first line\nsecond line"
+    );
+}
+
+#[test]
 fn split_visible_working_copy_uses_bare_command() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
         crate::jj::LogItem::new(
@@ -2836,7 +3042,7 @@ fn new_failure_keeps_full_error_output_readable() {
 }
 
 #[test]
-fn detail_action_menu_from_exact_show_offers_restore_and_revert() {
+fn detail_action_menu_from_exact_show_offers_duplicate_restore_and_revert() {
     let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
         ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
     )));
@@ -2852,7 +3058,14 @@ fn detail_action_menu_from_exact_show_offers_restore_and_revert() {
             .collect::<Vec<_>>(),
         _ => panic!("expected detail action menu"),
     };
-    assert_eq!(actions, vec![ActionKind::Restore, ActionKind::Revert]);
+    assert_eq!(
+        actions,
+        vec![
+            ActionKind::Duplicate,
+            ActionKind::Restore,
+            ActionKind::Revert
+        ]
+    );
 }
 
 #[test]
@@ -2882,7 +3095,12 @@ fn detail_action_menu_from_exact_file_list_offers_path_restore_first() {
         .collect::<Vec<_>>();
     assert_eq!(
         actions,
-        vec![ActionKind::Restore, ActionKind::Restore, ActionKind::Revert]
+        vec![
+            ActionKind::Restore,
+            ActionKind::Duplicate,
+            ActionKind::Restore,
+            ActionKind::Revert
+        ]
     );
     assert!(matches!(
         menu.items()[0].follow_up(),
@@ -3278,7 +3496,7 @@ fn revert_action_menu_enter_opens_preview_and_cancel_restores_normal_mode() {
         menu: crate::action_menu::build_action_menu(
             &crate::action_menu::ExactActionContext::detail("change-a"),
         ),
-        selected: 1,
+        selected: 2,
     };
 
     app.handle_mode_key(KeyCode::Enter, 12).unwrap();

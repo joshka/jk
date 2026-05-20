@@ -413,6 +413,11 @@ pub struct JjNewPlan {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjDuplicatePlan {
+    source: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjSplitTarget {
     ExactChange(String),
     CurrentWorkingCopy,
@@ -552,6 +557,53 @@ impl JjNewPlan {
     fn normalize(mut self) -> Self {
         self.parents.retain(|parent| !parent.trim().is_empty());
         self
+    }
+}
+
+impl JjDuplicatePlan {
+    pub fn exact_change(source: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+        }
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        vec!["duplicate".to_owned(), exact_change_id_revset(&self.source)]
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput::new(self.preview_summary()))
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(self.command_argv(), &self.command_label(), "duplicated")
+    }
+
+    pub fn preview_summary(&self) -> String {
+        [
+            format!("command: {}", self.command_label()),
+            String::new(),
+            format!("source revision: {}", self.source),
+            "source count: 1 exact selected change; multi-source duplicate is intentionally not exposed".to_owned(),
+            "effect: creates one new change with the same content as the selected source".to_owned(),
+            "placement: jj duplicates onto the source's existing parents because no destination is passed".to_owned(),
+            "description: jj controls duplicate description behavior through its own configuration".to_owned(),
+            "after run: jk refreshes and selects the source in recent work as a fallback because it does not parse duplicate output for the new change id".to_owned(),
+            "confirmation: press Enter to run jj duplicate".to_owned(),
+            "cancel: press Esc to return without running jj duplicate".to_owned(),
+            "recovery: jj undo".to_owned(),
+            "review: jj op show -p".to_owned(),
+        ]
+        .join("\n")
     }
 }
 
@@ -1812,6 +1864,31 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["parent: parent-a", "parent: parent-b", "parent: parent-c"]
         );
+    }
+
+    #[test]
+    fn duplicate_plan_uses_single_exact_change_revset() {
+        let duplicate = JjDuplicatePlan::exact_change("tvykuurwpnwzzqulzrvwvmxxotnlywqw");
+
+        assert_eq!(
+            duplicate.command_argv(),
+            vec![
+                "duplicate",
+                "exactly(change_id(\"tvykuurwpnwzzqulzrvwvmxxotnlywqw\"), 1)"
+            ]
+        );
+        assert_eq!(
+            duplicate.command_label(),
+            "jj duplicate exactly(change_id(\"tvykuurwpnwzzqulzrvwvmxxotnlywqw\"), 1)"
+        );
+
+        let preview = duplicate.preview_summary();
+        assert!(preview.contains("source revision: tvykuurwpnwzzqulzrvwvmxxotnlywqw"));
+        assert!(preview.contains("source count: 1 exact selected change"));
+        assert!(preview.contains("multi-source duplicate is intentionally not exposed"));
+        assert!(preview.contains("does not parse duplicate output for the new change id"));
+        assert!(preview.contains("confirmation: press Enter to run jj duplicate"));
+        assert!(preview.contains("recovery: jj undo"));
     }
 
     #[test]

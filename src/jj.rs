@@ -17,7 +17,7 @@ pub use crate::jj_actions::JjOperationTargetKind;
 pub use crate::jj_actions::{
     CommandOutput, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget,
-    JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjDuplicatePlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
     JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSplitPlan, JjSplitTarget, JjSquashPlan, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan,
