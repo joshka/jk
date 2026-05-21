@@ -98,6 +98,21 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 sync refresh completion helper:
+
+- `src/app/action_lifecycle/shared.rs` now owns `finish_successful_sync_action`, the shared app-side
+  refresh, clamp, status, and refresh-failure result contract for successful sync commands.
+- `src/app/action_lifecycle/completion.rs` still owns push/fetch command execution, command labels,
+  command-failure handling through `finish_failed_action`, and final preview-mode assignment.
+- The helper keeps the feature-specific status wording outside the shared mechanic by accepting a
+  status-message builder: push uses raw output and fetch uses `fetch_status_message`.
+- After the extraction, `src/app/action_lifecycle/completion.rs` measured 437 lines and
+  `src/app/action_lifecycle/shared.rs` measured 192 lines.
+- Focused validation covered `cargo test sync_actions -- --test-threads=1`,
+  `cargo test mode_input -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`. Full `just check` also passed at the
+  top of the stack.
+
 2026-05-21 mode input reducer test split:
 
 - `src/app/mode_input/reducers.rs` now declares its tests out-of-line in

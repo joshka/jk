@@ -229,21 +229,9 @@ impl App {
     ) {
         let command_label = push.command_label(false);
         let result_message = match self.run_push(&push) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    self.status = StatusLine::with_message(&self.view, output.as_str());
-                    output
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    if output.is_empty() {
-                        format!("refresh failed: {error}")
-                    } else {
-                        format!("{output}\nrefresh failed: {error}")
-                    }
-                }
-            },
+            Ok(output) => {
+                self.finish_successful_sync_action(output, viewport_height, str::to_owned)
+            }
             Err(error) => self.finish_failed_action(error),
         };
 
@@ -261,24 +249,9 @@ impl App {
     ) {
         let command_label = fetch.command_label();
         let result_message = match self.run_git_fetch(&fetch) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    self.status = StatusLine::with_message(
-                        &self.view,
-                        fetch_status_message(&fetch, output.as_str()),
-                    );
-                    output
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    if output.is_empty() {
-                        format!("refresh failed: {error}")
-                    } else {
-                        format!("{output}\nrefresh failed: {error}")
-                    }
-                }
-            },
+            Ok(output) => self.finish_successful_sync_action(output, viewport_height, |output| {
+                fetch_status_message(&fetch, output)
+            }),
             Err(error) => self.finish_failed_action(error),
         };
 

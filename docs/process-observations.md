@@ -5968,3 +5968,46 @@ belong here.
   - Thread id from `CODEX_THREAD_ID`.
   - Files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.
+
+### 2026-05-21 (Sync refresh completion helper)
+
+- Slice / task: extract the shared fetch/push success-refresh completion shape from
+  `src/app/action_lifecycle/completion.rs` into action lifecycle shared mechanics.
+- Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
+  implementation `019e4bee-b86a-74c2-a9eb-eb74c803e314`.
+- Model / routing: medium worker implemented the extraction without running jj or git commands. The
+  main thread reviewed the helper boundary, reran focused validation, and updated the
+  maintainability ledger.
+- Changed files: `src/app/action_lifecycle/completion.rs`, `src/app/action_lifecycle/shared.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `shared.rs` now owns `finish_successful_sync_action`, which handles the
+  refresh, viewport clamp, success status assignment, and refresh-failure result wording for sync
+  completions. `completion.rs` still owns push/fetch command execution and preview mode assignment.
+- Behavior-preservation evidence: push passes raw output as the status message builder, while fetch
+  passes the existing `fetch_status_message` builder. The helper preserves raw output in the result
+  body, keeps empty-output refresh failures as `refresh failed: {error}`, keeps non-empty refresh
+  failures as `{output}\nrefresh failed: {error}`, and leaves command failures on
+  `finish_failed_action`.
+- Main-thread review outcome: command execution, command labels, command failures, and preview-mode
+  assignment stayed in `completion.rs`; the shared helper owns only the post-success refresh and
+  result/status projection.
+- Size evidence after main review: `src/app/action_lifecycle/completion.rs` measured 437 lines and
+  `src/app/action_lifecycle/shared.rs` measured 192 lines.
+- Rework / surprise: `rustup run nightly cargo fmt --check` initially failed only because the new
+  push completion call needed rustfmt wrapping; formatting was applied and the check passed.
+  `just md-check` then caught only Panache wrapping in this process note; the wrapping was adjusted
+  and the check passed.
+- Validation trail:
+  - Worker validation passed: `cargo test sync_actions -- --test-threads=1` with 20 passed;
+    `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test sync_actions -- --test-threads=1` with 20
+    passed; `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
+    with `-D warnings`, `cargo check`, and `cargo test` with 557 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 12:09:55 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/action_lifecycle/completion.rs`, `src/app/action_lifecycle/shared.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.

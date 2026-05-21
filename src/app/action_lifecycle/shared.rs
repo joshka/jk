@@ -92,6 +92,30 @@ impl App {
             }
         }
     }
+
+    /// Finish sync commands that preserve raw command output as the result-pane body.
+    pub(in crate::app::action_lifecycle) fn finish_successful_sync_action(
+        &mut self,
+        output: String,
+        viewport_height: u16,
+        status_message: impl FnOnce(&str) -> String,
+    ) -> String {
+        match self.refresh_view_state() {
+            Ok(()) => {
+                self.view.clamp(viewport_height, current_viewport_width());
+                self.status = StatusLine::with_message(&self.view, status_message(output.as_str()));
+                output
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                if output.is_empty() {
+                    format!("refresh failed: {error}")
+                } else {
+                    format!("{output}\nrefresh failed: {error}")
+                }
+            }
+        }
+    }
 }
 
 pub(in crate::app::action_lifecycle) fn short_id(id: &str) -> &str {
