@@ -119,6 +119,94 @@ The exact names can change. The invariant is that a maintainer can start from a 
 `operation_log` or `bookmarks` and find the local row model, view behavior, action availability, and
 tests without first understanding global buckets.
 
+Do not introduce a `slices/` or migration-phase folder. Refactoring should move toward feature roots
+plus shared infrastructure:
+
+```text
+src/
+  app.rs
+  app/
+    input.rs
+    modes.rs
+    navigation.rs
+    services.rs
+    action_lifecycle.rs
+
+  log.rs
+  log/
+    rows.rs
+    actions.rs
+    selection.rs
+    tests.rs
+
+  operation_log.rs
+  operation_log/
+    rows.rs
+    actions.rs
+    detail.rs
+    tests.rs
+
+  bookmarks.rs
+  bookmarks/
+    rows.rs
+    actions.rs
+    action_targets.rs
+    tests.rs
+
+  status.rs
+  status/
+    rows.rs
+    actions.rs
+    tests.rs
+
+  files.rs
+  files/
+    list.rs
+    show.rs
+    actions.rs
+
+  documents.rs
+  documents/
+    sticky.rs
+    rendered.rs
+    search.rs
+
+  actions.rs
+  actions/
+    rewrite.rs
+    working_copy.rs
+    files.rs
+    sync.rs
+    describe.rs
+    abandon.rs
+
+  jj.rs
+  jj/
+    command.rs
+    process.rs
+    syntax.rs
+    view_spec.rs
+
+  ui.rs
+  ui/
+    chrome.rs
+    overlays.rs
+    menus.rs
+    status_hints.rs
+    theme.rs
+```
+
+This sketch is a direction, not a required final tree. A refactor packet should move code only when
+the move shortens the maintainer path for a concrete behavior. For example, `operation_log` should
+eventually be the starting point for operation row interpretation, operation selection/copy, and
+undo/redo/restore/revert target policy. `bookmarks` should be the starting point for bookmark row
+state, local/remote pairing, mutation target resolution, and bookmark-specific action availability.
+
+Shared action modules should begin after a feature has chosen a target. `actions/rewrite.rs` can own
+argv, preview, and run contracts for rebase, squash, and absorb. The log, status, or bookmark
+feature still owns whether that action is offered from its selected rows. Apply the same split to
+working-copy, file, sync, describe, and abandon flows.
+
 Current ownership:
 
 - `app.rs` owns terminal event loop, app-level key dispatch, pending key-prefix state, refresh, and

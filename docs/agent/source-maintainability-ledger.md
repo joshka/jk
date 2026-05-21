@@ -103,6 +103,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 feature-root refactoring guidance:
+
+- `docs/agent/architecture.md` now records the target feature-root plus shared-infrastructure shape
+  as an explicit direction rather than a `slices/` or kind-of-code folder migration.
+- The guidance keeps feature policy with product owners: `operation_log`, `bookmarks`, `status`,
+  `files`, and `log` should own view state, row interpretation, action availability, target
+  resolution, and feature tests when those rules change with the user-visible surface.
+- The guidance keeps shared infrastructure intentionally boring: `app` owns orchestration and
+  lifecycle, `jj` owns process/command/syntax/view-spec boundaries, `actions` owns command plans
+  after a feature has selected targets, and `ui` owns shared chrome and overlay rendering.
+- The packet intentionally did not move Rust code. It documents the next refactoring direction so
+  future source-shape packets have a concrete ownership test before moving behavior.
+- Focused validation covered `just md-check` after applying Panache formatting.
+
 2026-05-21 sticky file document test split:
 
 - `src/sticky_file_view.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

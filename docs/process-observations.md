@@ -5,6 +5,31 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Feature-root refactoring guidance)
+
+- Slice / task: record the user's requested feature-root plus shared-infrastructure refactoring
+  direction in durable project docs.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread GPT-5 Codex performed the packet directly because the user explicitly
+  requested "Do this in the main thread." No subagent was used.
+- Implementation outcome: `docs/agent/architecture.md` now makes the destination shape explicit:
+  feature roots should own product policy, while `app`, `jj`, `actions`, and `ui` should stay narrow
+  shared infrastructure. `docs/agent/source-maintainability-ledger.md` records the same direction as
+  active maintainability evidence for future source-shape packets.
+- Behavior-preservation evidence: this was a documentation-only packet. It intentionally did not
+  move Rust code or change runtime behavior.
+- Readability evidence: the new guidance adds a concrete ownership test for future refactoring: put
+  each rule where a maintainer would look when the user-visible concept changes, and use shared
+  modules only for mechanics two feature owners can use without understanding each other's domain.
+- Validation trail:
+  - Main-thread validation passed: `just md-check` after applying Panache formatting.
+- Rework / surprise: the first Markdown check reported wrapping differences in the new notes. After
+  running `just md-fmt`, the formatting-only differences were applied.
+- Evidence basis:
+  - Date: `2026-05-21 15:02:50 PDT` from local `date`.
+  - Files: `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and this
+    process note.
+
 ### 2026-05-21 (Sticky file document test split)
 
 - Slice / task: move inline tests from `src/sticky_file_view.rs` into
