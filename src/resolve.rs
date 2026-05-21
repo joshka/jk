@@ -16,7 +16,7 @@ use crate::copy::CopyOption;
 use crate::jj::{JjCommand, ViewSpec};
 use crate::jj_rows::{ResolveEntry, load_resolve_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
-use crate::selection::Selection;
+use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
 
 pub const BINDINGS: &[Binding] = &[
@@ -247,11 +247,12 @@ impl ResolveView {
         let previous_path = self.selected_path().map(str::to_owned);
 
         self.entries = load(&self.spec)?;
-        restore_selection(
+        restore_by_key_or_index(
             &mut self.selection,
             &self.entries,
             previous_index,
-            previous_path,
+            previous_path.as_deref(),
+            ResolveEntry::path,
         );
         Ok(())
     }
@@ -292,24 +293,6 @@ fn entry_row_text(entry: &ResolveEntry) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn restore_selection(
-    selection: &mut Selection,
-    entries: &[ResolveEntry],
-    previous_index: usize,
-    previous_path: Option<String>,
-) {
-    if let Some(path) = previous_path
-        && let Some(index) = entries
-            .iter()
-            .position(|entry| entry.path() == Some(path.as_str()))
-    {
-        selection.set(index, entries.len());
-        return;
-    }
-
-    selection.set(previous_index, entries.len());
 }
 
 impl ResolveEntry {

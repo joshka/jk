@@ -14,7 +14,7 @@ use crate::copy::CopyOption;
 use crate::jj::{JjCommand, ViewSpec};
 use crate::jj_rows::{FileListItem, load_file_list_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
-use crate::selection::Selection;
+use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
 
 pub const BINDINGS: &[Binding] = &[
@@ -241,11 +241,12 @@ impl FileListView {
         let previous_path = self.selected_path().map(str::to_owned);
 
         self.entries = load(&self.spec)?;
-        restore_selection(
+        restore_by_key_or_index(
             &mut self.selection,
             &self.entries,
             previous_index,
-            previous_path,
+            previous_path.as_deref(),
+            |entry| Some(entry.path()),
         );
         Ok(())
     }
@@ -265,22 +266,6 @@ fn entry_list(entries: &[FileListItem], search: Option<&SearchQuery>) -> List<'s
         .collect::<Vec<_>>();
 
     List::new(items).highlight_style(theme::active_row_style())
-}
-
-fn restore_selection(
-    selection: &mut Selection,
-    entries: &[FileListItem],
-    previous_index: usize,
-    previous_path: Option<String>,
-) {
-    if let Some(path) = previous_path
-        && let Some(index) = entries.iter().position(|entry| entry.path() == path)
-    {
-        selection.set(index, entries.len());
-        return;
-    }
-
-    selection.set(previous_index, entries.len());
 }
 
 #[cfg(test)]

@@ -229,12 +229,13 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
   through item rows, clamp after shrink, and prefer identity restoration before index restoration.
   View-specific policy is the identity key, whether missing metadata can still be selected, what
   fallback identity is acceptable, and which actions require exact metadata.
-- Helper decision: do not extract a helper yet. A future narrow helper could be
-  `restore_selection_by_key_or_index` for views whose refresh contract is exactly "capture optional
-  stable key, reload rows, find first matching key, else clamp previous index". The first candidates
-  would be `file_list.rs`, `resolve.rs`, and `operation_log.rs`, but the proof is not yet strong
-  enough because each still has different missing-metadata and action-degradation policy. `graph.rs`
-  has multi-selection retention, `status.rs` has row-text fallback, `bookmarks.rs` has incomplete
+- Helper decision: `selection.rs` now owns the narrow `restore_by_key_or_index` helper for views
+  whose refresh contract is exactly "capture optional stable key, reload rows, find first matching
+  key, else clamp previous index". This helper is applied only to `file_list.rs`, `resolve.rs`, and
+  `operation_log.rs`. The view-specific identity key, missing-metadata behavior, copy/action policy,
+  and status wording remain local to each view. Do not broaden this helper to `graph.rs`,
+  `status.rs`, `bookmarks.rs`, or `workspaces.rs` without separate proof: `graph.rs` has
+  multi-selection retention, `status.rs` has row-text fallback, `bookmarks.rs` has incomplete
   name-only mutation identity, and `workspaces.rs` mixes selectable rows with non-row header
   metadata.
 - Non-goals: no broad abstraction before the contract is named and tested in the owning views.

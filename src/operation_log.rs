@@ -17,7 +17,7 @@ use crate::copy::CopyOption;
 use crate::jj::ViewSpec;
 use crate::jj_rows::{OperationLogItem, load_operation_log_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
-use crate::selection::Selection;
+use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
 
 pub const BINDINGS: &[Binding] = &[
@@ -266,11 +266,12 @@ impl OperationLogView {
             .and_then(OperationLogItem::operation_id)
             .map(str::to_owned);
         self.entries = load(&self.spec)?;
-        restore_selection(
+        restore_by_key_or_index(
             &mut self.selection,
             &self.entries,
             previous_index,
-            previous_operation_id,
+            previous_operation_id.as_deref(),
+            OperationLogItem::operation_id,
         );
         Ok(())
     }
@@ -310,24 +311,6 @@ fn entry_list(entries: &[OperationLogItem], search: Option<&SearchQuery>) -> Lis
         .collect::<Vec<_>>();
 
     List::new(items).highlight_style(theme::active_row_style())
-}
-
-fn restore_selection(
-    selection: &mut Selection,
-    entries: &[OperationLogItem],
-    previous_index: usize,
-    previous_operation_id: Option<String>,
-) {
-    if let Some(operation_id) = previous_operation_id
-        && let Some(index) = entries
-            .iter()
-            .position(|entry| entry.operation_id() == Some(operation_id.as_str()))
-    {
-        selection.set(index, entries.len());
-        return;
-    }
-
-    selection.set(previous_index, entries.len());
 }
 
 fn short_id(id: &str) -> &str {

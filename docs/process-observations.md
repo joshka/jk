@@ -5,6 +5,47 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Selection helper Rustdoc correction)
+
+- Slice / task: add concise Rustdoc to `restore_by_key_or_index` on current jj change
+  `Extract simple selection restore helper`.
+- Thread id: `019e493c-b96b-79e0-9a66-b9df49b577fc`.
+- Files changed: `src/selection.rs` and this process note.
+- Implementation outcome: the helper now documents that it restores by the first matching stable
+  key, otherwise preserves and clamps the previous index, with key capture and action policy left to
+  the caller.
+- Validation trail: `cargo test selection -- --test-threads=1`,
+  `rustup run nightly cargo fmt --check`, and `just md-check` passed.
+- Evidence basis:
+  - Date: `2026-05-20 23:37:15 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Source context: `src/selection.rs` and `docs/process-observations.md`
+
+### 2026-05-20 (Simple selection restore helper)
+
+- Slice / task: implement the narrow helper candidate from the list-selection inventory on current
+  jj change `Extract simple selection restore helper`.
+- Thread id: `019e493c-b96b-79e0-9a66-b9df49b577fc`.
+- Files changed: `src/selection.rs`, `src/file_list.rs`, `src/resolve.rs`, `src/operation_log.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `Selection` keeps its existing cursor mechanics, while
+  `restore_by_key_or_index` now owns only the repeated refresh contract "optional stable key first,
+  previous index clamped second". `file_list.rs`, `resolve.rs`, and `operation_log.rs` use it after
+  reload.
+- Behavior intent: preserve selection, navigation, copy/action gating, missing-metadata status
+  wording, and rendering behavior exactly. View-specific identity capture and action policy remain
+  in the concrete views.
+- Validation trail: the main thread ran `cargo test selection -- --test-threads=1`,
+  `cargo test file_list -- --test-threads=1`, `cargo test resolve -- --test-threads=1`,
+  `cargo test operation_log -- --test-threads=1`, `cargo check`, `cargo clippy -- -D warnings`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`; all passed.
+- Residual risk: the helper intentionally does not cover graph multi-selection, status row-text
+  fallback, bookmarks action metadata, or workspace header metadata.
+- Evidence basis:
+  - Date: `2026-05-20 23:34:25 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `src/selection.rs`,
+    `src/file_list.rs`, `src/resolve.rs`, `src/operation_log.rs`,
+    `docs/development/rules/refactoring.md`, and `docs/development/rules/testing.md`
+
 ### 2026-05-20 (Identity-preserving list mechanics inventory)
 
 - Slice / task: implement the ledger slice `Identity-Preserving List Mechanics` as an audit and
