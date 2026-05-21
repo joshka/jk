@@ -103,6 +103,27 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 jj file/content action-plan module split:
+
+- Restore, revert, and file mutation command plans moved from `src/jj_actions.rs` to
+  `src/jj_actions/files.rs`, with `src/jj_actions.rs` declaring `mod files;` and continuing to
+  re-export `JjRestorePlan`, `JjRevertPlan`, `JjFileMutationPlan`, `JjFileMutationKind`,
+  `JjFileMutationTarget`, and `JjFileChmodMode` for app-facing callers.
+- The related restore/revert/track/untrack/chmod tests moved from `src/jj_actions/tests.rs` to
+  `src/jj_actions/files/tests.rs` with their existing names and assertions preserved. Describe,
+  commit, and abandon tests stayed in `src/jj_actions/tests.rs`.
+- The packet intentionally preserved command argv, preview wording, exact revset/fileset quoting,
+  run behavior, public re-export names, and app behavior. It did not change status/file-list/view
+  action availability.
+- Focused validation covered `cargo test jj_actions::files -- --test-threads=1` with 8 passed and
+  559 filtered out, `cargo test jj_actions -- --test-threads=1` with 42 passed and 525 filtered out,
+  `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check` after applying Panache
+  wrapping.
+- Main-thread review validation reran the same focused checks successfully. After the extraction,
+  `src/jj_actions.rs` measures 397 lines, `src/jj_actions/files.rs` measures 491 lines,
+  `src/jj_actions/tests.rs` measures 159 lines, and `src/jj_actions/files/tests.rs` measures 206
+  lines.
+
 2026-05-21 operation-log action-plan owner move:
 
 - Operation recovery command plans moved from `src/jj_actions/operation.rs` to

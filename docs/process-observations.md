@@ -5,6 +5,46 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (jj file/content action-plan module split)
+
+- Slice / task: extract restore, revert, and `jj file` mutation action plans from
+  `src/jj_actions.rs` into a coherent child module while preserving `crate::jj_actions` as the
+  app-facing import surface.
+- Thread id: `019e4c99-2219-7260-9da1-e99670f71fce` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex implemented the bounded maintainability packet in the current
+  existing jj change. The user explicitly prohibited version-control commands, and no `jj` or `git`
+  commands were run.
+- Implementation outcome: `src/jj_actions/files.rs` now owns `JjRestorePlan`, `JjFileMutationKind`,
+  `JjFileChmodMode`, `JjFileMutationTarget`, `JjFileMutationPlan`, internal `JjRestoreTarget`, and
+  `JjRevertPlan`. `src/jj_actions.rs` declares `mod files;` and re-exports the public file/content
+  plan types so existing callers can keep importing from `crate::jj_actions`.
+- Behavior-preservation evidence: the moved tests live in `src/jj_actions/files/tests.rs` with their
+  existing names and assertions. Describe, commit, and abandon tests stayed in
+  `src/jj_actions/tests.rs`. The packet intentionally preserved command argv, preview wording, exact
+  revset/fileset quoting, run behavior, public re-export names, and app behavior.
+- Scope boundary: the packet did not change status/file-list/view action availability or move
+  describe, commit, abandon, git sync, rewrite, working-copy, bookmark, or operation-log behavior.
+- Validation trail:
+  - Worker validation passed: `cargo test jj_actions::files -- --test-threads=1` with 8 passed and
+    559 filtered out; `cargo test jj_actions -- --test-threads=1` with 42 passed and 525 filtered
+    out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `just md-check` after applying Panache wrapping.
+  - Main-thread review validation passed: `cargo test jj_actions::files -- --test-threads=1` with 8
+    passed and 559 filtered out; `cargo test jj_actions -- --test-threads=1` with 42 passed and 525
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+- Rework / surprise: preserving the app-facing re-export names for currently-unused
+  `JjFileMutationKind` and `JjFileMutationTarget` produced an unused-import warning in the binary
+  crate. A narrow `#[allow(unused_imports)]` was added to that compatibility re-export.
+- Readability evidence: after the extraction, `src/jj_actions.rs` measures 397 lines,
+  `src/jj_actions/files.rs` measures 491 lines, `src/jj_actions/tests.rs` measures 159 lines, and
+  `src/jj_actions/files/tests.rs` measures 206 lines.
+- Evidence basis:
+  - Date: `2026-05-21 15:13:06 PDT` from local `date`.
+  - Main review date: `2026-05-21 15:19:16 PDT` from local `date`.
+  - Files: `src/jj_actions.rs`, `src/jj_actions/files.rs`, `src/jj_actions/files/tests.rs`,
+    `src/jj_actions/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Operation-log action-plan owner move)
 
 - Slice / task: move operation recovery/action command plans from the global `jj_actions` bucket to
