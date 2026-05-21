@@ -5,6 +5,26 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Maintainability ledger reconciliation)
+
+- Slice / task: reconcile `docs/agent/source-maintainability-ledger.md` after the completed preview,
+  git-sync, view-target, selection, and `src/jj.rs` extraction packets.
+- Thread id: `019e495d-4dfb-7930-a238-92360de65cbc`.
+- Model / routing: a `gpt-5.4-mini` worker/subagent updated the docs and the main thread reviewed
+  the result.
+- Additional review evidence: a `gpt-5.5` read-only review (`019e495d-a69c-7f23-9195-ac53720791ae`)
+  corrected the next-slice recommendation from generic action-plan extraction toward bookmark
+  vertical cohesion.
+- Files changed: `docs/agent/source-maintainability-ledger.md` and `docs/process-observations.md`.
+- Behavior intent: docs only; no source behavior, routing behavior, or tests changed.
+- Validation trail: `just md-check` passed.
+- Main-thread validation after review also ran `just md-check` and passed.
+- Evidence basis:
+  - Date: `2026-05-21 00:10:09 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`,
+    and `docs/agent/architecture.md`
+
 ### 2026-05-21 (View action-target policy extraction)
 
 - Slice / task: implement prioritized slice 3 from `docs/agent/source-maintainability-ledger.md`,

@@ -26,14 +26,10 @@ shape, documentation workflow, and agent workflow.
 
 ## Current Concept Map
 
-- Recent completed packets: `Extract simple selection restore helper`,
-  `Inventory list selection contracts`, `Clarify app mode input dispatch`,
-  `Inventory action planning cohesion`, `Repair remaining contract drift`,
-  `Add packet quality gate`, `Audit source maintainability surface`,
-  `Factor action completion outcomes`, `Repair stale source ownership docs`,
-  `Document app command contracts`, `Fail closed on row metadata drift`,
-  `Extract jj syntax helpers`, and the `Retire Or Narrow` slice for `src/jj.rs` compatibility
-  re-exports.
+- Recent completed packets: `Action Preview Pane Construction Helper`,
+  `Git Sync Action-Plan Cluster`, `View Action-Target Projection Policy`,
+  `Extract simple selection restore helper`, and the `Retire Or Narrow` slice for `src/jj.rs`
+  compatibility re-exports.
 - Command and app contracts: `src/command.rs` owns key binding metadata plus `Command`,
   `ViewCommand`, `CommandContext`, and `ViewEffect`; `src/app_screen.rs` owns `InteractionMode`; and
   `src/app/mode_input.rs` owns modal and prompt key reducers.
@@ -41,11 +37,20 @@ shape, documentation workflow, and agent workflow.
   orchestration.
 - Action lifecycle: `src/app/action_lifecycle/{entry,completion,rewrite_completion,shared}.rs` owns
   guided action dispatch, shared outcome helpers, refresh and reveal policy, and status/result
-  construction.
-- Action planning: `src/jj_actions.rs` owns preview-first action plans, command argv construction,
-  preview summaries, and fallback result wording.
-- View state: `src/view_state.rs` owns action-target projection policy and the view-level routing
-  that chooses the next detailed screen.
+  construction; `src/app/action_lifecycle/preview.rs` owns the preview-pane construction helper.
+- Bookmark cohesion: `src/bookmarks.rs` owns bookmark mutation and action-target resolution;
+  `src/jj_actions.rs` owns bookmark action plans and the remaining preview-first action plans;
+  `src/jj_rows.rs` owns bookmark row metadata pairing; `src/view_action_targets.rs` owns bookmark
+  action-target projection policy.
+- Action planning: `src/jj_actions/git_sync.rs` owns the extracted git sync action-plan cluster;
+  `src/jj_actions.rs` keeps the stable facade and the remaining action-plan clusters, including the
+  rewrite action plan.
+- View routing: `src/view_state.rs` keeps the view-level routing that chooses the next detailed
+  screen.
+- Selection mechanics: `src/selection.rs` owns the restore helper and shared selection cursor
+  mechanics.
+- Compatibility cleanup: `src/jj.rs` keeps only the helpers it owns, without the old compatibility
+  re-export layer.
 - Row metadata pairing: `src/jj_rows.rs` owns rendered-row loading, fail-closed metadata pairing,
   and row grouping for graph-adjacent utility views.
 - Syntax helpers: `src/jj_syntax.rs` owns pure `jj` syntax helpers extracted from
@@ -62,23 +67,25 @@ shape, documentation workflow, and agent workflow.
 `just largest-rust-files` reported these largest source files:
 
 ```text
-3585 src/jj_actions.rs
+3289 src/jj_actions.rs
 2145 src/jj_rows.rs
 1478 src/bookmarks.rs
 1440 src/jj.rs
 1255 src/command.rs
 1246 src/action_menu.rs
 1218 src/graph.rs
-778 src/app/mode_input.rs
-731 src/app/action_lifecycle/preview.rs
-702 src/view_state.rs
+1192 src/app/tests/bookmark_actions.rs
+1134 src/tui.rs
+820 src/status.rs
 ```
 
 The maintainability question is not "split the largest files." The question is whether a future
-change must keep unrelated facts live at the same time. `src/jj_actions.rs`, `src/jj_rows.rs`,
-`src/jj.rs`, `src/bookmarks.rs`, `src/command.rs`, `src/action_menu.rs`, `src/graph.rs`, and
-`src/sticky_file_view.rs` are the first places to inspect when action planning, row pairing, command
-construction, or selection-preserving view behavior starts mixing concepts.
+change must keep unrelated facts live at the same time. `src/bookmarks.rs`, `src/jj_actions.rs`,
+`src/jj_rows.rs`, `src/view_action_targets.rs`, `src/jj.rs`, `src/command.rs`, `src/action_menu.rs`,
+`src/graph.rs`, and `src/sticky_file_view.rs` are the first places to inspect when bookmark vertical
+cohesion, command construction, or selection-preserving view behavior starts mixing concepts.
+`src/app/action_lifecycle/preview.rs` and `src/view_state.rs` dropped out of the top-file list after
+the recent extractions, which is the expected result of the completed slices.
 
 ### Visibility Surface
 
@@ -111,12 +118,9 @@ The previous broad missing-module-doc finding is no longer active. A fresh scan 
 `src/main.rs` missing a `//!` module doc in the first eight lines. The central app and command
 contract gaps are also closed by the `Document app command contracts` packet: `Command`,
 `ViewCommand`, `CommandContext`, `ViewEffect`, `InteractionMode`, `AppServices`, and
-`PendingCommand` are no longer active ledger gaps.
-
-### Active Documentation Drift
-
-`docs/agent/architecture.md` still keeps the rendering guidance anchored to "show/diff" wording.
-Fold that wording cleanup into the next packet that already touches documentation.
+`PendingCommand` are no longer active ledger gaps. The rendered-file guidance drift in
+`docs/agent/architecture.md` is also closed. The sticky projection rules now refer to rendered
+file-oriented documents directly instead of anchoring the contract to show/diff wording.
 
 ### Weak Or Missing Intent Docs
 
@@ -133,13 +137,17 @@ near the type that future edits are likely to land on first.
 
 ### Repeated Or High-Live-Context Surfaces
 
-- `src/app/action_lifecycle/preview.rs` still repeats pending, finished, and status-context
-  patterns. The review called this the clearest repeated implementation pattern.
-- `src/jj_actions.rs` still mixes preview-first plans, argv construction, preview summaries, and
-  fallback wording even after `src/jj_syntax.rs` absorbed the pure syntax helpers. The git sync
-  cluster is the cleanest bounded next extraction.
-- `src/view_state.rs` still repeats action-target projection and navigation routing that want a
-  single policy owner.
+- `src/bookmarks.rs`, `src/jj_actions.rs`, `src/jj_rows.rs`, and `src/view_action_targets.rs` still
+  share bookmark-related vertical concerns across action targets, action plans, and row metadata.
+- `src/jj_actions.rs` still mixes the remaining action-plan clusters, argv construction, preview
+  summaries, and fallback wording. The bookmark and git sync clusters are already out of the generic
+  path, so the next bounded slice should stay on one remaining cluster rather than reopen the whole
+  planner.
+- `src/app/action_lifecycle/completion.rs` still concentrates the status/result construction
+  branches for action outcomes. It is a smaller target than `src/jj_actions.rs`, but it remains a
+  dense live-context surface.
+- `src/bookmarks.rs` remains dense because bookmark mutation and restore behavior share the same
+  file.
 - `src/app/mode_input.rs` still carries many modal key paths in one control-flow surface, but the
   recent readability packet already reduced the densest dispatch path, so it is not the next packet.
 - `src/app.rs` is no longer the main pressure point; the current measurements and review findings
@@ -150,17 +158,58 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 
 ## Prioritized Corrective Slices
 
-### 1. Action Preview Pane Construction Helper
+### 1. Bookmark Action Target Resolver
 
-- Owner: `src/app/action_lifecycle/preview.rs`.
-- Purpose: pull the repeated action preview pane construction pattern into one helper so the
-  status-context and pending/finished setup reads as a single unit.
-- Non-goals: no preview behavior change, no keymap redesign, and no result-model reshaping.
+- Owner: `src/bookmarks.rs`, with a child module if the resolution logic needs to split from the
+  mutation state.
+- Purpose: pull bookmark action-target resolution into one bounded owner while preserving
+  fail-closed metadata handling and existing error wording.
+- Non-goals: no bookmark behavior change, no action wording drift, and no broad navigation-model
+  rewrite.
+- Proof: `src/bookmarks.rs` remains one of the largest source files and still mixes bookmark
+  mutation with action-target resolution concerns.
+
+### 2. Bookmark Action Plan Submodule
+
+- Owner: `src/jj_actions/bookmarks.rs`.
+- Purpose: move bookmark action-plan construction into a stable submodule while keeping the public
+  `jj_actions` facade intact.
+- Non-goals: no argv wording drift, no behavior change, and no public call-site churn.
+- Proof: `src/jj_actions.rs` still ranks among the largest and hottest files after the git-sync
+  extraction.
+
+### 3. Bookmark Row Metadata Module
+
+- Owner: `src/jj_rows/bookmarks.rs`.
+- Purpose: separate bookmark row metadata pairing from the broader row-loading module once the
+  action and target ownership above have settled.
+- Non-goals: no fail-closed behavior change, no row grouping redesign, and no new selection policy.
+- Proof: `src/jj_rows.rs` remains a large row-pairing surface after the recent selection and
+  action-target extractions.
+
+### 4. Rewrite Action Plan Submodule
+
+- Owner: `src/jj_actions.rs`, with a bounded rewrite child module if the cluster stays cohesive.
+- Purpose: peel off the rewrite action-plan cluster as another bounded `jj_actions` slice after the
+  bookmark ownership is clarified.
+- Non-goals: no broad `jj_actions.rs` split, no public facade churn, and no wording drift.
+- Proof: the current size and hotspot scans still put `src/jj_actions.rs` at the top of the source
+  maintenance list.
+
+### 5. Completed: Action Preview Pane Construction Helper
+
+- Status: completed in a recent packet.
+- Result: `src/app/action_lifecycle/preview.rs` owns the preview-pane construction helper that turns
+  a successful preview/load result into `ActionOutput::pending` and records `StatusLine::error` on
+  failure. Callers still own their exact `InteractionMode` variants, command labels, status
+  contexts, and preview-text mappings.
+- Non-goals preserved: no preview behavior change, no keymap redesign, and no result-model
+  reshaping.
 - Proof: focused preview tests covering current rendering and scroll behavior, plus `cargo check`.
 
-### 2. Completed: Git Sync Action-Plan Cluster
+### 6. Completed: Git Sync Action-Plan Cluster
 
-- Status: completed in the current packet.
+- Status: completed in a recent packet.
 - Result: `src/jj_actions/git_sync.rs` owns `JjGitFetch`, `JjGitPush`, `JjGitPushTarget`, and their
   command-construction tests; `src/jj_actions.rs` keeps the stable public facade through re-exports.
 - Non-goals preserved: no broad `jj_actions.rs` split, no public facade churn, and no wording drift
@@ -168,9 +217,9 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 - Proof: `cargo test jj_actions -- --test-threads=1` keeps the moved git sync tests discoverable
   through the `jj_actions` module path.
 
-### 3. Completed: View Action-Target Projection Policy
+### 7. Completed: View Action-Target Projection Policy
 
-- Status: completed in the current packet.
+- Status: completed in a recent packet.
 - Result: `src/view_action_targets.rs` owns push targets, bookmark mutation targets, selected local
   bookmark names, bookmark forget targets, and exact restore/revert action contexts. `ViewState`
   keeps the stable app-facing methods as thin delegates, so view operation routing remains in
@@ -180,24 +229,9 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 - Proof: focused view-state and app action tests preserve the current action target mapping and
   destinations.
 
-### 4. Documentation Drift Cleanup
+### 8. Completed: Simple Selection Restore Helper
 
-- Owner: `docs/agent/architecture.md` and `docs/agent/source-maintainability-ledger.md`.
-- Purpose: fold the small remaining docs drift cleanup into the next packet that already touches
-  documentation, instead of spinning up a separate source-shape pass.
-- Non-goals: no source behavior work and no new contract surface.
-- Proof: `just md-check`.
-
-### 5. Completed: Retired `src/jj.rs` Compatibility Re-exports
-
-- Status: completed in the current packet.
-- Result: source and test imports now refer to `jj_actions` and `jj_rows` directly; `src/jj.rs`
-  keeps only the helpers it owns; and no compatibility re-export remains.
-- Proof: focused compile pass plus the import audit recorded in `docs/process-observations.md`.
-
-### 6. Completed: Simple Selection Restore Helper Inventory
-
-- Status: completed in the current packet.
+- Status: completed in a recent packet.
 - Result: the helper stays narrow and the selection contracts remain documented for future readers.
   `selection.rs` keeps cursor mechanics only; `graph.rs` preserves selection by change id with
   multi-selection retention; `status.rs` preserves the selected row by path, then rendered text,
@@ -208,11 +242,17 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 - Proof: the `Extract simple selection restore helper` packet and the inventory in
   `docs/process-observations.md`.
 
-### 7. Quality Gate Refinements
+### 9. Completed: Retired `src/jj.rs` Compatibility Re-exports
 
-- Owner: `docs/agent/source-maintainability-ledger.md` and the measurement commands that feed it.
-- Purpose: keep the next audit mechanical by refreshing `just largest-rust-files`, the visibility
-  scan, and the module-doc scan before each new packet.
-- Non-goals: no source behavior work and no broad guidance rewrite.
-- Proof: rerun the measurement commands, update the ledger, and record the results in
-  `docs/process-observations.md`.
+- Status: completed in a recent packet.
+- Result: source and test imports now refer to `jj_actions` and `jj_rows` directly; `src/jj.rs`
+  keeps only the helpers it owns; and no compatibility re-export remains.
+- Proof: focused compile pass plus the import audit recorded in `docs/process-observations.md`.
+
+### 10. Completed: Documentation Drift Cleanup
+
+- Status: completed in the prior packet.
+- Result: `docs/agent/architecture.md` now describes sticky rendering rules for rendered
+  file-oriented documents directly, so the old show/diff wording drift is closed.
+- Non-goals preserved: no source behavior work and no new contract surface.
+- Proof: `just md-check`.
