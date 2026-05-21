@@ -182,7 +182,7 @@ degrade gracefully instead of inventing a target.
 Rendered jj text should keep its Ratatui spans and styles. Avoid converting styled lines into plain
 strings except for narrow matching or parsing tasks.
 
-For show/diff documents:
+For rendered file-oriented documents:
 
 - Sticky file headings come from rendered jj output, not regenerated labels.
 - Sticky projections should preserve enough blank-line context to still look like jj output.

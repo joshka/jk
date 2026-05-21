@@ -3,6 +3,8 @@
 //! This module builds the preview/result panes before a command is confirmed. It owns preview
 //! status context wording, while `jj_actions` remains the owner of argv construction.
 
+use color_eyre::Result;
+
 use crate::action_output::ActionOutput;
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
@@ -26,28 +28,14 @@ impl App {
         let fetch = JjGitFetch::for_remote(remote);
         let status_context = Some(fetch_status_context(&fetch));
 
-        match fetch.run_preview() {
-            Ok(output) => {
-                let command_label = fetch.command_label();
-                self.mode = InteractionMode::FetchPreview {
-                    fetch,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = fetch.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::FetchPreview {
-                    fetch,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = fetch.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            fetch.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::FetchPreview { fetch, output };
     }
 
     pub(in crate::app) fn fetch(&mut self, viewport_height: u16) {
@@ -91,24 +79,14 @@ impl App {
             JjGitPushTarget::Status => JjGitPush::for_status().with_remote(remote),
         };
 
-        match self.load_push_preview(&push) {
-            Ok(output) => {
-                let command_label = push.command_label(true);
-                self.mode = InteractionMode::PushPreview {
-                    push,
-                    output: ActionOutput::pending(command_label, output, status_context),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = push.command_label(true);
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::PushPreview {
-                    push,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = push.command_label(true);
+        let output = self.preview_output_with_error_status(
+            command_label,
+            self.load_push_preview(&push),
+            std::convert::identity,
+            status_context,
+        );
+        self.mode = InteractionMode::PushPreview { push, output };
     }
 
     pub(in crate::app) fn open_operation_recovery_preview(
@@ -139,28 +117,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match target.run_preview() {
-            Ok(output) => {
-                let command_label = target.command_label();
-                self.mode = InteractionMode::OperationTargetPreview {
-                    target,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = target.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::OperationTargetPreview {
-                    target,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = target.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            target.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::OperationTargetPreview { target, output };
     }
 
     pub(in crate::app) fn open_graph_working_copy_navigation_preview(
@@ -207,28 +171,14 @@ impl App {
             ),
         });
 
-        match navigation.run_preview() {
-            Ok(output) => {
-                let command_label = navigation.command_label();
-                self.mode = InteractionMode::WorkingCopyNavigationPreview {
-                    navigation,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = navigation.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::WorkingCopyNavigationPreview {
-                    navigation,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = navigation.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            navigation.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::WorkingCopyNavigationPreview { navigation, output };
     }
 
     pub(in crate::app) fn open_describe_preview(&mut self, describe: JjDescribePlan) {
@@ -238,28 +188,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match describe.run_preview() {
-            Ok(output) => {
-                let command_label = describe.command_label();
-                self.mode = InteractionMode::DescribePreview {
-                    describe,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = describe.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::DescribePreview {
-                    describe,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = describe.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            describe.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::DescribePreview { describe, output };
     }
 
     pub(in crate::app) fn open_commit_preview(&mut self, commit: JjCommitPlan) {
@@ -268,28 +204,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match commit.run_preview() {
-            Ok(output) => {
-                let command_label = commit.command_label();
-                self.mode = InteractionMode::CommitPreview {
-                    commit,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = commit.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::CommitPreview {
-                    commit,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = commit.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            commit.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::CommitPreview { commit, output };
     }
 
     pub(in crate::app) fn open_bookmark_mutation_preview(
@@ -301,28 +223,14 @@ impl App {
             self.view.spec().app_label().as_str(),
         ));
 
-        match mutation.run_preview() {
-            Ok(output) => {
-                let command_label = mutation.command_label();
-                self.mode = InteractionMode::BookmarkMutationPreview {
-                    mutation,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = mutation.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::BookmarkMutationPreview {
-                    mutation,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = mutation.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            mutation.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::BookmarkMutationPreview { mutation, output };
     }
 
     pub(in crate::app) fn open_file_mutation_preview(&mut self, mutation: JjFileMutationPlan) {
@@ -337,28 +245,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match mutation.run_preview() {
-            Ok(output) => {
-                let command_label = mutation.command_label();
-                self.mode = InteractionMode::FileMutationPreview {
-                    mutation,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = mutation.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::FileMutationPreview {
-                    mutation,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = mutation.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            mutation.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::FileMutationPreview { mutation, output };
     }
 
     pub(in crate::app) fn open_new_preview(&mut self, new_change: JjNewPlan) {
@@ -375,28 +269,14 @@ impl App {
             parent_labels
         ));
 
-        match new_change.run_preview() {
-            Ok(output) => {
-                let command_label = new_change.command_label();
-                self.mode = InteractionMode::NewPreview {
-                    new_change,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = new_change.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::NewPreview {
-                    new_change,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = new_change.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            new_change.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::NewPreview { new_change, output };
     }
 
     pub(in crate::app) fn open_duplicate_preview(&mut self, duplicate: JjDuplicatePlan) {
@@ -406,28 +286,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match duplicate.run_preview() {
-            Ok(output) => {
-                let command_label = duplicate.command_label();
-                self.mode = InteractionMode::DuplicatePreview {
-                    duplicate,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = duplicate.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::DuplicatePreview {
-                    duplicate,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = duplicate.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            duplicate.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::DuplicatePreview { duplicate, output };
     }
 
     pub(in crate::app) fn run_new_trunk(&mut self, viewport_height: u16) {
@@ -493,28 +359,14 @@ impl App {
                 .map(|status_context| format!("{status_context} | source(s): {source_labels}"))
         };
 
-        match rebase.run_preview() {
-            Ok(output) => {
-                let command_label = rebase.command_label(true);
-                self.mode = InteractionMode::RebasePreview {
-                    rebase,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = rebase.command_label(true);
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::RebasePreview {
-                    rebase,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = rebase.command_label(true);
+        let output = self.preview_output_with_error_status(
+            command_label,
+            rebase.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::RebasePreview { rebase, output };
     }
 
     pub(in crate::app) fn open_split_preview(&mut self, split: JjSplitPlan) {
@@ -524,28 +376,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match split.run_preview() {
-            Ok(output) => {
-                let command_label = split.command_label();
-                self.mode = InteractionMode::SplitPreview {
-                    split,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = split.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::SplitPreview {
-                    split,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = split.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            split.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::SplitPreview { split, output };
     }
 
     pub(in crate::app) fn open_restore_preview(&mut self, restore: JjRestorePlan) {
@@ -558,24 +396,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match self.load_restore_preview(&restore) {
-            Ok(output) => {
-                let command_label = restore.command_label();
-                self.mode = InteractionMode::RestorePreview {
-                    restore,
-                    output: ActionOutput::pending(command_label, output, status_context),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = restore.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::RestorePreview {
-                    restore,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = restore.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            self.load_restore_preview(&restore),
+            std::convert::identity,
+            status_context,
+        );
+        self.mode = InteractionMode::RestorePreview { restore, output };
     }
 
     pub(in crate::app) fn open_revert_preview(&mut self, revert: JjRevertPlan) {
@@ -585,24 +413,14 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match self.load_revert_preview(&revert) {
-            Ok(output) => {
-                let command_label = revert.command_label();
-                self.mode = InteractionMode::RevertPreview {
-                    revert,
-                    output: ActionOutput::pending(command_label, output, status_context),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = revert.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::RevertPreview {
-                    revert,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = revert.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            self.load_revert_preview(&revert),
+            std::convert::identity,
+            status_context,
+        );
+        self.mode = InteractionMode::RevertPreview { revert, output };
     }
 
     pub(in crate::app) fn open_squash_preview(&mut self, squash: JjSquashPlan) {
@@ -625,28 +443,14 @@ impl App {
                 .map(|status_context| format!("{status_context} | source(s): {source_labels}"))
         };
 
-        match squash.run_preview() {
-            Ok(output) => {
-                let command_label = squash.command_label(true);
-                self.mode = InteractionMode::SquashPreview {
-                    squash,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = squash.command_label(true);
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::SquashPreview {
-                    squash,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = squash.command_label(true);
+        let output = self.preview_output_with_error_status(
+            command_label,
+            squash.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::SquashPreview { squash, output };
     }
 
     pub(in crate::app) fn open_absorb_preview(&mut self, absorb: JjAbsorbPlan) {
@@ -672,28 +476,14 @@ impl App {
             destination_labels
         ));
 
-        match absorb.run_preview() {
-            Ok(output) => {
-                let command_label = absorb.command_label();
-                self.mode = InteractionMode::AbsorbPreview {
-                    absorb,
-                    output: ActionOutput::pending(
-                        command_label,
-                        output.message().to_owned(),
-                        status_context,
-                    ),
-                };
-            }
-            Err(error) => {
-                let message = error.to_string();
-                let command_label = absorb.command_label();
-                self.status = StatusLine::error(&self.view, message.clone());
-                self.mode = InteractionMode::AbsorbPreview {
-                    absorb,
-                    output: ActionOutput::finished(command_label, message, status_context),
-                };
-            }
-        }
+        let command_label = absorb.command_label();
+        let output = self.preview_output_with_error_status(
+            command_label,
+            absorb.run_preview(),
+            |output| output.message().to_owned(),
+            status_context,
+        );
+        self.mode = InteractionMode::AbsorbPreview { absorb, output };
     }
 
     pub(in crate::app) fn open_abandon_preview(&mut self, abandon: JjAbandonPlan) {
@@ -725,6 +515,26 @@ impl App {
                     preview: JjAbandonPreview::new(String::new(), None, String::new()),
                     output: ActionOutput::finished(command_label, message, status_context),
                 };
+            }
+        }
+    }
+
+    // Keep mode construction at each caller; this helper owns only pane state and error status.
+    fn preview_output_with_error_status<T>(
+        &mut self,
+        command_label: String,
+        preview_result: Result<T>,
+        preview_text: impl FnOnce(T) -> String,
+        status_context: Option<String>,
+    ) -> ActionOutput {
+        match preview_result {
+            Ok(output) => {
+                ActionOutput::pending(command_label, preview_text(output), status_context)
+            }
+            Err(error) => {
+                let message = error.to_string();
+                self.status = StatusLine::error(&self.view, message.clone());
+                ActionOutput::finished(command_label, message, status_context)
             }
         }
     }

@@ -25,6 +25,53 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`,
     and the read-only review notes for the current packet
 
+### 2026-05-20 (Action preview pane helper)
+
+- Slice / task: implement prioritized slice 1 from `docs/agent/source-maintainability-ledger.md`,
+  `Action Preview Pane Construction Helper`.
+- Thread id: `019e4948-98a5-7e23-8c73-028917266650`.
+- Model / routing: a `gpt-5.5` worker/subagent implemented the behavior-preserving extraction and
+  worker validation; the main thread reviewed the result.
+- Implementation outcome: `src/app/action_lifecycle/preview.rs` now owns one
+  `preview_output_with_error_status` helper. The helper converts a successful preview/load result
+  into `ActionOutput::pending`, or records `StatusLine::error` and returns `ActionOutput::finished`
+  on failure. Callers still construct their exact `InteractionMode` variants, command labels, status
+  contexts, and preview text mappings locally.
+- Explicitly preserved special flows: default fetch execution, new-from-trunk, operation recovery,
+  graph edit precheck, absorb empty-destination precheck, and abandon strong-confirm/recheck remain
+  inline because their result wording, status policy, or extra preview state differs.
+- Documentation cleanup: `docs/agent/architecture.md` now describes sticky rendering rules for all
+  rendered file-oriented documents instead of anchoring the contract to show/diff wording only.
+- Worker validation passed: `cargo check`; `cargo test actions -- --test-threads=1`;
+  `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo test describe_commit_actions -- --test-threads=1`;
+  `cargo test detail_restore_actions -- --test-threads=1`;
+  `cargo test working_copy_actions -- --test-threads=1`;
+  `cargo test rewrite_actions -- --test-threads=1`;
+  `cargo test operation_actions -- --test-threads=1`;
+  `cargo test command_navigation -- --test-threads=1`;
+  `cargo test file_actions -- --test-threads=1`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`.
+- Main-thread validation after review passed: `cargo test actions -- --test-threads=1`;
+  `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo test describe_commit_actions -- --test-threads=1`;
+  `cargo test detail_restore_actions -- --test-threads=1`;
+  `cargo test working_copy_actions -- --test-threads=1`;
+  `cargo test rewrite_actions -- --test-threads=1`;
+  `cargo test operation_actions -- --test-threads=1`;
+  `cargo test command_navigation -- --test-threads=1`;
+  `cargo test file_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; full `just check` passed with 533 passed
+  / 2 ignored.
+- Residual risk: no behavior change is intended and no new tests were added. The remaining risk is
+  extraction drift if a future preview opener adopts the helper despite needing custom status,
+  refresh, or preview-state policy.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/app/action_lifecycle/preview.rs`, `docs/agent/architecture.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Selection helper Rustdoc correction)
 
 - Slice / task: add concise Rustdoc to `restore_by_key_or_index` on current jj change
