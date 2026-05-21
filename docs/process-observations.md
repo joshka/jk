@@ -5,6 +5,40 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark row metadata module extraction)
+
+- Slice / task: implement the ledger slice `Bookmark Row Metadata Module` on current jj change
+  `Extract bookmark row metadata`.
+- Thread id: `019e4974-550e-7230-98ba-8c085af511c1`.
+- Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
+  extraction for main-thread review.
+- Files changed: `src/jj_rows.rs`, `src/jj_rows/bookmarks.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_rows/bookmarks.rs` now owns rendered bookmark row loading, trusted
+  metadata parsing, fail-closed row pairing, local/remote row-state classification, and the existing
+  bookmark metadata tests/helpers. `src/jj_rows.rs` keeps the stable facade with a local `bookmarks`
+  submodule declaration plus re-exports for existing consumers.
+- Behavior intent: preserve rendered bookmark row grouping, metadata parse semantics, row-count
+  mismatch degradation, target ids, bookmark names, local/remote state classification, and bookmark
+  action-target inputs exactly.
+- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+  `cargo test bookmarks -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and
+  `just md-check` passed.
+- Main-thread validation after review passed: `cargo test jj_rows -- --test-threads=1`;
+  `cargo test bookmarks -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and
+  `just md-check` all passed.
+- Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
+  largest-file output showed `src/jj_rows.rs` at 1299 lines and `src/jj_rows/bookmarks.rs` at 876
+  lines.
+- Evidence basis:
+  - Date: `2026-05-21 00:34:07 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
+    `docs/agent/testing.md`, `src/jj_rows.rs`, `src/jj_rows/bookmarks.rs`, `src/bookmarks.rs`, and
+    `src/bookmarks/action_targets.rs`
+
 ### 2026-05-21 (Bookmark action-plan submodule extraction)
 
 - Slice / task: implement the ledger slice `Bookmark Action Plan Submodule` on current jj change

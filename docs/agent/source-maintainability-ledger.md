@@ -41,8 +41,9 @@ shape, documentation workflow, and agent workflow.
 - Bookmark cohesion: `src/bookmarks.rs` owns bookmark list state, rendering, refresh, and selection;
   `src/bookmarks/action_targets.rs` owns fail-closed bookmark action-target resolution;
   `src/jj_actions/bookmarks.rs` owns bookmark action plans; `src/jj_actions.rs` keeps the stable
-  facade and the remaining preview-first action plans; `src/jj_rows.rs` owns bookmark row metadata
-  pairing; `src/view_action_targets.rs` owns bookmark action-target projection policy.
+  facade and the remaining preview-first action plans; `src/jj_rows/bookmarks.rs` owns bookmark row
+  metadata pairing behind the stable `src/jj_rows.rs` facade; `src/view_action_targets.rs` owns
+  bookmark action-target projection policy.
 - Action planning: `src/jj_actions/git_sync.rs` owns the extracted git sync action-plan cluster;
   `src/jj_actions/bookmarks.rs` owns the extracted bookmark action-plan cluster; `src/jj_actions.rs`
   keeps the stable facade and the remaining action-plan clusters, including the rewrite action plan.
@@ -185,14 +186,16 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
   `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; and `just md-check`.
 
-### 3. Bookmark Row Metadata Module
+### 3. Completed: Bookmark Row Metadata Module
 
-- Owner: `src/jj_rows/bookmarks.rs`.
-- Purpose: separate bookmark row metadata pairing from the broader row-loading module once the
-  action and target ownership above have settled.
-- Non-goals: no fail-closed behavior change, no row grouping redesign, and no new selection policy.
-- Proof: `src/jj_rows.rs` remains a large row-pairing surface after the recent selection and
-  action-target extractions.
+- Status: completed in the `Extract bookmark row metadata` packet.
+- Result: `src/jj_rows/bookmarks.rs` now owns the bookmark row model, metadata parsing, fail-closed
+  pairing, row-state classification helpers, and focused bookmark metadata tests. `src/jj_rows.rs`
+  keeps the stable facade with `mod bookmarks;` plus re-exports for existing consumers.
+- Non-goals preserved: no rendered row grouping change, no metadata parse or row-count mismatch
+  behavior change, no target-field drift, and no bookmark action-target policy change.
+- Proof: focused `jj_rows`, `bookmarks`, and `bookmark_actions` tests preserve the existing bookmark
+  row contracts through the unchanged `jj_rows` import path.
 
 ### 4. Rewrite Action Plan Submodule
 
