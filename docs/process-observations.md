@@ -5,13 +5,50 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Source maintainability queue reassessment)
+
+- Slice / task: refresh `docs/agent/source-maintainability-ledger.md` after the completed help
+  projection and path action-menu extractions.
+- Thread id: `019e49a6-d87c-7b62-bb8a-e3105b7a02b3`.
+- Model / routing: worker/subagent `019e49a6-d87c-7b62-bb8a-e3105b7a02b3` with medium reasoning
+  implemented the docs-only reassessment. The user explicitly prohibited jj/git commands, so the
+  worker used direct file reads and local measurement commands without source-control inspection;
+  the main thread reviewed the result.
+- Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
+- Evidence gathered: `just largest-rust-files`; `wc -l` over `src/jj.rs`, `src/jj_rows.rs`,
+  `src/graph.rs`, `src/tui.rs`, `src/action_menu.rs`, `src/bookmarks.rs`, `src/help.rs`,
+  `src/action_menu/path_actions.rs`, `src/command.rs`, and `src/jj_actions.rs`; cheap `rg` scans for
+  visibility and control-flow density; and direct reads of `docs/agent/architecture.md`,
+  `docs/agent/rust-style.md`, `src/jj.rs`, `src/jj_rows.rs`, `src/graph.rs`, `src/tui.rs`,
+  `src/action_menu.rs`, `src/action_menu/path_actions.rs`, and `src/bookmarks.rs`.
+- Documentation outcome: the ledger now records help projection and path action-menu extraction as
+  completed history, refreshes current size/visibility/control-flow evidence, and names four bounded
+  next slices: rendered row loader/metadata packets, `ViewSpec` navigation provenance, graph
+  revision action-menu policy, and status hint projection.
+- Scope decision: the next packet recommendations are based on concept ownership rather than file
+  size alone. The ledger explicitly defers broad `src/graph.rs`, `src/bookmarks.rs`, `src/tui.rs`
+  overlay, `src/jj_actions.rs`, and `src/app/services.rs` work where the current evidence shows a
+  cohesive owner or no bounded safe slice.
+- Process observation: the first `just md-check` failed only on Panache wrapping in
+  `docs/agent/source-maintainability-ledger.md`; applying the formatter-equivalent wrapping fixed
+  the issue.
+- Validation trail:
+  - `just md-check` passed.
+- Main-thread review validation passed: `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 01:31:38 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `docs/agent/rust-style.md`, `src/jj.rs`, `src/jj_rows.rs`, `src/graph.rs`, `src/tui.rs`,
+    `src/action_menu.rs`, `src/action_menu/path_actions.rs`, `src/bookmarks.rs`
+
 ### 2026-05-21 (Path action-menu policy extraction)
 
 - Slice / task: extract path-scoped action-menu policy from broad `src/action_menu.rs` on current
   change `Extract path action-menu policy`.
 - Thread id: `019e49a1-8455-7e63-9859-70183c73ae25`.
-- Model / routing: Codex main thread. A worker/subagent callable was not exposed in this session, so
-  the main thread performed implementation, documentation, and focused validation.
+- Model / routing: worker/subagent `019e49a1-8455-7e63-9859-70183c73ae25` with medium reasoning
+  implemented the extraction. The main thread reviewed the result and ran focused validation.
 - Files changed: `src/action_menu.rs`, `src/action_menu/path_actions.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
 - Implementation outcome: `src/action_menu/path_actions.rs` now owns `FileActionContext`,
