@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Interactive process test split)
+
+- Slice / task: move inline inherited-stdio runner tests from `src/interactive_process.rs` into
+  `src/interactive_process/tests.rs` while preserving command intent, terminal suspend/restore,
+  restore-guard, fake lifecycle/spawner, error wording, and manual `/tmp` proof safeguards.
+- Thread id: `019e4ce7-58b5-7343-a352-015a84641b85` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the bounded test-module move in the
+  `Move interactive process tests` jj change; the main thread reviewed the diff, updated tracking
+  docs, and reran validation.
+- Changed files: `src/interactive_process.rs`, `src/interactive_process/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+  process note.
+- Implementation outcome: `src/interactive_process.rs` now declares `#[cfg(test)] mod tests;`; the
+  moved tests live in `src/interactive_process/tests.rs` and use Rust child-module privacy through
+  `use super::*;`.
+- Behavior-preservation evidence: all original test names, helpers, assertions, ignored-test
+  attributes and messages, error wording expectations, fake lifecycle/spawner behavior, manual
+  `/tmp` proof safeguards, public API, and runtime behavior are preserved.
+- Process observation: GPT-5.4 mini remained effective for a larger mechanical move when the write
+  set and acceptance criteria were exact. The main-thread review found no assertion drift in this
+  packet.
+- Validation trail:
+  - Worker validation passed: `cargo test interactive_process -- --test-threads=1` with 7 passed, 2
+    ignored, and 558 filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
+  - Main-thread validation passed: `cargo test interactive_process -- --test-threads=1` with 7
+    passed, 2 ignored, and 558 filtered out; `cargo check`; `rustup run nightly cargo fmt --check`;
+    and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:41:14 PDT` from local `date`.
+  - Files: `src/interactive_process.rs`, `src/interactive_process/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+    process note.
+
 ### 2026-05-21 (Action output test split)
 
 - Slice / task: move inline action-output tests from `src/action_output.rs` into

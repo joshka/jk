@@ -14,8 +14,8 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   feature root.
 - View tests moved beside their features: tests moved out of production modules for file show, file
   list, operation detail, operation log, view-state target routing, action output, workspaces, and
-  resolve. This keeps production files shorter while preserving behavior tests next to the code they
-  describe.
+  resolve. Shared interactive-process tests also moved beside their owner. This keeps production
+  files shorter while preserving behavior tests next to the code they describe.
 - App modal dispatch got its first reducer-shaped cleanup: copy, view, action, role, push-remote,
   and fetch-remote menu key handling now have named helpers while `handle_active_mode_key` remains
   the dispatch table.
@@ -42,7 +42,8 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   and operation inspection work by keeping recovery-related behavior near the operation log.
 - View tests moved out of production modules. This shortens production files while keeping the tests
   beside the feature they prove, so future behavior changes have nearby evidence. Operation-log view
-  behavior, view-state target routing, and action-output modal state are now in that shape too.
+  behavior, view-state target routing, action-output modal state, and the interactive-process
+  terminal boundary are now in that shape too.
 - App modal key handling is being simplified. Copy/view/action menus, text prompts, and abandon
   confirmation now have named handlers, which makes the main keyboard dispatch read more like a map
   of user modes instead of a long implementation block.

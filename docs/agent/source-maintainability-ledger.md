@@ -109,6 +109,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 interactive process test split:
+
+- `src/interactive_process.rs` now declares `#[cfg(test)] mod tests;`, and the moved lifecycle tests
+  live in `src/interactive_process/tests.rs` with `use super::*;` for private access to the
+  inherited-stdio runner boundary.
+- This keeps command construction, terminal suspend/restore, process spawning, restore-guard, and
+  result handling readable without scrolling through lifecycle fakes and manual terminal proof
+  tests.
+- The packet intentionally preserved all test names, helpers, assertions, ignored-test attributes
+  and messages, error wording expectations, fake lifecycle/spawner behavior, manual `/tmp` proof
+  safeguards, public API, and runtime behavior.
+- Focused validation passed: `cargo test interactive_process -- --test-threads=1` with 7 passed, 2
+  ignored, and 558 filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
+
 2026-05-21 action output test split:
 
 - `src/action_output.rs` now declares `#[cfg(test)] mod tests;`, and the moved modal-output tests
