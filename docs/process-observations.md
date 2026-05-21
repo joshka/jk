@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark row test split)
+
+- Slice / task: move inline tests from `src/bookmarks/rows.rs` into `src/bookmarks/rows/tests.rs`
+  for the existing jj change.
+- Thread id: `019e4c3e-d3a8-7e11-9e35-a841f1c6b8ef` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
+  packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
+  were run.
+- Implementation outcome: `rows.rs` now ends with `#[cfg(test)] mod tests;`, while the moved sibling
+  module uses `use super::*;` to preserve access to private metadata parsing, row pairing,
+  state-classification helpers, and test-only item helpers.
+- Behavior-preservation evidence: the packet moved the existing ten bookmark row tests without
+  changing their names, assertions, helper functions, rendered-output pairing expectations, metadata
+  parsing expectations, local/remote state expectations, visibility, labels, or public API.
+- Readability evidence: before the packet, `src/bookmarks/rows.rs` measured 876 lines with tests
+  inline. After the split it measured 398 lines, with 476 lines in `src/bookmarks/rows/tests.rs`,
+  keeping bookmark row production policy easier to scan while keeping tests beside the owning
+  module.
+- Validation trail:
+  - Worker validation passed: `cargo test bookmarks -- --test-threads=1`; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test bookmarks -- --test-threads=1` with 40 passed
+    and 527 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the mechanical extraction initially left the sibling module with inline-module
+  indentation, and the first format check found one leading blank line. Formatting cleanup was
+  limited to the moved test file; no behavior rework was needed.
+- Evidence basis:
+  - Date: `2026-05-21 13:34:21 PDT` from local `date`.
+  - Main review date: `2026-05-21 14:35:58 PDT` from local `date`.
+  - Files: `src/bookmarks/rows.rs`, `src/bookmarks/rows/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Revision action-menu test split)
 
 - Slice / task: move inline tests from `src/action_menu/revision_actions.rs` into

@@ -103,6 +103,21 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 bookmark row test split:
+
+- `src/bookmarks/rows.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/bookmarks/rows/tests.rs` with `use super::*;` for private access to the owning module.
+- This improves local readability by keeping bookmark row production policy visible without
+  scrolling through 476 lines of inline tests. The production file measured 876 lines before the
+  split and 398 lines after it.
+- The packet intentionally preserved all ten bookmark row test names, assertions, helper functions,
+  rendered-output pairing expectations, metadata parsing expectations, local/remote state
+  expectations, visibility, labels, and public API.
+- Focused validation covered `cargo test bookmarks -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check` after this documentation update.
+- Rework was limited to formatting cleanup after the mechanical split left inline-module indentation
+  and one leading blank line in the out-of-line sibling test module.
+
 2026-05-21 revision action-menu test split:
 
 - `src/action_menu/revision_actions.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests
