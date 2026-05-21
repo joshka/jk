@@ -103,6 +103,18 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 rewrite source context helper:
+
+- `src/app/action_lifecycle/preview.rs` now uses private `with_rewrite_source_context` for the
+  shared rebase/squash preview status-context source suffix.
+- Rebase and squash call sites still own their base status context strings, command labels, preview
+  calls, and mode variants. The helper owns only the shared short-source label suffix that app
+  lifecycle preview already owned.
+- Existing rewrite action tests assert the exact rebase and squash status context strings, including
+  `| source(s): ...`. Focused validation covered `cargo test rewrite_actions -- --test-threads=1`,
+  `cargo test mode_input -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+
 2026-05-21 text prompt side-effect helper:
 
 - `src/app/mode_input.rs` now uses a private `apply_text_prompt_accept_decision` helper for the

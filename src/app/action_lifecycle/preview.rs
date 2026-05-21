@@ -346,18 +346,7 @@ impl App {
             rebase.destination(),
             self.view.spec().app_label()
         ));
-        let source_labels = rebase
-            .sources()
-            .iter()
-            .map(|source| short_id(source))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let status_context = if source_labels.is_empty() {
-            status_context
-        } else {
-            status_context
-                .map(|status_context| format!("{status_context} | source(s): {source_labels}"))
-        };
+        let status_context = with_rewrite_source_context(status_context, rebase.sources());
 
         let command_label = rebase.command_label(true);
         let output = self.preview_output_with_error_status(
@@ -430,18 +419,7 @@ impl App {
             squash.destination(),
             self.view.spec().app_label()
         ));
-        let source_labels = squash
-            .sources()
-            .iter()
-            .map(|source| short_id(source))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let status_context = if source_labels.is_empty() {
-            status_context
-        } else {
-            status_context
-                .map(|status_context| format!("{status_context} | source(s): {source_labels}"))
-        };
+        let status_context = with_rewrite_source_context(status_context, squash.sources());
 
         let command_label = squash.command_label(true);
         let output = self.preview_output_with_error_status(
@@ -537,5 +515,23 @@ impl App {
                 ActionOutput::finished(command_label, message, status_context)
             }
         }
+    }
+}
+
+fn with_rewrite_source_context(
+    status_context: Option<String>,
+    sources: &[String],
+) -> Option<String> {
+    let source_labels = sources
+        .iter()
+        .map(|source| short_id(source))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    if source_labels.is_empty() {
+        status_context
+    } else {
+        status_context
+            .map(|status_context| format!("{status_context} | source(s): {source_labels}"))
     }
 }

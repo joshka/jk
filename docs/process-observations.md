@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Extract rewrite source context helper)
+
+- Slice / task: reduce duplicated rewrite preview status-context construction in
+  `src/app/action_lifecycle/preview.rs` for the current jj change
+  `Extract rewrite source context helper`.
+- Thread id: `019e4c09-b356-7313-ac7b-04ff16507bab` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded Rust
+  maintainability packet. The user explicitly kept version-control operations with the main thread,
+  and no `jj` or `git` commands were run.
+- Implementation outcome: rebase and squash preview opening now share the private
+  `with_rewrite_source_context` helper for short source-label suffix construction. The rebase and
+  squash base context strings, command labels, preview calls, mode variants, error handling, and
+  imports stayed at their original call sites.
+- Behavior-preservation evidence: existing rewrite action tests already assert the exact preview
+  status contexts for rebase and squash, including `| source(s): ...`, so no new helper-only test
+  was added. The helper preserves the prior behavior of appending the suffix only when the joined
+  short source labels are non-empty.
+- Validation trail:
+  - Worker validation passed: `cargo test rewrite_actions -- --test-threads=1` with 16 passed;
+    `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test rewrite_actions -- --test-threads=1` with 16
+    passed; `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, the
+    largest-file report, clippy with `-D warnings`, `cargo check`, and `cargo test` with 565 passed
+    / 2 ignored.
+- Rework / surprise: the first Rust fmt check reported wrapping needed in the new helper signature
+  and map chain. The first Markdown check reported Panache normalization for one inline code span in
+  this process note.
+- Evidence basis:
+  - Date: `2026-05-21 12:36:18 PDT` from local `date`.
+  - Files: `src/app/action_lifecycle/preview.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    this process note.
+
 ### 2026-05-21 (Refresh source audit measurements)
 
 - Slice / task: update the mechanical source audit snapshot in
