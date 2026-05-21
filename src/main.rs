@@ -27,6 +27,7 @@ mod sticky_file_view;
 mod theme;
 mod tui;
 mod view_state;
+mod workspaces;
 
 use color_eyre::Result;
 

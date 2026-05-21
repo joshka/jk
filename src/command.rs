@@ -19,6 +19,7 @@ pub enum Command {
     OpenStatus,
     OpenResolve,
     OpenBookmarks,
+    OpenWorkspaces,
     OpenOperationLog,
     OperationUndo,
     OperationRedo,
@@ -121,6 +122,7 @@ impl Command {
             | Self::OpenStatus
             | Self::OpenResolve
             | Self::OpenBookmarks
+            | Self::OpenWorkspaces
             | Self::OpenOperationLog
             | Self::Edit
             | Self::NextEdit
@@ -308,6 +310,7 @@ pub enum HelpContext {
     FileList,
     FileShow,
     Bookmarks,
+    Workspaces,
     OperationLog,
     OperationDetail,
 }
@@ -584,6 +587,7 @@ fn help_metadata(
         Command::OpenStatus => Some((HelpSectionKind::Views, "status")),
         Command::OpenResolve => Some((HelpSectionKind::Views, "resolve")),
         Command::OpenBookmarks => Some((HelpSectionKind::Views, "bookmarks")),
+        Command::OpenWorkspaces => Some((HelpSectionKind::Views, "workspaces")),
         Command::OpenOperationLog => Some((HelpSectionKind::Views, "operation log")),
         Command::Edit => (context == HelpContext::Graph)
             .then_some((HelpSectionKind::Actions, "edit selected revision")),
@@ -719,6 +723,7 @@ fn view_help_metadata(
                 | HelpContext::FileList
                 | HelpContext::FileShow
                 | HelpContext::Bookmarks
+                | HelpContext::Workspaces
                 | HelpContext::OperationLog
                 | HelpContext::OperationDetail => return None,
             };
@@ -734,6 +739,7 @@ fn view_help_metadata(
                 | HelpContext::Status
                 | HelpContext::FileShow
                 | HelpContext::Bookmarks
+                | HelpContext::Workspaces
                 | HelpContext::OperationLog
                 | HelpContext::OperationDetail => return None,
             };
@@ -748,7 +754,8 @@ fn view_help_metadata(
                 | HelpContext::Resolve
                 | HelpContext::Status
                 | HelpContext::FileList
-                | HelpContext::FileShow => return None,
+                | HelpContext::FileShow
+                | HelpContext::Workspaces => return None,
             };
             Some((HelpSectionKind::Views, action))
         }
@@ -757,6 +764,7 @@ fn view_help_metadata(
                 HelpContext::Graph | HelpContext::Show => "open diff",
                 HelpContext::OperationLog | HelpContext::OperationDetail => "operation diff",
                 HelpContext::Bookmarks
+                | HelpContext::Workspaces
                 | HelpContext::Diff
                 | HelpContext::Resolve
                 | HelpContext::Status

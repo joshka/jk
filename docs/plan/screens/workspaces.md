@@ -1,67 +1,67 @@
-# Workspace Screens
+# Workspace Screen
 
 ## Purpose
 
-Workspace screens expose workspace-related state without making multi-workspace management the
-center of the app.
+The workspace screen is a focused read-only utility surface for current root and workspace context.
+It helps users answer "where is this jj workspace?" and "which workspaces exist?" without leaving
+`jk` or mutating the repository.
 
 ## Source Commands
 
 - `jj root`
-- likely `jj workspace list`
-- related guided flows: add, rename, forget, update-stale
+- `jj workspace list`
+- `jj workspace list --template <workspace metadata template>`
 
-## View Model
+The metadata template uses `name`, `target.change_id()`, and `target.commit_id()`. It intentionally
+does not use `root` or per-workspace root commands.
 
-- root may be a simple informational screen
-- workspace list, if added, should be a small utility list screen
+## Current Behavior
 
-## Priority
+- Startup entry: `jk workspaces`.
+- Global entry: `X` opens workspaces from normal navigation.
+- View menu entry: `workspaces`.
+- The header shows the current root from `jj root`, or a readable root error if that command fails.
+- The list preserves rendered `jj workspace list` rows as the presentation source.
+- Exact workspace name, target change id, and target commit id come only from the metadata template.
+- Search moves through rendered workspace rows.
+- Copy offers the current root, exact selected workspace name when metadata is available, selected
+  target change id and commit id when available, and selected row text.
+- Refresh preserves the selected exact workspace name when metadata is still available, otherwise it
+  clamps by prior index.
 
-Priority 3. Workspace screens should remain low-frequency utility surfaces unless multi-workspace
-use proves central for `jk`.
+## Degradation
 
-## Primary Interactions
+Failures are shown in place instead of blocking the entire screen:
 
-- inspect current workspace root
-- inspect available workspaces if supported
-- launch add/rename/forget/update-stale flows
-- return to log or previous context
+- If `jj root` fails, the root header reports that the current root is unavailable.
+- If `jj workspace list` fails, the list is empty and the list error is shown.
+- If metadata command execution, JSON parsing, or row-count pairing fails, rendered rows remain
+  visible but exact workspace name and target copy options are withheld.
+
+## Non-Goals
+
+- No `jj workspace add`.
+- No `jj workspace rename`.
+- No `jj workspace forget`.
+- No `jj workspace update-stale`.
+- No worktree manager dashboard.
+- No replacement for shell directory navigation.
+- No per-workspace root exactness. Copy the current root path separately.
 
 ## Selection Model
 
-- root screen: no selection needed
-- workspace list: selection unit is workspace item
-- workspace actions require exact workspace name, path, and stale/current state
-
-## Interaction Details
-
-- Root: show workspace root and related repo path information as a simple document or info view.
-- List: show available workspaces as a list when native support is worthwhile.
-- Actions: add, rename, forget, and update-stale are guided flows with confirmation where they can
-  detach or change a workspace.
-- Refresh: preserve selected workspace name when possible.
-- Return: workspace screens should return to the previous context, usually log or status.
-
-## Shortcut Candidates
-
-- `j`/`k`, arrows: move workspace selection where applicable
-- `Enter`: inspect selected workspace
-- `a`: add flow
-- `R`: rename flow
-- `d`: forget flow
-- `u`: update-stale flow
-- `y`: copy workspace path or name
-- `r`: refresh
-- `h`, `Left`: back
+- Selection unit: rendered workspace row.
+- Rendered labels are opaque and are not parsed for exact names.
+- Exact workspace identity is optional metadata paired by row order.
+- Future workspace actions must use exact metadata or a stronger upstream contract, not rendered row
+  text.
 
 ## Integration Notes
 
-Use rendered root/list output for inspection. Workspace actions should use exact workspace names and
-paths from structured data or `jj_lib` before becoming mutation-capable.
+This packet deliberately avoids `WorkspaceRef.root()` and `jj workspace root --name` because this
+checkout has shown that they can render or fail with "Workspace has no recorded path: default".
+`jj root` succeeds here and is the exact source for the current workspace root.
 
-## Acceptance Criteria
-
-- workspace state is easy to inspect when needed
-- workspace management remains a utility concern, not a global app frame
-- workspace actions make their target path/name explicit before running
+The row-order pairing between rendered rows and metadata rows is a soft agreement with
+`jj workspace list`. If that pairing fails, `jk` keeps rendered rows visible and withholds exact
+metadata.

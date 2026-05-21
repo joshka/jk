@@ -99,6 +99,7 @@ fn item_count_message(view: &ViewState, item_count: usize) -> String {
         JjCommand::Resolve => format!("{item_count} conflicts"),
         JjCommand::FileList => format!("{item_count} files"),
         JjCommand::Bookmarks => format!("{item_count} bookmarks"),
+        JjCommand::Workspaces => format!("{item_count} workspaces"),
         JjCommand::OperationLog => format!("{item_count} operations"),
         JjCommand::Default | JjCommand::Log => {
             graph_status_message(item_count, view.graph_mode_label())

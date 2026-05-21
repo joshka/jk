@@ -86,6 +86,7 @@ impl App {
             | JjCommand::Resolve
             | JjCommand::FileList
             | JjCommand::Bookmarks
+            | JjCommand::Workspaces
             | JjCommand::OperationLog
             | JjCommand::OperationShow
             | JjCommand::OperationDiff => return None,
@@ -128,6 +129,14 @@ impl App {
         }
 
         self.push_view(ViewSpec::new(JjCommand::Bookmarks, Vec::new()))
+    }
+
+    pub(in crate::app) fn open_workspaces(&mut self) -> Result<()> {
+        if matches!(self.view.command(), JjCommand::Workspaces) {
+            return Ok(());
+        }
+
+        self.push_view(ViewSpec::workspaces(Vec::new()))
     }
 
     pub(in crate::app) fn push_view(&mut self, spec: ViewSpec) -> Result<()> {
@@ -207,6 +216,7 @@ impl App {
             ViewMenuAction::Open(JjCommand::Status) => self.open_status(),
             ViewMenuAction::Open(JjCommand::Resolve) => self.open_resolve(),
             ViewMenuAction::Open(JjCommand::Bookmarks) => self.open_bookmarks(),
+            ViewMenuAction::Open(JjCommand::Workspaces) => self.open_workspaces(),
             ViewMenuAction::Open(JjCommand::OperationLog) => self.open_operation_log(),
             ViewMenuAction::DiffFormat(diff_format) => {
                 self.apply_diff_format(diff_format, viewport_height)
@@ -273,9 +283,10 @@ pub(in crate::app) fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
             }
         }
         "bookmarks" => Ok(ViewSpec::bookmarks(rest.to_vec())),
+        "workspaces" => Ok(ViewSpec::workspaces(rest.to_vec())),
         "operation-log" => Ok(ViewSpec::new(JjCommand::OperationLog, rest.to_vec())),
         unknown => Err(eyre!(
-            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, resolve, bookmarks, operation-log"
+            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, resolve, bookmarks, workspaces, operation-log"
         )),
     }
 }

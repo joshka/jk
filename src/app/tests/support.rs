@@ -364,6 +364,9 @@ pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
         JjCommand::Bookmarks => {
             ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![]))
         }
+        JjCommand::Workspaces => ViewState::Workspaces(
+            crate::workspaces::WorkspacesView::test_new(crate::jj::WorkspaceContext::default()),
+        ),
         JjCommand::OperationLog => {
             ViewState::OperationLog(crate::operation_log::OperationLogView::test_new(vec![]))
         }

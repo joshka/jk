@@ -58,6 +58,7 @@ const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('S'), Command::OpenStatus),
     Binding::new(KeyPattern::char('R'), Command::OpenResolve),
     Binding::new(KeyPattern::char('B'), Command::OpenBookmarks),
+    Binding::new(KeyPattern::char('X'), Command::OpenWorkspaces),
     Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
     Binding::new(KeyPattern::char('D'), Command::Describe),
     Binding::new(KeyPattern::char('C'), Command::Commit),
@@ -346,6 +347,10 @@ impl App {
             }
             Command::OpenBookmarks => {
                 self.open_bookmarks()?;
+                Ok(true)
+            }
+            Command::OpenWorkspaces => {
+                self.open_workspaces()?;
                 Ok(true)
             }
             Command::OpenOperationLog => {

@@ -1,5 +1,41 @@
 # Slice Progress
 
+## Packet 41: Workspace And Root Utility Surface
+
+- Files changed: `src/workspaces.rs`, `src/main.rs`, `src/jj.rs`, `src/jj_rows.rs`,
+  `src/view_state.rs`, `src/command.rs`, `src/app.rs`, `src/app/navigation.rs`,
+  `src/app/action_lifecycle/entry.rs`, `src/app/action_lifecycle/completion.rs`,
+  `src/app/tests/command_navigation.rs`, `src/app/tests/support.rs`, `src/app_screen.rs`,
+  `src/app_status.rs`, `src/tui.rs`, `docs/plan/screens/workspaces.md`, `docs/plan/progress.md`,
+  `docs/plan/fragility-register.md`, and `docs/process-observations.md`.
+- Behavior: `jk workspaces`, global `X`, and the view menu now open a read-only workspace/root
+  screen. The header shows the current root from `jj root`; the list preserves rendered
+  `jj workspace list` rows. Exact workspace name, target change id, and target commit id come only
+  from a separate `jj workspace list --template` metadata pass.
+- Degradation: `jj root`, rendered list, and metadata failures are reported independently. Rendered
+  rows stay visible when metadata fails, while exact metadata copy options are withheld. Row-count
+  mismatches and malformed JSON degrade to opaque row text instead of parsed labels.
+- Copy/search/refresh: copy offers current root, exact selected workspace name when available,
+  target ids when available, and row text. Search wraps by rendered workspace row. Refresh preserves
+  selected exact workspace name when metadata is still available, otherwise it clamps by prior
+  index.
+- Validation:
+  - `cargo check`
+  - `cargo test workspaces -- --test-threads=1`
+  - `cargo test workspace_ -- --test-threads=1`
+  - `cargo test command_navigation -- --test-threads=1`
+  - `cargo test jj::tests::workspace_commands_use_read_only_root_list_and_metadata_template`
+  - `cargo clippy -- -D warnings`
+  - `rustup run nightly cargo fmt --check`
+  - full `cargo test` passed with 513 passed / 2 ignored
+  - `just md-check`
+  - `just check`
+- Remaining risk: workspace row metadata relies on row-order pairing between rendered
+  `jj workspace list` output and the metadata template stream. Per-workspace roots are not exact in
+  this packet; only the current root from `jj root` is exact.
+- Next recommended slice: Packet 42: Tag List Read Surface. The separate gpt-5.5 review accepted
+  Packet 41 with no blockers, so Packet 42 is next.
+
 ## Packet 40: File Track/Untrack/Chmod Actions
 
 - Files changed: `src/status.rs`, `src/file_show.rs`, `src/view_state.rs`, `src/action_menu.rs`,

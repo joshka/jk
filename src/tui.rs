@@ -28,6 +28,7 @@ pub enum StatusHints {
     FileList,
     FileShowDocument,
     Bookmarks,
+    Workspaces,
     OperationLog,
     OperationDetailDocument,
 }
@@ -447,6 +448,14 @@ const BOOKMARKS_STATUS_HINTS: &[StatusHint] = &[
     StatusHint::new("q", "quit"),
     StatusHint::new("?", "help"),
 ];
+const WORKSPACES_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "move"),
+    StatusHint::new("/", "search"),
+    StatusHint::new("y", "copy"),
+    StatusHint::new("h", "back"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
 const OPERATION_LOG_STATUS_HINTS: &[StatusHint] = &[
     StatusHint::new("j/k", "move"),
     StatusHint::new("u", "undo"),
@@ -470,6 +479,7 @@ fn status_hint_candidates(hints: StatusHints) -> &'static [StatusHint] {
         StatusHints::FileShowDocument => FILE_SHOW_STATUS_HINTS,
         StatusHints::OperationDetailDocument => OPERATION_DETAIL_STATUS_HINTS,
         StatusHints::Bookmarks => BOOKMARKS_STATUS_HINTS,
+        StatusHints::Workspaces => WORKSPACES_STATUS_HINTS,
         StatusHints::OperationLog => OPERATION_LOG_STATUS_HINTS,
     }
 }

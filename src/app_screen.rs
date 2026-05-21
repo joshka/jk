@@ -297,6 +297,10 @@ pub fn view_menu_options() -> &'static [ViewMenuOption] {
             action: ViewMenuAction::Open(JjCommand::Bookmarks),
         },
         ViewMenuOption {
+            label: "workspaces",
+            action: ViewMenuAction::Open(JjCommand::Workspaces),
+        },
+        ViewMenuOption {
             label: "operation log",
             action: ViewMenuAction::Open(JjCommand::OperationLog),
         },
@@ -381,12 +385,13 @@ mod tests {
                 ViewMenuAction::Open(JjCommand::Status),
                 ViewMenuAction::Open(JjCommand::Resolve),
                 ViewMenuAction::Open(JjCommand::Bookmarks),
+                ViewMenuAction::Open(JjCommand::Workspaces),
                 ViewMenuAction::Open(JjCommand::OperationLog),
                 ViewMenuAction::DiffFormat(DiffFormat::Default),
                 ViewMenuAction::DiffFormat(DiffFormat::Git),
             ]
         );
-        assert_eq!(options[6].label(), "show/diff format: default jj");
-        assert_eq!(options[7].label(), "show/diff format: git (--git)");
+        assert_eq!(options[7].label(), "show/diff format: default jj");
+        assert_eq!(options[8].label(), "show/diff format: git (--git)");
     }
 }

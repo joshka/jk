@@ -89,6 +89,14 @@ fn parses_bookmarks_startup_view() {
 }
 
 #[test]
+fn parses_workspaces_startup_view() {
+    let spec = initial_view(vec!["workspaces".into()]).unwrap();
+
+    assert_eq!(spec.command(), JjCommand::Workspaces);
+    assert!(spec.args().is_empty());
+}
+
+#[test]
 fn rejects_unknown_startup_command() {
     assert!(initial_view(vec!["bookmark".into()]).is_err());
 }
@@ -109,6 +117,14 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
     app.handle_normal_key(key(KeyCode::Char('B'), KeyModifiers::NONE), 12)
         .unwrap();
     assert_eq!(app.view.command(), JjCommand::Bookmarks);
+    assert!(app.pending_command.is_none());
+
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    app.services.load_view = mock_load_view;
+
+    app.handle_normal_key(key(KeyCode::Char('X'), KeyModifiers::NONE), 12)
+        .unwrap();
+    assert_eq!(app.view.command(), JjCommand::Workspaces);
     assert!(app.pending_command.is_none());
 
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
@@ -171,6 +187,7 @@ fn generated_help_uses_same_multikey_and_view_entry_bindings_as_dispatch() {
 
     assert!(rows.contains(&("S", "status")));
     assert!(rows.contains(&("B", "bookmarks")));
+    assert!(rows.contains(&("X", "workspaces")));
     assert!(rows.contains(&("O", "operation log")));
     assert!(rows.contains(&("b, bc", "create bookmark here")));
     assert!(rows.contains(&("f", "fetch")));
@@ -373,6 +390,13 @@ fn view_menu_selects_shipped_top_level_views() {
 
     assert_eq!(app.view.command(), JjCommand::Bookmarks);
     assert!(matches!(app.mode, InteractionMode::Normal));
+
+    app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key(KeyCode::Down, 12).unwrap();
+    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+
+    assert_eq!(app.view.command(), JjCommand::Workspaces);
 
     app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
         .unwrap();

@@ -601,6 +601,7 @@ impl App {
                 | JjCommand::Log
                 | JjCommand::Status
                 | JjCommand::Bookmarks
+                | JjCommand::Workspaces
                 | JjCommand::OperationLog => {
                     self.services.refresh_view(view)?;
                     view.clamp(viewport_height, current_viewport_width());

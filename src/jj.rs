@@ -26,9 +26,10 @@ pub use crate::jj_actions::{
 #[allow(unused_imports)]
 pub use crate::jj_rows::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, FileListItem, LocalBookmarkRemoteState,
-    LogItem, OperationLogItem, RemoteBookmarkTrackingState, ResolveEntry, document_plain_text,
-    load_bookmark_entries, load_compact_log_context, load_entries, load_file_list_entries,
-    load_operation_log_entries, load_resolve_entries,
+    LogItem, OperationLogItem, RemoteBookmarkTrackingState, ResolveEntry, WorkspaceContext,
+    WorkspaceItem, document_plain_text, load_bookmark_entries, load_compact_log_context,
+    load_entries, load_file_list_entries, load_operation_log_entries, load_resolve_entries,
+    load_workspace_context,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -42,6 +43,7 @@ pub enum JjCommand {
     FileList,
     FileShow,
     Bookmarks,
+    Workspaces,
     OperationLog,
     OperationShow,
     OperationDiff,
@@ -112,6 +114,7 @@ const ALL_REPO_REVSET: &str = "all()";
 const JJ_GIT_REMOTE_ARGS: [&str; 3] = ["git", "remote", "list"];
 const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
 const BOOKMARK_COMMAND_WORDS: [&str; 2] = ["bookmark", "list"];
+const WORKSPACE_LIST_COMMAND_WORDS: [&str; 2] = ["workspace", "list"];
 const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
 const OPERATION_LOG_LIMIT: &str = "100";
 
@@ -157,6 +160,7 @@ impl JjCommand {
             Self::FileList => "jj file list",
             Self::FileShow => "jj file show",
             Self::Bookmarks => "jj bookmark list",
+            Self::Workspaces => "jj workspace list",
             Self::OperationLog => "jj operation log",
             Self::OperationShow => "jj operation show",
             Self::OperationDiff => "jj operation diff",
@@ -174,6 +178,7 @@ impl JjCommand {
             Self::FileList => &["file", "list"],
             Self::FileShow => &["file", "show"],
             Self::Bookmarks => &BOOKMARK_COMMAND_WORDS,
+            Self::Workspaces => &WORKSPACE_LIST_COMMAND_WORDS,
             Self::OperationLog => &["operation", "log"],
             Self::OperationShow => &["operation", "show"],
             Self::OperationDiff => &["operation", "diff"],
@@ -192,6 +197,7 @@ impl JjCommand {
             | Self::FileList
             | Self::FileShow
             | Self::Bookmarks
+            | Self::Workspaces
             | Self::OperationShow
             | Self::OperationDiff => &[],
         }
@@ -262,6 +268,17 @@ impl ViewSpec {
     pub fn bookmarks(args: Vec<String>) -> Self {
         Self {
             command: JjCommand::Bookmarks,
+            args,
+            target: None,
+            target_is_exact_change: false,
+            path: None,
+            diff_format: DiffFormat::Default,
+        }
+    }
+
+    pub fn workspaces(args: Vec<String>) -> Self {
+        Self {
+            command: JjCommand::Workspaces,
             args,
             target: None,
             target_is_exact_change: false,
@@ -440,6 +457,7 @@ impl ViewSpec {
             JjCommand::FileList => "jk file list",
             JjCommand::FileShow => "jk file show",
             JjCommand::Bookmarks => "jk bookmarks",
+            JjCommand::Workspaces => "jk workspaces",
             JjCommand::OperationLog => "jk operation log",
             JjCommand::OperationShow => "jk operation show",
             JjCommand::OperationDiff => "jk operation diff",
@@ -467,6 +485,7 @@ impl ViewSpec {
             | JjCommand::Log
             | JjCommand::Status
             | JjCommand::Bookmarks
+            | JjCommand::Workspaces
             | JjCommand::OperationLog
             | JjCommand::OperationShow
             | JjCommand::OperationDiff => None,
@@ -583,6 +602,33 @@ fn revset_from_log_args(args: &[String]) -> Option<&str> {
 
 pub fn new_trunk() -> Result<CommandOutput> {
     run_direct_command(&NEW_TRUNK_ARGS, "jj new trunk()", "created new change")
+}
+
+pub(crate) fn load_workspace_root() -> Result<String> {
+    let mut jj = base_command(ColorMode::Never);
+    jj.args(workspace_root_command_args());
+
+    let output = jj.output()?;
+    if !output.status.success() {
+        return Err(eyre!(
+            "jj root failed: {}",
+            summarize_output(
+                &output.stdout,
+                &output.stderr,
+                "could not find workspace root"
+            )
+        ));
+    }
+
+    let root = String::from_utf8(output.stdout)?.trim().to_owned();
+    if root.is_empty() {
+        return Err(eyre!("jj root returned an empty path"));
+    }
+    Ok(root)
+}
+
+fn workspace_root_command_args() -> Vec<String> {
+    vec!["root".to_owned()]
 }
 
 pub fn resolve_exact_change_id(revset: &str) -> Result<String> {
@@ -894,7 +940,9 @@ mod tests {
     use std::ffi::OsStr;
 
     use super::*;
-    use crate::jj_rows::{OPERATION_ID_TEMPLATE, RESOLVE_CONFLICT_TEMPLATE};
+    use crate::jj_rows::{
+        OPERATION_ID_TEMPLATE, RESOLVE_CONFLICT_TEMPLATE, WORKSPACE_METADATA_TEMPLATE,
+    };
 
     #[test]
     fn bookmark_list_command_uses_bookmark_words_and_labels() {
@@ -907,6 +955,25 @@ mod tests {
         );
         assert_eq!(spec.label(), "jj bookmark list --revision main");
         assert_eq!(spec.app_label(), "jk bookmarks --revision main");
+    }
+
+    #[test]
+    fn workspace_commands_use_read_only_root_list_and_metadata_template() {
+        let spec = ViewSpec::workspaces(Vec::new());
+
+        assert_eq!(workspace_root_command_args(), vec!["root"]);
+        assert_eq!(spec.command(), JjCommand::Workspaces);
+        assert_eq!(
+            jj_command_args(&spec, None, false),
+            vec!["workspace", "list"]
+        );
+        assert_eq!(
+            jj_command_args(&spec, Some(WORKSPACE_METADATA_TEMPLATE), false),
+            vec!["workspace", "list", "-T", WORKSPACE_METADATA_TEMPLATE,]
+        );
+        assert!(!WORKSPACE_METADATA_TEMPLATE.contains("root"));
+        assert_eq!(spec.label(), "jj workspace list");
+        assert_eq!(spec.app_label(), "jk workspaces");
     }
 
     #[test]

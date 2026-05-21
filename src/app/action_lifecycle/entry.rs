@@ -205,6 +205,7 @@ impl App {
             | ViewState::FileList(_)
             | ViewState::FileShow(_)
             | ViewState::Bookmarks(_)
+            | ViewState::Workspaces(_)
             | ViewState::OperationLog(_)
             | ViewState::OperationDetail(_) => None,
         }
@@ -232,6 +233,7 @@ impl App {
             | JjCommand::FileList
             | JjCommand::FileShow
             | JjCommand::Bookmarks
+            | JjCommand::Workspaces
             | JjCommand::OperationLog
             | JjCommand::OperationShow
             | JjCommand::OperationDiff => {
@@ -354,6 +356,7 @@ impl App {
             | ViewState::Resolve(_)
             | ViewState::FileList(_)
             | ViewState::FileShow(_)
+            | ViewState::Workspaces(_)
             | ViewState::OperationLog(_)
             | ViewState::OperationDetail(_) => {
                 self.status = StatusLine::error(

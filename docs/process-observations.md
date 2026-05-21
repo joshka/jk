@@ -5,6 +5,46 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet 41 workspace/root surface)
+
+- Slice / task: implement Packet 41: Workspace And Root Utility Surface in jj change
+  `znpvoytk Add workspace root utility surface`.
+- Thread id: `019e485f-77dd-7eb1-ac1c-84df3ce56ab4`.
+- Starting evidence: read-only command probes in this checkout showed installed `jj 0.41.0`,
+  `jj --no-pager root` returning `/Users/joshka/local/jk`, and `jj --no-pager workspace list`
+  returning the current `default` workspace row.
+- Audit finding applied: the gpt-5.5 audit found that `WorkspaceRef.root()` and
+  `jj workspace root --name default` are not reliable in this repo because they can render or fail
+  with "Workspace has no recorded path: default". Packet 41 therefore uses `jj root` only for the
+  current root and does not claim exact per-workspace roots.
+- Metadata proof: `jj --no-pager workspace list --template ...` succeeded with template fields
+  `name`, `target.change_id()`, and `target.commit_id()`. The implemented template intentionally
+  excludes `root`.
+- Implementation outcome: `src/workspaces.rs` owns selection, render, bindings, search, copy, and
+  refresh for the new screen. `src/jj_rows.rs` owns opaque rendered row pairing with exact metadata,
+  and degrades on metadata command, malformed JSON, or row-count failure without parsing rendered
+  labels.
+- Validation run during implementation:
+  - `cargo check`
+  - `cargo test workspaces -- --test-threads=1`
+  - `cargo test workspace_ -- --test-threads=1`
+  - `cargo test command_navigation -- --test-threads=1`
+  - `cargo test jj::tests::workspace_commands_use_read_only_root_list_and_metadata_template`
+  - `cargo clippy -- -D warnings`
+  - `rustup run nightly cargo fmt --check`
+  - full `cargo test` passed with 513 passed / 2 ignored
+  - `just md-check`
+  - `just check`
+- Review / validation outcome: the separate gpt-5.5 review `019e486b-5489-7803-b130-13cee2eda8fa`
+  found no blockers and accepted Packet 41. Main orchestration reran validation, including
+  `just check`, with 513 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-20 19:40:18 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/workspaces.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/view_state.rs`,
+    `src/app/navigation.rs`, `src/app/tests/command_navigation.rs`,
+    `docs/plan/screens/workspaces.md`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+    and `docs/process-observations.md`
+
 ### 2026-05-20 (Shifted help-close key repair)
 
 - Slice / task: narrow repair for the current `@` UI/keybinding change so help closes on shifted `?`

@@ -24,6 +24,7 @@ use crate::search::SearchQuery;
 use crate::show::ShowView;
 use crate::status::{StatusFileAction, StatusView};
 use crate::tui::StatusHints;
+use crate::workspaces::WorkspacesView;
 
 /// The currently active top-level view.
 pub enum ViewState {
@@ -35,6 +36,7 @@ pub enum ViewState {
     FileList(FileListView),
     FileShow(FileShowView),
     Bookmarks(BookmarksView),
+    Workspaces(WorkspacesView),
     OperationLog(OperationLogView),
     OperationDetail(OperationDetailView),
 }
@@ -50,6 +52,7 @@ impl ViewState {
             JjCommand::FileList => Ok(Self::FileList(FileListView::load(spec)?)),
             JjCommand::FileShow => Ok(Self::FileShow(FileShowView::load(spec)?)),
             JjCommand::Bookmarks => Ok(Self::Bookmarks(BookmarksView::load(spec)?)),
+            JjCommand::Workspaces => Ok(Self::Workspaces(WorkspacesView::load(spec)?)),
             JjCommand::OperationLog => Ok(Self::OperationLog(OperationLogView::load(spec)?)),
             JjCommand::OperationShow | JjCommand::OperationDiff => {
                 Ok(Self::OperationDetail(OperationDetailView::load(spec)?))
@@ -67,6 +70,7 @@ impl ViewState {
             Self::FileList(view) => view.render(frame, area, search),
             Self::FileShow(view) => view.render(frame, area, search),
             Self::Bookmarks(view) => view.render(frame, area, search),
+            Self::Workspaces(view) => view.render(frame, area, search),
             Self::OperationLog(view) => view.render(frame, area, search),
             Self::OperationDetail(view) => view.render(frame, area, search),
         }
@@ -82,6 +86,7 @@ impl ViewState {
             Self::FileList(view) => view.bindings(),
             Self::FileShow(view) => view.bindings(),
             Self::Bookmarks(view) => view.bindings(),
+            Self::Workspaces(view) => view.bindings(),
             Self::OperationLog(view) => view.bindings(),
             Self::OperationDetail(view) => view.bindings(),
         }
@@ -97,6 +102,7 @@ impl ViewState {
             Self::FileList(view) => view.execute(command, context),
             Self::FileShow(view) => view.execute(command, context),
             Self::Bookmarks(view) => view.execute(command, context),
+            Self::Workspaces(view) => view.execute(command, context),
             Self::OperationLog(view) => view.execute(command, context),
             Self::OperationDetail(view) => view.execute(command, context),
         }
@@ -112,6 +118,7 @@ impl ViewState {
             Self::FileList(view) => view.refresh(),
             Self::FileShow(view) => view.refresh(),
             Self::Bookmarks(view) => view.refresh(),
+            Self::Workspaces(view) => view.refresh(),
             Self::OperationLog(view) => view.refresh(),
             Self::OperationDetail(view) => view.refresh(),
         }
@@ -127,6 +134,7 @@ impl ViewState {
             Self::FileList(view) => view.clamp(),
             Self::FileShow(view) => view.clamp(viewport_height, viewport_width),
             Self::Bookmarks(view) => view.clamp(),
+            Self::Workspaces(view) => view.clamp(),
             Self::OperationLog(view) => view.clamp(),
             Self::OperationDetail(view) => view.clamp(viewport_height),
         }
@@ -142,6 +150,7 @@ impl ViewState {
             Self::FileList(view) => view.spec(),
             Self::FileShow(view) => view.spec(),
             Self::Bookmarks(view) => view.spec(),
+            Self::Workspaces(view) => view.spec(),
             Self::OperationLog(view) => view.spec(),
             Self::OperationDetail(view) => view.spec(),
         }
@@ -157,6 +166,7 @@ impl ViewState {
             Self::FileList(_) => StatusHints::FileList,
             Self::FileShow(_) => StatusHints::FileShowDocument,
             Self::Bookmarks(_) => StatusHints::Bookmarks,
+            Self::Workspaces(_) => StatusHints::Workspaces,
             Self::OperationLog(_) => StatusHints::OperationLog,
             Self::OperationDetail(_) => StatusHints::OperationDetailDocument,
         }
@@ -172,6 +182,7 @@ impl ViewState {
             Self::FileList(_) => HelpContext::FileList,
             Self::FileShow(_) => HelpContext::FileShow,
             Self::Bookmarks(_) => HelpContext::Bookmarks,
+            Self::Workspaces(_) => HelpContext::Workspaces,
             Self::OperationLog(_) => HelpContext::OperationLog,
             Self::OperationDetail(_) => HelpContext::OperationDetail,
         }
@@ -191,6 +202,7 @@ impl ViewState {
             Self::FileList(_) => 0,
             Self::FileShow(view) => view.scroll_offset(),
             Self::Bookmarks(_) => 0,
+            Self::Workspaces(_) => 0,
             Self::OperationLog(_) => 0,
             Self::OperationDetail(view) => view.scroll_offset(),
         }
@@ -206,6 +218,7 @@ impl ViewState {
             Self::FileList(_) => {}
             Self::FileShow(view) => view.set_scroll_offset(viewport_height, scroll_offset),
             Self::Bookmarks(_) => {}
+            Self::Workspaces(_) => {}
             Self::OperationLog(_) => {}
             Self::OperationDetail(view) => view.set_scroll_offset(viewport_height, scroll_offset),
         }
@@ -217,6 +230,7 @@ impl ViewState {
             Self::Resolve(view) => Some(view.item_count()),
             Self::FileList(view) => Some(view.item_count()),
             Self::Bookmarks(view) => Some(view.item_count()),
+            Self::Workspaces(view) => Some(view.item_count()),
             Self::OperationLog(view) => Some(view.item_count()),
             Self::Show(_)
             | Self::Diff(_)
@@ -236,6 +250,7 @@ impl ViewState {
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => None,
         }
@@ -251,6 +266,7 @@ impl ViewState {
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(()),
         }
@@ -270,6 +286,7 @@ impl ViewState {
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(false),
         }
@@ -285,6 +302,7 @@ impl ViewState {
             Self::FileList(view) => view.line_count(),
             Self::FileShow(view) => view.line_count(),
             Self::Bookmarks(view) => view.line_count(),
+            Self::Workspaces(view) => view.line_count(),
             Self::OperationLog(view) => view.line_count(),
             Self::OperationDetail(view) => view.line_count(),
         }
@@ -320,6 +338,7 @@ impl ViewState {
             | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),
         }
@@ -345,6 +364,7 @@ impl ViewState {
             | Self::FileList(_)
             | Self::FileShow(_)
             | Self::Bookmarks(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),
         }
@@ -372,6 +392,7 @@ impl ViewState {
             | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),
         }
@@ -389,6 +410,7 @@ impl ViewState {
             | Self::Resolve(_)
             | Self::FileList(_)
             | Self::FileShow(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),
         }
@@ -468,6 +490,7 @@ impl ViewState {
             }
             Self::Resolve(_)
             | Self::Bookmarks(_)
+            | Self::Workspaces(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),
         }
