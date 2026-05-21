@@ -6,6 +6,7 @@
 //! process boundary stay in `jj.rs`.
 
 mod bookmarks;
+mod operations;
 
 use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
@@ -18,7 +19,9 @@ pub use self::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState, load_bookmark_entries,
 };
-pub(crate) const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
+#[cfg(test)]
+pub(crate) use self::operations::OPERATION_ID_TEMPLATE;
+pub use self::operations::{OperationLogItem, load_operation_log_entries};
 pub(crate) const RESOLVE_CONFLICT_TEMPLATE: &str = r#"self.conflicted_files().map(|entry| "{\"path\":" ++ json(entry.path()) ++ ",\"file_type\":" ++ json(entry.file_type()) ++ ",\"side_count\":" ++ json(entry.conflict_side_count()) ++ "}\n").join("")"#;
 pub(crate) const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
     r#""{\"name\":" ++ json(name)"#,
@@ -170,42 +173,6 @@ impl ResolveEntry {
     }
 }
 
-/// One selectable operation item parsed from rendered operation-log output.
-#[derive(Clone, Debug)]
-pub struct OperationLogItem {
-    lines: Vec<Line<'static>>,
-    operation_id: Option<String>,
-}
-
-impl OperationLogItem {
-    pub fn new(lines: Vec<Line<'static>>, operation_id: Option<String>) -> Self {
-        Self {
-            lines,
-            operation_id,
-        }
-    }
-
-    pub fn lines(&self) -> Vec<Line<'static>> {
-        self.lines.clone()
-    }
-
-    pub fn line_count(&self) -> usize {
-        self.lines.len()
-    }
-
-    pub fn operation_id(&self) -> Option<&str> {
-        self.operation_id.as_deref()
-    }
-
-    pub fn row_text(&self) -> String {
-        self.lines
-            .iter()
-            .map(line_text)
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-}
-
 /// Read-only workspace/root context loaded from separate `jj` commands.
 #[derive(Clone, Debug, Default)]
 pub struct WorkspaceContext {
@@ -344,13 +311,6 @@ pub fn load_file_list_entries(spec: &ViewSpec) -> Result<Vec<FileListItem>> {
         .collect())
 }
 
-pub fn load_operation_log_entries(spec: &ViewSpec) -> Result<Vec<OperationLogItem>> {
-    let output = run_jj(spec, ColorMode::Always)?;
-    let lines = output.stdout.into_text()?.lines;
-    let operation_ids = run_operation_log_ids(spec)?;
-    Ok(group_operation_log_lines(lines, operation_ids))
-}
-
 pub fn load_workspace_context(spec: &ViewSpec) -> Result<WorkspaceContext> {
     let (root, root_error) = match crate::jj::load_workspace_root() {
         Ok(root) => (Some(root), None),
@@ -399,14 +359,6 @@ pub fn document_plain_text(lines: &[Line<'static>]) -> String {
 fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<RowMetadata<RevisionMetadata>> {
     Ok(parse_revision_metadata_lines(run_jj_template_lines(
         spec, template, false,
-    )?))
-}
-
-fn run_operation_log_ids(spec: &ViewSpec) -> Result<RowMetadata<String>> {
-    Ok(parse_operation_id_lines(run_jj_template_lines(
-        spec,
-        OPERATION_ID_TEMPLATE,
-        true,
     )?))
 }
 
@@ -460,45 +412,6 @@ fn group_lines(lines: Vec<Line<'static>>, metadata: RowMetadata<RevisionMetadata
                 .map(|metadata| metadata.change_id.clone()),
             current_metadata.and_then(|metadata| metadata.commit_id),
         ));
-    }
-
-    items
-}
-
-fn group_operation_log_lines(
-    lines: Vec<Line<'static>>,
-    operation_ids: RowMetadata<String>,
-) -> Vec<OperationLogItem> {
-    let operation_row_count = lines
-        .iter()
-        .filter(|line| starts_operation_log_item(line))
-        .count();
-    let mut operation_ids = operation_ids
-        .into_rows_matching(operation_row_count)
-        .map(Vec::into_iter);
-
-    let mut items = Vec::new();
-    let mut current_lines = Vec::new();
-    let mut current_operation_id = None;
-
-    for line in lines {
-        let starts_item = starts_operation_log_item(&line);
-        let standalone_graph_line = is_standalone_graph_line(&line);
-
-        if (starts_item || standalone_graph_line) && !current_lines.is_empty() {
-            items.push(OperationLogItem::new(current_lines, current_operation_id));
-            current_lines = Vec::new();
-            current_operation_id = None;
-        }
-
-        if starts_item {
-            current_operation_id = operation_ids.as_mut().and_then(Iterator::next);
-        }
-        current_lines.push(line);
-    }
-
-    if !current_lines.is_empty() {
-        items.push(OperationLogItem::new(current_lines, current_operation_id));
     }
 
     items
@@ -661,28 +574,6 @@ fn is_graph_only_revision_metadata_line(line: &str) -> bool {
     text.is_empty() || text == "~" || text == "~  (elided revisions)"
 }
 
-fn parse_operation_id_line(line: &str) -> Option<String> {
-    let mut tokens = line.split_whitespace();
-    let operation_id = tokens.next()?;
-
-    if tokens.next().is_some() || line != operation_id || !is_operation_id(operation_id) {
-        return None;
-    }
-
-    Some(operation_id.to_owned())
-}
-
-fn parse_operation_id_lines(lines: Vec<String>) -> RowMetadata<String> {
-    let mut operation_ids = Vec::new();
-    for line in lines {
-        let Some(operation_id) = parse_operation_id_line(&line) else {
-            return RowMetadata::Drifted;
-        };
-        operation_ids.push(operation_id);
-    }
-    RowMetadata::Valid(operation_ids)
-}
-
 fn parse_resolve_entry_line(line: &str) -> ResolveEntry {
     let raw_line = line.to_owned();
     let Ok(Value::Object(fields)) = serde_json::from_str::<Value>(line) else {
@@ -739,20 +630,12 @@ fn is_full_change_id(token: &str) -> bool {
     token.len() == 32 && token.bytes().all(|byte| byte.is_ascii_lowercase())
 }
 
-fn is_operation_id(token: &str) -> bool {
-    token.len() == 128 && token.bytes().all(|byte| byte.is_ascii_hexdigit())
-}
-
 fn starts_log_item(line: &Line<'_>) -> bool {
     starts_log_item_text(&line_text(line))
 }
 
 fn starts_log_item_text(text: &str) -> bool {
     first_content_char(text).is_some_and(|character| matches!(character, '@' | '○' | '◆'))
-}
-
-fn starts_operation_log_item(line: &Line<'_>) -> bool {
-    first_content_char(&line_text(line)).is_some_and(|character| matches!(character, '@' | '○'))
 }
 
 fn is_standalone_graph_line(line: &Line<'_>) -> bool {
@@ -968,91 +851,6 @@ mod tests {
     }
 
     #[test]
-    fn groups_operation_log_rows_and_preserves_styles() {
-        let text =
-            b"\x1b[1m@\x1b[0m  current\n\xE2\x94\x82  args: jj describe\n\xE2\x97\x8B  previous\n"
-                .to_vec();
-        let lines = text.into_text().unwrap().lines;
-        let operation_ids = operation_id_rows(vec![operation_id('a'), operation_id('b')]);
-
-        let items = group_operation_log_lines(lines, operation_ids);
-
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0].line_count(), 2);
-        assert_eq!(items[0].operation_id(), Some(operation_id('a').as_str()));
-        assert_eq!(items[0].lines[0].spans[0].content, "@");
-        assert_eq!(items[1].operation_id(), Some(operation_id('b').as_str()));
-    }
-
-    #[test]
-    fn operation_log_rows_fail_closed_on_malformed_id_metadata_line() {
-        let lines = b"@  current\n\xE2\x97\x8B  previous\n"
-            .to_vec()
-            .into_text()
-            .unwrap()
-            .lines;
-        let operation_ids =
-            parse_operation_id_lines(vec![operation_id('a'), "not-an-operation".to_owned()]);
-
-        let items = group_operation_log_lines(lines, operation_ids);
-
-        assert_eq!(items.len(), 2);
-        assert!(items.iter().all(|item| item.operation_id().is_none()));
-        assert_eq!(items[0].row_text(), "@  current");
-        assert_eq!(items[1].row_text(), "○  previous");
-    }
-
-    #[test]
-    fn operation_log_rows_fail_closed_when_metadata_line_is_missing_id() {
-        let lines = b"@  current\n\xE2\x97\x8B  previous\n"
-            .to_vec()
-            .into_text()
-            .unwrap()
-            .lines;
-        let operation_ids = parse_operation_id_lines(vec![operation_id('a'), String::new()]);
-
-        let items = group_operation_log_lines(lines, operation_ids);
-
-        assert_eq!(items.len(), 2);
-        assert!(items.iter().all(|item| item.operation_id().is_none()));
-        assert_eq!(items[0].row_text(), "@  current");
-        assert_eq!(items[1].row_text(), "○  previous");
-    }
-
-    #[test]
-    fn operation_log_rows_fail_closed_on_extra_metadata() {
-        let lines = b"@  current\n\xE2\x94\x82  args: jj describe\n"
-            .to_vec()
-            .into_text()
-            .unwrap()
-            .lines;
-        let operation_ids = operation_id_rows(vec![operation_id('a'), operation_id('b')]);
-
-        let items = group_operation_log_lines(lines, operation_ids);
-
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].operation_id(), None);
-        assert_eq!(items[0].row_text(), "@  current\n│  args: jj describe");
-    }
-
-    #[test]
-    fn operation_log_rows_fail_closed_on_row_count_mismatch() {
-        let lines = b"@  current\n\xE2\x97\x8B  previous\n"
-            .to_vec()
-            .into_text()
-            .unwrap()
-            .lines;
-        let operation_ids = operation_id_rows(vec![operation_id('a')]);
-
-        let items = group_operation_log_lines(lines, operation_ids);
-
-        assert_eq!(items.len(), 2);
-        assert!(items.iter().all(|item| item.operation_id().is_none()));
-        assert_eq!(items[0].row_text(), "@  current");
-        assert_eq!(items[1].row_text(), "○  previous");
-    }
-
-    #[test]
     fn parses_revision_metadata_lines_graph_shape() {
         let change_id = "t".repeat(32);
         let commit_id = "6".repeat(40);
@@ -1105,20 +903,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parses_operation_id_lines_exact_shape() {
-        let operation_id = operation_id('a');
-
-        assert_eq!(
-            parse_operation_id_line(&operation_id),
-            Some(operation_id.clone())
-        );
-        assert_eq!(
-            parse_operation_id_line(&format!("junk {operation_id}")),
-            None
-        );
-        assert_eq!(parse_operation_id_line("not-an-operation"), None);
-    }
     #[test]
     fn resolve_entry_parser_keeps_exact_fields() {
         let entry = parse_resolve_entry_line(
@@ -1287,13 +1071,5 @@ mod tests {
             std::iter::repeat_n(change_digit, 32).collect::<String>(),
             std::iter::repeat_n(commit_digit, 40).collect::<String>()
         )
-    }
-
-    fn operation_id_rows(rows: Vec<String>) -> RowMetadata<String> {
-        RowMetadata::Valid(rows)
-    }
-
-    fn operation_id(digit: char) -> String {
-        std::iter::repeat_n(digit, 128).collect()
     }
 }

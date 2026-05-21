@@ -5,6 +5,52 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Operation row metadata extraction)
+
+- Slice / task: extract operation-log rendered row loading and operation-id metadata pairing from
+  broad `src/jj_rows.rs` on current change `Extract operation row loading`.
+- Thread id: `019e49ab-e7d9-7b71-8f38-ce18e4e42eb1`.
+- Model / routing: worker/subagent `019e49ab-e7d9-7b71-8f38-ce18e4e42eb1` with medium reasoning
+  implemented the extraction. The main thread reviewed and validated the result. The user explicitly
+  prohibited jj/git commands, so the work used direct file reads, local measurements, and validation
+  commands without source-control inspection.
+- Files changed: `src/jj_rows.rs`, `src/jj_rows/operations.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_rows/operations.rs` now owns `OperationLogItem`,
+  `load_operation_log_entries`, operation-id template execution, operation row grouping,
+  operation-id parsing, and focused operation row drift tests. `src/jj_rows.rs` re-exports the
+  stable operation row facade for existing callers and retains shared row helpers plus the remaining
+  row families.
+- Behavior intent: preserve rendered ANSI conversion, operation-log row grouping, operation id
+  shape, row-count drift fail-closed behavior, operation-log view behavior, and existing app/test
+  call sites exactly.
+- Maintainability evidence: `wc -l src/jj_rows.rs src/jj_rows/operations.rs` showed `src/jj_rows.rs`
+  at 1075 lines and `src/jj_rows/operations.rs` at 251 lines after the extraction.
+- Rework / surprise: the first patch moved the operation tests but left the original copies in
+  `src/jj_rows.rs`; a follow-up cleanup removed the duplicates and operation-only test helpers from
+  the parent module.
+- Validation trail:
+  - `cargo test jj_rows -- --test-threads=1` passed with 36 passed.
+  - `cargo test operation_log -- --test-threads=1` passed with 21 passed.
+  - `cargo test operation_actions -- --test-threads=1` passed with 10 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed after applying rustfmt. The command still printed
+    the repo's existing rustfmt unstable-option warnings.
+  - `just md-check` passed after applying Panache wrapping to the edited docs.
+- Main-thread review validation passed: `cargo test jj_rows -- --test-threads=1` with 36 passed;
+  `cargo test operation_log -- --test-threads=1` with 21 passed;
+  `cargo test operation_actions -- --test-threads=1` with 10 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; `just md-check`; and full
+  `just check`. Full `just check` reported 533 passed / 2 ignored, and its largest-file output
+  included `src/jj_rows.rs` at 1075 lines.
+- Evidence basis:
+  - Date: `2026-05-21 01:36:41 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `docs/agent/rust-style.md`, `docs/agent/testing.md`, `src/jj_rows.rs`,
+    `src/jj_rows/operations.rs`, `src/operation_log.rs`, and `src/jj.rs`
+
 ### 2026-05-21 (Source maintainability queue reassessment)
 
 - Slice / task: refresh `docs/agent/source-maintainability-ledger.md` after the completed help

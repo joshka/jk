@@ -156,26 +156,41 @@ should have an owner and a contract, not a line-count target.
 - Proof: focused action-menu, file-action, and detail-restore tests, plus `cargo check`,
   `cargo clippy -- -D warnings`, `rustup run nightly cargo fmt --check`, and `just md-check`.
 
+### Operation Row Metadata Packet
+
+- Status: completed on 2026-05-21 in the Codex main thread.
+- Owner: `src/jj_rows/operations.rs`
+- Outcome: `src/jj_rows/operations.rs` owns `OperationLogItem`, operation-log row loading, operation
+  id metadata loading, row grouping, operation id parsing, and the focused operation row drift
+  tests. `src/jj_rows.rs` keeps the stable facade for `OperationLogItem` and
+  `load_operation_log_entries`, plus shared row helpers and the remaining row families.
+- Maintainability evidence: `src/jj_rows.rs` dropped from 1299 lines in the reassessment snapshot to
+  1075 lines after extraction, and the new `src/jj_rows/operations.rs` is 251 lines including moved
+  tests.
+- Non-goals preserved: no graph revision grouping changes, no bookmark/file-list/resolve/workspace
+  row changes, no rendered ANSI conversion changes, no operation id shape changes, and no
+  process-boundary move into `src/jj.rs`.
+- Proof: focused `cargo test jj_rows -- --test-threads=1` passed during the extraction, with final
+  gate commands recorded in `docs/process-observations.md`.
+
 ## Current Next Slices
 
 ### 1. Rendered Row Loader And Metadata Packets
 
 - Owner: `src/jj_rows.rs`, with likely new siblings under `src/jj_rows/` beside
   `src/jj_rows/bookmarks.rs`.
-- Purpose: split row loading and metadata pairing by rendered row family. The clearest first packet
-  is either operation-log row loading (`OperationLogItem`, operation id metadata, operation row
-  grouping) or workspace row loading (`WorkspaceContext`, `WorkspaceItem`, workspace metadata
-  parsing and pairing). Both already have narrow templates, row-count drift behavior, and focused
-  tests in one file.
-- Evidence: `src/jj_rows.rs` is 1299 lines after bookmark metadata was already moved out.
-  `load_operation_log_entries`, `group_operation_log_lines`, `parse_operation_id_lines`, and their
-  tests form one operation-log concept. `load_workspace_context`, `WorkspaceContext`,
-  `WorkspaceItem`, workspace metadata parsing, and workspace drift tests form another concept.
+- Purpose: continue splitting row loading and metadata pairing by rendered row family after the
+  operation packet. The clearest remaining packet is workspace row loading (`WorkspaceContext`,
+  `WorkspaceItem`, workspace metadata parsing and pairing), which already has a narrow template,
+  row-count drift behavior, and focused tests in one file.
+- Evidence: `src/jj_rows.rs` is 1075 lines after bookmark metadata and operation rows were moved
+  out. `load_workspace_context`, `WorkspaceContext`, `WorkspaceItem`, workspace metadata parsing,
+  and workspace drift tests form the next coherent row-family concept.
 - Non-goals: do not change rendered ANSI conversion, graph revision grouping, bookmark rows, file
   list path preservation, or the process boundary in `src/jj.rs`. Do not broaden parsing beyond the
   current narrow metadata templates.
-- Proof: focused `cargo test jj_rows::tests::operation` or workspace-row tests for the chosen
-  packet, plus `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Proof: focused workspace-row tests for the chosen packet, plus `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
 
 ### 2. ViewSpec Navigation Provenance Packet
 
