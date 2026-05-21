@@ -6,7 +6,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::action_menu::RolePrompt;
+use crate::action_menu::{ActionKind, RolePrompt};
 use crate::action_output::ActionOutput;
 use crate::app_screen::view_menu_options;
 use crate::jj_actions::{
@@ -76,11 +76,118 @@ pub(super) fn reduce_view_menu_key(selected: &mut usize, code: KeyCode) -> MenuK
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub(super) enum RolePromptDecision {
+    Rebase(JjRebasePlan),
+    Squash(JjSquashPlan),
+    StatusMessage(String),
+    StatusError(String),
+}
+
+pub(super) fn reduce_role_prompt_accept(
+    action: ActionKind,
+    prompt: &RolePrompt,
+) -> RolePromptDecision {
+    match action {
+        ActionKind::Rebase => match rebase_plan_from_prompt(prompt) {
+            Some(rebase) => RolePromptDecision::Rebase(rebase),
+            None => RolePromptDecision::StatusError(prompt.status_message()),
+        },
+        ActionKind::Squash => match squash_plan_from_prompt(prompt) {
+            Some(squash) => RolePromptDecision::Squash(squash),
+            None => RolePromptDecision::StatusError(prompt.status_message()),
+        },
+        ActionKind::Edit
+        | ActionKind::New
+        | ActionKind::Split
+        | ActionKind::Duplicate
+        | ActionKind::Restore
+        | ActionKind::Revert
+        | ActionKind::Abandon
+        | ActionKind::Absorb
+        | ActionKind::FileTrack
+        | ActionKind::FileUntrack
+        | ActionKind::FileChmodExecutable
+        | ActionKind::FileChmodNormal => RolePromptDecision::StatusMessage(prompt.status_message()),
+    }
+}
+
 pub(super) enum ConfirmationKey {
     Cancel,
     Accept,
     Handled,
     Ignored,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::action_menu::RolePromptOption;
+
+    fn role_prompt(options: Vec<RolePromptOption>) -> RolePrompt {
+        RolePrompt::new("confirm role assignment", options, "Preview required.")
+    }
+
+    #[test]
+    fn role_prompt_accept_builds_rebase_plan() {
+        let prompt = role_prompt(vec![
+            RolePromptOption::new("source", "source-a"),
+            RolePromptOption::new("destination", "dest"),
+            RolePromptOption::new("source", "source-b"),
+        ]);
+
+        let RolePromptDecision::Rebase(rebase) =
+            reduce_role_prompt_accept(ActionKind::Rebase, &prompt)
+        else {
+            panic!("expected rebase decision");
+        };
+
+        assert_eq!(rebase.sources(), &["source-a", "source-b"]);
+        assert_eq!(rebase.destination(), "dest");
+    }
+
+    #[test]
+    fn role_prompt_accept_builds_squash_plan() {
+        let prompt = role_prompt(vec![
+            RolePromptOption::new("source", "source-a"),
+            RolePromptOption::new("source", "source-b"),
+            RolePromptOption::new("destination", "dest"),
+        ]);
+
+        let RolePromptDecision::Squash(squash) =
+            reduce_role_prompt_accept(ActionKind::Squash, &prompt)
+        else {
+            panic!("expected squash decision");
+        };
+
+        assert_eq!(squash.sources(), &["source-a", "source-b"]);
+        assert_eq!(squash.destination(), "dest");
+    }
+
+    #[test]
+    fn role_prompt_accept_reports_rewrite_prompt_error_without_a_plan() {
+        let prompt = role_prompt(vec![RolePromptOption::new("source", "source-a")]);
+
+        assert_eq!(
+            reduce_role_prompt_accept(ActionKind::Rebase, &prompt),
+            RolePromptDecision::StatusError("source: source-a\nPreview required.".to_owned())
+        );
+    }
+
+    #[test]
+    fn role_prompt_accept_reports_unsupported_action_as_status_message() {
+        let prompt = role_prompt(vec![
+            RolePromptOption::new("source", "source-a"),
+            RolePromptOption::new("destination", "dest"),
+        ]);
+
+        assert_eq!(
+            reduce_role_prompt_accept(ActionKind::Absorb, &prompt),
+            RolePromptDecision::StatusMessage(
+                "source: source-a\ndestination: dest\nPreview required.".to_owned(),
+            )
+        );
+    }
 }
 
 pub(super) fn reduce_confirmation_key(

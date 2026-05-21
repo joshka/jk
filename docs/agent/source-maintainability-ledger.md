@@ -38,6 +38,20 @@ change, but a maintainer should be able to start from a feature such as `operati
 `bookmarks`, `status`, `files`, or `log` and find the local row model, view behavior, action
 availability, and tests without first understanding global buckets.
 
+Do not create a `slices/` folder or another implementation-phase bucket. The destination should look
+like feature roots with optional submodules for local concerns, plus shared infrastructure for
+boring cross-cutting mechanics:
+
+- `app`: input, modes, navigation, services, and action lifecycle orchestration;
+- `log`, `operation_log`, `bookmarks`, `status`, and `files`: feature-owned views, rows, action
+  availability, target resolution, and tests;
+- `documents`: rendered document mechanics such as sticky headings, rendered line structure, and
+  document search when those mechanics are not owned by one file-oriented feature;
+- `actions`: cross-view command plans and execution contracts such as rewrite, working-copy, file,
+  sync, describe, and abandon plans;
+- `jj`: command construction, process execution, syntax quoting, and view specs;
+- `ui`: shared chrome, overlays, menus, status hints, and theme primitives.
+
 Feature modules should own product decisions that change together:
 
 - view state and bindings;
@@ -65,17 +79,38 @@ Examples for future packets:
 - Operation-log behavior now starts from `operation_log`: `src/operation_log/rows.rs` owns rendered
   row grouping, operation-id template parsing and pairing, and fail-closed metadata drift tests;
   `src/operation_log.rs` owns movement/copy, undo/redo/restore/revert availability, operation detail
-  navigation, and view tests.
+  navigation, and view tests. Future operation-detail rendering or recovery target policy should
+  move toward `operation_log/detail.rs` or `operation_log/actions.rs` when that shortens the reader
+  path.
 - Bookmark behavior now starts from `bookmarks`: `src/bookmarks/rows.rs` owns rendered row loading,
   bookmark metadata template parsing and pairing, local/remote state classification, and fail-closed
-  drift tests; `src/bookmarks/action_targets.rs` owns safe mutation targets.
+  drift tests; `src/bookmarks/action_targets.rs` owns safe mutation targets. Future bookmark
+  create/set/move/rename/delete/forget/track/untrack availability belongs under the bookmark feature
+  before a shared action plan exists.
 - Cross-view action plans such as rebase, squash, absorb, new, edit, duplicate, split, restore,
   revert, track, untrack, chmod, fetch, push, describe, and abandon may live under an action-plan
   owner, but view-specific availability belongs with the feature that offers the action.
+- `actions/*` should own argv, preview, and run behavior after a feature has already selected a
+  command target. It should not own whether the log, status, bookmark, file, or operation-log view
+  offers that action to the user.
 - Rendered document scrolling, sticky file headings, and rendered jj document parsing may become a
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 role prompt acceptance reducer extraction:
+
+- `src/app/mode_input/reducers.rs` now owns the pure role-prompt acceptance decision:
+  `RolePromptDecision` classifies rebase previews, squash previews, normal status messages, and
+  error status messages without mutating app state.
+- `src/app/mode_input.rs` still owns the side effects after prompt acceptance: reset to normal mode,
+  open rewrite previews, and update `StatusLine`.
+- The extraction follows the app shared-infrastructure rule: reducers own modal interpretation,
+  while action lifecycle and status routing stay with app orchestration.
+- Focused validation covered `cargo test command_navigation -- --test-threads=1`,
+  `cargo test rewrite_actions -- --test-threads=1`, `cargo test mode_input -- --test-threads=1`,
+  `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check`. Full `just check` also
+  passed at the top of the stack.
 
 2026-05-21 action plan root contract documentation:
 

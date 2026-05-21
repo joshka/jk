@@ -5845,3 +5845,47 @@ belong here.
   - Date: `2026-05-21` from local `date +%F`
   - Thread id from `CODEX_THREAD_ID`
   - Files: `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`
+
+### 2026-05-21 (Role prompt acceptance reducer extraction)
+
+- Slice / task: extract the pure `InteractionMode::RolePrompt` accept decision from
+  `src/app/mode_input.rs` into `src/app/mode_input/reducers.rs` while preserving app-owned side
+  effects.
+- Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
+  implementation `019e4ba8-1144-7fe0-b09c-925e8970ba5e`.
+- Model / routing: worker/subagent `019e4ba8-1144-7fe0-b09c-925e8970ba5e` with medium reasoning
+  implemented the reducer extraction. The main thread reviewed the diff, reran focused validation,
+  and updated the maintainability ledger with the feature-root guidance.
+- User constraints: the worker ran no `jj` or `git` commands; main-thread jj usage was limited to
+  status/diff inspection. Writes stayed within the requested implementation scope plus the required
+  process and maintainability documentation.
+- Implementation outcome: `reducers.rs` now owns `RolePromptDecision` and
+  `reduce_role_prompt_accept`, including rebase/squash plan construction and the previous status
+  fallback classification. `mode_input.rs` now resets the mode and applies only preview/status side
+  effects after interpreting that decision.
+- Behavior-preservation evidence: the reducer keeps the existing status wording by continuing to use
+  `RolePrompt::status_message()`, opens the same rebase and squash preview plans, uses an error
+  status when rewrite plan construction fails, and uses a normal status message for unsupported
+  role-prompt actions.
+- Maintainability guidance outcome: `docs/agent/source-maintainability-ledger.md` now states the
+  concrete feature-root plus shared-infrastructure destination and clarifies that `actions/*` owns
+  command plans after a feature has chosen a target, while feature roots own action availability and
+  target resolution.
+- Rework / surprise: main-thread validation accidentally started two focused cargo tests in
+  parallel, causing package-cache lock waits again. Future cargo validation should stay sequential.
+- Validation trail:
+  - Worker validation passed: `cargo test command_navigation -- --test-threads=1` with 35 passed;
+    `cargo test rewrite_actions -- --test-threads=1` with 16 passed;
+    `cargo test mode_input -- --test-threads=1` with 4 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test command_navigation -- --test-threads=1` with
+    35 passed; `cargo test rewrite_actions -- --test-threads=1` with 16 passed;
+    `cargo test mode_input -- --test-threads=1` with 4 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
+    with `-D warnings`, `cargo check`, and `cargo test` with 549 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 11:51:45 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.

@@ -10,7 +10,6 @@ use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::DefaultTerminal;
 
-use crate::action_menu::ActionKind;
 use crate::action_output::{
     ActionOutputKey, action_output_visible_lines, handle_action_output_key,
 };
@@ -31,10 +30,11 @@ use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand, prefix_st
 mod reducers;
 
 use reducers::{
-    ConfirmationKey, MenuKey, TextPromptKey, bookmark_mutation_plan, is_help_close_key,
-    is_help_scroll_key, reduce_confirmation_key, reduce_menu_key, reduce_text_prompt_key,
-    reduce_view_menu_key,
+    ConfirmationKey, MenuKey, RolePromptDecision, TextPromptKey, bookmark_mutation_plan,
+    is_help_close_key, is_help_scroll_key, reduce_confirmation_key, reduce_menu_key,
+    reduce_role_prompt_accept, reduce_text_prompt_key, reduce_view_menu_key,
 };
+#[cfg(test)]
 pub(in crate::app) use reducers::{rebase_plan_from_prompt, squash_plan_from_prompt};
 
 impl App {
@@ -188,48 +188,17 @@ impl App {
                 match reduce_menu_key(selected, prompt.options().len(), code) {
                     MenuKey::Cancel => self.mode = InteractionMode::Normal,
                     MenuKey::Accept => {
-                        let next_status = prompt.status_message();
-                        let action = *action;
-                        let rebase_plan = match action {
-                            ActionKind::Rebase => rebase_plan_from_prompt(prompt),
-                            _ => None,
-                        };
-                        let squash_plan = match action {
-                            ActionKind::Squash => squash_plan_from_prompt(prompt),
-                            _ => None,
-                        };
-
+                        let decision = reduce_role_prompt_accept(*action, prompt);
                         self.mode = InteractionMode::Normal;
 
-                        match action {
-                            ActionKind::Rebase => match rebase_plan {
-                                Some(rebase) => self.open_rebase_preview(rebase),
-                                None => {
-                                    self.status =
-                                        StatusLine::error(&self.view, next_status.to_owned());
-                                }
-                            },
-                            ActionKind::Squash => match squash_plan {
-                                Some(squash) => self.open_squash_preview(squash),
-                                None => {
-                                    self.status =
-                                        StatusLine::error(&self.view, next_status.to_owned());
-                                }
-                            },
-                            ActionKind::Edit
-                            | ActionKind::New
-                            | ActionKind::Split
-                            | ActionKind::Duplicate
-                            | ActionKind::Restore
-                            | ActionKind::Revert
-                            | ActionKind::Abandon
-                            | ActionKind::Absorb
-                            | ActionKind::FileTrack
-                            | ActionKind::FileUntrack
-                            | ActionKind::FileChmodExecutable
-                            | ActionKind::FileChmodNormal => {
-                                self.status =
-                                    StatusLine::with_message(&self.view, next_status.to_owned());
+                        match decision {
+                            RolePromptDecision::Rebase(rebase) => self.open_rebase_preview(rebase),
+                            RolePromptDecision::Squash(squash) => self.open_squash_preview(squash),
+                            RolePromptDecision::StatusMessage(message) => {
+                                self.status = StatusLine::with_message(&self.view, message);
+                            }
+                            RolePromptDecision::StatusError(message) => {
+                                self.status = StatusLine::error(&self.view, message);
                             }
                         }
                     }
