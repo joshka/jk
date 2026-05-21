@@ -5,6 +5,34 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Action output overlay collapse)
+
+- Slice / task: implement the first maintainability corrective packet to collapse duplicate
+  per-action TUI preview/result overlay variants into one ordinary action-output overlay, while
+  keeping typed abandon confirmation separate.
+- Thread id: `019e4870-6d2c-7b23-afd8-1ecb726878b5`.
+- Model choice in task prompt: `gpt-5.5 high`.
+- Implementation outcome: `src/tui.rs` now has one ordinary action-output render path plus the
+  existing `Overlay::AbandonConfirm` render path. `src/app_screen.rs` still owns `InteractionMode`
+  projection and maps ordinary action preview/result modes to the common action-output overlay with
+  the existing titles; `AbandonConfirm` stays on its dedicated overlay.
+- Evidence that duplicate overlay variants were removed: `rg` for the previous per-action
+  `Overlay::*Preview` names in `src/tui.rs` and `src/app_screen.rs` returned no matches.
+- Line-count evidence after the change: `src/tui.rs` 1134 LOC, `src/app_screen.rs` 622 LOC, and
+  `src/action_output.rs` 245 LOC.
+- Validation run:
+  - `cargo check`
+  - `cargo test tui -- --test-threads=1`
+  - `cargo test app_screen -- --test-threads=1`
+  - `cargo test action_output -- --test-threads=1`
+  - `cargo clippy -- -D warnings`
+  - `rustup run nightly cargo fmt --check`
+  - full `cargo test` passed with 517 passed / 2 ignored
+  - `just check`
+- Evidence basis:
+  - Date: `2026-05-20 19:55:31 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/app_screen.rs`, `src/tui.rs`, and `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 41 workspace/root surface)
 
 - Slice / task: implement Packet 41: Workspace And Root Utility Surface in jj change

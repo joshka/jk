@@ -88,80 +88,8 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             frame.render_widget(remote_prompt("Fetch remote", remotes, selected), area);
         }
-        Overlay::NewPreview { output } => {
-            let title = action_output_title("New change", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::DuplicatePreview { output } => {
-            let title = action_output_title("Duplicate", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::DescribePreview { output } => {
-            let title = action_output_title("Describe", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::CommitPreview { output } => {
-            let title = action_output_title("Commit", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::BookmarkMutationPreview { output } => {
-            let title = action_output_title("Bookmark", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::FileMutationPreview { output } => {
-            let title = action_output_title("File", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::RebasePreview { output } => {
-            let title = action_output_title("Rebase", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::SplitPreview { output } => {
-            let title = action_output_title("Split", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::RestorePreview { output } => {
-            let title = action_output_title("Restore", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::RevertPreview { output } => {
-            let title = action_output_title("Revert", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::SquashPreview { output } => {
-            let title = action_output_title("Squash", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::AbsorbPreview { output } => {
-            let title = action_output_title("Absorb", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::AbandonPreview { output } => {
-            let title = action_output_title("Abandon", output);
+        Overlay::ActionOutput { title, output } => {
+            let title = action_output_title(title, output);
             let area = action_output_area(frame.area(), &title, output);
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
@@ -181,36 +109,6 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             let area = centered_area(frame.area(), 54, prompt.options().len() as u16 + 4);
             frame.render_widget(Clear, area);
             frame.render_widget(role_prompt(prompt, selected), area);
-        }
-        Overlay::PushPreview { output } => {
-            let title = action_output_title("Push", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::FetchPreview { output } => {
-            let title = action_output_title("Fetch", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::OperationRecoveryPreview { output } => {
-            let title = action_output_title("Operation recovery", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::OperationTargetPreview { output } => {
-            let title = action_output_title("Operation action", output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
-        }
-        Overlay::WorkingCopyNavigationPreview { title, output } => {
-            let title = action_output_title(title, output);
-            let area = action_output_area(frame.area(), &title, output);
-            frame.render_widget(Clear, area);
-            render_action_output(frame, area, &title, output);
         }
     }
 }
@@ -240,59 +138,8 @@ pub enum Overlay<'a> {
         remotes: &'a [String],
         selected: usize,
     },
-    PushPreview {
-        output: &'a ActionOutput,
-    },
-    FetchPreview {
-        output: &'a ActionOutput,
-    },
-    NewPreview {
-        output: &'a ActionOutput,
-    },
-    DuplicatePreview {
-        output: &'a ActionOutput,
-    },
-    DescribePreview {
-        output: &'a ActionOutput,
-    },
-    CommitPreview {
-        output: &'a ActionOutput,
-    },
-    BookmarkMutationPreview {
-        output: &'a ActionOutput,
-    },
-    FileMutationPreview {
-        output: &'a ActionOutput,
-    },
-    OperationRecoveryPreview {
-        output: &'a ActionOutput,
-    },
-    OperationTargetPreview {
-        output: &'a ActionOutput,
-    },
-    WorkingCopyNavigationPreview {
+    ActionOutput {
         title: &'static str,
-        output: &'a ActionOutput,
-    },
-    RebasePreview {
-        output: &'a ActionOutput,
-    },
-    SplitPreview {
-        output: &'a ActionOutput,
-    },
-    RestorePreview {
-        output: &'a ActionOutput,
-    },
-    RevertPreview {
-        output: &'a ActionOutput,
-    },
-    SquashPreview {
-        output: &'a ActionOutput,
-    },
-    AbsorbPreview {
-        output: &'a ActionOutput,
-    },
-    AbandonPreview {
         output: &'a ActionOutput,
     },
     AbandonConfirm {
@@ -1182,6 +1029,59 @@ mod tests {
           line 4
         Enter confirm  Esc/q cancel  j/k s
         ");
+    }
+
+    #[test]
+    fn action_output_overlay_renders_common_preview_title_and_footer() {
+        let output = ActionOutput::pending(
+            "jj git fetch --remote exact:origin".to_owned(),
+            "fetch preview".to_owned(),
+            None,
+        );
+        let status = StatusLine::test("jk log", "ready", StatusKind::Ready, StatusHints::Graph);
+
+        let rendered = render_widget_rows(80, 8, |frame| {
+            render_overlay(
+                frame,
+                &status,
+                Overlay::ActionOutput {
+                    title: "Fetch",
+                    output: &output,
+                },
+            );
+        });
+
+        assert!(rendered.contains("Fetch preview"));
+        assert!(rendered.contains("command: jj git fetch --remote exact:origin"));
+        assert!(rendered.contains("Enter confirm  Esc/q cancel"));
+        assert!(!rendered.contains("type exact id"));
+    }
+
+    #[test]
+    fn action_output_overlay_renders_common_result_title_and_footer() {
+        let output = ActionOutput::finished(
+            "jj git fetch".to_owned(),
+            "fetched".to_owned(),
+            Some("default fetch uses jj git fetch remote resolution".to_owned()),
+        );
+        let status = StatusLine::test("jk log", "ready", StatusKind::Ready, StatusHints::Graph);
+
+        let rendered = render_widget_rows(80, 8, |frame| {
+            render_overlay(
+                frame,
+                &status,
+                Overlay::ActionOutput {
+                    title: "Fetch",
+                    output: &output,
+                },
+            );
+        });
+
+        assert!(rendered.contains("Fetch result"));
+        assert!(rendered.contains("command: jj git fetch"));
+        assert!(rendered.contains("default fetch uses jj git fetch remote resolution"));
+        assert!(rendered.contains("Enter close  Esc/q close"));
+        assert!(!rendered.contains("type exact id"));
     }
 
     #[test]

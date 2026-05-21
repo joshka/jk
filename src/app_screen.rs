@@ -201,21 +201,58 @@ impl InteractionMode {
                 prompt,
                 selected: *selected,
             },
-            Self::DescribePreview { output, .. } => Overlay::DescribePreview { output },
-            Self::CommitPreview { output, .. } => Overlay::CommitPreview { output },
-            Self::BookmarkMutationPreview { output, .. } => {
-                Overlay::BookmarkMutationPreview { output }
-            }
-            Self::FileMutationPreview { output, .. } => Overlay::FileMutationPreview { output },
-            Self::NewPreview { output, .. } => Overlay::NewPreview { output },
-            Self::DuplicatePreview { output, .. } => Overlay::DuplicatePreview { output },
-            Self::RebasePreview { output, .. } => Overlay::RebasePreview { output },
-            Self::SplitPreview { output, .. } => Overlay::SplitPreview { output },
-            Self::RestorePreview { output, .. } => Overlay::RestorePreview { output },
-            Self::RevertPreview { output, .. } => Overlay::RevertPreview { output },
-            Self::SquashPreview { output, .. } => Overlay::SquashPreview { output },
-            Self::AbsorbPreview { output, .. } => Overlay::AbsorbPreview { output },
-            Self::AbandonPreview { output, .. } => Overlay::AbandonPreview { output },
+            Self::DescribePreview { output, .. } => Overlay::ActionOutput {
+                title: "Describe",
+                output,
+            },
+            Self::CommitPreview { output, .. } => Overlay::ActionOutput {
+                title: "Commit",
+                output,
+            },
+            Self::BookmarkMutationPreview { output, .. } => Overlay::ActionOutput {
+                title: "Bookmark",
+                output,
+            },
+            Self::FileMutationPreview { output, .. } => Overlay::ActionOutput {
+                title: "File",
+                output,
+            },
+            Self::NewPreview { output, .. } => Overlay::ActionOutput {
+                title: "New change",
+                output,
+            },
+            Self::DuplicatePreview { output, .. } => Overlay::ActionOutput {
+                title: "Duplicate",
+                output,
+            },
+            Self::RebasePreview { output, .. } => Overlay::ActionOutput {
+                title: "Rebase",
+                output,
+            },
+            Self::SplitPreview { output, .. } => Overlay::ActionOutput {
+                title: "Split",
+                output,
+            },
+            Self::RestorePreview { output, .. } => Overlay::ActionOutput {
+                title: "Restore",
+                output,
+            },
+            Self::RevertPreview { output, .. } => Overlay::ActionOutput {
+                title: "Revert",
+                output,
+            },
+            Self::SquashPreview { output, .. } => Overlay::ActionOutput {
+                title: "Squash",
+                output,
+            },
+            Self::AbsorbPreview { output, .. } => Overlay::ActionOutput {
+                title: "Absorb",
+                output,
+            },
+            Self::AbandonPreview { output, .. } => Overlay::ActionOutput {
+                title: "Abandon",
+                output,
+            },
             Self::AbandonConfirm { input, output, .. } => Overlay::AbandonConfirm { input, output },
             Self::PushRemotePrompt {
                 remotes, selected, ..
@@ -227,20 +264,26 @@ impl InteractionMode {
                 remotes,
                 selected: *selected,
             },
-            Self::FetchPreview { output, .. } => Overlay::FetchPreview { output },
-            Self::PushPreview { output, .. } => Overlay::PushPreview { output },
-            Self::OperationRecoveryPreview { output, .. } => {
-                Overlay::OperationRecoveryPreview { output }
-            }
-            Self::OperationTargetPreview { output, .. } => {
-                Overlay::OperationTargetPreview { output }
-            }
-            Self::WorkingCopyNavigationPreview { navigation, output } => {
-                Overlay::WorkingCopyNavigationPreview {
-                    title: navigation.overlay_title(),
-                    output,
-                }
-            }
+            Self::FetchPreview { output, .. } => Overlay::ActionOutput {
+                title: "Fetch",
+                output,
+            },
+            Self::PushPreview { output, .. } => Overlay::ActionOutput {
+                title: "Push",
+                output,
+            },
+            Self::OperationRecoveryPreview { output, .. } => Overlay::ActionOutput {
+                title: "Operation recovery",
+                output,
+            },
+            Self::OperationTargetPreview { output, .. } => Overlay::ActionOutput {
+                title: "Operation action",
+                output,
+            },
+            Self::WorkingCopyNavigationPreview { navigation, output } => Overlay::ActionOutput {
+                title: navigation.overlay_title(),
+                output,
+            },
             Self::Normal
             | Self::SearchPrompt(_)
             | Self::LogRevsetPrompt(_)
@@ -320,6 +363,7 @@ mod tests {
     use super::*;
     use crate::app_status::StatusKind;
     use crate::graph::GraphView;
+    use crate::jj::JjOperationRecoveryKind;
     use crate::tui::StatusHints;
 
     #[test]
@@ -367,6 +411,187 @@ mod tests {
             InteractionMode::Normal.overlay(&view, &[]),
             Overlay::None
         ));
+    }
+
+    #[test]
+    fn action_output_modes_project_common_overlay_titles() {
+        let output = ActionOutput::pending("jj action".to_owned(), "preview".to_owned(), None);
+        let modes = [
+            (
+                InteractionMode::NewPreview {
+                    new_change: JjNewPlan::new(vec!["parent".to_owned()]),
+                    output: output.clone(),
+                },
+                "New change",
+            ),
+            (
+                InteractionMode::DuplicatePreview {
+                    duplicate: JjDuplicatePlan::exact_change("change"),
+                    output: output.clone(),
+                },
+                "Duplicate",
+            ),
+            (
+                InteractionMode::DescribePreview {
+                    describe: JjDescribePlan::new(
+                        JjDescribeTarget::current_working_copy(),
+                        "message",
+                    ),
+                    output: output.clone(),
+                },
+                "Describe",
+            ),
+            (
+                InteractionMode::CommitPreview {
+                    commit: JjCommitPlan::new("message"),
+                    output: output.clone(),
+                },
+                "Commit",
+            ),
+            (
+                InteractionMode::BookmarkMutationPreview {
+                    mutation: JjBookmarkMutationPlan::create(
+                        "name",
+                        JjBookmarkTarget::current_working_copy(),
+                    ),
+                    output: output.clone(),
+                },
+                "Bookmark",
+            ),
+            (
+                InteractionMode::FileMutationPreview {
+                    mutation: JjFileMutationPlan::track("src/main.rs"),
+                    output: output.clone(),
+                },
+                "File",
+            ),
+            (
+                InteractionMode::RebasePreview {
+                    rebase: JjRebasePlan::new(vec!["source".to_owned()], "destination"),
+                    output: output.clone(),
+                },
+                "Rebase",
+            ),
+            (
+                InteractionMode::SplitPreview {
+                    split: JjSplitPlan::current_working_copy(),
+                    output: output.clone(),
+                },
+                "Split",
+            ),
+            (
+                InteractionMode::RestorePreview {
+                    restore: JjRestorePlan::for_revision("change"),
+                    output: output.clone(),
+                },
+                "Restore",
+            ),
+            (
+                InteractionMode::RevertPreview {
+                    revert: JjRevertPlan::new("change"),
+                    output: output.clone(),
+                },
+                "Revert",
+            ),
+            (
+                InteractionMode::SquashPreview {
+                    squash: JjSquashPlan::new(vec!["source".to_owned()], "destination"),
+                    output: output.clone(),
+                },
+                "Squash",
+            ),
+            (
+                InteractionMode::AbsorbPreview {
+                    absorb: JjAbsorbPlan::new("source", vec!["destination".to_owned()]),
+                    output: output.clone(),
+                },
+                "Absorb",
+            ),
+            (
+                InteractionMode::AbandonPreview {
+                    abandon: JjAbandonPlan::new("change"),
+                    preview: JjAbandonPreview::new("change".to_owned(), None, String::new()),
+                    output: output.clone(),
+                },
+                "Abandon",
+            ),
+            (
+                InteractionMode::PushPreview {
+                    push: JjGitPush::for_status(),
+                    output: output.clone(),
+                },
+                "Push",
+            ),
+            (
+                InteractionMode::FetchPreview {
+                    fetch: JjGitFetch::default_remotes(),
+                    output: output.clone(),
+                },
+                "Fetch",
+            ),
+            (
+                InteractionMode::OperationRecoveryPreview {
+                    recovery: JjOperationRecovery::new(JjOperationRecoveryKind::Undo),
+                    output: output.clone(),
+                },
+                "Operation recovery",
+            ),
+            (
+                InteractionMode::OperationTargetPreview {
+                    target: JjOperationTarget::restore("operation"),
+                    output: output.clone(),
+                },
+                "Operation action",
+            ),
+            (
+                InteractionMode::WorkingCopyNavigationPreview {
+                    navigation: JjWorkingCopyNavigationPlan::edit("change"),
+                    output: output.clone(),
+                },
+                "Edit",
+            ),
+            (
+                InteractionMode::WorkingCopyNavigationPreview {
+                    navigation: JjWorkingCopyNavigationPlan::next(),
+                    output: output.clone(),
+                },
+                "Next",
+            ),
+            (
+                InteractionMode::WorkingCopyNavigationPreview {
+                    navigation: JjWorkingCopyNavigationPlan::prev(),
+                    output: output.clone(),
+                },
+                "Prev",
+            ),
+        ];
+        let view = ViewState::Graph(GraphView::test_new(vec![]));
+
+        for (mode, expected_title) in modes {
+            let Overlay::ActionOutput { title, output } = mode.overlay(&view, &[]) else {
+                panic!("{expected_title} should project a common action output overlay");
+            };
+
+            assert_eq!(title, expected_title);
+            assert_eq!(output.command_label(), "jj action");
+        }
+    }
+
+    #[test]
+    fn abandon_confirm_projects_dedicated_overlay() {
+        let view = ViewState::Graph(GraphView::test_new(vec![]));
+        let mode = InteractionMode::AbandonConfirm {
+            abandon: JjAbandonPlan::new("change"),
+            input: "change".to_owned(),
+            output: ActionOutput::pending("jj abandon change".to_owned(), String::new(), None),
+        };
+
+        let Overlay::AbandonConfirm { input, output } = mode.overlay(&view, &[]) else {
+            panic!("typed abandon confirmation should use the dedicated overlay");
+        };
+
+        assert_eq!(input, "change");
+        assert_eq!(output.command_label(), "jj abandon change");
     }
 
     #[test]
