@@ -103,6 +103,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 new trunk refresh flow:
+
+- `src/app/action_lifecycle/preview.rs` now uses private `finish_new_trunk_success` for the
+  successful trunk shortcut's refresh, recent-mode reveal, clamp, and fixed status-message path.
+- `run_new_trunk` still owns trunk preflight, command execution through the app service, and
+  resolving `@` before refresh. The helper intentionally ignores raw service output and does not use
+  `finish_successful_action_revealing_change`, preserving the fixed status strings and avoiding
+  operation-show output.
+- Existing `working_copy_actions::graph_new_trunk_uses_test_service_and_reveals_working_copy` covers
+  the recent-mode success status. Focused validation covered
+  `cargo test working_copy_actions -- --test-threads=1`,
+  `cargo test action_lifecycle -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+
 2026-05-21 rewrite source context helper:
 
 - `src/app/action_lifecycle/preview.rs` now uses private `with_rewrite_source_context` for the

@@ -311,29 +311,33 @@ impl App {
                         return;
                     }
                 };
-                match self.refresh_view_state() {
-                    Ok(()) => {
-                        self.view.clamp(viewport_height, current_viewport_width());
-                        let revealed_in_recent =
-                            match self.reveal_graph_change(&new_change_id, LogViewMode::Recent) {
-                                Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height, current_viewport_width());
-                                    switched_modes
-                                }
-                                Err(error) => {
-                                    self.status = StatusLine::error(&self.view, error.to_string());
-                                    return;
-                                }
-                            };
-                        let message = if revealed_in_recent {
-                            "created new change from trunk | showing recent work | jj undo"
-                        } else {
-                            "created new change from trunk | jj undo"
-                        };
-                        self.status = StatusLine::with_message(&self.view, message);
-                    }
-                    Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
-                }
+                self.finish_new_trunk_success(&new_change_id, viewport_height);
+            }
+            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+        }
+    }
+
+    fn finish_new_trunk_success(&mut self, new_change_id: &str, viewport_height: u16) {
+        match self.refresh_view_state() {
+            Ok(()) => {
+                self.view.clamp(viewport_height, current_viewport_width());
+                let revealed_in_recent =
+                    match self.reveal_graph_change(new_change_id, LogViewMode::Recent) {
+                        Ok(switched_modes) => {
+                            self.view.clamp(viewport_height, current_viewport_width());
+                            switched_modes
+                        }
+                        Err(error) => {
+                            self.status = StatusLine::error(&self.view, error.to_string());
+                            return;
+                        }
+                    };
+                let message = if revealed_in_recent {
+                    "created new change from trunk | showing recent work | jj undo"
+                } else {
+                    "created new change from trunk | jj undo"
+                };
+                self.status = StatusLine::with_message(&self.view, message);
             }
             Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
         }

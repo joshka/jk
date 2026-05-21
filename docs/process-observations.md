@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Extract new trunk refresh flow)
+
+- Slice / task: reduce nested control flow in `src/app/action_lifecycle/preview.rs::run_new_trunk`
+  for the current jj change `Extract new trunk refresh flow`.
+- Thread id: `019e4c0f-2b06-78d3-aeb6-56641966f403` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded Rust
+  maintainability packet. The user explicitly kept version-control operations with the main thread,
+  and no `jj` or `git` commands were run.
+- Implementation outcome: `run_new_trunk` now keeps trunk preflight, command execution, and
+  resolving `@` at the caller, then delegates the post-success refresh, reveal, clamp, and fixed
+  status-message path to private `finish_new_trunk_success`.
+- Behavior-preservation evidence: the helper keeps the same order of effects: refresh view state,
+  clamp, reveal the new change in `LogViewMode::Recent`, clamp again after reveal, and set the fixed
+  trunk status text. It still ignores the raw service output and does not use
+  `finish_successful_action_revealing_change`, so it does not change wording or add operation-show
+  output. Existing
+  `working_copy_actions::graph_new_trunk_uses_test_service_and_reveals_working_copy` covers the
+  recent-mode success status, so no new duplicate test was added.
+- Validation trail:
+  - Worker validation passed: `cargo test working_copy_actions -- --test-threads=1` with 27 passed;
+    `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings; and
+    `just md-check`.
+  - Main-thread review validation passed: `cargo test working_copy_actions -- --test-threads=1` with
+    27 passed; `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings; and
+    `just md-check`.
+- Rework / surprise: the first Markdown check reported Panache wrapping for two lines in this
+  process note; after applying that formatting-only change, Markdown validation passed.
+- Evidence basis:
+  - Date: `2026-05-21 12:42:18 PDT` from local `date`.
+  - Main review date: `2026-05-21 12:46:12 PDT` from local `date`.
+  - Files: `src/app/action_lifecycle/preview.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    this process note.
+
 ### 2026-05-21 (Extract rewrite source context helper)
 
 - Slice / task: reduce duplicated rewrite preview status-context construction in
