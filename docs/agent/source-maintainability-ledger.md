@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 bookmark action-plan test split:
+
+- `src/jj_actions/bookmarks.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/jj_actions/bookmarks/tests.rs` with `use super::*;` for private access to command-plan
+  helpers and validation.
+- This improves local readability by keeping bookmark mutation argv, preview-summary, exact-pattern,
+  target, and rename-validation code visible without scrolling through 243 lines of inline tests.
+  The production file measured 833 lines before the split and 588 lines after it.
+- The packet intentionally preserved all eight bookmark action-plan test names, assertions, helper
+  access, argv expectations, preview wording checks, exact pattern quoting, labels, visibility, and
+  public API.
+- Focused validation covered `cargo test jj_actions::bookmarks -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check` after this documentation update.
+- Rework was limited to moving the extracted test block into a Rust child module and applying
+  Panache wrapping to the new notes; no bookmark command behavior, argv, preview summaries, labels,
+  or visibility changed.
+
 2026-05-21 bookmark row test split:
 
 - `src/bookmarks/rows.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

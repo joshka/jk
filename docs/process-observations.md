@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark action-plan test split)
+
+- Slice / task: move inline tests from `src/jj_actions/bookmarks.rs` into
+  `src/jj_actions/bookmarks/tests.rs` for the existing jj change.
+- Thread id: `019e4c78-0092-7742-8bd1-b0c032199cb9` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
+  packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
+  were run.
+- Implementation outcome: `bookmarks.rs` now ends with `#[cfg(test)] mod tests;`, while the moved
+  sibling module uses `use super::*;` to preserve private access to bookmark command-plan helpers,
+  preview summary construction, tracking target helpers, and rename validation.
+- Behavior-preservation evidence: the packet moved the existing eight bookmark action-plan tests
+  without changing their names, assertions, helper access, argv expectations, preview wording
+  checks, exact pattern quoting, labels, visibility, or public API.
+- Readability evidence: before the packet, `src/jj_actions/bookmarks.rs` measured 833 lines with
+  tests inline. After the split it measured 588 lines, with 243 lines in
+  `src/jj_actions/bookmarks/tests.rs`, keeping production command-plan code easier to scan while
+  keeping tests beside the owning module.
+- Validation trail:
+  - Worker validation passed: `cargo test jj_actions::bookmarks -- --test-threads=1`; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test jj_actions::bookmarks -- --test-threads=1`
+    with 8 passed and 559 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first Markdown check reported Panache wrapping for the new notes. After
+  applying that formatting-only change, Markdown validation passed. Bookmark command behavior, argv,
+  preview summaries, exact pattern quoting, labels, visibility, and public API stayed unchanged.
+- Evidence basis:
+  - Date: `2026-05-21 14:36:48 PDT` from local `date`.
+  - Main review date: `2026-05-21 14:39:45 PDT` from local `date`.
+  - Files: `src/jj_actions/bookmarks.rs`, `src/jj_actions/bookmarks/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Bookmark row test split)
 
 - Slice / task: move inline tests from `src/bookmarks/rows.rs` into `src/bookmarks/rows/tests.rs`
