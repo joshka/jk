@@ -13,8 +13,9 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   This makes operation-log navigation, recovery actions, and operation detail views start from one
   feature root.
 - View tests moved beside their features: tests moved out of production modules for file show, file
-  list, operation detail, operation log, view-state target routing, workspaces, and resolve. This
-  keeps production files shorter while preserving behavior tests next to the code they describe.
+  list, operation detail, operation log, view-state target routing, action output, workspaces, and
+  resolve. This keeps production files shorter while preserving behavior tests next to the code they
+  describe.
 - App modal dispatch got its first reducer-shaped cleanup: copy, view, action, role, push-remote,
   and fetch-remote menu key handling now have named helpers while `handle_active_mode_key` remains
   the dispatch table.
@@ -41,7 +42,7 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   and operation inspection work by keeping recovery-related behavior near the operation log.
 - View tests moved out of production modules. This shortens production files while keeping the tests
   beside the feature they prove, so future behavior changes have nearby evidence. Operation-log view
-  behavior and view-state target routing are now in that shape too.
+  behavior, view-state target routing, and action-output modal state are now in that shape too.
 - App modal key handling is being simplified. Copy/view/action menus, text prompts, and abandon
   confirmation now have named handlers, which makes the main keyboard dispatch read more like a map
   of user modes instead of a long implementation block.
@@ -83,9 +84,8 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - Action lifecycle readability: `src/app/action_lifecycle/*` should stay focused on dispatch,
   preview, completion, refresh, and reveal policy. Repeated completion/result handling should be
   audited before extracting helpers.
-- Remaining inline view tests: modules such as `action_output`, row/action helpers, and shared
-  process helpers still have inline tests. These should move only when the split improves reader
-  locality, not just because a file is large.
+- Remaining inline tests: row/action helpers and shared process helpers still have inline tests.
+  These should move only when the split improves reader locality, not just because a file is large.
 - Mechanical reports: largest files, broad visibility, inline-test modules, and repeated list
   mechanics are tracked in [`source-cleanup-audit.md`](source-cleanup-audit.md) and should be
   treated as prompts for review rather than automatic refactor targets.

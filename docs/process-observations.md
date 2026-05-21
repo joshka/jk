@@ -5,6 +5,38 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Action output test split)
+
+- Slice / task: move inline action-output tests from `src/action_output.rs` into
+  `src/action_output/tests.rs` while preserving body projection, visible-line clamping, scroll
+  boundaries, and key mapping behavior.
+- Thread id: `019e4ce5-5a29-78a1-bdc6-f0aaea34a222` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the bounded test-module move in the
+  `Move action output tests` jj change; the main thread reviewed the diff, updated tracking docs,
+  and reran validation.
+- Changed files: `src/action_output.rs`, `src/action_output/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+  process note.
+- Implementation outcome: `src/action_output.rs` now declares `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/action_output/tests.rs` and use Rust child-module privacy through
+  `use super::*;`.
+- Behavior-preservation evidence: all original test names, helpers, assertions, imports, body line
+  expectations, visible-line expectations, scroll behavior, key mapping behavior, public API, and
+  runtime behavior are preserved.
+- Process observation: GPT-5.4 mini again handled a small, explicit test-module move without
+  behavioral drift. This is a good fit for narrow cleanup packets where the main thread can quickly
+  inspect the full diff.
+- Validation trail:
+  - Worker validation passed: `cargo test action_output -- --test-threads=1` with 10 passed,
+    `cargo check`, and `rustup run nightly cargo fmt --check`.
+  - Main-thread validation passed: `cargo test action_output -- --test-threads=1` with 10 passed and
+    557 filtered out; `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:36:44 PDT` from local `date`.
+  - Files: `src/action_output.rs`, `src/action_output/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+    process note.
+
 ### 2026-05-21 (View state target test split)
 
 - Slice / task: move inline view-state target routing tests from `src/view_state.rs` into

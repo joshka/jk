@@ -109,6 +109,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 action output test split:
+
+- `src/action_output.rs` now declares `#[cfg(test)] mod tests;`, and the moved modal-output tests
+  live in `src/action_output/tests.rs` with `use super::*;` for private access to action-output
+  state.
+- This keeps action output body projection, visible-line clamping, scroll boundary, and key mapping
+  tests beside the modal-output state owner without making readers scroll through tests before the
+  production key handling and scroll contracts.
+- The packet intentionally preserved all test names, helpers, assertions, imports, body line
+  expectations, visible-line expectations, scroll behavior, key mapping behavior, public API, and
+  runtime behavior.
+- Focused validation passed: `cargo test action_output -- --test-threads=1` with 10 passed and 557
+  filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
+
 2026-05-21 view state target test split:
 
 - `src/view_state.rs` now declares `#[cfg(test)] mod tests;`, and the moved cross-view target tests
