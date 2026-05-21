@@ -5,6 +5,52 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Status hint projection extraction)
+
+- Slice / task: extract status-bar hint vocabulary and width-fit projection from broad `src/tui.rs`.
+- Thread id: `019e49ec-202b-7f82-87b3-2ce67a2df804`.
+- Model / routing: GPT-5 Codex worker/subagent with medium reasoning implemented the extraction. The
+  main thread reviewed and validated the result. The user explicitly prohibited jj/git commands, so
+  the work used direct file reads, local measurements, and validation commands without
+  source-control inspection.
+- Files changed: `src/tui.rs`, `src/tui/status_hints.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/tui/status_hints.rs` now owns `StatusHints`, the per-view status hint
+  tables, status hint candidate selection, status-hint key styling, and the width-fit span
+  projection used by the status bar. `src/tui.rs` re-exports `StatusHints`, calls the narrow
+  `status_hint_spans` facade from `status_line_text`, and keeps shared chrome, overlay rendering,
+  title/status layout, action-output layout, menu rendering, and overlay footer helpers.
+- Behavior intent: preserve the exact status hint vocabulary, per-view hint selection, item
+  truncation behavior, status line spacing, and rendered chrome snapshots.
+- Maintainability evidence: `wc -l src/tui.rs src/tui/status_hints.rs` showed `src/tui.rs` at 976
+  lines and `src/tui/status_hints.rs` at 202 lines after the extraction. Before the packet,
+  `docs/agent/source-maintainability-ledger.md` recorded `src/tui.rs` at 1134 lines with
+  `StatusHints`, per-view hint tables, `status_hint_candidates`, and `status_hint_spans` still in
+  the parent module.
+- Rework / surprise: the first `just md-check` failed only on one Panache wrapping change in
+  `docs/agent/source-maintainability-ledger.md`; applying the suggested wrap fixed the issue. No
+  Rust behavior rework was needed after the focused TUI tests.
+- Validation trail:
+  - `cargo test tui -- --test-threads=1` passed with 17 passed, 1 ignored, and 529 filtered out.
+  - `rustup run nightly cargo fmt --check` passed. The command still printed the repo's existing
+    rustfmt unstable-option warnings.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `just md-check` passed after applying Panache wrapping to the edited ledger entry.
+- Main-thread review validation passed: `cargo test tui -- --test-threads=1` with 17 passed / 1
+  ignored; `cargo test status_chrome -- --test-threads=1` with 2 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored, and
+  its largest-file output included `src/tui.rs` at 976 lines. Packet line-count evidence also showed
+  `src/tui/status_hints.rs` at 202 lines.
+- Evidence basis:
+  - Date: `2026-05-21 02:46:51 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/architecture.md`, `docs/agent/rust-style.md`, `src/tui.rs`, and
+    `src/tui/status_hints.rs`
+
 ### 2026-05-21 (Graph revision action-menu extraction)
 
 - Slice / task: extract graph/detail revision action-menu policy from broad `src/action_menu.rs`.

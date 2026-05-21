@@ -39,6 +39,7 @@ together with [`architecture.md`](architecture.md) and [`rust-style.md`](rust-st
 - `File And Status Path Action-Menu Policy`
 - `Graph Revision Action-Menu Policy Packet`
 - `ViewSpec Navigation Provenance Packet`
+- `Status Hint Projection Packet`
 
 Those packets closed the previous bookmark-, rewrite-, help-, and path-heavy queue. The next work
 should start from the current hotspots instead of replaying the old priority order.
@@ -234,6 +235,25 @@ should have an owner and a contract, not a line-count target.
 - Proof: focused `cargo test jj -- --test-threads=1` passed during the extraction, with final gate
   commands recorded in `docs/process-observations.md`.
 
+### Status Hint Projection Packet
+
+- Status: completed on 2026-05-21 in a Codex worker/subagent.
+- Owner: `src/tui/status_hints.rs`
+- Outcome: `src/tui/status_hints.rs` owns `StatusHints`, per-view status hint tables,
+  `status_hint_candidates`, `status_hint_spans`, status-hint key styling, and the width-fit helper
+  used only for status-bar hint projection. `src/tui.rs` re-exports `StatusHints`, calls the narrow
+  `status_hint_spans` facade from `status_line_text`, and keeps shared title/status chrome,
+  overlays, action-output layout, menu rendering, and overlay footer helpers.
+- Maintainability evidence: `src/tui.rs` dropped from 1134 lines before the packet to 976 lines
+  after extraction, and the new `src/tui/status_hints.rs` is 202 lines including focused projection
+  tests.
+- Non-goals preserved: no title/status layout redesign, no help overlay rendering changes, no
+  action-output overlay rendering changes, no menu rendering changes, no theme style changes, no
+  overlay footer movement, and no status hint vocabulary or truncation behavior changes.
+- Proof: focused `cargo test tui -- --test-threads=1` passed with the moved module tests and the
+  existing status chrome snapshots; final gate commands are recorded in
+  `docs/process-observations.md`.
+
 ## Current Next Slices
 
 ### 1. Remaining Rendered Row Loader And Metadata Packets
@@ -251,20 +271,6 @@ should have an owner and a contract, not a line-count target.
 - Proof: focused row-family tests for any chosen packet, plus `cargo check`,
   `rustup run nightly cargo fmt --check`, and `just md-check`.
 
-### 2. Status Hint Projection Packet
-
-- Owner: `src/tui.rs`, with a likely `src/tui/status_hints.rs` split if the module shape allows it
-  without broad churn.
-- Purpose: move status-hint vocabulary and width-fit projection behind one small owner, leaving
-  `tui.rs` focused on shared chrome and overlay rendering.
-- Evidence: `src/tui.rs` is 1134 lines. Direct reads show overlay rendering is still broadly
-  cohesive, but `StatusHints`, the per-view hint tables, `status_hint_candidates`, and
-  `status_hint_spans` are a bounded projection concept with clear tests and no app state.
-- Non-goals: do not redesign title/status layout, help overlay rendering, action-output overlay
-  rendering, menu rendering, or theme styles. Do not change which hints are shown for any view.
-- Proof: focused `tui` status-line/status-hint tests or snapshots, plus `cargo check`,
-  `rustup run nightly cargo fmt --check`, and `just md-check`.
-
 ## Not The Next Packet
 
 - `src/graph.rs`: still large at 1218 lines, but the remaining direct read is one view contract:
@@ -275,9 +281,9 @@ should have an owner and a contract, not a line-count target.
   action-target safety. The production view now delegates target resolution to
   `src/bookmarks/action_targets.rs`; another split should wait for new bookmark view behavior, not
   happen only because tests are long.
-- `src/tui.rs` overlay rendering as a whole: large but cohesive around shared chrome. The bounded
-  status-hint packet above is reasonable; a broad overlay split is not yet justified without a
-  concrete overlay owner and snapshot proof.
+- `src/tui.rs` overlay rendering as a whole: still cohesive around shared chrome after the
+  status-hint packet. A broad overlay split is not yet justified without a concrete overlay owner
+  and snapshot proof.
 - `src/jj_actions.rs`: still visible in the largest-file list at 1159 lines, but the current shape
   is a facade over already extracted bookmark, rewrite, sync, working-copy, and operation action
   clusters. Do not start another `jj_actions` split until a remaining mutation-plan family presents
