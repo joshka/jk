@@ -166,7 +166,7 @@ impl StatusView {
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
             ViewCommand::OpenActionMenu => self
-                .selected_exact_path()
+                .selected_file_action()
                 .map_or_else(ViewEffect::StatusError, |_| ViewEffect::Ignored),
             ViewCommand::ToggleSelect => ViewEffect::Ignored,
             ViewCommand::OpenItem => ViewEffect::Ignored,
@@ -238,11 +238,19 @@ impl StatusView {
         true
     }
 
+    #[cfg(test)]
     pub fn selected_exact_path(&self) -> std::result::Result<&str, String> {
         let Some(row) = self.rows.get(self.selection.index()) else {
             return Err("status file action unavailable: status output is empty".to_owned());
         };
         row.exact_path()
+    }
+
+    pub fn selected_file_action(&self) -> std::result::Result<StatusFileAction, String> {
+        let Some(row) = self.rows.get(self.selection.index()) else {
+            return Err("status file action unavailable: status output is empty".to_owned());
+        };
+        row.file_action()
     }
 
     fn copy_options(&self) -> Vec<CopyOption> {
@@ -301,6 +309,53 @@ pub struct StatusRow {
     path: StatusPathContract,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StatusFileAction {
+    Track {
+        path: String,
+    },
+    Tracked {
+        path: String,
+        restore_allowed: bool,
+        chmod_allowed: bool,
+    },
+}
+
+impl StatusFileAction {
+    pub fn path(&self) -> &str {
+        match self {
+            Self::Track { path }
+            | Self::Tracked {
+                path,
+                restore_allowed: _,
+                chmod_allowed: _,
+            } => path,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn restore_allowed(&self) -> bool {
+        matches!(
+            self,
+            Self::Tracked {
+                restore_allowed: true,
+                ..
+            }
+        )
+    }
+
+    #[cfg(test)]
+    pub fn chmod_allowed(&self) -> bool {
+        matches!(
+            self,
+            Self::Tracked {
+                chmod_allowed: true,
+                ..
+            }
+        )
+    }
+}
+
 impl StatusRow {
     fn new(line: Line<'static>, path: StatusPathContract) -> Self {
         Self { line, path }
@@ -310,9 +365,14 @@ impl StatusRow {
         &self.line
     }
 
+    #[cfg(test)]
     fn exact_path(&self) -> std::result::Result<&str, String> {
         match &self.path {
-            StatusPathContract::Exact(path) => Ok(path),
+            StatusPathContract::Action(action) if action.restore_allowed() => Ok(action.path()),
+            StatusPathContract::Action(_) => Err(
+                "status file action unavailable: selected status row is not path-restorable"
+                    .to_owned(),
+            ),
             StatusPathContract::Disabled(message) => Err((*message).to_owned()),
             StatusPathContract::None => Err(
                 "status file action unavailable: selected row has no exact file path".to_owned(),
@@ -322,8 +382,18 @@ impl StatusRow {
 
     fn exact_path_option(&self) -> Option<&str> {
         match &self.path {
-            StatusPathContract::Exact(path) => Some(path),
+            StatusPathContract::Action(action) => Some(action.path()),
             StatusPathContract::Disabled(_) | StatusPathContract::None => None,
+        }
+    }
+
+    fn file_action(&self) -> std::result::Result<StatusFileAction, String> {
+        match &self.path {
+            StatusPathContract::Action(action) => Ok(action.clone()),
+            StatusPathContract::Disabled(message) => Err((*message).to_owned()),
+            StatusPathContract::None => Err(
+                "status file action unavailable: selected row has no exact file path".to_owned(),
+            ),
         }
     }
 
@@ -334,7 +404,7 @@ impl StatusRow {
 
 #[derive(Clone, Debug)]
 enum StatusPathContract {
-    Exact(String),
+    Action(StatusFileAction),
     Disabled(&'static str),
     None,
 }
@@ -380,25 +450,43 @@ fn parse_status_path_contract(text: &str) -> StatusPathContract {
             "status file action unavailable: selected status row has no file path",
         );
     }
-    if status.contains('?') || status.contains('!') {
-        return StatusPathContract::Disabled(
-            "status file action unavailable: selected status row is not a tracked jj path",
-        );
-    }
     if status == "R" {
         return StatusPathContract::Disabled(
             "status file action unavailable: renamed status rows contain multiple paths",
         );
     }
-    if !matches!(status, "M" | "A" | "D") {
+    if status.contains('U') {
         return StatusPathContract::Disabled(
-            "status file action unavailable: selected status kind is not path-restorable",
+            "status file action unavailable: conflicted status rows are not file hygiene targets",
         );
     }
 
-    match validate_repo_relative_path(path) {
-        Ok(()) => StatusPathContract::Exact(path.to_owned()),
-        Err(message) => StatusPathContract::Disabled(message),
+    if let Err(message) = validate_repo_relative_path(path) {
+        return StatusPathContract::Disabled(message);
+    }
+
+    match status {
+        "?" => StatusPathContract::Action(StatusFileAction::Track {
+            path: path.to_owned(),
+        }),
+        "M" | "A" => StatusPathContract::Action(StatusFileAction::Tracked {
+            path: path.to_owned(),
+            restore_allowed: true,
+            chmod_allowed: true,
+        }),
+        "D" => StatusPathContract::Action(StatusFileAction::Tracked {
+            path: path.to_owned(),
+            restore_allowed: true,
+            chmod_allowed: false,
+        }),
+        "!" => StatusPathContract::Action(StatusFileAction::Tracked {
+            path: path.to_owned(),
+            restore_allowed: false,
+            chmod_allowed: false,
+        }),
+        _ => StatusPathContract::Disabled(
+            "status file action unavailable: selected status kind is not a file hygiene target",
+        ),
     }
 }
 
@@ -612,10 +700,37 @@ mod tests {
     }
 
     #[test]
-    fn status_parser_disables_renamed_conflict_and_untracked_looking_rows() {
+    fn status_parser_classifies_untracked_tracked_and_non_chmod_rows() {
+        let untracked = parse_status_row(Line::from("? scratch.txt".to_owned()));
+        let modified = parse_status_row(Line::from("M src/lib.rs".to_owned()));
+        let added = parse_status_row(Line::from("A src/new.rs".to_owned()));
+        let deleted = parse_status_row(Line::from("D src/old.rs".to_owned()));
+        let missing = parse_status_row(Line::from("! src/missing.rs".to_owned()));
+
+        assert_eq!(
+            untracked.file_action().unwrap(),
+            StatusFileAction::Track {
+                path: "scratch.txt".to_owned()
+            }
+        );
+        assert_eq!(
+            modified.file_action().unwrap(),
+            StatusFileAction::Tracked {
+                path: "src/lib.rs".to_owned(),
+                restore_allowed: true,
+                chmod_allowed: true,
+            }
+        );
+        assert!(added.file_action().unwrap().chmod_allowed());
+        assert!(!deleted.file_action().unwrap().chmod_allowed());
+        assert!(!missing.file_action().unwrap().restore_allowed());
+        assert!(!missing.file_action().unwrap().chmod_allowed());
+    }
+
+    #[test]
+    fn status_parser_disables_renamed_and_conflicted_rows() {
         let renamed = parse_status_row(Line::from("R {old.rs => new.rs}".to_owned()));
         let conflict = parse_status_row(Line::from("UU src/lib.rs".to_owned()));
-        let untracked = parse_status_row(Line::from("? scratch.txt".to_owned()));
 
         assert_eq!(
             renamed.exact_path().unwrap_err(),
@@ -623,11 +738,7 @@ mod tests {
         );
         assert_eq!(
             conflict.exact_path().unwrap_err(),
-            "status file action unavailable: selected status kind is not path-restorable"
-        );
-        assert_eq!(
-            untracked.exact_path().unwrap_err(),
-            "status file action unavailable: selected status row is not a tracked jj path"
+            "status file action unavailable: conflicted status rows are not file hygiene targets"
         );
     }
 

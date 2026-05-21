@@ -12,8 +12,8 @@ use crate::app_status::StatusLine;
 use crate::command::ViewCommand;
 use crate::jj::{
     JjAbandonPlan, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjCommand,
-    JjDescribeTarget, JjDuplicatePlan, JjGitFetch, JjGitPushTarget, JjNewPlan, JjOperationTarget,
-    JjRestorePlan, JjRevertPlan, JjSplitPlan, JjWorkingCopyNavigationPlan,
+    JjDescribeTarget, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPushTarget, JjNewPlan,
+    JjOperationTarget, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjWorkingCopyNavigationPlan,
 };
 use crate::view_state::ViewState;
 
@@ -80,7 +80,11 @@ impl App {
                     | ActionKind::Revert
                     | ActionKind::Rebase
                     | ActionKind::Squash
-                    | ActionKind::Absorb => {
+                    | ActionKind::Absorb
+                    | ActionKind::FileTrack
+                    | ActionKind::FileUntrack
+                    | ActionKind::FileChmodExecutable
+                    | ActionKind::FileChmodNormal => {
                         self.status =
                             StatusLine::with_message(&self.view, "preview not yet implemented");
                     }
@@ -160,6 +164,33 @@ impl App {
                 let destinations = destinations.clone();
                 self.mode = InteractionMode::Normal;
                 self.open_absorb_preview(JjAbsorbPlan::new(source, destinations));
+            }
+            FollowUp::FileTrack { path } => {
+                let path = path.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_file_mutation_preview(JjFileMutationPlan::track(path));
+            }
+            FollowUp::FileUntrack { path } => {
+                let path = path.clone();
+                self.mode = InteractionMode::Normal;
+                self.open_file_mutation_preview(JjFileMutationPlan::untrack(path));
+            }
+            FollowUp::FileChmod {
+                path,
+                revision,
+                mode,
+            } => {
+                let path = path.clone();
+                let revision = revision.clone();
+                let mode = *mode;
+                self.mode = InteractionMode::Normal;
+                let mutation = match revision {
+                    Some(revision) => {
+                        JjFileMutationPlan::chmod_exact_revision(revision, path, mode)
+                    }
+                    None => JjFileMutationPlan::chmod_working_copy(path, mode),
+                };
+                self.open_file_mutation_preview(mutation);
             }
         }
     }

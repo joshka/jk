@@ -8,6 +8,7 @@ mod bookmark_actions;
 mod command_navigation;
 mod describe_commit_actions;
 mod detail_restore_actions;
+mod file_actions;
 mod operation_actions;
 mod rewrite_actions;
 mod support;

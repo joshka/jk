@@ -13,8 +13,9 @@ use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::jj::{
     JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjDuplicatePlan,
-    JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan,
-    JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
+    JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget,
+    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
+    JjWorkingCopyNavigationPlan,
 };
 
 use super::App;
@@ -72,6 +73,10 @@ impl App {
                 mutation,
                 status_context,
             } => self.confirm_bookmark_mutation(mutation, status_context, viewport_height),
+            ActionPreviewConfirmation::FileMutation {
+                mutation,
+                status_context,
+            } => self.confirm_file_mutation(mutation, status_context, viewport_height),
             ActionPreviewConfirmation::New {
                 new_change,
                 status_context,
@@ -162,6 +167,16 @@ impl InteractionMode {
                 visible_lines,
                 format!("bookmark {} cancelled", mutation.kind().label()),
                 |status_context| ActionPreviewConfirmation::BookmarkMutation {
+                    mutation: mutation.clone(),
+                    status_context,
+                },
+            )),
+            Self::FileMutationPreview { mutation, output } => Some(action_preview_event(
+                code,
+                output,
+                visible_lines,
+                format!("file {} cancelled", mutation.kind().label()),
+                |status_context| ActionPreviewConfirmation::FileMutation {
                     mutation: mutation.clone(),
                     status_context,
                 },
@@ -321,6 +336,10 @@ enum ActionPreviewConfirmation {
     },
     BookmarkMutation {
         mutation: JjBookmarkMutationPlan,
+        status_context: Option<String>,
+    },
+    FileMutation {
+        mutation: JjFileMutationPlan,
         status_context: Option<String>,
     },
     New {

@@ -56,6 +56,9 @@ Likely selectable units:
   structured groups.
 - File actions: file track, untrack, restore, chmod, and file drill-down should require exact paths
   or fileset data, not prose parsing.
+- Shipped file hygiene: status `?` rows offer guided track; tracked `M`/`A`/`D`/`!` rows offer
+  guided untrack where an exact clean path is parsed; chmod is offered only for tracked non-deleted
+  rows where status distinguishes a path that should exist.
 - Sync entry: fetch and push flows can launch here when status shows remote or bookmark context, but
   they should use guided previews rather than raw command execution.
 - Fetch: `jj git fetch` is common and low-risk enough to be a direct action when the remote/default
@@ -71,6 +74,7 @@ Likely selectable units:
 - `[`/`]`: previous/next section
 - `/`, `n`, `N`: search
 - `l`, `Right`: open file list
+- `a`: action menu for exact path rows
 - `f`: fetch
 - `p`: push flow
 - `y`: copy selected path or identifier

@@ -464,6 +464,31 @@ pub struct JjRestorePlan {
     path: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JjFileMutationKind {
+    Track,
+    Untrack,
+    Chmod(JjFileChmodMode),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JjFileChmodMode {
+    Executable,
+    Normal,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JjFileMutationTarget {
+    WorkingCopy { path: String },
+    ExactRevision { revision: String, path: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JjFileMutationPlan {
+    kind: JjFileMutationKind,
+    target: JjFileMutationTarget,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum JjRestoreTarget {
     ExactChange(String),
@@ -1155,6 +1180,209 @@ impl JjRestoreTarget {
             }
             Self::CurrentWorkingCopy => {
                 "effect: restore removes the selected path's working-copy diff from @".to_owned()
+            }
+        }
+    }
+}
+
+impl JjFileChmodMode {
+    pub fn command_arg(self) -> &'static str {
+        match self {
+            Self::Executable => "x",
+            Self::Normal => "n",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Executable => "executable",
+            Self::Normal => "normal",
+        }
+    }
+}
+
+impl JjFileMutationKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Track => "track",
+            Self::Untrack => "untrack",
+            Self::Chmod(JjFileChmodMode::Executable) => "chmod x",
+            Self::Chmod(JjFileChmodMode::Normal) => "chmod n",
+        }
+    }
+
+    fn success_fallback(self) -> &'static str {
+        match self {
+            Self::Track => "tracked file",
+            Self::Untrack => "untracked file",
+            Self::Chmod(JjFileChmodMode::Executable) => "set file executable",
+            Self::Chmod(JjFileChmodMode::Normal) => "set file normal",
+        }
+    }
+}
+
+impl JjFileMutationTarget {
+    fn path(&self) -> &str {
+        match self {
+            Self::WorkingCopy { path } | Self::ExactRevision { path, .. } => path,
+        }
+    }
+
+    fn revision(&self) -> Option<&str> {
+        match self {
+            Self::WorkingCopy { .. } => None,
+            Self::ExactRevision { revision, .. } => Some(revision),
+        }
+    }
+
+    fn scope_label(&self) -> String {
+        match self {
+            Self::WorkingCopy { .. } => "working-copy change (@)".to_owned(),
+            Self::ExactRevision { revision, .. } => {
+                format!("exact selected revision {revision}")
+            }
+        }
+    }
+}
+
+impl JjFileMutationPlan {
+    pub fn track(path: impl Into<String>) -> Self {
+        Self {
+            kind: JjFileMutationKind::Track,
+            target: JjFileMutationTarget::WorkingCopy { path: path.into() },
+        }
+    }
+
+    pub fn untrack(path: impl Into<String>) -> Self {
+        Self {
+            kind: JjFileMutationKind::Untrack,
+            target: JjFileMutationTarget::WorkingCopy { path: path.into() },
+        }
+    }
+
+    pub fn chmod_working_copy(path: impl Into<String>, mode: JjFileChmodMode) -> Self {
+        Self {
+            kind: JjFileMutationKind::Chmod(mode),
+            target: JjFileMutationTarget::WorkingCopy { path: path.into() },
+        }
+    }
+
+    pub fn chmod_exact_revision(
+        revision: impl Into<String>,
+        path: impl Into<String>,
+        mode: JjFileChmodMode,
+    ) -> Self {
+        Self {
+            kind: JjFileMutationKind::Chmod(mode),
+            target: JjFileMutationTarget::ExactRevision {
+                revision: revision.into(),
+                path: path.into(),
+            },
+        }
+    }
+
+    pub fn kind(&self) -> JjFileMutationKind {
+        self.kind
+    }
+
+    pub fn path(&self) -> &str {
+        self.target.path()
+    }
+
+    pub fn revision(&self) -> Option<&str> {
+        self.target.revision()
+    }
+
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
+
+    pub fn command_argv(&self) -> Vec<String> {
+        let fileset = root_file_fileset(self.path());
+        match self.kind {
+            JjFileMutationKind::Track => {
+                vec![
+                    "file".to_owned(),
+                    "track".to_owned(),
+                    "--".to_owned(),
+                    fileset,
+                ]
+            }
+            JjFileMutationKind::Untrack => {
+                vec![
+                    "file".to_owned(),
+                    "untrack".to_owned(),
+                    "--".to_owned(),
+                    fileset,
+                ]
+            }
+            JjFileMutationKind::Chmod(mode) => {
+                let mut argv = vec!["file".to_owned(), "chmod".to_owned()];
+                if let Some(revision) = self.revision() {
+                    argv.push("-r".to_owned());
+                    argv.push(exact_change_id_revset(revision));
+                }
+                argv.push(mode.command_arg().to_owned());
+                argv.push("--".to_owned());
+                argv.push(fileset);
+                argv
+            }
+        }
+    }
+
+    pub fn run_preview(&self) -> Result<CommandOutput> {
+        Ok(CommandOutput::new(self.preview_summary()))
+    }
+
+    pub fn run(&self) -> Result<CommandOutput> {
+        run_direct_args(
+            self.command_argv(),
+            &self.command_label(),
+            self.kind.success_fallback(),
+        )
+    }
+
+    pub fn preview_summary(&self) -> String {
+        let mut lines = vec![
+            format!("command: {}", self.command_label()),
+            String::new(),
+            format!("selected path: {}", self.path()),
+            format!("exact fileset: {}", root_file_fileset(self.path())),
+            format!("target scope: {}", self.target.scope_label()),
+        ];
+
+        if let JjFileMutationKind::Chmod(mode) = self.kind {
+            lines.push(format!(
+                "chmod mode: {} ({})",
+                mode.command_arg(),
+                mode.label()
+            ));
+        }
+
+        lines.extend([
+            self.effect_summary(),
+            "confirmation: press Enter to run the command above".to_owned(),
+            "output: jj stdout and stderr are preserved in this result pane".to_owned(),
+            "recovery: jj undo".to_owned(),
+            "review: jj status; jj op show -p".to_owned(),
+        ]);
+        lines.join("\n")
+    }
+
+    fn effect_summary(&self) -> String {
+        match self.kind {
+            JjFileMutationKind::Track => {
+                "effect: starts tracking this exact untracked working-copy path".to_owned()
+            }
+            JjFileMutationKind::Untrack => {
+                "effect: stops tracking this exact working-copy path; jj requires the path to already be ignored".to_owned()
+            }
+            JjFileMutationKind::Chmod(JjFileChmodMode::Executable) => {
+                "effect: marks this exact path executable in the target scope".to_owned()
+            }
+            JjFileMutationKind::Chmod(JjFileChmodMode::Normal) => {
+                "effect: marks this exact path non-executable in the target scope".to_owned()
             }
         }
     }
@@ -3069,6 +3297,96 @@ mod tests {
         assert_eq!(
             root_file_fileset("a b/\"c\"/d\\e[f]{g}(h)|i?*"),
             "root-file:\"a b/\\\"c\\\"/d\\\\e[f]{g}(h)|i?*\""
+        );
+    }
+
+    #[test]
+    fn file_track_uses_root_file_fileset_after_double_dash() {
+        let plan = JjFileMutationPlan::track("-leading dir/quo\"te\\[glob]?*.rs");
+
+        assert_eq!(
+            plan.command_argv(),
+            vec![
+                "file",
+                "track",
+                "--",
+                "root-file:\"-leading dir/quo\\\"te\\\\[glob]?*.rs\""
+            ]
+        );
+        let preview = plan.preview_summary();
+        assert!(preview.contains("selected path: -leading dir/quo\"te\\[glob]?*.rs"));
+        assert!(
+            preview.contains("exact fileset: root-file:\"-leading dir/quo\\\"te\\\\[glob]?*.rs\"")
+        );
+        assert!(preview.contains("effect: starts tracking this exact untracked working-copy path"));
+        assert!(preview.contains("output: jj stdout and stderr are preserved"));
+        assert!(preview.contains("recovery: jj undo"));
+        assert!(preview.contains("review: jj status; jj op show -p"));
+    }
+
+    #[test]
+    fn file_untrack_uses_root_file_fileset_and_mentions_ignore_requirement() {
+        let plan = JjFileMutationPlan::untrack("dir/file.rs");
+
+        assert_eq!(
+            plan.command_argv(),
+            vec!["file", "untrack", "--", "root-file:\"dir/file.rs\""]
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("jj requires the path to already be ignored")
+        );
+    }
+
+    #[test]
+    fn file_chmod_modes_use_installed_jj_mode_args() {
+        let executable =
+            JjFileMutationPlan::chmod_working_copy("src/main.rs", JjFileChmodMode::Executable);
+        let normal = JjFileMutationPlan::chmod_working_copy("src/main.rs", JjFileChmodMode::Normal);
+
+        assert_eq!(
+            executable.command_argv(),
+            vec!["file", "chmod", "x", "--", "root-file:\"src/main.rs\""]
+        );
+        assert_eq!(
+            normal.command_argv(),
+            vec!["file", "chmod", "n", "--", "root-file:\"src/main.rs\""]
+        );
+        assert!(
+            executable
+                .preview_summary()
+                .contains("chmod mode: x (executable)")
+        );
+        assert!(normal.preview_summary().contains("chmod mode: n (normal)"));
+    }
+
+    #[test]
+    fn exact_revision_file_chmod_uses_exact_change_revset_before_mode_and_fileset() {
+        let plan = JjFileMutationPlan::chmod_exact_revision(
+            "change-a",
+            "dir/space file.rs",
+            JjFileChmodMode::Executable,
+        );
+
+        assert_eq!(
+            plan.command_argv(),
+            vec![
+                "file",
+                "chmod",
+                "-r",
+                "exactly(change_id(\"change-a\"), 1)",
+                "x",
+                "--",
+                "root-file:\"dir/space file.rs\""
+            ]
+        );
+        assert_eq!(
+            plan.command_label(),
+            "jj file chmod -r exactly(change_id(\"change-a\"), 1) x -- root-file:\"dir/space file.rs\""
+        );
+        assert!(
+            plan.preview_summary()
+                .contains("target scope: exact selected revision change-a")
         );
     }
 

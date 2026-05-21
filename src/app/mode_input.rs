@@ -248,7 +248,11 @@ impl App {
                             | ActionKind::Restore
                             | ActionKind::Revert
                             | ActionKind::Abandon
-                            | ActionKind::Absorb => {
+                            | ActionKind::Absorb
+                            | ActionKind::FileTrack
+                            | ActionKind::FileUntrack
+                            | ActionKind::FileChmodExecutable
+                            | ActionKind::FileChmodNormal => {
                                 self.status =
                                     StatusLine::with_message(&self.view, next_status.to_owned());
                             }
@@ -530,6 +534,7 @@ impl App {
             InteractionMode::DescribePreview { .. }
             | InteractionMode::CommitPreview { .. }
             | InteractionMode::BookmarkMutationPreview { .. }
+            | InteractionMode::FileMutationPreview { .. }
             | InteractionMode::NewPreview { .. }
             | InteractionMode::DuplicatePreview { .. }
             | InteractionMode::RebasePreview { .. }

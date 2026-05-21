@@ -11,9 +11,9 @@ use crate::copy::CopyOption;
 use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
-    JjDescribeTarget, JjDuplicatePlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan,
-    JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan,
-    JjSquashPlan, JjWorkingCopyNavigationPlan,
+    JjDescribeTarget, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget,
+    JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
 use crate::tui::Overlay;
 use crate::view_state::ViewState;
@@ -63,6 +63,10 @@ pub(crate) enum InteractionMode {
     },
     BookmarkMutationPreview {
         mutation: JjBookmarkMutationPlan,
+        output: ActionOutput,
+    },
+    FileMutationPreview {
+        mutation: JjFileMutationPlan,
         output: ActionOutput,
     },
     NewPreview {
@@ -202,6 +206,7 @@ impl InteractionMode {
             Self::BookmarkMutationPreview { output, .. } => {
                 Overlay::BookmarkMutationPreview { output }
             }
+            Self::FileMutationPreview { output, .. } => Overlay::FileMutationPreview { output },
             Self::NewPreview { output, .. } => Overlay::NewPreview { output },
             Self::DuplicatePreview { output, .. } => Overlay::DuplicatePreview { output },
             Self::RebasePreview { output, .. } => Overlay::RebasePreview { output },

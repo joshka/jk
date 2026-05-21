@@ -58,6 +58,8 @@ fn detail_action_menu_from_exact_file_list_offers_path_restore_first() {
         actions,
         vec![
             ActionKind::Restore,
+            ActionKind::FileChmodExecutable,
+            ActionKind::FileChmodNormal,
             ActionKind::Duplicate,
             ActionKind::Restore,
             ActionKind::Revert
@@ -265,7 +267,7 @@ fn status_action_menu_opens_working_copy_path_restore_preview() {
         InteractionMode::ActionMenu { menu, .. } => menu,
         _ => panic!("expected status action menu"),
     };
-    assert_eq!(menu.items().len(), 1);
+    assert_eq!(menu.items().len(), 4);
     assert!(matches!(
         menu.items()[0].follow_up(),
         FollowUp::RestoreWorkingCopyPath { path } if path == "src/status.rs"

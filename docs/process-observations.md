@@ -3693,6 +3693,55 @@ belong here.
     `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/command-inventory.md`,
     `docs/plan/progress.md`, `docs/process-observations.md`
 
+### 2026-05-20 (Packet 40 file hygiene actions)
+
+- Slice / task: implement Packet 40 guided exact-path file track, untrack, and chmod actions.
+- Thread id: `019e483c-44ca-7c91-82f4-a07a96220f84`.
+- Model / routing: gpt-5.5 high by user request because the change crossed status parsing,
+  exact-path ownership, command construction, app action lifecycle, tests, docs, and disposable jj
+  proof.
+- Audit facts preserved: installed jj is `0.41.0`; `--` is accepted before file filesets; file
+  mutation targets must be one `root-file:"..."` fileset argument; `jj file chmod` modes are `x` and
+  `n`; `jj file untrack` requires ignored paths.
+- Observable implementation outcome: `src/jj_actions.rs` owns `JjFileMutationPlan` for
+  `jj file track`, `jj file untrack`, and `jj file chmod`. The app routes these plans through the
+  existing ActionOutput preview/result lifecycle in `src/app/action_lifecycle/preview.rs`,
+  `src/app/action_lifecycle/completion.rs`, and `src/app/action_flow.rs`.
+- Safety outcome: `src/status.rs` parses only clean single-path status rows for file actions. Status
+  `?` rows enable track; tracked rows enable untrack; chmod is blocked for deleted or missing status
+  paths; conflicts, renames, headers, absolute paths, parent-relative paths, whitespace-ambiguous
+  paths, and multi-path rows fail closed.
+- Exact provenance outcome: `src/view_state.rs` enables working-copy file list/show actions only
+  when the view has no revision target, enables exact-revision chmod only when graph-derived
+  provenance is recorded, and rejects direct arbitrary revsets such as `main` or resolve-derived `@`
+  file shows.
+- Proof outcome: disposable repo `/tmp/jk-packet40-proof` verified file track, chmod executable,
+  chmod normal, exact-revision chmod, status review, and undo. Disposable repo
+  `/tmp/jk-packet40-untrack-proof` verified untrack after a tracked path became ignored, plus undo.
+- Validation trail: `cargo check`; `cargo test jj_actions::tests::file_ --no-fail-fast`;
+  `cargo test exact_revision_file_chmod --no-fail-fast`; `cargo test status_parser --no-fail-fast`;
+  `cargo test app::tests::file_actions --no-fail-fast`; `cargo test action_menu --no-fail-fast`;
+  `cargo test view_state::tests::exact_restore_revert_context --no-fail-fast`;
+  `rustup run nightly cargo fmt --check`; `cargo clippy -- -D warnings`; full `cargo test` passed
+  with 501 passed / 2 ignored.
+- Final gpt-5.5 review: no findings or blockers. The reviewer ran focused file/status/action/menu
+  tests, full `cargo test --no-fail-fast` with 501 passed / 2 ignored, clippy, and `jj help` checks.
+  Two attempted combined `cargo test` filters were invalid cargo syntax and did not count as proof.
+- Main-thread final validation after review: `cargo check`;
+  `cargo test app::tests::file_actions -- --test-threads=1`; `cargo test file_ -- --test-threads=1`;
+  `cargo test status_parser -- --test-threads=1`; `cargo clippy -- -D warnings`; full
+  `cargo test -- --test-threads=1` with 501 passed / 2 ignored;
+  `rustup run nightly cargo fmt --check`; `just md-check`; `just check`.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/status.rs`, `src/file_show.rs`, `src/view_state.rs`, `src/action_menu.rs`,
+    `src/jj_actions.rs`, `src/app/action_lifecycle/entry.rs`, `src/app/action_lifecycle/preview.rs`,
+    `src/app/action_lifecycle/completion.rs`, `src/app/services.rs`, `src/app/action_flow.rs`,
+    `src/app_screen.rs`, `src/app/mode_input.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`,
+    `docs/plan/progress.md`, `docs/plan/command-inventory.md`, `docs/plan/screens/files.md`,
+    `docs/plan/screens/status.md`
+
 ### 2026-05-20 (App refactor audit before Packet 39)
 
 - A prior gpt-5.5 high read-only audit found no blocking app refactor needed before Packet 39. The

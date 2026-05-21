@@ -8,9 +8,9 @@ use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
-    JjDescribePlan, JjDuplicatePlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan,
-    JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan,
-    JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
+    JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget,
+    JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan,
+    JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan, LogViewMode,
 };
 
@@ -317,6 +317,42 @@ impl App {
                 let command_label = mutation.command_label();
                 self.status = StatusLine::error(&self.view, message.clone());
                 self.mode = InteractionMode::BookmarkMutationPreview {
+                    mutation,
+                    output: ActionOutput::finished(command_label, message, status_context),
+                };
+            }
+        }
+    }
+
+    pub(in crate::app) fn open_file_mutation_preview(&mut self, mutation: JjFileMutationPlan) {
+        let target = mutation
+            .revision()
+            .map(|revision| format!("{} at {}", mutation.path(), revision))
+            .unwrap_or_else(|| format!("{} at @", mutation.path()));
+        let status_context = Some(format!(
+            "file {} {} from {}",
+            mutation.kind().label(),
+            target,
+            self.view.spec().app_label()
+        ));
+
+        match mutation.run_preview() {
+            Ok(output) => {
+                let command_label = mutation.command_label();
+                self.mode = InteractionMode::FileMutationPreview {
+                    mutation,
+                    output: ActionOutput::pending(
+                        command_label,
+                        output.message().to_owned(),
+                        status_context,
+                    ),
+                };
+            }
+            Err(error) => {
+                let message = error.to_string();
+                let command_label = mutation.command_label();
+                self.status = StatusLine::error(&self.view, message.clone());
+                self.mode = InteractionMode::FileMutationPreview {
                     mutation,
                     output: ActionOutput::finished(command_label, message, status_context),
                 };

@@ -22,7 +22,7 @@ use crate::operation_log::OperationLogView;
 use crate::resolve::ResolveView;
 use crate::search::SearchQuery;
 use crate::show::ShowView;
-use crate::status::StatusView;
+use crate::status::{StatusFileAction, StatusView};
 use crate::tui::StatusHints;
 
 /// The currently active top-level view.
@@ -420,44 +420,68 @@ impl ViewState {
                     )
                 }),
             Self::FileList(view) => {
-                let Some(revision) = view.spec().exact_change_target() else {
+                let Some(path) = view.selected_path() else {
                     return Err(color_eyre::eyre::eyre!(
-                        "restore/revert from {} requires an exact graph-derived revision target",
+                        "file action from {} requires a selected exact path",
                         view.spec().app_label()
                     ));
                 };
-                let context = view
-                    .selected_path()
-                    .map(|path| ExactActionContext::detail(revision).with_selected_path(path))
-                    .unwrap_or_else(|| ExactActionContext::detail(revision));
-                Ok(Some(context))
-            }
-            Self::FileShow(view) => {
-                let Some(revision) = view.spec().exact_change_target() else {
-                    return Err(color_eyre::eyre::eyre!(
-                        "restore/revert from {} requires an exact graph-derived revision target",
-                        view.spec().app_label()
+                if let Some(revision) = view.spec().exact_change_target() {
+                    return Ok(Some(
+                        ExactActionContext::detail(revision).with_selected_path(path),
                     ));
-                };
-                let Some(path) = view.spec().path() else {
-                    return Err(color_eyre::eyre::eyre!(
-                        "restore from {} requires an exact selected path",
-                        view.spec().app_label()
-                    ));
-                };
-                Ok(Some(
-                    ExactActionContext::detail(revision).with_selected_path(path),
+                }
+                if view.spec().target().is_none() {
+                    return Ok(Some(ExactActionContext::working_copy_file_path(path)));
+                }
+                Err(color_eyre::eyre::eyre!(
+                    "file actions from {} require a working-copy file list or exact graph-derived revision target",
+                    view.spec().app_label()
                 ))
             }
-            Self::Status(view) => Ok(Some(ExactActionContext::status_path(
-                view.selected_exact_path()
-                    .map_err(|message| color_eyre::eyre::eyre!(message))?,
-            ))),
+            Self::FileShow(view) => {
+                let path = view.path();
+                if path.is_empty() {
+                    return Err(color_eyre::eyre::eyre!(
+                        "file action from {} requires a selected exact path",
+                        view.spec().app_label()
+                    ));
+                }
+                if let Some(revision) = view.spec().exact_change_target() {
+                    return Ok(Some(
+                        ExactActionContext::detail(revision).with_selected_path(path),
+                    ));
+                }
+                if view.spec().target().is_none() {
+                    return Ok(Some(ExactActionContext::working_copy_file_path(path)));
+                }
+                Err(color_eyre::eyre::eyre!(
+                    "file actions from {} require a working-copy file show or exact graph-derived revision target",
+                    view.spec().app_label()
+                ))
+            }
+            Self::Status(view) => {
+                let action = view
+                    .selected_file_action()
+                    .map_err(|message| color_eyre::eyre::eyre!(message))?;
+                Ok(Some(status_file_action_context(action)))
+            }
             Self::Resolve(_)
             | Self::Bookmarks(_)
             | Self::OperationLog(_)
             | Self::OperationDetail(_) => Ok(None),
         }
+    }
+}
+
+fn status_file_action_context(action: StatusFileAction) -> ExactActionContext {
+    match action {
+        StatusFileAction::Track { path } => ExactActionContext::status_untracked_path(path),
+        StatusFileAction::Tracked {
+            path,
+            restore_allowed,
+            chmod_allowed,
+        } => ExactActionContext::status_tracked_path(path, restore_allowed, chmod_allowed),
     }
 }
 
@@ -651,14 +675,14 @@ mod tests {
                 .exact_restore_revert_context()
                 .unwrap_err()
                 .to_string(),
-            "restore/revert from jk file list -r main requires an exact graph-derived revision target"
+            "file actions from jk file list -r main require a working-copy file list or exact graph-derived revision target"
         );
         assert_eq!(
             file_show
                 .exact_restore_revert_context()
                 .unwrap_err()
                 .to_string(),
-            "restore/revert from jk file show -r main src/main.rs requires an exact graph-derived revision target"
+            "file actions from jk file show -r main src/main.rs require a working-copy file show or exact graph-derived revision target"
         );
     }
 }

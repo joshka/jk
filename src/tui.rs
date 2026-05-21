@@ -117,6 +117,12 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
             frame.render_widget(Clear, area);
             render_action_output(frame, area, &title, output);
         }
+        Overlay::FileMutationPreview { output } => {
+            let title = action_output_title("File", output);
+            let area = action_output_area(frame.area(), &title, output);
+            frame.render_widget(Clear, area);
+            render_action_output(frame, area, &title, output);
+        }
         Overlay::RebasePreview { output } => {
             let title = action_output_title("Rebase", output);
             let area = action_output_area(frame.area(), &title, output);
@@ -252,6 +258,9 @@ pub enum Overlay<'a> {
         output: &'a ActionOutput,
     },
     BookmarkMutationPreview {
+        output: &'a ActionOutput,
+    },
+    FileMutationPreview {
         output: &'a ActionOutput,
     },
     OperationRecoveryPreview {
@@ -406,6 +415,7 @@ const FILE_LIST_STATUS_HINTS: &[StatusHint] = &[
     StatusHint::new("Enter/l", "open"),
     StatusHint::new("/", "search"),
     StatusHint::new("y", "copy"),
+    StatusHint::new("a", "action"),
     StatusHint::new("q", "quit"),
     StatusHint::new("?", "help"),
 ];
@@ -413,6 +423,7 @@ const FILE_SHOW_STATUS_HINTS: &[StatusHint] = &[
     StatusHint::new("j/k", "scroll"),
     StatusHint::new("Space/C-b", "page"),
     StatusHint::new("/", "search"),
+    StatusHint::new("a", "action"),
     StatusHint::new("h", "back"),
     StatusHint::new("q", "quit"),
     StatusHint::new("?", "help"),
@@ -992,7 +1003,22 @@ mod tests {
 
         assert_snapshot!(render_chrome_snapshot(&status, 100), @r"
         title|jk file list
-        status|1 files  j/k move  Enter/l open  / search  y copy  q quit  ? help
+        status|1 files  j/k move  Enter/l open  / search  y copy  a action  q quit  ? help
+        ");
+    }
+
+    #[test]
+    fn file_show_status_hints_advertise_file_actions() {
+        let status = StatusLine::test(
+            "jk file show src/main.rs",
+            "4 lines",
+            StatusKind::Ready,
+            StatusHints::FileShowDocument,
+        );
+
+        assert_snapshot!(render_chrome_snapshot(&status, 120), @r"
+        title|jk file show src/main.rs
+        status|4 lines  j/k scroll  Space/C-b page  / search  a action  h back  q quit  ? help
         ");
     }
 

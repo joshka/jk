@@ -212,6 +212,10 @@ impl FileShowView {
         &self.spec
     }
 
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
     pub fn line_count(&self) -> usize {
         self.document.line_count()
     }

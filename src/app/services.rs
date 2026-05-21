@@ -10,9 +10,9 @@ use ratatui::DefaultTerminal;
 
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
-    JjDescribePlan, JjDuplicatePlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery,
-    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
-    JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec, git_remotes, new_trunk,
+    JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan,
+    JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan,
+    JjSquashPlan, JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec, git_remotes, new_trunk,
     resolve_exact_change_id,
 };
 use crate::view_state::ViewState;
@@ -32,6 +32,7 @@ pub(in crate::app) type RevertPreviewLoad = fn(&JjRevertPlan) -> Result<String>;
 pub(in crate::app) type DescribeRun = fn(&JjDescribePlan) -> Result<String>;
 pub(in crate::app) type CommitRun = fn(&JjCommitPlan) -> Result<String>;
 pub(in crate::app) type BookmarkMutationRun = fn(&JjBookmarkMutationPlan) -> Result<String>;
+pub(in crate::app) type FileMutationRun = fn(&JjFileMutationPlan) -> Result<String>;
 pub(in crate::app) type AbandonPreviewLoad = fn(&JjAbandonPlan) -> Result<JjAbandonPreview>;
 pub(in crate::app) type AbandonRun = fn(&JjAbandonPlan) -> Result<String>;
 pub(in crate::app) type OperationRecoveryRun = fn(&JjOperationRecovery) -> Result<String>;
@@ -62,6 +63,7 @@ pub(in crate::app) struct AppServices {
     pub(in crate::app) describe_run: DescribeRun,
     pub(in crate::app) commit_run: CommitRun,
     pub(in crate::app) bookmark_mutation_run: BookmarkMutationRun,
+    pub(in crate::app) file_mutation_run: FileMutationRun,
     pub(in crate::app) abandon_preview_load: AbandonPreviewLoad,
     pub(in crate::app) abandon_run: AbandonRun,
     pub(in crate::app) operation_recovery_run: OperationRecoveryRun,
@@ -136,6 +138,13 @@ impl AppServices {
         mutation: &JjBookmarkMutationPlan,
     ) -> Result<String> {
         (self.bookmark_mutation_run)(mutation)
+    }
+
+    pub(in crate::app) fn run_file_mutation(
+        &self,
+        mutation: &JjFileMutationPlan,
+    ) -> Result<String> {
+        (self.file_mutation_run)(mutation)
     }
 
     pub(in crate::app) fn load_abandon_preview(
@@ -272,6 +281,13 @@ impl App {
         self.services.run_bookmark_mutation(mutation)
     }
 
+    pub(in crate::app) fn run_file_mutation(
+        &self,
+        mutation: &JjFileMutationPlan,
+    ) -> Result<String> {
+        self.services.run_file_mutation(mutation)
+    }
+
     pub(in crate::app) fn load_abandon_preview(
         &self,
         abandon: &JjAbandonPlan,
@@ -358,6 +374,7 @@ impl Default for AppServices {
             describe_run: default_describe_run,
             commit_run: default_commit_run,
             bookmark_mutation_run: default_bookmark_mutation_run,
+            file_mutation_run: default_file_mutation_run,
             abandon_preview_load: default_abandon_preview_load,
             abandon_run: default_abandon_run,
             operation_recovery_run: default_operation_recovery_run,
@@ -441,6 +458,10 @@ fn default_commit_run(commit: &JjCommitPlan) -> Result<String> {
 }
 
 fn default_bookmark_mutation_run(mutation: &JjBookmarkMutationPlan) -> Result<String> {
+    mutation.run().map(|output| output.message().to_owned())
+}
+
+fn default_file_mutation_run(mutation: &JjFileMutationPlan) -> Result<String> {
     mutation.run().map(|output| output.message().to_owned())
 }
 

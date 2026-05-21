@@ -17,10 +17,11 @@ pub use crate::jj_actions::JjOperationTargetKind;
 pub use crate::jj_actions::{
     CommandOutput, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkForgetTarget,
     JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget, JjBookmarkTrackingTarget,
-    JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan, JjGitFetch, JjGitPush,
-    JjGitPushTarget, JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget,
-    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSplitTarget, JjSquashPlan,
-    JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, validate_bookmark_rename_new_name,
+    JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan, JjFileChmodMode,
+    JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjSplitPlan, JjSplitTarget, JjSquashPlan, JjWorkingCopyNavigationKind,
+    JjWorkingCopyNavigationPlan, validate_bookmark_rename_new_name,
 };
 #[allow(unused_imports)]
 pub use crate::jj_rows::{

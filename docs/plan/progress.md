@@ -1,5 +1,35 @@
 # Slice Progress
 
+## Packet 40: File Track/Untrack/Chmod Actions
+
+- Files changed: `src/status.rs`, `src/file_show.rs`, `src/view_state.rs`, `src/action_menu.rs`,
+  `src/jj_actions.rs`, `src/jj.rs`, `src/app/action_lifecycle/entry.rs`,
+  `src/app/action_lifecycle/preview.rs`, `src/app/action_lifecycle/completion.rs`,
+  `src/app/services.rs`, `src/app/action_flow.rs`, `src/app_screen.rs`, `src/app/mode_input.rs`,
+  `src/tui.rs`, app/view tests, and packet docs.
+- Behavior: status `?` rows offer guided `jj file track`; exact tracked working-copy paths from
+  status, file list, and file show offer guided `jj file untrack` and chmod `x`/`n`; exact
+  graph-derived file list/show paths offer exact-revision chmod; direct arbitrary revsets and
+  ambiguous status rows fail closed.
+- Command safety: every file target is one `root-file:"..."` fileset argument built by
+  `jj_actions.rs`, and file track/untrack/chmod place `--` before the fileset. Chmod exposes only
+  installed jj 0.41 `x` and `n` modes.
+- Proof / validation: disposable jj proof under `/tmp/jk-packet40-proof` verified file track, chmod
+  `x`, chmod `n`, exact-revision chmod, status review, and undo; disposable jj proof under
+  `/tmp/jk-packet40-untrack-proof` verified untrack after a tracked path became ignored, plus undo.
+  Local validation: `cargo check`; focused `cargo test file_ --no-fail-fast`;
+  `cargo test status_parser --no-fail-fast`; `cargo test app::tests::file_actions --no-fail-fast`;
+  `cargo test action_menu --no-fail-fast`;
+  `cargo test view_state::tests::exact_restore_revert_context --no-fail-fast`;
+  `rustup run nightly cargo fmt --check`; `cargo clippy -- -D warnings`; full `cargo test` passed
+  with 501 passed / 2 ignored.
+- Review note: final gpt-5.5 review found no correctness, path-safety, docs, or test blockers and
+  accepted Packet 40. Extraction of `src/jj_actions.rs` and `src/action_menu.rs` was deferred until
+  more file-action policy accumulates.
+- Remaining risk: status file-state gating still depends on narrow rendered `jj status` row parsing
+  until a structured status contract is available.
+- Next recommended slice: Packet 41: Workspace And Root Utility Surface.
+
 ## Packet Clippy Baseline Cleanup
 
 - Slice / task: remove known clippy baseline blockers (`dead_code` and `collapsible_if`) and keep

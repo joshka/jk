@@ -3,6 +3,8 @@
 //! This module owns the user-visible action vocabulary for mutation prep.
 //! It intentionally does not execute commands or invoke `jj`.
 
+use crate::jj::JjFileChmodMode;
+
 const PREVIEW_REQUIRED_MARKER: &str = "Preview required before execution.";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33,6 +35,10 @@ pub enum ActionKind {
     Rebase,
     Squash,
     Absorb,
+    FileTrack,
+    FileUntrack,
+    FileChmodExecutable,
+    FileChmodNormal,
 }
 
 impl ActionKind {
@@ -48,6 +54,10 @@ impl ActionKind {
             Self::Rebase => "rebase",
             Self::Squash => "squash",
             Self::Absorb => "absorb",
+            Self::FileTrack => "track",
+            Self::FileUntrack => "untrack",
+            Self::FileChmodExecutable => "chmod x",
+            Self::FileChmodNormal => "chmod n",
         }
     }
 
@@ -63,6 +73,10 @@ impl ActionKind {
             Self::Rebase => 'b',
             Self::Squash => 'u',
             Self::Absorb => 'a',
+            Self::FileTrack => 't',
+            Self::FileUntrack => 'u',
+            Self::FileChmodExecutable => 'x',
+            Self::FileChmodNormal => 'n',
         }
     }
 }
@@ -192,6 +206,17 @@ pub enum FollowUp {
         source: String,
         destinations: Vec<String>,
     },
+    FileTrack {
+        path: String,
+    },
+    FileUntrack {
+        path: String,
+    },
+    FileChmod {
+        path: String,
+        revision: Option<String>,
+        mode: JjFileChmodMode,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -268,8 +293,25 @@ pub struct ExactActionContext {
     current_revision: Option<String>,
     source_revisions: Vec<String>,
     selected_path: Option<String>,
+    file_action: Option<FileActionContext>,
     current_is_visible_working_copy: bool,
     surface: ActionSurface,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FileActionContext {
+    path: String,
+    scope: FileActionScope,
+    restore_allowed: bool,
+    track_allowed: bool,
+    untrack_allowed: bool,
+    chmod_allowed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum FileActionScope {
+    WorkingCopy,
+    ExactRevision(String),
 }
 
 impl ExactActionContext {
@@ -278,6 +320,7 @@ impl ExactActionContext {
             current_revision: Some(current_revision.into()),
             source_revisions: Vec::new(),
             selected_path: None,
+            file_action: None,
             current_is_visible_working_copy: false,
             surface: ActionSurface::Graph,
         }
@@ -288,18 +331,58 @@ impl ExactActionContext {
             current_revision: Some(current_revision.into()),
             source_revisions: Vec::new(),
             selected_path: None,
+            file_action: None,
             current_is_visible_working_copy: false,
             surface: ActionSurface::Detail,
         }
     }
 
-    pub fn status_path(path: impl Into<String>) -> Self {
+    pub fn status_tracked_path(
+        path: impl Into<String>,
+        restore_allowed: bool,
+        chmod_allowed: bool,
+    ) -> Self {
+        let path = path.into();
         Self {
             current_revision: Some("@".to_owned()),
             source_revisions: Vec::new(),
-            selected_path: Some(path.into()),
+            selected_path: Some(path.clone()),
+            file_action: Some(FileActionContext::working_copy_tracked(
+                path,
+                restore_allowed,
+                chmod_allowed,
+            )),
             current_is_visible_working_copy: false,
             surface: ActionSurface::Status,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn status_path(path: impl Into<String>) -> Self {
+        Self::status_tracked_path(path, true, true)
+    }
+
+    pub fn status_untracked_path(path: impl Into<String>) -> Self {
+        let path = path.into();
+        Self {
+            current_revision: Some("@".to_owned()),
+            source_revisions: Vec::new(),
+            selected_path: Some(path.clone()),
+            file_action: Some(FileActionContext::working_copy_untracked(path)),
+            current_is_visible_working_copy: false,
+            surface: ActionSurface::Status,
+        }
+    }
+
+    pub fn working_copy_file_path(path: impl Into<String>) -> Self {
+        let path = path.into();
+        Self {
+            current_revision: None,
+            source_revisions: Vec::new(),
+            selected_path: Some(path.clone()),
+            file_action: Some(FileActionContext::working_copy_tracked(path, false, true)),
+            current_is_visible_working_copy: false,
+            surface: ActionSurface::File,
         }
     }
 
@@ -309,6 +392,7 @@ impl ExactActionContext {
             current_revision: None,
             source_revisions: Vec::new(),
             selected_path: None,
+            file_action: None,
             current_is_visible_working_copy: false,
             surface: ActionSurface::Graph,
         }
@@ -324,7 +408,17 @@ impl ExactActionContext {
     }
 
     pub fn with_selected_path(mut self, path: impl Into<String>) -> Self {
-        self.selected_path = Some(path.into());
+        let path = path.into();
+        if self.is_detail_surface()
+            && let Some(revision) = self.current_revision.clone()
+        {
+            self.file_action = Some(FileActionContext::exact_revision_tracked(
+                revision,
+                path.clone(),
+                true,
+            ));
+        }
+        self.selected_path = Some(path);
         self
     }
 
@@ -358,19 +452,80 @@ impl ExactActionContext {
     }
 }
 
-pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
-    let Some(current_revision) = context.current_revision() else {
-        return ActionMenu::default();
-    };
+impl FileActionContext {
+    fn working_copy_untracked(path: String) -> Self {
+        Self {
+            path,
+            scope: FileActionScope::WorkingCopy,
+            restore_allowed: false,
+            track_allowed: true,
+            untrack_allowed: false,
+            chmod_allowed: false,
+        }
+    }
 
+    fn working_copy_tracked(path: String, restore_allowed: bool, chmod_allowed: bool) -> Self {
+        Self {
+            path,
+            scope: FileActionScope::WorkingCopy,
+            restore_allowed,
+            track_allowed: false,
+            untrack_allowed: true,
+            chmod_allowed,
+        }
+    }
+
+    fn exact_revision_tracked(revision: String, path: String, chmod_allowed: bool) -> Self {
+        Self {
+            path,
+            scope: FileActionScope::ExactRevision(revision),
+            restore_allowed: true,
+            track_allowed: false,
+            untrack_allowed: false,
+            chmod_allowed,
+        }
+    }
+
+    fn path(&self) -> &str {
+        &self.path
+    }
+
+    fn revision(&self) -> Option<&str> {
+        match &self.scope {
+            FileActionScope::WorkingCopy => None,
+            FileActionScope::ExactRevision(revision) => Some(revision),
+        }
+    }
+}
+
+pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     if context.is_status_surface() {
         return context
-            .selected_path()
+            .file_action
+            .as_ref()
             .map(status_path_action_menu)
             .unwrap_or_default();
     }
 
-    let mutation_items = mutation_menu_items(current_revision, context.selected_path(), true);
+    let Some(current_revision) = context.current_revision() else {
+        return context
+            .file_action
+            .as_ref()
+            .map(file_action_menu)
+            .unwrap_or_default();
+    };
+
+    let mut mutation_items = mutation_menu_items(current_revision, context.selected_path(), true);
+    if context.is_detail_surface()
+        && let Some(file_action) = &context.file_action
+    {
+        let file_items = file_action_menu_items(file_action);
+        if context.selected_path().is_some() {
+            mutation_items.splice(1..1, file_items);
+        } else {
+            mutation_items.extend(file_items);
+        }
+    }
 
     if context.is_detail_surface() {
         return ActionMenu::new(mutation_items);
@@ -453,6 +608,10 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
         | ActionKind::Rebase
         | ActionKind::Squash
         | ActionKind::Absorb
+        | ActionKind::FileTrack
+        | ActionKind::FileUntrack
+        | ActionKind::FileChmodExecutable
+        | ActionKind::FileChmodNormal
         | ActionKind::Split => {
             let message = format!("{} {}", label, PREVIEW_REQUIRED_MARKER);
             FollowUp::StatusMessage(message)
@@ -618,18 +777,93 @@ enum ActionSurface {
     Graph,
     Detail,
     Status,
+    File,
 }
 
-fn status_path_action_menu(path: &str) -> ActionMenu {
-    ActionMenu::new(vec![ActionMenuItem {
-        action: ActionKind::Restore,
-        shortcut: ActionKind::Restore.shortcut(),
-        label: format!("restore selected status path {path}"),
+fn status_path_action_menu(file_action: &FileActionContext) -> ActionMenu {
+    let mut items = Vec::new();
+    if file_action.restore_allowed {
+        let path = file_action.path();
+        items.push(ActionMenuItem {
+            action: ActionKind::Restore,
+            shortcut: ActionKind::Restore.shortcut(),
+            label: format!("restore selected status path {path}"),
+            safety_tier: SafetyTier::PreviewFirst,
+            follow_up: FollowUp::RestoreWorkingCopyPath {
+                path: path.to_owned(),
+            },
+        });
+    }
+    items.extend(file_action_menu_items(file_action));
+    ActionMenu::new(items)
+}
+
+fn file_action_menu(file_action: &FileActionContext) -> ActionMenu {
+    ActionMenu::new(file_action_menu_items(file_action))
+}
+
+fn file_action_menu_items(file_action: &FileActionContext) -> Vec<ActionMenuItem> {
+    let mut items = Vec::new();
+    let path = file_action.path();
+    if file_action.track_allowed {
+        items.push(ActionMenuItem {
+            action: ActionKind::FileTrack,
+            shortcut: ActionKind::FileTrack.shortcut(),
+            label: format!("track selected path {path}"),
+            safety_tier: SafetyTier::PreviewFirst,
+            follow_up: FollowUp::FileTrack {
+                path: path.to_owned(),
+            },
+        });
+    }
+    if file_action.untrack_allowed {
+        items.push(ActionMenuItem {
+            action: ActionKind::FileUntrack,
+            shortcut: ActionKind::FileUntrack.shortcut(),
+            label: format!("untrack selected path {path}"),
+            safety_tier: SafetyTier::PreviewFirst,
+            follow_up: FollowUp::FileUntrack {
+                path: path.to_owned(),
+            },
+        });
+    }
+    if file_action.chmod_allowed {
+        items.push(file_chmod_item(
+            ActionKind::FileChmodExecutable,
+            path,
+            file_action.revision(),
+            JjFileChmodMode::Executable,
+        ));
+        items.push(file_chmod_item(
+            ActionKind::FileChmodNormal,
+            path,
+            file_action.revision(),
+            JjFileChmodMode::Normal,
+        ));
+    }
+    items
+}
+
+fn file_chmod_item(
+    action: ActionKind,
+    path: &str,
+    revision: Option<&str>,
+    mode: JjFileChmodMode,
+) -> ActionMenuItem {
+    let scope = revision
+        .map(|revision| format!(" in {}", short_id(revision)))
+        .unwrap_or_default();
+    ActionMenuItem {
+        action,
+        shortcut: action.shortcut(),
+        label: format!("{} selected path {}{}", action.label(), path, scope),
         safety_tier: SafetyTier::PreviewFirst,
-        follow_up: FollowUp::RestoreWorkingCopyPath {
+        follow_up: FollowUp::FileChmod {
             path: path.to_owned(),
+            revision: revision.map(str::to_owned),
+            mode,
         },
-    }])
+    }
 }
 
 fn short_id(id: &str) -> &str {
@@ -951,15 +1185,19 @@ mod tests {
             actions,
             vec![
                 ActionKind::Restore,
+                ActionKind::FileChmodExecutable,
+                ActionKind::FileChmodNormal,
                 ActionKind::Duplicate,
                 ActionKind::Restore,
                 ActionKind::Revert
             ]
         );
         assert_eq!(menu.items()[0].shortcut(), 'p');
-        assert_eq!(menu.items()[1].shortcut(), 'd');
-        assert_eq!(menu.items()[2].shortcut(), 'r');
-        assert_eq!(menu.items()[3].shortcut(), 'v');
+        assert_eq!(menu.items()[1].shortcut(), 'x');
+        assert_eq!(menu.items()[2].shortcut(), 'n');
+        assert_eq!(menu.items()[3].shortcut(), 'd');
+        assert_eq!(menu.items()[4].shortcut(), 'r');
+        assert_eq!(menu.items()[5].shortcut(), 'v');
         assert_eq!(
             menu.item_for_shortcut('p').map(ActionMenuItem::label),
             Some("restore selected path from ccccdddd")
@@ -973,12 +1211,15 @@ mod tests {
     }
 
     #[test]
-    fn status_path_context_offers_only_working_copy_path_restore() {
+    fn status_path_context_offers_working_copy_restore_and_hygiene_actions() {
         let menu = build_action_menu(&ExactActionContext::status_path("src/status.rs"));
 
-        assert_eq!(menu.items().len(), 1);
+        assert_eq!(menu.items().len(), 4);
         assert_eq!(menu.items()[0].action(), ActionKind::Restore);
         assert_eq!(menu.items()[0].shortcut(), 'r');
+        assert_eq!(menu.items()[1].action(), ActionKind::FileUntrack);
+        assert_eq!(menu.items()[2].action(), ActionKind::FileChmodExecutable);
+        assert_eq!(menu.items()[3].action(), ActionKind::FileChmodNormal);
         assert_eq!(
             menu.items()[0].label(),
             "restore selected status path src/status.rs"
@@ -986,6 +1227,19 @@ mod tests {
         assert!(matches!(
             menu.items()[0].follow_up(),
             FollowUp::RestoreWorkingCopyPath { path } if path == "src/status.rs"
+        ));
+    }
+
+    #[test]
+    fn status_untracked_context_offers_only_file_track() {
+        let menu = build_action_menu(&ExactActionContext::status_untracked_path("scratch.txt"));
+
+        assert_eq!(menu.items().len(), 1);
+        assert_eq!(menu.items()[0].action(), ActionKind::FileTrack);
+        assert_eq!(menu.items()[0].shortcut(), 't');
+        assert!(matches!(
+            menu.items()[0].follow_up(),
+            FollowUp::FileTrack { path } if path == "scratch.txt"
         ));
     }
 }

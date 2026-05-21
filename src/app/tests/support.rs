@@ -15,9 +15,9 @@ pub(super) use crate::command::{CommandContext, ViewCommand};
 pub(super) use crate::jj::{
     DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
     JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
-    JjDescribeTarget, JjDuplicatePlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan,
-    JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan,
-    JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
+    JjDescribeTarget, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget,
+    JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan,
+    JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
 };
 pub(super) use crate::tui::Overlay;
@@ -172,6 +172,18 @@ pub(super) fn mock_bookmark_mutation_success(mutation: &JjBookmarkMutationPlan) 
 
 pub(super) fn mock_bookmark_mutation_failure(_: &JjBookmarkMutationPlan) -> Result<String> {
     Err(eyre!("jj bookmark failed: first line\nsecond line"))
+}
+
+pub(super) fn mock_file_mutation_success(mutation: &JjFileMutationPlan) -> Result<String> {
+    Ok(format!(
+        "file {} {}",
+        mutation.kind().label(),
+        mutation.path()
+    ))
+}
+
+pub(super) fn mock_file_mutation_failure(_: &JjFileMutationPlan) -> Result<String> {
+    Err(eyre!("jj file failed: first line\nsecond line"))
 }
 
 pub(super) fn mock_bookmark_mutation_duplicate_name_failure(
@@ -509,6 +521,7 @@ pub(super) fn test_services() -> AppServices {
     services.describe_run = mock_describe_success;
     services.commit_run = mock_commit_success;
     services.bookmark_mutation_run = mock_bookmark_mutation_success;
+    services.file_mutation_run = mock_file_mutation_success;
     services.abandon_preview_load = mock_empty_abandon_preview;
     services.abandon_run = mock_abandon_success;
     services.operation_recovery_run = mock_operation_recovery_success;

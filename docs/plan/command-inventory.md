@@ -113,9 +113,12 @@ or stay deferred until the exact target, preview, and recovery story is obvious.
 - `file show`: `utility screen`. Drill-down from file list.
 - `file search`: `planned`. Useful if scoped well.
 - `file annotate`: `planned`. Later read surface.
-- `file track`: `planned`. Needs exact path ownership from status or file list.
-- `file untrack`: `planned`. Same exact-path requirement as track.
-- `file chmod`: `planned`. Lower-frequency file action.
+- `file track`: `guided flow`. Shipped for exact untracked status `?` paths.
+- `file untrack`: `guided flow`. Shipped for exact tracked working-copy paths from status, file
+  list, and file show; preview states jj requires the path to already be ignored.
+- `file chmod`: `guided flow`. Shipped for exact status/file-list/file-show paths with installed `x`
+  and `n` modes; exact graph-derived file list/show targets pass the exact revision, while direct
+  arbitrary revsets fail closed.
 - `resolve`: `utility screen`. List-first conflict surface.
 
 ## Git And Remote Sync
@@ -147,10 +150,11 @@ Short version:
   `operation diff`.
 - Shipped guided flows: `edit`, `next`, `prev`, `describe`, `commit`, `rebase`, `squash`, `abandon`,
   `restore`, `revert`, `operation restore`, `operation revert`, `absorb`,
-  `bookmark set/create/move/rename/delete/forget/track/untrack`, `undo`, `redo`, `git push`.
+  `bookmark set/create/move/rename/delete/forget/track/untrack`, `file track/untrack/chmod`, `undo`,
+  `redo`, `git push`.
 - Shipped direct actions: `jj git fetch` and `jj new trunk`.
 - Planned utility or guided work: `evolog`, `root`, `workspace`, `split`, `duplicate`, `tag`,
-  `file search`, `file annotate`, `file track/untrack/chmod`.
+  `file search`, `file annotate`.
 - Everything else stays passthrough or deferred until the core loop is strong.
 
 When a command needs native structure, check [`integration-strategy.md`](integration-strategy.md)

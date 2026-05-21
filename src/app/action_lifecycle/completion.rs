@@ -11,9 +11,9 @@ use crate::action_output::ActionOutput;
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::jj::{
-    JjBookmarkMutationPlan, JjCommand, JjCommitPlan, JjDescribePlan, JjDuplicatePlan, JjGitFetch,
-    JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget, JjSplitPlan, JjSplitTarget,
-    LogViewMode,
+    JjBookmarkMutationPlan, JjCommand, JjCommitPlan, JjDescribePlan, JjDuplicatePlan,
+    JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget,
+    JjSplitPlan, JjSplitTarget, LogViewMode,
 };
 use crate::view_state::ViewState;
 
@@ -155,6 +155,41 @@ impl App {
         };
 
         self.mode = InteractionMode::BookmarkMutationPreview {
+            mutation,
+            output: ActionOutput::finished(command_label, result_message, status_context),
+        };
+    }
+
+    pub(in crate::app) fn confirm_file_mutation(
+        &mut self,
+        mutation: JjFileMutationPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        let command_label = mutation.command_label();
+        let result_message = match self.run_file_mutation(&mutation) {
+            Ok(output) => match self.refresh_view_state() {
+                Ok(()) => {
+                    self.view.clamp(viewport_height, current_viewport_width());
+                    let message = format!("{} | jj undo | jj op show -p", output.trim());
+                    self.status = StatusLine::with_message(&self.view, message.as_str());
+                    message
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    format!(
+                        "{} | refresh failed: {error} | jj undo | jj op show -p",
+                        output.trim()
+                    )
+                }
+            },
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                error.to_string()
+            }
+        };
+
+        self.mode = InteractionMode::FileMutationPreview {
             mutation,
             output: ActionOutput::finished(command_label, result_message, status_context),
         };

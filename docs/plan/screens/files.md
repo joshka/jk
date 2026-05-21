@@ -59,12 +59,16 @@ on exact path identity and benefit from established document navigation behavior
 - File list: list paths for a revision, diff, status group, or working-copy context. Movement is by
   path item.
 - File show: open one path in a dedicated document view with search, copy path, and back.
+- Working-copy actions: exact working-copy file list/show paths offer guided untrack and chmod
+  previews. Untrack previews state that jj requires the path to already be ignored.
+- Exact revision actions: graph-derived file list/show paths offer exact-revision chmod previews
+  using the selected change id. Direct arbitrary revsets do not enable chmod.
 - File search: if native, search should be scoped to a revision or path set and return a list of
   matches that can open file show at a line.
 - Annotate: later screen for line provenance; should use semantic line/revision data before it
   becomes native.
-- Actions: track, untrack, chmod, restore-like actions should launch guided flows with previews when
-  they can change state.
+- Actions: track is shipped from status `?` rows; untrack, chmod, and restore-like actions launch
+  guided flows with previews when exact path and revision or working-copy ownership are known.
 - Refresh: preserve selected path when possible.
 
 ## Shortcut Candidates
@@ -73,16 +77,19 @@ on exact path identity and benefit from established document navigation behavior
 - `Enter`, `l`, `Right`: open selected file
 - `/`, `n`, `N`: search
 - `y`: copy path or selected text
-- `t`: track/untrack flow where valid
-- `x`: chmod flow where valid
+- `a`: action menu where valid
+- `t`: track flow in status action menu where valid
+- `u`: untrack flow in action menu where valid
+- `x`/`n`: chmod executable/normal in action menu where valid
 - `r`: refresh
 - `h`, `Left`: back
 
 ## Integration Notes
 
-File inspection can start from rendered output. Track, untrack, chmod, and restore-like actions
-should not rely on loosely parsed file labels when exact paths or fileset behavior matter. Prefer
-structured output, narrow templates, or `jj_lib` before mutation flows expand.
+File inspection can start from rendered output. Shipped track, untrack, chmod, and restore-like
+actions do not pass raw paths as filesets; they use exact paths carried by status, file list, or
+file show state and construct one `root-file:"..."` fileset argument. Prefer structured output,
+narrow templates, or `jj_lib` before mutation flows expand.
 
 The preferred contract exposes exact path, file status, revision context, display label, and
 renderable styled row or document spans together. File list should carry the exact path separately
