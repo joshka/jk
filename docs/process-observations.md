@@ -5,6 +5,54 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Automatic-session status map)
+
+- Slice / task: reconstruct a concise, user-readable list of recent and upcoming work from the
+  tracked docs and jj stack so the automatic session can be understood without reading
+  implementation-specific packet names.
+- Thread id: main orchestration thread; no subagent was used because this was a small documentation
+  and status-synthesis packet.
+- Model / routing: GPT-5 Codex read the status docs and `jj log`, then updated
+  `docs/agent/cleanup-wave-status.md` with a short work map and a process note.
+- Changed files: `docs/agent/cleanup-wave-status.md` and `docs/process-observations.md`.
+- Implementation outcome: `cleanup-wave-status.md` now includes a short list that explains why each
+  recent and upcoming work bucket exists: feature roots, operation-log ownership, view-test moves,
+  app modal dispatch cleanup, action-plan ownership, source-shape audit, likely cleanup targets, and
+  later product workflows.
+- Process observation: automatic orchestration is easier to audit when the repo carries two levels
+  of status: a concise product/task map for humans and a detailed evidence ledger for future agents.
+  Packet names such as "modal text prompt extraction" are useful for review but insufficient for a
+  user returning after hours away.
+- Evidence basis:
+  - Date: `2026-05-21 16:23:50 PDT` from local `date`.
+  - Command: `jj --no-pager log -r 'ancestors(@, 30)'`.
+  - Files: `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/source-cleanup-audit.md`, and this process note.
+
+### 2026-05-21 (Source cleanup audit)
+
+- Slice / task: capture current source-shape measurements and candidate targets in
+  `docs/agent/source-cleanup-audit.md` before more refactoring.
+- Thread id: main orchestration thread; no subagent was used because this was a small documentation
+  and measurement packet.
+- Model / routing: GPT-5 Codex performed the measurement, documentation update, and validation in
+  the main thread.
+- Changed files: `docs/agent/source-cleanup-audit.md`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/agent/cleanup-wave-status.md`.
+- Implementation outcome: the repo now has a concise audit that records largest files, broad
+  visibility count, remaining inline test blocks, app/action-lifecycle match-expression count, and
+  candidate next targets with guidance against line-count-driven refactors.
+- Behavior-preservation evidence: documentation-only packet. It did not alter Rust behavior, command
+  argv, rendered `jj` output, status wording, key handling, refresh/reveal behavior, or tests.
+- Validation trail:
+  - Main-thread validation passed: `just md-check` and `cargo check`.
+- Rework / surprise: `just md-check` requested Panache line wrapping in the new audit; applying the
+  suggested wrapping fixed the Markdown gate.
+- Evidence basis:
+  - Date: `2026-05-21 16:22:11 PDT` from local `date`.
+  - Files: `docs/agent/source-cleanup-audit.md`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/cleanup-wave-status.md`, and this process note.
+
 ### 2026-05-21 (Abandon modal key handler extraction)
 
 - Slice / task: extract named `App` helper methods for only the `AbandonPreview` and

@@ -7,6 +7,9 @@ nominate places to read first; they do not mandate refactors.
 For a concise human-readable map of recent work, current focus, likely next work, and process
 observations, see [`cleanup-wave-status.md`](cleanup-wave-status.md).
 
+For current mechanical measurements and candidate cleanup targets, see
+[`source-cleanup-audit.md`](source-cleanup-audit.md).
+
 Before starting a source-shape packet, gather fresh measurements and read the owning module. Prefer
 product work and local documentation improvements over movement that only changes line counts.
 
@@ -105,6 +108,18 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 source cleanup audit:
+
+- `docs/agent/source-cleanup-audit.md` now records current source-shape measurements: total Rust
+  lines, broad visibility count, remaining inline test blocks, and a simple match-expression count
+  for app dispatch/action-lifecycle hotspots.
+- The audit turns mechanical measurements into candidate targets rather than an automatic refactor
+  queue. It explicitly separates small helper inline tests from larger feature/shared modules that
+  should be read before a split.
+- The packet intentionally changed documentation only and did not alter Rust behavior, command argv,
+  rendered `jj` output, status wording, key handling, or tests.
+- Validation passed: `just md-check` and `cargo check`.
 
 2026-05-21 abandon modal key handler extraction:
 
