@@ -118,6 +118,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 file and resolve directory-root conversion:
+
+- A third safe subset of existing `foo.rs` plus `foo/` pairs moved to `foo/mod.rs` without content
+  changes: `files`, `files/list`, `files/show`, `resolve`, and `app/tests`.
+- The packet continues applying the epage module-layout rule to existing split modules while
+  preserving coherent file-view and resolve-view roots.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `action_menu`, `app`,
+  `app/action_lifecycle`, `app/mode_input`, `bookmarks`, `graph`, `jj`, `jj_actions`,
+  `operation_log`, and `tui`.
+- The packet intentionally changed module paths only and did not alter Rust behavior, command argv,
+  rendered `jj` output, status wording, key handling, selection behavior, refresh/reveal behavior,
+  public API, or tests.
+- Validation passed: `cargo check`; `cargo test files -- --test-threads=1`;
+  `cargo test resolve -- --test-threads=1`;
+  `cargo test app::tests::command_navigation -- --test-threads=1`;
+  `rustup run nightly cargo fmt --check`; and `just md-check`.
+
 2026-05-21 nested module directory-root conversion:
 
 - A second safe subset of existing nested `foo.rs` plus `foo/` pairs moved to `foo/mod.rs` without

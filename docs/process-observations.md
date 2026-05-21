@@ -5,6 +5,35 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (File and resolve directory-root conversion)
+
+- Slice / task: convert coherent file, resolve, and app-test `foo.rs` plus `foo/` pairs to
+  `foo/mod.rs` after the nested module-root conversion.
+- Thread id: `019e4cf2-28b6-75e2-ada6-259ab694f46d` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the path-only source move in the
+  `Adopt file and resolve module roots` jj change; the main thread reviewed that the source diff was
+  path-only, refreshed tracking docs, and reran validation.
+- Changed source roots: `files`, `files/list`, `files/show`, `resolve`, and `app/tests`.
+- Implementation outcome: those modules now use directory roots such as `src/files/list/mod.rs`
+  instead of `src/files/list.rs` plus `src/files/list/`.
+- Behavior-preservation evidence: the source diff for the moved roots is path-only with zero content
+  changes. Runtime behavior, command argv, rendered `jj` output, status wording, key handling,
+  selection behavior, refresh/reveal behavior, public API, and tests are unchanged.
+- Process observation: GPT-5.4 mini handled this path-only conversion cleanly. The remaining
+  `foo.rs` plus `foo/` pairs are now larger roots where a useful `mod.rs` probably requires
+  extracting topical child files rather than just moving the whole file.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `cargo test files -- --test-threads=1`;
+    `cargo test resolve -- --test-threads=1`;
+    `cargo test app::tests::command_navigation -- --test-threads=1`; and
+    `rustup run nightly cargo fmt --check`.
+  - Main-thread validation passed: the same focused checks; `rustup run nightly cargo fmt --check`;
+    and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:51:17 PDT` from local `date`.
+  - Files: moved source roots listed above, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/cleanup-wave-status.md`, and this process note.
+
 ### 2026-05-21 (Nested module directory-root conversion)
 
 - Slice / task: convert narrow nested `foo.rs` plus `foo/` pairs to `foo/mod.rs` after the first
