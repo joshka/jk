@@ -5,6 +5,43 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (File show view test split)
+
+- Slice / task: move inline tests from `src/file_show.rs` into `src/file_show/tests.rs` while
+  preserving file-show projection behavior, exact path copy behavior, search behavior, refresh clamp
+  behavior, wrap and horizontal scroll behavior, public API, and runtime behavior.
+- Thread id: `019e4cb5-f0aa-76c2-87b8-e9aa64da2d57` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex implemented the bounded maintainability packet in the current
+  existing jj change. The user explicitly prohibited version-control commands, and no `jj` or `git`
+  commands were run.
+- Changed files: `src/file_show.rs`, `src/file_show/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/file_show.rs` now ends with `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/file_show/tests.rs` and use Rust child-module privacy through `use super::*;`.
+  The production file measured 484 lines before the split and 341 lines after it, with 142 lines of
+  tests now in the child module.
+- Behavior-preservation evidence: the packet moved the existing eight file-show tests without
+  changing their names, assertions, helper functions, imports, file-show projection behavior, exact
+  path copy behavior, search behavior, refresh clamp behavior, wrap and horizontal scroll behavior,
+  public API, or runtime behavior.
+- Scope boundary: the packet did not change `sticky_file_view.rs`, `show.rs`, `diff.rs`,
+  `rendered_jj.rs`, shared document mechanics, visibility, or production file-show code beyond the
+  test module declaration.
+- Validation trail:
+  - Worker validation passed: `cargo test file_show -- --test-threads=1` with 16 passed and 551
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test file_show -- --test-threads=1` with 16 passed
+    and 551 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: no Rust behavior or formatting rework was needed. The first Markdown check
+  reported only Panache wrapping differences in the new notes; applying those wraps fixed the gate.
+- Evidence basis:
+  - Date: `2026-05-21 15:44:30 PDT` from local `date`.
+  - Main review date: `2026-05-21 15:48:14 PDT` from local `date`.
+  - Files: `src/file_show.rs`, `src/file_show/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Rendered jj document test split)
 
 - Slice / task: move the inline `src/rendered_jj.rs` tests into `src/rendered_jj/tests.rs` while

@@ -103,6 +103,24 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 file show view test split:
+
+- `src/file_show.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/file_show/tests.rs` with `use super::*;` for private access to file-show view state.
+- This improves local readability by keeping file-show projection, exact path copy behavior, search,
+  refresh clamping, wrap, and horizontal scroll behavior visible without scrolling through 142 lines
+  of inline tests. The production file measured 484 lines before the split and 341 lines after it.
+- The packet intentionally preserved all eight file-show test names, assertions, helper functions,
+  imports, file-show projection behavior, exact path copy behavior, search behavior, refresh clamp
+  behavior, wrap and horizontal scroll behavior, public API, and runtime behavior.
+- Focused validation covered `cargo test file_show -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Main-thread review validation reran the same focused checks successfully with 16 passed and 551
+  filtered out for `cargo test file_show -- --test-threads=1`.
+- Rework was limited to moving the extracted test block into a Rust child module; no production
+  file-show code changed beyond replacing the inline test block with the sibling test module
+  declaration.
+
 2026-05-21 rendered jj document test split:
 
 - `src/rendered_jj.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
