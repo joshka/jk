@@ -5,6 +5,29 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Source maintainability ledger refresh)
+
+- Slice / task: refresh `docs/agent/source-maintainability-ledger.md` after the current cleanup
+  packets.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Model / routing: the main thread orchestrated the packet; a `gpt-5.5 xhigh` read-only audit
+  supplied evidence; a `gpt-5.4-mini` worker edited the ledger; main-thread review caught a
+  visibility-versus-match count mix-up and a priority that re-opened closed app/command contract
+  work.
+- Evidence basis: `just largest-rust-files` currently reports `src/jj_actions.rs` at `3557` and
+  `src/jj_rows.rs` at `2145`; the visibility scan found `283` public or restricted Rust items and
+  `162` restricted-visibility lines; the module-doc scan found only `src/main.rs` missing a leading
+  module doc; `docs/agent/architecture.md` still has sticky-file-view show/diff-only wording that
+  drifts from source usage.
+- Outcome: the ledger now separates visibility counts from match hotspots, marks the central
+  app/command contract docs as closed, records the active sticky_file_view architecture drift, and
+  adds `src/jj.rs` compatibility re-export cleanup as a future slice.
+- Validation trail: the worker ran `just md-check` after the corrections; the main thread ran
+  `just md-check` again and it passed.
+- Model note: `gpt-5.4-mini` handled the bounded doc edit but needed review correction on evidence
+  classification and active-versus-completed scope; `gpt-5.5 xhigh` provided useful file-backed
+  follow-up targets in read-only audit mode.
+
 ### 2026-05-20 (Fetch exact-pattern stale test repair)
 
 - Slice / task: repair fetch test expectations that still asserted unquoted remote pattern form

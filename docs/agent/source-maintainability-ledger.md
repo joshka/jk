@@ -5,48 +5,45 @@ findings that name an owning concept, a concrete risk, and a proof path. Use it 
 [`architecture.md`](architecture.md), [`rust-style.md`](rust-style.md), and the repo-local
 development guidance before starting broad source-shape work.
 
-The evidence in this file comes from the 2026-05-20 source audit, `just largest-rust-files`, and
-direct reads of the cited source files. The quality bar is grounded in these reviewed `../practice`
-sources:
-
-- `src/content/guides/rust-maintainability.md`
-- `src/content/guides/documentation-workflow.md`
-- `src/content/guides/code-shape.md`
-- `src/content/patterns/reader-locality.md`
-- `src/content/patterns/strengthen-cohesion.md`
+The evidence in this file comes from the 2026-05-20 source audit, `just largest-rust-files`, direct
+reads of the cited source files, and the copied `../practice` guidance on reader-first Rust, code
+shape, documentation workflow, and agent workflow.
 
 ## Quality Bar
 
-- Favor reader-first Rust: reduce the number of concepts, fields, jumps, and hidden invariants a
-  maintainer must hold at once.
-- Improve cohesion by moving data, rules, and transitions toward the named concept that changes for
-  the same reason.
-- Preserve reader locality. Extract helpers only when the new name and location reduce live context;
-  keep weak helpers near the caller.
-- Separate structure from behavior. Source-shape cleanup should be behavior-preserving unless the
-  change explicitly owns a user-visible behavior.
-- Treat docs as contracts. Module comments and Rustdoc should state current behavior, current
-  ownership, side effects, and lifecycle constraints.
-- Keep follow-up slices bounded. A large file is a signal to inspect ownership, not a reason to
-  split by line count.
+- Favor reader locality and low cognitive burden. Reduce the number of concepts, fields, branches,
+  and hidden invariants a maintainer must hold at once.
+- Keep ownership vertical and cohesive. Move data, rules, and transitions toward the concept that
+  changes for the same reason.
+- Preserve rendered `jj` output, argv shape, status wording, selection behavior, key handling, and
+  refresh semantics unless the slice explicitly owns that behavior.
+- Separate structure from behavior. Source-shape cleanup should stay behavior-preserving unless the
+  change explicitly owns a user-visible contract.
+- Treat docs as contracts. Module comments and Rustdoc should state current ownership, side effects,
+  lifecycle constraints, and selection or refresh rules.
+- Measure before editing. Use current file-size, visibility, and hotspot scans to choose the next
+  slice instead of splitting by line count alone.
 
 ## Current Concept Map
 
-- Command contracts: `src/command.rs` owns key binding metadata plus `Command`, `ViewCommand`,
-  `CommandContext`, and `ViewEffect`.
-- App mode and screens: `src/app_screen.rs` owns `InteractionMode` and overlay/status projection;
+- Recent completed packets: `Add packet quality gate`, `Audit source maintainability surface`,
+  `Factor action completion outcomes`, `Repair stale source ownership docs`,
+  `Document app command contracts`, `Fail closed on row metadata drift`, and
+  `Extract jj syntax helpers`.
+- Command and app contracts: `src/command.rs` owns key binding metadata plus `Command`,
+  `ViewCommand`, `CommandContext`, and `ViewEffect`; `src/app_screen.rs` owns `InteractionMode`; and
   `src/app/mode_input.rs` owns modal and prompt key reducers.
-- App services: `src/app/services.rs` owns `AppServices`, the app side-effect boundary used by tests
-  and app orchestration.
-- Action lifecycle: `src/app/action_lifecycle/entry.rs`, `completion.rs`, and
-  `rewrite_completion.rs` own guided action dispatch, result handling, refresh, reveal, and status
+- App services: `src/app/services.rs` owns the app side-effect boundary used by tests and app
+  orchestration.
+- Action lifecycle: `src/app/action_lifecycle/{entry,completion,rewrite_completion,shared}.rs` owns
+  guided action dispatch, shared outcome helpers, refresh and reveal policy, and status/result
   construction.
 - Action planning: `src/jj_actions.rs` owns preview-first action plans, command argv construction,
   preview summaries, and fallback result wording.
-- Rendered rows: `src/jj_rows.rs` owns rendered-row loading, metadata pairing, and row grouping for
-  graph-adjacent utility views.
-- Command execution and view specs: `src/jj.rs` owns shared `jj` process helpers, `ViewSpec`, direct
-  command construction, and navigation target provenance.
+- Row metadata pairing: `src/jj_rows.rs` owns rendered-row loading, fail-closed metadata pairing,
+  and row grouping for graph-adjacent utility views.
+- Syntax helpers: `src/jj_syntax.rs` owns pure `jj` syntax helpers extracted from
+  `src/jj_actions.rs`.
 - Document mechanics: `src/sticky_file_view.rs` owns sticky document scrolling, file anchors, file
   jumping, and search for rendered file-oriented documents.
 - Shared chrome: `src/tui.rs` owns shared layout, status/header rendering, overlays, and modal
@@ -59,116 +56,169 @@ sources:
 `just largest-rust-files` reported these largest source files:
 
 ```text
-3601 src/jj_actions.rs
-1836 src/jj_rows.rs
+3557 src/jj_actions.rs
+2145 src/jj_rows.rs
 1477 src/bookmarks.rs
 1458 src/jj.rs
-1245 src/action_menu.rs
-1235 src/command.rs
+1254 src/command.rs
+1246 src/action_menu.rs
 1217 src/graph.rs
 1192 src/app/tests/bookmark_actions.rs
 1134 src/tui.rs
+819 src/status.rs
+778 src/app/tests/working_copy_actions.rs
+734 src/app/mode_input.rs
+730 src/app/action_lifecycle/preview.rs
+711 src/view_state.rs
+704 src/sticky_file_view.rs
 ```
 
 The maintainability question is not "split the largest files." The question is whether a future
-change must keep unrelated facts live at the same time. `src/jj_actions.rs`, `src/jj_rows.rs`, and
-`src/jj.rs` are the first places to inspect when action planning, rendered-row metadata, or command
-construction starts mixing concepts.
+change must keep unrelated facts live at the same time. `src/jj_actions.rs`, `src/jj_rows.rs`,
+`src/jj.rs`, `src/bookmarks.rs`, `src/command.rs`, `src/action_menu.rs`, `src/graph.rs`, and
+`src/sticky_file_view.rs` are the first places to inspect when action planning, row pairing, command
+construction, or selection-preserving view behavior starts mixing concepts.
 
-### Stale Or Narrow Docs
+### Visibility Surface
 
-- `src/action_menu.rs` still describes "future graph mutation preparation", but the module now owns
-  active status, file, and operation action surfaces.
-- `src/command.rs` says help and status text live in `tui.rs`, while command metadata owns much of
-  the help/status vocabulary.
-- `src/interactive_process.rs` says it has no app call site, but app services now wire it into app
-  behavior.
-- `src/sticky_file_view.rs` says show/diff only, while status and operation detail surfaces also use
-  the shared document mechanics.
+Current broad `rg` scans found 283 public or restricted Rust items and 162 restricted-visibility
+lines. The counts below are measurement-only, not a design judgment.
 
-These are documentation-contract bugs. Fix them in source comments or Rustdoc as narrow docs-only
-patches when touching the owning module.
+- `src/jj_actions.rs`: 34
+- `src/app/services.rs`: 29
+- `src/jj_rows.rs`: 19
+- `src/command.rs`: 17
+- `src/jj.rs`: 16
+- `src/sticky_file_view.rs`: 15
+- `src/action_menu.rs`: 10
+- `src/interactive_process.rs`: 8
+- `src/theme.rs`: 7
+- `src/tui.rs`: 6
+
+### Match Hotspots
+
+Current match and control-flow hotspot scans found these counts. The counts below are
+measurement-only, not a design judgment.
+
+- `src/jj_actions.rs`: 48
+- `src/app/mode_input.rs`: 31
+- `src/command.rs`: 28
+- `src/app/action_lifecycle/completion.rs`: 27
+- `src/app/action_lifecycle/preview.rs`: 26
+- `src/view_state.rs`: 22
+- `src/bookmarks.rs`: 19
+
+### Closed Documentation Drift
+
+The previous broad missing-module-doc finding is no longer active. A fresh scan only found
+`src/main.rs` missing a `//!` module doc in the first eight lines. The central app and command
+contract gaps are also closed by the `Document app command contracts` packet: `Command`,
+`ViewCommand`, `CommandContext`, `ViewEffect`, `InteractionMode`, `AppServices`, and
+`PendingCommand` are no longer active ledger gaps.
+
+### Active Documentation Drift
+
+`docs/agent/architecture.md` still describes `src/sticky_file_view.rs` as show/diff-only, but the
+current source usage includes status, file-show, and operation-detail surfaces. That doc should be
+narrowed before the next ownership-oriented packet.
 
 ### Weak Or Missing Intent Docs
 
-The audit found important contracts that are visible in code but not yet explained strongly enough
+The audit still found important contracts that are visible in code but not explained strongly enough
 for non-linear readers:
 
-- `Command`, `ViewCommand`, `CommandContext`, and `ViewEffect` in `src/command.rs`
-- `InteractionMode` in `src/app_screen.rs`
 - action plan and value types in `src/jj_actions.rs`
-- `AppServices` in `src/app/services.rs`
-- private invariants such as `StatusPathContract`, `BookmarkMetadataCoverage`, `PlainDocument`, and
-  `PendingCommand`
+- private invariants such as `StatusPathContract`, `BookmarkMetadataCoverage`, and `PlainDocument`
+- `src/main.rs` missing a `//!` module doc in the first eight lines, if full module-doc coverage is
+  worth keeping on the ledger
 
 These do not need broad public API documentation. They need short ownership and invariant comments
 near the type that future edits are likely to land on first.
 
 ### Repeated Or High-Live-Context Surfaces
 
-- `handle_mode_key_event_with_terminal` in `src/app/mode_input.rs` carries many modal key paths in
-  one control-flow surface.
-- `apply_action_menu_item` in `src/app/action_lifecycle/entry.rs` maps many action menu variants to
-  preview, prompt, run, or status behavior.
-- `completion.rs` and `rewrite_completion.rs` repeat confirm/run/refresh/reveal/status-result
-  construction.
-- Graph, status, file, resolve, bookmark, operation, and workspace screens repeat
-  identity-preserving list-view mechanics.
+- `src/app/mode_input.rs` still carries many modal key paths in one control-flow surface.
+- `src/app/action_lifecycle/{completion,rewrite_completion,preview,shared}.rs` now share outcome
+  helpers, but `preview.rs` still repeats pending, finished, and status-context patterns.
+- `src/jj_actions.rs` still mixes preview-first plans, argv construction, preview summaries, and
+  fallback wording even after `src/jj_syntax.rs` absorbed the pure syntax helpers.
+- Graph, bookmarks, file list, resolve, operation log, status, and workspaces still repeat
+  identity-preserving list mechanics around `Selection`, `clamp`, selected identity, and
+  refresh-preserves tests.
 
 Do not jump from these findings to a generic list abstraction or a broad `jj_actions.rs` split. Use
-one bounded behavior-preserving slice at a time, and prove that the new owner reduces live context.
+one bounded, behavior-preserving slice at a time, and prove that the new owner reduces live context.
 
 ## Prioritized Corrective Slices
 
-### 1. Action Completion Outcome Helper
+### 1. Remaining Contract Drift Sweep
 
-- Owner: `src/app/action_lifecycle`, likely a small `shared.rs` used by `completion.rs` and
-  `rewrite_completion.rs`.
-- Purpose: collapse repeated result construction after confirmed actions: run command, refresh,
-  reveal target when applicable, and build the status/result screen.
-- Non-goals: no behavior changes, no action menu redesign, no `jj_actions.rs` split, and no generic
-  list abstraction.
-- Proof: focused app action-lifecycle tests for existing completion and rewrite-completion flows,
-  plus `cargo check`, focused working-copy and bookmark action tests, and `just md-check` if docs
-  change.
+- Owner: `docs/agent/architecture.md`, `src/jj_actions.rs`, `src/jj_rows.rs`,
+  `src/sticky_file_view.rs`, and `src/main.rs` only if full module-doc coverage is still a tracked
+  policy.
+- Purpose: repair the sticky-file-view architecture drift and document the remaining action-plan,
+  row-metadata, and private invariant contracts without re-opening already closed app/command
+  contract work.
+- Non-goals: no visibility changes, no API reshaping, and no behavior changes.
+- Proof: `cargo check`; focused tests only if wording changes affect generated help, status labels,
+  doctests, or the module-doc policy.
 
-### 2. Repair Stale Source Comments
+### 2. App Mode Input Readability
 
-- Owner: the module that owns each stale comment: `src/action_menu.rs`, `src/command.rs`,
-  `src/interactive_process.rs`, and `src/sticky_file_view.rs`.
-- Purpose: make module comments describe current ownership and call sites so future agents do not
-  route work through outdated assumptions.
-- Non-goals: no code movement and no behavior changes.
-- Proof: `rustup run nightly cargo fmt --check`; `cargo check`; focused tests only if comments are
-  edited near doctests or examples.
+- Owner: `src/app/mode_input.rs`.
+- Purpose: make the modal and prompt key reducers easier to read without changing mode behavior,
+  especially around the dense key-event dispatch path.
+- Non-goals: no new input modes, no binding redesign, and no command coverage changes.
+- Proof: focused mode-input tests for current key paths, plus `cargo check`.
 
-### 3. Document Central App And Command Contracts
-
-- Owner: `src/command.rs`, `src/app_screen.rs`, `src/app/services.rs`, and `src/app.rs` for
-  `PendingCommand`.
-- Purpose: add short Rustdoc or private comments for the mode, command, effect, and service
-  contracts that future dispatch changes must preserve.
-- Non-goals: no visibility changes, no API reshaping, and no new command behavior.
-- Proof: `cargo check`; focused command/help tests if wording changes affect generated help or
-  status labels.
-
-### 4. Name Action-Plan Cohesion Before Splitting
+### 3. Action Planning Cohesion
 
 - Owner: `src/jj_actions.rs`.
-- Purpose: identify which plan/value clusters change together before extracting any submodule.
+- Purpose: identify which plan and value clusters change together before extracting any submodule.
   Candidate clusters include preview-first mutation plans, file mutation plans, bookmark plans, and
   operation recovery plans.
 - Non-goals: no mechanical line-count split and no public facade churn.
-- Proof: a docs or source-comment inventory first; then a behavior-preserving extraction with
+- Proof: a source-comment or inventory pass first; then behavior-preserving extraction with
   command-construction tests for each moved cluster.
 
-### 5. Inventory Identity-Preserving List Mechanics
+### 4. Vertical Ownership For Rows, Views, And Actions
 
-- Owner: the concrete list views first: graph, status, file, resolve, bookmarks, operation log, and
-  workspaces.
-- Purpose: name the shared invariants around preserving selection by identity across refresh,
-  search, filtering, and content shrink.
+- Owner: `src/jj_rows.rs`, `src/bookmarks.rs`, `src/graph.rs`, `src/status.rs`, `src/file_list.rs`,
+  `src/resolve.rs`, `src/operation_log.rs`, and `src/workspaces.rs`.
+- Purpose: move repeated selection, identity, and refresh contracts toward the view that owns the
+  behavior instead of letting those rules spread horizontally.
 - Non-goals: no generic list abstraction until at least two follow-up edits prove the same contract
   needs a shared owner.
-- Proof: view-level tests that show selection preservation and clamping on refresh/content shrink
-  for each touched screen.
+- Proof: view-level tests that show selection preservation and clamping on refresh or shrink for
+  each touched screen.
+
+### 5. Identity-Preserving List Mechanics
+
+- Owner: the concrete list views first, then any shared helper only if repeated proof shows it is
+  worth centralizing.
+- Purpose: name the shared invariants around preserving selection by identity across refresh,
+  search, filtering, and content shrink.
+- Non-goals: no broad abstraction before the contract is named and tested in the owning views.
+- Proof: snapshots or focused tests showing the selected identity is preserved, clamped, or
+  intentionally cleared on each screen.
+
+### 6. Retire Or Narrow `src/jj.rs` Compatibility Re-exports
+
+- Owner: `src/jj.rs`.
+- Purpose: retire or narrow compatibility re-exports so source ownership matches direct imports from
+  `src/jj_actions.rs` and `src/jj_rows.rs`.
+- Acceptance criteria: source and test imports refer to `jj_actions` and `jj_rows` directly; the
+  remaining `jj.rs` surface keeps only the helpers it still owns; and any leftover re-export is
+  justified by an explicit compatibility need.
+- Non-goals: no behavior changes and no broad module reshuffle.
+- Proof: source import audit, focused compile pass, and follow-up cleanup of any now-redundant
+  compatibility path.
+
+### 7. Quality Gate Refinements
+
+- Owner: `docs/agent/source-maintainability-ledger.md` and the measurement commands that feed it.
+- Purpose: keep the next audit mechanical by refreshing `just largest-rust-files`, the visibility
+  scan, and the module-doc scan before each new packet.
+- Non-goals: no source behavior work and no broad guidance rewrite.
+- Proof: rerun the measurement commands, update the ledger, and record the results in
+  `docs/process-observations.md`.
