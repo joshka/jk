@@ -28,6 +28,7 @@ visibility and control-flow scans, and direct reads of the cited source files to
 - `Rewrite Action Plan Submodule`
 - `Action Preview Pane Construction Helper`
 - `Git Sync Action-Plan Cluster`
+- `Working-Copy Action Plan Cluster`
 - `View Action-Target Projection Policy`
 - `Simple Selection Restore Helper`
 - `Retired src/jj.rs Compatibility Re-exports`
@@ -95,19 +96,7 @@ show a sharper bounded packet there than the ones below.
 
 ## Current Next Slices
 
-### 1. Working-Copy Action Plan Cluster
-
-- Owner: `src/jj_actions.rs`
-- Purpose: move the working-copy creation and movement packet into one owner: `JjNewPlan`,
-  `JjDuplicatePlan`, `JjSplitPlan`, `JjSplitTarget`, and `JjWorkingCopyNavigationPlan`. These types
-  share the same graph-selection-versus-`@` contract, preview/result wording style, and "reveal the
-  resulting change or fall back honestly" boundary.
-- Non-goals: no bookmark, rewrite, abandon, restore/revert, or completion-policy redesign; no app
-  call-site churn; no argv or preview wording drift.
-- Proof: focused `jj_actions`, `working_copy_actions`, and command-navigation coverage, plus
-  `cargo check`, `cargo clippy -- -D warnings`, and `just md-check`.
-
-### 2. Operation Recovery And Target Plan Cluster
+### 1. Operation Recovery And Target Plan Cluster
 
 - Owner: `src/jj_actions.rs`
 - Purpose: give global undo/redo and exact operation restore/revert a focused home:
@@ -120,7 +109,7 @@ show a sharper bounded packet there than the ones below.
 - Proof: focused operation action tests through the stable `jj_actions` import path, plus
   `cargo check`, `cargo clippy -- -D warnings`, and `just md-check`.
 
-### 3. Help Projection Policy Packet
+### 2. Help Projection Policy Packet
 
 - Owner: `src/command.rs`
 - Purpose: isolate the context-conditioned help policy currently concentrated in `help_metadata`,
@@ -131,7 +120,7 @@ show a sharper bounded packet there than the ones below.
 - Proof: focused command/help projection tests, especially context-specific visibility cases, plus
   `cargo check` and `just md-check`.
 
-### 4. File And Status Path Action-Menu Policy
+### 3. File And Status Path Action-Menu Policy
 
 - Owner: `src/action_menu.rs`
 - Purpose: isolate the path-scoped action-menu rules currently mixed across `ExactActionContext`,

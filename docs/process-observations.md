@@ -5,6 +5,42 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Working-copy action-plan cluster extraction)
+
+- Slice / task: implement the ledger slice `Working-Copy Action Plan Cluster` on current jj change
+  `Extract working-copy action plans`.
+- Thread id: `019e4988-13f7-7662-8450-f6d3fd1aded2`.
+- Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
+  extraction for main-thread review.
+- Files changed: `src/jj_actions.rs`, `src/jj_actions/working_copy.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_actions/working_copy.rs` now owns `JjNewPlan`, `JjDuplicatePlan`,
+  `JjSplitTarget`, `JjSplitPlan`, `JjWorkingCopyNavigationKind`, and `JjWorkingCopyNavigationPlan`,
+  together with their argv/preview/run implementations and the focused working-copy unit tests.
+  `src/jj_actions.rs` keeps the stable facade through a local `working_copy` submodule declaration
+  plus `pub use` re-exports.
+- Behavior intent: preserve working-copy argv shape, preview wording, fallback wording, labels,
+  split interactive behavior, graph-selection-versus-`@` contracts, and existing app call sites
+  exactly while reducing live context in `src/jj_actions.rs`.
+- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test working_copy_actions -- --test-threads=1`;
+  `cargo test command_navigation -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test working_copy_actions -- --test-threads=1`;
+  `cargo test command_navigation -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check` all passed.
+- Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
+  largest-file output showed `src/jj_actions.rs` at 1435 lines and `src/jj_actions/working_copy.rs`
+  at 639 lines.
+- Issue / rework note: none so far; record main-thread reruns here if review finds anything.
+- Evidence basis:
+  - Date: `2026-05-21` from the turn environment
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
+    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/working_copy.rs`, and
+    `src/app/tests/working_copy_actions.rs`
+
 ### 2026-05-21 (Maintainability queue reassessment after bookmark and rewrite slices)
 
 - Slice / task: reassess the maintainability ledger on current jj change
