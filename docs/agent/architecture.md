@@ -91,12 +91,14 @@ Keep modules aligned with user-visible concepts:
 - `command.rs` owns binding metadata and the command/effect vocabulary shared between app-level
   dispatch and individual views.
 - `jj_actions.rs` owns preview-first `jj` action and mutation plans, including argv construction,
-  labels, preview summaries, exact revset/fileset quoting, direct run methods, and fallback result
-  wording for user-confirmed mutation flows.
+  labels, preview summaries, direct run methods, and fallback result wording for user-confirmed
+  mutation flows.
 - `jj.rs` owns view-spec command construction, direct process helpers, diff-format arguments, and
   command/navigation target provenance. It re-exports action-plan and row-loading types for
   compatibility, but action-plan behavior should stay in `jj_actions.rs` and rendered-row behavior
   should stay in `jj_rows.rs`.
+- `jj_syntax.rs` owns exact revset/fileset/string quoting helpers and argv label helpers shared by
+  `jj_actions.rs` and related command builders.
 - `jj_rows.rs` owns selectable rendered row models, row loaders, narrow metadata templates, metadata
   pairing, row grouping, resolve-entry parsing, file-list path preservation, and conversion from
   rendered ANSI output into Ratatui row items. It may call the `jj.rs` process helpers, but it
@@ -105,8 +107,9 @@ Keep modules aligned with user-visible concepts:
   navigation.
 - `show.rs` and `diff.rs` own their view behavior and should stay distinct even when they share
   document mechanics.
-- `sticky_file_view.rs` owns shared show/diff document scrolling, file jumping, sticky heading
-  projection, and document search.
+- `sticky_file_view.rs` owns shared rendered-file document mechanics for show, diff, status,
+  file-show, and operation-detail surfaces: sticky heading projection, file jumping, scroll state,
+  search, and render helpers.
 - `rendered_jj.rs` owns lightweight structure over rendered jj lines, including file heading
   detection and sticky projection inputs.
 - `search.rs`, `selection.rs`, `copy.rs`, and `clipboard.rs` own narrow support concepts and should

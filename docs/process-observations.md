@@ -5,6 +5,19 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Remaining contract drift repair)
+
+- Slice / task: repair the remaining contract drift without behavior changes by updating the
+  architecture docs and the missing `src/main.rs` module doc.
+- Thread id: `019e4926-b587-75b0-a61e-8b6f6efc8214`.
+- Model / routing: `gpt-5.4-mini` handled the bounded doc edit; the main thread reviewed the result
+  and requested the correction.
+- Files changed: `docs/agent/architecture.md`, `src/main.rs`, and `docs/process-observations.md`.
+- Validation trail: `just md-check` passed; `cargo check` passed;
+  `rustup run nightly cargo fmt --check` passed.
+- Residual risk: doc wording can still drift if future source ownership changes without a matching
+  architecture update.
+
 ### 2026-05-20 (Source maintainability ledger refresh)
 
 - Slice / task: refresh `docs/agent/source-maintainability-ledger.md` after the current cleanup
