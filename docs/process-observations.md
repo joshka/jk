@@ -5,6 +5,37 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (View action-target policy extraction)
+
+- Slice / task: implement prioritized slice 3 from `docs/agent/source-maintainability-ledger.md`,
+  `View Action-Target Projection Policy`, on current jj change `Group view action targets`.
+- Thread id: `019e4956-7963-71e1-9f7a-c94f9253a403`.
+- Model / routing: a `gpt-5.5` worker/subagent implemented the extraction and the main thread
+  reviewed it.
+- Files changed: `src/main.rs`, `src/view_state.rs`, `src/view_action_targets.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/view_action_targets.rs` now owns the action-target projection policy
+  for push targets, bookmark targets, selected local bookmark names, bookmark forget targets, and
+  exact restore/revert contexts. `src/view_state.rs` keeps the existing public methods as thin
+  delegates and remains the app-facing view routing owner.
+- Behavior intent: preserve action destinations, exactness rules, error strings, and existing app
+  call sites exactly.
+- Worker validation trail passed: `cargo test view_state -- --test-threads=1`;
+  `cargo test detail_restore_actions -- --test-threads=1`;
+  `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and
+  `just md-check`.
+- Main-thread validation after review passed: `cargo test view_state -- --test-threads=1`;
+  `cargo test detail_restore_actions -- --test-threads=1`;
+  `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; and full `just check` passed with 533 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 00:03:28 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `src/view_state.rs`, and app action test filters for detail restore, sync, and bookmarks
+
 ### 2026-05-20 (Git sync action-plan extraction)
 
 - Slice / task: implement prioritized slice 2 from `docs/agent/source-maintainability-ledger.md`,

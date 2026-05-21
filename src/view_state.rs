@@ -21,8 +21,9 @@ use crate::operation_log::OperationLogView;
 use crate::resolve::ResolveView;
 use crate::search::SearchQuery;
 use crate::show::ShowView;
-use crate::status::{StatusFileAction, StatusView};
+use crate::status::StatusView;
 use crate::tui::StatusHints;
+use crate::view_action_targets::ViewActionTargets;
 use crate::workspaces::WorkspacesView;
 
 /// The currently active top-level view.
@@ -308,202 +309,27 @@ impl ViewState {
     }
 
     pub fn push_target(&self) -> Result<Option<JjGitPushTarget>> {
-        match self {
-            Self::Graph(view) => view
-                .selected_revision()
-                .map(|revision| JjGitPushTarget::Revision(revision.to_owned()))
-                .map_or_else(
-                    || {
-                        Err(color_eyre::eyre::eyre!(
-                            "push from graph requires a selected row with an exact revision"
-                        ))
-                    },
-                    |target| Ok(Some(target)),
-                ),
-            Self::Bookmarks(view) => view
-                .selected_bookmark_name()
-                .map(|name| JjGitPushTarget::Bookmark(name.to_owned()))
-                .map_or_else(
-                    || {
-                        Err(color_eyre::eyre::eyre!(
-                            "selected bookmark has no target name for push"
-                        ))
-                    },
-                    |target| Ok(Some(target)),
-                ),
-            Self::Status(_) => Ok(Some(JjGitPushTarget::Status)),
-            Self::Show(_)
-            | Self::Diff(_)
-            | Self::Resolve(_)
-            | Self::FileList(_)
-            | Self::FileShow(_)
-            | Self::Workspaces(_)
-            | Self::OperationLog(_)
-            | Self::OperationDetail(_) => Ok(None),
-        }
+        ViewActionTargets::new(self).push_target()
     }
 
     pub fn bookmark_target(&self) -> Result<Option<JjBookmarkTarget>> {
-        match self {
-            Self::Graph(view) => view
-                .selected_revision()
-                .map(|revision| JjBookmarkTarget::exact_change(revision.to_owned()))
-                .map_or_else(
-                    || {
-                        Err(color_eyre::eyre::eyre!(
-                            "bookmark mutation from graph requires a selected row with an exact revision"
-                        ))
-                    },
-                    |target| Ok(Some(target)),
-                ),
-            Self::Status(_) => Ok(Some(JjBookmarkTarget::current_working_copy())),
-            Self::Show(_)
-            | Self::Diff(_)
-            | Self::Resolve(_)
-            | Self::FileList(_)
-            | Self::FileShow(_)
-            | Self::Bookmarks(_)
-            | Self::Workspaces(_)
-            | Self::OperationLog(_)
-            | Self::OperationDetail(_) => Ok(None),
-        }
+        ViewActionTargets::new(self).bookmark_target()
     }
 
     pub fn selected_local_bookmark_name(&self) -> Result<Option<&str>> {
-        self.selected_local_bookmark_name_for("delete")
+        ViewActionTargets::new(self).selected_local_bookmark_name()
     }
 
     pub fn selected_local_bookmark_name_for(&self, action: &str) -> Result<Option<&str>> {
-        match self {
-            Self::Bookmarks(view) => view.selected_local_bookmark_name().map_or_else(
-                || {
-                    Err(color_eyre::eyre::eyre!(
-                        "{} requires a selected exact local bookmark",
-                        action
-                    ))
-                },
-                |name| Ok(Some(name)),
-            ),
-            Self::Graph(_)
-            | Self::Show(_)
-            | Self::Diff(_)
-            | Self::Status(_)
-            | Self::Resolve(_)
-            | Self::FileList(_)
-            | Self::FileShow(_)
-            | Self::Workspaces(_)
-            | Self::OperationLog(_)
-            | Self::OperationDetail(_) => Ok(None),
-        }
+        ViewActionTargets::new(self).selected_local_bookmark_name_for(action)
     }
 
     pub fn bookmark_forget_target(&self) -> Result<Option<(String, JjBookmarkForgetTarget)>> {
-        match self {
-            Self::Bookmarks(view) => view
-                .selected_bookmark_forget_target()
-                .map(|target| target.map(|(name, forget_target)| (name.to_owned(), forget_target))),
-            Self::Graph(_)
-            | Self::Show(_)
-            | Self::Diff(_)
-            | Self::Status(_)
-            | Self::Resolve(_)
-            | Self::FileList(_)
-            | Self::FileShow(_)
-            | Self::Workspaces(_)
-            | Self::OperationLog(_)
-            | Self::OperationDetail(_) => Ok(None),
-        }
+        ViewActionTargets::new(self).bookmark_forget_target()
     }
 
     pub fn exact_restore_revert_context(&self) -> Result<Option<ExactActionContext>> {
-        match self {
-            Self::Graph(_) => Ok(None),
-            Self::Show(view) => view
-                .spec()
-                .exact_change_target()
-                .map(ExactActionContext::detail)
-                .map(Some)
-                .ok_or_else(|| {
-                    color_eyre::eyre::eyre!(
-                        "restore/revert from {} requires an exact graph-derived revision target",
-                        view.spec().app_label()
-                    )
-                }),
-            Self::Diff(view) => view
-                .spec()
-                .exact_change_target()
-                .map(ExactActionContext::detail)
-                .map(Some)
-                .ok_or_else(|| {
-                    color_eyre::eyre::eyre!(
-                        "restore/revert from {} requires an exact graph-derived revision target",
-                        view.spec().app_label()
-                    )
-                }),
-            Self::FileList(view) => {
-                let Some(path) = view.selected_path() else {
-                    return Err(color_eyre::eyre::eyre!(
-                        "file action from {} requires a selected exact path",
-                        view.spec().app_label()
-                    ));
-                };
-                if let Some(revision) = view.spec().exact_change_target() {
-                    return Ok(Some(
-                        ExactActionContext::detail(revision).with_selected_path(path),
-                    ));
-                }
-                if view.spec().target().is_none() {
-                    return Ok(Some(ExactActionContext::working_copy_file_path(path)));
-                }
-                Err(color_eyre::eyre::eyre!(
-                    "file actions from {} require a working-copy file list or exact graph-derived revision target",
-                    view.spec().app_label()
-                ))
-            }
-            Self::FileShow(view) => {
-                let path = view.path();
-                if path.is_empty() {
-                    return Err(color_eyre::eyre::eyre!(
-                        "file action from {} requires a selected exact path",
-                        view.spec().app_label()
-                    ));
-                }
-                if let Some(revision) = view.spec().exact_change_target() {
-                    return Ok(Some(
-                        ExactActionContext::detail(revision).with_selected_path(path),
-                    ));
-                }
-                if view.spec().target().is_none() {
-                    return Ok(Some(ExactActionContext::working_copy_file_path(path)));
-                }
-                Err(color_eyre::eyre::eyre!(
-                    "file actions from {} require a working-copy file show or exact graph-derived revision target",
-                    view.spec().app_label()
-                ))
-            }
-            Self::Status(view) => {
-                let action = view
-                    .selected_file_action()
-                    .map_err(|message| color_eyre::eyre::eyre!(message))?;
-                Ok(Some(status_file_action_context(action)))
-            }
-            Self::Resolve(_)
-            | Self::Bookmarks(_)
-            | Self::Workspaces(_)
-            | Self::OperationLog(_)
-            | Self::OperationDetail(_) => Ok(None),
-        }
-    }
-}
-
-fn status_file_action_context(action: StatusFileAction) -> ExactActionContext {
-    match action {
-        StatusFileAction::Track { path } => ExactActionContext::status_untracked_path(path),
-        StatusFileAction::Tracked {
-            path,
-            restore_allowed,
-            chmod_allowed,
-        } => ExactActionContext::status_tracked_path(path, restore_allowed, chmod_allowed),
+        ViewActionTargets::new(self).exact_restore_revert_context()
     }
 }
 

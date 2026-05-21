@@ -31,6 +31,7 @@ mod status;
 mod sticky_file_view;
 mod theme;
 mod tui;
+mod view_action_targets;
 mod view_state;
 mod workspaces;
 

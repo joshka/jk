@@ -168,14 +168,17 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 - Proof: `cargo test jj_actions -- --test-threads=1` keeps the moved git sync tests discoverable
   through the `jj_actions` module path.
 
-### 3. View Action-Target Projection Policy
+### 3. Completed: View Action-Target Projection Policy
 
-- Owner: `src/view_state.rs`.
-- Purpose: group the action-target projection rules that decide how view commands turn into the next
-  detail screen.
-- Non-goals: no graph/search redesign and no new navigation model.
-- Proof: focused view-state tests that show the current action target mapping still produces the
-  same destinations.
+- Status: completed in the current packet.
+- Result: `src/view_action_targets.rs` owns push targets, bookmark mutation targets, selected local
+  bookmark names, bookmark forget targets, and exact restore/revert action contexts. `ViewState`
+  keeps the stable app-facing methods as thin delegates, so view operation routing remains in
+  `src/view_state.rs`.
+- Non-goals preserved: no graph/search redesign, no new navigation model, no call-site churn, and no
+  behavior or error wording drift.
+- Proof: focused view-state and app action tests preserve the current action target mapping and
+  destinations.
 
 ### 4. Documentation Drift Cleanup
 
