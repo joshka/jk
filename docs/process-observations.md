@@ -4568,6 +4568,43 @@ belong here.
     `docs/plan/progress.md`, `docs/plan/command-inventory.md`, `docs/plan/screens/files.md`,
     `docs/plan/screens/status.md`
 
+### 2026-05-21 (Help projection policy extraction)
+
+- Slice / task: extract generated help projection policy from `src/command.rs` into a coherent
+  owning module.
+- Thread id: `019e4998-a104-7ea2-a236-59b96048e5a1`.
+- Model / routing: Codex main thread. A subagent callable was not exposed in this session, so the
+  main thread performed orchestration, implementation, and review with focused validation instead.
+- Implementation outcome: `src/help.rs` now owns `HelpContext`, `HelpSectionKind`, `HelpRow`,
+  `HelpSection`, `project_help`, row collection, command visibility, and help metadata.
+  `src/main.rs` declares the module, and `src/command.rs` re-exports the caller-facing help API
+  while keeping binding matching and help-mode prefix matching local.
+- Maintainability evidence: `src/command.rs` dropped from 1255 lines before the slice to 632 lines
+  after extraction; `src/help.rs` is 642 lines including the moved projection tests. The only shared
+  helper crossing back into `command.rs` is `command_is_visible_in_help`.
+- Test ownership outcome: help projection tests moved to `src/help.rs`; the help binding-match test
+  stayed in `src/command.rs` because it exercises binding matching with help visibility.
+- Rework / surprise: `cargo check` surfaced one unused production re-export for `HelpSectionKind`.
+  The re-export was narrowed to `#[cfg(test)]` because production callers do not need it, while
+  existing tests keep their compatibility path.
+- Process observation: running cargo validation commands in parallel caused file-lock waits and made
+  output harder to scan. Future validation should run cargo checks sequentially when clean, fast
+  output matters.
+- Validation trail:
+  - `cargo test command -- --test-threads=1` passed with 86 passed.
+  - `cargo test command_navigation -- --test-threads=1` passed with 35 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - `just check` passed with 533 passed / 2 ignored and reported the largest-file list with
+    `src/command.rs` at 632 lines and `src/help.rs` at 642 lines.
+- Evidence basis:
+  - Date: `2026-05-21` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/help.rs`, `src/command.rs`, `src/main.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (App refactor audit before Packet 39)
 
 - A prior gpt-5.5 high read-only audit found no blocking app refactor needed before Packet 39. The

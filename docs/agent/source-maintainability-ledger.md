@@ -83,10 +83,11 @@ Cheap token scans over production files found these current hotspots:
 
 - `src/jj_actions.rs`: 62
 - `src/app/mode_input.rs`: 58
-- `src/command.rs`: 55
 - `src/jj.rs`: 50
 - `src/action_menu.rs`: 43
+- `src/command.rs`: 40
 - `src/app/action_lifecycle/completion.rs`: 34
+- `src/help.rs`: 32
 - `src/jj_rows.rs`: 30
 - `src/app.rs`: 30
 - `src/tui.rs`: 29
@@ -99,14 +100,16 @@ show a sharper bounded packet there than the ones below.
 
 ### 1. Help Projection Policy Packet
 
-- Owner: `src/command.rs`
-- Purpose: isolate the context-conditioned help policy currently concentrated in `help_metadata`,
-  `view_help_metadata`, `collect_help_rows`, and `project_help`. This is a sharp vertical slice
-  because it changes when bindings are documented, not when key matching or dispatch changes.
+- Status: completed on 2026-05-21 in the Codex main thread.
+- Owner: `src/help.rs`
+- Outcome: `src/help.rs` owns `HelpContext`, help sections and rows, generated help projection,
+  context visibility, and the `help_metadata` / `view_help_metadata` policy. `src/command.rs`
+  remains focused on command vocabulary, key labels, binding matching, and help-mode prefix matching
+  through the narrow `command_is_visible_in_help` helper.
 - Non-goals: no key binding changes, no dispatch changes, no `ViewEffect` changes, and no TUI help
   layout redesign in `src/tui.rs`.
-- Proof: focused command/help projection tests, especially context-specific visibility cases, plus
-  `cargo check` and `just md-check`.
+- Proof: focused command/help projection tests, especially context-specific visibility cases,
+  `cargo check`, `just md-check`, and final `just check` with 533 passed / 2 ignored.
 
 ### 2. File And Status Path Action-Menu Policy
 
