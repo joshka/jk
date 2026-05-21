@@ -37,6 +37,7 @@ together with [`architecture.md`](architecture.md) and [`rust-style.md`](rust-st
 - `Documentation Drift Cleanup`
 - `Help Projection Policy Packet`
 - `File And Status Path Action-Menu Policy`
+- `Graph Revision Action-Menu Policy Packet`
 - `ViewSpec Navigation Provenance Packet`
 
 Those packets closed the previous bookmark-, rewrite-, help-, and path-heavy queue. The next work
@@ -147,8 +148,9 @@ should have an owner and a contract, not a line-count target.
 - Owner: `src/action_menu/path_actions.rs`
 - Outcome: `src/action_menu/path_actions.rs` owns `FileActionContext`, its working-copy and exact
   revision scopes, status path menu construction, file path menu construction, chmod item
-  construction, and the focused path-action policy tests. `src/action_menu.rs` keeps the shared
-  action vocabulary and the broad `ExactActionContext` routing surface.
+  construction, and the focused path-action policy tests. `src/action_menu.rs` kept the shared
+  action vocabulary and the broad `ExactActionContext` routing surface until the revision packet
+  below moved that routing into its own owner.
 - Maintainability evidence: `src/action_menu.rs` dropped from 1246 lines in the reassessment
   snapshot to 1028 lines after extraction, and the new `src/action_menu/path_actions.rs` is 246
   lines including moved tests.
@@ -156,6 +158,26 @@ should have an owner and a contract, not a line-count target.
   preview execution changes, and no new action vocabulary.
 - Proof: focused action-menu, file-action, and detail-restore tests, plus `cargo check`,
   `cargo clippy -- -D warnings`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+
+### Graph Revision Action-Menu Policy Packet
+
+- Status: completed on 2026-05-21 in a Codex worker/subagent.
+- Owner: `src/action_menu/revision_actions.rs`
+- Outcome: `src/action_menu/revision_actions.rs` owns `ExactActionContext`, graph/detail/status/file
+  surface routing, multi-revision role-prompt item construction, single-revision action ordering,
+  detail selected-path insertion policy, and revision mutation item construction.
+  `src/action_menu.rs` keeps shared action vocabulary, prompt vocabulary, `FollowUp`,
+  `ActionMenuItem`, `ActionMenu`, the public `ExactActionContext` re-export, the public
+  `build_action_menu` facade, and the shared `short_id` helper used by path and revision policy.
+- Maintainability evidence: `src/action_menu.rs` dropped from 1028 lines after the path extraction
+  to 302 lines after this packet, while the new `src/action_menu/revision_actions.rs` is 743 lines
+  including moved tests. `src/action_menu/path_actions.rs` remains 246 lines and unchanged in
+  ownership.
+- Non-goals preserved: no label, shortcut, safety-tier, role-prompt wording, follow-up payload, path
+  action policy, action execution, or app lifecycle behavior changes.
+- Proof: focused `cargo test action_menu -- --test-threads=1` passed with graph, path, app, and TUI
+  action-menu tests; `cargo test detail_restore_actions -- --test-threads=1` passed; final gate
+  commands are recorded in `docs/process-observations.md`.
 
 ### Operation Row Metadata Packet
 
@@ -229,26 +251,7 @@ should have an owner and a contract, not a line-count target.
 - Proof: focused row-family tests for any chosen packet, plus `cargo check`,
   `rustup run nightly cargo fmt --check`, and `just md-check`.
 
-### 2. Graph Revision Action-Menu Policy Packet
-
-- Owner: `src/action_menu.rs`, with a likely `src/action_menu/revision_actions.rs` or
-  `graph_actions.rs` split if the boundary remains sharp during implementation.
-- Purpose: separate graph/detail revision action policy from shared action vocabulary. The parent
-  should keep `ActionKind`, `FollowUp`, `ActionMenuItem`, `ActionMenu`, and prompt vocabulary while
-  the revision policy owns `ExactActionContext`, graph versus detail surface handling,
-  multi-revision role prompts, and revision mutation item ordering.
-- Evidence: after the path extraction, `src/action_menu.rs` is 1028 lines. The remaining dense area
-  is not path policy; it is the graph/detail routing in `build_action_menu`, `ExactActionContext`,
-  `menu_item_for_new_parents`, `menu_item_for_split`, `menu_item_for_multirev_action`,
-  `menu_item_for_absorb`, and `mutation_menu_items`.
-- Non-goals: do not alter labels, shortcuts, safety tiers, role-prompt wording, follow-up payloads,
-  path action policy in `path_actions.rs`, or action execution in `jj_actions.rs` and
-  `app/action_lifecycle.rs`.
-- Proof: focused `cargo test action_menu -- --test-threads=1`, graph action-menu tests, detail
-  restore/action tests, plus `cargo check`, `rustup run nightly cargo fmt --check`, and
-  `just md-check`.
-
-### 3. Status Hint Projection Packet
+### 2. Status Hint Projection Packet
 
 - Owner: `src/tui.rs`, with a likely `src/tui/status_hints.rs` split if the module shape allows it
   without broad churn.

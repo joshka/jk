@@ -5,6 +5,56 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Graph revision action-menu extraction)
+
+- Slice / task: extract graph/detail revision action-menu policy from broad `src/action_menu.rs`.
+- Thread id: `019e49c1-6f14-73b1-889c-70456eaee022`.
+- Model / routing: GPT-5 Codex worker/subagent with medium reasoning implemented the extraction. The
+  main thread reviewed and validated the result. The user explicitly prohibited jj/git commands, so
+  the work used direct file reads, local measurements, and validation commands without
+  source-control inspection.
+- Files changed: `src/action_menu.rs`, `src/action_menu/revision_actions.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/action_menu/revision_actions.rs` now owns `ExactActionContext`,
+  graph/detail/status/file surface routing, multi-revision role-prompt item construction,
+  single-revision action ordering, detail selected-path insertion policy, revision mutation item
+  construction, and the focused revision action-menu tests. `src/action_menu.rs` keeps shared action
+  and prompt vocabulary, follow-up payload types, `ActionMenuItem`, `ActionMenu`, the public
+  `ExactActionContext` re-export, the public `build_action_menu` facade, and the shared `short_id`
+  helper used by both path and revision policy.
+- Behavior intent: preserve labels, shortcuts, safety tiers, role-prompt wording, follow-up
+  payloads, path action policy, action execution, and app lifecycle behavior exactly.
+- Maintainability evidence: `wc -l` over `src/action_menu.rs`,
+  `src/action_menu/revision_actions.rs`, and `src/action_menu/path_actions.rs` showed
+  `src/action_menu.rs` at 302 lines, `src/action_menu/revision_actions.rs` at 743 lines, and
+  `src/action_menu/path_actions.rs` at 246 lines after the extraction.
+- Rework / surprise: the split boundary was sharper than the packet's fallback option, so the new
+  module took the whole exact-revision policy while the parent retained only the public facade and
+  shared vocabulary. No behavior rework was needed after the focused action-menu tests; the only
+  rework was Panache wrapping in the new docs entries.
+- Validation trail:
+  - `cargo test action_menu -- --test-threads=1` passed with 40 passed.
+  - `cargo test detail_restore_actions -- --test-threads=1` passed with 19 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed. The command still printed the repo's existing
+    rustfmt unstable-option warnings.
+  - `just md-check` passed after applying Panache wrapping to the edited docs.
+- Main-thread review validation passed: `cargo test action_menu -- --test-threads=1` with 40 passed;
+  `cargo test detail_restore_actions -- --test-threads=1` with 19 passed;
+  `cargo test graph::tests::open_action_menu -- --test-threads=1` with 5 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 543 passed / 2 ignored, and
+  its largest-file output included `src/action_menu/revision_actions.rs` at 743 lines and no longer
+  listed `src/action_menu.rs` in the top 20.
+- Evidence basis:
+  - Date: `2026-05-21 02:03:10 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/architecture.md`, `docs/agent/rust-style.md`, `src/action_menu.rs`, and
+    `src/action_menu/path_actions.rs`
+
 ### 2026-05-21 (Workspace row loading extraction)
 
 - Slice / task: extract workspace rendered row loading and workspace metadata pairing from broad
