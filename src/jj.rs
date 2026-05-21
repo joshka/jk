@@ -1384,7 +1384,7 @@ mod tests {
         );
         assert_eq!(
             JjGitFetch::for_remote("origin").command_argv(),
-            vec!["git", "fetch", "--remote", "exact:origin"]
+            vec!["git", "fetch", "--remote", "exact:\"origin\""]
         );
     }
 

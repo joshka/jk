@@ -1034,7 +1034,7 @@ mod tests {
     #[test]
     fn action_output_overlay_renders_common_preview_title_and_footer() {
         let output = ActionOutput::pending(
-            "jj git fetch --remote exact:origin".to_owned(),
+            "jj git fetch --remote exact:\"origin\"".to_owned(),
             "fetch preview".to_owned(),
             None,
         );
@@ -1052,7 +1052,7 @@ mod tests {
         });
 
         assert!(rendered.contains("Fetch preview"));
-        assert!(rendered.contains("command: jj git fetch --remote exact:origin"));
+        assert!(rendered.contains("command: jj git fetch --remote exact:\"origin\""));
         assert!(rendered.contains("Enter confirm  Esc/q cancel"));
         assert!(!rendered.contains("type exact id"));
     }

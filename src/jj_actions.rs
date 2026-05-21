@@ -15,6 +15,9 @@ use crate::jj::{
     ColorMode, base_command, interactive_jj_command, run_direct_args, run_direct_args_stdout,
     summarize_output,
 };
+use crate::jj_syntax::{
+    command_label_from_argv, exact_change_id_revset, exact_string_pattern, root_file_fileset,
+};
 
 const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 
@@ -253,14 +256,12 @@ impl JjGitFetch {
     }
 
     pub fn exact_remote_pattern(&self) -> Option<String> {
-        self.remote
-            .as_deref()
-            .map(|remote| format!("exact:{remote}"))
+        self.remote.as_deref().map(exact_string_pattern)
     }
 
     pub fn command_label(&self) -> String {
-        let label_args = self.command_argv().join(" ");
-        format!("jj {label_args}")
+        let command_argv = self.command_argv();
+        command_label_from_argv(&command_argv)
     }
 
     pub fn command_argv(&self) -> Vec<String> {
@@ -2296,38 +2297,6 @@ impl JjAbandonPlan {
     }
 }
 
-fn exact_change_id_revset(change_id: &str) -> String {
-    format!(
-        "exactly(change_id({}), 1)",
-        revset_string_literal(change_id)
-    )
-}
-
-fn root_file_fileset(path: &str) -> String {
-    format!("root-file:{}", revset_string_literal(path))
-}
-
-fn revset_string_literal(value: &str) -> String {
-    let mut quoted = String::with_capacity(value.len() + 2);
-    quoted.push('"');
-    for character in value.chars() {
-        match character {
-            '\\' => quoted.push_str("\\\\"),
-            '"' => quoted.push_str("\\\""),
-            '\n' => quoted.push_str("\\n"),
-            '\r' => quoted.push_str("\\r"),
-            '\t' => quoted.push_str("\\t"),
-            _ => quoted.push(character),
-        }
-    }
-    quoted.push('"');
-    quoted
-}
-
-fn exact_string_pattern(value: &str) -> String {
-    format!("exact:{}", revset_string_literal(value))
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjAbandonPreview {
     revision: String,
@@ -3285,22 +3254,6 @@ mod tests {
     }
 
     #[test]
-    fn exact_change_id_revset_quotes_literal_prefix() {
-        assert_eq!(
-            exact_change_id_revset("abc\"\\"),
-            "exactly(change_id(\"abc\\\"\\\\\"), 1)"
-        );
-    }
-
-    #[test]
-    fn root_file_fileset_quotes_spaces_quotes_backslashes_and_metacharacters() {
-        assert_eq!(
-            root_file_fileset("a b/\"c\"/d\\e[f]{g}(h)|i?*"),
-            "root-file:\"a b/\\\"c\\\"/d\\\\e[f]{g}(h)|i?*\""
-        );
-    }
-
-    #[test]
     fn file_track_uses_root_file_fileset_after_double_dash() {
         let plan = JjFileMutationPlan::track("-leading dir/quo\"te\\[glob]?*.rs");
 
@@ -3532,17 +3485,20 @@ mod tests {
 
         assert_eq!(
             fetch.command_argv(),
-            vec!["git", "fetch", "--remote", "exact:origin"]
+            vec!["git", "fetch", "--remote", "exact:\"origin\""]
         );
-        assert_eq!(fetch.command_label(), "jj git fetch --remote exact:origin");
+        assert_eq!(
+            fetch.command_label(),
+            "jj git fetch --remote exact:\"origin\""
+        );
         assert_eq!(
             fetch.exact_remote_pattern().as_deref(),
-            Some("exact:origin")
+            Some("exact:\"origin\"")
         );
         assert!(
             fetch
                 .preview_summary()
-                .contains("remote pattern: exact:origin")
+                .contains("remote pattern: exact:\"origin\"")
         );
     }
 

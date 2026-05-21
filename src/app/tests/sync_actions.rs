@@ -69,17 +69,17 @@ fn fetch_remote_prompt_selects_remote_for_preview() {
     assert!(!output.completed());
     assert_eq!(
         output.command_label(),
-        "jj git fetch --remote exact:upstream"
+        "jj git fetch --remote exact:\"upstream\""
     );
     assert_eq!(
         output.status_context().map(String::as_str),
-        Some("fetch targets exact remote 'upstream' with pattern exact:upstream")
+        Some("fetch targets exact remote 'upstream' with pattern exact:\"upstream\"")
     );
     assert!(
         output
             .body_lines()
             .join("\n")
-            .contains("remote pattern: exact:upstream")
+            .contains("remote pattern: exact:\"upstream\"")
     );
 }
 
@@ -98,7 +98,10 @@ fn fetch_remote_skips_prompt_for_single_remote() {
         _ => panic!("expected fetch preview"),
     };
     assert!(!output.completed());
-    assert_eq!(output.command_label(), "jj git fetch --remote exact:origin");
+    assert_eq!(
+        output.command_label(),
+        "jj git fetch --remote exact:\"origin\""
+    );
 }
 
 #[test]
@@ -167,7 +170,10 @@ fn fetch_preview_enter_runs_remote_fetch_and_keeps_result_output() {
         _ => panic!("expected fetch result"),
     };
     assert!(output.completed());
-    assert_eq!(output.command_label(), "jj git fetch --remote exact:origin");
+    assert_eq!(
+        output.command_label(),
+        "jj git fetch --remote exact:\"origin\""
+    );
     assert!(output.body_lines().join("\n").contains("fetched origin"));
 }
 
@@ -183,7 +189,7 @@ fn fetch_failure_keeps_error_output() {
     assert!(matches!(app.status.kind(), StatusKind::Error));
     assert_eq!(
         app.status.message(),
-        "jj git fetch --remote exact:origin failed: denied"
+        "jj git fetch --remote exact:\"origin\" failed: denied"
     );
     let output = match &app.mode {
         InteractionMode::FetchPreview { output, .. } => output,
@@ -194,7 +200,7 @@ fn fetch_failure_keeps_error_output() {
         output
             .body_lines()
             .join("\n")
-            .contains("jj git fetch --remote exact:origin failed: denied")
+            .contains("jj git fetch --remote exact:\"origin\" failed: denied")
     );
 }
 

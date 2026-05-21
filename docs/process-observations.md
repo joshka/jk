@@ -5,6 +5,46 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Fetch exact-pattern stale test repair)
+
+- Slice / task: repair fetch test expectations that still asserted unquoted remote pattern form
+  (`exact:origin`) after `jj` syntax helper extraction introduced shared quoted exact-pattern
+  rendering (`exact:"origin"`).
+- 5.5 read-only review follow-up: a final stale-reference sweep found `exact:origin` still present
+  in `src/tui.rs` and `docs/plan/progress.md`; this cleanup updated those references to
+  `exact:"origin"`.
+- Thread id: `019e4903-836a-7852-9032-f07a9d26e6b0`.
+- Main-thread validation note: `just check` on `main` failed after the extraction because
+  `src/app/tests/sync_actions.rs` and `src/jj.rs` still expected the old unquoted form.
+- Outcome: updated the stale command-label, status-message, and command-arg assertions to the quoted
+  exact-pattern form so fetch-related tests match production command construction.
+- Validation trail: `cargo test sync_actions -- --test-threads=1`;
+  `cargo test fetch_command_args_are_stable -- --test-threads=1`;
+  `cargo test tui -- --test-threads=1`; `just md-check`; main-thread `just check` passed with 529
+  tests / 2 ignored after the stale progress and TUI references were updated.
+- Evidence basis:
+  - Date: `2026-05-20 22:30:42 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/app/tests/sync_actions.rs`, `src/jj.rs`, `src/tui.rs`, `docs/plan/progress.md`, and
+    `docs/process-observations.md`
+
+### 2026-05-20 (JJ syntax helper extraction)
+
+- Slice / task: extract pure `jj` syntax helpers from `src/jj_actions.rs` into a dedicated
+  `src/jj_syntax.rs` owner module.
+- Thread id: `019e4900-9038-7a72-8493-bdda2ac1f215`.
+- Implementation outcome: `src/jj_syntax.rs` now owns exact change revsets, `root-file` fileset
+  literals, exact string patterns, and a small argv display-label helper; `src/jj_actions.rs`
+  imports those helpers, and `JjGitFetch::exact_remote_pattern` now reuses the shared exact-string
+  pattern builder.
+- Validation trail: `cargo test jj_syntax -- --test-threads=1`;
+  `cargo test jj_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; main-thread `just check` passed after the
+  stale fetch expectations were repaired in a follow-up.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Files: `src/jj_syntax.rs`, `src/jj_actions.rs`, `src/main.rs`, and
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Connector-prefixed revision metadata repair)
 
 - Slice / task: close the review gap where graph-prefixed revision rows were still rejected when the
@@ -3113,8 +3153,8 @@ belong here.
   `docs/development/rules/testing.md`, `docs/development/rules/review.md`, and
   `~/.codex/guides/rust-maintainability.md`.
 - Observable outcome: `src/jj_actions.rs` now has a `JjGitFetch` plan that distinguishes default
-  `jj git fetch` from remote-specific `jj git fetch --remote exact:<remote>`, with preview wording
-  that exposes the selected remote and exact pattern.
+  `jj git fetch` from remote-specific fetch. The current argv uses `--remote` plus
+  `exact:"<remote>"`, with preview wording that exposes the selected remote and exact pattern.
 - Observable outcome: `src/app.rs`, `src/app/action_lifecycle.rs`, `src/app/action_flow.rs`,
   `src/app/mode_input.rs`, `src/app_screen.rs`, and `src/tui.rs` now route default fetch results,
   remote-list selection, remote fetch preview, confirmation, result output, cancellation, and
@@ -3126,9 +3166,10 @@ belong here.
   after fetch execution moved to `JjGitFetch`; removing that helper kept the new implementation from
   adding another dead-code warning. A later focused-test command used two Cargo filters at once and
   was rerun as two separate commands.
-- Disposable proof: `/tmp/jk-fetch-proof.gmwDVS` proved installed `jj 0.41.0` accepts
-  `--remote exact:origin` and `--remote exact:upstream` in a repo with two remotes, and a separate
-  no-remote repo preserves the warning/error output for a nonmatching exact remote.
+- Disposable proof: `/tmp/jk-fetch-proof.gmwDVS` originally proved installed `jj 0.41.0` accepted
+  the exact remote string-pattern form in a repo with two remotes, and a separate no-remote repo
+  preserved the warning/error output for a nonmatching exact remote. The later syntax-helper
+  extraction normalized fetch to the shared quoted form, `exact:"<remote>"`.
 - Validation run during implementation:
   - `cargo check`
   - `cargo test fetch -- --nocapture`

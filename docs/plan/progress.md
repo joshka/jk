@@ -1529,9 +1529,9 @@
   directly, multiple remotes open a keyboard remote picker, and no-remotes or remote-list failures
   produce readable status plus a completed output overlay.
 - Command contract: `JjGitFetch` owns default and remote-specific fetch argv construction. Remote
-  fetch passes `--remote exact:<remote>` so selected names from `jj git remote list` are not treated
-  as implicit glob patterns, and the preview/result context shows both the selected remote and exact
-  pattern.
+  fetch passes the argv value `--remote` plus `exact:"<remote>"` so selected names from
+  `jj git remote list` are not treated as implicit glob patterns, and the preview/result context
+  shows both the selected remote and exact pattern.
 - Coverage: focused app tests cover direct default fetch result output, graph `gf`, graph `gr`,
   global remote-fetch help metadata, one-remote skip, multi-remote selection, no-remote and
   remote-list errors, remote preview confirmation, fetch failure output, refresh-failure output, and
@@ -1539,11 +1539,11 @@
   remote-list parser.
 - Disposable proof: `/tmp/jk-fetch-proof.gmwDVS` created bare `origin` and `upstream` remotes,
   cloned them through `jj git clone`, added the second remote with `jj git remote add`, and proved
-  `jj --no-pager git fetch`, `jj --no-pager git fetch --remote exact:origin`, and
-  `jj --no-pager git fetch --remote exact:upstream`. A no-remote `/tmp` repo proved
-  `jj --no-pager git remote list` emits no rows and `jj --no-pager git fetch --remote exact:origin`
-  preserves the warning and error text: `No matching remotes for names: origin` and
-  `No git remotes to fetch from`.
+  `jj --no-pager git fetch`, `jj --no-pager git fetch --remote 'exact:"origin"'`, and
+  `jj --no-pager git fetch --remote 'exact:"upstream"'`. A no-remote `/tmp` repo proved
+  `jj --no-pager git remote list` emits no rows and
+  `jj --no-pager git fetch --remote 'exact:"origin"'` preserves the warning and error text:
+  `No matching remotes for names: origin` and `No git remotes to fetch from`.
 - Validation:
   - `cargo check` passed with the existing dead-code warnings for `FileShowView::new`,
     `ViewSpec::bookmarks`, and `FileListItem::row_text`.
