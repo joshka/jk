@@ -5,6 +5,55 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Modal menu key handler extraction)
+
+- Slice / task: extract named `App` helper methods for menu-like `InteractionMode` arms in
+  `src/app/mode_input.rs` while keeping `handle_active_mode_key` as the active-mode dispatch table.
+- Thread id: `019e4cc9-680d-7933-b8bc-b8d6e867ee14` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex performed the bounded maintainability packet in the existing
+  `Extract modal menu key handlers` jj working copy change. The user explicitly prohibited
+  version-control commands, and no `jj` or `git` commands were run.
+- Changed files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: the `CopyMenu`, `ViewMenu`, `ActionMenu`, `RolePrompt`,
+  `PushRemotePrompt`, and `FetchRemotePrompt` arms now dispatch to named helpers:
+  `handle_copy_menu_key`, `handle_view_menu_key`, `handle_action_menu_key`,
+  `handle_role_prompt_key`, `handle_push_remote_prompt_key`, and `handle_fetch_remote_prompt_key`.
+- Behavior-preservation evidence: the helper bodies preserve the same reducer calls, selected-index
+  mutation, normal-mode exits, preview openings, clipboard behavior, status wording, remote
+  selection errors, and shortcut handling from the former inline match arms.
+- Scope boundary: the packet did not alter reducers, app-screen projection, command bindings, action
+  lifecycle, status wording, key behavior, prompt behavior, tests, or files outside the requested
+  target scope.
+- Validation trail:
+  - Requested command rejected with Cargo's `unexpected argument 'app::tests::sync_actions'`:
+
+    ```sh
+    cargo test app::tests::command_navigation app::tests::sync_actions app::tests::bookmark_actions app::tests::file_actions -- --test-threads=1
+    ```
+
+  - Focused replacement validation passed:
+    `cargo test app::tests::command_navigation -- --test-threads=1` with 35 passed and 532 filtered
+    out; `cargo test app::tests::sync_actions -- --test-threads=1` with 20 passed and 547 filtered
+    out; `cargo test app::tests::bookmark_actions -- --test-threads=1` with 27 passed and 540
+    filtered out; and `cargo test app::tests::file_actions -- --test-threads=1` with 6 passed and
+    561 filtered out.
+
+  - Main-thread review validation reran the four focused app test filters successfully with the same
+    pass counts, then reran `cargo check`, `rustup run nightly cargo fmt --check`, and
+    `just md-check`.
+
+  - Additional validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first Rust format check reported only rustfmt wrapping differences in the
+  extracted helper dispatch and one status assignment. Applying rustfmt fixed the Rust formatting
+  gate.
+- Evidence basis:
+  - Date: `2026-05-21 16:06:49 PDT` from local `date`.
+  - Main review date: `2026-05-21 16:08:55 PDT` from local `date`.
+  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
+    note.
+
 ### 2026-05-21 (Resolve view test split)
 
 - Slice / task: move inline resolve view tests from `src/resolve.rs` into `src/resolve/tests.rs`
