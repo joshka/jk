@@ -5,6 +5,37 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Action-plan test module extraction)
+
+- Slice / task: move root action-plan tests out of `src/jj_actions.rs` and into the action-plan
+  module directory so production plan contracts are easier to scan.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b57-5181-7df3-a807-fa47b83e881b`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the mechanical extraction with
+  write scope limited to `src/jj_actions.rs` and `src/jj_actions/tests.rs`. The main thread kept jj
+  ownership, reviewed the result, and reran validation.
+- Implementation outcome: `src/jj_actions.rs` now declares `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/jj_actions/tests.rs` and continue to cover describe, commit, restore, revert,
+  file mutation, and abandon preview contracts.
+- Size evidence: after the move, `wc -l src/jj_actions.rs src/jj_actions/tests.rs` reported 822
+  lines in `src/jj_actions.rs` and 364 in `src/jj_actions/tests.rs`.
+- Rework / surprise: none beyond the expected module extraction.
+- Validation trail:
+  - Worker validation passed: `cargo test jj_actions -- --test-threads=1` with 54 passed;
+    `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo test jj_actions -- --test-threads=1` with 54
+    passed; `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+  - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
+    test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:24:11 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b57-5181-7df3-a807-fa47b83e881b` from the worker handoff.
+  - Files: `src/jj_actions.rs`, `src/jj_actions/tests.rs`, and this process note.
+
 ### 2026-05-21 (Graph test module extraction)
 
 - Slice / task: move graph view tests out of `src/graph.rs` and into the graph feature directory so
