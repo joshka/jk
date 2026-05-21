@@ -77,6 +77,17 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 shared row helper contract documentation:
+
+- `src/jj_rows.rs` now states that feature-specific row policy belongs in feature roots and this
+  module owns only domain-neutral rendered-row mechanics: plain-text flattening, metadata drift
+  handling, JSON field extraction, graph-line detection, and rendered line text extraction.
+- Main-thread review rewrote several generic helper comments into contracts about fail-closed
+  metadata parsing and intentional style loss.
+- Focused validation covered `cargo check`, `cargo test jj_rows -- --test-threads=1`, and
+  `rustup run nightly cargo fmt --check`. The test filter matched 0 tests, so the useful proof for
+  the docs-only change is buildability and formatting.
+
 2026-05-21 command dispatch contract documentation:
 
 - `src/command.rs` now documents the boundary between app-level command vocabulary, view-local

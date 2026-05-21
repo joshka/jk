@@ -5,6 +5,38 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Shared row helper contract documentation)
+
+- Slice / task: document the remaining `src/jj_rows.rs` shared-helper boundary so future row work
+  keeps feature-specific policy in feature roots.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b6b-db96-77c0-a1da-a8b4f51759cd`.
+- Model / routing: GPT-5.4-mini worker with medium reasoning performed a small docs-only sweep with
+  write scope limited to `src/jj_rows.rs`. The main thread reviewed the result and tightened a few
+  comments from function-name narration into contracts about fail-closed metadata parsing and
+  intentional style loss.
+- Implementation outcome: `src/jj_rows.rs` now states that it owns only domain-neutral rendered-row
+  mechanics: plain-text flattening, metadata drift handling, JSON field extraction, graph-line
+  detection, and rendered line text extraction.
+- Size evidence: after the change, `src/jj_rows.rs` measured 88 lines.
+- Rework / surprise: the mini worker stayed in scope and passed validation, but its first pass added
+  a few generic helper comments that the main thread rewrote into more contract-oriented wording.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `cargo test jj_rows -- --test-threads=1` with 0 tests
+    matched; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo check`; `cargo test jj_rows -- --test-threads=1`
+    with 0 tests matched; and `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings.
+  - `just md-check` passed.
+  - Residual risk: this docs-only packet has no matching focused test filter; `cargo check` and
+    rustfmt are the relevant proof.
+- Evidence basis:
+  - Date: `2026-05-21 09:45:50 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b6b-db96-77c0-a1da-a8b4f51759cd` from the worker handoff.
+  - Files: `src/jj_rows.rs` and this process note.
+
 ### 2026-05-21 (Command dispatch contract documentation)
 
 - Slice / task: add concise source contracts to `src/command.rs` so command vocabulary, key
