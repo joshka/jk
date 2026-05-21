@@ -113,15 +113,19 @@ show a sharper bounded packet there than the ones below.
 
 ### 2. File And Status Path Action-Menu Policy
 
-- Owner: `src/action_menu.rs`
-- Purpose: isolate the path-scoped action-menu rules currently mixed across `ExactActionContext`,
-  `FileActionContext`, `status_path_action_menu`, `file_action_menu_items`, and the path
-  restore/track/untrack/chmod follow-ups. This packet is narrower than a whole-file split and
-  matches one user-visible concept: path actions vary by working-copy versus exact revision scope.
-- Non-goals: no graph multi-revision menu redesign, no role-prompt redesign, no mutation preview
-  execution changes, and no new action vocabulary.
-- Proof: focused action-menu tests for status paths, file lists, and file-show surfaces, plus
-  `cargo check` and `just md-check`.
+- Status: completed on 2026-05-21 in the Codex main thread.
+- Owner: `src/action_menu/path_actions.rs`
+- Outcome: `src/action_menu/path_actions.rs` owns `FileActionContext`, its working-copy and exact
+  revision scopes, status path menu construction, file path menu construction, chmod item
+  construction, and the focused path-action policy tests. `src/action_menu.rs` keeps the shared
+  action vocabulary and the broad `ExactActionContext` routing surface.
+- Maintainability evidence: `src/action_menu.rs` dropped from 1246 lines in the reassessment
+  snapshot to 1028 lines after extraction, and the new `src/action_menu/path_actions.rs` is 246
+  lines including moved tests.
+- Non-goals preserved: no graph multi-revision menu redesign, no role-prompt redesign, no mutation
+  preview execution changes, and no new action vocabulary.
+- Proof: focused action-menu, file-action, and detail-restore tests, plus `cargo check`,
+  `cargo clippy -- -D warnings`, `rustup run nightly cargo fmt --check`, and `just md-check`.
 
 ## Not The Next Packet
 

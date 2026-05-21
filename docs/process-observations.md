@@ -5,6 +5,50 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Path action-menu policy extraction)
+
+- Slice / task: extract path-scoped action-menu policy from broad `src/action_menu.rs` on current
+  change `Extract path action-menu policy`.
+- Thread id: `019e49a1-8455-7e63-9859-70183c73ae25`.
+- Model / routing: Codex main thread. A worker/subagent callable was not exposed in this session, so
+  the main thread performed implementation, documentation, and focused validation.
+- Files changed: `src/action_menu.rs`, `src/action_menu/path_actions.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/action_menu/path_actions.rs` now owns `FileActionContext`,
+  `FileActionScope`, status path menus, file path menus, chmod menu items, and the focused
+  path-policy tests. `src/action_menu.rs` keeps shared vocabulary, `ExactActionContext`, graph and
+  multi-revision policy, and broad action-menu routing.
+- Behavior intent: preserve path action ordering, labels, shortcuts, safety tiers, and follow-up
+  payloads exactly for status tracked paths, status untracked paths, file/detail chmod actions, and
+  selected-path restore.
+- Maintainability evidence: `wc -l src/action_menu.rs src/action_menu/path_actions.rs` showed
+  `src/action_menu.rs` at 1028 lines and `src/action_menu/path_actions.rs` at 246 lines after the
+  extraction.
+- Rework / surprise: the first focused `cargo test action_menu -- --test-threads=1` compile caught
+  that `FollowUp::FileChmod` still required `JjFileChmodMode` in the parent module after moving item
+  construction. Restoring the parent import fixed the compile error.
+- Validation trail:
+  - `cargo test action_menu -- --test-threads=1` passed with 40 passed.
+  - `cargo test file_actions -- --test-threads=1` passed with 7 passed.
+  - `cargo test detail_restore_actions -- --test-threads=1` passed with 19 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed after applying rustfmt to import ordering and one
+    trailing blank line.
+  - `just md-check` passed.
+- Main-thread review validation passed: `cargo test action_menu -- --test-threads=1`;
+  `cargo test file_actions -- --test-threads=1`;
+  `cargo test detail_restore_actions -- --test-threads=1`; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; `just md-check`; and full
+  `just check` all passed. Full `just check` reported 533 passed / 2 ignored, and its largest-file
+  output included `src/action_menu.rs` at 1028 lines and `src/action_menu/path_actions.rs` at 246
+  lines.
+- Evidence basis:
+  - Date: `2026-05-21` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/action_menu.rs`, `src/action_menu/path_actions.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`
+
 ### 2026-05-21 (Operation recovery and target plan cluster extraction)
 
 - Slice / task: implement the ledger slice `Operation Recovery And Target Plan Cluster` on current

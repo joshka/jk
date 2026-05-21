@@ -4,7 +4,12 @@
 //! This module owns the user-visible action vocabulary, prompts, and follow-up
 //! context used to present those actions. Execution still happens elsewhere.
 
+mod path_actions;
+
 use crate::jj_actions::JjFileChmodMode;
+use path_actions::{
+    FileActionContext, file_action_menu, file_action_menu_items, status_path_action_menu,
+};
 
 const PREVIEW_REQUIRED_MARKER: &str = "Preview required before execution.";
 
@@ -299,22 +304,6 @@ pub struct ExactActionContext {
     surface: ActionSurface,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FileActionContext {
-    path: String,
-    scope: FileActionScope,
-    restore_allowed: bool,
-    track_allowed: bool,
-    untrack_allowed: bool,
-    chmod_allowed: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum FileActionScope {
-    WorkingCopy,
-    ExactRevision(String),
-}
-
 impl ExactActionContext {
     pub fn with_current(current_revision: impl Into<String>) -> Self {
         Self {
@@ -450,52 +439,6 @@ impl ExactActionContext {
 
     fn is_status_surface(&self) -> bool {
         matches!(self.surface, ActionSurface::Status)
-    }
-}
-
-impl FileActionContext {
-    fn working_copy_untracked(path: String) -> Self {
-        Self {
-            path,
-            scope: FileActionScope::WorkingCopy,
-            restore_allowed: false,
-            track_allowed: true,
-            untrack_allowed: false,
-            chmod_allowed: false,
-        }
-    }
-
-    fn working_copy_tracked(path: String, restore_allowed: bool, chmod_allowed: bool) -> Self {
-        Self {
-            path,
-            scope: FileActionScope::WorkingCopy,
-            restore_allowed,
-            track_allowed: false,
-            untrack_allowed: true,
-            chmod_allowed,
-        }
-    }
-
-    fn exact_revision_tracked(revision: String, path: String, chmod_allowed: bool) -> Self {
-        Self {
-            path,
-            scope: FileActionScope::ExactRevision(revision),
-            restore_allowed: true,
-            track_allowed: false,
-            untrack_allowed: false,
-            chmod_allowed,
-        }
-    }
-
-    fn path(&self) -> &str {
-        &self.path
-    }
-
-    fn revision(&self) -> Option<&str> {
-        match &self.scope {
-            FileActionScope::WorkingCopy => None,
-            FileActionScope::ExactRevision(revision) => Some(revision),
-        }
     }
 }
 
@@ -779,92 +722,6 @@ enum ActionSurface {
     Detail,
     Status,
     File,
-}
-
-fn status_path_action_menu(file_action: &FileActionContext) -> ActionMenu {
-    let mut items = Vec::new();
-    if file_action.restore_allowed {
-        let path = file_action.path();
-        items.push(ActionMenuItem {
-            action: ActionKind::Restore,
-            shortcut: ActionKind::Restore.shortcut(),
-            label: format!("restore selected status path {path}"),
-            safety_tier: SafetyTier::PreviewFirst,
-            follow_up: FollowUp::RestoreWorkingCopyPath {
-                path: path.to_owned(),
-            },
-        });
-    }
-    items.extend(file_action_menu_items(file_action));
-    ActionMenu::new(items)
-}
-
-fn file_action_menu(file_action: &FileActionContext) -> ActionMenu {
-    ActionMenu::new(file_action_menu_items(file_action))
-}
-
-fn file_action_menu_items(file_action: &FileActionContext) -> Vec<ActionMenuItem> {
-    let mut items = Vec::new();
-    let path = file_action.path();
-    if file_action.track_allowed {
-        items.push(ActionMenuItem {
-            action: ActionKind::FileTrack,
-            shortcut: ActionKind::FileTrack.shortcut(),
-            label: format!("track selected path {path}"),
-            safety_tier: SafetyTier::PreviewFirst,
-            follow_up: FollowUp::FileTrack {
-                path: path.to_owned(),
-            },
-        });
-    }
-    if file_action.untrack_allowed {
-        items.push(ActionMenuItem {
-            action: ActionKind::FileUntrack,
-            shortcut: ActionKind::FileUntrack.shortcut(),
-            label: format!("untrack selected path {path}"),
-            safety_tier: SafetyTier::PreviewFirst,
-            follow_up: FollowUp::FileUntrack {
-                path: path.to_owned(),
-            },
-        });
-    }
-    if file_action.chmod_allowed {
-        items.push(file_chmod_item(
-            ActionKind::FileChmodExecutable,
-            path,
-            file_action.revision(),
-            JjFileChmodMode::Executable,
-        ));
-        items.push(file_chmod_item(
-            ActionKind::FileChmodNormal,
-            path,
-            file_action.revision(),
-            JjFileChmodMode::Normal,
-        ));
-    }
-    items
-}
-
-fn file_chmod_item(
-    action: ActionKind,
-    path: &str,
-    revision: Option<&str>,
-    mode: JjFileChmodMode,
-) -> ActionMenuItem {
-    let scope = revision
-        .map(|revision| format!(" in {}", short_id(revision)))
-        .unwrap_or_default();
-    ActionMenuItem {
-        action,
-        shortcut: action.shortcut(),
-        label: format!("{} selected path {}{}", action.label(), path, scope),
-        safety_tier: SafetyTier::PreviewFirst,
-        follow_up: FollowUp::FileChmod {
-            path: path.to_owned(),
-            revision: revision.map(str::to_owned),
-            mode,
-        },
-    }
 }
 
 fn short_id(id: &str) -> &str {
@@ -1167,80 +1024,5 @@ mod tests {
                 ActionKind::Revert
             ]
         );
-    }
-
-    #[test]
-    fn detail_context_with_selected_path_offers_path_restore_first() {
-        let menu = build_action_menu(
-            &ExactActionContext::detail("ccccdddd1111111111111111111111111111111111")
-                .with_selected_path("src/quoted path.rs"),
-        );
-
-        let actions = menu
-            .items()
-            .iter()
-            .map(ActionMenuItem::action)
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            actions,
-            vec![
-                ActionKind::Restore,
-                ActionKind::FileChmodExecutable,
-                ActionKind::FileChmodNormal,
-                ActionKind::Duplicate,
-                ActionKind::Restore,
-                ActionKind::Revert
-            ]
-        );
-        assert_eq!(menu.items()[0].shortcut(), 'p');
-        assert_eq!(menu.items()[1].shortcut(), 'x');
-        assert_eq!(menu.items()[2].shortcut(), 'n');
-        assert_eq!(menu.items()[3].shortcut(), 'd');
-        assert_eq!(menu.items()[4].shortcut(), 'r');
-        assert_eq!(menu.items()[5].shortcut(), 'v');
-        assert_eq!(
-            menu.item_for_shortcut('p').map(ActionMenuItem::label),
-            Some("restore selected path from ccccdddd")
-        );
-        assert!(matches!(
-            menu.items()[0].follow_up(),
-            FollowUp::RestoreExactTarget { revision, path }
-                if revision == "ccccdddd1111111111111111111111111111111111"
-                    && path.as_deref() == Some("src/quoted path.rs")
-        ));
-    }
-
-    #[test]
-    fn status_path_context_offers_working_copy_restore_and_hygiene_actions() {
-        let menu = build_action_menu(&ExactActionContext::status_path("src/status.rs"));
-
-        assert_eq!(menu.items().len(), 4);
-        assert_eq!(menu.items()[0].action(), ActionKind::Restore);
-        assert_eq!(menu.items()[0].shortcut(), 'r');
-        assert_eq!(menu.items()[1].action(), ActionKind::FileUntrack);
-        assert_eq!(menu.items()[2].action(), ActionKind::FileChmodExecutable);
-        assert_eq!(menu.items()[3].action(), ActionKind::FileChmodNormal);
-        assert_eq!(
-            menu.items()[0].label(),
-            "restore selected status path src/status.rs"
-        );
-        assert!(matches!(
-            menu.items()[0].follow_up(),
-            FollowUp::RestoreWorkingCopyPath { path } if path == "src/status.rs"
-        ));
-    }
-
-    #[test]
-    fn status_untracked_context_offers_only_file_track() {
-        let menu = build_action_menu(&ExactActionContext::status_untracked_path("scratch.txt"));
-
-        assert_eq!(menu.items().len(), 1);
-        assert_eq!(menu.items()[0].action(), ActionKind::FileTrack);
-        assert_eq!(menu.items()[0].shortcut(), 't');
-        assert!(matches!(
-            menu.items()[0].follow_up(),
-            FollowUp::FileTrack { path } if path == "scratch.txt"
-        ));
     }
 }
