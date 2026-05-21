@@ -5,6 +5,30 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Identity-preserving list mechanics inventory)
+
+- Slice / task: implement the ledger slice `Identity-Preserving List Mechanics` as an audit and
+  documentation pass on current jj change `Inventory list selection contracts`.
+- Thread id: `019e493a-13ce-7552-9d26-5947edef0472`.
+- Model / routing: a `gpt-5.5` worker/subagent implemented the docs-only inventory; the main thread
+  reviewed it.
+- Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
+- Implementation outcome: the ledger now records the concrete selection identity contracts for
+  graph, status, file list, resolve, bookmarks, operation log, workspaces, and the shared
+  `Selection` cursor mechanics.
+- Behavior intent: no source behavior, navigation policy, selection policy, or test changes were
+  made. No shared helper was extracted because the visible repetition still mixes different identity
+  keys, fallback rules, missing-metadata behavior, and action-gating policy.
+- Validation trail: worker `just md-check` passed.
+- Residual risk: this is an inventory, not executable proof; future helper extraction still needs
+  view-level tests for each touched refresh/selection contract.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `docs/development/rules/refactoring.md`, `docs/development/rules/testing.md`, and concrete list
+    views in `src/graph.rs`, `src/status.rs`, `src/file_list.rs`, `src/resolve.rs`,
+    `src/bookmarks.rs`, `src/operation_log.rs`, `src/workspaces.rs`, and `src/selection.rs`
+
 ### 2026-05-20 (Action planning cohesion inventory)
 
 - Slice / task: implement the ledger slice `Action Planning Cohesion` as a documentation and

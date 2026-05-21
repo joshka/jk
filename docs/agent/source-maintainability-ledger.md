@@ -201,6 +201,42 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
   worth centralizing.
 - Purpose: name the shared invariants around preserving selection by identity across refresh,
   search, filtering, and content shrink.
+- Current contracts:
+  - `selection.rs` owns only cursor mechanics: current row index, first/previous/next/last, set, and
+    clamp-to-last behavior for empty or shrinking content. It does not know row identity.
+  - `graph.rs` preserves the cursor by selected row change id (`LogItem::action_id`) across refresh
+    and log-mode switches, falling back to the previous cursor row when the change disappears.
+    Explicit multi-selection is a separate list of exact change ids, retained only while those
+    changes remain visible, and action sources are projected in graph row order.
+  - `status.rs` preserves the selected row first by exact single repo-relative path when the row has
+    one, then by exact rendered row text, then by previous cursor row. Rows without trusted path
+    metadata stay visible and selectable, but file actions fail closed instead of guessing.
+  - `file_list.rs` preserves selection by exact file path, initializes from an optional spec path
+    when present, and falls back to the previous cursor row when the path disappears.
+  - `resolve.rs` preserves selection by exact conflict path when the template parsed one, then falls
+    back to the previous cursor row. Copy and inspect actions degrade when a row lacks exact path
+    metadata.
+  - `bookmarks.rs` currently preserves selection by bookmark name, while action policy depends on
+    row-local metadata: local versus remote state, remote name, tracking state, local-peer state,
+    target change id, target commit id, and whether the visible list came from unfiltered
+    all-remotes metadata. Name alone is not a complete mutation identity.
+  - `operation_log.rs` preserves selection by exact operation id and falls back to the previous
+    cursor row. Operation detail, copy, restore, and revert actions require the exact operation id.
+  - `workspaces.rs` preserves selection by exact workspace name and falls back to the previous
+    cursor row. Copy policy includes repository root plus optional workspace name, change id, commit
+    id, and row text; root and metadata errors are header context, not selectable rows.
+- Shared mechanics are limited to `Selection` and repeated row-search loops: move next/previous
+  through item rows, clamp after shrink, and prefer identity restoration before index restoration.
+  View-specific policy is the identity key, whether missing metadata can still be selected, what
+  fallback identity is acceptable, and which actions require exact metadata.
+- Helper decision: do not extract a helper yet. A future narrow helper could be
+  `restore_selection_by_key_or_index` for views whose refresh contract is exactly "capture optional
+  stable key, reload rows, find first matching key, else clamp previous index". The first candidates
+  would be `file_list.rs`, `resolve.rs`, and `operation_log.rs`, but the proof is not yet strong
+  enough because each still has different missing-metadata and action-degradation policy. `graph.rs`
+  has multi-selection retention, `status.rs` has row-text fallback, `bookmarks.rs` has incomplete
+  name-only mutation identity, and `workspaces.rs` mixes selectable rows with non-row header
+  metadata.
 - Non-goals: no broad abstraction before the contract is named and tested in the owning views.
 - Proof: snapshots or focused tests showing the selected identity is preserved, clamped, or
   intentionally cleared on each screen.
