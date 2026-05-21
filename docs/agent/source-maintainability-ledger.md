@@ -44,6 +44,15 @@ change, but a maintainer should be able to start from a feature such as `operati
 `bookmarks`, `status`, `files`, or `log` and find the local row model, view behavior, action
 availability, and tests without first understanding global buckets.
 
+Use Ed Page's Rust style module-layout rule for both future and existing refactors: when `foo` has
+child modules, prefer `foo/mod.rs` over `foo.rs` plus `foo/`. A `foo.rs` file should imply the
+module is self-contained. A `foo/` directory should be the atomic module unit.
+
+Prefer `mod.rs` as a table of contents that declares child modules and re-exports the public surface
+when a module has multiple topical parts. For small or titular modules, keeping the central type or
+function in `mod.rs` is acceptable when splitting it into another file would add more indirection
+than clarity. Avoid `#[path]`.
+
 Do not create a `slices/` folder or another implementation-phase bucket. The destination should look
 like feature roots with optional submodules for local concerns, plus shared infrastructure for
 boring cross-cutting mechanics:
@@ -108,6 +117,24 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 module directory-root conversion:
+
+- The first safe subset of existing `foo.rs` plus `foo/` pairs moved to `foo/mod.rs` without content
+  changes: `action_output`, `app_screen`, `command`, `diff`, `help`, `interactive_process`,
+  `rendered_jj`, `show`, `status`, `sticky_file_view`, `view_state`, and `workspaces`.
+- Remaining `foo.rs` plus `foo/` pairs are mostly larger roots or nested roots with meaningful
+  policy: `action_menu`, `app`, `app/action_lifecycle`, `app/mode_input`, `app/tests`, `bookmarks`,
+  `files`, `graph`, `jj`, `jj_actions`, `operation_log`, `resolve`, and `tui`. Convert these through
+  topical extraction so `mod.rs` can serve as a table of contents instead of becoming a renamed
+  large file.
+- The packet applies the epage module-layout rule to existing split modules while deferring larger
+  roots that need topical child files before `mod.rs` can act as a real table of contents.
+- The packet intentionally changed module paths only and did not alter Rust behavior, command argv,
+  rendered `jj` output, status wording, key handling, selection behavior, refresh/reveal behavior,
+  public API, or tests.
+- Validation passed: `cargo check`; focused `cargo test <filter> -- --test-threads=1` runs for each
+  moved root; `rustup run nightly cargo fmt --check`; and `just md-check`.
 
 2026-05-21 interactive process test split:
 

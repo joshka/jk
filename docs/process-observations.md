@@ -5,6 +5,63 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Module directory-root conversion)
+
+- Slice / task: convert the first safe subset of existing `foo.rs` plus `foo/` pairs to `foo/mod.rs`
+  after adopting Ed Page's Rust style module-layout rule.
+- Thread id: `019e4ceb-8dfa-76e3-a13c-232f84a9c5d6` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the path-only source move in the
+  `Adopt module directory roots` jj change; the main thread reviewed that the source diff was
+  path-only, updated guidance and status docs, and reran validation.
+- Changed source roots: `action_output`, `app_screen`, `command`, `diff`, `help`,
+  `interactive_process`, `rendered_jj`, `show`, `status`, `sticky_file_view`, `view_state`, and
+  `workspaces`.
+- Implementation outcome: those modules now use directory roots such as `src/status/mod.rs` instead
+  of `src/status.rs` plus `src/status/`, matching the corrected rule that a split module should be
+  an atomic directory.
+- Behavior-preservation evidence: the source diff for the moved roots is path-only with zero content
+  changes. Runtime behavior, command argv, rendered `jj` output, status wording, key handling,
+  selection behavior, refresh/reveal behavior, public API, and tests are unchanged.
+- Process observation: GPT-5.4 mini was effective for a path-only conversion once the safe subset
+  and exclusions were explicit. Larger roots should not be handed off as blind moves because the
+  table-of-contents rule requires topical extraction judgment.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `rustup run nightly cargo fmt --check`; and separate
+    focused `cargo test <filter> -- --test-threads=1` runs after the attempted combined Cargo filter
+    failed with `unexpected argument 'app_screen'`.
+  - Main-thread validation passed: `cargo check`; focused tests for `action_output`, `app_screen`,
+    `command`, `diff`, `help`, `interactive_process`, `rendered_jj`, `show`, `status`,
+    `sticky_file_view`, `view_state`, and `workspaces`; `rustup run nightly cargo fmt --check`; and
+    `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:44:21 PDT` from local `date`.
+  - Files: moved source roots listed above, `AGENTS.md`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+    process note.
+
+### 2026-05-21 (Module layout rule correction)
+
+- Slice / task: apply Ed Page's Rust style module-layout guidance to the ongoing refactoring plan,
+  including existing `foo.rs` plus `foo/` modules rather than only future files.
+- Thread id: main orchestration thread; the first path-only conversion was delegated separately.
+- Model / routing: GPT-5 Codex read `https://epage.github.io/dev/rust-style/`, updated repo-local
+  guidance in `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/agent/cleanup-wave-status.md`, and started a bounded worker packet for the first safe subset
+  of existing modules.
+- Implementation outcome: the repo guidance now prefers `foo/mod.rs` when `foo` has child modules,
+  treats `foo.rs` as self-contained, avoids `#[path]`, and records that larger roots should trend
+  toward table-of-contents `mod.rs` files with definitions in named child modules.
+- Process observation: this correction changes the shape of future refactors. Recent test splits
+  created many `foo.rs` plus `foo/tests.rs` pairs that now need follow-up layout packets. Small
+  roots can be moved mechanically; larger roots such as `app`, `bookmarks`, `operation_log`,
+  `jj_actions`, `files`, `graph`, and `tui` need judgment-heavy topical splits rather than a blind
+  file move.
+- Evidence basis:
+  - Source: Ed Page, "Guideline: Rust Style", project-structure sections P-MOD, P-DIR-MOD,
+    P-PATH-MOD, and P-API.
+  - Files: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/cleanup-wave-status.md`, and this process note.
+
 ### 2026-05-21 (Interactive process test split)
 
 - Slice / task: move inline inherited-stdio runner tests from `src/interactive_process.rs` into

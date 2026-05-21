@@ -149,6 +149,16 @@ domain. Treat this as a feature-policy versus shared-mechanics split: feature ro
 surface shows, selects, copies, recovers from, and offers; `ui`, `jj`, `actions`, `app`, and small
 helpers answer boring cross-cutting questions after a feature has already chosen its policy.
 
+Apply the project-structure rule from Ed Page's Rust style guidance when a module is split across
+files: prefer a directory root (`foo/mod.rs`) over `foo.rs` plus `foo/`, and avoid `#[path]`. A
+reader who sees `foo.rs` should be able to assume it is self-contained. A reader who sees `foo/`
+should be able to treat the directory as the module unit.
+
+For small or titular modules, `foo/mod.rs` may own the central type or function directly when that
+is the clearest reader path. For larger modules, trend toward `mod.rs` as a table of contents with
+definitions in named child files. Do not create `mod.rs` layers that hide feature policy or add
+indirection without improving the reader path.
+
 The code is organized by vertical slices where practical:
 
 - `app.rs` owns the terminal event loop, key dispatch, modal state, view stack, refresh, and
@@ -194,8 +204,10 @@ Panache, configured in [`panache.toml`](panache.toml) for GFM, 100-column reflow
 
 ## Coding Style & Naming Conventions
 
-Prefer feature-oriented modules over horizontal buckets. Use named files such as `graph.rs` and
-`show.rs`; avoid `mod.rs` re-export layers unless there is a strong reason.
+Prefer feature-oriented modules over horizontal buckets. Use a plain `foo.rs` file only when `foo`
+is self-contained. Once `foo` has child modules, prefer `foo/mod.rs` and decide whether the root
+should hold the titular concept or only re-export named child modules based on reader locality.
+Avoid `#[path]`, broad umbrella folders, and `mod.rs` layers that only reshuffle names.
 
 Write Rustdoc/module comments for durable intent: jj CLI compatibility, navigation policy, sticky
 scroll behavior, and other non-obvious constraints. Avoid comments that restate simple code. Keep
