@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Document command binding contracts)
+
+- Slice / task: document `src/command.rs` as the shared command identity, key binding metadata,
+  sequence matching, prefix hint, `CommandContext`, and `ViewEffect` contract surface without
+  changing behavior, public API, labels, bindings, tests, or formatting semantics.
+- Thread id: `019e4bfc-54cd-72c1-a6b1-deedfb90a82e` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded docs-only packet.
+  The user explicitly kept version-control operations with the main thread, and no `jj` or `git`
+  commands were run.
+- Implementation outcome: `src/command.rs` now documents the operation-recovery conversion as an
+  identity-to-action-flow bridge rather than feature availability, compact versus spaced multi-key
+  labels, shifted printable-character matching, prefix fallback ownership, first-exact match
+  preservation, next-key label deduplication, and app-owned interpretation of view effects. The main
+  thread added matching packet evidence to `docs/agent/source-maintainability-ledger.md`.
+- Behavior-preservation evidence: the packet added Rustdoc and private invariant comments only. It
+  did not change binding tables, command variants, key-label construction, matching expressions,
+  tests, imports, visibility, or function signatures.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; `cargo test command -- --test-threads=1` with 86 passed; and
+    `just md-check`.
+  - Main-thread review validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings; `cargo test command -- --test-threads=1` with 86
+    passed; and `just md-check`.
+- Rework / surprise: the worker's first `just md-check` reported Panache wrapping for one process
+  note bullet. Main-thread review also had to run Panache over the new maintainability-ledger entry.
+- Evidence basis:
+  - Date: `2026-05-21 12:21:41 PDT` from local `date`.
+  - Files: `src/command.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Sync remote prompt decision reducers)
 
 - Slice / task: extract pure push/fetch remote-list prompt branching from

@@ -103,6 +103,18 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 command binding contract docs:
+
+- `src/command.rs` now documents command recovery conversion, key sequence labels and prefix
+  behavior, shifted printable-character matching, prefix fallback ownership, first-exact match
+  preservation, next-key label deduplication, and app-owned interpretation of view effects.
+- The docs preserve the current boundary: feature views own local binding availability and execution
+  policy; `help.rs` owns help projection; `app.rs` owns prefix timing and command application;
+  `command.rs` owns shared identity and matching mechanics.
+- This packet intentionally changed comments only. Focused validation covered `cargo check`,
+  `rustup run nightly cargo fmt --check`, `just md-check`, and
+  `cargo test command -- --test-threads=1`.
+
 2026-05-21 action lifecycle entry ownership docs:
 
 - `src/app/action_lifecycle/entry.rs` now documents that action lifecycle entry owns routing from

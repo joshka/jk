@@ -149,6 +149,10 @@ impl Binding {
 
 impl Command {
     /// Return the jj operation recovery kind represented by this global command, if any.
+    ///
+    /// Recovery target availability belongs to the operation-log feature. This
+    /// conversion only keeps the shared command identity connected to the app
+    /// action flow once a recovery command has already been accepted.
     pub fn operation_recovery(self) -> Option<JjOperationRecoveryKind> {
         match self {
             Self::OperationUndo => Some(JjOperationRecoveryKind::Undo),
@@ -258,7 +262,9 @@ impl KeyPattern {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum KeySequence {
+    /// A one-key binding that can complete immediately.
     Single(KeyPattern),
+    /// A fixed sequence whose full label and prefix behavior are user-visible.
     Multi(&'static [KeyPattern]),
 }
 
@@ -275,6 +281,9 @@ impl KeySequence {
     fn label(self) -> String {
         match self {
             Self::Single(pattern) => pattern.label(),
+            // Plain character chords render compactly for help and prefix
+            // fallback labels, while modified/non-character chords keep spaces
+            // between physical key labels.
             Self::Multi(patterns) if patterns.iter().all(|pattern| pattern.is_plain_char()) => {
                 patterns
                     .iter()
@@ -321,6 +330,10 @@ impl KeySequence {
 }
 
 fn shifted_character_is_encoded_in_key_code(code: KeyCode) -> bool {
+    // Some terminals report shifted printable characters as both
+    // `KeyModifiers::SHIFT` and the already-shifted `KeyCode::Char`.
+    // Accept that encoding only for printable characters whose shifted form is
+    // visible in the key code; control/alt/explicit shift bindings remain exact.
     matches!(
         code,
         KeyCode::Char(character)
@@ -347,6 +360,9 @@ pub enum BindingMatch {
     /// A complete binding with no longer available sequence sharing the same prefix.
     Exact(Binding),
     /// A valid prefix for longer bindings, optionally with an exact binding to run on timeout.
+    ///
+    /// The fallback is not executed by this module. `App` owns the prefix timer
+    /// and decides whether to keep collecting keys or apply the exact command.
     Prefix { fallback: Option<Binding> },
 }
 
@@ -461,6 +477,8 @@ fn match_binding_sequence_by(
         return None;
     }
 
+    // Keep the first exact match in binding-table priority order, but do not
+    // let it hide a longer sequence that still matches the pending prefix.
     let mut exact = None;
     let mut has_prefix = false;
 
@@ -509,6 +527,8 @@ fn binding_prefix_next_labels_by(
                 continue;
             };
             let label = pattern.label();
+            // Deduplicate by user-visible label rather than key identity so
+            // hints stay stable when two commands share the same next key.
             if !labels.iter().any(|existing| existing == &label) {
                 labels.push(label);
             }
