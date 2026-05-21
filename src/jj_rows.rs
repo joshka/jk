@@ -538,7 +538,7 @@ pub fn load_compact_log_context(revset: &str) -> Result<Vec<Line<'static>>> {
     let output = run_jj(&spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
 
-    Ok(group_lines(lines, Vec::new())
+    Ok(group_lines(lines, RowMetadata::Valid(Vec::new()))
         .into_iter()
         .next()
         .map(|item| item.lines().into_iter().take(2).collect())
@@ -549,11 +549,10 @@ pub fn document_plain_text(lines: &[Line<'static>]) -> String {
     lines.iter().map(line_text).collect::<Vec<_>>().join("\n")
 }
 
-fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<Vec<RevisionMetadata>> {
-    Ok(run_jj_template_lines(spec, template, false)?
-        .into_iter()
-        .filter_map(|line| parse_metadata_line(&line))
-        .collect())
+fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<RowMetadata<RevisionMetadata>> {
+    Ok(parse_revision_metadata_lines(run_jj_template_lines(
+        spec, template, false,
+    )?))
 }
 
 fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
@@ -565,11 +564,12 @@ fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
     )
 }
 
-fn run_operation_log_ids(spec: &ViewSpec) -> Result<Vec<Option<String>>> {
-    Ok(run_jj_template_lines(spec, OPERATION_ID_TEMPLATE, true)?
-        .into_iter()
-        .map(|line| parse_operation_id_line(&line))
-        .collect())
+fn run_operation_log_ids(spec: &ViewSpec) -> Result<RowMetadata<String>> {
+    Ok(parse_operation_id_lines(run_jj_template_lines(
+        spec,
+        OPERATION_ID_TEMPLATE,
+        true,
+    )?))
 }
 
 fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMetadata>> {
@@ -580,11 +580,15 @@ fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMetadata>> {
     )?)
 }
 
-fn group_lines(lines: Vec<Line<'static>>, metadata: Vec<RevisionMetadata>) -> Vec<LogItem> {
+fn group_lines(lines: Vec<Line<'static>>, metadata: RowMetadata<RevisionMetadata>) -> Vec<LogItem> {
+    let revision_row_count = lines.iter().filter(|line| starts_log_item(line)).count();
+    let mut metadata = metadata
+        .into_rows_matching(revision_row_count)
+        .map(Vec::into_iter);
+
     let mut items = Vec::new();
     let mut current_lines = Vec::new();
     let mut current_metadata: Option<RevisionMetadata> = None;
-    let mut metadata = metadata.into_iter();
 
     for line in lines {
         let starts_item = starts_log_item(&line);
@@ -605,7 +609,7 @@ fn group_lines(lines: Vec<Line<'static>>, metadata: Vec<RevisionMetadata>) -> Ve
         }
 
         if starts_item {
-            current_metadata = metadata.next();
+            current_metadata = metadata.as_mut().and_then(Iterator::next);
         }
         current_lines.push(line);
     }
@@ -717,12 +721,19 @@ fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCoverage {
 
 fn group_operation_log_lines(
     lines: Vec<Line<'static>>,
-    operation_ids: Vec<Option<String>>,
+    operation_ids: RowMetadata<String>,
 ) -> Vec<OperationLogItem> {
+    let operation_row_count = lines
+        .iter()
+        .filter(|line| starts_operation_log_item(line))
+        .count();
+    let mut operation_ids = operation_ids
+        .into_rows_matching(operation_row_count)
+        .map(Vec::into_iter);
+
     let mut items = Vec::new();
     let mut current_lines = Vec::new();
     let mut current_operation_id = None;
-    let mut operation_ids = operation_ids.into_iter();
 
     for line in lines {
         let starts_item = starts_operation_log_item(&line);
@@ -735,7 +746,7 @@ fn group_operation_log_lines(
         }
 
         if starts_item {
-            current_operation_id = operation_ids.next().flatten();
+            current_operation_id = operation_ids.as_mut().and_then(Iterator::next);
         }
         current_lines.push(line);
     }
@@ -799,6 +810,21 @@ struct RevisionMetadata {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+enum RowMetadata<T> {
+    Valid(Vec<T>),
+    Drifted,
+}
+
+impl<T> RowMetadata<T> {
+    fn into_rows_matching(self, rendered_row_count: usize) -> Option<Vec<T>> {
+        match self {
+            Self::Valid(rows) if rows.len() == rendered_row_count => Some(rows),
+            Self::Valid(_) | Self::Drifted => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct BookmarkMetadata {
     name: String,
     remote: Option<String>,
@@ -841,21 +867,46 @@ impl BookmarkMetadata {
 }
 
 fn parse_metadata_line(line: &str) -> Option<RevisionMetadata> {
-    let mut change_id = None;
-    let mut commit_id = None;
+    let line = line
+        .char_indices()
+        .find(|(_, character)| !matches!(character, ' ' | '│' | '├' | '─' | '╯' | '╰' | '╭' | '╮'))
+        .map(|(index, _)| &line[index..])?;
 
-    for token in line.split_whitespace() {
-        if change_id.is_none() && is_full_change_id(token) {
-            change_id = Some(token.to_owned());
-        } else if commit_id.is_none() && is_full_commit_id(token) {
-            commit_id = Some(token.to_owned());
-        }
+    let line = line
+        .strip_prefix("@  ")
+        .or_else(|| line.strip_prefix("○  "))
+        .or_else(|| line.strip_prefix("◆  "))?;
+
+    let mut tokens = line.split_whitespace();
+    let change_id = tokens.next()?;
+    let commit_id = tokens.next()?;
+
+    if tokens.next().is_some() || line != format!("{change_id} {commit_id}") {
+        return None;
     }
 
-    change_id.map(|change_id| RevisionMetadata {
-        change_id,
-        commit_id,
+    if !is_full_change_id(change_id) || !is_full_commit_id(commit_id) {
+        return None;
+    }
+
+    Some(RevisionMetadata {
+        change_id: change_id.to_owned(),
+        commit_id: Some(commit_id.to_owned()),
     })
+}
+
+fn parse_revision_metadata_lines(lines: Vec<String>) -> RowMetadata<RevisionMetadata> {
+    let mut metadata = Vec::new();
+    for line in lines {
+        if is_graph_only_revision_metadata_line(&line) {
+            continue;
+        }
+        let Some(row) = parse_metadata_line(&line) else {
+            return RowMetadata::Drifted;
+        };
+        metadata.push(row);
+    }
+    RowMetadata::Valid(metadata)
 }
 
 fn parse_bookmark_metadata_line(line: &str) -> Option<BookmarkMetadata> {
@@ -916,6 +967,14 @@ fn parse_workspace_metadata_line(line: &str) -> Option<WorkspaceMetadata> {
     })
 }
 
+fn is_graph_only_revision_metadata_line(line: &str) -> bool {
+    let text = line.trim_start_matches(|character| {
+        matches!(character, ' ' | '│' | '├' | '─' | '╯' | '╰' | '╭' | '╮')
+    });
+
+    text.is_empty() || text == "~" || text == "~  (elided revisions)"
+}
+
 fn local_bookmark_remote_state(
     metadata: &BookmarkMetadata,
     coverage: BookmarkMetadataCoverage,
@@ -966,9 +1025,25 @@ fn local_peer_state(
 }
 
 fn parse_operation_id_line(line: &str) -> Option<String> {
-    line.split_whitespace()
-        .find(|token| is_operation_id(token))
-        .map(str::to_owned)
+    let mut tokens = line.split_whitespace();
+    let operation_id = tokens.next()?;
+
+    if tokens.next().is_some() || line != operation_id || !is_operation_id(operation_id) {
+        return None;
+    }
+
+    Some(operation_id.to_owned())
+}
+
+fn parse_operation_id_lines(lines: Vec<String>) -> RowMetadata<String> {
+    let mut operation_ids = Vec::new();
+    for line in lines {
+        let Some(operation_id) = parse_operation_id_line(&line) else {
+            return RowMetadata::Drifted;
+        };
+        operation_ids.push(operation_id);
+    }
+    RowMetadata::Valid(operation_ids)
 }
 
 fn parse_resolve_entry_line(line: &str) -> ResolveEntry {
@@ -1078,7 +1153,7 @@ mod tests {
             b"\x1b[1m@\x1b[0m  change\n\xE2\x94\x82  description\n\xE2\x97\x8B  parent\n".to_vec();
         let lines = text.into_text().unwrap().lines;
         let metadata = vec![metadata("abc", "123"), metadata("def", "456")];
-        let items = group_lines(lines, metadata);
+        let items = group_lines(lines, metadata_rows(metadata));
 
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].lines.len(), 2);
@@ -1096,7 +1171,7 @@ mod tests {
             .lines;
         let metadata = vec![metadata("abc", "123")];
 
-        assert_eq!(group_lines(lines, metadata).len(), 1);
+        assert_eq!(group_lines(lines, metadata_rows(metadata)).len(), 1);
     }
 
     #[test]
@@ -1111,7 +1186,7 @@ mod tests {
             metadata("parent", "222"),
             metadata("root", "333"),
         ];
-        let items = group_lines(lines, metadata);
+        let items = group_lines(lines, metadata_rows(metadata));
 
         assert_eq!(items.len(), 3);
         assert_eq!(items[0].lines.len(), 2);
@@ -1130,7 +1205,7 @@ mod tests {
                 .unwrap()
                 .lines;
         let metadata = vec![metadata("abc", "123"), metadata("def", "456")];
-        let items = group_lines(lines, metadata);
+        let items = group_lines(lines, metadata_rows(metadata));
 
         assert_eq!(items.len(), 4);
         assert_eq!(items[0].change_id(), Some("abc"));
@@ -1140,12 +1215,136 @@ mod tests {
     }
 
     #[test]
+    fn log_rows_ignore_graph_only_revision_metadata_lines() {
+        let lines = b"@  current\n\xE2\x97\x8B  parent\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let current_change_id = "a".repeat(32);
+        let current_commit_id = "1".repeat(40);
+        let parent_change_id = "b".repeat(32);
+        let parent_commit_id = "2".repeat(40);
+        let metadata = parse_revision_metadata_lines(vec![
+            graph_revision_metadata_text('@', 'a', '1'),
+            "│ ~  (elided revisions)".to_owned(),
+            "│ ├─╯".to_owned(),
+            graph_revision_metadata_text('○', 'b', '2'),
+        ]);
+
+        let items = group_lines(lines, metadata);
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].change_id(), Some(current_change_id.as_str()));
+        assert_eq!(items[0].commit_id(), Some(current_commit_id.as_str()));
+        assert_eq!(items[1].change_id(), Some(parent_change_id.as_str()));
+        assert_eq!(items[1].commit_id(), Some(parent_commit_id.as_str()));
+    }
+
+    #[test]
+    fn log_rows_ignore_bare_tilde_graph_noise_without_losing_ids() {
+        let lines = b"@  current\n\xE2\x94\x82 ~\n\xE2\x97\x8B  parent\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let current_change_id = "a".repeat(32);
+        let current_commit_id = "1".repeat(40);
+        let parent_change_id = "b".repeat(32);
+        let parent_commit_id = "2".repeat(40);
+        let metadata = parse_revision_metadata_lines(vec![
+            graph_revision_metadata_text('@', 'a', '1'),
+            "│ ~".to_owned(),
+            graph_revision_metadata_text('○', 'b', '2'),
+        ]);
+
+        let items = group_lines(lines, metadata);
+
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].change_id(), Some(current_change_id.as_str()));
+        assert_eq!(items[0].commit_id(), Some(current_commit_id.as_str()));
+        assert_eq!(items[1].change_id(), None);
+        assert_eq!(items[2].change_id(), Some(parent_change_id.as_str()));
+        assert_eq!(items[2].commit_id(), Some(parent_commit_id.as_str()));
+    }
+
+    #[test]
+    fn log_rows_fail_closed_on_malformed_metadata_line() {
+        let lines = b"@  current\n\xE2\x97\x8B  parent\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let metadata = parse_revision_metadata_lines(vec![
+            graph_revision_metadata_text('@', 'a', '1'),
+            format!("junk {}", graph_revision_metadata_text('○', 'b', '2')),
+        ]);
+
+        let items = group_lines(lines, metadata);
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.change_id().is_none()));
+        assert_eq!(items[0].row_text(), "@  current");
+        assert_eq!(items[1].row_text(), "○  parent");
+    }
+
+    #[test]
+    fn log_rows_fail_closed_when_a_metadata_line_is_missing_ids() {
+        let lines = b"@  current\n\xE2\x97\x8B  parent\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let metadata = parse_revision_metadata_lines(vec![
+            graph_revision_metadata_text('@', 'a', '1'),
+            "○  ".to_owned(),
+        ]);
+
+        let items = group_lines(lines, metadata);
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.change_id().is_none()));
+        assert_eq!(items[0].row_text(), "@  current");
+        assert_eq!(items[1].row_text(), "○  parent");
+    }
+
+    #[test]
+    fn log_rows_fail_closed_on_extra_metadata() {
+        let lines = b"@  current\n".to_vec().into_text().unwrap().lines;
+        let metadata = metadata_rows(vec![metadata("current", "111"), metadata("extra", "222")]);
+
+        let items = group_lines(lines, metadata);
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].change_id(), None);
+        assert_eq!(items[0].commit_id(), None);
+        assert_eq!(items[0].row_text(), "@  current");
+    }
+
+    #[test]
+    fn log_rows_fail_closed_on_row_count_mismatch() {
+        let lines = b"@  current\n\xE2\x97\x8B  parent\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let metadata = metadata_rows(vec![metadata("current", "111")]);
+
+        let items = group_lines(lines, metadata);
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.change_id().is_none()));
+        assert_eq!(items[0].row_text(), "@  current");
+        assert_eq!(items[1].row_text(), "○  parent");
+    }
+
+    #[test]
     fn groups_operation_log_rows_and_preserves_styles() {
         let text =
             b"\x1b[1m@\x1b[0m  current\n\xE2\x94\x82  args: jj describe\n\xE2\x97\x8B  previous\n"
                 .to_vec();
         let lines = text.into_text().unwrap().lines;
-        let operation_ids = vec![Some(operation_id('a')), Some(operation_id('b'))];
+        let operation_ids = operation_id_rows(vec![operation_id('a'), operation_id('b')]);
 
         let items = group_operation_log_lines(lines, operation_ids);
 
@@ -1157,47 +1356,137 @@ mod tests {
     }
 
     #[test]
-    fn operation_log_rows_allow_missing_metadata() {
+    fn operation_log_rows_fail_closed_on_malformed_id_metadata_line() {
+        let lines = b"@  current\n\xE2\x97\x8B  previous\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let operation_ids =
+            parse_operation_id_lines(vec![operation_id('a'), "not-an-operation".to_owned()]);
+
+        let items = group_operation_log_lines(lines, operation_ids);
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.operation_id().is_none()));
+        assert_eq!(items[0].row_text(), "@  current");
+        assert_eq!(items[1].row_text(), "○  previous");
+    }
+
+    #[test]
+    fn operation_log_rows_fail_closed_when_metadata_line_is_missing_id() {
+        let lines = b"@  current\n\xE2\x97\x8B  previous\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let operation_ids = parse_operation_id_lines(vec![operation_id('a'), String::new()]);
+
+        let items = group_operation_log_lines(lines, operation_ids);
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.operation_id().is_none()));
+        assert_eq!(items[0].row_text(), "@  current");
+        assert_eq!(items[1].row_text(), "○  previous");
+    }
+
+    #[test]
+    fn operation_log_rows_fail_closed_on_extra_metadata() {
         let lines = b"@  current\n\xE2\x94\x82  args: jj describe\n"
             .to_vec()
             .into_text()
             .unwrap()
             .lines;
+        let operation_ids = operation_id_rows(vec![operation_id('a'), operation_id('b')]);
 
-        let items = group_operation_log_lines(lines, vec![None]);
+        let items = group_operation_log_lines(lines, operation_ids);
 
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].operation_id(), None);
+        assert_eq!(items[0].row_text(), "@  current\n│  args: jj describe");
     }
 
     #[test]
-    fn parses_revision_metadata_lines() {
-        assert_eq!(
-            parse_metadata_line(
-                "@  tvykuurwpnwzzqulzrvwvmxxotnlywqw 64d399917e441072c228d7811743550753c9f6cf"
-            ),
-            Some(RevisionMetadata {
-                change_id: "tvykuurwpnwzzqulzrvwvmxxotnlywqw".to_owned(),
-                commit_id: Some("64d399917e441072c228d7811743550753c9f6cf".to_owned()),
-            })
-        );
-        assert_eq!(
-            parse_metadata_line("@  tvykuurwpnwzzqulzrvwvmxxotnlywqw"),
-            Some(RevisionMetadata {
-                change_id: "tvykuurwpnwzzqulzrvwvmxxotnlywqw".to_owned(),
-                commit_id: None,
-            })
-        );
-        assert_eq!(parse_metadata_line("│ ~  (elided revisions)"), None);
+    fn operation_log_rows_fail_closed_on_row_count_mismatch() {
+        let lines = b"@  current\n\xE2\x97\x8B  previous\n"
+            .to_vec()
+            .into_text()
+            .unwrap()
+            .lines;
+        let operation_ids = operation_id_rows(vec![operation_id('a')]);
+
+        let items = group_operation_log_lines(lines, operation_ids);
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.operation_id().is_none()));
+        assert_eq!(items[0].row_text(), "@  current");
+        assert_eq!(items[1].row_text(), "○  previous");
     }
 
     #[test]
-    fn parses_operation_id_lines() {
+    fn parses_revision_metadata_lines_graph_shape() {
+        let change_id = "t".repeat(32);
+        let commit_id = "6".repeat(40);
+
+        assert_eq!(
+            parse_metadata_line(&graph_revision_metadata_text('@', 't', '6')),
+            Some(RevisionMetadata {
+                change_id: change_id.to_owned(),
+                commit_id: Some(commit_id.to_owned()),
+            })
+        );
+        assert_eq!(
+            parse_metadata_line(&graph_revision_metadata_text('○', 't', '6')),
+            Some(RevisionMetadata {
+                change_id: change_id.to_owned(),
+                commit_id: Some(commit_id.to_owned()),
+            })
+        );
+        assert_eq!(
+            parse_metadata_line(&format!("│ ○  {} {}", change_id, commit_id)),
+            Some(RevisionMetadata {
+                change_id: change_id.to_owned(),
+                commit_id: Some(commit_id.to_owned()),
+            })
+        );
+        assert_eq!(
+            parse_metadata_line(&format!("│ ◆  {} {}", change_id, commit_id)),
+            Some(RevisionMetadata {
+                change_id: change_id.to_owned(),
+                commit_id: Some(commit_id.to_owned()),
+            })
+        );
+        assert_eq!(
+            parse_metadata_line(&format!(
+                "junk {}",
+                graph_revision_metadata_text('@', 't', '6')
+            )),
+            None
+        );
+        assert_eq!(
+            parse_metadata_line(&format!(
+                "{} junk",
+                graph_revision_metadata_text('@', 't', '6')
+            )),
+            None
+        );
+        assert_eq!(
+            parse_metadata_line(&format!("│ junk @  {} {}", change_id, commit_id)),
+            None
+        );
+    }
+
+    #[test]
+    fn parses_operation_id_lines_exact_shape() {
         let operation_id = operation_id('a');
 
         assert_eq!(
-            parse_operation_id_line(&("@  ".to_owned() + &operation_id + "\n")),
-            Some(operation_id)
+            parse_operation_id_line(&operation_id),
+            Some(operation_id.clone())
+        );
+        assert_eq!(
+            parse_operation_id_line(&format!("junk {operation_id}")),
+            None
         );
         assert_eq!(parse_operation_id_line("not-an-operation"), None);
     }
@@ -1781,6 +2070,26 @@ mod tests {
             change_id: change_id.to_owned(),
             commit_id: Some(commit_id.to_owned()),
         }
+    }
+
+    fn metadata_rows(rows: Vec<RevisionMetadata>) -> RowMetadata<RevisionMetadata> {
+        RowMetadata::Valid(rows)
+    }
+
+    fn graph_revision_metadata_text(
+        marker: char,
+        change_digit: char,
+        commit_digit: char,
+    ) -> String {
+        format!(
+            "{marker}  {} {}",
+            std::iter::repeat_n(change_digit, 32).collect::<String>(),
+            std::iter::repeat_n(commit_digit, 40).collect::<String>()
+        )
+    }
+
+    fn operation_id_rows(rows: Vec<String>) -> RowMetadata<String> {
+        RowMetadata::Valid(rows)
     }
 
     fn bookmark_metadata(

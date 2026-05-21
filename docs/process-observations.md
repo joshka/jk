@@ -5,6 +5,74 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Connector-prefixed revision metadata repair)
+
+- Slice / task: close the review gap where graph-prefixed revision rows were still rejected when the
+  graph connectors preceded the revision marker.
+- Thread id: `019e48fc-7033-7893-81e9-a44444bb19d1`.
+- Implementation outcome: `src/jj_rows.rs` now strips only the graph prefix before parsing `@`, `○`,
+  or `◆` revision metadata rows, while still rejecting junk-with-marker rows and keeping
+  operation-log metadata strict.
+- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+  `cargo test graph -- --test-threads=1`; `cargo test operation_log -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; main-thread `just check` passed with 526 tests / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Files: `src/jj_rows.rs` and `docs/process-observations.md`
+- Review outcome: a follow-up gpt-5.5 high read-only review reported no issues after the
+  connector-prefix repair. The remaining named risk is future `jj` graph connector glyph drift,
+  which should fail closed by withholding exact ids until the whitelist and tests are updated.
+
+### 2026-05-20 (Graph-prefixed revision metadata repair)
+
+- Slice / task: follow up on the review finding that graph-enabled revision metadata rows were being
+  parsed as if they were bare template payloads.
+- Thread id: `019e48f6-8954-7a53-bc04-7661876eab0f`.
+- Implementation outcome: `src/jj_rows.rs` now accepts the actual `@  ...` and `○  ...` `jj log -T`
+  revision metadata rows, still fails closed on junk with embedded valid ids, and keeps
+  operation-log metadata strict and unprefixed.
+- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+  `cargo test graph -- --test-threads=1`; `cargo test operation_log -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; main-thread `just check` passed with 526 tests / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Files: `src/jj_rows.rs` and `docs/process-observations.md`
+
+### 2026-05-20 (Revision metadata graph-noise repair)
+
+- Slice / task: keep graph-enabled revision metadata pairing from dropping ids when jj emits elision
+  or connector-only template rows.
+- Thread id: `019e48eb-6dca-7b00-9b21-40033c901861`.
+- Implementation outcome: `src/jj_rows.rs` now skips the known graph-only revision metadata shapes
+  before row-count matching, while malformed revision-like metadata still fails closed.
+- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+  `cargo test graph -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; main-thread `just check` passed with 525
+  tests / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-20 22:05:16 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/jj_rows.rs` and `docs/process-observations.md`
+
+### 2026-05-20 (Fail closed on row metadata drift)
+
+- Slice / task: harden log and operation-log row metadata pairing so drift withholds exact ids while
+  preserving rendered rows.
+- Thread id: `019e48c5-d735-76e3-8dbd-39bee59cc7cd`.
+- Implementation outcome: `src/jj_rows.rs` treats revision and operation metadata as all-or-nothing
+  row-order contracts. Malformed, missing, extra, or row-count-mismatched metadata now leaves
+  rendered log and operation rows visible with exact ids set to `None`.
+- Fragility note: `docs/plan/fragility-register.md` records the tightened fail-closed contract for
+  revision identity and operation-log ids.
+- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+  `cargo test operation_log -- --test-threads=1`; `cargo test graph -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; main-thread `just check` passed with 524 tests / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Files: `src/jj_rows.rs`, `docs/plan/fragility-register.md`, and `docs/process-observations.md`
+
 ### 2026-05-20 (Central app and command contracts)
 
 - Slice / task: document ownership and invariants for central app and command contracts in
