@@ -26,7 +26,10 @@ shape, documentation workflow, and agent workflow.
 
 ## Current Concept Map
 
-- Recent completed packets: `Add packet quality gate`, `Audit source maintainability surface`,
+- Recent completed packets: `Extract simple selection restore helper`,
+  `Inventory list selection contracts`, `Clarify app mode input dispatch`,
+  `Inventory action planning cohesion`, `Repair remaining contract drift`,
+  `Add packet quality gate`, `Audit source maintainability surface`,
   `Factor action completion outcomes`, `Repair stale source ownership docs`,
   `Document app command contracts`, `Fail closed on row metadata drift`,
   `Extract jj syntax helpers`, and the `Retire Or Narrow` slice for `src/jj.rs` compatibility
@@ -41,6 +44,8 @@ shape, documentation workflow, and agent workflow.
   construction.
 - Action planning: `src/jj_actions.rs` owns preview-first action plans, command argv construction,
   preview summaries, and fallback result wording.
+- View state: `src/view_state.rs` owns action-target projection policy and the view-level routing
+  that chooses the next detailed screen.
 - Row metadata pairing: `src/jj_rows.rs` owns rendered-row loading, fail-closed metadata pairing,
   and row grouping for graph-adjacent utility views.
 - Syntax helpers: `src/jj_syntax.rs` owns pure `jj` syntax helpers extracted from
@@ -57,21 +62,16 @@ shape, documentation workflow, and agent workflow.
 `just largest-rust-files` reported these largest source files:
 
 ```text
-3557 src/jj_actions.rs
+3585 src/jj_actions.rs
 2145 src/jj_rows.rs
-1477 src/bookmarks.rs
-1458 src/jj.rs
-1254 src/command.rs
+1478 src/bookmarks.rs
+1440 src/jj.rs
+1255 src/command.rs
 1246 src/action_menu.rs
-1217 src/graph.rs
-1192 src/app/tests/bookmark_actions.rs
-1134 src/tui.rs
-819 src/status.rs
-778 src/app/tests/working_copy_actions.rs
-734 src/app/mode_input.rs
-730 src/app/action_lifecycle/preview.rs
-711 src/view_state.rs
-704 src/sticky_file_view.rs
+1218 src/graph.rs
+778 src/app/mode_input.rs
+731 src/app/action_lifecycle/preview.rs
+702 src/view_state.rs
 ```
 
 The maintainability question is not "split the largest files." The question is whether a future
@@ -91,10 +91,6 @@ lines. The counts below are measurement-only, not a design judgment.
 - `src/command.rs`: 17
 - `src/jj.rs`: 16
 - `src/sticky_file_view.rs`: 15
-- `src/action_menu.rs`: 10
-- `src/interactive_process.rs`: 8
-- `src/theme.rs`: 7
-- `src/tui.rs`: 6
 
 ### Match Hotspots
 
@@ -102,7 +98,7 @@ Current match and control-flow hotspot scans found these counts. The counts belo
 measurement-only, not a design judgment.
 
 - `src/jj_actions.rs`: 48
-- `src/app/mode_input.rs`: 31
+- `src/app/mode_input.rs`: 35
 - `src/command.rs`: 28
 - `src/app/action_lifecycle/completion.rs`: 27
 - `src/app/action_lifecycle/preview.rs`: 26
@@ -119,9 +115,8 @@ contract gaps are also closed by the `Document app command contracts` packet: `C
 
 ### Active Documentation Drift
 
-`docs/agent/architecture.md` still describes `src/sticky_file_view.rs` as show/diff-only, but the
-current source usage includes status, file-show, and operation-detail surfaces. That doc should be
-narrowed before the next ownership-oriented packet.
+`docs/agent/architecture.md` still keeps the rendering guidance anchored to "show/diff" wording.
+Fold that wording cleanup into the next packet that already touches documentation.
 
 ### Weak Or Missing Intent Docs
 
@@ -138,116 +133,76 @@ near the type that future edits are likely to land on first.
 
 ### Repeated Or High-Live-Context Surfaces
 
-- `src/app/mode_input.rs` still carries many modal key paths in one control-flow surface.
-- `src/app/action_lifecycle/{completion,rewrite_completion,preview,shared}.rs` now share outcome
-  helpers, but `preview.rs` still repeats pending, finished, and status-context patterns.
+- `src/app/action_lifecycle/preview.rs` still repeats pending, finished, and status-context
+  patterns. The review called this the clearest repeated implementation pattern.
 - `src/jj_actions.rs` still mixes preview-first plans, argv construction, preview summaries, and
-  fallback wording even after `src/jj_syntax.rs` absorbed the pure syntax helpers.
-- Graph, bookmarks, file list, resolve, operation log, status, and workspaces still repeat
-  identity-preserving list mechanics around `Selection`, `clamp`, selected identity, and
-  refresh-preserves tests.
+  fallback wording even after `src/jj_syntax.rs` absorbed the pure syntax helpers. The git sync
+  cluster is the cleanest bounded next extraction.
+- `src/view_state.rs` still repeats action-target projection and navigation routing that want a
+  single policy owner.
+- `src/app/mode_input.rs` still carries many modal key paths in one control-flow surface, but the
+  recent readability packet already reduced the densest dispatch path, so it is not the next packet.
+- `src/app.rs` is no longer the main pressure point; the current measurements and review findings
+  point at the surfaces above instead.
 
 Do not jump from these findings to a generic list abstraction or a broad `jj_actions.rs` split. Use
 one bounded, behavior-preserving slice at a time, and prove that the new owner reduces live context.
 
 ## Prioritized Corrective Slices
 
-### 1. Remaining Contract Drift Sweep
+### 1. Action Preview Pane Construction Helper
 
-- Owner: `docs/agent/architecture.md`, `src/jj_actions.rs`, `src/jj_rows.rs`,
-  `src/sticky_file_view.rs`, and `src/main.rs` only if full module-doc coverage is still a tracked
-  policy.
-- Purpose: repair the sticky-file-view architecture drift and document the remaining action-plan,
-  row-metadata, and private invariant contracts without re-opening already closed app/command
-  contract work.
-- Non-goals: no visibility changes, no API reshaping, and no behavior changes.
-- Proof: `cargo check`; focused tests only if wording changes affect generated help, status labels,
-  doctests, or the module-doc policy.
+- Owner: `src/app/action_lifecycle/preview.rs`.
+- Purpose: pull the repeated action preview pane construction pattern into one helper so the
+  status-context and pending/finished setup reads as a single unit.
+- Non-goals: no preview behavior change, no keymap redesign, and no result-model reshaping.
+- Proof: focused preview tests covering current rendering and scroll behavior, plus `cargo check`.
 
-### 2. App Mode Input Readability
-
-- Owner: `src/app/mode_input.rs`.
-- Purpose: make the modal and prompt key reducers easier to read without changing mode behavior,
-  especially around the dense key-event dispatch path.
-- Non-goals: no new input modes, no binding redesign, and no command coverage changes.
-- Proof: focused mode-input tests for current key paths, plus `cargo check`.
-
-### 3. Action Planning Cohesion
+### 2. Git Sync Action-Plan Cluster
 
 - Owner: `src/jj_actions.rs`.
-- Status: inventory completed in the current packet; extraction remains future work.
-- Purpose: split coherent plan and value clusters only after their source contracts are named.
-  Current clusters are operation recovery/targeting, git sync, working-copy creation/copy/split,
-  describe/commit, working-copy navigation, content and file mutations, bookmark mutations, graph
-  rewrite plans, and abandon safety.
-- Non-goals: no mechanical line-count split and no public facade churn.
-- Proof: source-comment inventory first; then behavior-preserving extraction with
-  command-construction tests for each moved cluster when an extraction packet starts.
+- Purpose: extract the git sync action-plan cluster now that the shared syntax helpers are already
+  out of the file.
+- Non-goals: no broad `jj_actions.rs` split, no public facade churn, and no wording drift in argv
+  labels or fallback result text.
+- Proof: command-construction tests for the moved cluster, plus the current compile pass.
 
-### 4. Vertical Ownership For Rows, Views, And Actions
+### 3. View Action-Target Projection Policy
 
-- Owner: `src/jj_rows.rs`, `src/bookmarks.rs`, `src/graph.rs`, `src/status.rs`, `src/file_list.rs`,
-  `src/resolve.rs`, `src/operation_log.rs`, and `src/workspaces.rs`.
-- Purpose: move repeated selection, identity, and refresh contracts toward the view that owns the
-  behavior instead of letting those rules spread horizontally.
-- Non-goals: no generic list abstraction until at least two follow-up edits prove the same contract
-  needs a shared owner.
-- Proof: view-level tests that show selection preservation and clamping on refresh or shrink for
-  each touched screen.
+- Owner: `src/view_state.rs`.
+- Purpose: group the action-target projection rules that decide how view commands turn into the next
+  detail screen.
+- Non-goals: no graph/search redesign and no new navigation model.
+- Proof: focused view-state tests that show the current action target mapping still produces the
+  same destinations.
 
-### 5. Identity-Preserving List Mechanics
+### 4. Documentation Drift Cleanup
 
-- Owner: the concrete list views first, then any shared helper only if repeated proof shows it is
-  worth centralizing.
-- Purpose: name the shared invariants around preserving selection by identity across refresh,
-  search, filtering, and content shrink.
-- Current contracts:
-  - `selection.rs` owns only cursor mechanics: current row index, first/previous/next/last, set, and
-    clamp-to-last behavior for empty or shrinking content. It does not know row identity.
-  - `graph.rs` preserves the cursor by selected row change id (`LogItem::action_id`) across refresh
-    and log-mode switches, falling back to the previous cursor row when the change disappears.
-    Explicit multi-selection is a separate list of exact change ids, retained only while those
-    changes remain visible, and action sources are projected in graph row order.
-  - `status.rs` preserves the selected row first by exact single repo-relative path when the row has
-    one, then by exact rendered row text, then by previous cursor row. Rows without trusted path
-    metadata stay visible and selectable, but file actions fail closed instead of guessing.
-  - `file_list.rs` preserves selection by exact file path, initializes from an optional spec path
-    when present, and falls back to the previous cursor row when the path disappears.
-  - `resolve.rs` preserves selection by exact conflict path when the template parsed one, then falls
-    back to the previous cursor row. Copy and inspect actions degrade when a row lacks exact path
-    metadata.
-  - `bookmarks.rs` currently preserves selection by bookmark name, while action policy depends on
-    row-local metadata: local versus remote state, remote name, tracking state, local-peer state,
-    target change id, target commit id, and whether the visible list came from unfiltered
-    all-remotes metadata. Name alone is not a complete mutation identity.
-  - `operation_log.rs` preserves selection by exact operation id and falls back to the previous
-    cursor row. Operation detail, copy, restore, and revert actions require the exact operation id.
-  - `workspaces.rs` preserves selection by exact workspace name and falls back to the previous
-    cursor row. Copy policy includes repository root plus optional workspace name, change id, commit
-    id, and row text; root and metadata errors are header context, not selectable rows.
-- Shared mechanics are limited to `Selection` and repeated row-search loops: move next/previous
-  through item rows, clamp after shrink, and prefer identity restoration before index restoration.
-  View-specific policy is the identity key, whether missing metadata can still be selected, what
-  fallback identity is acceptable, and which actions require exact metadata.
-- Helper decision: `selection.rs` now owns the narrow `restore_by_key_or_index` helper for views
-  whose refresh contract is exactly "capture optional stable key, reload rows, find first matching
-  key, else clamp previous index". This helper is applied only to `file_list.rs`, `resolve.rs`, and
-  `operation_log.rs`. The view-specific identity key, missing-metadata behavior, copy/action policy,
-  and status wording remain local to each view. Do not broaden this helper to `graph.rs`,
-  `status.rs`, `bookmarks.rs`, or `workspaces.rs` without separate proof: `graph.rs` has
-  multi-selection retention, `status.rs` has row-text fallback, `bookmarks.rs` has incomplete
-  name-only mutation identity, and `workspaces.rs` mixes selectable rows with non-row header
-  metadata.
-- Non-goals: no broad abstraction before the contract is named and tested in the owning views.
-- Proof: snapshots or focused tests showing the selected identity is preserved, clamped, or
-  intentionally cleared on each screen.
+- Owner: `docs/agent/architecture.md` and `docs/agent/source-maintainability-ledger.md`.
+- Purpose: fold the small remaining docs drift cleanup into the next packet that already touches
+  documentation, instead of spinning up a separate source-shape pass.
+- Non-goals: no source behavior work and no new contract surface.
+- Proof: `just md-check`.
 
-### 6. Completed: Retired `src/jj.rs` Compatibility Re-exports
+### 5. Completed: Retired `src/jj.rs` Compatibility Re-exports
 
 - Status: completed in the current packet.
 - Result: source and test imports now refer to `jj_actions` and `jj_rows` directly; `src/jj.rs`
   keeps only the helpers it owns; and no compatibility re-export remains.
 - Proof: focused compile pass plus the import audit recorded in `docs/process-observations.md`.
+
+### 6. Completed: Simple Selection Restore Helper Inventory
+
+- Status: completed in the current packet.
+- Result: the helper stays narrow and the selection contracts remain documented for future readers.
+  `selection.rs` keeps cursor mechanics only; `graph.rs` preserves selection by change id with
+  multi-selection retention; `status.rs` preserves the selected row by path, then rendered text,
+  then previous cursor row; `file_list.rs` preserves exact file-path selection; `resolve.rs`
+  preserves exact conflict-path selection; `bookmarks.rs` still depends on row-local mutation
+  metadata; `operation_log.rs` preserves exact operation-id selection; and `workspaces.rs` preserves
+  exact workspace-name selection while mixing selectable rows with header metadata.
+- Proof: the `Extract simple selection restore helper` packet and the inventory in
+  `docs/process-observations.md`.
 
 ### 7. Quality Gate Refinements
 

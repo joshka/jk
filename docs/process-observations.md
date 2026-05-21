@@ -5,6 +5,26 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Assess next maintainability slices)
+
+- Slice / task: reassess the next maintainability packets after the recent cleanup work on current
+  jj change `Assess next maintainability slices`.
+- Thread id: `019e4945-3ba1-73c0-8d80-cf13869c2ddd`.
+- Model / routing: a `gpt-5.5` read-only review supplied the recommendations; a `gpt-5.4-mini`
+  worker updated the docs; the main thread reviewed and requested corrections.
+- Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
+- Implementation outcome: the ledger now reflects the refreshed size, visibility, and hotspot
+  counts; marks the recent contract-drift, mode-input, action-planning, identity-list, and
+  selection-helper work as recent completions; and reprioritizes the next slices toward preview-pane
+  construction, the git sync action-plan cluster, view action-target projection policy, and a small
+  docs drift cleanup.
+- Behavior intent: no source code changed in this packet.
+- Validation trail: `just md-check` passed.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`,
+    and the read-only review notes for the current packet
+
 ### 2026-05-20 (Selection helper Rustdoc correction)
 
 - Slice / task: add concise Rustdoc to `restore_by_key_or_index` on current jj change
