@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Sticky file document test split)
+
+- Slice / task: move inline tests from `src/sticky_file_view.rs` into
+  `src/sticky_file_view/tests.rs` for the existing jj change.
+- Thread id: `019e4c8b-b05a-75b3-b676-4c1742bbb535` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
+  packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
+  were run.
+- Implementation outcome: `sticky_file_view.rs` now ends with `#[cfg(test)] mod tests;`, while the
+  moved sibling module uses `use super::*;` to preserve private access to rendered document helpers,
+  `StickyFileDocument::replace_lines`, and `StickyFileDocument::horizontal_offset`.
+- Behavior-preservation evidence: the packet moved the existing five sticky file view tests without
+  changing their names, assertions, helper functions, snapshots, rendering semantics, sticky heading
+  behavior, no-wrap behavior, scroll behavior, visibility, or public API.
+- Readability evidence: before the packet, `src/sticky_file_view.rs` measured 702 lines with tests
+  inline. After the split it measured 568 lines, with 132 lines in `src/sticky_file_view/tests.rs`,
+  keeping shared document rendering and scroll code easier to scan while keeping tests beside the
+  owning module.
+- Validation trail:
+  - Worker validation passed: `cargo test sticky_file_view -- --test-threads=1` with 5 passed and
+    562 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test sticky_file_view -- --test-threads=1` with 5
+    passed and 562 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first format check reported one rustfmt wrapping difference in the moved
+  test file. After applying that formatting-only change, validation passed. No behavior rework was
+  needed; document rendering, sticky heading projection, no-wrap viewport handling, scroll behavior,
+  visibility, and public API stayed unchanged.
+- Evidence basis:
+  - Date: `2026-05-21 14:59:08 PDT` from local `date`.
+  - Main review date: `2026-05-21 15:00:56 PDT` from local `date`.
+  - Files: `src/sticky_file_view.rs`, `src/sticky_file_view/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Command vocabulary test split)
 
 - Slice / task: move inline tests from `src/command.rs` into `src/command/tests.rs` for the existing

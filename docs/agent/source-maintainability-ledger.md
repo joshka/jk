@@ -103,6 +103,25 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 sticky file document test split:
+
+- `src/sticky_file_view.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/sticky_file_view/tests.rs` with `use super::*;` for private access to rendered document
+  helpers and `StickyFileDocument` internals.
+- This improves local readability by keeping shared document rendering, sticky heading projection,
+  no-wrap viewport handling, search, file navigation, and scroll mechanics visible without scrolling
+  through 132 lines of inline tests. The production file measured 702 lines before the split and 568
+  lines after it.
+- The packet intentionally preserved all five sticky file view test names, assertions, helper
+  functions, snapshots, rendering semantics, sticky heading behavior, no-wrap behavior, scroll
+  behavior, visibility, and public API.
+- Focused validation covered `cargo test sticky_file_view -- --test-threads=1` with 5 passed and 562
+  filtered out, `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check` after
+  this documentation update.
+- Rework was limited to applying rustfmt's wrapping for one moved test assertion; no document
+  rendering, sticky heading projection, no-wrap viewport handling, scroll behavior, visibility, or
+  public API changed.
+
 2026-05-21 command vocabulary test split:
 
 - `src/command.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
