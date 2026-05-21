@@ -5,6 +5,49 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Workspace row loading extraction)
+
+- Slice / task: extract workspace rendered row loading and workspace metadata pairing from broad
+  `src/jj_rows.rs` on current change `Extract workspace row loading`.
+- Thread id: `019e49b1-adbf-77c2-8aec-d534d9ec3fdb`.
+- Model / routing: worker/subagent `019e49b1-adbf-77c2-8aec-d534d9ec3fdb` with medium reasoning
+  implemented the extraction. The main thread reviewed and validated the result. The user explicitly
+  prohibited jj/git commands, so the work used direct file reads, local measurements, and validation
+  commands without source-control inspection.
+- Files changed: `src/jj_rows.rs`, `src/jj_rows/workspaces.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_rows/workspaces.rs` now owns `WorkspaceContext`, `WorkspaceItem`,
+  `load_workspace_context`, the workspace metadata template, root/list/metadata context loading,
+  rendered workspace row pairing, metadata parsing, row-count drift behavior, and focused workspace
+  row tests. `src/jj_rows.rs` re-exports the stable workspace row facade for existing callers and
+  keeps shared row helpers plus the remaining row families.
+- Behavior intent: preserve rendered ANSI conversion, workspace metadata JSON shape, row-count drift
+  behavior, root/list error handling, workspaces view behavior, and existing app/test call sites
+  exactly.
+- Maintainability evidence: `wc -l src/jj_rows.rs src/jj_rows/workspaces.rs` showed `src/jj_rows.rs`
+  at 760 lines and `src/jj_rows/workspaces.rs` at 338 lines after the extraction.
+- Rework / surprise: the first `just md-check` failed only on Panache wrapping in the new ledger and
+  process-observation entries; applying the suggested wrapping fixed the issue.
+- Validation trail:
+  - `cargo test jj_rows -- --test-threads=1` passed with 36 passed.
+  - `cargo test workspaces -- --test-threads=1` passed with 11 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed. The command still printed the repo's existing
+    rustfmt unstable-option warnings.
+  - `just md-check` passed.
+- Main-thread review validation passed: `cargo test jj_rows -- --test-threads=1` with 36 passed;
+  `cargo test workspaces -- --test-threads=1` with 11 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; `just md-check`; and full
+  `just check`. Full `just check` reported 533 passed / 2 ignored, and its largest-file output
+  included `src/jj_rows.rs` at 760 lines.
+- Evidence basis:
+  - Date: `2026-05-21 01:43:07 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `docs/agent/rust-style.md`, `docs/agent/testing.md`, `src/jj_rows.rs`,
+    `src/jj_rows/workspaces.rs`, `src/workspaces.rs`, and `src/jj.rs`
+
 ### 2026-05-21 (Operation row metadata extraction)
 
 - Slice / task: extract operation-log rendered row loading and operation-id metadata pairing from

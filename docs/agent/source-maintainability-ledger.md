@@ -173,23 +173,40 @@ should have an owner and a contract, not a line-count target.
 - Proof: focused `cargo test jj_rows -- --test-threads=1` passed during the extraction, with final
   gate commands recorded in `docs/process-observations.md`.
 
+### Workspace Row Loading Packet
+
+- Status: completed on 2026-05-21 in the Codex main thread.
+- Owner: `src/jj_rows/workspaces.rs`
+- Outcome: `src/jj_rows/workspaces.rs` owns `WorkspaceContext`, `WorkspaceItem`,
+  `load_workspace_context`, the workspace metadata template, metadata loading, rendered-row pairing,
+  workspace metadata parsing, row-count drift behavior, and focused workspace row tests.
+  `src/jj_rows.rs` keeps the stable workspace facade plus shared row helpers and the remaining row
+  families.
+- Maintainability evidence: `src/jj_rows.rs` dropped from 1075 lines after the operation-row
+  extraction to 760 lines after this packet, and the new `src/jj_rows/workspaces.rs` is 338 lines
+  including moved tests.
+- Non-goals preserved: no graph revision grouping changes, no operation/bookmark/file-list/resolve
+  row changes, no rendered ANSI conversion changes, no workspace metadata JSON shape changes, no
+  row-count drift behavior changes, and no workspaces view behavior changes.
+- Proof: focused `cargo test jj_rows -- --test-threads=1` and
+  `cargo test workspaces -- --test-threads=1` passed during the extraction, with final gate commands
+  recorded in `docs/process-observations.md`.
+
 ## Current Next Slices
 
-### 1. Rendered Row Loader And Metadata Packets
+### 1. Remaining Rendered Row Loader And Metadata Packets
 
 - Owner: `src/jj_rows.rs`, with likely new siblings under `src/jj_rows/` beside
   `src/jj_rows/bookmarks.rs`.
-- Purpose: continue splitting row loading and metadata pairing by rendered row family after the
-  operation packet. The clearest remaining packet is workspace row loading (`WorkspaceContext`,
-  `WorkspaceItem`, workspace metadata parsing and pairing), which already has a narrow template,
-  row-count drift behavior, and focused tests in one file.
-- Evidence: `src/jj_rows.rs` is 1075 lines after bookmark metadata and operation rows were moved
-  out. `load_workspace_context`, `WorkspaceContext`, `WorkspaceItem`, workspace metadata parsing,
-  and workspace drift tests form the next coherent row-family concept.
+- Purpose: continue splitting row loading and metadata pairing by rendered row family only when a
+  remaining family has a clear owner and focused contract.
+- Evidence: `src/jj_rows.rs` is 760 lines after bookmark metadata, operation rows, and workspace
+  rows were moved out. The remaining parent now mostly owns graph revision grouping, resolve-entry
+  parsing, file-list path preservation, shared JSON field helpers, and facade re-exports.
 - Non-goals: do not change rendered ANSI conversion, graph revision grouping, bookmark rows, file
   list path preservation, or the process boundary in `src/jj.rs`. Do not broaden parsing beyond the
   current narrow metadata templates.
-- Proof: focused workspace-row tests for the chosen packet, plus `cargo check`,
+- Proof: focused row-family tests for any chosen packet, plus `cargo check`,
   `rustup run nightly cargo fmt --check`, and `just md-check`.
 
 ### 2. ViewSpec Navigation Provenance Packet
