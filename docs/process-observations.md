@@ -5,6 +5,48 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Modal text prompt key handler extraction)
+
+- Slice / task: extract named `App` helper methods for text-prompt `InteractionMode` arms in
+  `src/app/mode_input.rs` while keeping `handle_active_mode_key` as the active-mode dispatch table.
+- Thread id: `019e4ccf-5087-7cc2-915f-41a0e5b52acc` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex performed the bounded maintainability packet in the existing
+  `Extract modal text prompt handlers` jj working copy change. The user explicitly prohibited
+  version-control commands, and no `jj` or `git` commands were run.
+- Changed files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: the `SearchPrompt`, `LogRevsetPrompt`, `DescribePrompt`, `CommitPrompt`,
+  `BookmarkNamePrompt`, and `BookmarkRenamePrompt` arms now dispatch to named helpers:
+  `handle_search_prompt_key`, `handle_log_revset_prompt_key`, `handle_describe_prompt_key`,
+  `handle_commit_prompt_key`, `handle_bookmark_name_prompt_key`, and
+  `handle_bookmark_rename_prompt_key`.
+- Behavior-preservation evidence: the helper bodies preserve the same reducer calls, prompt input
+  mutation, cancel transitions, search start behavior, custom log revset application, prompt accept
+  decisions, preview openings, and status wording from the former inline match arms.
+- Scope boundary: the packet did not alter reducers, app-screen projection, command bindings, action
+  lifecycle, status wording, key behavior, prompt behavior, tests, or files outside the requested
+  target scope.
+- Validation trail:
+  - Focused validation passed: `cargo test app::tests::command_navigation -- --test-threads=1` with
+    35 passed and 532 filtered out; `cargo test app::tests::bookmark_actions -- --test-threads=1`
+    with 27 passed and 540 filtered out;
+    `cargo test app::tests::rewrite_actions -- --test-threads=1` with 16 passed and 551 filtered
+    out; and `cargo test app::tests::working_copy_actions -- --test-threads=1` with 27 passed and
+    540 filtered out.
+  - Main-thread review validation reran the same four focused app test filters successfully with the
+    same pass counts, then reran `cargo check`, `rustup run nightly cargo fmt --check`, and
+    `just md-check`.
+  - Additional validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first Rust format check reported only rustfmt wrapping differences in the
+  extracted helper dispatch and one status assignment. Applying rustfmt fixed the Rust formatting
+  gate.
+- Evidence basis:
+  - Date: `2026-05-21 16:12:09 PDT` from local `date`.
+  - Main review date: `2026-05-21 16:15:23 PDT` from local `date`.
+  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
+    note.
+
 ### 2026-05-21 (Modal menu key handler extraction)
 
 - Slice / task: extract named `App` helper methods for menu-like `InteractionMode` arms in

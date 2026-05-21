@@ -91,119 +91,21 @@ impl App {
         match &mut self.mode {
             InteractionMode::Normal => Ok(false),
             InteractionMode::Help => unreachable!("help mode is handled before borrowing mode"),
-            InteractionMode::SearchPrompt(input) => {
-                match reduce_text_prompt_key(input, code) {
-                    TextPromptKey::Cancel => self.mode = InteractionMode::Normal,
-                    TextPromptKey::Accept => {
-                        self.search = SearchQuery::new(input.clone());
-                        self.mode = InteractionMode::Normal;
-                        self.status = if self.search.is_some() {
-                            match self.execute_view(ViewCommand::StartSearch, viewport_height) {
-                                ViewEffect::SearchStarted { matches } => StatusLine::with_message(
-                                    &self.view,
-                                    format!("{matches} matches"),
-                                ),
-                                _ => StatusLine::ready(&self.view),
-                            }
-                        } else {
-                            StatusLine::ready(&self.view)
-                        };
-                    }
-                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
-                }
-                Ok(true)
+            InteractionMode::SearchPrompt(_) => {
+                self.handle_search_prompt_key(code, viewport_height)
             }
-            InteractionMode::LogRevsetPrompt(input) => {
-                match reduce_text_prompt_key(input, code) {
-                    TextPromptKey::Cancel => self.mode = InteractionMode::Normal,
-                    TextPromptKey::Accept => {
-                        let revset = std::mem::take(input);
-                        self.mode = InteractionMode::Normal;
-                        self.apply_custom_log_revset(revset);
-                    }
-                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
-                }
-                Ok(true)
-            }
+            InteractionMode::LogRevsetPrompt(_) => self.handle_log_revset_prompt_key(code),
             InteractionMode::CopyMenu { .. } => self.handle_copy_menu_key(code),
             InteractionMode::ViewMenu { .. } => self.handle_view_menu_key(code, viewport_height),
             InteractionMode::ActionMenu { .. } => self.handle_action_menu_key(code),
             InteractionMode::RolePrompt { .. } => self.handle_role_prompt_key(code),
-            InteractionMode::DescribePrompt { target, input } => {
-                match reduce_text_prompt_key(input, code) {
-                    TextPromptKey::Cancel => {
-                        self.mode = InteractionMode::Normal;
-                        self.status =
-                            StatusLine::with_message(&self.view, "describe cancelled".to_owned());
-                    }
-                    TextPromptKey::Accept => {
-                        let decision = reduce_describe_prompt_accept(target, input);
-                        self.apply_text_prompt_accept_decision(
-                            decision,
-                            Self::open_describe_preview,
-                        );
-                    }
-                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
-                }
-                Ok(true)
+            InteractionMode::DescribePrompt { .. } => self.handle_describe_prompt_key(code),
+            InteractionMode::CommitPrompt(_) => self.handle_commit_prompt_key(code),
+            InteractionMode::BookmarkNamePrompt { .. } => {
+                self.handle_bookmark_name_prompt_key(code)
             }
-            InteractionMode::CommitPrompt(input) => {
-                match reduce_text_prompt_key(input, code) {
-                    TextPromptKey::Cancel => {
-                        self.mode = InteractionMode::Normal;
-                        self.status =
-                            StatusLine::with_message(&self.view, "commit cancelled".to_owned());
-                    }
-                    TextPromptKey::Accept => {
-                        let decision = reduce_commit_prompt_accept(input);
-                        self.apply_text_prompt_accept_decision(decision, Self::open_commit_preview);
-                    }
-                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
-                }
-                Ok(true)
-            }
-            InteractionMode::BookmarkNamePrompt {
-                kind,
-                target,
-                input,
-            } => {
-                match reduce_text_prompt_key(input, code) {
-                    TextPromptKey::Cancel => {
-                        let kind = *kind;
-                        self.mode = InteractionMode::Normal;
-                        self.status = StatusLine::with_message(
-                            &self.view,
-                            format!("bookmark {} cancelled", kind.label()),
-                        );
-                    }
-                    TextPromptKey::Accept => {
-                        let decision = reduce_bookmark_name_prompt_accept(*kind, target, input);
-                        self.apply_text_prompt_accept_decision(
-                            decision,
-                            Self::open_bookmark_mutation_preview,
-                        );
-                    }
-                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
-                }
-                Ok(true)
-            }
-            InteractionMode::BookmarkRenamePrompt { old_name, input } => {
-                match reduce_text_prompt_key(input, code) {
-                    TextPromptKey::Cancel => {
-                        self.mode = InteractionMode::Normal;
-                        self.status =
-                            StatusLine::with_message(&self.view, "bookmark rename cancelled");
-                    }
-                    TextPromptKey::Accept => {
-                        let decision = reduce_bookmark_rename_prompt_accept(old_name, input);
-                        self.apply_text_prompt_accept_decision(
-                            decision,
-                            Self::open_bookmark_mutation_preview,
-                        );
-                    }
-                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
-                }
-                Ok(true)
+            InteractionMode::BookmarkRenamePrompt { .. } => {
+                self.handle_bookmark_rename_prompt_key(code)
             }
             InteractionMode::AbandonPreview {
                 abandon,
@@ -303,6 +205,140 @@ impl App {
                 unreachable!("common action preview modes are handled before borrowing mode")
             }
         }
+    }
+
+    fn handle_search_prompt_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
+        let InteractionMode::SearchPrompt(input) = &mut self.mode else {
+            unreachable!("search prompt key handler requires search prompt mode");
+        };
+
+        match reduce_text_prompt_key(input, code) {
+            TextPromptKey::Cancel => self.mode = InteractionMode::Normal,
+            TextPromptKey::Accept => {
+                self.search = SearchQuery::new(input.clone());
+                self.mode = InteractionMode::Normal;
+                self.status = if self.search.is_some() {
+                    match self.execute_view(ViewCommand::StartSearch, viewport_height) {
+                        ViewEffect::SearchStarted { matches } => {
+                            StatusLine::with_message(&self.view, format!("{matches} matches"))
+                        }
+                        _ => StatusLine::ready(&self.view),
+                    }
+                } else {
+                    StatusLine::ready(&self.view)
+                };
+            }
+            TextPromptKey::Edited | TextPromptKey::Ignored => {}
+        }
+        Ok(true)
+    }
+
+    fn handle_log_revset_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+        let InteractionMode::LogRevsetPrompt(input) = &mut self.mode else {
+            unreachable!("log revset prompt key handler requires log revset prompt mode");
+        };
+
+        match reduce_text_prompt_key(input, code) {
+            TextPromptKey::Cancel => self.mode = InteractionMode::Normal,
+            TextPromptKey::Accept => {
+                let revset = std::mem::take(input);
+                self.mode = InteractionMode::Normal;
+                self.apply_custom_log_revset(revset);
+            }
+            TextPromptKey::Edited | TextPromptKey::Ignored => {}
+        }
+        Ok(true)
+    }
+
+    fn handle_describe_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+        let InteractionMode::DescribePrompt { target, input } = &mut self.mode else {
+            unreachable!("describe prompt key handler requires describe prompt mode");
+        };
+
+        match reduce_text_prompt_key(input, code) {
+            TextPromptKey::Cancel => {
+                self.mode = InteractionMode::Normal;
+                self.status = StatusLine::with_message(&self.view, "describe cancelled".to_owned());
+            }
+            TextPromptKey::Accept => {
+                let decision = reduce_describe_prompt_accept(target, input);
+                self.apply_text_prompt_accept_decision(decision, Self::open_describe_preview);
+            }
+            TextPromptKey::Edited | TextPromptKey::Ignored => {}
+        }
+        Ok(true)
+    }
+
+    fn handle_commit_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+        let InteractionMode::CommitPrompt(input) = &mut self.mode else {
+            unreachable!("commit prompt key handler requires commit prompt mode");
+        };
+
+        match reduce_text_prompt_key(input, code) {
+            TextPromptKey::Cancel => {
+                self.mode = InteractionMode::Normal;
+                self.status = StatusLine::with_message(&self.view, "commit cancelled".to_owned());
+            }
+            TextPromptKey::Accept => {
+                let decision = reduce_commit_prompt_accept(input);
+                self.apply_text_prompt_accept_decision(decision, Self::open_commit_preview);
+            }
+            TextPromptKey::Edited | TextPromptKey::Ignored => {}
+        }
+        Ok(true)
+    }
+
+    fn handle_bookmark_name_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+        let InteractionMode::BookmarkNamePrompt {
+            kind,
+            target,
+            input,
+        } = &mut self.mode
+        else {
+            unreachable!("bookmark name prompt key handler requires bookmark name prompt mode");
+        };
+
+        match reduce_text_prompt_key(input, code) {
+            TextPromptKey::Cancel => {
+                let kind = *kind;
+                self.mode = InteractionMode::Normal;
+                self.status = StatusLine::with_message(
+                    &self.view,
+                    format!("bookmark {} cancelled", kind.label()),
+                );
+            }
+            TextPromptKey::Accept => {
+                let decision = reduce_bookmark_name_prompt_accept(*kind, target, input);
+                self.apply_text_prompt_accept_decision(
+                    decision,
+                    Self::open_bookmark_mutation_preview,
+                );
+            }
+            TextPromptKey::Edited | TextPromptKey::Ignored => {}
+        }
+        Ok(true)
+    }
+
+    fn handle_bookmark_rename_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+        let InteractionMode::BookmarkRenamePrompt { old_name, input } = &mut self.mode else {
+            unreachable!("bookmark rename prompt key handler requires bookmark rename prompt mode");
+        };
+
+        match reduce_text_prompt_key(input, code) {
+            TextPromptKey::Cancel => {
+                self.mode = InteractionMode::Normal;
+                self.status = StatusLine::with_message(&self.view, "bookmark rename cancelled");
+            }
+            TextPromptKey::Accept => {
+                let decision = reduce_bookmark_rename_prompt_accept(old_name, input);
+                self.apply_text_prompt_accept_decision(
+                    decision,
+                    Self::open_bookmark_mutation_preview,
+                );
+            }
+            TextPromptKey::Edited | TextPromptKey::Ignored => {}
+        }
+        Ok(true)
     }
 
     fn handle_copy_menu_key(&mut self, code: KeyCode) -> Result<bool> {

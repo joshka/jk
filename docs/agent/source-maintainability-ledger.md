@@ -106,6 +106,28 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 modal text prompt key handler extraction:
+
+- `src/app/mode_input.rs` keeps `handle_active_mode_key` as the active-mode dispatch table while
+  moving text-prompt interaction behavior into named `App` helpers: `handle_search_prompt_key`,
+  `handle_log_revset_prompt_key`, `handle_describe_prompt_key`, `handle_commit_prompt_key`,
+  `handle_bookmark_name_prompt_key`, and `handle_bookmark_rename_prompt_key`.
+- The packet intentionally preserved reducers, app-screen projection, command bindings, action
+  lifecycle, status wording, key behavior, prompt behavior, and tests. The helpers re-read the
+  active `InteractionMode` they own and keep the same reducer branches, prompt accept decisions,
+  preview openers, status updates, search start, and custom log revset application as the former
+  inline match arms.
+- Focused validation passed: `cargo test app::tests::command_navigation -- --test-threads=1` with 35
+  passed and 532 filtered out; `cargo test app::tests::bookmark_actions -- --test-threads=1` with 27
+  passed and 540 filtered out; `cargo test app::tests::rewrite_actions -- --test-threads=1` with 16
+  passed and 551 filtered out; and `cargo test app::tests::working_copy_actions -- --test-threads=1`
+  with 27 passed and 540 filtered out.
+- Additional validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with existing
+  rustfmt unstable-option warnings; and `just md-check`.
+- Main-thread review validation reran the same four focused app test filters successfully with the
+  same pass counts, then reran `cargo check`, `rustup run nightly cargo fmt --check`, and
+  `just md-check`.
+
 2026-05-21 modal menu key handler extraction:
 
 - `src/app/mode_input.rs` keeps `handle_active_mode_key` as the active-mode dispatch table while
