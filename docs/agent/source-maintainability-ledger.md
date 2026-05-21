@@ -103,6 +103,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 revision action-menu test split:
+
+- `src/action_menu/revision_actions.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests
+  live in `src/action_menu/revision_actions/tests.rs` with `use super::*;` for private access to the
+  owning module.
+- This improves local readability by keeping revision action-menu production policy visible without
+  scrolling through 291 lines of inline tests. The production file measured 743 lines before the
+  split and 447 lines after it.
+- The packet intentionally preserved all seven revision action-menu test names, assertions, action
+  ordering, labels, follow-ups, safety tiers, private helpers, and production visibility.
+- Focused validation covered `cargo test action_menu -- --test-threads=1` with 40 passed and 527
+  filtered out, `cargo check`, and `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings, plus `just md-check` after this documentation update.
+
 2026-05-21 new trunk refresh flow:
 
 - `src/app/action_lifecycle/preview.rs` now uses private `finish_new_trunk_success` for the

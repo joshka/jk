@@ -5,6 +5,40 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Revision action-menu test split)
+
+- Slice / task: move inline tests from `src/action_menu/revision_actions.rs` into
+  `src/action_menu/revision_actions/tests.rs` for the existing jj change.
+- Thread id: `019e4c14-a45b-7203-ba69-2839521a848c` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
+  packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
+  were run.
+- Implementation outcome: `revision_actions.rs` now ends with `#[cfg(test)] mod tests;`, while the
+  moved sibling module uses `use super::*;` to preserve access to private action-menu helpers,
+  context constructors, and policy constants.
+- Behavior-preservation evidence: the packet moved the existing seven revision action-menu tests
+  without changing their names, assertions, expected labels, follow-ups, action ordering, safety
+  tiers, or visibility. Production action behavior stayed limited to the test-module declaration.
+- Readability evidence: before the packet, `src/action_menu/revision_actions.rs` measured 743 lines
+  with tests inline. After the split it measured 447 lines, with 291 lines in
+  `src/action_menu/revision_actions/tests.rs`, keeping revision action policy easier to scan while
+  keeping tests beside the owning module.
+- Validation trail:
+  - Worker validation passed: `cargo test action_menu -- --test-threads=1` with 40 passed and 527
+    filtered out; `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test action_menu -- --test-threads=1` with 40
+    passed and 527 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first Markdown check reported Panache wrapping for two new note lines.
+  After applying that formatting-only change, Markdown validation passed. The sibling module path
+  preserved private access through Rust's child-module privacy rules.
+- Evidence basis:
+  - Date: `2026-05-21 12:48:25 PDT` from local `date`.
+  - Main review date: `2026-05-21 13:17:03 PDT` from local `date`.
+  - Files: `src/action_menu/revision_actions.rs`, `src/action_menu/revision_actions/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Extract new trunk refresh flow)
 
 - Slice / task: reduce nested control flow in `src/app/action_lifecycle/preview.rs::run_new_trunk`
