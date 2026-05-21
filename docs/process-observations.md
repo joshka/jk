@@ -5,6 +5,46 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Sync remote prompt decision reducers)
+
+- Slice / task: extract pure push/fetch remote-list prompt branching from
+  `src/app/action_lifecycle/entry.rs` while preserving app-owned status, mode, preview, and service
+  side effects.
+- Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
+  implementation `019e4bf3-8ef4-7670-a5cb-1017f113e0d3`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the scoped implementation. The
+  main thread retained ownership of version-control operations, reviewed the diff, reran focused
+  validation, and updated the maintainability ledger.
+- Implementation outcome: `entry.rs` now routes loaded remote-list results through private
+  `PushRemotePromptDecision` and `FetchRemotePromptDecision` reducers. Empty, single, multiple, and
+  error remote-list cases stay explicit while `load_git_remotes()`, status updates, mode updates,
+  and preview opening remain in the app boundary.
+- Behavior-preservation evidence: the reducers keep the existing push no-remotes message, fetch
+  no-remotes message, `jj git remote list` finished-output label, and fetch selection context
+  strings. Existing sync action tests still cover app-level fetch/push prompt behavior and the new
+  `action_lifecycle` reducer tests cover empty, single, multiple, and error decisions for both
+  prompt families.
+- Main-thread review outcome: `load_git_remotes()`, status assignment, mode assignment, and preview
+  opening stayed in `entry.rs`; the reducers only classify already-loaded remote-list results.
+- Size evidence: after the change, `src/app/action_lifecycle/entry.rs` measured 559 lines and
+  `src/app/action_lifecycle/entry/tests.rs` measured 84 lines.
+- Validation trail:
+  - Worker validation passed: `cargo test sync_actions -- --test-threads=1` with 20 passed;
+    `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test sync_actions -- --test-threads=1` with 20
+    passed; `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
+    with `-D warnings`, `cargo check`, and `cargo test` with 565 passed / 2 ignored.
+- Rework / surprise: the first rustfmt check requested one line-wrap change in the new reducer
+  tests; after applying that formatting-only fix, the Rust formatting gate passed.
+- Evidence basis:
+  - Date: `2026-05-21 12:15:17 PDT` from local `date`.
+  - Worker thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/action_lifecycle/entry.rs`, `src/app/action_lifecycle/entry/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Mode input reducer test split)
 
 - Slice / task: move the inline `src/app/mode_input/reducers.rs` reducer tests beside the module

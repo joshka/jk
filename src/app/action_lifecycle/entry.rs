@@ -20,6 +20,39 @@ use crate::view_state::ViewState;
 
 use super::super::App;
 
+const PUSH_NO_REMOTES_MESSAGE: &str = "no git remotes found; add a remote before pushing";
+const FETCH_NO_REMOTES_MESSAGE: &str =
+    "no git remotes found; run default fetch or add a remote before choosing one";
+const FETCH_REMOTE_LIST_COMMAND_LABEL: &str = "jj git remote list";
+const FETCH_NO_REMOTES_CONTEXT: &str = "fetch remote selection found no remotes";
+const FETCH_REMOTE_LIST_ERROR_CONTEXT: &str = "fetch remote selection failed to list remotes";
+
+#[derive(Debug, Eq, PartialEq)]
+enum PushRemotePromptDecision {
+    MissingRemotes { message: String },
+    OpenPreview { remote: String },
+    Prompt { remotes: Vec<String> },
+    RemoteListError { message: String },
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum FetchRemotePromptDecision {
+    MissingRemotes {
+        message: String,
+        status_context: String,
+    },
+    OpenPreview {
+        remote: String,
+    },
+    Prompt {
+        remotes: Vec<String>,
+    },
+    RemoteListError {
+        message: String,
+        status_context: String,
+    },
+}
+
 impl App {
     pub(in crate::app) fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
         if matches!(
@@ -428,69 +461,99 @@ impl App {
             }
         };
 
-        match self.load_git_remotes() {
-            Ok(remotes) => {
-                match remotes.as_slice() {
-                    [] => {
-                        self.status = StatusLine::error(
-                            &self.view,
-                            "no git remotes found; add a remote before pushing".to_owned(),
-                        );
-                    }
-                    [remote] => self.open_push_preview(target, remote.to_owned()),
-                    _ => {
-                        self.mode = InteractionMode::PushRemotePrompt {
-                            target,
-                            remotes,
-                            selected: 0,
-                        };
-                    }
-                }
-                Ok(false)
+        let decision =
+            decide_push_remote_prompt(self.load_git_remotes().map_err(|error| error.to_string()));
+        match decision {
+            PushRemotePromptDecision::MissingRemotes { message }
+            | PushRemotePromptDecision::RemoteListError { message } => {
+                self.status = StatusLine::error(&self.view, message);
             }
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                Ok(false)
+            PushRemotePromptDecision::OpenPreview { remote } => {
+                self.open_push_preview(target, remote);
+            }
+            PushRemotePromptDecision::Prompt { remotes } => {
+                self.mode = InteractionMode::PushRemotePrompt {
+                    target,
+                    remotes,
+                    selected: 0,
+                }
             }
         }
+        Ok(false)
     }
 
     pub(in crate::app) fn open_fetch_remote_prompt(&mut self) {
-        match self.load_git_remotes() {
-            Ok(remotes) => match remotes.as_slice() {
-                [] => {
-                    let message = "no git remotes found; run default fetch or add a remote before choosing one"
-                        .to_owned();
-                    self.status = StatusLine::error(&self.view, message.clone());
-                    self.mode = InteractionMode::FetchPreview {
-                        fetch: JjGitFetch::default_remotes(),
-                        output: ActionOutput::finished(
-                            "jj git remote list".to_owned(),
-                            message,
-                            Some("fetch remote selection found no remotes".to_owned()),
-                        ),
-                    };
-                }
-                [remote] => self.open_fetch_preview(remote.to_owned()),
-                _ => {
-                    self.mode = InteractionMode::FetchRemotePrompt {
-                        remotes,
-                        selected: 0,
-                    };
-                }
-            },
-            Err(error) => {
-                let message = error.to_string();
+        let decision =
+            decide_fetch_remote_prompt(self.load_git_remotes().map_err(|error| error.to_string()));
+        match decision {
+            FetchRemotePromptDecision::MissingRemotes {
+                message,
+                status_context,
+            }
+            | FetchRemotePromptDecision::RemoteListError {
+                message,
+                status_context,
+            } => {
                 self.status = StatusLine::error(&self.view, message.clone());
                 self.mode = InteractionMode::FetchPreview {
                     fetch: JjGitFetch::default_remotes(),
                     output: ActionOutput::finished(
-                        "jj git remote list".to_owned(),
+                        FETCH_REMOTE_LIST_COMMAND_LABEL.to_owned(),
                         message,
-                        Some("fetch remote selection failed to list remotes".to_owned()),
+                        Some(status_context),
                     ),
+                };
+            }
+            FetchRemotePromptDecision::OpenPreview { remote } => {
+                self.open_fetch_preview(remote);
+            }
+            FetchRemotePromptDecision::Prompt { remotes } => {
+                self.mode = InteractionMode::FetchRemotePrompt {
+                    remotes,
+                    selected: 0,
                 };
             }
         }
     }
 }
+
+fn decide_push_remote_prompt(
+    remotes: std::result::Result<Vec<String>, String>,
+) -> PushRemotePromptDecision {
+    match remotes {
+        Ok(remotes) => match remotes.as_slice() {
+            [] => PushRemotePromptDecision::MissingRemotes {
+                message: PUSH_NO_REMOTES_MESSAGE.to_owned(),
+            },
+            [remote] => PushRemotePromptDecision::OpenPreview {
+                remote: remote.to_owned(),
+            },
+            _ => PushRemotePromptDecision::Prompt { remotes },
+        },
+        Err(message) => PushRemotePromptDecision::RemoteListError { message },
+    }
+}
+
+fn decide_fetch_remote_prompt(
+    remotes: std::result::Result<Vec<String>, String>,
+) -> FetchRemotePromptDecision {
+    match remotes {
+        Ok(remotes) => match remotes.as_slice() {
+            [] => FetchRemotePromptDecision::MissingRemotes {
+                message: FETCH_NO_REMOTES_MESSAGE.to_owned(),
+                status_context: FETCH_NO_REMOTES_CONTEXT.to_owned(),
+            },
+            [remote] => FetchRemotePromptDecision::OpenPreview {
+                remote: remote.to_owned(),
+            },
+            _ => FetchRemotePromptDecision::Prompt { remotes },
+        },
+        Err(message) => FetchRemotePromptDecision::RemoteListError {
+            message,
+            status_context: FETCH_REMOTE_LIST_ERROR_CONTEXT.to_owned(),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests;

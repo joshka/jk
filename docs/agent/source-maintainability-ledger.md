@@ -98,6 +98,21 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 sync remote prompt decision reducers:
+
+- `src/app/action_lifecycle/entry.rs` now separates loaded remote-list branching from app side
+  effects with private push/fetch prompt decision reducers.
+- `entry.rs` still owns `load_git_remotes()`, status updates, mode changes, and preview opening. The
+  reducers only classify empty, single, multiple, and error remote-list results.
+- New `src/app/action_lifecycle/entry/tests.rs` tests the pure decision matrix and existing
+  `sync_actions` tests continue to prove app-level prompt behavior, status text, and output panes.
+- After the extraction, `src/app/action_lifecycle/entry.rs` measured 559 lines and
+  `src/app/action_lifecycle/entry/tests.rs` measured 84 lines.
+- Focused validation covered `cargo test sync_actions -- --test-threads=1`,
+  `cargo test action_lifecycle -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`. Full `just check` also passed at the
+  top of the stack.
+
 2026-05-21 sync refresh completion helper:
 
 - `src/app/action_lifecycle/shared.rs` now owns `finish_successful_sync_action`, the shared app-side
