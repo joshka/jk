@@ -5,6 +5,54 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Graph revision row extraction)
+
+- Slice / task: extract graph revision rendered row loading and revision metadata pairing from broad
+  `src/jj_rows.rs`.
+- Thread id: `019e4a1a-c8ee-7053-8f7e-6deab4c68dfe`.
+- Model / routing: GPT-5 Codex worker/subagent with medium reasoning implemented the extraction. The
+  main thread reviewed and validated the result. The user explicitly prohibited jj/git commands, so
+  the work used direct file reads, local measurements, and validation commands without
+  source-control inspection.
+- Files changed: `src/jj_rows.rs`, `src/jj_rows/revisions.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_rows/revisions.rs` now owns `LogItem`, `load_entries`,
+  `load_compact_log_context`, revision metadata template execution, revision metadata parsing,
+  rendered graph row grouping, revision id pairing, and focused revision grouping/parser tests.
+  `src/jj_rows.rs` re-exports the stable revision row facade and keeps resolve rows, file-list rows,
+  `document_plain_text`, `line_text`, JSON field helpers, `RowMetadata`, `first_content_char`, and
+  `is_standalone_graph_line`.
+- Behavior intent: preserve rendered ANSI conversion, graph row grouping, revision metadata drift
+  fail-closed behavior, compact log-context behavior, resolve and file-list parsing, and the process
+  boundary in `src/jj.rs` exactly.
+- Maintainability evidence: the row-family `wc -l` command showed `src/jj_rows.rs` at 282 lines and
+  `src/jj_rows/revisions.rs` at 498 lines after the extraction. The ledger recorded `src/jj_rows.rs`
+  at 760 lines before this packet.
+- Rework / surprise: `rustup run nightly cargo fmt --check` failed only on one trailing blank-line
+  formatting diff in `src/jj_rows.rs`; running rustfmt fixed it. The first `just md-check` failed
+  only on Panache wrapping in the edited docs; applying the suggested wrapping fixed it.
+- Validation trail:
+  - `cargo test jj_rows -- --test-threads=1` passed with 36 passed.
+  - `cargo test graph -- --test-threads=1` passed with 55 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed after applying rustfmt. The command still printed
+    the repo's existing rustfmt unstable-option warnings.
+  - `just md-check` passed after applying Panache wrapping to the edited docs.
+- Main-thread review validation passed: `cargo test jj_rows -- --test-threads=1` with 36 passed;
+  `cargo test graph -- --test-threads=1` with 55 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored, and
+  its largest-file output no longer listed `src/jj_rows.rs` in the top 20. Packet line-count
+  evidence also showed `src/jj_rows.rs` at 282 lines and `src/jj_rows/revisions.rs` at 498 lines.
+- Evidence basis:
+  - Date: `2026-05-21 03:39:12 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/architecture.md`, `docs/agent/rust-style.md`, `src/jj_rows.rs`,
+    `src/jj_rows/bookmarks.rs`, `src/jj_rows/operations.rs`, and `src/jj_rows/workspaces.rs`
+
 ### 2026-05-21 (Row extraction reassessment)
 
 - Slice / task: reassess the remaining source maintainability queue after the ViewSpec, revision

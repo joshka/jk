@@ -71,12 +71,14 @@ Current largest Rust files from `just largest-rust-files` on 2026-05-21:
  613 src/diff.rs
 ```
 
-Current row-family line counts from `wc -l src/*.rs src/jj_rows/*.rs`:
+Current row-family line counts from `wc -l src/jj_rows.rs src/jj_rows/*.rs` after the 2026-05-21
+graph revision row extraction:
 
 ```text
 876 src/jj_rows/bookmarks.rs
-760 src/jj_rows.rs
+498 src/jj_rows/revisions.rs
 338 src/jj_rows/workspaces.rs
+282 src/jj_rows.rs
 251 src/jj_rows/operations.rs
 ```
 
@@ -211,19 +213,30 @@ cohesion, not a single obvious "split the biggest file" queue.
   existing status chrome snapshots; final gate commands are recorded in
   `docs/process-observations.md`.
 
+### Graph Revision Row Loading Packet
+
+- Status: completed on 2026-05-21 in a Codex worker/subagent.
+- Owner: `src/jj_rows/revisions.rs`
+- Outcome: `src/jj_rows/revisions.rs` owns `LogItem`, graph revision row loading, compact
+  log-context loading, revision metadata template execution, revision metadata parsing, rendered
+  graph row grouping, revision id pairing, and the focused revision grouping/parser tests.
+  `src/jj_rows.rs` keeps the stable revision row facade plus resolve rows, file-list rows,
+  `document_plain_text`, `line_text`, JSON field helpers, `RowMetadata`, `first_content_char`, and
+  `is_standalone_graph_line`.
+- Maintainability evidence: `src/jj_rows.rs` dropped from 760 lines after the workspace extraction
+  to 282 lines after this packet, while the new `src/jj_rows/revisions.rs` is 498 lines including
+  moved tests.
+- Non-goals preserved: no rendered ANSI conversion changes, no graph row grouping behavior changes,
+  no metadata drift fail-closed behavior changes, no compact log-context behavior changes, no
+  resolve row or file-list row changes, and no process-boundary movement into `src/jj.rs`.
+- Proof: focused `cargo test jj_rows -- --test-threads=1` and `cargo test graph -- --test-threads=1`
+  passed during the extraction, with final gate commands recorded in `docs/process-observations.md`.
+
 ## Current Row Extraction Reassessment
 
-`src/jj_rows.rs` still has one coherent extractable row-family concept: graph revision rows.
-
-- Candidate owner: `src/jj_rows/revisions.rs`
-- Move: `LogItem`, `load_entries`, `load_compact_log_context`, `run_jj_with_template`,
-  `RevisionMetadata`, revision metadata parsing, and `group_lines` for rendered graph rows.
-- Keep in parent for now: facade re-exports, `document_plain_text`, `line_text`, JSON field helpers,
-  `RowMetadata`, `first_content_char`, and `is_standalone_graph_line` while operation rows still
-  share that drift and graph-line classification policy.
-- Proof: the moved revision grouping/parser tests currently at the bottom of `src/jj_rows.rs`,
-  `cargo test jj_rows -- --test-threads=1`, and at least one graph-focused test command such as
-  `cargo test graph -- --test-threads=1`.
+The graph revision row extraction has now completed. Broad `src/jj_rows` source-shape work should
+pause unless product work expands resolve rows, file-list rows, or metadata pairing enough to expose
+a sharper owner.
 
 The remaining candidates from the prior ledger are not good standalone packets right now:
 
@@ -235,10 +248,6 @@ The remaining candidates from the prior ledger are not good standalone packets r
   current home is acceptable. A helper module would make readers jump for simple field accessors.
 - Facade re-exports are intentional. They keep callers stable after row-family splits and should not
   become a separate source-shape packet.
-
-The recommended next implementation packet is therefore one bounded revision-row extraction. After
-that packet, pause `src/jj_rows` source-shape work unless a product feature expands resolve rows,
-file-list rows, or metadata pairing enough to expose a sharper boundary.
 
 ## Other Large Files
 
@@ -262,13 +271,8 @@ file-list rows, or metadata pairing enough to expose a sharper boundary.
 
 ## Next Worker Guidance
 
-The next source-shape worker should either:
-
-1. Extract the revision-row family into `src/jj_rows/revisions.rs` with the owner, non-goals, and
-   proof above.
-1. Pause source-shape refactoring and take product work if the desired next work is not specifically
-   revision-row extraction.
-
-The next worker should not extract resolve rows, file-list rows, JSON helpers, facade re-exports, or
-large view modules merely to reduce line counts. It should preserve rendered `jj` output, ANSI
-conversion, metadata drift behavior, graph-row grouping, and all caller-facing row facades.
+The next source-shape worker should pause `src/jj_rows` refactoring and take product work unless a
+new product change exposes a sharper row boundary. It should not extract resolve rows, file-list
+rows, JSON helpers, facade re-exports, or large view modules merely to reduce line counts. It should
+preserve rendered `jj` output, ANSI conversion, metadata drift behavior, graph-row grouping, and all
+caller-facing row facades.
