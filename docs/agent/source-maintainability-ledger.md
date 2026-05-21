@@ -118,6 +118,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 nested module directory-root conversion:
+
+- A second safe subset of existing nested `foo.rs` plus `foo/` pairs moved to `foo/mod.rs` without
+  content changes: `action_menu/revision_actions`, `app/action_lifecycle/entry`,
+  `app/mode_input/reducers`, `bookmarks/actions`, `bookmarks/rows`, `jj/view_spec`,
+  `jj_actions/files`, `jj_actions/working_copy`, and `operation_log/detail`.
+- The packet continues applying the epage module-layout rule to existing split modules while keeping
+  larger roots for later topical extraction.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `action_menu`, `app`,
+  `app/action_lifecycle`, `app/mode_input`, `app/tests`, `bookmarks`, `files`, `files/list`,
+  `files/show`, `graph`, `jj`, `jj_actions`, `operation_log`, `resolve`, and `tui`.
+- The packet intentionally changed module paths only and did not alter Rust behavior, command argv,
+  rendered `jj` output, status wording, key handling, selection behavior, refresh/reveal behavior,
+  public API, or tests.
+- Validation passed: `cargo check`; focused `cargo test <filter> -- --test-threads=1` runs for each
+  moved root; `rustup run nightly cargo fmt --check`; and `just md-check`.
+
 2026-05-21 module directory-root conversion:
 
 - The first safe subset of existing `foo.rs` plus `foo/` pairs moved to `foo/mod.rs` without content

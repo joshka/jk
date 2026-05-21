@@ -31,6 +31,10 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - The first module-layout conversion moved small existing `foo.rs` plus `foo/` pairs to `foo/mod.rs`
   for `action_output`, `app_screen`, `command`, `diff`, `help`, `interactive_process`,
   `rendered_jj`, `show`, `status`, `sticky_file_view`, `view_state`, and `workspaces`.
+- The second module-layout conversion moved narrow nested roots to `mod.rs` for
+  `action_menu/revision_actions`, `app/action_lifecycle/entry`, `app/mode_input/reducers`,
+  `bookmarks/actions`, `bookmarks/rows`, `jj/view_spec`, `jj_actions/files`,
+  `jj_actions/working_copy`, and `operation_log/detail`.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -88,8 +92,8 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   splits, not blind path moves.
 - Remaining `foo.rs` plus `foo/` pairs after the first conversion are mostly larger roots or nested
   roots with feature/action policy: `action_menu`, `app`, `app/action_lifecycle`, `app/mode_input`,
-  `app/tests`, `bookmarks`, `files`, `graph`, `jj`, `jj_actions`, `operation_log`, `resolve`, and
-  `tui`.
+  `app/tests`, `bookmarks`, `files`, `files/list`, `files/show`, `graph`, `jj`, `jj_actions`,
+  `operation_log`, `resolve`, and `tui`.
 - App modal dispatch readability: `src/app/mode_input.rs` now mostly reads as a dispatch table plus
   named modal handlers. The next app-dispatch work should be based on measured remaining complexity,
   not another automatic extraction.

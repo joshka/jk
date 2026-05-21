@@ -5,6 +5,38 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Nested module directory-root conversion)
+
+- Slice / task: convert narrow nested `foo.rs` plus `foo/` pairs to `foo/mod.rs` after the first
+  top-level module-root conversion.
+- Thread id: `019e4cef-5f3b-7471-8f98-1fba6b39cdc7` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the path-only source move in the
+  `Adopt nested module roots` jj change; the main thread reviewed that the source diff was
+  path-only, refreshed tracking docs, and reran validation.
+- Changed source roots: `action_menu/revision_actions`, `app/action_lifecycle/entry`,
+  `app/mode_input/reducers`, `bookmarks/actions`, `bookmarks/rows`, `jj/view_spec`,
+  `jj_actions/files`, `jj_actions/working_copy`, and `operation_log/detail`.
+- Implementation outcome: those nested modules now use directory roots such as
+  `src/bookmarks/actions/mod.rs` instead of `src/bookmarks/actions.rs` plus
+  `src/bookmarks/actions/`.
+- Behavior-preservation evidence: the source diff for the moved roots is path-only with zero content
+  changes. Runtime behavior, command argv, rendered `jj` output, status wording, key handling,
+  selection behavior, refresh/reveal behavior, public API, and tests are unchanged.
+- Process observation: GPT-5.4 mini remained effective for explicit path-only conversions. The
+  remaining `foo.rs` plus `foo/` pairs are larger roots or feature roots and should be handled
+  through topical extraction, not blind moves.
+- Validation trail:
+  - Worker validation passed: `cargo check`; focused tests for the moved roots; and
+    `rustup run nightly cargo fmt --check`.
+  - Main-thread validation passed: `cargo check`; focused tests for `revision_actions`,
+    `app::action_lifecycle::entry`, `reducers`, `bookmarks::actions`, `bookmarks::rows`,
+    `view_spec`, `jj_actions::files`, `working_copy`, and `operation_log::detail`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:48:10 PDT` from local `date`.
+  - Files: moved source roots listed above, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/cleanup-wave-status.md`, and this process note.
+
 ### 2026-05-21 (Module directory-root conversion)
 
 - Slice / task: convert the first safe subset of existing `foo.rs` plus `foo/` pairs to `foo/mod.rs`
