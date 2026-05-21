@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (File list view test split)
+
+- Slice / task: move inline file-list view tests from `src/files/list.rs` into
+  `src/files/list/tests.rs` while preserving file-list movement, search, copy, refresh, and
+  open-item behavior.
+- Thread id: main orchestration thread; no subagent was used because this was a small follow-up
+  inside the feature-root refactoring direction the user asked to handle in the main thread.
+- Model / routing: GPT-5 Codex performed the implementation, review, validation, and evidence
+  updates in the main thread.
+- Changed files: `src/files/list.rs`, `src/files/list/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/files/list.rs` now ends with `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/files/list/tests.rs` and use Rust child-module privacy through `use super::*;`.
+- Behavior-preservation evidence: the packet moved the existing six file-list view tests without
+  changing their names, assertions, helper functions, imports, selection behavior, exact path copy
+  behavior, refresh behavior, open-item behavior, public API, or runtime behavior.
+- Scope boundary: the packet did not change file-list row parsing, file-show behavior, file action
+  plans, app routing, view-state dispatch, or production file-list code beyond the test module
+  declaration.
+- Validation trail:
+  - Main-thread validation passed: `cargo test files::list -- --test-threads=1` with 8 passed and
+    559 filtered out; `cargo check`; and `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings.
+- Rework / surprise: rustfmt requested the original multi-line refresh helper wrapping after an
+  initial compact move; applying the formatting restored the previous readable shape.
+- Evidence basis:
+  - Date: `2026-05-21 15:52:44 PDT` from local `date`.
+  - Files: `src/files/list.rs`, `src/files/list/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Files feature root)
 
 - Slice / task: move file-list and file-show view modules under a `files` feature root while

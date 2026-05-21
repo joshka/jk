@@ -103,6 +103,22 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 file list view test split:
+
+- `src/files/list.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/files/list/tests.rs` with `use super::*;` for private access to file-list view state.
+- This matches the `files::show` test layout and improves local readability by keeping file-list
+  movement, search, copy, refresh, and open-item behavior visible in tests without requiring the
+  production view module to carry 125 lines of inline test code.
+- The packet intentionally preserved all six file-list view test names, assertions, helper
+  functions, imports, selection behavior, exact path copy behavior, refresh behavior, open-item
+  behavior, public API, and runtime behavior.
+- Focused validation covered `cargo test files::list -- --test-threads=1` with 8 passed and 559
+  filtered out, `cargo check`, and `rustup run nightly cargo fmt --check`.
+- Rework was limited to applying rustfmt's preferred wrapping to one moved helper expression; no
+  production file-list code changed beyond replacing the inline test block with the sibling test
+  module declaration.
+
 2026-05-21 files feature root:
 
 - `src/files.rs` now owns the file-oriented view root, with the former `src/file_list.rs` moved to
