@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Help projection test split)
+
+- Slice / task: move inline tests from `src/help.rs` into `src/help/tests.rs` for the existing jj
+  change.
+- Thread id: `019e4c9f-c7bc-7411-b007-00178921b219` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex implemented the bounded maintainability packet in the current
+  existing jj change. The user explicitly prohibited version-control commands, and no `jj` or `git`
+  commands were run.
+- Implementation outcome: `src/help.rs` now ends with `#[cfg(test)] mod tests;`, while the moved
+  sibling module uses `use super::*;` to preserve private access to help projection helpers and
+  types.
+- Behavior-preservation evidence: the packet moved the existing ten help projection tests without
+  changing their names, assertions, helper-free setup, imports, help grouping, labels, context
+  filtering, key text, public API, or runtime behavior.
+- Scope boundary: the packet did not change help UI behavior, keymap behavior, command metadata,
+  visibility, or public API.
+- Readability evidence: before the packet, `src/help.rs` measured 641 lines with tests inline. After
+  the split it measured 377 lines, with 264 lines in `src/help/tests.rs`, keeping generated help
+  projection policy easier to scan while keeping tests beside the owning module.
+- Validation trail:
+  - Worker validation passed: `cargo test help -- --test-threads=1` with 23 passed and 544 filtered
+    out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `just md-check` after applying Panache wrapping.
+  - Main-thread review validation passed: `cargo test help -- --test-threads=1` with 23 passed and
+    544 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first Markdown check reported Panache wrapping for the new process note.
+  After applying `just md-fmt`, the Markdown check passed. No Rust formatting or behavior rework was
+  needed.
+- Evidence basis:
+  - Date: `2026-05-21 15:22:03 PDT` from local `date`.
+  - Main review date: `2026-05-21 15:23:34 PDT` from local `date`.
+  - Files: `src/help.rs`, `src/help/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    this process note.
+
 ### 2026-05-21 (jj file/content action-plan module split)
 
 - Slice / task: extract restore, revert, and `jj file` mutation action plans from

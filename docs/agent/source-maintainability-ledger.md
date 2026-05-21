@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 help projection test split:
+
+- `src/help.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/help/tests.rs` with `use super::*;` for private access to help projection helpers.
+- This improves local readability by keeping generated help projection policy, grouping, context
+  filtering, labels, and key text visible without scrolling through 264 lines of inline tests. The
+  production file measured 641 lines before the split and 377 lines after it.
+- The packet intentionally preserved all ten help projection test names, assertions, helper-free
+  setup, imports, help grouping, labels, context filtering, key text, public API, and runtime
+  behavior.
+- Focused validation covered `cargo test help -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Main-thread review validation reran the same focused checks successfully with 23 passed and 544
+  filtered out for `cargo test help -- --test-threads=1`.
+- Rework was limited to applying Panache wrapping for the new process note; no help projection code,
+  help UI behavior, keymap behavior, command metadata, visibility, or public API changed.
+
 2026-05-21 jj file/content action-plan module split:
 
 - Restore, revert, and file mutation command plans moved from `src/jj_actions.rs` to
