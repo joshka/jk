@@ -5,6 +5,40 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Operation log view test split)
+
+- Slice / task: move inline operation-log view tests from `src/operation_log.rs` into
+  `src/operation_log/tests.rs` while preserving operation-log movement, copy, refresh, search,
+  operation detail navigation, recovery action menu, and global undo/redo binding checks.
+- Thread id: `019e4cdf-de30-7502-aa06-6ec065e52368` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the bounded test-module move in the
+  `Move operation log view tests` jj change; the main thread reviewed the diff, removed one
+  unintended assertion drift, updated tracking docs, and reran validation.
+- Changed files: `src/operation_log.rs`, `src/operation_log/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+  process note.
+- Implementation outcome: `src/operation_log.rs` now declares `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/operation_log/tests.rs` and use Rust child-module privacy through
+  `use super::*;`.
+- Behavior-preservation evidence: all original test names, helpers, assertions, imports, status
+  wording, action menu expectations, operation show/diff expectations, binding checks, public API,
+  and runtime behavior are preserved after main-thread review removed an added assertion.
+- Process observation: GPT-5.4 mini completed the mechanical test move and validation, but added one
+  harmless extra assertion while preserving the rest of the test body. Main-thread diff review
+  caught and removed it, which reinforces that even mechanical split packets need exact diff review
+  when the acceptance criterion is "move only".
+- Validation trail:
+  - Worker validation passed: `cargo test operation_log -- --test-threads=1` with 29 passed,
+    `cargo check`, and `rustup run nightly cargo fmt --check` after running rustfmt for two
+    line-wrap diffs.
+  - Main-thread validation passed: `cargo test operation_log -- --test-threads=1` with 29 passed and
+    538 filtered out; `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:32:15 PDT` from local `date`.
+  - Files: `src/operation_log.rs`, `src/operation_log/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+    process note.
+
 ### 2026-05-21 (Source ownership contract sweep)
 
 - Slice / task: add concise Rustdoc and invariant comments to central source modules before more

@@ -109,6 +109,19 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 operation log view test split:
+
+- `src/operation_log.rs` now declares `#[cfg(test)] mod tests;`, and the moved view tests live in
+  `src/operation_log/tests.rs` with `use super::*;` for private access to operation-log view state.
+- This keeps operation-log movement, copy, refresh, search, operation detail navigation, recovery
+  action-menu, and global undo/redo binding tests beside the operation-log feature while removing
+  the inline test block from the production view module.
+- The packet intentionally preserved all test names, helpers, assertions, imports, status wording,
+  action menu expectations, operation show/diff expectations, binding checks, public API, and
+  runtime behavior.
+- Focused validation passed: `cargo test operation_log -- --test-threads=1` with 29 passed and 538
+  filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
+
 2026-05-21 source ownership contract sweep:
 
 - `src/main.rs`, `src/app.rs`, `src/app_screen.rs`, `src/command.rs`, `src/action_menu.rs`,
