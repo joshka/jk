@@ -66,13 +66,30 @@ Examples for future packets:
   row grouping, operation-id template parsing and pairing, and fail-closed metadata drift tests;
   `src/operation_log.rs` owns movement/copy, undo/redo/restore/revert availability, operation detail
   navigation, and view tests.
-- Bookmark behavior should trend toward `bookmarks`: row metadata, safe mutation targets,
-  create/set/move/rename/delete/forget/track/untrack availability, and tests.
+- Bookmark behavior now starts from `bookmarks`: `src/bookmarks/rows.rs` owns rendered row loading,
+  bookmark metadata template parsing and pairing, local/remote state classification, and fail-closed
+  drift tests; `src/bookmarks/action_targets.rs` owns safe mutation targets.
 - Cross-view action plans such as rebase, squash, absorb, new, edit, duplicate, split, restore,
   revert, track, untrack, chmod, fetch, push, describe, and abandon may live under an action-plan
   owner, but view-specific availability belongs with the feature that offers the action.
 - Rendered document scrolling, sticky file headings, and rendered jj document parsing may become a
   document feature owner when that lowers reader burden more than today's separate helper modules.
+
+### Recent Packet Evidence
+
+2026-05-21 bookmark row migration:
+
+- `src/bookmarks/rows.rs` contains `BookmarkItem`, `BookmarkRowState`, `LocalBookmarkRemoteState`,
+  `RemoteBookmarkTrackingState`, `BookmarkLocalPeerState`, `load_bookmark_entries`,
+  `BOOKMARK_METADATA_TEMPLATE`, metadata parsing, row pairing, and the bookmark row tests that
+  previously lived under `jj_rows`.
+- `src/bookmarks.rs` declares `mod rows;` and re-exports the row item, row-state enums, and loader
+  for crate-local app/view tests.
+- `src/jj_rows.rs` no longer declares a bookmark submodule or re-exports bookmark row types. It
+  keeps shared rendered-row helpers such as `line_text` and JSON field helpers because revision,
+  workspace, resolve, file-list, and feature-owned row loaders still use them.
+- `src/app/tests/support.rs`, focused app tests, and `src/view_state.rs` construct bookmark rows
+  through `crate::bookmarks::...`, so tests now point at the feature owner.
 
 ## Mechanical Audit Snapshot
 
@@ -109,7 +126,7 @@ The largest production files reported by `just largest-rust-files` were:
 1159 src/jj_actions.rs
  976 src/tui.rs
  973 src/bookmarks.rs
- 876 src/jj_rows/bookmarks.rs
+ 876 src/bookmarks/rows.rs
  833 src/jj_actions/bookmarks.rs
  820 src/status.rs
  797 src/jj/view_spec.rs

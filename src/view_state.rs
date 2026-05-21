@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn push_target_from_bookmarks_uses_selected_name() {
         let view = ViewState::Bookmarks(bookmarks::BookmarksView::test_new(vec![
-            crate::jj_rows::BookmarkItem::new(Vec::new(), "main".to_owned(), None, None),
+            crate::bookmarks::BookmarkItem::new(Vec::new(), "main".to_owned(), None, None),
         ]));
 
         assert_eq!(
@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn selected_local_bookmark_name_rejects_nonlocal_rows() {
         let view = ViewState::Bookmarks(bookmarks::BookmarksView::test_new(vec![
-            crate::jj_rows::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
+            crate::bookmarks::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
                 .with_local(false),
         ]));
 

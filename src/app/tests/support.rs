@@ -11,6 +11,11 @@ pub(super) use crate::app::mode_input::{rebase_plan_from_prompt, squash_plan_fro
 pub(super) use crate::app::services::AppServices;
 pub(super) use crate::app_screen::{InteractionMode, ViewMenuAction};
 pub(super) use crate::app_status::{StatusKind, StatusLine};
+#[allow(unused_imports)]
+pub(super) use crate::bookmarks::{
+    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
+    RemoteBookmarkTrackingState, load_bookmark_entries,
+};
 pub(super) use crate::command::{CommandContext, ViewCommand};
 #[allow(unused_imports)]
 pub(super) use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
@@ -24,10 +29,9 @@ pub(super) use crate::jj_actions::{
 };
 #[allow(unused_imports)]
 pub(super) use crate::jj_rows::{
-    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, FileListItem, LocalBookmarkRemoteState,
-    LogItem, RemoteBookmarkTrackingState, ResolveEntry, WorkspaceContext, WorkspaceItem,
-    document_plain_text, load_bookmark_entries, load_compact_log_context, load_entries,
-    load_file_list_entries, load_resolve_entries, load_workspace_context,
+    FileListItem, LogItem, ResolveEntry, WorkspaceContext, WorkspaceItem, document_plain_text,
+    load_compact_log_context, load_entries, load_file_list_entries, load_resolve_entries,
+    load_workspace_context,
 };
 pub(super) use crate::tui::Overlay;
 pub(super) use crate::view_state::ViewState;

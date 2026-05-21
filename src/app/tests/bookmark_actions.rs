@@ -4,69 +4,73 @@ use super::support::*;
 
 fn bookmark_row_with_state(
     name: &str,
-    state: crate::jj_rows::BookmarkRowState,
-) -> crate::jj_rows::BookmarkItem {
-    crate::jj_rows::BookmarkItem::new(Vec::new(), name.to_owned(), None, None).with_state(state)
+    state: crate::bookmarks::BookmarkRowState,
+) -> crate::bookmarks::BookmarkItem {
+    crate::bookmarks::BookmarkItem::new(Vec::new(), name.to_owned(), None, None).with_state(state)
 }
 
-fn tracked_local_bookmark(name: &str) -> crate::jj_rows::BookmarkItem {
+fn tracked_local_bookmark(name: &str) -> crate::bookmarks::BookmarkItem {
     bookmark_row_with_state(
         name,
-        crate::jj_rows::BookmarkRowState::Local {
-            tracking: crate::jj_rows::LocalBookmarkRemoteState::Tracked {
+        crate::bookmarks::BookmarkRowState::Local {
+            tracking: crate::bookmarks::LocalBookmarkRemoteState::Tracked {
                 untracked_remote_present: false,
             },
         },
     )
 }
 
-fn remote_only_bookmark(name: &str, remote: &str) -> crate::jj_rows::BookmarkItem {
-    remote_bookmark_with_local_peer(name, remote, crate::jj_rows::BookmarkLocalPeerState::Absent)
+fn remote_only_bookmark(name: &str, remote: &str) -> crate::bookmarks::BookmarkItem {
+    remote_bookmark_with_local_peer(
+        name,
+        remote,
+        crate::bookmarks::BookmarkLocalPeerState::Absent,
+    )
 }
 
 fn remote_bookmark_with_local_peer(
     name: &str,
     remote: &str,
-    local_peer: crate::jj_rows::BookmarkLocalPeerState,
-) -> crate::jj_rows::BookmarkItem {
+    local_peer: crate::bookmarks::BookmarkLocalPeerState,
+) -> crate::bookmarks::BookmarkItem {
     bookmark_row_with_state(
         name,
-        crate::jj_rows::BookmarkRowState::Remote {
+        crate::bookmarks::BookmarkRowState::Remote {
             remote: remote.to_owned(),
-            tracking: crate::jj_rows::RemoteBookmarkTrackingState::Untracked { synced: false },
+            tracking: crate::bookmarks::RemoteBookmarkTrackingState::Untracked { synced: false },
             local_peer,
         },
     )
 }
 
-fn untracked_remote_bookmark(name: &str, remote: &str) -> crate::jj_rows::BookmarkItem {
-    crate::jj_rows::BookmarkItem::new(
+fn untracked_remote_bookmark(name: &str, remote: &str) -> crate::bookmarks::BookmarkItem {
+    crate::bookmarks::BookmarkItem::new(
         Vec::new(),
         name.to_owned(),
         Some("change-a".to_owned()),
         None,
     )
-    .with_state(crate::jj_rows::BookmarkRowState::Remote {
+    .with_state(crate::bookmarks::BookmarkRowState::Remote {
         remote: remote.to_owned(),
-        tracking: crate::jj_rows::RemoteBookmarkTrackingState::Untracked { synced: false },
-        local_peer: crate::jj_rows::BookmarkLocalPeerState::Absent,
+        tracking: crate::bookmarks::RemoteBookmarkTrackingState::Untracked { synced: false },
+        local_peer: crate::bookmarks::BookmarkLocalPeerState::Absent,
     })
 }
 
-fn tracked_remote_bookmark(name: &str, remote: &str) -> crate::jj_rows::BookmarkItem {
-    crate::jj_rows::BookmarkItem::new(
+fn tracked_remote_bookmark(name: &str, remote: &str) -> crate::bookmarks::BookmarkItem {
+    crate::bookmarks::BookmarkItem::new(
         Vec::new(),
         name.to_owned(),
         Some("change-a".to_owned()),
         None,
     )
-    .with_state(crate::jj_rows::BookmarkRowState::Remote {
+    .with_state(crate::bookmarks::BookmarkRowState::Remote {
         remote: remote.to_owned(),
-        tracking: crate::jj_rows::RemoteBookmarkTrackingState::Tracked {
+        tracking: crate::bookmarks::RemoteBookmarkTrackingState::Tracked {
             local_present: true,
             synced: true,
         },
-        local_peer: crate::jj_rows::BookmarkLocalPeerState::Unknown,
+        local_peer: crate::bookmarks::BookmarkLocalPeerState::Unknown,
     })
 }
 
@@ -302,7 +306,7 @@ fn bookmark_mutation_rejects_unsupported_and_inexact_contexts() {
 #[test]
 fn bookmark_delete_preview_uses_selected_exact_local_bookmark() {
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature/name".to_owned(),
             Some("change-a".to_owned()),
@@ -330,7 +334,7 @@ fn bookmark_delete_preview_uses_selected_exact_local_bookmark() {
 
 #[test]
 fn bookmark_delete_rejects_nonlocal_bookmark_rows() {
-    let remote = crate::jj_rows::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
+    let remote = crate::bookmarks::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
         .with_local(false);
     let mut app = test_app(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new(vec![remote]),
@@ -412,7 +416,7 @@ fn bookmark_forget_rejects_remote_only_row_from_filtered_metadata() {
         crate::bookmarks::BookmarksView::test_new(vec![remote_bookmark_with_local_peer(
             "feature/name",
             "origin",
-            crate::jj_rows::BookmarkLocalPeerState::Unknown,
+            crate::bookmarks::BookmarkLocalPeerState::Unknown,
         )]),
     ));
 
@@ -492,14 +496,14 @@ fn bookmark_forget_cancel_confirm_success_and_failure_are_inspectable() {
 
 #[test]
 fn bookmark_forget_reports_disabled_rows_without_preview() {
-    let local_only = crate::jj_rows::BookmarkItem::new(
+    let local_only = crate::bookmarks::BookmarkItem::new(
         Vec::new(),
         "scratch".to_owned(),
         Some("change-a".to_owned()),
         None,
     )
-    .with_state(crate::jj_rows::BookmarkRowState::Local {
-        tracking: crate::jj_rows::LocalBookmarkRemoteState::LocalOnly,
+    .with_state(crate::bookmarks::BookmarkRowState::Local {
+        tracking: crate::bookmarks::LocalBookmarkRemoteState::LocalOnly,
     });
     let mut app = test_app(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new_with_args(
@@ -611,14 +615,14 @@ fn bookmark_untrack_preview_uses_exact_selected_remote_bookmark() {
 
 #[test]
 fn bookmark_track_and_untrack_report_disabled_rows_without_preview() {
-    let local_only = crate::jj_rows::BookmarkItem::new(
+    let local_only = crate::bookmarks::BookmarkItem::new(
         Vec::new(),
         "scratch".to_owned(),
         Some("change-a".to_owned()),
         None,
     )
-    .with_state(crate::jj_rows::BookmarkRowState::Local {
-        tracking: crate::jj_rows::LocalBookmarkRemoteState::LocalOnly,
+    .with_state(crate::bookmarks::BookmarkRowState::Local {
+        tracking: crate::bookmarks::LocalBookmarkRemoteState::LocalOnly,
     });
     let mut app = test_app(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new_with_args(
@@ -760,7 +764,7 @@ fn bookmark_delete_rename_and_forget_use_distinct_actions() {
 #[test]
 fn bookmark_rename_prompt_uses_selected_exact_local_bookmark() {
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature/name".to_owned(),
             Some("change-a".to_owned()),
@@ -808,7 +812,7 @@ fn bookmark_rename_prompt_uses_selected_exact_local_bookmark() {
 #[test]
 fn bookmark_rename_prompt_rejects_whitespace_wrapped_input_before_preview() {
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature/name".to_owned(),
             Some("change-a".to_owned()),
@@ -836,7 +840,7 @@ fn bookmark_rename_prompt_rejects_whitespace_wrapped_input_before_preview() {
 fn bookmark_rename_prompt_cancel_and_invalid_inputs_do_not_open_preview() {
     let view = || {
         ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![
-            crate::jj_rows::BookmarkItem::new(
+            crate::bookmarks::BookmarkItem::new(
                 Vec::new(),
                 "feature/name".to_owned(),
                 Some("change-a".to_owned()),
@@ -899,11 +903,11 @@ fn bookmark_rename_prompt_cancel_and_invalid_inputs_do_not_open_preview() {
 
 #[test]
 fn bookmark_rename_rejects_nonlocal_bookmark_rows() {
-    let remote = crate::jj_rows::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
-        .with_state(crate::jj_rows::BookmarkRowState::Remote {
+    let remote = crate::bookmarks::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
+        .with_state(crate::bookmarks::BookmarkRowState::Remote {
             remote: "origin".to_owned(),
-            tracking: crate::jj_rows::RemoteBookmarkTrackingState::Untracked { synced: false },
-            local_peer: crate::jj_rows::BookmarkLocalPeerState::Unknown,
+            tracking: crate::bookmarks::RemoteBookmarkTrackingState::Untracked { synced: false },
+            local_peer: crate::bookmarks::BookmarkLocalPeerState::Unknown,
         });
     let mut app = test_app(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new(vec![remote]),
@@ -920,13 +924,13 @@ fn bookmark_rename_rejects_nonlocal_bookmark_rows() {
         "rename requires a selected exact local bookmark"
     );
 
-    let unknown = crate::jj_rows::BookmarkItem::new(
+    let unknown = crate::bookmarks::BookmarkItem::new(
         Vec::new(),
         "maybe-local".to_owned(),
         Some("change-a".to_owned()),
         None,
     )
-    .with_state(crate::jj_rows::BookmarkRowState::Unknown);
+    .with_state(crate::bookmarks::BookmarkRowState::Unknown);
     let mut app = test_app(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new(vec![unknown]),
     ));
@@ -946,7 +950,7 @@ fn bookmark_rename_rejects_nonlocal_bookmark_rows() {
 #[test]
 fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature/name".to_owned(),
             Some("change-a".to_owned()),
@@ -985,7 +989,7 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
     );
 
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature/name".to_owned(),
             Some("change-a".to_owned()),
@@ -1022,7 +1026,7 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
     );
 
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature/name".to_owned(),
             Some("change-a".to_owned()),
@@ -1047,7 +1051,7 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
 #[test]
 fn bookmark_rename_confirm_duplicate_name_failure_preserves_error_output() {
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature/name".to_owned(),
             Some("change-a".to_owned()),

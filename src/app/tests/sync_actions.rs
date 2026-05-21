@@ -344,7 +344,7 @@ fn push_preview_context_names_status_default_resolution() {
 #[test]
 fn push_preview_context_names_exact_bookmark() {
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature".to_owned(),
             Some("abcdef".to_owned()),

@@ -558,7 +558,7 @@ fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
     assert_eq!(app.view.command(), JjCommand::Default);
 
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "main".to_owned(),
             Some("change-a".to_owned()),

@@ -100,7 +100,7 @@ fn describe_requires_exact_graph_target_and_rejects_unsupported_context() {
     );
 
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "main".to_owned(),
             Some("change-a".to_owned()),

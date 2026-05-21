@@ -126,7 +126,7 @@ fn detail_navigation_marks_graph_targets_exact() {
 #[test]
 fn detail_navigation_from_bookmarks_is_not_exact() {
     let app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
             Vec::new(),
             "feature".to_owned(),
             Some("change-a".to_owned()),

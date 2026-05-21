@@ -5,6 +5,52 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark row feature-root migration)
+
+- Slice / task: move bookmark rendered-row loading and metadata pairing out of the generic `jj_rows`
+  bucket and into the `bookmarks` feature root.
+- Worker thread id: `019e4af1-ad55-7503-8177-018b372f08f1`.
+- Model / routing: GPT-5 Codex worker with medium reasoning implemented the row migration. The main
+  thread kept jj orchestration, reviewed the changed boundary, and reran validation.
+- Implementation outcome: `src/bookmarks/rows.rs` now owns `BookmarkItem`, `BookmarkRowState`,
+  `LocalBookmarkRemoteState`, `RemoteBookmarkTrackingState`, `BookmarkLocalPeerState`,
+  `load_bookmark_entries`, `BOOKMARK_METADATA_TEMPLATE`, bookmark metadata parsing and pairing,
+  local/remote state classification, and the existing fail-closed row tests.
+- Boundary evidence: `src/bookmarks.rs` declares `mod rows;` and re-exports the bookmark row surface
+  for crate-local callers and tests. `src/bookmarks/action_targets.rs` still owns action target
+  policy, but imports row types from the `bookmarks` feature root. `src/jj_rows.rs` no longer
+  declares or re-exports a bookmark submodule and keeps only shared rendered-row helpers used by
+  multiple owners.
+- Caller evidence: `src/app/tests/support.rs`, `src/app/tests/bookmark_actions.rs`, other app tests,
+  and `src/view_state.rs` now construct bookmark rows through `crate::bookmarks::...`.
+- Rework / surprise: the first `rustup run nightly cargo fmt --check` failed only on import ordering
+  and a wrapped helper call after the mechanical namespace update; running rustfmt applied those
+  formatting changes. The command still prints the repo's existing rustfmt unstable-option warnings.
+- Validation trail:
+  - `cargo test bookmarks -- --test-threads=1` passed with 40 passed.
+  - `cargo test bookmark_actions -- --test-threads=1` passed with 27 passed.
+  - `cargo test jj_rows -- --test-threads=1` passed with 20 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed after applying rustfmt.
+  - `just md-check` passed after applying Panache wrapping to this process note and the source
+    maintainability ledger.
+- Main-thread review validation passed: `cargo test bookmarks -- --test-threads=1` with 40 passed;
+  `cargo test bookmark_actions -- --test-threads=1` with 27 passed;
+  `cargo test jj_rows -- --test-threads=1` with 20 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored, and
+  its largest-file output included `src/bookmarks.rs` at 977 lines, `src/bookmarks/rows.rs` at 876
+  lines, and no bookmark row module under `src/jj_rows`.
+- Evidence basis:
+  - Date: `2026-05-21 08:14:18 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id from the worker handoff.
+  - Files: `src/bookmarks.rs`, `src/bookmarks/rows.rs`, `src/bookmarks/action_targets.rs`,
+    `src/jj_rows.rs`, `src/app/tests/support.rs`, `src/app/tests/bookmark_actions.rs`,
+    `src/view_state.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Operation-log row feature-root migration)
 
 - Slice / task: move operation-log rendered-row loading and operation-id metadata pairing out of the

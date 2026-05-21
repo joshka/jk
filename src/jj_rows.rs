@@ -5,7 +5,6 @@
 //! by the app's list views. Command identity, navigation provenance, and the
 //! process boundary stay in `jj.rs`.
 
-mod bookmarks;
 mod revisions;
 mod workspaces;
 
@@ -16,10 +15,6 @@ use serde_json::Value;
 
 use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
 
-pub use self::bookmarks::{
-    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
-    RemoteBookmarkTrackingState, load_bookmark_entries,
-};
 pub use self::revisions::{LogItem, load_compact_log_context, load_entries};
 #[cfg(test)]
 pub(crate) use self::workspaces::WORKSPACE_METADATA_TEMPLATE;
@@ -187,15 +182,18 @@ fn parse_file_list_path(line: &str) -> Option<String> {
     (!line.is_empty()).then(|| line.to_owned())
 }
 
-fn string_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<String> {
+pub(crate) fn string_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<String> {
     fields.get(name).and_then(Value::as_str).map(str::to_owned)
 }
 
-fn non_empty_string_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<String> {
+pub(crate) fn non_empty_string_field(
+    fields: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Option<String> {
     string_field(fields, name).filter(|field| !field.is_empty())
 }
 
-fn optional_string_field(
+pub(crate) fn optional_string_field(
     fields: &serde_json::Map<String, Value>,
     name: &str,
 ) -> Option<Option<String>> {
@@ -207,7 +205,7 @@ fn optional_string_field(
     }
 }
 
-fn boolean_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<bool> {
+pub(crate) fn boolean_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<bool> {
     fields.get(name).and_then(Value::as_bool)
 }
 
