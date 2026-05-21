@@ -5,6 +5,38 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark view test module extraction)
+
+- Slice / task: move bookmark view/action tests out of `src/bookmarks.rs` and into the bookmark
+  feature directory so production bookmark behavior is easier to scan while tests stay local.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b5b-3e4d-73a3-8fda-2bd81039b7ed`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the mechanical extraction with
+  write scope limited to `src/bookmarks.rs` and `src/bookmarks/tests.rs`. The main thread kept jj
+  ownership, reviewed the result, and reran validation.
+- Implementation outcome: `src/bookmarks.rs` now declares `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/bookmarks/tests.rs` and continue to exercise bookmark movement, copy, refresh,
+  open-show behavior, local/remote mutation target selection, and tracking safety policy.
+- Size evidence: after the move, the measured line counts were 330 lines in `src/bookmarks.rs`, 643
+  in `src/bookmarks/tests.rs`, and 876 in `src/bookmarks/rows.rs`.
+- Rework / surprise: the worker's first fmt check failed on extracted test formatting; running
+  rustfmt fixed the ordering/formatting.
+- Validation trail:
+  - Worker validation passed after formatting: `cargo test bookmarks -- --test-threads=1` with 40
+    passed; `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings.
+  - Main-thread review validation passed: `cargo test bookmarks -- --test-threads=1` with 40 passed;
+    `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+  - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
+    test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:26:59 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b5b-3e4d-73a3-8fda-2bd81039b7ed` from the worker handoff.
+  - Files: `src/bookmarks.rs`, `src/bookmarks/tests.rs`, and this process note.
+
 ### 2026-05-21 (Action-plan test module extraction)
 
 - Slice / task: move root action-plan tests out of `src/jj_actions.rs` and into the action-plan
