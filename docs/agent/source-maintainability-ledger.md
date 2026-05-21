@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 files feature root:
+
+- `src/files.rs` now owns the file-oriented view root, with the former `src/file_list.rs` moved to
+  `src/files/list.rs`, `src/file_list/rows.rs` moved to `src/files/list/rows.rs`, and the former
+  `src/file_show.rs` and tests moved to `src/files/show.rs` and `src/files/show/tests.rs`.
+- This follows the feature-root direction by making `files` the maintainer starting point for file
+  list and file show view state, row interpretation, selection, search, copy, and tests while
+  leaving cross-view file mutation command plans in `jj_actions::files`.
+- The packet intentionally preserved file-list and file-show behavior, row parsing, action target
+  construction, app routing, command specs, and test assertions. Callers now import file views from
+  `crate::files::list` and `crate::files::show`.
+- Focused validation covered `cargo test files -- --test-threads=1` with 27 passed and 540 filtered
+  out, `cargo test file -- --test-threads=1` with 76 passed and 491 filtered out, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Rework was limited to fixing mechanical module-path replacements after the file move; no runtime
+  file-view logic changed.
+
 2026-05-21 file show view test split:
 
 - `src/file_show.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

@@ -11,8 +11,8 @@ use crate::action_menu::ExactActionContext;
 use crate::bookmarks::BookmarksView;
 use crate::command::{Binding, CommandContext, HelpContext, ViewCommand, ViewEffect};
 use crate::diff::DiffView;
-use crate::file_list::FileListView;
-use crate::file_show::FileShowView;
+use crate::files::list::FileListView;
+use crate::files::show::FileShowView;
 use crate::graph::GraphView;
 use crate::jj::{JjCommand, LogViewMode, ViewSpec};
 use crate::jj_actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
@@ -425,15 +425,15 @@ mod tests {
             "abcdefg".to_owned(),
             crate::jj::DiffFormat::Default,
         )));
-        let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
+        let file_list = ViewState::FileList(crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("abcdefg".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
         ));
-        let file_show = ViewState::FileShow(crate::file_show::FileShowView::new(
+        let file_show = ViewState::FileShow(crate::files::show::FileShowView::new(
             ViewSpec::file_show(Some("abcdefg".to_owned()), "src/main.rs".to_owned())
                 .with_exact_change_target(),
             "src/main.rs",
@@ -489,14 +489,14 @@ mod tests {
             JjCommand::Diff,
             vec!["-r".to_owned(), "main".to_owned()],
         )));
-        let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
+        let file_list = ViewState::FileList(crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned())),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
         ));
-        let file_show = ViewState::FileShow(crate::file_show::FileShowView::new(
+        let file_show = ViewState::FileShow(crate::files::show::FileShowView::new(
             ViewSpec::file_show(Some("main".to_owned()), "src/main.rs".to_owned()),
             "src/main.rs",
             crate::rendered_jj::DocumentLines::new(Vec::new()),

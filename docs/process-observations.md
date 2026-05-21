@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Files feature root)
+
+- Slice / task: move file-list and file-show view modules under a `files` feature root while
+  preserving existing file-oriented view behavior.
+- Thread id: main orchestration thread; no subagent was used because the user explicitly requested
+  this refactoring direction be handled in the main thread.
+- Model / routing: GPT-5 Codex performed the implementation, review, validation, and evidence
+  updates in the main thread.
+- Changed files: `src/files.rs`, `src/files/list.rs`, `src/files/list/rows.rs`, `src/files/show.rs`,
+  `src/files/show/tests.rs`, `src/main.rs`, `src/view_state.rs`, and app test references that
+  construct file views directly.
+- Implementation outcome: `files` is now the feature root for file-oriented views. The list and show
+  modules moved from root-level `file_list` and `file_show` modules to `crate::files::list` and
+  `crate::files::show`; file mutation command plans intentionally stayed in `jj_actions::files`
+  because they are cross-view action plans.
+- Behavior-preservation evidence: the packet moved modules and updated import paths only. It did not
+  change file-list row parsing, file-show document behavior, app routing, command construction,
+  action target policy, or test assertions.
+- Scope boundary: the packet did not move file mutation plans, status file behavior, document
+  mechanics, sticky file rendering, or view-state dispatch policy beyond the module path updates
+  needed for the moved view modules.
+- Validation trail:
+  - Main-thread validation passed: `cargo test files -- --test-threads=1` with 27 passed and 540
+    filtered out; `cargo test file -- --test-threads=1` with 76 passed and 491 filtered out;
+    `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `just md-check`.
+- Rework / surprise: the first mechanical path replacement briefly produced invalid combined names
+  in the diff view; direct file inspection showed the on-disk files were corrected before
+  validation. No Rust behavior rework was needed.
+- Evidence basis:
+  - Date: `2026-05-21 15:50:11 PDT` from local `date`.
+  - Files: `src/files.rs`, `src/files/list.rs`, `src/files/list/rows.rs`, `src/files/show.rs`,
+    `src/files/show/tests.rs`, `src/main.rs`, `src/view_state.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (File show view test split)
 
 - Slice / task: move inline tests from `src/file_show.rs` into `src/file_show/tests.rs` while

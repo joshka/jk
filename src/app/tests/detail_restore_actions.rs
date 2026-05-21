@@ -32,10 +32,10 @@ fn detail_action_menu_from_exact_show_offers_duplicate_restore_and_revert() {
 #[test]
 fn detail_action_menu_from_exact_file_list_offers_path_restore_first() {
     let mut app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -160,19 +160,19 @@ fn detail_navigation_preserves_inexact_direct_startup_revsets() {
 #[test]
 fn file_show_navigation_preserves_source_exactness_only() {
     let exact_app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
         ),
     ));
     let direct_app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned())),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -309,10 +309,10 @@ fn status_action_menu_reports_disabled_ambiguous_row() {
 #[test]
 fn restore_action_menu_enter_opens_path_preview() {
     let mut app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -349,10 +349,10 @@ fn restore_action_menu_enter_opens_path_preview() {
 #[test]
 fn restore_action_menu_path_shortcut_opens_path_preview() {
     let mut app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],

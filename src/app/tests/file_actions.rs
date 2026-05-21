@@ -93,9 +93,9 @@ fn status_tracked_path_opens_untrack_and_chmod_previews() {
 #[test]
 fn file_list_working_copy_offers_untrack_and_chmod() {
     let mut app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(None, None),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -126,9 +126,9 @@ fn file_list_working_copy_offers_untrack_and_chmod() {
 #[test]
 fn exact_file_list_chmod_passes_exact_revision() {
     let mut app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), None).with_exact_change_target(),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -152,9 +152,9 @@ fn exact_file_list_chmod_passes_exact_revision() {
 #[test]
 fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
     let mut direct = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_with_spec(
+        crate::files::list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("main".to_owned()), None),
-            vec![crate::file_list::FileListItem::new(
+            vec![crate::files::list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -171,7 +171,7 @@ fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
         "file actions from jk file list -r main require a working-copy file list or exact graph-derived revision target"
     );
 
-    let mut resolve = test_app(ViewState::FileShow(crate::file_show::FileShowView::new(
+    let mut resolve = test_app(ViewState::FileShow(crate::files::show::FileShowView::new(
         ViewSpec::file_show(Some("@".to_owned()), "src/main.rs".to_owned()),
         "src/main.rs",
         crate::rendered_jj::DocumentLines::new(Vec::new()),
@@ -190,7 +190,7 @@ fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
 
 #[test]
 fn file_mutation_confirm_preserves_result_output_and_refreshes() {
-    let mut app = test_app(ViewState::FileShow(crate::file_show::FileShowView::new(
+    let mut app = test_app(ViewState::FileShow(crate::files::show::FileShowView::new(
         ViewSpec::file_show(None, "src/main.rs".to_owned()),
         "src/main.rs",
         crate::rendered_jj::DocumentLines::new(Vec::new()),

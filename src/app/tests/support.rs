@@ -18,7 +18,7 @@ pub(super) use crate::bookmarks::{
 };
 pub(super) use crate::command::{CommandContext, ViewCommand};
 #[allow(unused_imports)]
-pub(super) use crate::file_list::{FileListItem, load_file_list_entries};
+pub(super) use crate::files::list::{FileListItem, load_file_list_entries};
 #[allow(unused_imports)]
 pub(super) use crate::graph::{LogItem, load_compact_log_context, load_entries};
 #[allow(unused_imports)]
@@ -371,9 +371,9 @@ pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
         JjCommand::Status => ViewState::Status(crate::status::StatusView::test_new(&[])),
         JjCommand::Resolve => ViewState::Resolve(crate::resolve::ResolveView::test_new(vec![])),
         JjCommand::FileList => {
-            ViewState::FileList(crate::file_list::FileListView::test_new(vec![]))
+            ViewState::FileList(crate::files::list::FileListView::test_new(vec![]))
         }
-        JjCommand::FileShow => ViewState::FileShow(crate::file_show::FileShowView::new(
+        JjCommand::FileShow => ViewState::FileShow(crate::files::show::FileShowView::new(
             spec,
             "src/main.rs",
             crate::rendered_jj::DocumentLines::new(Vec::new()),
