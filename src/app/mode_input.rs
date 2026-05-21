@@ -12,7 +12,7 @@ use ratatui::DefaultTerminal;
 
 use crate::action_menu::{ActionKind, RolePrompt};
 use crate::action_output::{
-    ActionOutputKey, action_output_visible_lines, handle_action_output_key,
+    ActionOutput, ActionOutputKey, action_output_visible_lines, handle_action_output_key,
 };
 use crate::app_screen::{InteractionMode, view_menu_options};
 use crate::app_status::StatusLine;
@@ -77,13 +77,17 @@ impl App {
             return Ok(true);
         }
 
+        self.handle_active_mode_key(code, viewport_height)
+    }
+
+    fn handle_active_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
         match &mut self.mode {
             InteractionMode::Normal => Ok(false),
             InteractionMode::Help => unreachable!("help mode is handled before borrowing mode"),
             InteractionMode::SearchPrompt(input) => {
-                match code {
-                    KeyCode::Esc => self.mode = InteractionMode::Normal,
-                    KeyCode::Enter => {
+                match reduce_text_prompt_key(input, code) {
+                    TextPromptKey::Cancel => self.mode = InteractionMode::Normal,
+                    TextPromptKey::Accept => {
                         self.search = SearchQuery::new(input.clone());
                         self.mode = InteractionMode::Normal;
                         self.status = if self.search.is_some() {
@@ -98,40 +102,26 @@ impl App {
                             StatusLine::ready(&self.view)
                         };
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(character) => input.push(character),
-                    _ => {}
+                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
                 Ok(true)
             }
             InteractionMode::LogRevsetPrompt(input) => {
-                match code {
-                    KeyCode::Esc => self.mode = InteractionMode::Normal,
-                    KeyCode::Enter => {
+                match reduce_text_prompt_key(input, code) {
+                    TextPromptKey::Cancel => self.mode = InteractionMode::Normal,
+                    TextPromptKey::Accept => {
                         let revset = std::mem::take(input);
                         self.mode = InteractionMode::Normal;
                         self.apply_custom_log_revset(revset);
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(character) => input.push(character),
-                    _ => {}
+                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
                 Ok(true)
             }
             InteractionMode::CopyMenu { options, selected } => {
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < options.len() => {
-                        *selected += 1;
-                    }
-                    KeyCode::Char('k') | KeyCode::Up => {
-                        *selected = selected.saturating_sub(1);
-                    }
-                    KeyCode::Enter => {
+                match reduce_menu_key(selected, options.len(), code) {
+                    MenuKey::Cancel => self.mode = InteractionMode::Normal,
+                    MenuKey::Accept => {
                         if let Some(option) = options.get(*selected) {
                             match clipboard::copy(option.value()) {
                                 Ok(()) => {
@@ -147,53 +137,38 @@ impl App {
                         }
                         self.mode = InteractionMode::Normal;
                     }
-                    _ => {}
+                    MenuKey::Shortcut(_) | MenuKey::Other => {}
                 }
                 Ok(true)
             }
             InteractionMode::ViewMenu { selected } => {
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('v') => {
-                        self.mode = InteractionMode::Normal;
-                    }
-                    KeyCode::Char('j') | KeyCode::Down => {
-                        *selected =
-                            (*selected + 1).min(view_menu_options().len().saturating_sub(1));
-                    }
-                    KeyCode::Char('k') | KeyCode::Up => {
-                        *selected = selected.saturating_sub(1);
-                    }
-                    KeyCode::Enter => {
+                match reduce_view_menu_key(selected, code) {
+                    MenuKey::Cancel => self.mode = InteractionMode::Normal,
+                    MenuKey::Accept => {
                         let action = view_menu_options()[*selected].action();
                         self.mode = InteractionMode::Normal;
                         self.apply_view_menu_action(action, viewport_height)?;
                     }
-                    _ => {}
+                    MenuKey::Shortcut(_) | MenuKey::Other => {}
                 }
                 Ok(true)
             }
             InteractionMode::ActionMenu { menu, selected } => {
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < menu.items().len() => {
-                        *selected += 1;
-                    }
-                    KeyCode::Char('k') | KeyCode::Up => {
-                        *selected = selected.saturating_sub(1);
-                    }
-                    KeyCode::Enter => {
+                match reduce_menu_key(selected, menu.items().len(), code) {
+                    MenuKey::Cancel => self.mode = InteractionMode::Normal,
+                    MenuKey::Accept => {
                         if let Some(action) = menu.items().get(*selected).cloned() {
                             self.apply_action_menu_item(action);
                         } else {
                             self.mode = InteractionMode::Normal;
                         }
                     }
-                    KeyCode::Char(shortcut) => {
+                    MenuKey::Shortcut(shortcut) => {
                         if let Some(action) = menu.item_for_shortcut(shortcut).cloned() {
                             self.apply_action_menu_item(action);
                         }
                     }
-                    _ => {}
+                    MenuKey::Other => {}
                 }
                 Ok(true)
             }
@@ -202,17 +177,9 @@ impl App {
                 prompt,
                 selected,
             } => {
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down
-                        if *selected + 1 < prompt.options().len() =>
-                    {
-                        *selected += 1;
-                    }
-                    KeyCode::Char('k') | KeyCode::Up => {
-                        *selected = selected.saturating_sub(1);
-                    }
-                    KeyCode::Enter => {
+                match reduce_menu_key(selected, prompt.options().len(), code) {
+                    MenuKey::Cancel => self.mode = InteractionMode::Normal,
+                    MenuKey::Accept => {
                         let next_status = prompt.status_message();
                         let action = *action;
                         let rebase_plan = match action {
@@ -258,18 +225,18 @@ impl App {
                             }
                         }
                     }
-                    _ => {}
+                    MenuKey::Shortcut(_) | MenuKey::Other => {}
                 }
                 Ok(true)
             }
             InteractionMode::DescribePrompt { target, input } => {
-                match code {
-                    KeyCode::Esc => {
+                match reduce_text_prompt_key(input, code) {
+                    TextPromptKey::Cancel => {
                         self.mode = InteractionMode::Normal;
                         self.status =
                             StatusLine::with_message(&self.view, "describe cancelled".to_owned());
                     }
-                    KeyCode::Enter => {
+                    TextPromptKey::Accept => {
                         let message = input.trim().to_owned();
                         let target = target.clone();
                         self.mode = InteractionMode::Normal;
@@ -282,22 +249,18 @@ impl App {
                             self.open_describe_preview(JjDescribePlan::new(target, message));
                         }
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(character) => input.push(character),
-                    _ => {}
+                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
                 Ok(true)
             }
             InteractionMode::CommitPrompt(input) => {
-                match code {
-                    KeyCode::Esc => {
+                match reduce_text_prompt_key(input, code) {
+                    TextPromptKey::Cancel => {
                         self.mode = InteractionMode::Normal;
                         self.status =
                             StatusLine::with_message(&self.view, "commit cancelled".to_owned());
                     }
-                    KeyCode::Enter => {
+                    TextPromptKey::Accept => {
                         let message = input.trim().to_owned();
                         self.mode = InteractionMode::Normal;
                         if message.is_empty() {
@@ -309,11 +272,7 @@ impl App {
                             self.open_commit_preview(JjCommitPlan::new(message));
                         }
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(character) => input.push(character),
-                    _ => {}
+                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
                 Ok(true)
             }
@@ -322,8 +281,8 @@ impl App {
                 target,
                 input,
             } => {
-                match code {
-                    KeyCode::Esc => {
+                match reduce_text_prompt_key(input, code) {
+                    TextPromptKey::Cancel => {
                         let kind = *kind;
                         self.mode = InteractionMode::Normal;
                         self.status = StatusLine::with_message(
@@ -331,7 +290,7 @@ impl App {
                             format!("bookmark {} cancelled", kind.label()),
                         );
                     }
-                    KeyCode::Enter => {
+                    TextPromptKey::Accept => {
                         let name = input.trim().to_owned();
                         let kind = *kind;
                         let target = target.clone();
@@ -347,22 +306,18 @@ impl App {
                             ));
                         }
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(character) => input.push(character),
-                    _ => {}
+                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
                 Ok(true)
             }
             InteractionMode::BookmarkRenamePrompt { old_name, input } => {
-                match code {
-                    KeyCode::Esc => {
+                match reduce_text_prompt_key(input, code) {
+                    TextPromptKey::Cancel => {
                         self.mode = InteractionMode::Normal;
                         self.status =
                             StatusLine::with_message(&self.view, "bookmark rename cancelled");
                     }
-                    KeyCode::Enter => {
+                    TextPromptKey::Accept => {
                         let old_name = old_name.clone();
                         let new_name = std::mem::take(input);
                         self.mode = InteractionMode::Normal;
@@ -380,11 +335,7 @@ impl App {
                             }
                         }
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(character) => input.push(character),
-                    _ => {}
+                    TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
                 Ok(true)
             }
@@ -444,13 +395,13 @@ impl App {
                 let (abandon_plan, status_context) =
                     (abandon.clone(), output.status_context().cloned());
                 let visible_lines = action_output_visible_lines(viewport_height);
-                match code {
-                    KeyCode::Esc => {
+                match reduce_confirmation_key(input, output, visible_lines, code) {
+                    ConfirmationKey::Cancel => {
                         self.mode = InteractionMode::Normal;
                         self.status =
                             StatusLine::with_message(&self.view, "abandon cancelled".to_owned());
                     }
-                    KeyCode::Enter => {
+                    ConfirmationKey::Accept => {
                         if input == abandon.revision() {
                             self.confirm_abandon(abandon_plan, status_context, viewport_height);
                         } else {
@@ -460,17 +411,7 @@ impl App {
                             );
                         }
                     }
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Char(character) => input.push(character),
-                    KeyCode::Down => output.scroll_down(visible_lines),
-                    KeyCode::Up => output.scroll_up(),
-                    KeyCode::PageDown => output.page_down(visible_lines),
-                    KeyCode::PageUp => output.page_up(visible_lines),
-                    KeyCode::Home => output.scroll_to_top(),
-                    KeyCode::End => output.scroll_to_bottom(visible_lines),
-                    _ => {}
+                    ConfirmationKey::Handled | ConfirmationKey::Ignored => {}
                 }
                 Ok(true)
             }
@@ -479,15 +420,9 @@ impl App {
                 remotes,
                 selected,
             } => {
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < remotes.len() => {
-                        *selected += 1;
-                    }
-                    KeyCode::Char('k') | KeyCode::Up => {
-                        *selected = selected.saturating_sub(1);
-                    }
-                    KeyCode::Enter => {
+                match reduce_menu_key(selected, remotes.len(), code) {
+                    MenuKey::Cancel => self.mode = InteractionMode::Normal,
+                    MenuKey::Accept => {
                         let target = target.clone();
                         let selected_remote = remotes.get(*selected).cloned();
                         self.mode = InteractionMode::Normal;
@@ -501,20 +436,14 @@ impl App {
                             }
                         }
                     }
-                    _ => {}
+                    MenuKey::Shortcut(_) | MenuKey::Other => {}
                 }
                 Ok(true)
             }
             InteractionMode::FetchRemotePrompt { remotes, selected } => {
-                match code {
-                    KeyCode::Esc | KeyCode::Char('q') => self.mode = InteractionMode::Normal,
-                    KeyCode::Char('j') | KeyCode::Down if *selected + 1 < remotes.len() => {
-                        *selected += 1;
-                    }
-                    KeyCode::Char('k') | KeyCode::Up => {
-                        *selected = selected.saturating_sub(1);
-                    }
-                    KeyCode::Enter => {
+                match reduce_menu_key(selected, remotes.len(), code) {
+                    MenuKey::Cancel => self.mode = InteractionMode::Normal,
+                    MenuKey::Accept => {
                         let selected_remote = remotes.get(*selected).cloned();
                         self.mode = InteractionMode::Normal;
                         match selected_remote {
@@ -527,7 +456,7 @@ impl App {
                             }
                         }
                     }
-                    _ => {}
+                    MenuKey::Shortcut(_) | MenuKey::Other => {}
                 }
                 Ok(true)
             }
@@ -672,6 +601,121 @@ impl App {
         self.pending_command = None;
         self.mode = InteractionMode::Normal;
         self.run_binding_with_status_refresh(binding, viewport_height)
+    }
+}
+
+enum TextPromptKey {
+    Cancel,
+    Accept,
+    Edited,
+    Ignored,
+}
+
+fn reduce_text_prompt_key(input: &mut String, code: KeyCode) -> TextPromptKey {
+    match code {
+        KeyCode::Esc => TextPromptKey::Cancel,
+        KeyCode::Enter => TextPromptKey::Accept,
+        KeyCode::Backspace => {
+            input.pop();
+            TextPromptKey::Edited
+        }
+        KeyCode::Char(character) => {
+            input.push(character);
+            TextPromptKey::Edited
+        }
+        _ => TextPromptKey::Ignored,
+    }
+}
+
+enum MenuKey {
+    Cancel,
+    Accept,
+    Shortcut(char),
+    Other,
+}
+
+fn reduce_menu_key(selected: &mut usize, item_count: usize, code: KeyCode) -> MenuKey {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => MenuKey::Cancel,
+        KeyCode::Char('j') | KeyCode::Down if *selected + 1 < item_count => {
+            *selected += 1;
+            MenuKey::Other
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            *selected = selected.saturating_sub(1);
+            MenuKey::Other
+        }
+        KeyCode::Enter => MenuKey::Accept,
+        KeyCode::Char(shortcut) => MenuKey::Shortcut(shortcut),
+        _ => MenuKey::Other,
+    }
+}
+
+fn reduce_view_menu_key(selected: &mut usize, code: KeyCode) -> MenuKey {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('v') => MenuKey::Cancel,
+        KeyCode::Char('j') | KeyCode::Down => {
+            *selected = (*selected + 1).min(view_menu_options().len().saturating_sub(1));
+            MenuKey::Other
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            *selected = selected.saturating_sub(1);
+            MenuKey::Other
+        }
+        KeyCode::Enter => MenuKey::Accept,
+        _ => MenuKey::Other,
+    }
+}
+
+enum ConfirmationKey {
+    Cancel,
+    Accept,
+    Handled,
+    Ignored,
+}
+
+fn reduce_confirmation_key(
+    input: &mut String,
+    output: &mut ActionOutput,
+    visible_lines: u16,
+    code: KeyCode,
+) -> ConfirmationKey {
+    match code {
+        KeyCode::Esc => ConfirmationKey::Cancel,
+        KeyCode::Enter => ConfirmationKey::Accept,
+        KeyCode::Backspace => {
+            input.pop();
+            ConfirmationKey::Handled
+        }
+        KeyCode::Char(character) => {
+            input.push(character);
+            ConfirmationKey::Handled
+        }
+        KeyCode::Down => {
+            output.scroll_down(visible_lines);
+            ConfirmationKey::Handled
+        }
+        KeyCode::Up => {
+            output.scroll_up();
+            ConfirmationKey::Handled
+        }
+        KeyCode::PageDown => {
+            output.page_down(visible_lines);
+            ConfirmationKey::Handled
+        }
+        KeyCode::PageUp => {
+            output.page_up(visible_lines);
+            ConfirmationKey::Handled
+        }
+        KeyCode::Home => {
+            output.scroll_to_top();
+            ConfirmationKey::Handled
+        }
+        KeyCode::End => {
+            output.scroll_to_bottom(visible_lines);
+            ConfirmationKey::Handled
+        }
+        _ => ConfirmationKey::Ignored,
     }
 }
 

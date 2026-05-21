@@ -22,6 +22,32 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Residual risk: future import drift could reintroduce `src/jj.rs` as the compatibility path unless
   new code keeps importing the direct owner modules.
 
+### 2026-05-20 (App mode input dispatch readability)
+
+- Slice / task: reduce reader load in `src/app/mode_input.rs` on current jj change
+  `Clarify app mode input dispatch`.
+- Thread id: `019e4931-5110-78c0-aa49-dd53dabb37ef`.
+- Model / routing: a `gpt-5.5` worker/subagent implemented the packet and ran worker validation; the
+  main thread reviewed the result.
+- Files changed: `src/app/mode_input.rs` and this process note.
+- Implementation outcome: `handle_mode_key_event_with_terminal` now handles only help-mode and
+  common action-preview pre-dispatch before delegating active modal dispatch to
+  `handle_active_mode_key`. Repeated text prompt, menu, view-menu, and confirmation-output key
+  reducers are named private helpers in the same module.
+- Behavior intent: preserve existing help prefixes, command prefixes, menu selection and shortcuts,
+  prompt accept/cancel behavior, abandon confirmation, and action-output scrolling; no new
+  keybindings, command coverage, wording, or module ownership changes were introduced.
+- Worker validation trail: `cargo check`; `cargo test command_navigation -- --test-threads=1`;
+  `cargo test actions -- --test-threads=1`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`.
+- Main-thread validation after review: `cargo check`;
+  `cargo test command_navigation -- --test-threads=1`; `cargo test actions -- --test-threads=1`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; `just md-check`; all
+  passed.
+- Residual risk: behavior is covered by existing focused command/navigation and action tests, but
+  the change is still a structural extraction over a broad modal dispatch surface rather than a new
+  behavior-specific regression test.
+
 ### 2026-05-20 (Remaining contract drift repair)
 
 - Slice / task: repair the remaining contract drift without behavior changes by updating the
