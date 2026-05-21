@@ -6168,3 +6168,37 @@ belong here.
   - Date: `2026-05-21 12:24:40 PDT` from local `date`.
   - Thread id from `CODEX_THREAD_ID`.
   - Files: `docs/agent/source-maintainability-ledger.md` and `docs/process-observations.md`.
+
+### 2026-05-21 (Text prompt side-effect helper)
+
+- Slice / task: reduce `src/app/mode_input.rs` branching in the text prompt accept path while
+  preserving the existing pure reducer boundary in `src/app/mode_input/reducers.rs`.
+- Thread id: `019e4c05-d241-7fe1-8a0d-3cf1f40237fd` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker handled the bounded Rust maintainability packet without running jj
+  or git commands; version-control ownership stayed with the main thread.
+- Changed files: `src/app/mode_input.rs` and `docs/process-observations.md`.
+- Implementation outcome: `mode_input.rs` now has a private `apply_text_prompt_accept_decision`
+  helper that resets the mode to normal, opens the feature-specific preview callback for
+  `PromptAcceptDecision::Preview`, or assigns the status line for
+  `PromptAcceptDecision::StatusMessage`. The four describe, commit, bookmark-name, and
+  bookmark-rename accept arms still name their prompt-specific reducers and preview methods at the
+  call sites.
+- Behavior-preservation evidence: the packet did not change prompt reducers, status strings,
+  cancellation wording, validation behavior, key handling, visibility, or preview methods. Search
+  and log-revset prompt handling stayed separate because their accept paths have distinct side
+  effects.
+- Rework / surprise: `rustup run nightly cargo fmt --check` initially failed only because the new
+  describe helper call needed rustfmt wrapping; formatting was applied and the check passed.
+- Validation trail: `cargo test mode_input -- --test-threads=1` passed with 12 tests;
+  `cargo test describe_commit_actions -- --test-threads=1` passed with 10 tests;
+  `cargo test bookmark_actions -- --test-threads=1` passed with 27 tests; `cargo check` passed;
+  `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option warnings;
+  and `just md-check` passed. Main-thread review reran the same focused validation successfully.
+  Full `just check` also passed at the top of the stack, including fmt, Panache Markdown checks, the
+  largest-file report, clippy with `-D warnings`, `cargo check`, and `cargo test` with 565 passed /
+  2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 12:32:03 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.

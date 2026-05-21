@@ -103,6 +103,31 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 text prompt side-effect helper:
+
+- `src/app/mode_input.rs` now uses a private `apply_text_prompt_accept_decision` helper for the
+  repeated text-prompt accept shape: reset the app mode to normal, open the feature-specific preview
+  for `PromptAcceptDecision::Preview`, or assign the status line for
+  `PromptAcceptDecision::StatusMessage`.
+- The four affected call sites still name their prompt-specific reducer and preview method:
+  describe, commit, bookmark-name, and bookmark-rename prompts. Search and log-revset prompts stayed
+  separate because their accept paths have distinct side effects.
+- This packet intentionally preserved prompt reducers, status strings, cancellation wording,
+  validation behavior, key handling, visibility, and preview methods. Focused validation covered
+  `cargo test mode_input -- --test-threads=1`,
+  `cargo test describe_commit_actions -- --test-threads=1`,
+  `cargo test bookmark_actions -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+
+2026-05-21 source audit measurement refresh:
+
+- The mechanical audit snapshot now records current largest-file, visibility, repeated-list,
+  action-lifecycle/result, control-flow, and immediate-doc scan counts gathered for this packet.
+- The refreshed recommendation names `src/app/mode_input.rs` as the clearest bounded readability
+  candidate from current measurements and avoids treating `src/app.rs` as an automatic documentation
+  target because it already has run-level docs.
+- The packet intentionally changed documentation only. Validation covered `just md-check`.
+
 2026-05-21 command binding contract docs:
 
 - `src/command.rs` now documents command recovery conversion, key sequence labels and prefix

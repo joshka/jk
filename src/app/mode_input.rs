@@ -214,16 +214,10 @@ impl App {
                     }
                     TextPromptKey::Accept => {
                         let decision = reduce_describe_prompt_accept(target, input);
-                        self.mode = InteractionMode::Normal;
-
-                        match decision {
-                            PromptAcceptDecision::Preview(describe) => {
-                                self.open_describe_preview(describe);
-                            }
-                            PromptAcceptDecision::StatusMessage(message) => {
-                                self.status = StatusLine::with_message(&self.view, message);
-                            }
-                        }
+                        self.apply_text_prompt_accept_decision(
+                            decision,
+                            Self::open_describe_preview,
+                        );
                     }
                     TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
@@ -238,16 +232,7 @@ impl App {
                     }
                     TextPromptKey::Accept => {
                         let decision = reduce_commit_prompt_accept(input);
-                        self.mode = InteractionMode::Normal;
-
-                        match decision {
-                            PromptAcceptDecision::Preview(commit) => {
-                                self.open_commit_preview(commit);
-                            }
-                            PromptAcceptDecision::StatusMessage(message) => {
-                                self.status = StatusLine::with_message(&self.view, message);
-                            }
-                        }
+                        self.apply_text_prompt_accept_decision(decision, Self::open_commit_preview);
                     }
                     TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
@@ -269,16 +254,10 @@ impl App {
                     }
                     TextPromptKey::Accept => {
                         let decision = reduce_bookmark_name_prompt_accept(*kind, target, input);
-                        self.mode = InteractionMode::Normal;
-
-                        match decision {
-                            PromptAcceptDecision::Preview(bookmark) => {
-                                self.open_bookmark_mutation_preview(bookmark);
-                            }
-                            PromptAcceptDecision::StatusMessage(message) => {
-                                self.status = StatusLine::with_message(&self.view, message);
-                            }
-                        }
+                        self.apply_text_prompt_accept_decision(
+                            decision,
+                            Self::open_bookmark_mutation_preview,
+                        );
                     }
                     TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
@@ -293,16 +272,10 @@ impl App {
                     }
                     TextPromptKey::Accept => {
                         let decision = reduce_bookmark_rename_prompt_accept(old_name, input);
-                        self.mode = InteractionMode::Normal;
-
-                        match decision {
-                            PromptAcceptDecision::Preview(bookmark) => {
-                                self.open_bookmark_mutation_preview(bookmark);
-                            }
-                            PromptAcceptDecision::StatusMessage(message) => {
-                                self.status = StatusLine::with_message(&self.view, message);
-                            }
-                        }
+                        self.apply_text_prompt_accept_decision(
+                            decision,
+                            Self::open_bookmark_mutation_preview,
+                        );
                     }
                     TextPromptKey::Edited | TextPromptKey::Ignored => {}
                 }
@@ -447,6 +420,21 @@ impl App {
             | InteractionMode::OperationTargetPreview { .. }
             | InteractionMode::WorkingCopyNavigationPreview { .. } => {
                 unreachable!("common action preview modes are handled before borrowing mode")
+            }
+        }
+    }
+
+    fn apply_text_prompt_accept_decision<T>(
+        &mut self,
+        decision: PromptAcceptDecision<T>,
+        open_preview: impl FnOnce(&mut Self, T),
+    ) {
+        self.mode = InteractionMode::Normal;
+
+        match decision {
+            PromptAcceptDecision::Preview(plan) => open_preview(self, plan),
+            PromptAcceptDecision::StatusMessage(message) => {
+                self.status = StatusLine::with_message(&self.view, message);
             }
         }
     }
