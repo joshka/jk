@@ -84,9 +84,9 @@ Examples for future packets:
 - Operation-log behavior now starts from `operation_log`: `src/operation_log/rows.rs` owns rendered
   row grouping, operation-id template parsing and pairing, and fail-closed metadata drift tests;
   `src/operation_log.rs` owns movement/copy, undo/redo/restore/revert availability, operation detail
-  navigation, and view tests. Future operation-detail rendering or recovery target policy should
-  move toward `operation_log/detail.rs` or `operation_log/actions.rs` when that shortens the reader
-  path.
+  navigation, and view tests; `src/operation_log/actions.rs` owns undo/redo and exact operation
+  restore/revert argv, preview, and run contracts. Future operation-detail rendering should move
+  toward `operation_log/detail.rs` when that shortens the reader path.
 - Bookmark behavior now starts from `bookmarks`: `src/bookmarks/rows.rs` owns rendered row loading,
   bookmark metadata template parsing and pairing, local/remote state classification, and fail-closed
   drift tests; `src/bookmarks/action_targets.rs` owns safe mutation targets. Future bookmark
@@ -102,6 +102,20 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 operation-log action-plan owner move:
+
+- Operation recovery command plans moved from `src/jj_actions/operation.rs` to
+  `src/operation_log/actions.rs`, keeping the existing inline tests with the moved module.
+- `src/operation_log.rs` now declares `pub(crate) mod actions;`, while `src/jj_actions.rs` keeps
+  re-exporting `JjOperationRecovery`, `JjOperationRecoveryKind`, and `JjOperationTarget` for app
+  callers. This mirrors the bookmark action-plan owner move and keeps app imports stable while
+  making undo/redo/restore/revert behavior discoverable from the operation-log feature root.
+- The packet intentionally preserved command argv, command labels, preview wording, status action
+  wording, run behavior, app-facing re-export names, key behavior, and operation-log view behavior.
+- Focused validation covered `cargo test operation -- --test-threads=1` with 46 passed and 521
+  filtered out, `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check` after
+  applying Panache wrapping to the new process note.
 
 2026-05-21 bookmark action-plan owner move:
 

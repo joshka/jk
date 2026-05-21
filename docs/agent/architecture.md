@@ -243,8 +243,11 @@ Current ownership:
   should keep shrinking as feature roots own their row models and should not own command identity,
   navigation provenance, document loading, or feature-specific row policy.
 - `operation_log.rs` owns the operation-log feature view, operation selection/copy/search, operation
-  recovery availability, and operation detail navigation. `operation_log/rows.rs` owns rendered
-  operation-log row grouping, operation-id metadata parsing and pairing, and metadata drift tests.
+  recovery availability, operation detail navigation, and operation recovery action plans.
+  `operation_log/rows.rs` owns rendered operation-log row grouping, operation-id metadata parsing
+  and pairing, and metadata drift tests. `operation_log/actions.rs` owns undo/redo and exact
+  operation restore/revert argv construction, preview wording, and run contracts, while
+  `jj_actions.rs` re-exports the app-facing names.
 - `bookmarks.rs` owns the bookmarks feature view, bookmark selection/copy/search, and bookmark
   action availability. `bookmarks/rows.rs` owns bookmark row metadata and local/remote state
   classification; `bookmarks/action_targets.rs` owns safe bookmark mutation target resolution;
@@ -282,10 +285,12 @@ Every active app screen should have one explicit owner for each part of its cont
   overlay chrome without deciding app behavior.
 - Status projection: `app_status.rs` constructs durable ready/error status lines from the active
   view; `app_screen.rs` supplies transient prompt status text while a mode is active.
-- Command execution: `jj_actions.rs` owns action-plan command contracts for confirmed mutation
-  flows; `jj.rs` owns the shared `jj` process helpers and view-spec command construction.
-  `app/action_lifecycle.rs` owns when action commands are run, how results refresh or reveal views,
-  and what status/result screen follows.
+- Command execution: `jj_actions.rs` owns or re-exports action-plan command contracts for confirmed
+  mutation flows; feature-owned action modules such as `operation_log/actions.rs` and
+  `bookmarks/actions.rs` own their local argv, preview, and run contracts. `jj.rs` owns the shared
+  `jj` process helpers and view-spec command construction. `app/action_lifecycle.rs` owns when
+  action commands are run, how results refresh or reveal views, and what status/result screen
+  follows.
 - View behavior: view modules execute `ViewCommand` into `ViewEffect`; `app.rs` routes global
   effects such as opening screens, copying, pushing views, refreshing, or changing search state to
   the app submodule that owns the detailed policy.
@@ -347,8 +352,8 @@ style, or modal layout unless the app design genuinely changes.
 ## Terminal And Process Boundaries
 
 Terminal lifecycle belongs in `app.rs` and Ratatui setup. View and process command execution helpers
-belong in `jj.rs`; preview-first mutation command plans belong in `jj_actions.rs`. Clipboard
-integration belongs in `clipboard.rs`.
+belong in `jj.rs`; preview-first mutation command plans belong in `jj_actions.rs` until a narrower
+feature owner is the better reader path. Clipboard integration belongs in `clipboard.rs`.
 
 Make side effects visible:
 

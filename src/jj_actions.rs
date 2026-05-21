@@ -8,7 +8,7 @@
 //! Family modules and feature-owned action modules own their narrower command areas:
 //!
 //! - [`git_sync`] owns Git fetch and push plans.
-//! - [`operation`] owns operation recovery plans.
+//! - [`crate::operation_log::actions`] owns operation recovery plans.
 //! - [`rewrite`] owns rewrite plans such as absorb, rebase, and squash.
 //! - [`working_copy`] owns working-copy creation, duplication, splitting, and navigation plans.
 //!
@@ -25,7 +25,6 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
 mod git_sync;
-mod operation;
 mod rewrite;
 mod working_copy;
 
@@ -36,8 +35,10 @@ pub use crate::bookmarks::actions::{
     JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget,
     validate_bookmark_rename_new_name,
 };
+pub use crate::operation_log::actions::{
+    JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget,
+};
 pub use git_sync::{JjGitFetch, JjGitPush, JjGitPushTarget};
-pub use operation::{JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget};
 pub use rewrite::{JjAbsorbPlan, JjRebasePlan, JjSquashPlan};
 pub use working_copy::{
     JjDuplicatePlan, JjNewPlan, JjSplitPlan, JjSplitTarget, JjWorkingCopyNavigationKind,

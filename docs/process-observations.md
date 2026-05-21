@@ -5,6 +5,40 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Operation-log action-plan owner move)
+
+- Slice / task: move operation recovery/action command plans from the global `jj_actions` bucket to
+  the operation-log feature owner while preserving app-facing re-export names.
+- Thread id: `019e4c95-505b-7d62-8c45-2cd377e1eda3` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker implemented the bounded maintainability packet in the current
+  existing jj change without running jj or git commands; the main thread handled jj ownership and
+  review.
+- Changed files: `src/jj_actions.rs`, `src/operation_log.rs`, `src/operation_log/actions.rs`,
+  `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: `src/jj_actions/operation.rs` moved to `src/operation_log/actions.rs` with
+  its inline tests preserved. `src/operation_log.rs` now declares the actions module, and
+  `src/jj_actions.rs` re-exports `JjOperationRecovery`, `JjOperationRecoveryKind`, and
+  `JjOperationTarget` from `crate::operation_log::actions`.
+- Behavior-preservation evidence: command argv, command labels, preview wording, status action
+  wording, run behavior, key behavior, and operation-log view behavior were not intentionally
+  changed. The move mirrors the existing bookmark action-plan owner pattern while keeping app
+  imports stable through `jj_actions`.
+- Validation trail:
+  - Worker validation passed: `cargo test operation -- --test-threads=1` with 46 tests and 521
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check` after applying Panache wrapping.
+  - Main-thread review validation passed: `cargo test operation -- --test-threads=1` with 46 tests
+    and 521 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 15:09:05 PDT` from worker-reported local `date`.
+  - Main review date: `2026-05-21 15:11:16 PDT` from local `date`.
+  - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Files: `src/jj_actions.rs`, `src/operation_log.rs`, `src/operation_log/actions.rs`,
+    `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and this process
+    note.
+
 ### 2026-05-21 (Bookmark action-plan owner move)
 
 - Slice / task: move bookmark mutation action plans from the global `jj_actions` bucket to the

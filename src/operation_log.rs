@@ -19,6 +19,7 @@ use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
 
+pub(crate) mod actions;
 mod rows;
 
 #[cfg(test)]
