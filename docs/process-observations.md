@@ -5,6 +5,43 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Rewrite action-plan submodule extraction)
+
+- Slice / task: implement the ledger slice `Rewrite Action Plan Submodule` on current jj change
+  `Extract rewrite action plans`.
+- Thread id: `019e497d-c099-7052-af9f-0b9d80bba0bd`.
+- Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
+  extraction for main-thread review.
+- Files changed: `src/jj_actions.rs`, `src/jj_actions/rewrite.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_actions/rewrite.rs` now owns `JjRebasePlan`, `JjSquashPlan`,
+  `JjAbsorbPlan`, their argv/preview/run implementations, and the focused rewrite unit tests.
+  `src/jj_actions.rs` keeps the stable facade with a local `rewrite` submodule declaration plus
+  `pub use` re-exports for existing callers.
+- Behavior intent: preserve rewrite argv shape, preview wording, fallback wording, labels, dry-run
+  behavior, role-prompt behavior, and app call sites exactly while reducing live context in
+  `src/jj_actions.rs`.
+- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test rewrite_actions -- --test-threads=1`;
+  `cargo test working_copy_actions -- --test-threads=1`; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and `just md-check` passed.
+- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test rewrite_actions -- --test-threads=1`;
+  `cargo test working_copy_actions -- --test-threads=1`; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and `just md-check` all
+  passed.
+- Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
+  largest-file output showed `src/jj_actions.rs` at 2056 lines.
+- Issue / rework note: `just md-check` initially failed on Panache line reflow in
+  `docs/agent/source-maintainability-ledger.md`; reflowing the completed-slice entry fixed the gate
+  without changing meaning.
+- Evidence basis:
+  - Date: `2026-05-21 00:47:17 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
+    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/rewrite.rs`,
+    `src/app/tests/rewrite_actions.rs`, and `src/app/tests/working_copy_actions.rs`
+
 ### 2026-05-21 (Bookmark row metadata module extraction)
 
 - Slice / task: implement the ledger slice `Bookmark Row Metadata Module` on current jj change

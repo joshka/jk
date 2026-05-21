@@ -45,8 +45,9 @@ shape, documentation workflow, and agent workflow.
   metadata pairing behind the stable `src/jj_rows.rs` facade; `src/view_action_targets.rs` owns
   bookmark action-target projection policy.
 - Action planning: `src/jj_actions/git_sync.rs` owns the extracted git sync action-plan cluster;
-  `src/jj_actions/bookmarks.rs` owns the extracted bookmark action-plan cluster; `src/jj_actions.rs`
-  keeps the stable facade and the remaining action-plan clusters, including the rewrite action plan.
+  `src/jj_actions/bookmarks.rs` owns the extracted bookmark action-plan cluster;
+  `src/jj_actions/rewrite.rs` owns the extracted rewrite action-plan cluster; `src/jj_actions.rs`
+  keeps the stable facade and the remaining action-plan clusters.
 - View routing: `src/view_state.rs` keeps the view-level routing that chooses the next detailed
   screen.
 - Selection mechanics: `src/selection.rs` owns the restore helper and shared selection cursor
@@ -197,14 +198,16 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 - Proof: focused `jj_rows`, `bookmarks`, and `bookmark_actions` tests preserve the existing bookmark
   row contracts through the unchanged `jj_rows` import path.
 
-### 4. Rewrite Action Plan Submodule
+### 4. Completed: Rewrite Action Plan Submodule
 
-- Owner: `src/jj_actions.rs`, with a bounded rewrite child module if the cluster stays cohesive.
-- Purpose: peel off the rewrite action-plan cluster as another bounded `jj_actions` slice after the
-  bookmark ownership is clarified.
-- Non-goals: no broad `jj_actions.rs` split, no public facade churn, and no wording drift.
-- Proof: the current size and hotspot scans still put `src/jj_actions.rs` at the top of the source
-  maintenance list.
+- Status: completed in the `Extract rewrite action plans` packet.
+- Result: `src/jj_actions/rewrite.rs` now owns `JjRebasePlan`, `JjSquashPlan`, `JjAbsorbPlan`, their
+  argv/preview behavior, and the focused rewrite command-construction tests. `src/jj_actions.rs`
+  keeps the stable facade through a local `rewrite` submodule plus `pub use` re-exports.
+- Non-goals preserved: no argv shape change, no preview wording drift, no fallback wording change,
+  no role-prompt behavior change, and no app call-site churn.
+- Proof: focused `jj_actions`, `rewrite_actions`, and `working_copy_actions` coverage preserves the
+  existing rewrite planning contracts through the unchanged `jj_actions` import path.
 
 ### 5. Completed: Action Preview Pane Construction Helper
 
