@@ -103,6 +103,25 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 show view test split:
+
+- `src/show.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/show/tests.rs` with `use super::*;` for private access to show view state.
+- This improves local readability by keeping show projection, sticky commit/file context, file
+  navigation, copy options, and horizontal scroll behavior visible without scrolling through 255
+  lines of inline tests. The production file measured 591 lines before the split and 335 lines after
+  it.
+- The packet intentionally preserved all 11 show view test names, assertions, helper functions,
+  imports, show projection behavior, sticky commit/file context behavior, file navigation behavior,
+  copy options, horizontal scroll behavior, public API, and runtime behavior.
+- Focused validation covered `cargo test show -- --test-threads=1` with 47 passed and 520 filtered
+  out, `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check` after applying
+  Panache wrapping to the new notes.
+- Main-thread review validation reran the same focused checks successfully with 47 passed and 520
+  filtered out for `cargo test show -- --test-threads=1`.
+- Rework was limited to moving the extracted test block into a Rust child module; no production show
+  view code changed beyond replacing the inline test block with the sibling test module declaration.
+
 2026-05-21 diff view test split:
 
 - `src/diff.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

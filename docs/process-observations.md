@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Show view test split)
+
+- Slice / task: move the inline `src/show.rs` tests into an out-of-line child module while
+  preserving show projection, sticky commit/file context behavior, file navigation behavior, copy
+  options, horizontal scroll behavior, public API, and runtime behavior.
+- Thread id: `019e4cad-7e5a-75d1-beb9-81585c18d6ec` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker handled the bounded Rust maintainability packet without running jj
+  or git commands; version-control ownership and review stayed with the main thread.
+- Changed files: `src/show.rs`, `src/show/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
+  and `docs/process-observations.md`.
+- Implementation outcome: `src/show.rs` now ends with `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/show/tests.rs` and use Rust child-module privacy through `use super::*;`. The
+  production file measured 591 lines before the split and 335 lines after it, with 255 lines of
+  tests now in the child module.
+- Behavior-preservation evidence: the packet moved the existing tests unchanged in behavior and did
+  not alter show view projection, sticky commit/file context behavior, file navigation behavior,
+  copy options, horizontal scroll behavior, visibility, public API, or runtime behavior. The test
+  names, assertions, imports, and helper functions stayed with the moved test module.
+- Validation trail:
+  - Worker validation passed: `cargo test show -- --test-threads=1` with 47 tests and 520 filtered
+    out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `just md-check` after applying Panache wrapping.
+  - Main-thread review validation passed: `cargo test show -- --test-threads=1` with 47 tests and
+    520 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+- Rework / surprise: no Rust formatting rework was needed; `just md-check` initially reported only
+  Panache wrapping differences in the new notes, and applying those wraps fixed the Markdown gate.
+- Evidence basis:
+  - Date: `2026-05-21 15:35:13 PDT` from worker-reported local `date`.
+  - Main review date: `2026-05-21 15:38:14 PDT` from local `date`.
+  - Files: `src/show.rs`, `src/show/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    this process note.
+
 ### 2026-05-21 (Diff view test split)
 
 - Slice / task: move the inline `src/diff.rs` tests into an out-of-line child module while
