@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Status view test module extraction)
+
+- Slice / task: move status view tests out of `src/status.rs` and into the status feature directory
+  so production status parsing and navigation are easier to scan while tests stay local.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b62-94bc-7822-9b93-f4738f6a8258`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the mechanical extraction with
+  write scope limited to `src/status.rs` and `src/status/tests.rs`. The main thread kept jj
+  ownership, reviewed the result, and reran focused validation.
+- Implementation outcome: `src/status.rs` now declares `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/status/tests.rs`, and the test-only `StatusView::test_new` constructor remains beside
+  the status view implementation.
+- Coverage preserved: the extracted tests continue to cover status copy text, navigation, search,
+  refresh selection preservation, row readability, exact path parsing, and file-action availability
+  policy.
+- Size evidence: after the move, measured line counts were 583 lines in `src/status.rs` and 236 in
+  `src/status/tests.rs`.
+- Rework / surprise: none beyond the expected module extraction.
+- Validation trail:
+  - Worker validation passed: `cargo test status -- --test-threads=1` with 44 passed; `cargo check`;
+    and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings.
+  - Main-thread review validation passed: `cargo test status -- --test-threads=1` with 44 passed;
+    `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+  - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
+    test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:37:03 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b62-94bc-7822-9b93-f4738f6a8258` from the worker handoff.
+  - Files: `src/status.rs`, `src/status/tests.rs`, and this process note.
+
 ### 2026-05-21 (Shared chrome test module extraction)
 
 - Slice / task: move shared TUI chrome tests out of `src/tui.rs` and into the `tui` module directory
