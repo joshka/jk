@@ -5,6 +5,30 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Remaining row ownership reassessment)
+
+- Slice / task: reassess maintainability guidance after operation-log, bookmark, workspace, and
+  resolve row feature-root migrations, without source edits.
+- Worker thread id: `019e4b44-5330-7922-b6a7-c6177e6372d8`.
+- Model / routing: GPT-5 Codex worker with medium reasoning updated docs only. The main thread
+  provided current row-ownership evidence and requested Markdown validation.
+- Evidence outcome: `src/jj_rows.rs` now declares only `mod revisions`, re-exports revision log
+  loaders, owns `FileListItem` and `load_file_list_entries`, and keeps shared rendered-row helpers
+  including `document_plain_text`, `RowMetadata`, JSON helpers, graph-line helpers, and `line_text`.
+- Recommendation outcome: `docs/agent/source-maintainability-ledger.md` now recommends a bounded
+  file-list row migration next if feature-root cleanup continues, because `src/file_list.rs` already
+  owns the user-visible `jj file list` view.
+- Deferred scope: revision/log row migration is explicitly deferred until a packet defines ownership
+  and acceptance criteria across `src/graph.rs`, compact show context in `src/show.rs`, and sticky
+  file detail behavior in `src/sticky_file_view.rs`.
+- Validation trail:
+  - `just md-check` passed.
+- Evidence basis:
+  - Date: `2026-05-21 09:00:47 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Worker thread id `019e4b44-5330-7922-b6a7-c6177e6372d8` from the worker handoff.
+  - Files: `src/jj_rows.rs`, `src/file_list.rs`, `src/graph.rs`, `src/show.rs`,
+    `src/sticky_file_view.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Resolve row feature-root migration)
 
 - Slice / task: move resolve conflict row loading and template parsing out of the generic `jj_rows`

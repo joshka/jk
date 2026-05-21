@@ -77,6 +77,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 row ownership reassessment:
+
+- `src/jj_rows.rs` is now a much smaller staging module: it declares only `mod revisions`,
+  re-exports revision log loaders, owns `FileListItem` and `load_file_list_entries`, and keeps
+  shared rendered row helpers such as `document_plain_text`, `RowMetadata`, JSON field helpers,
+  graph-line helpers, and `line_text`.
+- `src/file_list.rs` imports `FileListItem` and `load_file_list_entries` from `jj_rows`; this is the
+  cleanest remaining feature-root row migration because `file_list.rs` already owns the user-visible
+  `jj file list` view.
+- Revision/log rows are broader than a size cleanup: `src/graph.rs` consumes `LogItem` and
+  `load_entries`, while `src/show.rs` uses `load_compact_log_context` and `src/sticky_file_view.rs`
+  uses `load_entries` for file-detail behavior. Do not move them until a packet defines the owner
+  and acceptance criteria across graph, compact show context, and sticky file detail consumers.
+
 2026-05-21 resolve row migration:
 
 - `src/resolve/rows.rs` contains `ResolveEntry`, `load_resolve_entries`,
@@ -150,14 +164,13 @@ The largest production files reported by `just largest-rust-files` were:
 
 ```text
 1218 src/graph.rs
-1159 src/jj_actions.rs
- 976 src/tui.rs
- 973 src/bookmarks.rs
+1191 src/jj_actions.rs
+ 994 src/tui.rs
+ 977 src/bookmarks.rs
  876 src/bookmarks/rows.rs
  833 src/jj_actions/bookmarks.rs
  820 src/status.rs
  797 src/jj/view_spec.rs
- 778 src/app/mode_input.rs
  773 src/jj.rs
  743 src/action_menu/revision_actions.rs
  705 src/sticky_file_view.rs
@@ -282,7 +295,7 @@ Recent completed packets already moved several coherent owners out of broad modu
 - path and revision action-menu policy into `src/action_menu/path_actions.rs` and
   `src/action_menu/revision_actions.rs`;
 - operation, bookmark, workspace, and resolve row loading into feature-owned `rows.rs` modules;
-- revision row loading into `src/jj_rows/revisions.rs`;
+- revision row loading into `src/jj_rows/revisions.rs` as a staging point;
 - ViewSpec navigation provenance into `src/jj/view_spec.rs`;
 - status hint projection into `src/tui/status_hints.rs`;
 - pure modal key reducers and prompt-plan helpers into `src/app/mode_input/reducers.rs`.
@@ -291,7 +304,9 @@ Those packets improved local contracts, but several are still organized by kind 
 by user-visible feature. Treat them as staging points, not the final product shape:
 
 - `src/jj_rows/*` proved row contracts and metadata pairing, but feature-owned row modules are the
-  better destination when a feature packet touches the related view behavior.
+  better destination when a feature packet touches the related view behavior. After the
+  operation-log, bookmark, workspace, and resolve row migrations, `src/jj_rows.rs` is mostly shared
+  helpers plus revision/log and file-list staging.
 - `src/jj_actions/*` proved command-plan boundaries, but action availability and target policy
   should move toward feature roots rather than stay in global action-menu planning.
 - `src/action_menu/*` should shrink over time toward shared menu vocabulary and presentation; the
@@ -304,17 +319,22 @@ the owning product concept, and make the reader path shorter.
 
 Recommended next bounded packet:
 
+1. File-list row feature-root migration, bounded to moving `FileListItem`, `load_file_list_entries`,
+   the file-list path parser, and their focused tests from `src/jj_rows.rs` into a `file_list`
+   feature-owned row module. Acceptance criteria should prove that `src/file_list.rs` still
+   preserves rendered `jj file list` rows, exact path text, selection/search/copy behavior, and file
+   action targets.
+
+Other bounded candidates:
+
 1. Source documentation sweep for central public and crate-visible contracts, starting with
    `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/command.rs`, `src/app_screen.rs`,
    and the loaders/helpers in `src/jj_rows.rs`. The docs should explicitly mark which contracts are
    shared mechanics and which are feature policy that should migrate to a feature root when touched.
-
-Only consider these after the documentation sweep or when product work touches the area:
-
-1. Feature-root migration packet for one product concept, preferably `bookmarks`, bounded to one
-   vertical owner such as rows plus action availability. Acceptance criteria should prove that
-   callers still see the same rendered rows, action labels, target safety, and focused view
-   behavior.
+1. Revision/log row migration only if the packet first defines the feature root (`graph` versus a
+   future `log`) and acceptance criteria across `src/graph.rs`, compact show context in
+   `src/show.rs`, and sticky file detail behavior in `src/sticky_file_view.rs`. Do not do this only
+   to reduce `src/jj_rows.rs` or `src/graph.rs` line counts.
 1. Action lifecycle documentation or grouping packet if the owner is clearly app-side completion,
    preview, or shared result wording. Keep `src/jj_actions.rs` focused on plan construction, preview
    text, argv, and execution.
@@ -329,7 +349,8 @@ Pause broad source-shape splits where modules are cohesive:
   only a concrete overlay family with snapshot proof.
 - `src/bookmarks.rs` remains mostly view behavior plus focused tests; target-selection policy
   already has `src/bookmarks/action_targets.rs`.
-- `src/jj_rows.rs` is now a facade plus small file-list/shared helpers. Do not extract tiny row
-  families, JSON helpers, or re-exports for size alone.
+- `src/jj_rows.rs` is now mostly shared helpers plus revision/log and file-list staging. Move
+  file-list rows next if continuing feature-root cleanup; leave revision/log rows until the
+  cross-view owner and behavior proof are clear.
 - Do not create a `slices/` or other umbrella bucket. Prefer feature roots plus shared
   infrastructure.
