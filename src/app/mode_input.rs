@@ -20,9 +20,6 @@ use crate::command::{
     Binding, BindingMatch, ViewCommand, ViewEffect, help_binding_prefix_next_labels,
     match_help_binding_sequence,
 };
-use crate::jj_actions::{
-    JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, validate_bookmark_rename_new_name,
-};
 use crate::search::SearchQuery;
 
 use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand, prefix_status_message};
@@ -30,9 +27,11 @@ use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand, prefix_st
 mod reducers;
 
 use reducers::{
-    ConfirmationKey, MenuKey, RolePromptDecision, TextPromptKey, bookmark_mutation_plan,
-    is_help_close_key, is_help_scroll_key, reduce_confirmation_key, reduce_menu_key,
-    reduce_role_prompt_accept, reduce_text_prompt_key, reduce_view_menu_key,
+    ConfirmationKey, MenuKey, PromptAcceptDecision, RolePromptDecision, TextPromptKey,
+    is_help_close_key, is_help_scroll_key, reduce_bookmark_name_prompt_accept,
+    reduce_bookmark_rename_prompt_accept, reduce_commit_prompt_accept, reduce_confirmation_key,
+    reduce_describe_prompt_accept, reduce_menu_key, reduce_role_prompt_accept,
+    reduce_text_prompt_key, reduce_view_menu_key,
 };
 #[cfg(test)]
 pub(in crate::app) use reducers::{rebase_plan_from_prompt, squash_plan_from_prompt};
@@ -214,16 +213,16 @@ impl App {
                             StatusLine::with_message(&self.view, "describe cancelled".to_owned());
                     }
                     TextPromptKey::Accept => {
-                        let message = input.trim().to_owned();
-                        let target = target.clone();
+                        let decision = reduce_describe_prompt_accept(target, input);
                         self.mode = InteractionMode::Normal;
-                        if message.is_empty() {
-                            self.status = StatusLine::with_message(
-                                &self.view,
-                                "describe cancelled: empty description".to_owned(),
-                            );
-                        } else {
-                            self.open_describe_preview(JjDescribePlan::new(target, message));
+
+                        match decision {
+                            PromptAcceptDecision::Preview(describe) => {
+                                self.open_describe_preview(describe);
+                            }
+                            PromptAcceptDecision::StatusMessage(message) => {
+                                self.status = StatusLine::with_message(&self.view, message);
+                            }
                         }
                     }
                     TextPromptKey::Edited | TextPromptKey::Ignored => {}
@@ -238,15 +237,16 @@ impl App {
                             StatusLine::with_message(&self.view, "commit cancelled".to_owned());
                     }
                     TextPromptKey::Accept => {
-                        let message = input.trim().to_owned();
+                        let decision = reduce_commit_prompt_accept(input);
                         self.mode = InteractionMode::Normal;
-                        if message.is_empty() {
-                            self.status = StatusLine::with_message(
-                                &self.view,
-                                "commit cancelled: empty description".to_owned(),
-                            );
-                        } else {
-                            self.open_commit_preview(JjCommitPlan::new(message));
+
+                        match decision {
+                            PromptAcceptDecision::Preview(commit) => {
+                                self.open_commit_preview(commit);
+                            }
+                            PromptAcceptDecision::StatusMessage(message) => {
+                                self.status = StatusLine::with_message(&self.view, message);
+                            }
                         }
                     }
                     TextPromptKey::Edited | TextPromptKey::Ignored => {}
@@ -268,19 +268,16 @@ impl App {
                         );
                     }
                     TextPromptKey::Accept => {
-                        let name = input.trim().to_owned();
-                        let kind = *kind;
-                        let target = target.clone();
+                        let decision = reduce_bookmark_name_prompt_accept(*kind, target, input);
                         self.mode = InteractionMode::Normal;
-                        if name.is_empty() {
-                            self.status = StatusLine::with_message(
-                                &self.view,
-                                format!("bookmark {} cancelled: empty bookmark name", kind.label()),
-                            );
-                        } else {
-                            self.open_bookmark_mutation_preview(bookmark_mutation_plan(
-                                kind, name, target,
-                            ));
+
+                        match decision {
+                            PromptAcceptDecision::Preview(bookmark) => {
+                                self.open_bookmark_mutation_preview(bookmark);
+                            }
+                            PromptAcceptDecision::StatusMessage(message) => {
+                                self.status = StatusLine::with_message(&self.view, message);
+                            }
                         }
                     }
                     TextPromptKey::Edited | TextPromptKey::Ignored => {}
@@ -295,20 +292,15 @@ impl App {
                             StatusLine::with_message(&self.view, "bookmark rename cancelled");
                     }
                     TextPromptKey::Accept => {
-                        let old_name = old_name.clone();
-                        let new_name = std::mem::take(input);
+                        let decision = reduce_bookmark_rename_prompt_accept(old_name, input);
                         self.mode = InteractionMode::Normal;
-                        match validate_bookmark_rename_new_name(&old_name, &new_name) {
-                            Ok(()) => {
-                                self.open_bookmark_mutation_preview(
-                                    JjBookmarkMutationPlan::rename(old_name, new_name),
-                                );
+
+                        match decision {
+                            PromptAcceptDecision::Preview(bookmark) => {
+                                self.open_bookmark_mutation_preview(bookmark);
                             }
-                            Err(reason) => {
-                                self.status = StatusLine::with_message(
-                                    &self.view,
-                                    format!("bookmark rename cancelled: {reason}"),
-                                );
+                            PromptAcceptDecision::StatusMessage(message) => {
+                                self.status = StatusLine::with_message(&self.view, message);
                             }
                         }
                     }

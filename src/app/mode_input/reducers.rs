@@ -10,7 +10,8 @@ use crate::action_menu::{ActionKind, RolePrompt};
 use crate::action_output::ActionOutput;
 use crate::app_screen::view_menu_options;
 use crate::jj_actions::{
-    JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget, JjRebasePlan, JjSquashPlan,
+    JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan,
+    JjDescribeTarget, JjRebasePlan, JjSquashPlan, validate_bookmark_rename_new_name,
 };
 
 pub(super) enum TextPromptKey {
@@ -112,6 +113,69 @@ pub(super) fn reduce_role_prompt_accept(
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub(super) enum PromptAcceptDecision<T> {
+    Preview(T),
+    StatusMessage(String),
+}
+
+pub(super) fn reduce_describe_prompt_accept(
+    target: &JjDescribeTarget,
+    input: &str,
+) -> PromptAcceptDecision<JjDescribePlan> {
+    let message = input.trim().to_owned();
+
+    if message.is_empty() {
+        PromptAcceptDecision::StatusMessage("describe cancelled: empty description".to_owned())
+    } else {
+        PromptAcceptDecision::Preview(JjDescribePlan::new(target.clone(), message))
+    }
+}
+
+pub(super) fn reduce_commit_prompt_accept(input: &str) -> PromptAcceptDecision<JjCommitPlan> {
+    let message = input.trim().to_owned();
+
+    if message.is_empty() {
+        PromptAcceptDecision::StatusMessage("commit cancelled: empty description".to_owned())
+    } else {
+        PromptAcceptDecision::Preview(JjCommitPlan::new(message))
+    }
+}
+
+pub(super) fn reduce_bookmark_name_prompt_accept(
+    kind: JjBookmarkMutationKind,
+    target: &JjBookmarkTarget,
+    input: &str,
+) -> PromptAcceptDecision<JjBookmarkMutationPlan> {
+    let name = input.trim().to_owned();
+
+    if name.is_empty() {
+        PromptAcceptDecision::StatusMessage(format!(
+            "bookmark {} cancelled: empty bookmark name",
+            kind.label()
+        ))
+    } else {
+        PromptAcceptDecision::Preview(bookmark_mutation_plan(kind, name, target.clone()))
+    }
+}
+
+pub(super) fn reduce_bookmark_rename_prompt_accept(
+    old_name: &str,
+    input: &str,
+) -> PromptAcceptDecision<JjBookmarkMutationPlan> {
+    let new_name = input.to_owned();
+
+    match validate_bookmark_rename_new_name(old_name, &new_name) {
+        Ok(()) => PromptAcceptDecision::Preview(JjBookmarkMutationPlan::rename(
+            old_name.to_owned(),
+            new_name,
+        )),
+        Err(reason) => {
+            PromptAcceptDecision::StatusMessage(format!("bookmark rename cancelled: {reason}"))
+        }
+    }
+}
+
 pub(super) enum ConfirmationKey {
     Cancel,
     Accept,
@@ -185,6 +249,103 @@ mod tests {
             reduce_role_prompt_accept(ActionKind::Absorb, &prompt),
             RolePromptDecision::StatusMessage(
                 "source: source-a\ndestination: dest\nPreview required.".to_owned(),
+            )
+        );
+    }
+
+    #[test]
+    fn describe_prompt_accept_trims_message_and_builds_plan() {
+        let target = JjDescribeTarget::exact_change("abc123");
+
+        let PromptAcceptDecision::Preview(plan) =
+            reduce_describe_prompt_accept(&target, "  new description  ")
+        else {
+            panic!("expected describe preview decision");
+        };
+
+        assert_eq!(plan.target(), &target);
+        assert_eq!(
+            plan.command_label(),
+            "jj describe abc123 --message new description"
+        );
+    }
+
+    #[test]
+    fn describe_prompt_accept_reports_empty_description_cancellation() {
+        assert_eq!(
+            reduce_describe_prompt_accept(&JjDescribeTarget::current_working_copy(), "   "),
+            PromptAcceptDecision::StatusMessage("describe cancelled: empty description".to_owned())
+        );
+    }
+
+    #[test]
+    fn commit_prompt_accept_trims_message_and_builds_plan() {
+        let PromptAcceptDecision::Preview(plan) = reduce_commit_prompt_accept("  commit message  ")
+        else {
+            panic!("expected commit preview decision");
+        };
+
+        assert_eq!(plan.command_label(), "jj commit --message commit message");
+    }
+
+    #[test]
+    fn commit_prompt_accept_reports_empty_description_cancellation() {
+        assert_eq!(
+            reduce_commit_prompt_accept("\t"),
+            PromptAcceptDecision::StatusMessage("commit cancelled: empty description".to_owned())
+        );
+    }
+
+    #[test]
+    fn bookmark_name_prompt_accept_trims_name_and_builds_plan() {
+        let target = JjBookmarkTarget::exact_change("abc123");
+
+        let PromptAcceptDecision::Preview(plan) = reduce_bookmark_name_prompt_accept(
+            JjBookmarkMutationKind::Create,
+            &target,
+            "  feature/name  ",
+        ) else {
+            panic!("expected bookmark mutation preview decision");
+        };
+
+        assert_eq!(plan.kind(), JjBookmarkMutationKind::Create);
+        assert_eq!(plan.name(), "feature/name");
+        assert_eq!(plan.target(), Some(&target));
+    }
+
+    #[test]
+    fn bookmark_name_prompt_accept_reports_empty_name_with_kind_label() {
+        assert_eq!(
+            reduce_bookmark_name_prompt_accept(
+                JjBookmarkMutationKind::Move,
+                &JjBookmarkTarget::current_working_copy(),
+                "  ",
+            ),
+            PromptAcceptDecision::StatusMessage(
+                "bookmark move cancelled: empty bookmark name".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn bookmark_rename_prompt_accept_builds_rename_plan() {
+        let PromptAcceptDecision::Preview(plan) =
+            reduce_bookmark_rename_prompt_accept("old/name", "new/name")
+        else {
+            panic!("expected bookmark rename preview decision");
+        };
+
+        assert_eq!(plan.kind(), JjBookmarkMutationKind::Rename);
+        assert_eq!(plan.name(), "old/name");
+        assert_eq!(plan.new_name(), Some("new/name"));
+    }
+
+    #[test]
+    fn bookmark_rename_prompt_accept_reports_validation_reason() {
+        assert_eq!(
+            reduce_bookmark_rename_prompt_accept("old/name", ""),
+            PromptAcceptDecision::StatusMessage(
+                "bookmark rename cancelled: empty bookmark name".to_owned()
             )
         );
     }

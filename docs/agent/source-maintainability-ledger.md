@@ -112,6 +112,22 @@ Examples for future packets:
   `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check`. Full `just check` also
   passed at the top of the stack.
 
+2026-05-21 text prompt acceptance reducer extraction:
+
+- `src/app/mode_input/reducers.rs` now owns pure accept decisions for describe, commit, bookmark
+  name, and bookmark rename prompts. The prompt-specific reducers return either a preview plan or
+  the exact cancellation status wording.
+- `src/app/mode_input.rs` still owns the app side effects after text-prompt acceptance: reset to
+  normal mode, open the relevant preview, or assign `StatusLine`.
+- Main-thread review collapsed four identical decision enum shapes into one narrow
+  `PromptAcceptDecision<T>` so prompt-specific function names carry the concept while the shared
+  result shape stays boring.
+- Focused validation covered `cargo test mode_input -- --test-threads=1`,
+  `cargo test describe_commit_actions -- --test-threads=1`,
+  `cargo test bookmark_actions -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`. Full `just check` also passed at the
+  top of the stack.
+
 2026-05-21 action plan root contract documentation:
 
 - `src/jj_actions.rs` now documents the root action-plan ownership boundary: root plans own argv

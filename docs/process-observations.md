@@ -5889,3 +5889,49 @@ belong here.
   - Thread id from `CODEX_THREAD_ID`.
   - Files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.
+
+### 2026-05-21 (Text prompt acceptance reducer extraction)
+
+- Slice / task: extract pure accept decisions for describe, commit, bookmark-name, and
+  bookmark-rename prompts from `src/app/mode_input.rs` into `src/app/mode_input/reducers.rs`.
+- Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
+  implementation `019e4be3-d196-7000-a1d9-d2ba609e117d`.
+- Model / routing: worker/subagent `019e4be3-d196-7000-a1d9-d2ba609e117d` with medium reasoning
+  implemented the extraction without jj/git commands. The main thread reviewed the diff, tightened
+  the decision shape, reran validation, and updated the maintainability ledger.
+- Changed files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `reducers.rs` now owns prompt-specific pure reducers that return a shared
+  prompt accept decision carrying preview plan data or the existing cancellation status wording.
+  `mode_input.rs` still owns mode reset, `StatusLine` assignment, and preview opening.
+- Behavior-preservation evidence: describe and commit accept reducers trim prompt text before
+  building plans and keep the exact empty-description cancellation strings. Bookmark-name accept
+  trims the prompt name, keeps the mutation kind label in the empty-name status, and still builds
+  plans through `bookmark_mutation_plan`. Bookmark-rename accept keeps raw input validation through
+  `validate_bookmark_rename_new_name`, preserving the whitespace-wrapped rejection path and the
+  exact `bookmark rename cancelled: {reason}` status text.
+- Main-thread review outcome: four parallel prompt-decision enums were collapsed into one narrow
+  generic `PromptAcceptDecision<T>`. Prompt-specific reducer function names remain the reader entry
+  points, while the repeated result shape no longer adds four concepts to import and match.
+- Size evidence after main review: `src/app/mode_input.rs` measured 574 lines and
+  `src/app/mode_input/reducers.rs` measured 459 lines.
+- Rework / surprise: worker validation initially had a formatting-only failure; rustfmt was applied
+  and validation was rerun. Main review found the process note was missing its file evidence tail,
+  repaired it, and then hit another formatting-only rustfmt diff after collapsing the decision enum
+  shape.
+- Validation trail:
+  - Worker validation passed: `cargo test mode_input -- --test-threads=1` with 12 passed;
+    `cargo test describe_commit_actions -- --test-threads=1` with 10 passed;
+    `cargo test bookmark_actions -- --test-threads=1` with 27 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test mode_input -- --test-threads=1` with 12
+    passed; `cargo test describe_commit_actions -- --test-threads=1` with 10 passed;
+    `cargo test bookmark_actions -- --test-threads=1` with 27 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
+    with `-D warnings`, `cargo check`, and `cargo test` with 557 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 11:58:40 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.
