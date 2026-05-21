@@ -5,6 +5,44 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Rendered jj document test split)
+
+- Slice / task: move the inline `src/rendered_jj.rs` tests into `src/rendered_jj/tests.rs` while
+  preserving file-heading extraction behavior, style preservation, active-file selection, sticky
+  projection behavior, public API, and runtime behavior.
+- Thread id: `019e4cb1-53cf-7a31-939e-3fcfcd45cec5` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker implemented the bounded maintainability packet in the current
+  existing jj change without running jj or git commands; version-control ownership and review stayed
+  with the main thread.
+- Changed files: `src/rendered_jj.rs`, `src/rendered_jj/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/rendered_jj.rs` now ends with `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/rendered_jj/tests.rs` and use Rust child-module privacy through
+  `use super::*;`. The production file measured 597 lines before the split and 281 lines after it,
+  with 315 lines in the child test module.
+- Behavior-preservation evidence: the packet moved the existing nine rendered document tests without
+  changing their names, assertions, helper functions, imports, inline insta snapshots, file-heading
+  extraction behavior, style preservation, active-file selection, sticky projection behavior, public
+  API, or runtime behavior.
+- Scope boundary: the packet did not change `sticky_file_view.rs`, `show.rs`, `diff.rs`, shared
+  document mechanics, visibility, or production rendered document code beyond the test module
+  declaration.
+- Validation trail:
+  - Worker validation passed: `cargo test rendered_jj -- --test-threads=1` with 9 tests and 558
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check` after applying Panache wrapping.
+  - Main-thread review validation passed: `cargo test rendered_jj -- --test-threads=1` with 9 tests
+    and 558 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: no Rust behavior or formatting rework was needed after the move. The first
+  Markdown check reported only Panache wrapping in this process note; applying the formatter fixed
+  the gate.
+- Evidence basis:
+  - Date: `2026-05-21 15:39:29 PDT` from worker-reported local `date`.
+  - Main review date: `2026-05-21 15:43:02 PDT` from local `date`.
+  - Files: `src/rendered_jj.rs`, `src/rendered_jj/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Show view test split)
 
 - Slice / task: move the inline `src/show.rs` tests into an out-of-line child module while

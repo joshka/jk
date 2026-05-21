@@ -103,6 +103,26 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 rendered jj document test split:
+
+- `src/rendered_jj.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/rendered_jj/tests.rs` with `use super::*;` for private access to rendered document helpers.
+- This improves local readability by keeping rendered `jj` file-heading extraction, style
+  preservation, active-file selection, and sticky projection code visible without scrolling through
+  315 lines of inline tests. The production file measured 597 lines before the split and 281 lines
+  after it.
+- The packet intentionally preserved all nine rendered document test names, assertions, helper
+  functions, imports, inline insta snapshots, file-heading extraction behavior, style preservation,
+  active-file selection, sticky projection behavior, public API, and runtime behavior.
+- Focused validation covered `cargo test rendered_jj -- --test-threads=1` with 9 passed and 558
+  filtered out, `cargo check`, `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings, and `just md-check`.
+- Main-thread review validation reran the same focused checks successfully with 9 passed and 558
+  filtered out for `cargo test rendered_jj -- --test-threads=1`.
+- Rework was limited to moving the extracted test block into a Rust child module; no production
+  rendered document code changed beyond replacing the inline test block with the sibling test module
+  declaration.
+
 2026-05-21 show view test split:
 
 - `src/show.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
