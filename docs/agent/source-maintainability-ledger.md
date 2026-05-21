@@ -109,6 +109,19 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 view state target test split:
+
+- `src/view_state.rs` now declares `#[cfg(test)] mod tests;`, and the moved cross-view target tests
+  live in `src/view_state/tests.rs` with `use super::*;` for private access to view-state routing.
+- This keeps push target, bookmark target, local bookmark name, exact restore/revert context, status
+  selected-path, ambiguous status row, and direct startup revset tests beside the view-state routing
+  code without forcing readers through inline tests in the production module.
+- The packet intentionally preserved all test names, assertions, imports, error wording
+  expectations, exact target expectations, cross-view routing behavior, public API, and runtime
+  behavior.
+- Focused validation passed: `cargo test view_state -- --test-threads=1` with 11 passed and 556
+  filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
+
 2026-05-21 operation log view test split:
 
 - `src/operation_log.rs` now declares `#[cfg(test)] mod tests;`, and the moved view tests live in

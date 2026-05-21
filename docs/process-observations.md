@@ -5,6 +5,38 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (View state target test split)
+
+- Slice / task: move inline view-state target routing tests from `src/view_state.rs` into
+  `src/view_state/tests.rs` while preserving push target, bookmark target, local bookmark name,
+  exact restore/revert context, status selected-path, ambiguous status row, and direct startup
+  revset behavior.
+- Thread id: `019e4ce3-4dbd-7030-aa17-4eb7cc168e10` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the bounded test-module move in the
+  `Move view state target tests` jj change; the main thread reviewed the diff, updated tracking
+  docs, and reran validation.
+- Changed files: `src/view_state.rs`, `src/view_state/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+  process note.
+- Implementation outcome: `src/view_state.rs` now declares `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/view_state/tests.rs` and use Rust child-module privacy through `use super::*;`.
+- Behavior-preservation evidence: all original test names, assertions, imports, error wording
+  expectations, exact target expectations, cross-view routing behavior, public API, and runtime
+  behavior are preserved.
+- Process observation: GPT-5.4 mini completed this mechanical move without assertion drift. This
+  supports using it for strongly specified test-module moves when the write set is narrow and the
+  main thread still performs exact diff review.
+- Validation trail:
+  - Worker validation passed: `cargo test view_state -- --test-threads=1` with 11 passed and 556
+    filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
+  - Main-thread validation passed: `cargo test view_state -- --test-threads=1` with 11 passed and
+    556 filtered out; `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:35:04 PDT` from local `date`.
+  - Files: `src/view_state.rs`, `src/view_state/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+    process note.
+
 ### 2026-05-21 (Operation log view test split)
 
 - Slice / task: move inline operation-log view tests from `src/operation_log.rs` into
