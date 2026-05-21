@@ -23,6 +23,10 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - App abandon preview and confirmation handling now also have named modal helpers, keeping empty
   abandon rechecks, non-empty confirmation, cancellation, and output-closing behavior out of the
   main dispatch table.
+- Central source ownership contracts were tightened in `main`, `app`, `app_screen`, `command`,
+  `action_menu`, `tui`, `jj_actions`, and `jj_rows`. This makes future cleanup less dependent on
+  chat context because the source now states which module owns process setup, dispatch, modal
+  projection, shared chrome, command metadata, action plans, and rendered-row helpers.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -64,7 +68,7 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 
 ## Current State
 
-- The current top of stack refreshes this status map after the app abandon modal handler extraction.
+- The current top of stack adds source ownership contracts after the source cleanup audit.
 - Recent behavior-preserving packets have focused on locality, feature ownership, and making the
   automatic session easier to audit from files rather than chat history.
 - The broad goal is still active. The completed packets do not prove the whole cleanup queue is

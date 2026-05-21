@@ -1,7 +1,8 @@
 //! App-level modal and prompt screen contracts.
 //!
 //! `app.rs` owns dispatch and side effects. This module owns the transient screen state and the
-//! projection from that state to status-line text and shared TUI overlays.
+//! projection from that state to status-line text and shared TUI overlays. It should stay free of
+//! command execution and feature-specific availability rules.
 
 use crate::action_menu::{ActionKind, ActionMenu, RolePrompt};
 use crate::action_output::ActionOutput;

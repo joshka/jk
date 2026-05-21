@@ -4,7 +4,8 @@
 //! policy. `app_screen.rs` projects app interaction state into borrowed [`Overlay`] values; this
 //! module sizes, clears, styles, and renders those values as shared chrome around the active view.
 //! Future behavior belongs in the view, app screen, action lifecycle, or action output owner that
-//! holds the state being changed, not in this presentation layer.
+//! holds the state being changed, not in this presentation layer. This module should only adjust
+//! presentation geometry and styling.
 
 mod status_hints;
 

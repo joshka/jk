@@ -109,6 +109,19 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 source ownership contract sweep:
+
+- `src/main.rs`, `src/app.rs`, `src/app_screen.rs`, `src/command.rs`, `src/action_menu.rs`,
+  `src/tui.rs`, `src/jj_actions.rs`, and `src/jj_rows.rs` now have tighter source-level contracts
+  for central ownership boundaries.
+- The packet documents process setup, app dispatch state, global binding ownership, modal projection
+  boundaries, action-menu follow-up payload preservation, shared chrome limits, abandon preflight
+  title loading, metadata drift handling, and narrow graph-line detection.
+- The packet intentionally changed comments only and did not alter Rust behavior, command argv,
+  rendered `jj` output, status wording, key handling, selection behavior, refresh/reveal behavior,
+  or tests.
+- Validation passed: `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+
 2026-05-21 source cleanup audit:
 
 - `docs/agent/source-cleanup-audit.md` now records current source-shape measurements: total Rust

@@ -51,6 +51,10 @@ pub use working_copy::{
     JjWorkingCopyNavigationPlan,
 };
 
+/// Template used to read the first description line for abandon preflight text.
+///
+/// The abandon flow uses `jj log` to surface a title without inventing its own
+/// parser or changing the selected change.
 const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 
 /// Shared result envelope for preview and confirmed command output.
@@ -291,6 +295,10 @@ impl JjAbandonPlan {
         run_direct_args(self.command_argv(), &self.command_label(), "abandoned")
     }
 
+    /// Read the selected change title for abandon preflight.
+    ///
+    /// Failure surfaces as preview failure instead of guessing a title or
+    /// changing the target revision.
     fn load_title(&self) -> Result<Option<String>> {
         let mut jj = base_command(ColorMode::Never);
         jj.args(self.title_argv());
@@ -387,6 +395,10 @@ impl JjAbandonPreview {
     }
 }
 
+/// Preflight only cares whether the diff summary is empty or not.
+///
+/// More detailed abandon policy belongs in the preview builder and app
+/// confirmation flow, not in this local classifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AbandonChangeState {
     Empty,

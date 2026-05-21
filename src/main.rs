@@ -1,6 +1,7 @@
 //! Binary entry point for `jk`.
 //!
 //! This crate installs `color_eyre` and then hands control to `app::run`.
+//! Process setup stays here; feature behavior starts in the app boundary.
 
 mod action_menu;
 mod action_output;

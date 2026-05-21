@@ -5,6 +5,38 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Source ownership contract sweep)
+
+- Slice / task: add concise Rustdoc and invariant comments to central source modules before more
+  behavior-preserving refactors.
+- Thread id: `019e4cdb-facd-7571-b75a-cd5e50d4d95f` from the worker handoff.
+- Model / routing: GPT-5.4 mini with medium reasoning handled the bounded source documentation
+  packet in the `Document source ownership contracts` jj change; the main thread reviewed the diff,
+  updated tracking docs, and reran validation.
+- Changed files: `src/main.rs`, `src/app.rs`, `src/app_screen.rs`, `src/command.rs`,
+  `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/jj_rows.rs`,
+  `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+  process note.
+- Implementation outcome: central files now carry explicit contracts for process setup, app dispatch
+  and view history, global binding ownership, modal projection boundaries, action-menu payload
+  preservation, shared chrome limits, abandon preflight title loading, row metadata drift, and
+  narrow graph-line detection.
+- Behavior-preservation evidence: comment-only source changes. They did not alter Rust behavior,
+  command argv, rendered `jj` output, status wording, key handling, selection behavior,
+  refresh/reveal behavior, or tests.
+- Process observation: GPT-5.4 mini was effective for this bounded documentation packet because the
+  write set was explicit and the desired output was source contracts, not architecture discovery.
+  The main review found the diff aligned with the stated boundaries and did not need rework beyond
+  adding durable status evidence.
+- Validation trail:
+  - Worker validation passed: `cargo check` and `rustup run nightly cargo fmt --check`.
+  - Main-thread validation passed: `cargo check`, `rustup run nightly cargo fmt --check`, and
+    `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:28:45 PDT` from local `date`.
+  - Files: the source files listed above, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/cleanup-wave-status.md`, and this process note.
+
 ### 2026-05-21 (Automatic-session status map)
 
 - Slice / task: reconstruct a concise, user-readable list of recent and upcoming work from the

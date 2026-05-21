@@ -18,8 +18,9 @@ pub fn document_plain_text(lines: &[Line<'static>]) -> String {
 
 /// Row metadata that must stay aligned with rendered `jj` rows.
 ///
-/// Feature roots decide how to use the metadata; this helper only reports whether the side channel
-/// still matches the rendered row count.
+/// Feature roots decide how to use the metadata; this helper only reports
+/// whether the side channel still matches the rendered row count. A mismatch
+/// means the caller should discard the metadata instead of guessing alignment.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum RowMetadata<T> {
     Valid(Vec<T>),
@@ -68,6 +69,9 @@ pub(crate) fn boolean_field(fields: &serde_json::Map<String, Value>, name: &str)
 }
 
 /// Detect graph rows that contain only structural glyphs or `~`.
+///
+/// The helper stays intentionally narrow so graph-row detection does not drift
+/// into general rendered-text parsing.
 pub(crate) fn is_standalone_graph_line(line: &Line<'_>) -> bool {
     let text = line_text(line);
     first_content_char(&text).is_none_or(|character| character == '~')

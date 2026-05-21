@@ -239,11 +239,13 @@ pub enum FollowUp {
     OperationRevertExactTarget {
         operation_id: String,
     },
+    /// New-change payloads keep the exact parent list selected upstream.
     NewParents {
         parents: Vec<String>,
     },
     /// Multi-target rewrite payloads preserve candidate ordering for the next app prompt or plan.
     RolePrompt(RolePrompt),
+    /// Absorb payloads preserve the chosen source and destination ordering.
     AbsorbCandidates {
         source: String,
         destinations: Vec<String>,

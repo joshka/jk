@@ -42,6 +42,12 @@ pub fn run() -> Result<()> {
     ratatui::run(|terminal| app.run(terminal))
 }
 
+/// App-owned runtime state for dispatch, view history, and prompt handoff.
+///
+/// View modules own the rendered content and local navigation policy. This
+/// struct keeps the cross-view stack, pending prefix state, search scope, and
+/// terminal-facing services together so dispatch does not have to reconstruct
+/// them from rendered output.
 struct App {
     view: ViewState,
     stack: Vec<ViewState>,
@@ -55,6 +61,10 @@ struct App {
     services: AppServices,
 }
 
+/// Global bindings that resolve before view-local bindings.
+///
+/// Feature views add their own commands on top; these entries stay focused on
+/// app-level dispatch and shared mode changes.
 const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('q'), Command::Quit),
     Binding::new(KeyPattern::code(KeyCode::Esc), Command::Quit),
@@ -95,6 +105,10 @@ const BOOKMARK_TRACK_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::
 const BOOKMARK_UNTRACK_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('u')];
 const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
 
+/// Read the current terminal width at dispatch time.
+///
+/// View clamping uses live terminal size instead of cached geometry so resize
+/// handling stays local to the next refresh or view effect.
 fn current_viewport_width() -> u16 {
     crossterm::terminal::size()
         .map(|(width, _)| width)
@@ -467,6 +481,10 @@ impl App {
         }
     }
 
+    /// Rebuild the active view and convert refresh failure into status.
+    ///
+    /// ViewState owns the actual reload and clamp policy; this method only
+    /// keeps the app status in sync with the result.
     fn refresh(&mut self, viewport_height: u16) {
         match self.refresh_view_state() {
             Ok(()) => {
@@ -488,6 +506,10 @@ impl App {
         )
     }
 
+    /// Interpret a view effect and move the app-owned state it refers to.
+    ///
+    /// View code reports intent here; this dispatcher owns the resulting mode
+    /// changes, status text, and follow-up navigation.
     fn apply_view_effect(&mut self, effect: ViewEffect, viewport_height: u16) -> Result<bool> {
         match effect {
             ViewEffect::Ignored | ViewEffect::Handled => Ok(true),

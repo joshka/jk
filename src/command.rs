@@ -260,6 +260,10 @@ impl KeyPattern {
     }
 }
 
+/// Physical key shape used by a binding table entry.
+///
+/// Binding metadata stays separate from dispatch state. `App` owns prefix
+/// timing and fallback behavior; this enum only records the exact key pattern.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum KeySequence {
     /// A one-key binding that can complete immediately.
