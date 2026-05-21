@@ -5,6 +5,50 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Operation-log row feature-root migration)
+
+- Slice / task: move operation-log rendered-row loading and operation-id metadata pairing out of the
+  generic `jj_rows` bucket and into the `operation_log` feature root.
+- Worker thread id: `019e4a64-8b0a-71f1-9402-1abb0fd6c080`.
+- Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The main
+  thread kept jj orchestration, reviewed the boundary, and reran validation.
+- Implementation outcome: `src/operation_log/rows.rs` now owns `OperationLogItem`,
+  `load_operation_log_entries`, `OPERATION_ID_TEMPLATE`, operation-id parsing, rendered operation
+  row grouping, and fail-closed drift tests. `src/operation_log.rs` declares the row submodule and
+  re-exports the item and loader for crate-local callers and tests.
+- Boundary evidence: `src/jj_rows.rs` no longer declares `mod operations` or re-exports
+  operation-log items. It keeps only the shared rendered-row mechanics used outside the feature:
+  `RowMetadata`, `is_standalone_graph_line`, `first_content_char`, and `line_text` are crate-visible
+  for the new feature-owned row loader.
+- Caller evidence: app tests that construct operation-log rows now use
+  `crate::operation_log::OperationLogItem`; `src/jj.rs` tests import `OPERATION_ID_TEMPLATE` from
+  `operation_log` while still using resolve and workspace templates from `jj_rows`.
+- Rework / surprise: making `RowMetadata` crate-visible needed only enum-level visibility; Rust enum
+  variants inherit the enum visibility and reject explicit variant qualifiers.
+- Validation trail:
+  - `cargo test operation_log -- --test-threads=1` passed with 22 passed.
+  - `cargo test operation_actions -- --test-threads=1` passed with 10 passed.
+  - `cargo test jj_rows -- --test-threads=1` passed with 30 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed.
+- Main-thread review validation passed: `cargo test operation_log -- --test-threads=1` with 22
+  passed; `cargo test operation_actions -- --test-threads=1` with 10 passed;
+  `cargo test jj_rows -- --test-threads=1` with 30 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 07:13:38 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`
+  - Worker thread id from the worker handoff
+  - Files: `src/operation_log.rs`, `src/operation_log/rows.rs`, `src/jj_rows.rs`, `src/jj.rs`,
+    `src/app/tests/command_navigation.rs`, `src/app/tests/operation_actions.rs`,
+    `src/app/tests/support.rs`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-21 (Mode input reducer extraction)
 
 - Slice / task: extract pure modal key reducers and prompt-plan helpers from `src/app/mode_input.rs`

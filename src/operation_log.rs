@@ -15,10 +15,15 @@ use crate::action_menu::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, Safet
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::ViewSpec;
-use crate::jj_rows::{OperationLogItem, load_operation_log_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
+
+mod rows;
+
+#[cfg(test)]
+pub(crate) use rows::OPERATION_ID_TEMPLATE;
+pub(crate) use rows::{OperationLogItem, load_operation_log_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),

@@ -25,11 +25,11 @@ fn push_remote_prompt_without_selection_stays_ready() {
 fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
     let selected_operation_id = "b".repeat(128);
     let mut operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("a".repeat(128)),
         ),
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("○  selected")],
             Some(selected_operation_id.clone()),
         ),
@@ -64,7 +64,7 @@ fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
 #[test]
 fn operation_recovery_preview_can_cancel_or_confirm_success() {
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("a".repeat(128)),
         ),
@@ -98,7 +98,7 @@ fn operation_recovery_preview_can_cancel_or_confirm_success() {
 #[test]
 fn operation_redo_failure_keeps_command_output_readable() {
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("a".repeat(128)),
         ),
@@ -131,7 +131,10 @@ fn operation_redo_failure_keeps_command_output_readable() {
 #[test]
 fn operation_action_menu_requires_exact_operation_id() {
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(vec![ratatui::text::Line::from("@  current")], None),
+        crate::operation_log::OperationLogItem::new(
+            vec![ratatui::text::Line::from("@  current")],
+            None,
+        ),
     ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
@@ -149,7 +152,7 @@ fn operation_action_menu_requires_exact_operation_id() {
 fn operation_restore_preview_can_cancel_or_confirm_success() {
     let operation_id = "e".repeat(128);
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
         ),
@@ -207,7 +210,7 @@ fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
     OPERATION_RESTORE_REFRESH_CALLS.store(0, Ordering::SeqCst);
     let operation_id = "e".repeat(128);
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
         ),
@@ -247,7 +250,7 @@ fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
     OPERATION_REVERT_REFRESH_CALLS.store(0, Ordering::SeqCst);
     let operation_id = "f".repeat(128);
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
         ),
@@ -281,7 +284,7 @@ fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
 fn operation_revert_preview_confirm_failure_keeps_output_readable() {
     let operation_id = "f".repeat(128);
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
         ),
@@ -332,7 +335,7 @@ fn operation_revert_preview_confirm_failure_keeps_output_readable() {
 fn back_from_operation_detail_returns_to_operation_log() {
     let operation_id = "abcdef".to_owned();
     let operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj_rows::OperationLogItem::new(
+        crate::operation_log::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some(operation_id.clone()),
         ),

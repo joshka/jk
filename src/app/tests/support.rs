@@ -25,10 +25,9 @@ pub(super) use crate::jj_actions::{
 #[allow(unused_imports)]
 pub(super) use crate::jj_rows::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, FileListItem, LocalBookmarkRemoteState,
-    LogItem, OperationLogItem, RemoteBookmarkTrackingState, ResolveEntry, WorkspaceContext,
-    WorkspaceItem, document_plain_text, load_bookmark_entries, load_compact_log_context,
-    load_entries, load_file_list_entries, load_operation_log_entries, load_resolve_entries,
-    load_workspace_context,
+    LogItem, RemoteBookmarkTrackingState, ResolveEntry, WorkspaceContext, WorkspaceItem,
+    document_plain_text, load_bookmark_entries, load_compact_log_context, load_entries,
+    load_file_list_entries, load_resolve_entries, load_workspace_context,
 };
 pub(super) use crate::tui::Overlay;
 pub(super) use crate::view_state::ViewState;

@@ -581,7 +581,7 @@ fn operation_log_l_opens_operation_detail() {
     let operation_id = "op123".to_owned();
     let mut app = test_app(ViewState::OperationLog(
         crate::operation_log::OperationLogView::test_new(vec![
-            crate::jj_rows::OperationLogItem::new(
+            crate::operation_log::OperationLogItem::new(
                 vec![ratatui::text::Line::from("@  current")],
                 Some(operation_id),
             ),

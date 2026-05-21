@@ -6,7 +6,6 @@
 //! process boundary stay in `jj.rs`.
 
 mod bookmarks;
-mod operations;
 mod revisions;
 mod workspaces;
 
@@ -21,9 +20,6 @@ pub use self::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState, load_bookmark_entries,
 };
-#[cfg(test)]
-pub(crate) use self::operations::OPERATION_ID_TEMPLATE;
-pub use self::operations::{OperationLogItem, load_operation_log_entries};
 pub use self::revisions::{LogItem, load_compact_log_context, load_entries};
 #[cfg(test)]
 pub(crate) use self::workspaces::WORKSPACE_METADATA_TEMPLATE;
@@ -160,13 +156,13 @@ pub fn document_plain_text(lines: &[Line<'static>]) -> String {
 // Metadata loaders fail closed when their side-channel row count no longer
 // matches rendered jj rows; selection should stay usable without guessed ids.
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum RowMetadata<T> {
+pub(crate) enum RowMetadata<T> {
     Valid(Vec<T>),
     Drifted,
 }
 
 impl<T> RowMetadata<T> {
-    fn into_rows_matching(self, rendered_row_count: usize) -> Option<Vec<T>> {
+    pub(crate) fn into_rows_matching(self, rendered_row_count: usize) -> Option<Vec<T>> {
         match self {
             Self::Valid(rows) if rows.len() == rendered_row_count => Some(rows),
             Self::Valid(_) | Self::Drifted => None,
@@ -222,17 +218,17 @@ fn integer_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<
         .and_then(|value| usize::try_from(value).ok())
 }
 
-fn is_standalone_graph_line(line: &Line<'_>) -> bool {
+pub(crate) fn is_standalone_graph_line(line: &Line<'_>) -> bool {
     let text = line_text(line);
     first_content_char(&text).is_none_or(|character| character == '~')
 }
 
-fn first_content_char(text: &str) -> Option<char> {
+pub(crate) fn first_content_char(text: &str) -> Option<char> {
     text.chars()
         .find(|character| !matches!(character, ' ' | '│' | '├' | '─' | '╯' | '╰' | '╭' | '╮'))
 }
 
-fn line_text(line: &Line<'_>) -> String {
+pub(crate) fn line_text(line: &Line<'_>) -> String {
     line.spans
         .iter()
         .map(|span| span.content.as_ref())

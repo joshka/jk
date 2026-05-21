@@ -62,8 +62,10 @@ now.
 
 Examples for future packets:
 
-- Operation-log behavior should trend toward `operation_log`: rows and id pairing, movement/copy,
-  undo/redo/restore/revert availability, operation detail navigation, and tests.
+- Operation-log behavior now starts from `operation_log`: `src/operation_log/rows.rs` owns rendered
+  row grouping, operation-id template parsing and pairing, and fail-closed metadata drift tests;
+  `src/operation_log.rs` owns movement/copy, undo/redo/restore/revert availability, operation detail
+  navigation, and view tests.
 - Bookmark behavior should trend toward `bookmarks`: row metadata, safe mutation targets,
   create/set/move/rename/delete/forget/track/untrack availability, and tests.
 - Cross-view action plans such as rebase, squash, absorb, new, edit, duplicate, split, restore,
@@ -265,10 +267,10 @@ Recommended next bounded packet:
 
 Only consider these after the documentation sweep or when product work touches the area:
 
-1. Feature-root migration packet for one product concept, preferably `operation_log` or `bookmarks`,
-   bounded to one vertical owner such as rows plus action availability. Acceptance criteria should
-   prove that callers still see the same rendered rows, action labels, target safety, and focused
-   view behavior.
+1. Feature-root migration packet for one product concept, preferably `bookmarks`, bounded to one
+   vertical owner such as rows plus action availability. Acceptance criteria should prove that
+   callers still see the same rendered rows, action labels, target safety, and focused view
+   behavior.
 1. Action lifecycle documentation or grouping packet if the owner is clearly app-side completion,
    preview, or shared result wording. Keep `src/jj_actions.rs` focused on plan construction, preview
    text, argv, and execution.
