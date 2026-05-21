@@ -107,81 +107,11 @@ impl App {
             InteractionMode::BookmarkRenamePrompt { .. } => {
                 self.handle_bookmark_rename_prompt_key(code)
             }
-            InteractionMode::AbandonPreview {
-                abandon,
-                preview,
-                output,
-            } => {
-                let (abandon, preview, status_context, completed) = {
-                    (
-                        abandon.clone(),
-                        preview.clone(),
-                        output.status_context().cloned(),
-                        output.completed(),
-                    )
-                };
-                let visible_lines = action_output_visible_lines(viewport_height);
-                match handle_action_output_key(code, output, visible_lines) {
-                    ActionOutputKey::Cancel => {
-                        self.mode = InteractionMode::Normal;
-                        if !completed {
-                            self.status = StatusLine::with_message(
-                                &self.view,
-                                "abandon cancelled".to_owned(),
-                            );
-                        }
-                    }
-                    ActionOutputKey::Primary => {
-                        if completed {
-                            self.mode = InteractionMode::Normal;
-                            return Ok(true);
-                        }
-
-                        if preview.is_empty_change() {
-                            self.confirm_empty_abandon_after_recheck(
-                                abandon,
-                                status_context,
-                                viewport_height,
-                            );
-                        } else {
-                            self.mode = InteractionMode::AbandonConfirm {
-                                abandon,
-                                input: String::new(),
-                                output: output.clone(),
-                            };
-                        }
-                    }
-                    ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
-                }
-                Ok(true)
+            InteractionMode::AbandonPreview { .. } => {
+                self.handle_abandon_preview_key(code, viewport_height)
             }
-            InteractionMode::AbandonConfirm {
-                abandon,
-                input,
-                output,
-            } => {
-                let (abandon_plan, status_context) =
-                    (abandon.clone(), output.status_context().cloned());
-                let visible_lines = action_output_visible_lines(viewport_height);
-                match reduce_confirmation_key(input, output, visible_lines, code) {
-                    ConfirmationKey::Cancel => {
-                        self.mode = InteractionMode::Normal;
-                        self.status =
-                            StatusLine::with_message(&self.view, "abandon cancelled".to_owned());
-                    }
-                    ConfirmationKey::Accept => {
-                        if input == abandon.revision() {
-                            self.confirm_abandon(abandon_plan, status_context, viewport_height);
-                        } else {
-                            self.status = StatusLine::error(
-                                &self.view,
-                                "confirmation did not match; abandon not run".to_owned(),
-                            );
-                        }
-                    }
-                    ConfirmationKey::Handled | ConfirmationKey::Ignored => {}
-                }
-                Ok(true)
+            InteractionMode::AbandonConfirm { .. } => {
+                self.handle_abandon_confirm_key(code, viewport_height)
             }
             InteractionMode::PushRemotePrompt { .. } => self.handle_push_remote_prompt_key(code),
             InteractionMode::FetchRemotePrompt { .. } => self.handle_fetch_remote_prompt_key(code),
@@ -205,6 +135,90 @@ impl App {
                 unreachable!("common action preview modes are handled before borrowing mode")
             }
         }
+    }
+
+    fn handle_abandon_preview_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
+        let InteractionMode::AbandonPreview {
+            abandon,
+            preview,
+            output,
+        } = &mut self.mode
+        else {
+            unreachable!("abandon preview key handler requires abandon preview mode");
+        };
+
+        let (abandon, preview, status_context, completed) = {
+            (
+                abandon.clone(),
+                preview.clone(),
+                output.status_context().cloned(),
+                output.completed(),
+            )
+        };
+        let visible_lines = action_output_visible_lines(viewport_height);
+        match handle_action_output_key(code, output, visible_lines) {
+            ActionOutputKey::Cancel => {
+                self.mode = InteractionMode::Normal;
+                if !completed {
+                    self.status =
+                        StatusLine::with_message(&self.view, "abandon cancelled".to_owned());
+                }
+            }
+            ActionOutputKey::Primary => {
+                if completed {
+                    self.mode = InteractionMode::Normal;
+                    return Ok(true);
+                }
+
+                if preview.is_empty_change() {
+                    self.confirm_empty_abandon_after_recheck(
+                        abandon,
+                        status_context,
+                        viewport_height,
+                    );
+                } else {
+                    self.mode = InteractionMode::AbandonConfirm {
+                        abandon,
+                        input: String::new(),
+                        output: output.clone(),
+                    };
+                }
+            }
+            ActionOutputKey::Handled | ActionOutputKey::Ignored => {}
+        }
+        Ok(true)
+    }
+
+    fn handle_abandon_confirm_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
+        let InteractionMode::AbandonConfirm {
+            abandon,
+            input,
+            output,
+        } = &mut self.mode
+        else {
+            unreachable!("abandon confirm key handler requires abandon confirm mode");
+        };
+
+        let (abandon_plan, status_context) = (abandon.clone(), output.status_context().cloned());
+        let visible_lines = action_output_visible_lines(viewport_height);
+        match reduce_confirmation_key(input, output, visible_lines, code) {
+            ConfirmationKey::Cancel => {
+                self.mode = InteractionMode::Normal;
+                self.status = StatusLine::with_message(&self.view, "abandon cancelled".to_owned());
+            }
+            ConfirmationKey::Accept => {
+                if input == abandon.revision() {
+                    self.confirm_abandon(abandon_plan, status_context, viewport_height);
+                } else {
+                    self.status = StatusLine::error(
+                        &self.view,
+                        "confirmation did not match; abandon not run".to_owned(),
+                    );
+                }
+            }
+            ConfirmationKey::Handled | ConfirmationKey::Ignored => {}
+        }
+        Ok(true)
     }
 
     fn handle_search_prompt_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {

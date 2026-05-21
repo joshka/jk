@@ -5,6 +5,45 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Abandon modal key handler extraction)
+
+- Slice / task: extract named `App` helper methods for only the `AbandonPreview` and
+  `AbandonConfirm` `InteractionMode` arms in `src/app/mode_input.rs` while keeping
+  `handle_active_mode_key` as the active-mode dispatch table.
+- Thread id: `019e4cd4-17f0-72e3-88b9-19884b12b10a` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex performed the bounded maintainability packet in the existing
+  `Extract abandon modal handlers` jj working copy change. The user explicitly prohibited
+  version-control commands, and no `jj` or `git` commands were run.
+- Changed files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: the abandon preview and abandon confirmation arms now dispatch to named
+  helpers: `handle_abandon_preview_key` and `handle_abandon_confirm_key`.
+- Behavior-preservation evidence: the helper bodies preserve the same action-output key handling,
+  confirmation reducer handling, cancel transitions, completed-output close behavior, empty-abandon
+  recheck, confirmation prompt transition, abandon execution call, and status wording from the
+  former inline match arms.
+- Scope boundary: the packet did not alter reducers, app-screen projection, command bindings, action
+  lifecycle, status wording, key behavior, prompt behavior, output behavior, tests, or files outside
+  the requested target scope.
+- Validation trail:
+  - Focused validation passed: `cargo test app::tests::working_copy_actions -- --test-threads=1`
+    with 27 passed and 540 filtered out; and
+    `cargo test app::tests::command_navigation -- --test-threads=1` with 35 passed and 532 filtered
+    out.
+  - Main-thread review validation reran the same focused app test filters successfully with the same
+    pass counts, then reran `cargo check`, `rustup run nightly cargo fmt --check`, and
+    `just md-check`.
+  - Additional validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings after applying rustfmt to one wrapping difference; and
+    `just md-check`.
+- Rework / surprise: the first Rust format check reported only a rustfmt wrapping difference in
+  `handle_abandon_confirm_key`. Applying rustfmt fixed the Rust formatting gate.
+- Evidence basis:
+  - Date: `2026-05-21 16:17:48 PDT` from local `date`.
+  - Main review date: `2026-05-21 16:19:58 PDT` from local `date`.
+  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
+    note.
+
 ### 2026-05-21 (Modal text prompt key handler extraction)
 
 - Slice / task: extract named `App` helper methods for text-prompt `InteractionMode` arms in

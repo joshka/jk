@@ -106,6 +106,24 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 abandon modal key handler extraction:
+
+- `src/app/mode_input.rs` keeps `handle_active_mode_key` as the active-mode dispatch table while
+  moving the abandon modal interaction behavior into named `App` helpers:
+  `handle_abandon_preview_key` and `handle_abandon_confirm_key`.
+- The packet intentionally preserved reducers, app-screen projection, command bindings, action
+  lifecycle, status wording, key behavior, prompt behavior, output behavior, and tests. The helpers
+  re-read the active `InteractionMode` they own and keep the same output key reduction, confirmation
+  reduction, empty-abandon recheck, confirm transition, status updates, and abandon execution calls
+  as the former inline match arms.
+- Focused validation passed: `cargo test app::tests::working_copy_actions -- --test-threads=1` with
+  27 passed and 540 filtered out; `cargo test app::tests::command_navigation -- --test-threads=1`
+  with 35 passed and 532 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` after
+  applying rustfmt to one wrapping difference; and `just md-check`.
+- Main-thread review validation reran the same focused app test filters successfully with the same
+  pass counts, then reran `cargo check`, `rustup run nightly cargo fmt --check`, and
+  `just md-check`.
+
 2026-05-21 modal text prompt key handler extraction:
 
 - `src/app/mode_input.rs` keeps `handle_active_mode_key` as the active-mode dispatch table while
