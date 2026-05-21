@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (ViewSpec test split)
+
+- Slice / task: move inline tests from `src/jj/view_spec.rs` into `src/jj/view_spec/tests.rs` for
+  the existing jj change.
+- Thread id: `019e4c7f-8329-7903-8294-c9d915e44e76` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
+  packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
+  were run.
+- Implementation outcome: `view_spec.rs` now ends with `#[cfg(test)] mod tests;`, while the moved
+  sibling module uses `use super::*;` to preserve private access to ViewSpec parsing helpers,
+  diff-format helpers, target state, and short-label behavior.
+- Behavior-preservation evidence: the packet moved the existing ViewSpec tests without changing
+  their names, assertions, helper functions, labels, argv expectations, diff-format handling,
+  navigation target semantics, visibility, or public API.
+- Readability evidence: `src/jj/view_spec.rs` now measures 460 lines, with 336 lines in
+  `src/jj/view_spec/tests.rs`, keeping production ViewSpec construction and navigation semantics
+  easier to scan while keeping tests beside the owning module.
+- Validation trail:
+  - Worker validation passed: `cargo test jj::view_spec -- --test-threads=1`; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test jj::view_spec -- --test-threads=1` with 31
+    passed and 536 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first Markdown check reported Panache wrapping for the new notes. After
+  applying that formatting-only change, Markdown validation passed. No behavior rework was needed;
+  ViewSpec behavior, labels, argv, diff-format handling, navigation target semantics, visibility,
+  and public API stayed unchanged.
+- Evidence basis:
+  - Date: `2026-05-21 14:47:07 PDT` from local `date`.
+  - Main review date: `2026-05-21 14:48:47 PDT` from local `date`.
+  - Files: `src/jj/view_spec.rs`, `src/jj/view_spec/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Working-copy action-plan test split)
 
 - Slice / task: move inline tests from `src/jj_actions/working_copy.rs` into

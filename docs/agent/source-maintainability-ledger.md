@@ -103,6 +103,22 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 ViewSpec test split:
+
+- `src/jj/view_spec.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/jj/view_spec/tests.rs` with `use super::*;` for private access to ViewSpec parsing helpers
+  and state.
+- This improves local readability by keeping ViewSpec construction, label, diff-format, path, and
+  navigation-target code visible without scrolling through 336 lines of inline tests. The production
+  file now measures 460 lines.
+- The packet intentionally preserved all ViewSpec test names, assertions, helper functions, labels,
+  argv expectations, diff-format handling, navigation target semantics, visibility, and public API.
+- Focused validation covered `cargo test jj::view_spec -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check` after this documentation update.
+- Rework was limited to moving the extracted test block into a Rust child module and applying
+  Panache wrapping to the new notes; no ViewSpec behavior, labels, argv, diff-format handling,
+  navigation target semantics, visibility, or public API changed.
+
 2026-05-21 working-copy action-plan test split:
 
 - `src/jj_actions/working_copy.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live
