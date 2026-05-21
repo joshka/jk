@@ -5,6 +5,29 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Refresh source audit measurements)
+
+- Slice / task: update the mechanical source audit snapshot in
+  `docs/agent/source-maintainability-ledger.md` from main-thread measurements and add this factual
+  process note.
+- Thread id: `019e4c02-99ce-7560-84b9-bb5d8554873a` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded docs-only packet.
+  The user explicitly kept version-control operations with the main thread, and no `jj` or `git`
+  commands were run.
+- Implementation outcome: the ledger now records the 2026-05-21 largest-file, visibility,
+  repeated-list-mechanic, action-lifecycle/result, control-flow, and immediate-doc scan counts from
+  this packet. The recommendations now treat counts as read-first nominations, keep
+  `src/app/mode_input.rs` as the strongest bounded readability candidate, and avoid treating
+  `src/app.rs` as an automatic documentation target because it already has run-level docs.
+- Validation trail:
+  - Worker validation passed: `just md-check`.
+  - Main-thread review validation passed: `just md-check`.
+- Rework / surprise: none. The edit was limited to the two requested Markdown files and used only
+  the measurements provided by the main thread.
+- Evidence basis:
+  - Date: `2026-05-21 12:28:38 PDT` from local `date`.
+  - Files: `docs/agent/source-maintainability-ledger.md` and this process note.
+
 ### 2026-05-21 (Document command binding contracts)
 
 - Slice / task: document `src/command.rs` as the shared command identity, key binding metadata,

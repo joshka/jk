@@ -380,7 +380,9 @@ Examples for future packets:
 
 ## Mechanical Audit Snapshot
 
-Snapshot date: 2026-05-21. Rerun these commands before using the measurements for new work.
+Snapshot date: 2026-05-21. The current measurements below were gathered by the main thread for the
+`Refresh source audit measurements` packet. Rerun these commands before using the measurements for
+new work.
 
 Commands used:
 
@@ -406,26 +408,29 @@ rg -n '^\s*(match|if let|while let|for |loop\b)|\bmatch\b|else \{|\.and_then\(|\
 
 ### Largest Rust Files
 
-The largest production files reported by `just largest-rust-files` were:
+The largest files reported by `just largest-rust-files` were:
 
 ```text
-1218 src/graph.rs
-1191 src/jj_actions.rs
- 994 src/tui.rs
- 977 src/bookmarks.rs
+1196 src/app/tests/bookmark_actions.rs
  876 src/bookmarks/rows.rs
+ 872 src/jj_actions.rs
  833 src/jj_actions/bookmarks.rs
- 820 src/status.rs
  797 src/jj/view_spec.rs
+ 778 src/app/tests/working_copy_actions.rs
  773 src/jj.rs
  743 src/action_menu/revision_actions.rs
- 705 src/sticky_file_view.rs
+ 714 src/command.rs
+ 702 src/sticky_file_view.rs
+ 659 src/app_screen.rs
+ 643 src/bookmarks/tests.rs
  642 src/help.rs
  639 src/jj_actions/working_copy.rs
- 632 src/command.rs
- 628 src/app_screen.rs
+ 613 src/graph/tests.rs
  613 src/diff.rs
+ 605 src/graph.rs
  597 src/rendered_jj.rs
+ 596 src/app/tests/command_navigation.rs
+ 592 src/tui.rs
 ```
 
 The same report also listed large test files. Those test sizes are evidence to read the surrounding
@@ -439,7 +444,8 @@ of the originally nominated files, so use the bullets as historical evidence of 
 happened and rerun the scan before opening a new documentation packet.
 
 - `src/main.rs`: module docs are enough for the binary entry point; `run` lives in `src/app.rs`.
-- `src/app.rs`: `run` lacks direct Rustdoc, though the module docs explain app orchestration.
+- `src/app.rs`: current run-level docs already explain the app orchestration boundary. It is not
+  automatically a documentation target just because it still appears in some mechanical scans.
 - `src/app_screen.rs`: stale nomination. Later packet evidence documents `InteractionMode`,
   `ViewMenuOption`, and `view_menu_options` ownership around prompt status projection, borrowed
   overlays, static view-menu data, clamping, and app-owned dispatch.
@@ -466,19 +472,49 @@ reconstruct visibility, side effects, ids, argv shape, or output-shape assumptio
 supports a broad weak-doc sweep over `app_screen.rs`, `command.rs`, `action_menu.rs`, `tui.rs`,
 `jj_actions.rs`, or `jj_rows.rs` without fresh evidence.
 
+Current immediate-doc scan counts for the named central files were:
+
+```text
+ 86 src/action_menu.rs
+ 16 src/app.rs
+ 29 src/app_screen.rs
+ 82 src/command.rs
+144 src/jj_actions.rs
+ 31 src/jj_rows.rs
+  3 src/main.rs
+ 31 src/tui.rs
+```
+
 ### Visibility Shape
 
 Broad visibility counts across `src`:
 
 ```text
-778 pub
- 96 pub(crate)
-118 pub(super)
+1220 pub total
+ 118 pub(crate)
+ 140 pub(super)
 ```
 
-The highest per-file broad-visibility counts were in `src/app/services.rs`, test support,
-`src/jj_actions.rs`, `src/jj_actions/working_copy.rs`, `src/sticky_file_view.rs`,
-`src/jj_actions/bookmarks.rs`, `src/action_menu.rs`, `src/jj/view_spec.rs`, and `src/command.rs`.
+The highest per-file broad-visibility counts were:
+
+```text
+112 src/app/services.rs
+102 src/app/tests/support.rs
+ 84 src/jj_actions.rs
+ 47 src/jj_actions/working_copy.rs
+ 44 src/sticky_file_view.rs
+ 35 src/jj_actions/bookmarks.rs
+ 32 src/action_menu.rs
+ 30 src/jj/view_spec.rs
+ 29 src/command.rs
+ 28 src/show.rs
+ 28 src/graph.rs
+ 28 src/file_show.rs
+ 28 src/diff.rs
+ 27 src/jj_actions/rewrite.rs
+ 25 src/status.rs
+```
+
 Use these counts to audit boundary clarity and documentation. Do not narrow visibility just to move
 the count.
 
@@ -487,13 +523,13 @@ the count.
 Selection, restore, movement, `ListState`, and clamp evidence across list-style views:
 
 ```text
-172 src/graph.rs
- 93 src/bookmarks.rs
- 78 src/status.rs
- 49 src/operation_log.rs
- 47 src/file_list.rs
- 44 src/resolve.rs
- 42 src/workspaces.rs
+87 src/graph.rs
+60 src/status.rs
+49 src/operation_log.rs
+47 src/file_list.rs
+44 src/resolve.rs
+42 src/workspaces.rs
+41 src/bookmarks.rs
 ```
 
 The evidence shows a real repeated shape: views keep a `Selection`, build a Ratatui `ListState`,
@@ -510,40 +546,58 @@ hard to audit in multiple places.
 Action lifecycle and mutation-plan evidence:
 
 ```text
- 97 src/app/action_lifecycle/preview.rs
- 86 src/app/action_lifecycle/completion.rs
- 72 src/app/action_lifecycle/entry.rs
- 48 src/app/action_lifecycle/rewrite_completion.rs
- 18 src/app/action_lifecycle/shared.rs
- 15 src/jj_actions.rs
+144 src/app/action_lifecycle/preview.rs
+102 src/app/action_lifecycle/entry.rs
+ 87 src/app/action_lifecycle/completion.rs
+ 61 src/jj_actions.rs
+ 55 src/app/action_lifecycle/rewrite_completion.rs
+ 25 src/app/action_lifecycle/shared.rs
+  4 src/app/action_lifecycle/entry/tests.rs
 ```
 
-The clear owner for app-side completion policy is `src/app/action_lifecycle`, especially
-`completion.rs`, `preview.rs`, and `shared.rs`. `src/jj_actions.rs` owns plan-side argv, preview
-text, and execution helpers. A future packet should improve documentation or grouping at that
-boundary only if it can state which side owns result wording, refresh/reveal behavior, or command
-output preservation. Do not merge app lifecycle policy into mutation plans.
+The clear owner for app-side completion and preview policy is `src/app/action_lifecycle`, especially
+`preview.rs`, `entry.rs`, `completion.rs`, and `shared.rs`. `src/jj_actions.rs` owns plan-side argv,
+preview text, and execution helpers. A future packet should improve documentation or grouping at
+that boundary only if it can name the side-effect boundary it is protecting, such as which side owns
+result wording, refresh/reveal behavior, or command-output preservation. Do not merge app lifecycle
+policy into mutation plans.
 
 ### Control-Flow Hot Spots
 
 Cheap nested/control-flow counts nominated these files for readability review:
 
 ```text
-51 src/app/mode_input.rs
-31 src/app/action_lifecycle/completion.rs
-28 src/graph.rs
+41 src/app/mode_input.rs
+27 src/command.rs
+27 src/app/action_lifecycle/completion.rs
 25 src/jj_actions.rs
-25 src/command.rs
 24 src/help.rs
+23 src/graph.rs
+23 src/app/action_lifecycle/entry.rs
 23 src/app.rs
 22 src/status.rs
-21 src/app/action_lifecycle/entry.rs
+17 src/workspaces.rs
+17 src/tui.rs
+17 src/jj/view_spec.rs
+17 src/app/action_lifecycle/preview.rs
+16 src/view_state.rs
+16 src/action_menu/revision_actions.rs
+15 src/sticky_file_view.rs
+15 src/jj.rs
+14 src/app/navigation.rs
+12 src/app/action_lifecycle/shared.rs
+11 src/jj_actions/bookmarks.rs
+10 src/resolve.rs
+10 src/jj_actions/working_copy.rs
+10 src/app/action_lifecycle/rewrite_completion.rs
+ 9 src/view_action_targets.rs
+ 9 src/operation_log.rs
 ```
 
-The stricter indentation-oriented scan put `src/app/mode_input.rs` first again with 35 hits, ahead
-of `src/jj_actions.rs`, `src/command.rs`, `src/action_menu/revision_actions.rs`, and
-`src/view_state.rs`. That makes `src/app/mode_input.rs` the only clearly bounded app readability
-candidate in this snapshot.
+The current scan puts `src/app/mode_input.rs` first again, ahead of `src/command.rs`,
+`src/app/action_lifecycle/completion.rs`, and `src/jj_actions.rs`. Combined with the completed-doc
+context, that keeps `src/app/mode_input.rs` as the clearest bounded readability candidate in this
+snapshot. `src/app.rs` already has run-level docs and is not automatically a documentation target.
 
 Later packet evidence partly supersedes this snapshot: `src/app/mode_input/reducers.rs` now owns
 pure prompt acceptance decisions and out-of-line reducer tests, while `src/app/mode_input.rs` still
@@ -583,16 +637,19 @@ the owning product concept, and make the reader path shorter.
 
 Recommended bounded candidates:
 
-1. Fresh measurement pass before choosing the next packet. Rerun the audit commands and compare them
-   with the completed documentation and row-migration evidence above so future work starts from
+1. Mode-input boundary review is the strongest current measured candidate. Reread the current
+   reducer split first, then name one remaining prompt-side-effect or status-wording rule that
+   belongs in app orchestration versus reducers.
+1. Fresh measurement pass before choosing any different packet. Rerun the audit commands and compare
+   them with the completed documentation and row-migration evidence above so future work starts from
    current code instead of this snapshot.
-1. App entry-point contract docs only if the current `src/app.rs` surface still forces readers to
-   reconstruct `run`, terminal lifecycle, event-loop ownership, refresh/reveal orchestration, or
-   cross-view dispatch from call sites. Keep the packet comment/docs-only unless fresh evidence
-   shows a behavior-preserving extraction with one clear owner.
-1. Mode-input boundary review only after rereading the current reducer split. A useful packet would
-   name one remaining prompt-side-effect or status-wording rule that belongs in app orchestration
-   versus reducers; do not continue the old control-flow nomination mechanically.
+1. App entry-point contract docs only with fresh evidence that the current `src/app.rs` surface
+   still forces readers to reconstruct terminal lifecycle, event-loop ownership, refresh/reveal
+   orchestration, or cross-view dispatch from call sites. Current run-level docs mean `src/app.rs`
+   is not automatically a documentation target.
+1. Action lifecycle preview/entry review only with a named side-effect boundary, such as
+   preview-pane construction versus mode/status mutation, command-output preservation versus result
+   wording, or prompt routing versus remote-list loading.
 1. Feature-owned action availability packets when a product feature changes, especially around
    status, files, bookmarks, operation log, or graph/log actions. Feature roots should own whether
    an action is offered and which target it selects; `action_menu` should keep shared vocabulary and
