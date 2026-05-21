@@ -103,6 +103,24 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 workspace view test split:
+
+- `src/workspaces.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/workspaces/tests.rs` with `use super::*;` for private access to workspace view state.
+- This matches the sibling child-module test layout used by file list, file show, and operation
+  detail views and improves local readability by keeping workspace movement, search, copy, refresh,
+  and degraded-output tests out of the production view module.
+- The packet intentionally preserved all six workspace view test names, assertions, helper
+  functions, imports, selection behavior, search behavior, exact metadata copy behavior, refresh
+  behavior, degraded-output behavior, public API, and runtime behavior.
+- Focused validation covered `cargo test workspaces -- --test-threads=1` with 11 passed and 556
+  filtered out, `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Main-thread review validation reran the same focused checks successfully with 11 passed and 556
+  filtered out for `cargo test workspaces -- --test-threads=1`.
+- Rework was limited to moving the extracted test block into a Rust child module; no production
+  workspace code changed beyond replacing the inline test block with the sibling test module
+  declaration.
+
 2026-05-21 operation detail test split:
 
 - `src/operation_log/detail.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

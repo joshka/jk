@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Workspace view test split)
+
+- Slice / task: move inline workspace view tests from `src/workspaces.rs` into
+  `src/workspaces/tests.rs` while preserving workspace movement, search, copy, refresh, and
+  degraded-output behavior.
+- Thread id: `019e4cc1-e77f-7fc3-8822-a4eace7ed7da` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex performed the bounded maintainability packet in the existing
+  `Move workspace view tests` jj working copy change. The user explicitly prohibited version-control
+  commands, and no `jj` or `git` commands were run.
+- Changed files: `src/workspaces.rs`, `src/workspaces/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/workspaces.rs` now ends with `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/workspaces/tests.rs` and use Rust child-module privacy through `use super::*;`.
+- Behavior-preservation evidence: the packet moved the existing six workspace view tests without
+  changing their names, assertions, helper functions, imports, selection behavior, search behavior,
+  exact metadata copy behavior, refresh behavior, degraded-output behavior, public API, or runtime
+  behavior.
+- Scope boundary: the packet did not change workspace row loading, workspace metadata parsing, app
+  routing, selection/search/copy/refresh/open behavior, or production workspace code beyond the test
+  module declaration.
+- Validation trail:
+  - Worker validation passed: `cargo test workspaces -- --test-threads=1` with 11 passed and 556
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test workspaces -- --test-threads=1` with 11 passed
+    and 556 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first Markdown check reported only Panache wrapping differences in the new
+  process note; applying those wraps fixed the gate.
+- Evidence basis:
+  - Date: `2026-05-21 15:57:32 PDT` from local `date`.
+  - Main review date: `2026-05-21 15:59:51 PDT` from local `date`.
+  - Files: `src/workspaces.rs`, `src/workspaces/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Operation detail test split)
 
 - Slice / task: move inline operation-detail tests from `src/operation_log/detail.rs` into
