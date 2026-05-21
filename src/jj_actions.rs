@@ -1,10 +1,22 @@
-//! Preview-first action and mutation plans for `jj` commands.
+//! Root preview-first action and mutation plans for `jj` commands.
 //!
-//! These value types own argv construction, labels, preview summaries, and
-//! direct execution for user-confirmed mutation flows. Syntax quoting helpers
-//! stay in [`crate::jj_syntax`]; rendered row loading stays in
-//! [`crate::jj_rows`] and view-spec command construction stays in
-//! [`crate::jj`].
+//! Root plans own argv labels, argv construction, preview summaries, and direct execution envelopes
+//! for user-confirmed mutation flows. They preserve preview honesty by showing the exact `jj`
+//! command that will run, exact revsets/filesets where a target comes from rendered metadata, and
+//! `jj`'s own preview output where available instead of simulating final graph or file results.
+//!
+//! Family modules own their narrower command areas:
+//!
+//! - [`bookmarks`] owns bookmark mutation targets and plans.
+//! - [`git_sync`] owns Git fetch and push plans.
+//! - [`operation`] owns operation recovery plans.
+//! - [`rewrite`] owns rewrite plans such as absorb, rebase, and squash.
+//! - [`working_copy`] owns working-copy creation, duplication, splitting, and navigation plans.
+//!
+//! Feature views and action menus own availability decisions and target selection. The app
+//! lifecycle owns prompt flow, confirmation strength, refresh/reveal policy, and result-screen
+//! transitions after a plan runs. Syntax quoting helpers stay in [`crate::jj_syntax`]; rendered row
+//! loading stays in [`crate::jj_rows`] and view-spec command construction stays in [`crate::jj`].
 
 use crate::jj::{
     ColorMode, base_command, run_direct_args, run_direct_args_stdout, summarize_output,
@@ -19,6 +31,9 @@ mod operation;
 mod rewrite;
 mod working_copy;
 
+// Re-export plan types as the boundary consumed by views, menus, and the app lifecycle. The
+// submodules keep family-specific policy local while this root module keeps the top-level action
+// vocabulary discoverable from one import path.
 pub use bookmarks::{
     JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget,
     JjBookmarkTrackingTarget, validate_bookmark_rename_new_name,
@@ -35,18 +50,22 @@ const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n
 
 /// Shared result envelope for preview and confirmed command output.
 ///
-/// The message is already presentation-ready text. Callers preserve it in the action-output pane
-/// instead of reparsing stdout or reconstructing jj wording.
+/// `CommandOutput` deliberately carries only presentation-ready text. Preview plans put their
+/// honest preview summary here; confirmed execution plans put preserved `jj` stdout/stderr or a
+/// narrow fallback message here. Callers display the message in the action-output pane instead of
+/// reparsing command output, reconstructing jj wording, or inferring follow-up state transitions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
     message: String,
 }
 
 impl CommandOutput {
+    /// Wrap presentation-ready output from a preview or confirmed execution path.
     pub(crate) fn new(message: String) -> Self {
         Self { message }
     }
 
+    /// Return output exactly as the result pane should present it.
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -139,10 +158,12 @@ pub struct JjRevertPlan {
 }
 
 impl JjDescribeTarget {
+    /// Target an exact rendered change id, quoted during argv construction.
     pub fn exact_change(change_id: impl Into<String>) -> Self {
         Self::ExactChange(change_id.into())
     }
 
+    /// Target jj's current working-copy revset (`@`) without exact-change quoting.
     pub fn current_working_copy() -> Self {
         Self::CurrentWorkingCopy
     }
@@ -154,6 +175,7 @@ impl JjDescribeTarget {
         }
     }
 
+    /// Expose the exact change id only when the target came from rendered row metadata.
     pub fn exact_change_id(&self) -> Option<&str> {
         match self {
             Self::ExactChange(change_id) => Some(change_id),
@@ -177,6 +199,7 @@ impl JjDescribeTarget {
 }
 
 impl JjDescribePlan {
+    /// Build a non-interactive describe plan; prompt collection stays with the app lifecycle.
     pub fn new(target: JjDescribeTarget, message: impl Into<String>) -> Self {
         Self {
             target,
@@ -209,10 +232,12 @@ impl JjDescribePlan {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Execute the described argv directly; confirmation and refresh/reveal happen outside.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(self.command_argv(), &self.command_label(), "described")
     }
 
+    /// Summarize the effect without predicting jj's post-command graph state.
     pub fn preview_summary(&self) -> String {
         format!(
             "command: {}\n\ntarget: {}\nmessage: {}\n\neffect: updates only the target change description without opening an editor\nconfirmation: press Enter to run jj describe\nundo path: jj undo",
@@ -224,6 +249,7 @@ impl JjDescribePlan {
 }
 
 impl JjCommitPlan {
+    /// Build a commit plan for `@`; selected graph rows are intentionally not accepted.
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
@@ -246,6 +272,7 @@ impl JjCommitPlan {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Execute `jj commit`; follow-up navigation remains an app lifecycle concern.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(),
@@ -254,6 +281,7 @@ impl JjCommitPlan {
         )
     }
 
+    /// Summarize jj's working-copy commit effect without inspecting future state.
     pub fn preview_summary(&self) -> String {
         format!(
             "command: {}\n\ntarget: current working-copy change (@)\nmessage: {}\n\neffect: updates @ with the message and creates a new working-copy change on top\nselection: selected graph rows are not arguments to jj commit\nconfirmation: press Enter to run jj commit\nundo path: jj undo",
@@ -266,6 +294,7 @@ impl JjCommitPlan {
 // Content/file mutation plans share exact change/path targeting and preview
 // honesty about showing jj's source diff rather than simulating the result.
 impl JjRestorePlan {
+    /// Restore the entire forward diff from one exact rendered revision.
     pub fn for_revision(revision: impl Into<String>) -> Self {
         Self {
             target: JjRestoreTarget::ExactChange(revision.into()),
@@ -273,6 +302,7 @@ impl JjRestorePlan {
         }
     }
 
+    /// Restore one repository-root path from one exact rendered revision.
     pub fn for_path(revision: impl Into<String>, path: impl Into<String>) -> Self {
         Self {
             target: JjRestoreTarget::ExactChange(revision.into()),
@@ -280,6 +310,7 @@ impl JjRestorePlan {
         }
     }
 
+    /// Restore one repository-root path from the current working-copy diff.
     pub fn for_working_copy_path(path: impl Into<String>) -> Self {
         Self {
             target: JjRestoreTarget::CurrentWorkingCopy,
@@ -335,16 +366,19 @@ impl JjRestorePlan {
         argv
     }
 
+    /// Load jj's forward diff and wrap it with the restore preview contract.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         let forward_diff =
             run_direct_args_stdout(self.preview_diff_argv(), &self.preview_diff_label())?;
         Ok(CommandOutput::new(self.preview_summary(&forward_diff)))
     }
 
+    /// Execute `jj restore`; confirmation and result transitions happen outside the plan.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(self.command_argv(), &self.command_label(), "restored")
     }
 
+    /// Summarize the restore using jj's forward diff rather than a simulated result.
     pub fn preview_summary(&self, forward_diff: &str) -> String {
         let mut lines = vec![
             format!("target revision: {}", self.revision()),
@@ -459,6 +493,7 @@ impl JjFileMutationTarget {
 }
 
 impl JjFileMutationPlan {
+    /// Track an exact repository-root working-copy path.
     pub fn track(path: impl Into<String>) -> Self {
         Self {
             kind: JjFileMutationKind::Track,
@@ -466,6 +501,7 @@ impl JjFileMutationPlan {
         }
     }
 
+    /// Untrack an exact repository-root working-copy path.
     pub fn untrack(path: impl Into<String>) -> Self {
         Self {
             kind: JjFileMutationKind::Untrack,
@@ -473,6 +509,7 @@ impl JjFileMutationPlan {
         }
     }
 
+    /// Change executable mode for an exact repository-root path in `@`.
     pub fn chmod_working_copy(path: impl Into<String>, mode: JjFileChmodMode) -> Self {
         Self {
             kind: JjFileMutationKind::Chmod(mode),
@@ -480,6 +517,7 @@ impl JjFileMutationPlan {
         }
     }
 
+    /// Change executable mode for an exact repository-root path in a rendered revision.
     pub fn chmod_exact_revision(
         revision: impl Into<String>,
         path: impl Into<String>,
@@ -548,6 +586,7 @@ impl JjFileMutationPlan {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Execute the file mutation; availability and confirmation are external policy.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(),
@@ -556,6 +595,7 @@ impl JjFileMutationPlan {
         )
     }
 
+    /// Summarize the exact target scope without pretending to know jj's final status output.
     pub fn preview_summary(&self) -> String {
         let mut lines = vec![
             format!("command: {}", self.command_label()),
@@ -602,6 +642,7 @@ impl JjFileMutationPlan {
 }
 
 impl JjRevertPlan {
+    /// Build a revert plan for one exact rendered revision into `@`.
     pub fn new(revision: impl Into<String>) -> Self {
         Self {
             revision: revision.into(),
@@ -640,16 +681,19 @@ impl JjRevertPlan {
         ]
     }
 
+    /// Load jj's forward diff and wrap it with the revert preview contract.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         let forward_diff =
             run_direct_args_stdout(self.preview_diff_argv(), &self.preview_diff_label())?;
         Ok(CommandOutput::new(self.preview_summary(&forward_diff)))
     }
 
+    /// Execute `jj revert`; refresh and result-screen transitions happen outside the plan.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(self.command_argv(), &self.command_label(), "reverted")
     }
 
+    /// Summarize revert using jj's forward diff rather than a simulated result.
     pub fn preview_summary(&self, forward_diff: &str) -> String {
         [
             format!("target revision: {}", self.revision),
@@ -677,6 +721,7 @@ pub struct JjAbandonPlan {
 }
 
 impl JjAbandonPlan {
+    /// Build an abandon plan for one exact rendered revision.
     pub fn new(revision: impl Into<String>) -> Self {
         Self {
             revision: revision.into(),
@@ -708,6 +753,7 @@ impl JjAbandonPlan {
         ]
     }
 
+    /// Load jj preflight text for the confirmation screen without deciding app transitions.
     pub fn run_preview(&self) -> Result<JjAbandonPreview> {
         let summary = run_direct_args_stdout(self.diff_summary_argv(), &self.diff_summary_label())?;
         let title = self.load_title().ok().flatten();
@@ -715,6 +761,7 @@ impl JjAbandonPlan {
         Ok(JjAbandonPreview::new(self.revision.clone(), title, summary))
     }
 
+    /// Execute `jj abandon`; refresh/reveal and result-screen routing are external policy.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(self.command_argv(), &self.command_label(), "abandoned")
     }
@@ -765,6 +812,7 @@ pub struct JjAbandonPreview {
 }
 
 impl JjAbandonPreview {
+    /// Classify preflight output only by whether jj reported a non-empty diff summary.
     pub fn new(revision: String, title: Option<String>, summary: String) -> Self {
         let change_state = if summary.trim().is_empty() {
             AbandonChangeState::Empty
@@ -785,10 +833,12 @@ impl JjAbandonPreview {
         &self.revision
     }
 
+    /// Return whether abandon can use the weaker empty-change confirmation flow.
     pub fn is_empty_change(&self) -> bool {
         self.change_state == AbandonChangeState::Empty
     }
 
+    /// Build the confirmation text from jj preflight output without simulating abandon results.
     pub fn preview_text(&self) -> String {
         let title = self.title.as_deref().unwrap_or("<no description>");
         let summary = if self.summary.trim().is_empty() {

@@ -77,6 +77,21 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 action plan root contract documentation:
+
+- `src/jj_actions.rs` now documents the root action-plan ownership boundary: root plans own argv
+  labels, argv construction, preview summaries, and direct execution envelopes; family submodules
+  own narrower action families; feature views/action menus own availability and target selection;
+  app lifecycle owns prompt flow, confirmation strength, refresh/reveal policy, and result-screen
+  transitions.
+- `CommandOutput` now documents that it carries presentation-ready preview or execution output so
+  callers preserve `jj` wording instead of reparsing output or inferring state transitions.
+- Main-thread review trimmed repetitive comments that restated similarly shaped method names,
+  keeping the contracts around exact revsets/filesets, forward-diff preview honesty, and no
+  simulation of jj results.
+- Focused validation covered `cargo check`, `cargo test jj_actions -- --test-threads=1`,
+  `rustup run nightly cargo fmt --check`, and `cargo doc --no-deps`.
+
 2026-05-21 shared chrome rendering contract documentation:
 
 - `src/tui.rs` now documents the split between feature-owned main content and shared chrome-owned

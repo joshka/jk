@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Action plan root contract documentation)
+
+- Slice / task: document the root `jj_actions` action-planning boundary before further action-plan
+  cleanup so argv construction, previews, direct execution, and feature-owned availability stay
+  separate.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b76-8048-7f92-a5b0-09f4e57a0606`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only sweep with write
+  scope limited to `src/jj_actions.rs`. The main thread reviewed the diff, removed repetitive
+  low-value method comments, and reran focused validation including rustdoc generation for links.
+- Implementation outcome: `src/jj_actions.rs` now documents the root action-plan ownership boundary,
+  the submodule family split, feature/menu-owned availability and target selection, app lifecycle
+  ownership of prompt/confirmation/refresh/reveal/result transitions, `CommandOutput` semantics, and
+  preview-honesty contracts for describe, commit, restore, file mutation, revert, and abandon plans.
+- Size evidence: after main-thread trimming, `src/jj_actions.rs` measured 872 lines.
+- Rework / surprise: the worker stayed in scope and passed validation, but the first pass added too
+  many repetitive comments on similarly shaped methods. Main-thread review kept the ownership and
+  preview-honesty contracts and removed comments that restated method names.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `cargo test jj_actions -- --test-threads=1` with 54
+    passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo check`; `cargo test jj_actions -- --test-threads=1`
+    with 54 passed; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `cargo doc --no-deps`.
+  - Full `just check` passed at the top of the stack, reporting fmt, Panache format/lint, clippy,
+    cargo check, and cargo test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 10:15:28 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b76-8048-7f92-a5b0-09f4e57a0606` from the worker handoff.
+  - Files: `src/jj_actions.rs` and this process note.
+
 ### 2026-05-21 (Shared chrome rendering contract documentation)
 
 - Slice / task: document shared terminal chrome and modal presentation boundaries so feature views
