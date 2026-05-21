@@ -28,8 +28,8 @@ shape, documentation workflow, and agent workflow.
 
 - Recent completed packets: `Action Preview Pane Construction Helper`,
   `Git Sync Action-Plan Cluster`, `View Action-Target Projection Policy`,
-  `Extract simple selection restore helper`, and the `Retire Or Narrow` slice for `src/jj.rs`
-  compatibility re-exports.
+  `Bookmark Action Target Resolver`, `Extract simple selection restore helper`, and the
+  `Retire Or Narrow` slice for `src/jj.rs` compatibility re-exports.
 - Command and app contracts: `src/command.rs` owns key binding metadata plus `Command`,
   `ViewCommand`, `CommandContext`, and `ViewEffect`; `src/app_screen.rs` owns `InteractionMode`; and
   `src/app/mode_input.rs` owns modal and prompt key reducers.
@@ -38,7 +38,8 @@ shape, documentation workflow, and agent workflow.
 - Action lifecycle: `src/app/action_lifecycle/{entry,completion,rewrite_completion,shared}.rs` owns
   guided action dispatch, shared outcome helpers, refresh and reveal policy, and status/result
   construction; `src/app/action_lifecycle/preview.rs` owns the preview-pane construction helper.
-- Bookmark cohesion: `src/bookmarks.rs` owns bookmark mutation and action-target resolution;
+- Bookmark cohesion: `src/bookmarks.rs` owns bookmark list state, rendering, refresh, and selection;
+  `src/bookmarks/action_targets.rs` owns fail-closed bookmark action-target resolution;
   `src/jj_actions.rs` owns bookmark action plans and the remaining preview-first action plans;
   `src/jj_rows.rs` owns bookmark row metadata pairing; `src/view_action_targets.rs` owns bookmark
   action-target projection policy.
@@ -137,17 +138,18 @@ near the type that future edits are likely to land on first.
 
 ### Repeated Or High-Live-Context Surfaces
 
-- `src/bookmarks.rs`, `src/jj_actions.rs`, `src/jj_rows.rs`, and `src/view_action_targets.rs` still
-  share bookmark-related vertical concerns across action targets, action plans, and row metadata.
+- `src/jj_actions.rs`, `src/jj_rows.rs`, `src/bookmarks/action_targets.rs`, and
+  `src/view_action_targets.rs` still share bookmark-related vertical concerns across action targets,
+  action plans, and row metadata, but the selected-row target policy now has a focused owner.
 - `src/jj_actions.rs` still mixes the remaining action-plan clusters, argv construction, preview
-  summaries, and fallback wording. The bookmark and git sync clusters are already out of the generic
-  path, so the next bounded slice should stay on one remaining cluster rather than reopen the whole
-  planner.
+  summaries, and fallback wording. The git sync cluster is already out of the generic path, while
+  the bookmark action-plan cluster remains in `src/jj_actions.rs`; the next bounded slice should
+  extract that cluster without reopening the whole planner.
 - `src/app/action_lifecycle/completion.rs` still concentrates the status/result construction
   branches for action outcomes. It is a smaller target than `src/jj_actions.rs`, but it remains a
   dense live-context surface.
-- `src/bookmarks.rs` remains dense because bookmark mutation and restore behavior share the same
-  file.
+- `src/bookmarks.rs` remains dense because bookmark list rendering, refresh, selection, search, and
+  copy behavior still share the same file.
 - `src/app/mode_input.rs` still carries many modal key paths in one control-flow surface, but the
   recent readability packet already reduced the densest dispatch path, so it is not the next packet.
 - `src/app.rs` is no longer the main pressure point; the current measurements and review findings
@@ -158,16 +160,16 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 
 ## Prioritized Corrective Slices
 
-### 1. Bookmark Action Target Resolver
+### 1. Completed: Bookmark Action Target Resolver
 
-- Owner: `src/bookmarks.rs`, with a child module if the resolution logic needs to split from the
-  mutation state.
-- Purpose: pull bookmark action-target resolution into one bounded owner while preserving
-  fail-closed metadata handling and existing error wording.
-- Non-goals: no bookmark behavior change, no action wording drift, and no broad navigation-model
-  rewrite.
-- Proof: `src/bookmarks.rs` remains one of the largest source files and still mixes bookmark
-  mutation with action-target resolution concerns.
+- Status: completed in the `Extract bookmark target resolver` packet.
+- Result: `src/bookmarks/action_targets.rs` owns selected-row forget, track, and untrack resolution,
+  including local/remote peer checks, exact-target checks, all-remotes requirements, and fail-closed
+  metadata wording. `BookmarksView` keeps the existing public methods as thin delegates.
+- Non-goals preserved: no bookmark behavior change, no action wording drift, no app call-site churn,
+  and no row metadata or command-construction changes.
+- Proof: focused bookmark resolver tests and app bookmark action tests preserve the current accepted
+  and rejected states.
 
 ### 2. Bookmark Action Plan Submodule
 

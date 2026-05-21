@@ -5,6 +5,34 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark action-target resolver extraction)
+
+- Slice / task: implement the ledger slice `Bookmark Action Target Resolver` on current jj change
+  `Extract bookmark target resolver`.
+- Thread id: `019e4962-ee8f-7553-a842-7760df8b8934`.
+- Model / routing: a `gpt-5.5` worker implemented the behavior-preserving extraction for main-thread
+  review.
+- Files changed: `src/bookmarks.rs`, `src/bookmarks/action_targets.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/bookmarks/action_targets.rs` now owns selected-row forget, track, and
+  untrack target resolution. `BookmarksView` keeps its existing public methods as delegates and
+  continues to own list state, rendering, refresh, search, and copy behavior.
+- Behavior intent: preserve bookmark action eligibility, accepted/rejected target states, argv
+  shape, visible labels, app call sites, and current error/status wording exactly.
+- Validation trail: `cargo test bookmarks -- --test-threads=1`;
+  `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check` passed.
+- Main-thread validation after review passed: `cargo test bookmarks -- --test-threads=1`;
+  `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Full `just check` also passed after main-thread review with 533 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 00:19:04 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `docs/agent/rust-style.md`, `docs/agent/testing.md`, `src/bookmarks.rs`, and
+    `src/app/tests/bookmark_actions.rs`
+
 ### 2026-05-21 (Maintainability ledger reconciliation)
 
 - Slice / task: reconcile `docs/agent/source-maintainability-ledger.md` after the completed preview,
