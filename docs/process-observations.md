@@ -5,6 +5,19 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Source maintainability ledger)
+
+- Slice / task: orchestration-only documentation edit for the current maintainability audit jj
+  change; no Rust or source behavior changes.
+- Thread id: `019e488c-bb4f-76e2-989f-e2e48696e589`.
+- Evidence read: `jj --no-pager status` showed an empty working copy on the audit change;
+  `just largest-rust-files` reported `src/jj_actions.rs` at 3601 lines, `src/jj_rows.rs` at 1836,
+  and `src/bookmarks.rs` at 1477.
+- Guidance basis: read the repo-local docs guidance plus `../practice` guidance for Rust
+  maintainability, documentation workflow, code shape, reader locality, and cohesion.
+- Documentation outcome: `docs/agent/source-maintainability-ledger.md` now records the audit's
+  quality bar, concept map, concrete findings, and bounded corrective slices.
+
 ### 2026-05-20 (Packet quality gate)
 
 - Slice / task: add a mechanical packet-quality gate so the local `just` workflow and agent docs
