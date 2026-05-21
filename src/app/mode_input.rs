@@ -21,7 +21,7 @@ use crate::command::{
     Binding, BindingMatch, ViewCommand, ViewEffect, help_binding_prefix_next_labels,
     match_help_binding_sequence,
 };
-use crate::jj::{
+use crate::jj_actions::{
     JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan,
     JjRebasePlan, JjSquashPlan, validate_bookmark_rename_new_name,
 };

@@ -12,13 +12,23 @@ pub(super) use crate::app::services::AppServices;
 pub(super) use crate::app_screen::{InteractionMode, ViewMenuAction};
 pub(super) use crate::app_status::{StatusKind, StatusLine};
 pub(super) use crate::command::{CommandContext, ViewCommand};
-pub(super) use crate::jj::{
-    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
-    JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
-    JjDescribeTarget, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget,
-    JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan,
-    JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
-    JjWorkingCopyNavigationPlan, LogViewMode, ViewSpec,
+#[allow(unused_imports)]
+pub(super) use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
+#[allow(unused_imports)]
+pub(super) use crate::jj_actions::{
+    JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
+    JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan,
+    JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
+};
+#[allow(unused_imports)]
+pub(super) use crate::jj_rows::{
+    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, FileListItem, LocalBookmarkRemoteState,
+    LogItem, OperationLogItem, RemoteBookmarkTrackingState, ResolveEntry, WorkspaceContext,
+    WorkspaceItem, document_plain_text, load_bookmark_entries, load_compact_log_context,
+    load_entries, load_file_list_entries, load_operation_log_entries, load_resolve_entries,
+    load_workspace_context,
 };
 pub(super) use crate::tui::Overlay;
 pub(super) use crate::view_state::ViewState;
@@ -365,7 +375,7 @@ pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
             ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![]))
         }
         JjCommand::Workspaces => ViewState::Workspaces(
-            crate::workspaces::WorkspacesView::test_new(crate::jj::WorkspaceContext::default()),
+            crate::workspaces::WorkspacesView::test_new(crate::jj_rows::WorkspaceContext::default()),
         ),
         JjCommand::OperationLog => {
             ViewState::OperationLog(crate::operation_log::OperationLogView::test_new(vec![]))
@@ -493,8 +503,8 @@ pub(super) fn mock_reveal_current_working_copy_in_recent(
     Ok(true)
 }
 
-pub(super) fn graph_item(change_id: &str) -> crate::jj::LogItem {
-    crate::jj::LogItem::new(
+pub(super) fn graph_item(change_id: &str) -> crate::jj_rows::LogItem {
+    crate::jj_rows::LogItem::new(
         vec![ratatui::text::Line::from(change_id.to_owned())],
         Some(change_id.to_owned()),
         None,

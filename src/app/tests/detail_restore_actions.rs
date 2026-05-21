@@ -35,7 +35,7 @@ fn detail_action_menu_from_exact_file_list_offers_path_restore_first() {
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -126,7 +126,7 @@ fn detail_navigation_marks_graph_targets_exact() {
 #[test]
 fn detail_navigation_from_bookmarks_is_not_exact() {
     let app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
             Vec::new(),
             "feature".to_owned(),
             Some("change-a".to_owned()),
@@ -163,7 +163,7 @@ fn file_show_navigation_preserves_source_exactness_only() {
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -172,7 +172,7 @@ fn file_show_navigation_preserves_source_exactness_only() {
     let direct_app = test_app(ViewState::FileList(
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned())),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -196,7 +196,7 @@ fn file_show_navigation_from_resolve_uses_resolve_revision() {
     let app = test_app(ViewState::Resolve(
         crate::resolve::ResolveView::test_with_spec(
             ViewSpec::resolve(Some("main".to_owned())),
-            vec![crate::jj::ResolveEntry::parsed(
+            vec![crate::jj_rows::ResolveEntry::parsed(
                 Some("src/main.rs".to_owned()),
                 Some("file".to_owned()),
                 Some(3),
@@ -219,7 +219,7 @@ fn file_show_navigation_from_default_resolve_uses_current_revision() {
     let app = test_app(ViewState::Resolve(
         crate::resolve::ResolveView::test_with_spec(
             ViewSpec::resolve(None),
-            vec![crate::jj::ResolveEntry::parsed(
+            vec![crate::jj_rows::ResolveEntry::parsed(
                 Some("src/main.rs".to_owned()),
                 Some("file".to_owned()),
                 Some(3),
@@ -312,7 +312,7 @@ fn restore_action_menu_enter_opens_path_preview() {
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -352,7 +352,7 @@ fn restore_action_menu_path_shortcut_opens_path_preview() {
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],

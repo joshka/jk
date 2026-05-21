@@ -11,7 +11,7 @@ use crate::action_output::{
 };
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
-use crate::jj::{
+use crate::jj_actions::{
     JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjDuplicatePlan,
     JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget,
     JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,

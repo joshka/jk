@@ -7,7 +7,8 @@
 use std::fmt::Display;
 
 use crate::app_status::StatusLine;
-use crate::jj::{JjBookmarkMutationPlan, JjGitFetch, JjGitPushTarget, LogViewMode};
+use crate::jj::LogViewMode;
+use crate::jj_actions::{JjBookmarkMutationPlan, JjGitFetch, JjGitPushTarget};
 
 use super::super::{App, current_viewport_width};
 

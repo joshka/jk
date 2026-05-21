@@ -5,7 +5,7 @@ use super::support::*;
 #[test]
 fn push_remote_prompt_without_selection_stays_ready() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushRemotePrompt {
         target: JjGitPushTarget::Revision("abcdef".to_owned()),
@@ -25,11 +25,11 @@ fn push_remote_prompt_without_selection_stays_ready() {
 fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
     let selected_operation_id = "b".repeat(128);
     let mut operation_log = crate::operation_log::OperationLogView::test_new(vec![
-        crate::jj::OperationLogItem::new(
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("a".repeat(128)),
         ),
-        crate::jj::OperationLogItem::new(
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("○  selected")],
             Some(selected_operation_id.clone()),
         ),
@@ -63,11 +63,12 @@ fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
 
 #[test]
 fn operation_recovery_preview_can_cancel_or_confirm_success() {
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("a".repeat(128)),
-        )]);
+        ),
+    ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
     app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
@@ -96,11 +97,12 @@ fn operation_recovery_preview_can_cancel_or_confirm_success() {
 
 #[test]
 fn operation_redo_failure_keeps_command_output_readable() {
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("a".repeat(128)),
-        )]);
+        ),
+    ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
     app.services.operation_recovery_run = mock_operation_recovery_failure;
 
@@ -128,11 +130,9 @@ fn operation_redo_failure_keeps_command_output_readable() {
 
 #[test]
 fn operation_action_menu_requires_exact_operation_id() {
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
-            vec![ratatui::text::Line::from("@  current")],
-            None,
-        )]);
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(vec![ratatui::text::Line::from("@  current")], None),
+    ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
     app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
@@ -148,11 +148,12 @@ fn operation_action_menu_requires_exact_operation_id() {
 #[test]
 fn operation_restore_preview_can_cancel_or_confirm_success() {
     let operation_id = "e".repeat(128);
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
-        )]);
+        ),
+    ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
     app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
@@ -161,7 +162,10 @@ fn operation_restore_preview_can_cancel_or_confirm_success() {
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { target, output } => {
-            assert_eq!(target.kind(), crate::jj::JjOperationTargetKind::Restore);
+            assert_eq!(
+                target.kind(),
+                crate::jj_actions::JjOperationTargetKind::Restore
+            );
             assert_eq!(target.operation_id(), operation_id.as_str());
             output
         }
@@ -205,11 +209,12 @@ fn operation_restore_preview_can_cancel_or_confirm_success() {
 fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
     OPERATION_RESTORE_REFRESH_CALLS.store(0, Ordering::SeqCst);
     let operation_id = "e".repeat(128);
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
-        )]);
+        ),
+    ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
     app.services.refresh_view = mock_operation_restore_counting_refresh_ok;
     app.stack
@@ -244,11 +249,12 @@ fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
 fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
     OPERATION_REVERT_REFRESH_CALLS.store(0, Ordering::SeqCst);
     let operation_id = "f".repeat(128);
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
-        )]);
+        ),
+    ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
     app.services.refresh_view = mock_operation_revert_second_refresh_failure;
     app.stack
@@ -277,11 +283,12 @@ fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
 #[test]
 fn operation_revert_preview_confirm_failure_keeps_output_readable() {
     let operation_id = "f".repeat(128);
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  selected")],
             Some(operation_id.clone()),
-        )]);
+        ),
+    ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
     app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
@@ -291,7 +298,10 @@ fn operation_revert_preview_confirm_failure_keeps_output_readable() {
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { target, output } => {
-            assert_eq!(target.kind(), crate::jj::JjOperationTargetKind::Revert);
+            assert_eq!(
+                target.kind(),
+                crate::jj_actions::JjOperationTargetKind::Revert
+            );
             assert_eq!(target.operation_id(), operation_id.as_str());
             output
         }
@@ -327,11 +337,12 @@ fn operation_revert_preview_confirm_failure_keeps_output_readable() {
 #[test]
 fn back_from_operation_detail_returns_to_operation_log() {
     let operation_id = "abcdef".to_owned();
-    let operation_log =
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
+    let operation_log = crate::operation_log::OperationLogView::test_new(vec![
+        crate::jj_rows::OperationLogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some(operation_id.clone()),
-        )]);
+        ),
+    ]);
     let detail = crate::operation_detail::OperationDetailView::test_new(
         ViewSpec::operation_show(operation_id),
         crate::rendered_jj::DocumentLines::new(vec![ratatui::text::Line::from(

@@ -12,10 +12,11 @@ use ratatui::widgets::{List, ListItem, ListState};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{
-    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, JjBookmarkForgetTarget,
-    JjBookmarkMutationKind, JjBookmarkTrackingTarget, JjCommand, LocalBookmarkRemoteState,
-    RemoteBookmarkTrackingState, ViewSpec, load_bookmark_entries,
+use crate::jj::{JjCommand, ViewSpec};
+use crate::jj_actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
+use crate::jj_rows::{
+    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
+    RemoteBookmarkTrackingState, load_bookmark_entries,
 };
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;

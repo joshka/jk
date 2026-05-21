@@ -11,7 +11,8 @@ use ratatui::widgets::{List, ListItem, ListState};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{FileListItem, JjCommand, ViewSpec, load_file_list_entries};
+use crate::jj::{JjCommand, ViewSpec};
+use crate::jj_rows::{FileListItem, load_file_list_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;

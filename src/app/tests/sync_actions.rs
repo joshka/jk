@@ -228,7 +228,7 @@ fn fetch_success_with_refresh_error_keeps_output() {
 #[test]
 fn open_push_prompt_requires_exact_graph_revision() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), None, None),
+        crate::jj_rows::LogItem::new(Vec::new(), None, None),
     ])));
 
     assert!(!app.open_push_prompt().unwrap());
@@ -242,7 +242,7 @@ fn open_push_prompt_requires_exact_graph_revision() {
 #[test]
 fn open_push_prompt_skips_remote_prompt_for_single_remote() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.git_remotes_load = mock_single_remote;
 
@@ -268,7 +268,7 @@ fn open_push_prompt_skips_remote_prompt_for_single_remote() {
 #[test]
 fn open_push_prompt_keeps_remote_prompt_for_multiple_remotes() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.git_remotes_load = mock_multiple_remotes;
 
@@ -291,7 +291,7 @@ fn open_push_prompt_keeps_remote_prompt_for_multiple_remotes() {
 #[test]
 fn open_push_prompt_reports_no_remote_error() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.git_remotes_load = mock_no_remotes;
 
@@ -322,7 +322,7 @@ fn open_push_prompt_reports_unsupported_view_error() {
 #[test]
 fn push_preview_context_names_status_default_resolution() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
 
     app.open_push_preview(JjGitPushTarget::Status, "origin".to_owned());
@@ -344,7 +344,7 @@ fn push_preview_context_names_status_default_resolution() {
 #[test]
 fn push_preview_context_names_exact_bookmark() {
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
             Vec::new(),
             "feature".to_owned(),
             Some("abcdef".to_owned()),
@@ -374,7 +374,7 @@ fn push_preview_context_names_exact_bookmark() {
 #[test]
 fn push_result_keeps_context_until_closed() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_revision("abcdef".to_owned()).with_remote("origin"),
@@ -412,7 +412,7 @@ fn push_result_keeps_context_until_closed() {
 #[test]
 fn push_preview_entering_cancel_restores_normal_mode() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_status().with_remote("origin"),
@@ -434,7 +434,7 @@ fn push_preview_entering_cancel_restores_normal_mode() {
 #[test]
 fn push_confirm_success_with_refresh_error_keeps_output() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.refresh_view = mock_refresh_failure;
     app.mode = InteractionMode::PushPreview {
@@ -464,7 +464,7 @@ fn push_confirm_success_with_refresh_error_keeps_output() {
 #[test]
 fn push_preview_completion_stays_until_closed() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_status().with_remote("origin"),

@@ -8,7 +8,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::action_menu::ActionMenu;
 use crate::copy::CopyOption;
-use crate::jj::{JjCommand, JjOperationRecoveryKind};
+use crate::jj::JjCommand;
+use crate::jj_actions::JjOperationRecoveryKind;
 use crate::search::SearchQuery;
 
 /// App-level dispatch vocabulary for global bindings and view-facing effects.

@@ -10,10 +10,11 @@ use ratatui::DefaultTerminal;
 use crate::action_output::ActionOutput;
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
-use crate::jj::{
-    JjBookmarkMutationPlan, JjCommand, JjCommitPlan, JjDescribePlan, JjDuplicatePlan,
-    JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget,
-    JjSplitPlan, JjSplitTarget, LogViewMode,
+use crate::jj::{JjCommand, LogViewMode};
+use crate::jj_actions::{
+    JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan,
+    JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecovery, JjOperationTarget, JjSplitPlan,
+    JjSplitTarget,
 };
 use crate::view_state::ViewState;
 

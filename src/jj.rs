@@ -11,26 +11,7 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
 use crate::interactive_process::InteractiveCommand;
-
-#[allow(unused_imports)]
-pub use crate::jj_actions::JjOperationTargetKind;
-pub use crate::jj_actions::{
-    CommandOutput, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkForgetTarget,
-    JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget, JjBookmarkTrackingTarget,
-    JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan, JjFileChmodMode,
-    JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSplitPlan, JjSplitTarget, JjSquashPlan, JjWorkingCopyNavigationKind,
-    JjWorkingCopyNavigationPlan, validate_bookmark_rename_new_name,
-};
-#[allow(unused_imports)]
-pub use crate::jj_rows::{
-    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, FileListItem, LocalBookmarkRemoteState,
-    LogItem, OperationLogItem, RemoteBookmarkTrackingState, ResolveEntry, WorkspaceContext,
-    WorkspaceItem, document_plain_text, load_bookmark_entries, load_compact_log_context,
-    load_entries, load_file_list_entries, load_operation_log_entries, load_resolve_entries,
-    load_workspace_context,
-};
+use crate::jj_actions::CommandOutput;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjCommand {
@@ -940,6 +921,7 @@ mod tests {
     use std::ffi::OsStr;
 
     use super::*;
+    use crate::jj_actions::JjGitFetch;
     use crate::jj_rows::{
         OPERATION_ID_TEMPLATE, RESOLVE_CONFLICT_TEMPLATE, WORKSPACE_METADATA_TEMPLATE,
     };

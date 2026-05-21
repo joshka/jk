@@ -4,7 +4,7 @@
 //! This module owns the user-visible action vocabulary, prompts, and follow-up
 //! context used to present those actions. Execution still happens elsewhere.
 
-use crate::jj::JjFileChmodMode;
+use crate::jj_actions::JjFileChmodMode;
 
 const PREVIEW_REQUIRED_MARKER: &str = "Preview required before execution.";
 

@@ -10,7 +10,8 @@ use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Wrap};
 
-use crate::jj::{ViewSpec, load_entries};
+use crate::jj::ViewSpec;
+use crate::jj_rows::load_entries;
 use crate::rendered_jj::{DocumentLines, FileAnchor, PinnedDocument, project_with_active_file};
 use crate::search::{SearchQuery, highlight_line, line_matches};
 

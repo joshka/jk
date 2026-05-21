@@ -6,12 +6,13 @@
 use crate::action_output::ActionOutput;
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
-use crate::jj::{
+use crate::jj::LogViewMode;
+use crate::jj_actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
     JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget,
     JjNewPlan, JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan,
     JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind,
-    JjWorkingCopyNavigationPlan, LogViewMode,
+    JjWorkingCopyNavigationPlan,
 };
 
 use super::super::{App, current_viewport_width};

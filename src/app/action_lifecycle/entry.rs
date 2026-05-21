@@ -10,10 +10,11 @@ use crate::action_output::ActionOutput;
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::command::ViewCommand;
-use crate::jj::{
-    JjAbandonPlan, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjCommand,
-    JjDescribeTarget, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPushTarget, JjNewPlan,
-    JjOperationTarget, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjWorkingCopyNavigationPlan,
+use crate::jj::JjCommand;
+use crate::jj_actions::{
+    JjAbandonPlan, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjDescribeTarget,
+    JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPushTarget, JjNewPlan, JjOperationTarget,
+    JjRestorePlan, JjRevertPlan, JjSplitPlan, JjWorkingCopyNavigationPlan,
 };
 use crate::view_state::ViewState;
 

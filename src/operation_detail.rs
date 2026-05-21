@@ -11,7 +11,8 @@ use ratatui::layout::Rect;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{JjCommand, ViewSpec, document_plain_text};
+use crate::jj::{JjCommand, ViewSpec};
+use crate::jj_rows::document_plain_text;
 use crate::rendered_jj::{DocumentLines, FileAnchor, PinnedDocument, project_with_active_file};
 use crate::search::SearchQuery;
 use crate::sticky_file_view;

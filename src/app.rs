@@ -17,7 +17,8 @@ use crate::command::{
     Binding, BindingMatch, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect,
     binding_prefix_next_labels, match_binding_sequence,
 };
-use crate::jj::{DiffFormat, JjBookmarkMutationKind, JjWorkingCopyNavigationKind};
+use crate::jj::DiffFormat;
+use crate::jj_actions::{JjBookmarkMutationKind, JjWorkingCopyNavigationKind};
 use crate::search::SearchQuery;
 use crate::tui;
 use crate::view_state::ViewState;

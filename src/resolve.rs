@@ -13,7 +13,8 @@ use ratatui::widgets::{List, ListItem, ListState};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{JjCommand, ResolveEntry, ViewSpec, load_resolve_entries};
+use crate::jj::{JjCommand, ViewSpec};
+use crate::jj_rows::{ResolveEntry, load_resolve_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;

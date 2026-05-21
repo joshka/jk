@@ -8,12 +8,13 @@ use crate::action_output::ActionOutput;
 use crate::app_status::StatusLine;
 use crate::command::{Binding, project_help};
 use crate::copy::CopyOption;
-use crate::jj::{
-    DiffFormat, JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind,
-    JjBookmarkMutationPlan, JjBookmarkTarget, JjCommand, JjCommitPlan, JjDescribePlan,
-    JjDescribeTarget, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget,
-    JjNewPlan, JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationPlan,
+use crate::jj::{DiffFormat, JjCommand};
+use crate::jj_actions::{
+    JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
+    JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan,
+    JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
+    JjWorkingCopyNavigationPlan,
 };
 use crate::tui::Overlay;
 use crate::view_state::ViewState;
@@ -368,7 +369,7 @@ mod tests {
     use super::*;
     use crate::app_status::StatusKind;
     use crate::graph::GraphView;
-    use crate::jj::JjOperationRecoveryKind;
+    use crate::jj_actions::JjOperationRecoveryKind;
     use crate::tui::StatusHints;
 
     #[test]

@@ -6,7 +6,7 @@
 use crate::action_output::ActionOutput;
 use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
-use crate::jj::{
+use crate::jj_actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
 };

@@ -5,6 +5,23 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Retire jj.rs compatibility re-exports)
+
+- Slice / task: retire the remaining `src/jj.rs` compatibility re-exports so action-plan and
+  row-loader ownership matches the direct module imports.
+- Thread id: `019e4928-b85a-7193-bf18-78f0b403e59d`.
+- Model / routing: a `gpt-5.4-mini` worker handled the source cleanup and validation, and the main
+  thread reviewed the result.
+- Files changed: `src/jj.rs`, direct import users across the app, view, and action modules,
+  `src/app/tests/*`, and `docs/agent/architecture.md`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Validation trail: `cargo check` passed; `cargo test jj_actions -- --test-threads=1` passed;
+  `cargo test jj_rows -- --test-threads=1` passed; `cargo test jj -- --test-threads=1` passed;
+  `rustup run nightly cargo fmt --check` passed; the main thread ran `just check` after review and
+  it passed with 529 passed / 2 ignored; `just md-check` passed.
+- Residual risk: future import drift could reintroduce `src/jj.rs` as the compatibility path unless
+  new code keeps importing the direct owner modules.
+
 ### 2026-05-20 (Remaining contract drift repair)
 
 - Slice / task: repair the remaining contract drift without behavior changes by updating the

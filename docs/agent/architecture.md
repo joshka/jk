@@ -94,9 +94,7 @@ Keep modules aligned with user-visible concepts:
   labels, preview summaries, direct run methods, and fallback result wording for user-confirmed
   mutation flows.
 - `jj.rs` owns view-spec command construction, direct process helpers, diff-format arguments, and
-  command/navigation target provenance. It re-exports action-plan and row-loading types for
-  compatibility, but action-plan behavior should stay in `jj_actions.rs` and rendered-row behavior
-  should stay in `jj_rows.rs`.
+  command/navigation target provenance.
 - `jj_syntax.rs` owns exact revset/fileset/string quoting helpers and argv label helpers shared by
   `jj_actions.rs` and related command builders.
 - `jj_rows.rs` owns selectable rendered row models, row loaders, narrow metadata templates, metadata

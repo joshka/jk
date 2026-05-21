@@ -419,7 +419,7 @@ fn view_menu_diff_format_status_names_show_diff_scope() {
 #[test]
 fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
@@ -482,7 +482,7 @@ fn git_fetch_prefix_does_not_delay_non_graph_g_navigation() {
 #[test]
 fn expired_bookmark_prefix_runs_fallback_before_next_key() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
@@ -501,8 +501,8 @@ fn expired_bookmark_prefix_runs_fallback_before_next_key() {
 #[test]
 fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
     let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("first".to_owned()), None),
-        crate::jj::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("second".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -545,7 +545,7 @@ fn command_prefix_cancel_does_not_run_global_escape() {
 #[test]
 fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.load_view = mock_load_view;
 
@@ -558,7 +558,7 @@ fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
     assert_eq!(app.view.command(), JjCommand::Default);
 
     let mut app = test_app(ViewState::Bookmarks(
-        crate::bookmarks::BookmarksView::test_new(vec![crate::jj::BookmarkItem::new(
+        crate::bookmarks::BookmarksView::test_new(vec![crate::jj_rows::BookmarkItem::new(
             Vec::new(),
             "main".to_owned(),
             Some("change-a".to_owned()),
@@ -580,10 +580,12 @@ fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
 fn operation_log_l_opens_operation_detail() {
     let operation_id = "op123".to_owned();
     let mut app = test_app(ViewState::OperationLog(
-        crate::operation_log::OperationLogView::test_new(vec![crate::jj::OperationLogItem::new(
-            vec![ratatui::text::Line::from("@  current")],
-            Some(operation_id),
-        )]),
+        crate::operation_log::OperationLogView::test_new(vec![
+            crate::jj_rows::OperationLogItem::new(
+                vec![ratatui::text::Line::from("@  current")],
+                Some(operation_id),
+            ),
+        ]),
     ));
     app.services.load_view = mock_load_view;
 

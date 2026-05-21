@@ -95,7 +95,7 @@ fn file_list_working_copy_offers_untrack_and_chmod() {
     let mut app = test_app(ViewState::FileList(
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(None, None),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -128,7 +128,7 @@ fn exact_file_list_chmod_passes_exact_revision() {
     let mut app = test_app(ViewState::FileList(
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("change-a".to_owned()), None).with_exact_change_target(),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -154,7 +154,7 @@ fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
     let mut direct = test_app(ViewState::FileList(
         crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("main".to_owned()), None),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -198,7 +198,7 @@ fn file_mutation_confirm_preserves_result_output_and_refreshes() {
     app.mode = InteractionMode::FileMutationPreview {
         mutation: JjFileMutationPlan::chmod_working_copy(
             "src/main.rs",
-            crate::jj::JjFileChmodMode::Normal,
+            crate::jj_actions::JjFileChmodMode::Normal,
         ),
         output: ActionOutput::pending(
             "jj file chmod n -- root-file:\"src/main.rs\"".to_owned(),

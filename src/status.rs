@@ -15,7 +15,8 @@ use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, 
 use crate::copy::CopyOption;
 #[cfg(test)]
 use crate::jj::JjCommand;
-use crate::jj::{ViewSpec, document_plain_text};
+use crate::jj::ViewSpec;
+use crate::jj_rows::document_plain_text;
 use crate::rendered_jj::DocumentLines;
 use crate::search::{SearchQuery, highlight_line, line_matches};
 use crate::selection::Selection;

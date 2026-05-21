@@ -12,7 +12,8 @@ use ratatui::widgets::{List, ListItem, ListState, Paragraph};
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::jj::{ViewSpec, WorkspaceContext, WorkspaceItem, load_workspace_context};
+use crate::jj::ViewSpec;
+use crate::jj_rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;

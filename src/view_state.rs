@@ -14,9 +14,8 @@ use crate::diff::DiffView;
 use crate::file_list::FileListView;
 use crate::file_show::FileShowView;
 use crate::graph::GraphView;
-use crate::jj::{
-    JjBookmarkForgetTarget, JjBookmarkTarget, JjCommand, JjGitPushTarget, LogViewMode, ViewSpec,
-};
+use crate::jj::{JjCommand, LogViewMode, ViewSpec};
+use crate::jj_actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
 use crate::operation_detail::OperationDetailView;
 use crate::operation_log::OperationLogView;
 use crate::resolve::ResolveView;
@@ -516,11 +515,9 @@ mod tests {
 
     #[test]
     fn push_target_from_graph_uses_exact_revision() {
-        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
-            Vec::new(),
-            Some("abcdefg".to_owned()),
-            None,
-        )]));
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![
+            crate::jj_rows::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
+        ]));
 
         assert_eq!(
             view.push_target().unwrap(),
@@ -530,11 +527,9 @@ mod tests {
 
     #[test]
     fn push_target_from_graph_requires_exact_revision() {
-        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
-            Vec::new(),
-            None,
-            None,
-        )]));
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![
+            crate::jj_rows::LogItem::new(Vec::new(), None, None),
+        ]));
 
         assert_eq!(
             view.push_target().unwrap_err().to_string(),
@@ -545,7 +540,7 @@ mod tests {
     #[test]
     fn push_target_from_bookmarks_uses_selected_name() {
         let view = ViewState::Bookmarks(bookmarks::BookmarksView::test_new(vec![
-            crate::jj::BookmarkItem::new(Vec::new(), "main".to_owned(), None, None),
+            crate::jj_rows::BookmarkItem::new(Vec::new(), "main".to_owned(), None, None),
         ]));
 
         assert_eq!(
@@ -556,11 +551,9 @@ mod tests {
 
     #[test]
     fn bookmark_target_from_graph_and_status_is_exact() {
-        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
-            Vec::new(),
-            Some("abcdefg".to_owned()),
-            None,
-        )]));
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![
+            crate::jj_rows::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
+        ]));
 
         assert_eq!(
             view.bookmark_target().unwrap(),
@@ -577,11 +570,9 @@ mod tests {
 
     #[test]
     fn bookmark_target_from_graph_requires_exact_revision() {
-        let view = ViewState::Graph(graph::GraphView::test_new(vec![crate::jj::LogItem::new(
-            Vec::new(),
-            None,
-            None,
-        )]));
+        let view = ViewState::Graph(graph::GraphView::test_new(vec![
+            crate::jj_rows::LogItem::new(Vec::new(), None, None),
+        ]));
 
         assert_eq!(
             view.bookmark_target().unwrap_err().to_string(),
@@ -592,7 +583,7 @@ mod tests {
     #[test]
     fn selected_local_bookmark_name_rejects_nonlocal_rows() {
         let view = ViewState::Bookmarks(bookmarks::BookmarksView::test_new(vec![
-            crate::jj::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
+            crate::jj_rows::BookmarkItem::new(Vec::new(), "@origin".to_owned(), None, None)
                 .with_local(false),
         ]));
 
@@ -611,7 +602,7 @@ mod tests {
         let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("abcdefg".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -674,7 +665,7 @@ mod tests {
         )));
         let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned())),
-            vec![crate::jj::FileListItem::new(
+            vec![crate::jj_rows::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],

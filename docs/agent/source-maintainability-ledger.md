@@ -28,8 +28,9 @@ shape, documentation workflow, and agent workflow.
 
 - Recent completed packets: `Add packet quality gate`, `Audit source maintainability surface`,
   `Factor action completion outcomes`, `Repair stale source ownership docs`,
-  `Document app command contracts`, `Fail closed on row metadata drift`, and
-  `Extract jj syntax helpers`.
+  `Document app command contracts`, `Fail closed on row metadata drift`,
+  `Extract jj syntax helpers`, and the `Retire Or Narrow` slice for `src/jj.rs` compatibility
+  re-exports.
 - Command and app contracts: `src/command.rs` owns key binding metadata plus `Command`,
   `ViewCommand`, `CommandContext`, and `ViewEffect`; `src/app_screen.rs` owns `InteractionMode`; and
   `src/app/mode_input.rs` owns modal and prompt key reducers.
@@ -202,17 +203,12 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 - Proof: snapshots or focused tests showing the selected identity is preserved, clamped, or
   intentionally cleared on each screen.
 
-### 6. Retire Or Narrow `src/jj.rs` Compatibility Re-exports
+### 6. Completed: Retired `src/jj.rs` Compatibility Re-exports
 
-- Owner: `src/jj.rs`.
-- Purpose: retire or narrow compatibility re-exports so source ownership matches direct imports from
-  `src/jj_actions.rs` and `src/jj_rows.rs`.
-- Acceptance criteria: source and test imports refer to `jj_actions` and `jj_rows` directly; the
-  remaining `jj.rs` surface keeps only the helpers it still owns; and any leftover re-export is
-  justified by an explicit compatibility need.
-- Non-goals: no behavior changes and no broad module reshuffle.
-- Proof: source import audit, focused compile pass, and follow-up cleanup of any now-redundant
-  compatibility path.
+- Status: completed in the current packet.
+- Result: source and test imports now refer to `jj_actions` and `jj_rows` directly; `src/jj.rs`
+  keeps only the helpers it owns; and no compatibility re-export remains.
+- Proof: focused compile pass plus the import audit recorded in `docs/process-observations.md`.
 
 ### 7. Quality Gate Refinements
 

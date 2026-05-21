@@ -1,8 +1,9 @@
 //! Preview-first action and mutation plans for `jj` commands.
 //!
-//! These value types own argv construction, labels, preview summaries, exact
-//! revset/fileset quoting, and direct execution for user-confirmed mutation
-//! flows. Rendered row loading and view-spec command construction stay in
+//! These value types own argv construction, labels, preview summaries, and
+//! direct execution for user-confirmed mutation flows. Syntax quoting helpers
+//! stay in [`crate::jj_syntax`]; rendered row loading stays in
+//! [`crate::jj_rows`] and view-spec command construction stays in
 //! [`crate::jj`].
 
 use color_eyre::Result;
