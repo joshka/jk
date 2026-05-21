@@ -4,6 +4,8 @@
 //! come only from the separate workspace metadata template, so future actions
 //! do not have to depend on label parsing.
 
+mod rows;
+
 use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -13,10 +15,13 @@ use ratatui::widgets::{List, ListItem, ListState, Paragraph};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::ViewSpec;
-use crate::jj_rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;
+
+#[cfg(test)]
+pub(crate) use rows::WORKSPACE_METADATA_TEMPLATE;
+pub(crate) use rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),

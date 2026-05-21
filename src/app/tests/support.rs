@@ -29,12 +29,13 @@ pub(super) use crate::jj_actions::{
 };
 #[allow(unused_imports)]
 pub(super) use crate::jj_rows::{
-    FileListItem, LogItem, ResolveEntry, WorkspaceContext, WorkspaceItem, document_plain_text,
-    load_compact_log_context, load_entries, load_file_list_entries, load_resolve_entries,
-    load_workspace_context,
+    FileListItem, LogItem, ResolveEntry, document_plain_text, load_compact_log_context,
+    load_entries, load_file_list_entries, load_resolve_entries,
 };
 pub(super) use crate::tui::Overlay;
 pub(super) use crate::view_state::ViewState;
+#[allow(unused_imports)]
+pub(super) use crate::workspaces::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 pub(super) use color_eyre::Result;
 pub(super) use color_eyre::eyre::eyre;
 pub(super) use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
@@ -377,9 +378,11 @@ pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
         JjCommand::Bookmarks => {
             ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![]))
         }
-        JjCommand::Workspaces => ViewState::Workspaces(
-            crate::workspaces::WorkspacesView::test_new(crate::jj_rows::WorkspaceContext::default()),
-        ),
+        JjCommand::Workspaces => {
+            ViewState::Workspaces(crate::workspaces::WorkspacesView::test_new(
+                crate::workspaces::WorkspaceContext::default(),
+            ))
+        }
         JjCommand::OperationLog => {
             ViewState::OperationLog(crate::operation_log::OperationLogView::test_new(vec![]))
         }

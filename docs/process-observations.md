@@ -5,6 +5,48 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Workspace row feature-root migration)
+
+- Slice / task: move workspace rendered-row loading and metadata pairing out of the generic
+  `jj_rows` bucket and into the `workspaces` feature root.
+- Worker thread id: `019e4b2b-5072-73e2-a2e1-f13cc741cfb5`.
+- Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The main
+  thread kept jj orchestration, reviewed the boundary, and reran validation.
+- Implementation outcome: `src/workspaces/rows.rs` now owns `WorkspaceContext`, `WorkspaceItem`,
+  `load_workspace_context`, `WORKSPACE_METADATA_TEMPLATE`, workspace metadata parsing and pairing,
+  root/list/metadata degradation, and the existing fail-closed workspace row tests.
+- Boundary evidence: `src/workspaces.rs` declares `mod rows;` and re-exports the workspace row
+  surface for crate-local callers and tests. `src/jj_rows.rs` no longer declares or re-exports a
+  workspace submodule and keeps shared rendered-row helpers such as `line_text`, `string_field`, and
+  `non_empty_string_field`.
+- Caller evidence: `src/app/tests/support.rs` now re-exports workspace row fixtures from
+  `crate::workspaces`; `src/jj.rs` tests import `WORKSPACE_METADATA_TEMPLATE` from
+  `crate::workspaces` while resolve templates remain under `jj_rows`.
+- Rework / surprise: `just md-check` initially failed only on Panache wrapping in this process note
+  and the source maintainability ledger; `just md-fmt` applied those wrapping changes.
+- Validation trail:
+  - `cargo test workspaces -- --test-threads=1` passed with 11 passed.
+  - `cargo test jj_rows -- --test-threads=1` passed with 16 passed.
+  - `cargo test command_navigation -- --test-threads=1` passed with 35 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed after applying Panache wrapping.
+- Main-thread review validation passed: `cargo test workspaces -- --test-threads=1` with 11 passed;
+  `cargo test jj_rows -- --test-threads=1` with 16 passed;
+  `cargo test command_navigation -- --test-threads=1` with 35 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 08:37:04 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b2b-5072-73e2-a2e1-f13cc741cfb5` from the worker handoff.
+  - Files: `src/workspaces.rs`, `src/workspaces/rows.rs`, `src/jj_rows.rs`, `src/jj.rs`,
+    `src/app/tests/support.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
+    note.
+
 ### 2026-05-21 (Bookmark row feature-root migration)
 
 - Slice / task: move bookmark rendered-row loading and metadata pairing out of the generic `jj_rows`

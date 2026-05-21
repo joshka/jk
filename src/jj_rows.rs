@@ -6,8 +6,6 @@
 //! process boundary stay in `jj.rs`.
 
 mod revisions;
-mod workspaces;
-
 use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
 use ratatui::text::Line;
@@ -16,9 +14,6 @@ use serde_json::Value;
 use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
 
 pub use self::revisions::{LogItem, load_compact_log_context, load_entries};
-#[cfg(test)]
-pub(crate) use self::workspaces::WORKSPACE_METADATA_TEMPLATE;
-pub use self::workspaces::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 pub(crate) const RESOLVE_CONFLICT_TEMPLATE: &str = r#"self.conflicted_files().map(|entry| "{\"path\":" ++ json(entry.path()) ++ ",\"file_type\":" ++ json(entry.file_type()) ++ ",\"side_count\":" ++ json(entry.conflict_side_count()) ++ "}\n").join("")"#;
 
 /// One selectable file item parsed from rendered file-list output.

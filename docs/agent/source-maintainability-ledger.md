@@ -77,6 +77,19 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 workspace row migration:
+
+- `src/workspaces/rows.rs` contains `WorkspaceContext`, `WorkspaceItem`, `load_workspace_context`,
+  `WORKSPACE_METADATA_TEMPLATE`, workspace metadata parsing, row pairing, root/list/metadata
+  degradation, and the workspace row tests that previously lived under `jj_rows`.
+- `src/workspaces.rs` declares `mod rows;` and re-exports the workspace row context, item, loader,
+  and test-only metadata template for crate-local app/view/jj tests.
+- `src/jj_rows.rs` no longer declares a workspace submodule or re-exports workspace row types. It
+  keeps shared rendered-row helpers such as `line_text` and JSON field helpers because revision,
+  resolve, file-list, and feature-owned row loaders still use them.
+- `src/app/tests/support.rs` and `src/jj.rs` tests now reference workspace row/context/template
+  ownership through `crate::workspaces::...`, so tests point at the feature owner.
+
 2026-05-21 bookmark row migration:
 
 - `src/bookmarks/rows.rs` contains `BookmarkItem`, `BookmarkRowState`, `LocalBookmarkRemoteState`,

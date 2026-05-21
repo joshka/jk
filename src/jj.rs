@@ -478,8 +478,9 @@ mod tests {
 
     use super::*;
     use crate::jj_actions::JjGitFetch;
-    use crate::jj_rows::{RESOLVE_CONFLICT_TEMPLATE, WORKSPACE_METADATA_TEMPLATE};
+    use crate::jj_rows::RESOLVE_CONFLICT_TEMPLATE;
     use crate::operation_log::OPERATION_ID_TEMPLATE;
+    use crate::workspaces::WORKSPACE_METADATA_TEMPLATE;
 
     #[test]
     fn bookmark_list_command_uses_bookmark_words_and_labels() {
