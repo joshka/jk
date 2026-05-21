@@ -12,9 +12,15 @@ md-check:
     panache format --check README.md AGENTS.md docs
     panache lint --check README.md AGENTS.md docs
 
-check: fmt md-check
+check: fmt md-check packet-check
     cargo check
     cargo test
+
+packet-check: largest-rust-files
+    cargo clippy -- -D warnings
+
+largest-rust-files:
+    @rg --files src -g '*.rs' | while IFS= read -r file; do printf '%s\t%s\n' "$(wc -l < "$file")" "$file"; done | sort -nr | head -n 20
 
 test:
     cargo test

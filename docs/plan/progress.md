@@ -33,8 +33,10 @@
 - Remaining risk: workspace row metadata relies on row-order pairing between rendered
   `jj workspace list` output and the metadata template stream. Per-workspace roots are not exact in
   this packet; only the current root from `jj root` is exact.
-- Next recommended slice: Packet 42: Tag List Read Surface. The separate gpt-5.5 review accepted
-  Packet 41 with no blockers, so Packet 42 is next.
+- Next recommended slice: Packet 41 was accepted, feature throughput paused, and the immediate
+  follow-up moved to maintainability correction. The overlay-collapse and packet-quality gate
+  changes are the corrective follow-ups, and future feature packets such as Packet 42 remain paused
+  until explicitly resumed.
 
 ## Packet 40: File Track/Untrack/Chmod Actions
 

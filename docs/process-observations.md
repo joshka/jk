@@ -5,6 +5,33 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Packet quality gate)
+
+- Slice / task: add a mechanical packet-quality gate so the local `just` workflow and agent docs
+  agree on Rust validation and maintainability pressure.
+- Thread id: `019e487a-bf79-75f3-8bce-8d9e4c2db007`.
+- Model / routing: gpt-5.4-mini.
+- Implementation outcome: `just check` now depends on `packet-check`, which runs
+  `cargo clippy -- -D warnings` and the new `largest-rust-files` recipe before `cargo check` and
+  `cargo test`. `largest-rust-files` reports the top 20 Rust source files by line count from `src/`.
+- Documentation outcome: `AGENTS.md` now lists `just check`, `just packet-check`, and
+  `just largest-rust-files`. `docs/agent/workflow.md` now names `just check` as the repository
+  equivalent Rust gate.
+- Validation run:
+  - `just --list`
+  - `just largest-rust-files`
+  - `just packet-check`
+  - `just md-fmt`
+  - `just md-check`
+  - `just check`
+  - `just packet-check` passed with the size report and `cargo clippy -- -D warnings`
+  - `just md-check` passed after formatting `docs/agent/workflow.md`
+  - `just check` passed with `cargo clippy -- -D warnings`, `cargo check`, and `cargo test` with 517
+    passed / 2 ignored
+- Evidence basis:
+  - Date: `2026-05-20 20:01:33 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `Justfile`, `AGENTS.md`, `docs/agent/workflow.md`, and `docs/process-observations.md`
+
 ### 2026-05-20 (Action output overlay collapse)
 
 - Slice / task: implement the first maintainability corrective packet to collapse duplicate
@@ -66,6 +93,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Review / validation outcome: the separate gpt-5.5 review `019e486b-5489-7803-b130-13cee2eda8fa`
   found no blockers and accepted Packet 41. Main orchestration reran validation, including
   `just check`, with 513 passed / 2 ignored.
+- Documentation cross-reference: `docs/plan/progress.md` now records Packet 41 as accepted, pauses
+  Packet 42, and points the immediate follow-up at the maintainability corrective packets.
 - Evidence basis:
   - Date: `2026-05-20 19:40:18 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Files: `src/workspaces.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/view_state.rs`,

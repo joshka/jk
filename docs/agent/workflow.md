@@ -59,8 +59,8 @@ While editing:
 Before handoff:
 
 - run focused tests for the touched behavior;
-- for Rust changes, run `cargo clippy -- -D warnings` or the repository's documented equivalent, and
-  list the exact blockers if clippy is not clean;
+- for Rust changes, run `cargo clippy -- -D warnings` or the repository's documented equivalent such
+  as `just check`, and list the exact blockers if clippy is not clean;
 - run a `cargo run` smoke when it is practical for the change, and state whether that smoke was
   warning-free or why it was skipped;
 - run `just check` when practical;

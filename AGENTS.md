@@ -170,7 +170,10 @@ improves the reader path for a concrete change.
 
 Use the repository `just` commands:
 
-- `just check`: run nightly rustfmt, Panache Markdown checks, `cargo check`, and `cargo test`.
+- `just check`: run nightly rustfmt, Panache Markdown checks, `cargo check`, `cargo test`,
+  `cargo clippy -- -D warnings`, and the largest Rust source file report.
+- `just packet-check`: run the clippy gate and largest Rust source file report.
+- `just largest-rust-files`: print the top 20 Rust source files by line count.
 - `just fmt`: run `rustup run nightly cargo fmt`.
 - `just md-fmt`: run `panache format README.md AGENTS.md docs`.
 - `just md-check`: run Panache format and lint checks for Markdown.
