@@ -5,6 +5,37 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Row extraction reassessment)
+
+- Slice / task: reassess the remaining source maintainability queue after the ViewSpec, revision
+  action-menu, and status hint projection packets landed.
+- Thread id: `019e49f1-a3ce-71b2-84d6-9c8589f9cc42`.
+- Model / routing: GPT-5 Codex worker/subagent with medium reasoning performed a docs-only
+  reassessment. The user explicitly prohibited jj/git commands, so the work used normal shell
+  measurements and direct file reads only.
+- Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
+- Evidence gathered: `just largest-rust-files`, `wc -l src/*.rs src/jj_rows/*.rs`, local date and
+  `CODEX_THREAD_ID`, plus direct reads of `AGENTS.md`,
+  `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+  `docs/agent/rust-style.md`, `src/jj_rows.rs`, `src/jj_rows/bookmarks.rs`,
+  `src/jj_rows/operations.rs`, `src/jj_rows/workspaces.rs`, `src/graph.rs`, `src/jj_actions.rs`,
+  `src/tui.rs`, and `src/bookmarks.rs`.
+- Reassessment outcome: the stale 1440-line `src/jj.rs` and 1299-line `src/jj_rows.rs` snapshots
+  were replaced with current evidence. `src/jj_rows.rs` is now 760 lines, with extracted bookmark,
+  operation, and workspace row-family siblings. The only still-coherent row-family extraction is a
+  bounded graph revision row packet owned by a future `src/jj_rows/revisions.rs`; resolve rows,
+  file-list rows, shared JSON helpers, facade re-exports, and the current large view/action modules
+  should pause until product work exposes a sharper boundary.
+- Process observation: after several successful extraction packets, stale size evidence can keep an
+  old refactor queue alive longer than the code shape warrants. Reassessment entries should lead
+  with current measurements and explicitly retire candidates that no longer have an owner.
+- Validation trail:
+  - `just md-check` passed after the docs update.
+- Evidence basis:
+  - Date: `2026-05-21 03:08:11 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context listed above
+
 ### 2026-05-21 (Status hint projection extraction)
 
 - Slice / task: extract status-bar hint vocabulary and width-fit projection from broad `src/tui.rs`.

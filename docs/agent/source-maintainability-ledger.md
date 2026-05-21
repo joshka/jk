@@ -4,10 +4,10 @@ This ledger records the current bounded follow-up packets after the completed bo
 help projection, and path action-menu refactoring slices. It is not a standing "split the biggest
 files" queue. Reassess with fresh measurements before starting another source-shape packet.
 
-Current evidence comes from the 2026-05-21 reassessment packet on the
-`Reassess source maintainability queue` docs change: `just largest-rust-files`, `wc -l` over likely
-hotspots, cheap visibility and control-flow scans, and direct reads of the cited source files
-together with [`architecture.md`](architecture.md) and [`rust-style.md`](rust-style.md).
+Current evidence comes from the 2026-05-21 row-extraction reassessment packet:
+`just largest-rust-files`, `wc -l src/*.rs src/jj_rows/*.rs`, direct reads of the row loaders and
+current large modules, and the ownership rules in [`architecture.md`](architecture.md) and
+[`rust-style.md`](rust-style.md).
 
 ## Quality Bar
 
@@ -44,89 +44,46 @@ together with [`architecture.md`](architecture.md) and [`rust-style.md`](rust-st
 Those packets closed the previous bookmark-, rewrite-, help-, and path-heavy queue. The next work
 should start from the current hotspots instead of replaying the old priority order.
 
-### Current Size Snapshot
+### Current Source-Shape Snapshot
 
-Current largest Rust files from `just largest-rust-files`:
+Current largest Rust files from `just largest-rust-files` on 2026-05-21:
 
 ```text
-1440 src/jj.rs
-1299 src/jj_rows.rs
 1218 src/graph.rs
 1192 src/app/tests/bookmark_actions.rs
 1159 src/jj_actions.rs
-1134 src/tui.rs
-1028 src/action_menu.rs
+ 976 src/tui.rs
  973 src/bookmarks.rs
  876 src/jj_rows/bookmarks.rs
  833 src/jj_actions/bookmarks.rs
  820 src/status.rs
-```
-
-Direct source checks after the help and path extractions:
-
-```text
-1440 src/jj.rs
-1299 src/jj_rows.rs
-1218 src/graph.rs
-1134 src/tui.rs
-1028 src/action_menu.rs
- 973 src/bookmarks.rs
+ 797 src/jj/view_spec.rs
+ 778 src/app/tests/working_copy_actions.rs
+ 778 src/app/mode_input.rs
+ 773 src/jj.rs
+ 760 src/jj_rows.rs
+ 743 src/action_menu/revision_actions.rs
+ 705 src/sticky_file_view.rs
  642 src/help.rs
+ 639 src/jj_actions/working_copy.rs
  632 src/command.rs
- 246 src/action_menu/path_actions.rs
+ 628 src/app_screen.rs
+ 613 src/diff.rs
 ```
 
-The completed extractions changed the old hotspots materially:
+Current row-family line counts from `wc -l src/*.rs src/jj_rows/*.rs`:
 
 ```text
-before help extraction: 1255 src/command.rs
- after help extraction:  632 src/command.rs, 642 src/help.rs
-before path extraction: 1246 src/action_menu.rs
- after path extraction: 1028 src/action_menu.rs, 246 src/action_menu/path_actions.rs
+876 src/jj_rows/bookmarks.rs
+760 src/jj_rows.rs
+338 src/jj_rows/workspaces.rs
+251 src/jj_rows/operations.rs
 ```
 
-Large files alone do not justify a packet. They only nominate surfaces to inspect for mixed concepts
-and high live context.
-
-### Current Visibility Snapshot
-
-Cheap `rg`-style counts found these visibility totals across `src/**/*.rs`:
-
-- all `pub` lines: 1172
-- restricted visibility lines (`pub(crate)`, `pub(super)`, `pub(in ...)`): 401
-
-Top files by `pub` count:
-
-- `src/app/services.rs`: 112
-- `src/app/tests/support.rs`: 97
-- `src/jj_actions.rs`: 84
-- `src/jj_rows.rs`: 54
-- `src/jj_actions/working_copy.rs`: 47
-- `src/jj.rs`: 47
-- `src/action_menu.rs`: 45
-- `src/sticky_file_view.rs`: 44
-
-These counts are measurement only. They are useful when they line up with a concept boundary, not as
-a goal by themselves.
-
-### Current Control-Flow Snapshot
-
-Cheap token scans over production files found these current hotspots:
-
-- `src/app/mode_input.rs`: 58
-- `src/jj.rs`: 50
-- `src/action_menu.rs`: 35
-- `src/app/action_lifecycle/completion.rs`: 34
-- `src/command.rs`: 32
-- `src/jj_rows.rs`: 31
-- `src/tui.rs`: 29
-- `src/jj_actions.rs`: 29
-- `src/bookmarks/action_targets.rs`: 28
-- `src/app.rs`: 28
-
-The current next slices come from where these counts overlap with mixed ownership during direct
-reads. `src/graph.rs`, `src/tui.rs`, and `src/bookmarks.rs` are still large, but the next packet
-should have an owner and a contract, not a line-count target.
+The old 1440-line `src/jj.rs` and 1299-line `src/jj_rows.rs` measurements are stale. ViewSpec,
+operation rows, workspace rows, revision action-menu policy, and status hint projection changed the
+largest-file picture materially. The remaining source-shape pressure is now mostly view/action
+cohesion, not a single obvious "split the biggest file" queue.
 
 ## Completed Current Slices
 
@@ -254,40 +211,64 @@ should have an owner and a contract, not a line-count target.
   existing status chrome snapshots; final gate commands are recorded in
   `docs/process-observations.md`.
 
-## Current Next Slices
+## Current Row Extraction Reassessment
 
-### 1. Remaining Rendered Row Loader And Metadata Packets
+`src/jj_rows.rs` still has one coherent extractable row-family concept: graph revision rows.
 
-- Owner: `src/jj_rows.rs`, with likely new siblings under `src/jj_rows/` beside
-  `src/jj_rows/bookmarks.rs`.
-- Purpose: continue splitting row loading and metadata pairing by rendered row family only when a
-  remaining family has a clear owner and focused contract.
-- Evidence: `src/jj_rows.rs` is 760 lines after bookmark metadata, operation rows, and workspace
-  rows were moved out. The remaining parent now mostly owns graph revision grouping, resolve-entry
-  parsing, file-list path preservation, shared JSON field helpers, and facade re-exports.
-- Non-goals: do not change rendered ANSI conversion, graph revision grouping, bookmark rows, file
-  list path preservation, or the process boundary in `src/jj.rs`. Do not broaden parsing beyond the
-  current narrow metadata templates.
-- Proof: focused row-family tests for any chosen packet, plus `cargo check`,
-  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Candidate owner: `src/jj_rows/revisions.rs`
+- Move: `LogItem`, `load_entries`, `load_compact_log_context`, `run_jj_with_template`,
+  `RevisionMetadata`, revision metadata parsing, and `group_lines` for rendered graph rows.
+- Keep in parent for now: facade re-exports, `document_plain_text`, `line_text`, JSON field helpers,
+  `RowMetadata`, `first_content_char`, and `is_standalone_graph_line` while operation rows still
+  share that drift and graph-line classification policy.
+- Proof: the moved revision grouping/parser tests currently at the bottom of `src/jj_rows.rs`,
+  `cargo test jj_rows -- --test-threads=1`, and at least one graph-focused test command such as
+  `cargo test graph -- --test-threads=1`.
 
-## Not The Next Packet
+The remaining candidates from the prior ledger are not good standalone packets right now:
 
-- `src/graph.rs`: still large at 1218 lines, but the remaining direct read is one view contract:
-  bindings, selection, search, refresh, mode switching, graph-to-detail navigation, and opening the
-  action menu. The action-menu projection itself belongs in `src/action_menu.rs`, not another graph
-  split.
-- `src/bookmarks.rs`: still large at 973 lines, but much of that is focused tests around bookmark
-  action-target safety. The production view now delegates target resolution to
-  `src/bookmarks/action_targets.rs`; another split should wait for new bookmark view behavior, not
-  happen only because tests are long.
-- `src/tui.rs` overlay rendering as a whole: still cohesive around shared chrome after the
-  status-hint packet. A broad overlay split is not yet justified without a concrete overlay owner
-  and snapshot proof.
-- `src/jj_actions.rs`: still visible in the largest-file list at 1159 lines, but the current shape
-  is a facade over already extracted bookmark, rewrite, sync, working-copy, and operation action
-  clusters. Do not start another `jj_actions` split until a remaining mutation-plan family presents
-  a narrower owner.
-- `src/app/services.rs`: has the highest `pub` count in the cheap scan, but that visibility is a
-  test-service seam, not evidence of mixed production concepts. Do not optimize the count without a
-  concrete service-boundary problem.
+- Resolve-entry parsing is tiny and has no sibling behavior beyond its template, parser, and three
+  tests. Extracting it would create a small file but not reduce meaningful live context.
+- File-list path preservation is even smaller: one item type, one loader, exact path preservation,
+  and two focused tests. Wait until file-list behavior grows beyond "rendered row plus exact path."
+- Shared JSON helpers are reused by bookmark, workspace, and resolve metadata parsing, but their
+  current home is acceptable. A helper module would make readers jump for simple field accessors.
+- Facade re-exports are intentional. They keep callers stable after row-family splits and should not
+  become a separate source-shape packet.
+
+The recommended next implementation packet is therefore one bounded revision-row extraction. After
+that packet, pause `src/jj_rows` source-shape work unless a product feature expands resolve rows,
+file-list rows, or metadata pairing enough to expose a sharper boundary.
+
+## Other Large Files
+
+- `src/graph.rs` is the largest production file at 1218 lines, but the direct read still shows one
+  cohesive view: bindings, selection, search, refresh, log-mode switching, exact revision selection,
+  copy options, graph-to-detail navigation, and graph action-menu opening. The long test tail mostly
+  proves those view contracts. Do not split it only for size; revisit if explicit multi-revision
+  selection or graph action-menu behavior grows enough to deserve a `graph/selection.rs`-style
+  owner.
+- `src/jj_actions.rs` is 1159 lines and already a facade over extracted bookmark, git-sync,
+  operation, rewrite, and working-copy action clusters. The remaining parent owns
+  description/commit, restore, file mutation, revert, and abandon plans. A future file-mutation or
+  abandon-confirmation packet may be valid if product work changes those flows, but there is no
+  docs-only reason to split it now.
+- `src/tui.rs` is 976 lines after status hints moved out. It still owns shared chrome and overlay
+  rendering. The only plausible future split is a concrete overlay family, such as action-output and
+  abandon-confirmation rendering, with snapshot proof. Do not start a broad overlay split.
+- `src/bookmarks.rs` is 973 lines, but production code is compact and the large tail is focused
+  bookmark safety tests. The existing `src/bookmarks/action_targets.rs` boundary handles the
+  nontrivial target-selection policy. Leave this alone until bookmark view behavior changes.
+
+## Next Worker Guidance
+
+The next source-shape worker should either:
+
+1. Extract the revision-row family into `src/jj_rows/revisions.rs` with the owner, non-goals, and
+   proof above.
+1. Pause source-shape refactoring and take product work if the desired next work is not specifically
+   revision-row extraction.
+
+The next worker should not extract resolve rows, file-list rows, JSON helpers, facade re-exports, or
+large view modules merely to reduce line counts. It should preserve rendered `jj` output, ANSI
+conversion, metadata drift behavior, graph-row grouping, and all caller-facing row facades.
