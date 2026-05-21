@@ -2227,3 +2227,61 @@
 - Next potential refactor: if `src/app/action_lifecycle/preview.rs` grows, the next candidate is
   naming and ownership around the immediate action paths rather than another broad app split.
 - Validation: `just md-check`
+
+## Packet 39: Bookmark Track/Untrack Flows
+
+- Files changed: `src/app.rs`, `src/app/action_lifecycle/entry.rs`, `src/app/mode_input.rs`,
+  `src/app/tests/bookmark_actions.rs`, `src/app/tests/command_navigation.rs`, `src/bookmarks.rs`,
+  `src/command.rs`, `src/jj.rs`, `src/jj_actions.rs`, `docs/plan/command-inventory.md`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
+  `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/workflows/sync.md`, and
+  `docs/process-observations.md`.
+
+- Behavior: the bookmarks view now exposes preview-first `bt` bookmark track and `bu` bookmark
+  untrack flows. The commands always use exact remote-scoped argv:
+  `jj bookmark track --remote exact:"<remote>" exact:"<bookmark>"` and
+  `jj bookmark untrack --remote exact:"<remote>" exact:"<bookmark>"`.
+
+- Safety gates: remote rows use typed selected-row metadata and stay exact even when the bookmarks
+  view is filtered. Local rows require unfiltered all-remotes metadata, exactly one local row, and
+  exactly one typed eligible remote sibling with matching target metadata. Local-only, already
+  tracked/untracked in the wrong direction, unknown metadata, targetless rows, target drift,
+  ambiguous local rows, ambiguous remote siblings, and visible-only local contexts fail closed with
+  status text.
+
+- Output behavior: previews name the local bookmark, remote bookmark, remote, exact remote and
+  bookmark patterns, visible/tracking state, effect, confirmation policy, full-output visibility,
+  and `jj undo` / `jj op show -p` recovery/review paths. Success and failure output remains in the
+  existing scrollable `ActionOutput` surface, and success refreshes the bookmarks view through the
+  shared bookmark mutation completion path.
+
+- Proof: disposable repo `/tmp/jk-packet39-proof` with local remotes `/tmp/jk-packet39-origin.git`
+  and `/tmp/jk-packet39-upstream.git` verified untrack, track, remote-only track after local forget,
+  undo, and two-remote exactness. Commands were run with cwd set to `/tmp/jk-packet39-proof`. The
+  exact untrack command for origin made only `feature/name@origin` untracked while `@upstream`
+  stayed tracked. The exact track command for origin re-tracked only origin. After local forget,
+  both remote rows were remote-only; tracking origin again recreated the local tracked bookmark for
+  origin while `feature/name@upstream` stayed remote-only. `jj --no-pager undo` returned to the
+  remote-only state.
+
+- Validation: `cargo check`; focused `cargo test bookmark_track`; focused
+  `cargo test bookmark_untrack`; focused `cargo test app::tests::bookmark_actions`; focused
+  `cargo test bookmarks::tests::bookmark_tracking_targets`; focused
+  `cargo test command::tests::project_help_exposes_bookmark_mutations_only_in_honest_contexts`;
+  focused
+  `cargo test app::tests::command_navigation::multi_key_bookmark_create_dispatches_without_typing_prefix_suffix`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; full
+  `cargo test` passed with 488 passed / 2 ignored; `just md-check`; `just check`; disposable `/tmp`
+  jj proof above.
+
+- Remaining risk: the local-row proof still depends on row-order paired Packet 36 bookmark metadata
+  and an unfiltered all-remotes bookmark view. Remote rows are safer because the mutation command
+  names both the exact bookmark and exact remote, but targetless or visibly drifted peer metadata
+  still fails closed rather than attempting repair.
+
+- Review note: gpt-5.5 high final review found no blockers and accepted the `src/bookmarks.rs`
+  growth as coherent for this slice; future extraction only if more bookmark mutation gating
+  accumulates.
+
+- Next recommended slice: Packet 40: File Track/Untrack/Chmod Actions. Keep any local-row
+  all-remotes ergonomics as a subordinate follow-up if they still need a dedicated pass.

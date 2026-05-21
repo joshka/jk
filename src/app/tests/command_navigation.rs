@@ -401,7 +401,7 @@ fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
         .unwrap();
     assert!(app.pending_command.is_some());
-    assert_eq!(app.status.message(), "prefix: b -> c/r/f");
+    assert_eq!(app.status.message(), "prefix: b -> c/r/f/t/u");
 
     app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
         .unwrap();

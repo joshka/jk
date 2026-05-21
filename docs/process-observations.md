@@ -3645,3 +3645,60 @@ belong here.
   - Files: `src/app.rs`, `src/app/mode_input.rs`, `src/app/tests/command_navigation.rs`,
     `src/command.rs`, `src/graph.rs`, `src/theme.rs`, `src/tui.rs`, `docs/plan/progress.md`,
     `docs/process-observations.md`
+
+### 2026-05-20 (Packet 39 bookmark track/untrack)
+
+- Slice / task: implement Packet 39 bookmark track/untrack flows in
+  `spoutvku Add bookmark track untrack flows`.
+- Thread id: `019e4821-6a7a-7e53-bf2f-91e7c4d18130`.
+- Model / routing: gpt-5.5 high by user request because the change crossed bookmark metadata gating,
+  command construction, app action lifecycle, keybinding discovery, tests, docs, and disposable jj
+  proof.
+- Prior audit facts used: installed jj is `0.41.0`; `jj bookmark track` and `jj bookmark untrack`
+  accept bookmark string patterns and optional repeated `--remote <REMOTE>` string patterns;
+  omitting `--remote` applies all matching remotes and is too broad for guided UI.
+- Observable outcome: `bt` and `bu` now open bookmark track/untrack previews from the bookmarks
+  view. Command construction is always remote-scoped with `--remote exact:"<remote>"` plus
+  `exact:"<bookmark>"`, using the shared exact string-pattern builder for both names.
+- Safety outcome: local rows require unfiltered all-remotes metadata and exactly one typed eligible
+  remote sibling. Unknown metadata, targetless rows, metadata drift, ambiguous local rows, ambiguous
+  remote siblings, local-only rows, visible-only local contexts, already-tracked track, and
+  already-untracked untrack fail closed with status messages. Remote rows remain usable in filtered
+  views because the command carries exact bookmark and exact remote patterns.
+- Proof outcome: disposable repo `/tmp/jk-packet39-proof` with remotes `/tmp/jk-packet39-origin.git`
+  and `/tmp/jk-packet39-upstream.git` verified untrack, track, remote-only track after local forget,
+  undo, and two-remote exactness with all mutating proof commands run from the proof repo cwd.
+- Final 5.5 review outcome: no findings or blockers. The reviewer ran focused tests, full
+  `cargo test`, `just md-check`, `rustup run nightly cargo fmt --check`, and `cargo check`; they did
+  not run `just check` because of read-only constraints.
+- Final review acceptance note: the reviewer accepted the `src/bookmarks.rs` growth as coherent for
+  this slice and only flagged future extraction if more bookmark-mutation gating accumulates.
+- Main-thread local validation after review: `cargo check`; `cargo test bookmark_track`;
+  `cargo test bookmark_untrack`; `cargo clippy -- -D warnings`; full `cargo test` passed with 488
+  passed / 2 ignored; `rustup run nightly cargo fmt --check`; `just md-check`; and `just check`.
+- Validation trail: `cargo check`; `cargo test bookmark_track`; `cargo test bookmark_untrack`;
+  `cargo test app::tests::bookmark_actions`;
+  `cargo test bookmarks::tests::bookmark_tracking_targets`;
+  `cargo test command::tests::project_help_exposes_bookmark_mutations_only_in_honest_contexts`;
+  `cargo test app::tests::command_navigation::multi_key_bookmark_create_dispatches_without_typing_prefix_suffix`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; full `cargo test` passed
+  with 488 passed / 2 ignored; `just md-check`; `just check`.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/bookmarks.rs`, `src/jj_actions.rs`, `src/jj.rs`, `src/app.rs`,
+    `src/app/action_lifecycle/entry.rs`, `src/app/mode_input.rs`,
+    `src/app/tests/bookmark_actions.rs`, `src/app/tests/command_navigation.rs`, `src/command.rs`,
+    `docs/plan/fragility-register.md`, `docs/plan/workflows/sync.md`,
+    `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/command-inventory.md`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (App refactor audit before Packet 39)
+
+- A prior gpt-5.5 high read-only audit found no blocking app refactor needed before Packet 39. The
+  stable observation recorded in `docs/plan/progress.md` is that `src/app.rs` was about 511 LOC and
+  still owned app orchestration, key dispatch, and `ViewEffect` routing coherently.
+- The audit's recommended next refactor trigger was growth in `src/app/action_lifecycle/preview.rs`,
+  with the likely extraction around immediate action paths rather than another broad app split.
+  Packet 39 did not add a new modal or preview surface; it reused the existing bookmark mutation
+  preview/completion path.

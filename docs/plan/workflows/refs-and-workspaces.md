@@ -16,12 +16,13 @@ Shipped today:
 - `bookmark rename`
 - `bookmark delete`
 - `bookmark forget`
+- `bookmark track`
+- `bookmark untrack`
 - file list/show
 - resolve
 
 Planned follow-ups:
 
-- bookmark track/untrack
 - tag list/set/delete
 - file search/annotate/track/untrack/chmod
 - workspace root/list/add/rename/forget/update-stale
@@ -31,6 +32,7 @@ Planned follow-ups:
 - focused utility screens
 - actions launched from the relevant utility context
 - minimal chrome and no dashboard framing
+- remote-tracking mutations are exact bookmark-row actions, not parsed `name@remote` labels
 
 ## Acceptance Criteria
 

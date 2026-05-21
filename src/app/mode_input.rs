@@ -720,5 +720,10 @@ fn bookmark_mutation_plan(
         JjBookmarkMutationKind::Forget => {
             unreachable!("bookmark forget uses the selected bookmark row and has no prompt target")
         }
+        JjBookmarkMutationKind::Track | JjBookmarkMutationKind::Untrack => {
+            unreachable!(
+                "bookmark track/untrack uses selected bookmark rows and has no prompt target"
+            )
+        }
     }
 }

@@ -297,6 +297,64 @@ impl App {
         self.open_bookmark_mutation_preview(JjBookmarkMutationPlan::forget(name, target));
     }
 
+    pub(in crate::app) fn open_bookmark_tracking_preview(&mut self, kind: JjBookmarkMutationKind) {
+        let (name, target) = match &self.view {
+            ViewState::Bookmarks(view) => match view.selected_bookmark_tracking_target(kind) {
+                Ok(Some((name, target))) => (name.to_owned(), target),
+                Ok(None) => {
+                    self.status = StatusLine::error(
+                        &self.view,
+                        format!(
+                            "bookmark {} is only available from bookmarks view",
+                            kind.label()
+                        ),
+                    );
+                    return;
+                }
+                Err(error) => {
+                    self.status = StatusLine::error(&self.view, error.to_string());
+                    return;
+                }
+            },
+            ViewState::Graph(_)
+            | ViewState::Show(_)
+            | ViewState::Diff(_)
+            | ViewState::Status(_)
+            | ViewState::Resolve(_)
+            | ViewState::FileList(_)
+            | ViewState::FileShow(_)
+            | ViewState::OperationLog(_)
+            | ViewState::OperationDetail(_) => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    format!(
+                        "bookmark {} is only available from bookmarks view",
+                        kind.label()
+                    ),
+                );
+                return;
+            }
+        };
+
+        let mutation = match kind {
+            JjBookmarkMutationKind::Track => JjBookmarkMutationPlan::track(name, target),
+            JjBookmarkMutationKind::Untrack => JjBookmarkMutationPlan::untrack(name, target),
+            JjBookmarkMutationKind::Create
+            | JjBookmarkMutationKind::Set
+            | JjBookmarkMutationKind::Move
+            | JjBookmarkMutationKind::Rename
+            | JjBookmarkMutationKind::Delete
+            | JjBookmarkMutationKind::Forget => {
+                self.status = StatusLine::error(
+                    &self.view,
+                    "bookmark tracking preview requires track or untrack".to_owned(),
+                );
+                return;
+            }
+        };
+        self.open_bookmark_mutation_preview(mutation);
+    }
+
     pub(in crate::app) fn open_bookmark_rename_prompt(&mut self) {
         let old_name = match self.view.selected_local_bookmark_name_for("rename") {
             Ok(Some(name)) => name.to_owned(),

@@ -11,9 +11,6 @@ Shipped today:
 - `git fetch`
 - `git push`
 - bookmark create/set/move/delete
-
-Planned follow-ups:
-
 - bookmark track/untrack
 
 Passthrough commands:
@@ -40,6 +37,20 @@ Expected behavior:
 - avoid confirmation unless the command shape becomes unusual.
 
 Push is different. It should preview the destination and affected refs before running.
+
+## Bookmark Track And Untrack
+
+Bookmark track/untrack are shipped as preview-first actions from the bookmarks view:
+
+- `bt` tracks the exact selected remote bookmark or a proven local row with exactly one eligible
+  untracked remote sibling.
+- `bu` untracks the exact selected tracked remote bookmark or a proven local row with exactly one
+  eligible tracked remote sibling.
+- both commands are always remote-scoped with `--remote exact:"<remote>"` and an exact bookmark
+  string pattern.
+
+The flow intentionally stays a guided ref maintenance action, not a remote dashboard. It does not
+handle host state, branch protection, credentials, force-push policy, or broad remote inference.
 
 ## Acceptance Criteria
 

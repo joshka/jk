@@ -99,8 +99,11 @@ or stay deferred until the exact target, preview, and recovery story is obvious.
 - `bookmark forget`: `guided flow`. Shipped from metadata-proven local tracked or remote-backed
   bookmark rows as `bf`; remote-only forget requires unfiltered `--all-remotes` metadata proving one
   remote peer and no local peer.
-- `bookmark track`: `planned`. Tracking-state metadata still needs a stronger contract.
-- `bookmark untrack`: `planned`. Same tracking-state gap as track.
+- `bookmark track`: `guided flow`. Shipped from bookmarks view as `bt`; commands always pass
+  `--remote exact:"<remote>" exact:"<bookmark>"` and use typed metadata instead of rendered
+  `name@remote` labels.
+- `bookmark untrack`: `guided flow`. Shipped from bookmarks view as `bu`; local-row actions require
+  exactly one typed tracked remote sibling, while remote rows use the selected exact remote.
 - `bookmark advance`: `passthrough`. Probably not a first-class flow.
 - `tag`: `planned`. Lower-frequency utility surface.
 
@@ -144,10 +147,10 @@ Short version:
   `operation diff`.
 - Shipped guided flows: `edit`, `next`, `prev`, `describe`, `commit`, `rebase`, `squash`, `abandon`,
   `restore`, `revert`, `operation restore`, `operation revert`, `absorb`,
-  `bookmark set/create/move/rename/delete/forget`, `undo`, `redo`, `git push`.
+  `bookmark set/create/move/rename/delete/forget/track/untrack`, `undo`, `redo`, `git push`.
 - Shipped direct actions: `jj git fetch` and `jj new trunk`.
-- Planned utility or guided work: `evolog`, `root`, `workspace`, `split`, `duplicate`,
-  `bookmark track/untrack`, `tag`, `file search`, `file annotate`, `file track/untrack/chmod`.
+- Planned utility or guided work: `evolog`, `root`, `workspace`, `split`, `duplicate`, `tag`,
+  `file search`, `file annotate`, `file track/untrack/chmod`.
 - Everything else stays passthrough or deferred until the core loop is strong.
 
 When a command needs native structure, check [`integration-strategy.md`](integration-strategy.md)

@@ -33,6 +33,8 @@ pub enum Command {
     BookmarkRename,
     BookmarkDelete,
     BookmarkForget,
+    BookmarkTrack,
+    BookmarkUntrack,
     Fetch,
     FetchRemote,
     Push,
@@ -131,6 +133,8 @@ impl Command {
             | Self::BookmarkRename
             | Self::BookmarkDelete
             | Self::BookmarkForget
+            | Self::BookmarkTrack
+            | Self::BookmarkUntrack
             | Self::Fetch
             | Self::FetchRemote
             | Self::Push
@@ -636,6 +640,18 @@ fn help_metadata(
             )),
             _ => None,
         },
+        Command::BookmarkTrack => match context {
+            HelpContext::Bookmarks => {
+                Some((HelpSectionKind::Actions, "track exact remote bookmark"))
+            }
+            _ => None,
+        },
+        Command::BookmarkUntrack => match context {
+            HelpContext::Bookmarks => {
+                Some((HelpSectionKind::Actions, "untrack exact remote bookmark"))
+            }
+            _ => None,
+        },
         Command::OperationUndo => (context == HelpContext::OperationLog).then_some((
             HelpSectionKind::Recovery,
             "undo last repo operation (global)",
@@ -1047,6 +1063,8 @@ mod tests {
     fn project_help_exposes_bookmark_mutations_only_in_honest_contexts() {
         const BOOKMARK_RENAME: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('r')];
         const BOOKMARK_FORGET: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('f')];
+        const BOOKMARK_TRACK: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('t')];
+        const BOOKMARK_UNTRACK: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('u')];
         let global = [
             Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
             Binding::new(KeyPattern::char('='), Command::BookmarkSet),
@@ -1054,6 +1072,8 @@ mod tests {
             Binding::sequence(BOOKMARK_RENAME, Command::BookmarkRename),
             Binding::new(KeyPattern::char('x'), Command::BookmarkDelete),
             Binding::sequence(BOOKMARK_FORGET, Command::BookmarkForget),
+            Binding::sequence(BOOKMARK_TRACK, Command::BookmarkTrack),
+            Binding::sequence(BOOKMARK_UNTRACK, Command::BookmarkUntrack),
         ];
 
         let graph_help = project_help(&global, &[], HelpContext::Graph);
@@ -1083,6 +1103,8 @@ mod tests {
                 HelpRow::new("br", "rename local bookmark"),
                 HelpRow::new("x", "delete local bookmark"),
                 HelpRow::new("bf", "forget tracked or single remote-only bookmark"),
+                HelpRow::new("bt", "track exact remote bookmark"),
+                HelpRow::new("bu", "untrack exact remote bookmark"),
             ]
         );
         assert!(!show_help.iter().any(|section| {
