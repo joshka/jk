@@ -140,8 +140,14 @@ patching around it locally.
 
 ## Project Structure & Module Organization
 
-Source lives in `src/`; tests are colocated in each module under `#[cfg(test)]`. The code is
-organized by vertical slices where practical:
+Source lives in `src/`; tests are colocated in each module under `#[cfg(test)]`. The code is moving
+toward feature roots plus shared infrastructure. Put each rule where a maintainer would look when
+the user-visible concept changes: feature roots own view state, bindings, row interpretation,
+selection/search/copy behavior, action availability, target resolution, and tests; shared modules
+own only cross-cutting mechanics that two feature owners can use without understanding each other's
+domain.
+
+The code is organized by vertical slices where practical:
 
 - `app.rs` owns the terminal event loop, key dispatch, modal state, view stack, refresh, and
   cross-view transitions.
@@ -163,8 +169,9 @@ organized by vertical slices where practical:
 - `tui.rs` owns shared chrome only: layout, status/header rendering, overlays, and modal
   presentation.
 
-Add a module only when it gives a real concept a local home. Avoid broad reorganization unless it
-improves the reader path for a concrete change.
+Avoid letting `ui`, `jj`, `actions`, `jj_rows`, `action_menu`, `tui`, or `view_state` become dumping
+grounds for feature policy. Add a module only when it gives a real concept a local home. Avoid broad
+reorganization unless it improves the reader path for a concrete change.
 
 ## Build, Test, And Development Commands
 

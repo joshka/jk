@@ -5,6 +5,32 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Feature-root refactoring guidance)
+
+- Slice / task: document the feature-root plus shared-infrastructure refactoring direction in the
+  main thread after the user provided a concrete desired module-shape model.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Model / routing: GPT-5 Codex main thread with medium reasoning performed the documentation change
+  directly because the user explicitly requested this work in the main thread.
+- Implementation outcome: `docs/agent/architecture.md` now states that the first refactoring
+  question is which product concept owns a decision, defines the feature-policy versus shared
+  mechanics split, gives conceptual destinations for log, operation log, bookmarks, status, files,
+  documents, app, jj, actions, and ui, and expands current ownership for operation log, bookmarks,
+  and status.
+- Guidance outcome: `AGENTS.md` now includes the compact project-level version of the same rule, and
+  `docs/agent/source-maintainability-ledger.md` records the packet as active evidence for future
+  source-shape work.
+- Rework / surprise: none. This was a docs-only change after the previous status extraction had
+  already passed the full gate.
+- Validation trail:
+  - `panache format` wrapped this process note and left the other touched docs unchanged.
+  - `just md-check` passed.
+- Evidence basis:
+  - Date: `2026-05-21 09:38:37 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Files: `AGENTS.md`, `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`,
+    and this process note.
+
 ### 2026-05-21 (Status view test module extraction)
 
 - Slice / task: move status view tests out of `src/status.rs` and into the status feature directory

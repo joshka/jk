@@ -77,6 +77,19 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 feature-root refactoring direction:
+
+- `docs/agent/architecture.md` now states the destination shape as feature roots plus shared
+  infrastructure and gives the rule for future moves: ask which product concept owns the decision
+  before asking what kind of code it is.
+- `AGENTS.md` now gives the same compact project-level rule, so future agents start with feature
+  policy versus shared mechanics before selecting an owner module.
+- The guidance names `operation_log`, `bookmarks`, `status`, `files`, `documents`, `app`, `jj`,
+  `actions`, and `ui` as conceptual destinations without making exact filenames the review target.
+- The packet intentionally changed docs only. The useful proof is Markdown formatting/linting and a
+  review that the guidance reinforces the existing vertical row migrations rather than prescribing a
+  broad rewrite.
+
 2026-05-21 graph row ownership migration:
 
 - `src/graph/rows.rs` now owns `LogItem`, `load_entries`, `load_compact_log_context`, rendered log

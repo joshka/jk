@@ -64,7 +64,50 @@ would be more honest and maintainable.
 
 ## Module Ownership
 
-Keep modules aligned with user-visible concepts:
+Shape the code as feature roots plus shared infrastructure. The first question for any move is not
+"what kind of code is this?" It is "what product concept owns this decision?" Put each rule where a
+maintainer would look when the user-visible concept changes.
+
+Feature roots should own the decisions that change together for a user-visible surface:
+
+- view state and view-local bindings;
+- row models, row interpretation, and rendered-output assumptions;
+- selection, search, copy, refresh, reveal, and drill-down behavior;
+- feature-specific action availability and action target resolution;
+- feature tests and user-visible contracts.
+
+Shared infrastructure should own only cross-cutting mechanics that two feature owners can use
+without understanding each other's domain:
+
+- `app`: event loop, mode dispatch, navigation, action lifecycle, refresh/reveal orchestration, and
+  services;
+- `jj`: process execution, syntax quoting, command construction, and view specs;
+- `actions`: command plans and execution contracts after a feature has chosen an action;
+- `ui`: shared chrome, modal rendering, menus, status hints, and theme primitives;
+- `selection`, `search`, `clipboard`, and similar helpers when the rule is domain-neutral.
+
+Avoid letting `ui`, `jj`, `actions`, `jj_rows`, `action_menu`, `tui`, or `view_state` become dumping
+grounds for feature policy. A shared module is the right home only when two feature owners would use
+the code without learning each other's product rules.
+
+A plausible destination shape is:
+
+- `log` owns the default graph/log view, log rows, log selection, and log-local action availability.
+- `operation_log` owns operation rows, undo/redo/restore/revert target policy, operation detail
+  navigation, and operation-log tests.
+- `bookmarks` owns bookmark rows, bookmark metadata and pairing, bookmark mutation target policy,
+  and bookmark tests.
+- `status` owns status rows, exact path action policy, status navigation, and status tests.
+- `files` owns file-list, file-show, and file-action policy that is specific to file-oriented
+  surfaces.
+- `documents` owns reusable rendered-document mechanics such as sticky headings, rendered line
+  structure, and document search when that lowers reader burden more than separate helpers.
+
+The exact names can change. The invariant is that a maintainer can start from a feature such as
+`operation_log` or `bookmarks` and find the local row model, view behavior, action availability, and
+tests without first understanding global buckets.
+
+Current ownership:
 
 - `app.rs` owns terminal event loop, app-level key dispatch, pending key-prefix state, refresh, and
   `ViewEffect` routing. It should read as the app orchestration table of contents and route screen,
@@ -100,9 +143,17 @@ Keep modules aligned with user-visible concepts:
 - `jj_rows.rs` owns shared row-helper mechanics that have not yet moved to narrower owners. It
   should keep shrinking as feature roots own their row models and should not own command identity,
   navigation provenance, document loading, or feature-specific row policy.
+- `operation_log.rs` owns the operation-log feature view, operation selection/copy/search, operation
+  recovery availability, and operation detail navigation. `operation_log/rows.rs` owns rendered
+  operation-log row grouping, operation-id metadata parsing and pairing, and metadata drift tests.
+- `bookmarks.rs` owns the bookmarks feature view, bookmark selection/copy/search, and bookmark
+  action availability. `bookmarks/rows.rs` owns bookmark row metadata and local/remote state
+  classification; `bookmarks/action_targets.rs` owns safe bookmark mutation target resolution.
 - `graph.rs` owns the default/log graph view, graph row loading, graph-row selection, graph search,
   and graph-to-detail navigation. `graph/rows.rs` owns rendered `jj log` row grouping, revision
   metadata pairing, compact log context, and the `LogItem` row contract.
+- `status.rs` owns the status feature view, rendered status rows, exact path policy for file
+  actions, status selection/search/copy/refresh, and status view tests.
 - `show.rs` and `diff.rs` own their view behavior and should stay distinct even when they share
   document mechanics.
 - `sticky_file_view.rs` owns shared rendered-file document mechanics for show, diff, status,
