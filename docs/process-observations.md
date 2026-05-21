@@ -5,6 +5,37 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Shared chrome test module extraction)
+
+- Slice / task: move shared TUI chrome tests out of `src/tui.rs` and into the `tui` module directory
+  so production overlay/status rendering is easier to scan while tests stay local.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b5e-7963-71e2-8675-7e721f89d7fa`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the mechanical extraction with
+  write scope limited to `src/tui.rs` and `src/tui/tests.rs`. The main thread kept jj ownership,
+  reviewed the result, and reran validation.
+- Implementation outcome: `src/tui.rs` now declares `#[cfg(test)] mod tests;`; the moved tests live
+  in `src/tui/tests.rs` and continue to cover help overlay projection, status chrome, action menu
+  rendering, action output overlays, abandon confirmation rendering, and per-view status hints.
+- Size evidence: after the move, measured line counts were 576 lines in `src/tui.rs`, 417 in
+  `src/tui/tests.rs`, and 202 in `src/tui/status_hints.rs`.
+- Rework / surprise: none beyond the expected module extraction.
+- Validation trail:
+  - Worker validation passed: `cargo test tui -- --test-threads=1` with 17 passed / 1 ignored;
+    `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo test tui -- --test-threads=1` with 17 passed / 1
+    ignored; `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+  - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
+    test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:32:14 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b5e-7963-71e2-8675-7e721f89d7fa` from the worker handoff.
+  - Files: `src/tui.rs`, `src/tui/tests.rs`, and this process note.
+
 ### 2026-05-21 (Bookmark view test module extraction)
 
 - Slice / task: move bookmark view/action tests out of `src/bookmarks.rs` and into the bookmark
