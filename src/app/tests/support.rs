@@ -29,9 +29,11 @@ pub(super) use crate::jj_actions::{
 };
 #[allow(unused_imports)]
 pub(super) use crate::jj_rows::{
-    FileListItem, LogItem, ResolveEntry, document_plain_text, load_compact_log_context,
-    load_entries, load_file_list_entries, load_resolve_entries,
+    FileListItem, LogItem, document_plain_text, load_compact_log_context, load_entries,
+    load_file_list_entries,
 };
+#[allow(unused_imports)]
+pub(super) use crate::resolve::{ResolveEntry, load_resolve_entries};
 pub(super) use crate::tui::Overlay;
 pub(super) use crate::view_state::ViewState;
 #[allow(unused_imports)]

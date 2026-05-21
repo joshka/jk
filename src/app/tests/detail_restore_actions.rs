@@ -196,7 +196,7 @@ fn file_show_navigation_from_resolve_uses_resolve_revision() {
     let app = test_app(ViewState::Resolve(
         crate::resolve::ResolveView::test_with_spec(
             ViewSpec::resolve(Some("main".to_owned())),
-            vec![crate::jj_rows::ResolveEntry::parsed(
+            vec![crate::resolve::ResolveEntry::parsed(
                 Some("src/main.rs".to_owned()),
                 Some("file".to_owned()),
                 Some(3),
@@ -219,7 +219,7 @@ fn file_show_navigation_from_default_resolve_uses_current_revision() {
     let app = test_app(ViewState::Resolve(
         crate::resolve::ResolveView::test_with_spec(
             ViewSpec::resolve(None),
-            vec![crate::jj_rows::ResolveEntry::parsed(
+            vec![crate::resolve::ResolveEntry::parsed(
                 Some("src/main.rs".to_owned()),
                 Some("file".to_owned()),
                 Some(3),

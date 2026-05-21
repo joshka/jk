@@ -14,10 +14,15 @@ use ratatui::widgets::{List, ListItem, ListState};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{JjCommand, ViewSpec};
-use crate::jj_rows::{ResolveEntry, load_resolve_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
+
+mod rows;
+
+#[cfg(test)]
+pub(crate) use rows::RESOLVE_CONFLICT_TEMPLATE;
+pub(crate) use rows::{ResolveEntry, load_resolve_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),

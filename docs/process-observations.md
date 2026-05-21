@@ -5,6 +5,51 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Resolve row feature-root migration)
+
+- Slice / task: move resolve conflict row loading and template parsing out of the generic `jj_rows`
+  bucket and into the `resolve` feature root.
+- Worker thread id: `019e4b2f-d862-7171-8b31-0a4b263eeed9`.
+- Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The main
+  thread kept jj orchestration, reviewed the boundary, and reran validation.
+- Implementation outcome: `src/resolve/rows.rs` now owns `ResolveEntry`, `load_resolve_entries`,
+  `RESOLVE_CONFLICT_TEMPLATE`, resolve JSON template parsing, local side-count parsing, and the
+  existing resolve row parser tests.
+- Boundary evidence: `src/resolve.rs` declares `mod rows;` and re-exports the resolve row surface
+  for crate-local callers and tests. `src/jj_rows.rs` no longer owns resolve row parsing or the
+  resolve conflict template and keeps shared rendered-row helpers such as `line_text`,
+  `string_field`, and file-list loading.
+- Caller evidence: `src/app/tests/support.rs` re-exports resolve row fixtures from `crate::resolve`;
+  `src/app/tests/detail_restore_actions.rs` constructs resolve rows through
+  `crate::resolve::ResolveEntry`; `src/jj.rs` tests import `RESOLVE_CONFLICT_TEMPLATE` from
+  `crate::resolve`.
+- Rework / surprise: `rustup run nightly cargo fmt --check` initially failed only on import ordering
+  in `src/resolve.rs`; running rustfmt applied that ordering change. `just md-check` initially
+  failed only on Panache wrapping in this process note and the source maintainability ledger;
+  `just md-fmt` applied those wrapping changes.
+- Validation trail:
+  - `cargo test resolve -- --test-threads=1` passed with 24 passed.
+  - `cargo test detail_restore_actions -- --test-threads=1` passed with 19 passed.
+  - `cargo test jj_rows -- --test-threads=1` passed with 13 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed after applying rustfmt, with the existing rustfmt
+    unstable-option warnings.
+  - `just md-check` passed after applying Panache wrapping.
+- Main-thread review validation passed: `cargo test resolve -- --test-threads=1` with 24 passed;
+  `cargo test detail_restore_actions -- --test-threads=1` with 19 passed;
+  `cargo test jj_rows -- --test-threads=1` with 13 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 08:59:00 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b2f-d862-7171-8b31-0a4b263eeed9` from the worker handoff.
+  - Files: `src/resolve.rs`, `src/resolve/rows.rs`, `src/jj_rows.rs`, `src/jj.rs`,
+    `src/app/tests/support.rs`, `src/app/tests/detail_restore_actions.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Workspace row feature-root migration)
 
 - Slice / task: move workspace rendered-row loading and metadata pairing out of the generic

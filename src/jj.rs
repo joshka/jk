@@ -478,8 +478,8 @@ mod tests {
 
     use super::*;
     use crate::jj_actions::JjGitFetch;
-    use crate::jj_rows::RESOLVE_CONFLICT_TEMPLATE;
     use crate::operation_log::OPERATION_ID_TEMPLATE;
+    use crate::resolve::RESOLVE_CONFLICT_TEMPLATE;
     use crate::workspaces::WORKSPACE_METADATA_TEMPLATE;
 
     #[test]

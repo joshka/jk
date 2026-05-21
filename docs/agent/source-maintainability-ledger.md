@@ -77,6 +77,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 resolve row migration:
+
+- `src/resolve/rows.rs` contains `ResolveEntry`, `load_resolve_entries`,
+  `RESOLVE_CONFLICT_TEMPLATE`, resolve JSON template parsing, integer side-count parsing, and the
+  resolve row parser tests that previously lived under `jj_rows`.
+- `src/resolve.rs` declares `mod rows;` and re-exports the resolve row item and loader for
+  crate-local app/view tests, plus the test-only conflict template for `src/jj.rs` command argv
+  tests.
+- `src/jj_rows.rs` no longer owns resolve row parsing or the resolve conflict template. It keeps
+  shared rendered-row helpers such as `line_text` and JSON string helpers because revision,
+  bookmark, workspace, resolve, and file-list row loaders still use them.
+- `src/app/tests/support.rs`, focused detail-restore tests, and `src/jj.rs` tests now reference
+  resolve row/template ownership through `crate::resolve::...`, so tests point at the feature owner.
+
 2026-05-21 workspace row migration:
 
 - `src/workspaces/rows.rs` contains `WorkspaceContext`, `WorkspaceItem`, `load_workspace_context`,
@@ -86,7 +100,7 @@ Examples for future packets:
   and test-only metadata template for crate-local app/view/jj tests.
 - `src/jj_rows.rs` no longer declares a workspace submodule or re-exports workspace row types. It
   keeps shared rendered-row helpers such as `line_text` and JSON field helpers because revision,
-  resolve, file-list, and feature-owned row loaders still use them.
+  file-list, and feature-owned row loaders still use them.
 - `src/app/tests/support.rs` and `src/jj.rs` tests now reference workspace row/context/template
   ownership through `crate::workspaces::...`, so tests point at the feature owner.
 
@@ -100,7 +114,7 @@ Examples for future packets:
   for crate-local app/view tests.
 - `src/jj_rows.rs` no longer declares a bookmark submodule or re-exports bookmark row types. It
   keeps shared rendered-row helpers such as `line_text` and JSON field helpers because revision,
-  workspace, resolve, file-list, and feature-owned row loaders still use them.
+  workspace, file-list, and feature-owned row loaders still use them.
 - `src/app/tests/support.rs`, focused app tests, and `src/view_state.rs` construct bookmark rows
   through `crate::bookmarks::...`, so tests now point at the feature owner.
 
@@ -174,8 +188,8 @@ missing item-level Rustdoc on many public or crate-visible contracts:
 - `src/tui.rs`: module docs exist, but `Areas`, `Overlay`, and render facades have no direct docs.
 - `src/jj_actions.rs`: module docs and local comments explain preview-first plans, but public plan
   types and argv/preview/run methods mostly lack Rustdoc.
-- `src/jj_rows.rs`: `FileListItem` and `ResolveEntry` are documented; the resolve/file-list loaders
-  and shared rendered-line helpers are weakly documented.
+- `src/jj_rows.rs`: `FileListItem`, the file-list loader, and shared rendered-line helpers are
+  weakly documented.
 
 This nominates a source documentation sweep before another broad source split. The sweep should add
 short ownership and contract docs only where a maintainer would otherwise need to reconstruct
@@ -267,8 +281,8 @@ Recent completed packets already moved several coherent owners out of broad modu
 - help projection policy into `src/help.rs`;
 - path and revision action-menu policy into `src/action_menu/path_actions.rs` and
   `src/action_menu/revision_actions.rs`;
-- operation, workspace, and revision row loading into `src/jj_rows/operations.rs`,
-  `src/jj_rows/workspaces.rs`, and `src/jj_rows/revisions.rs`;
+- operation, bookmark, workspace, and resolve row loading into feature-owned `rows.rs` modules;
+- revision row loading into `src/jj_rows/revisions.rs`;
 - ViewSpec navigation provenance into `src/jj/view_spec.rs`;
 - status hint projection into `src/tui/status_hints.rs`;
 - pure modal key reducers and prompt-plan helpers into `src/app/mode_input/reducers.rs`.
@@ -315,7 +329,7 @@ Pause broad source-shape splits where modules are cohesive:
   only a concrete overlay family with snapshot proof.
 - `src/bookmarks.rs` remains mostly view behavior plus focused tests; target-selection policy
   already has `src/bookmarks/action_targets.rs`.
-- `src/jj_rows.rs` is now a facade plus small resolve/file-list/shared helpers. Do not extract tiny
-  row families, JSON helpers, or re-exports for size alone.
+- `src/jj_rows.rs` is now a facade plus small file-list/shared helpers. Do not extract tiny row
+  families, JSON helpers, or re-exports for size alone.
 - Do not create a `slices/` or other umbrella bucket. Prefer feature roots plus shared
   infrastructure.
