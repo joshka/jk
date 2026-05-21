@@ -103,6 +103,24 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 resolve view test split:
+
+- `src/resolve.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/resolve/tests.rs` with `use super::*;` for private access to resolve view state.
+- This matches the sibling child-module test layout used by workspace, file-list, and
+  operation-detail views and keeps conflict movement, search, copy, refresh, and open-file tests out
+  of the production resolve view module.
+- The packet intentionally preserved all seven resolve view test names, assertions, helper
+  functions, imports, conflict row selection/search/copy/open-file behavior, public API, and runtime
+  behavior.
+- Focused validation covered `cargo test resolve -- --test-threads=1` with 24 passed and 543
+  filtered out, `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Main-thread review validation reran the same focused checks successfully with 24 passed and 543
+  filtered out for `cargo test resolve -- --test-threads=1`.
+- Rework was limited to moving the extracted test block into a Rust child module; no production
+  resolve code changed beyond replacing the inline test block with the sibling test module
+  declaration.
+
 2026-05-21 workspace view test split:
 
 - `src/workspaces.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

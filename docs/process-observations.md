@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Resolve view test split)
+
+- Slice / task: move inline resolve view tests from `src/resolve.rs` into `src/resolve/tests.rs`
+  while preserving conflict row selection, search, copy, refresh, and open-file behavior.
+- Thread id: `019e4cc4-ea2f-7550-9371-d8a5b6455d42` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex performed the bounded test-module move in the existing
+  `Move resolve view tests` jj working copy change. The user explicitly prohibited version-control
+  commands, and no `jj` or `git` commands were run.
+- Changed files: `src/resolve.rs`, `src/resolve/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/resolve.rs` now declares `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/resolve/tests.rs` and use Rust child-module privacy through `use super::*;`.
+- Behavior-preservation evidence: the packet moved the existing seven resolve view tests without
+  changing their names, assertions, helper functions, imports, conflict row selection behavior,
+  search behavior, exact path copy behavior, refresh behavior, open-file behavior, public API, or
+  runtime behavior.
+- Scope boundary: the packet did not change resolve row loading, resolve metadata parsing, app
+  routing, selection/search/copy/refresh/open behavior, or production resolve code beyond the test
+  module declaration.
+- Validation trail:
+  - Worker validation passed: `cargo test resolve -- --test-threads=1` with 24 passed and 543
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test resolve -- --test-threads=1` with 24 passed
+    and 543 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: no Rust behavior or formatting rework was needed after the move.
+- Evidence basis:
+  - Date: `2026-05-21 16:01:38 PDT` from local `date`.
+  - Main review date: `2026-05-21 16:03:29 PDT` from local `date`.
+  - Files: `src/resolve.rs`, `src/resolve/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
+    and this process note.
+
 ### 2026-05-21 (Workspace view test split)
 
 - Slice / task: move inline workspace view tests from `src/workspaces.rs` into
