@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 app screen projection test split:
+
+- `src/app_screen.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/app_screen/tests.rs` with `use super::*;` for private access to app screen projection state.
+- This improves local readability by keeping modal/status/overlay projection code visible without
+  scrolling through 256 lines of inline tests. The production file measured 655 lines before the
+  split and 399 lines after it.
+- The packet intentionally preserved all eight app screen projection test names, assertions,
+  helper-free setup, imports, status text, overlay titles, view-menu options, action-output
+  projection, abandon-confirm projection, public API, and runtime behavior.
+- Focused validation covered `cargo test app_screen -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Main-thread review validation reran the same focused checks successfully with 7 passed and 560
+  filtered out for `cargo test app_screen -- --test-threads=1`.
+- Rework was limited to moving the test module; no production app screen projection code changed
+  beyond replacing the inline test block with the sibling test module declaration.
+
 2026-05-21 help projection test split:
 
 - `src/help.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

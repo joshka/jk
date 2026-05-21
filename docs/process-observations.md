@@ -5,6 +5,38 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (App screen projection test split)
+
+- Slice / task: move inline `src/app_screen.rs` tests into `src/app_screen/tests.rs` while
+  preserving the existing app-level screen projection behavior.
+- Thread id: `019e4ca3-dfa6-7392-b3b8-955bac708e33` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker handled the bounded maintainability packet without running jj or
+  git commands; version-control ownership and review stayed with the main thread.
+- Changed files: `src/app_screen.rs`, `src/app_screen/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/app_screen.rs` now ends with `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/app_screen/tests.rs` and use Rust child-module privacy through `use super::*;`.
+  The production file measured 655 lines before the split and 399 lines after it, with 256 lines of
+  tests now in the child module.
+- Behavior-preservation evidence: the packet moved the existing tests without changing production
+  projection behavior. It preserved test names, assertions, helper-free setup, imports, screen
+  status text, overlay titles, view-menu options, action-output projection, abandon-confirm
+  projection, public API, and runtime behavior.
+- Validation trail:
+  - Worker validation passed: `cargo test app_screen -- --test-threads=1` with 7 tests and 560
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test app_screen -- --test-threads=1` with 7 tests
+    and 560 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: no code rework was needed after the move. Markdown wrapping was already clean
+  on main-thread review.
+- Evidence basis:
+  - Date: `2026-05-21 15:26:14 PDT` from worker-reported local `date`.
+  - Main review date: `2026-05-21 15:27:44 PDT` from local `date`.
+  - Files: `src/app_screen.rs`, `src/app_screen/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Help projection test split)
 
 - Slice / task: move inline tests from `src/help.rs` into `src/help/tests.rs` for the existing jj
