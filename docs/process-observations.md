@@ -4775,6 +4775,47 @@ belong here.
   - Files: `src/help.rs`, `src/command.rs`, `src/main.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`
 
+### 2026-05-21 (ViewSpec navigation provenance extraction)
+
+- Slice / task: extract `ViewSpec` construction, display, diff-format, and navigation provenance
+  policy out of broad `src/jj.rs`.
+- Thread id: `019e49b7-8b5a-7d42-9ceb-f55f0632d5f5`.
+- Model / routing: worker/subagent `019e49b7-8b5a-7d42-9ceb-f55f0632d5f5` with medium reasoning
+  implemented the extraction without jj/git commands. The main thread reviewed and validated the
+  result.
+- Implementation outcome: `src/jj/view_spec.rs` now owns `DiffFormat`, `ViewSpec`, constructor
+  policy, app and jj label policy, exact-change target provenance, path provenance, diff-format arg
+  rewriting, direct startup revset parsing, and focused provenance tests. `src/jj.rs` declares the
+  submodule and re-exports `DiffFormat` / `ViewSpec` while keeping `JjCommand`, `LogViewMode`,
+  command-word and prefix behavior, process helpers, direct commands, templates, and output
+  summarization.
+- Maintainability evidence: `src/jj.rs` dropped from 1440 lines in the source maintainability
+  snapshot to 773 lines after extraction; `src/jj/view_spec.rs` is 797 lines including moved tests.
+- Rework / surprise: the option-value parser stayed in `src/jj.rs` because both `LogViewMode`
+  parsing and `ViewSpec` direct-revset parsing use it. The extraction made `ViewSpec`'s `command`
+  and `args` fields `pub(super)` so the process-boundary parent can keep constructing argv without
+  widening the public API.
+- Process observation: main-thread review accidentally ran two cargo tests in parallel and saw
+  package-cache/build lock waits again. Future cargo validation should stay sequential.
+- Validation trail:
+  - `cargo test jj -- --test-threads=1` passed with 155 passed / 2 ignored.
+  - `cargo test command_navigation -- --test-threads=1` passed with 35 passed.
+  - `cargo test detail_restore_actions -- --test-threads=1` passed with 19 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed.
+  - Full `just check` passed, including fmt, Panache format/lint, clippy, `cargo check`, and
+    `cargo test` with 543 passed / 2 ignored.
+  - The largest-file list from `just check` included `src/jj/view_spec.rs` at 797 lines and
+    `src/jj.rs` at 773 lines.
+- Evidence basis:
+  - Date: `2026-05-21` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/jj.rs`, `src/jj/view_spec.rs`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (App refactor audit before Packet 39)
 
 - A prior gpt-5.5 high read-only audit found no blocking app refactor needed before Packet 39. The

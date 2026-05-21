@@ -37,6 +37,7 @@ together with [`architecture.md`](architecture.md) and [`rust-style.md`](rust-st
 - `Documentation Drift Cleanup`
 - `Help Projection Policy Packet`
 - `File And Status Path Action-Menu Policy`
+- `ViewSpec Navigation Provenance Packet`
 
 Those packets closed the previous bookmark-, rewrite-, help-, and path-heavy queue. The next work
 should start from the current hotspots instead of replaying the old priority order.
@@ -192,6 +193,25 @@ should have an owner and a contract, not a line-count target.
   `cargo test workspaces -- --test-threads=1` passed during the extraction, with final gate commands
   recorded in `docs/process-observations.md`.
 
+### ViewSpec Navigation Provenance Packet
+
+- Status: completed on 2026-05-21 in the Codex main thread.
+- Owner: `src/jj/view_spec.rs`
+- Outcome: `src/jj/view_spec.rs` owns `DiffFormat`, `ViewSpec`, constructor provenance, app and jj
+  labels, exact-change target policy, path provenance, diff-format arg rewriting,
+  `navigation_revset`, `show_context_revset`, and the direct startup revset parsers used by those
+  policies. `src/jj.rs` re-exports `DiffFormat` and `ViewSpec` while keeping `JjCommand`,
+  `LogViewMode`, command-word/prefix behavior, direct commands, process helpers, templates, and
+  output summarization.
+- Maintainability evidence: `src/jj.rs` dropped from 1440 lines in the reassessment snapshot to 773
+  lines after extraction, and the new `src/jj/view_spec.rs` is 797 lines including focused
+  provenance tests.
+- Non-goals preserved: no argv shape changes, no command word changes, no label wording changes, no
+  `--git` behavior changes, no exact-change safety changes, no direct startup revset fallback
+  changes, no process helper movement, and no `jj_actions.rs` mutation-plan movement.
+- Proof: focused `cargo test jj -- --test-threads=1` passed during the extraction, with final gate
+  commands recorded in `docs/process-observations.md`.
+
 ## Current Next Slices
 
 ### 1. Remaining Rendered Row Loader And Metadata Packets
@@ -209,25 +229,7 @@ should have an owner and a contract, not a line-count target.
 - Proof: focused row-family tests for any chosen packet, plus `cargo check`,
   `rustup run nightly cargo fmt --check`, and `just md-check`.
 
-### 2. ViewSpec Navigation Provenance Packet
-
-- Owner: `src/jj.rs`, likely a `ViewSpec`-owned submodule if the implementation needs one.
-- Purpose: make the `ViewSpec` contract easier to audit by grouping constructor policy,
-  app-label/display-arg policy, diff-format application, and navigation revset provenance close to
-  the type that owns it.
-- Evidence: `src/jj.rs` is still the largest production file at 1440 lines. Direct reads show one
-  coherent process-boundary owner, but `ViewSpec` carries several distinct responsibilities: command
-  constructors, target exactness, path provenance, `navigation_revset`, `show_context_revset`,
-  display labels, and diff-format rewriting. Those are all one concept, but they do not need to
-  share live context with `run_jj`, `run_direct_args`, template execution, or remote parsing.
-- Non-goals: do not change argv shape, command words, labels, `--git` behavior, exact-change safety,
-  direct startup revset fallbacks, or any process helper. Do not move `jj_actions.rs` preview-first
-  mutation plans into this packet.
-- Proof: focused `jj` tests around `ViewSpec`, navigation revsets, diff format, operation specs,
-  file specs, and labels, plus `cargo check`, `rustup run nightly cargo fmt --check`, and
-  `just md-check`.
-
-### 3. Graph Revision Action-Menu Policy Packet
+### 2. Graph Revision Action-Menu Policy Packet
 
 - Owner: `src/action_menu.rs`, with a likely `src/action_menu/revision_actions.rs` or
   `graph_actions.rs` split if the boundary remains sharp during implementation.
@@ -246,7 +248,7 @@ should have an owner and a contract, not a line-count target.
   restore/action tests, plus `cargo check`, `rustup run nightly cargo fmt --check`, and
   `just md-check`.
 
-### 4. Status Hint Projection Packet
+### 3. Status Hint Projection Packet
 
 - Owner: `src/tui.rs`, with a likely `src/tui/status_hints.rs` split if the module shape allows it
   without broad churn.
