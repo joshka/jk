@@ -77,6 +77,15 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 command dispatch contract documentation:
+
+- `src/command.rs` now documents the boundary between app-level command vocabulary, view-local
+  commands, binding metadata, key-pattern matching, command context input, and `ViewEffect` output.
+- The packet preserved behavior and public API shape. Its value is reader locality: future key,
+  prefix, help, and status-hint work can inspect command contracts before tracing `app.rs`.
+- Focused validation covered `cargo check`, `cargo test command -- --test-threads=1`, and
+  `rustup run nightly cargo fmt --check`.
+
 2026-05-21 feature-root refactoring direction:
 
 - `docs/agent/architecture.md` now states the destination shape as feature roots plus shared

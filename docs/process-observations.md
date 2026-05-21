@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Command dispatch contract documentation)
+
+- Slice / task: add concise source contracts to `src/command.rs` so command vocabulary, key
+  patterns, binding sequences, contexts, and view effects can be understood before tracing app
+  dispatch.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b68-fe3a-7a53-89ca-b60849937a7b`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only Rust sweep with
+  write scope limited to `src/command.rs`. The main thread kept jj ownership, reviewed the diff,
+  reran focused validation, and recorded process evidence.
+- Implementation outcome: `src/command.rs` now documents the command-vocabulary boundary, binding
+  metadata versus dispatch behavior, key-pattern matching and labels, command context page sizing,
+  view effects as app-dispatched requests, and help-filtered prefix projection.
+- Size evidence: after the change, `src/command.rs` measured 694 lines.
+- Rework / surprise: none. The worker preserved behavior, key/status wording, tests, and public API
+  shape.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `cargo test command -- --test-threads=1` with 86
+    passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo check`; `cargo test command -- --test-threads=1`
+    with 86 passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+- Evidence basis:
+  - Date: `2026-05-21 09:42:31 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b68-fe3a-7a53-89ca-b60849937a7b` from the worker handoff.
+  - Files: `src/command.rs` and this process note.
+
 ### 2026-05-21 (Feature-root refactoring guidance)
 
 - Slice / task: document the feature-root plus shared-infrastructure refactoring direction in the

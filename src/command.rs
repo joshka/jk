@@ -1,7 +1,9 @@
-//! Key binding metadata and command effects.
+//! Command vocabulary, binding metadata, and view dispatch effects.
 //!
-//! This module owns command vocabulary, key patterns and labels, binding
-//! matching, and view effects. `help.rs` owns generated help projection policy.
+//! This module owns the app/view command vocabulary, key patterns and labels,
+//! key-sequence matching, and the effects views may return to app dispatch.
+//! Keep help/menu presentation policy in `help.rs`; this module only exposes the
+//! command metadata and filtered match helpers those projections need.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -14,13 +16,19 @@ use crate::search::SearchQuery;
 
 #[cfg(test)]
 pub use crate::help::HelpSectionKind;
+/// Help projection types re-exported from the command vocabulary surface.
+///
+/// Command tables are the source of key identity. `help.rs` decides which rows
+/// are visible for a context and how they are grouped for display.
 pub use crate::help::{HelpContext, HelpRow, HelpSection, project_help};
 
 /// App-level dispatch vocabulary for global bindings and view-facing effects.
 ///
-/// `App` matches these variants to top-level bindings first, then routes the
-/// view-specific variants through `ViewCommand`. Keep the enum aligned with the
-/// dispatcher because the variants define the commands the app can execute.
+/// `App` matches these variants through top-level binding groups first. A
+/// `Command::View` value is routed to the active view as a [`ViewCommand`].
+/// Add a variant here only when app dispatch or a shared binding table needs a
+/// stable command identity; feature-local policy still belongs in the owning
+/// view or app submodule.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Command {
     Quit,
@@ -63,7 +71,7 @@ pub enum Command {
 ///
 /// These commands stay on the presentation side of the boundary: they can
 /// return a `ViewEffect`, but `App` owns the actual state transition that
-/// follows.
+/// follows. The active view may ignore commands it does not support.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewCommand {
     CycleMode,
@@ -98,7 +106,10 @@ pub struct Binding {
 }
 
 impl Binding {
-    /// Bind one key pattern to an app command.
+    /// Bind one key pattern to a command identity.
+    ///
+    /// Bindings are metadata only. They do not execute commands, mutate pending
+    /// prefix state, or decide whether a command is currently visible in help.
     pub const fn new(key: KeyPattern, command: Command) -> Self {
         Self {
             key: KeySequence::Single(key),
@@ -106,10 +117,11 @@ impl Binding {
         }
     }
 
-    /// Bind a fixed multi-key sequence to an app command.
+    /// Bind a fixed multi-key sequence to a command identity.
     ///
-    /// The sequence slice must be static because global binding tables are static. Prefix timeout
-    /// and fallback behavior are owned by `App`, not by the binding metadata.
+    /// The sequence slice must be static because binding tables are static.
+    /// Prefix timeout and fallback behavior are owned by `App`, not by binding
+    /// metadata.
     pub const fn sequence(keys: &'static [KeyPattern], command: Command) -> Self {
         Self {
             key: KeySequence::Multi(keys),
@@ -126,6 +138,10 @@ impl Binding {
         self.command
     }
 
+    /// Return the display label for this binding's full key pattern.
+    ///
+    /// Labels are reused by help rows, status hints, and pending-prefix
+    /// messages, so changing this output is user-visible.
     pub fn key_label(self) -> String {
         self.key.label()
     }
@@ -173,10 +189,11 @@ impl Command {
     }
 }
 
-/// One physical key pattern used by a binding.
+/// One physical key pattern used by a binding table entry.
 ///
-/// Matching normalizes terminal events where crossterm reports shifted printable characters with a
-/// `SHIFT` modifier even though the key code already contains the shifted character.
+/// Matching is exact on key code and modifiers except for crossterm's shifted
+/// printable-character events, where the shifted character may appear both in
+/// the key code and as a `SHIFT` modifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct KeyPattern {
     code: KeyCode,
@@ -184,18 +201,22 @@ pub struct KeyPattern {
 }
 
 impl KeyPattern {
+    /// Construct an exact key pattern from the terminal key code and modifiers.
     pub const fn new(code: KeyCode, modifiers: KeyModifiers) -> Self {
         Self { code, modifiers }
     }
 
+    /// Construct an unmodified printable-character key pattern.
     pub const fn char(character: char) -> Self {
         Self::new(KeyCode::Char(character), KeyModifiers::NONE)
     }
 
+    /// Construct a printable-character key pattern with explicit modifiers.
     pub const fn modified_char(character: char, modifiers: KeyModifiers) -> Self {
         Self::new(KeyCode::Char(character), modifiers)
     }
 
+    /// Construct an unmodified non-character key pattern.
     pub const fn code(code: KeyCode) -> Self {
         Self::new(code, KeyModifiers::NONE)
     }
@@ -334,12 +355,19 @@ pub enum BindingMatch {
 /// `App` rebuilds this for each key event, so view code must treat it as
 /// read-only input for the current dispatch instead of retained state.
 pub struct CommandContext<'a> {
+    /// Current content viewport height in terminal rows.
     pub viewport_height: u16,
+    /// Current content viewport width in terminal columns.
     pub viewport_width: u16,
+    /// Active search query, if search is currently scoped to the view.
     pub search: Option<&'a SearchQuery>,
 }
 
 impl CommandContext<'_> {
+    /// Return the page jump size used by view-local page movement.
+    ///
+    /// Page movement keeps one row of overlap and never returns zero, even for
+    /// very small terminal viewports.
     pub fn page_size(&self) -> usize {
         usize::from(self.viewport_height.saturating_sub(1).max(1))
     }
@@ -348,7 +376,8 @@ impl CommandContext<'_> {
 /// One-way output from a view command back to the app dispatcher.
 ///
 /// The app interprets these effects and performs the resulting navigation,
-/// refresh, or status update; views do not mutate app-owned state directly.
+/// refresh, status update, search update, copy menu, or action menu transition.
+/// Views do not mutate app-owned state directly or run `jj` mutation flows.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ViewEffect {
     Ignored,
@@ -374,9 +403,11 @@ pub fn find_binding(bindings: &[Binding], key: KeyEvent) -> Option<Binding> {
 
 /// Match pending key events against binding groups in priority order.
 ///
-/// The matcher is pure and does not apply timeouts. If both an exact binding and longer binding
-/// share a prefix, callers receive `Prefix { fallback }` so `App` can wait briefly before running
-/// the fallback.
+/// The matcher is pure and does not apply timeouts. If both an exact binding
+/// and a longer binding share a prefix, callers receive `Prefix { fallback }`
+/// so `App` can wait briefly before running the fallback. Earlier binding
+/// groups win only among exact matches; any longer available sequence keeps the
+/// prefix pending.
 pub fn match_binding_sequence(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
@@ -386,8 +417,9 @@ pub fn match_binding_sequence(
 
 /// Match pending key events against commands visible in the active help context.
 ///
-/// This keeps help/prefix hints aligned with `help.rs` projection without letting help visibility
-/// change the underlying command tables.
+/// This keeps help/prefix hints aligned with `help.rs` projection without
+/// letting help visibility change the underlying command tables or dispatch
+/// behavior.
 pub fn match_help_binding_sequence(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
@@ -399,11 +431,17 @@ pub fn match_help_binding_sequence(
 }
 
 /// Return unique next-key labels for bindings that continue the pending prefix.
+///
+/// Labels preserve binding-table order and are deduplicated by rendered label so
+/// status hints do not repeat the same next key.
 pub fn binding_prefix_next_labels(binding_groups: &[&[Binding]], keys: &[KeyEvent]) -> Vec<String> {
     binding_prefix_next_labels_by(binding_groups, keys, |_| true)
 }
 
 /// Return unique next-key labels after applying active help-context visibility.
+///
+/// Use this for help and menu-adjacent prefix hints. Dispatch should use
+/// [`binding_prefix_next_labels`] so hidden help rows do not disable commands.
 pub fn help_binding_prefix_next_labels(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
