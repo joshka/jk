@@ -145,7 +145,9 @@ toward feature roots plus shared infrastructure. Put each rule where a maintaine
 the user-visible concept changes: feature roots own view state, bindings, row interpretation,
 selection/search/copy behavior, action availability, target resolution, and tests; shared modules
 own only cross-cutting mechanics that two feature owners can use without understanding each other's
-domain.
+domain. Treat this as a feature-policy versus shared-mechanics split: feature roots answer what the
+surface shows, selects, copies, recovers from, and offers; `ui`, `jj`, `actions`, `app`, and small
+helpers answer boring cross-cutting questions after a feature has already chosen its policy.
 
 The code is organized by vertical slices where practical:
 

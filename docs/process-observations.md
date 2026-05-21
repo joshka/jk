@@ -6051,3 +6051,41 @@ belong here.
   - Thread id from `CODEX_THREAD_ID`.
   - Files: `src/app/action_lifecycle/completion.rs`, `src/app/action_lifecycle/shared.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.
+
+### 2026-05-21 (Document action entry ownership)
+
+- Slice / task: document the action lifecycle entry ownership contract after the recent action-entry
+  reducer work, then fold the requested feature-root/shared-infrastructure guidance into the durable
+  repo docs.
+- Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
+  implementation `019e4bf8-76dc-7011-86cc-285aba56f249`.
+- Model / routing: a medium worker began the scoped action-entry docs update with no jj or git
+  commands. After the user explicitly asked to do the feature-root guidance in the main thread, the
+  main thread closed the still-running worker, reviewed its doc-only diff, and made the remaining
+  guidance changes directly.
+- Changed files: `src/app/action_lifecycle/entry.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `entry.rs` now states that it owns routing from accepted menu/key actions
+  to prompts, previews, or status messages. The module docs point availability and exact targets to
+  feature views/action menus, preview pane/status construction to `preview.rs`, confirmed result
+  handling to `completion.rs`/`shared.rs`, and command-plan argv/preview/run contracts to
+  `jj_actions`. `AGENTS.md` and `docs/agent/architecture.md` now state the feature-policy versus
+  shared-mechanics rule in product terms, including that `actions` owns cross-view command plans
+  after a feature has selected targets, not whether a feature offers the action.
+- Behavior-preservation evidence: the packet changed comments and documentation only. No match arms,
+  constants, command plans, status strings, mode assignments, or preview calls were changed.
+- Rework / surprise: the worker did not finish before the main-thread interruption; it was closed
+  while running so the requested architecture-guidance edit could happen in the orchestrator thread
+  without racing concurrent writes.
+- Validation trail:
+  - Main-thread review validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings; `cargo test action_lifecycle -- --test-threads=1`
+    with 8 passed; and `just md-check`.
+  - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, the
+    largest-file report, clippy with `-D warnings`, `cargo check`, and `cargo test` with 565 passed
+    / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 12:18:39 PDT` from local `date`.
+  - Main thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/action_lifecycle/entry.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
+    `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.

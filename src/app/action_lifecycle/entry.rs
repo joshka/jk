@@ -1,7 +1,11 @@
-//! Action-menu entry and prompt setup for app-owned action flows.
+//! Entry routing for app-owned action flows.
 //!
-//! This module decides which prompt or preview follows a selected action/menu item. Preview
-//! rendering and confirmed command completion live in sibling lifecycle modules.
+//! This module owns the app lifecycle step after an accepted menu item or key action has already
+//! been chosen: route it to a prompt, open the corresponding preview, or report a status. Feature
+//! views and action menus own whether an action is available and the exact target values they
+//! carry. [`super::preview`] owns preview pane construction and preview status contexts.
+//! [`super::completion`] and [`super::shared`] own confirmed command result handling.
+//! [`crate::jj_actions`] owns command-plan argv, preview, and run contracts.
 
 use color_eyre::Result;
 
@@ -93,6 +97,8 @@ impl App {
     }
 
     pub(in crate::app) fn apply_action_menu_item(&mut self, item: ActionMenuItem) {
+        // Accepted menu items leave modal input here because the app lifecycle owns the
+        // mode transition and any immediate preview/status side effects.
         match item.follow_up() {
             FollowUp::StatusMessage(message) => {
                 self.status = StatusLine::with_message(&self.view, message.as_str());
@@ -463,6 +469,8 @@ impl App {
 
         let decision =
             decide_push_remote_prompt(self.load_git_remotes().map_err(|error| error.to_string()));
+        // The reducer classifies loaded remotes; this entry point applies the resulting app
+        // side effect after preserving the feature-selected push target.
         match decision {
             PushRemotePromptDecision::MissingRemotes { message }
             | PushRemotePromptDecision::RemoteListError { message } => {
@@ -485,6 +493,8 @@ impl App {
     pub(in crate::app) fn open_fetch_remote_prompt(&mut self) {
         let decision =
             decide_fetch_remote_prompt(self.load_git_remotes().map_err(|error| error.to_string()));
+        // Fetch without an explicit remote still opens a preview pane so the failed remote-list
+        // command has the same status/output surface as other action previews.
         match decision {
             FetchRemotePromptDecision::MissingRemotes {
                 message,
@@ -520,6 +530,7 @@ impl App {
 fn decide_push_remote_prompt(
     remotes: std::result::Result<Vec<String>, String>,
 ) -> PushRemotePromptDecision {
+    // Keep remote-list classification pure; callers own status, prompt, and preview mutation.
     match remotes {
         Ok(remotes) => match remotes.as_slice() {
             [] => PushRemotePromptDecision::MissingRemotes {
@@ -537,6 +548,7 @@ fn decide_push_remote_prompt(
 fn decide_fetch_remote_prompt(
     remotes: std::result::Result<Vec<String>, String>,
 ) -> FetchRemotePromptDecision {
+    // Keep remote-list classification pure; callers own status, prompt, and preview mutation.
     match remotes {
         Ok(remotes) => match remotes.as_slice() {
             [] => FetchRemotePromptDecision::MissingRemotes {

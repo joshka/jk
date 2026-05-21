@@ -76,6 +76,11 @@ now.
 
 Examples for future packets:
 
+- When deciding ownership, prefer product-language questions over code-shape questions. "What does
+  the operation log show, select, copy, or recover from?" points to `operation_log`; "how do
+  bookmark rows map to safe bookmark mutations?" points to `bookmarks`; "how do we quote a jj exact
+  string pattern?" points to `jj`; "how is an action preview executed once a plan exists?" points to
+  app action lifecycle; and "how does a modal list render?" points to shared UI.
 - Operation-log behavior now starts from `operation_log`: `src/operation_log/rows.rs` owns rendered
   row grouping, operation-id template parsing and pairing, and fail-closed metadata drift tests;
   `src/operation_log.rs` owns movement/copy, undo/redo/restore/revert availability, operation detail
@@ -97,6 +102,24 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 action lifecycle entry ownership docs:
+
+- `src/app/action_lifecycle/entry.rs` now documents that action lifecycle entry owns routing from
+  accepted menu/key actions to prompts, previews, or status messages.
+- `AGENTS.md` and `docs/agent/architecture.md` now make the feature-policy versus shared-mechanics
+  split explicit, including the rule that feature roots own what a surface shows, selects, copies,
+  recovers from, and offers while shared modules own cross-cutting mechanics after feature policy is
+  already chosen.
+- The module docs preserve the current boundaries: feature views and action menus choose
+  availability and exact targets; preview owns preview pane/status construction; completion/shared
+  own confirmed result handling; `jj_actions` owns command-plan argv, preview, and run contracts.
+- Short comments now mark why app lifecycle entry keeps modal reset, preview opening, and sync
+  remote-list side effects beside otherwise pure prompt decisions.
+- This packet intentionally changed comments and documentation only. Focused validation covered
+  `cargo check`, `rustup run nightly cargo fmt --check`, `just md-check`, and
+  `cargo test action_lifecycle -- --test-threads=1`. Full `just check` also passed at the top of the
+  stack.
 
 2026-05-21 sync remote prompt decision reducers:
 

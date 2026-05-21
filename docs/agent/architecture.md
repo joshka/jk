@@ -90,6 +90,14 @@ Avoid letting `ui`, `jj`, `actions`, `jj_rows`, `action_menu`, `tui`, or `view_s
 grounds for feature policy. A shared module is the right home only when two feature owners would use
 the code without learning each other's product rules.
 
+That gives a practical split between feature policy and shared mechanics. Feature roots answer
+questions such as "what does this surface show, select, copy, or recover from?" and "when is this
+action available for the selected rows?" Shared modules answer questions such as "how is an exact
+revset quoted?", "how does a modal list render?", or "how is an already-built action preview
+executed?" If a rule changes because `operation_log`, `bookmarks`, `status`, `files`, or `log`
+changes as a product surface, prefer the feature owner even when the code shape resembles an
+existing shared helper.
+
 A plausible destination shape is:
 
 - `log` owns the default graph/log view, log rows, log selection, and log-local action availability.
@@ -102,6 +110,10 @@ A plausible destination shape is:
   surfaces.
 - `documents` owns reusable rendered-document mechanics such as sticky headings, rendered line
   structure, and document search when that lowers reader burden more than separate helpers.
+- `actions` owns cross-view action command plans, not view-specific availability. For example,
+  rewrite plans can own argv, preview, and execution for rebase, squash, and absorb after a feature
+  has selected targets; the log or status feature owns whether those actions are offered from its
+  selected rows.
 
 The exact names can change. The invariant is that a maintainer can start from a feature such as
 `operation_log` or `bookmarks` and find the local row model, view behavior, action availability, and
