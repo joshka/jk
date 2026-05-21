@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 diff view test split:
+
+- `src/diff.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/diff/tests.rs` with `use super::*;` for private access to diff view state.
+- This improves local readability by keeping diff projection, sticky file behavior, file navigation,
+  search, copy options, and horizontal scroll behavior visible without scrolling through 295 lines
+  of inline tests. The production file measured 613 lines before the split and 317 lines after it.
+- The packet intentionally preserved all 14 diff view test names, assertions, helper functions,
+  imports, diff projection behavior, sticky file behavior, file navigation behavior, search
+  behavior, copy options, horizontal scroll behavior, public API, and runtime behavior.
+- Focused validation covered `cargo test diff -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`.
+- Main-thread review validation reran the same focused checks successfully with 32 passed and 535
+  filtered out for `cargo test diff -- --test-threads=1`.
+- Rework was limited to moving the extracted test block into a Rust child module; no production diff
+  view code changed beyond replacing the inline test block with the sibling test module declaration.
+
 2026-05-21 app screen projection test split:
 
 - `src/app_screen.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

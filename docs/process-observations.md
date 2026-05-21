@@ -5,6 +5,40 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Diff view test split)
+
+- Slice / task: move the inline `src/diff.rs` tests into an out-of-line child module while
+  preserving existing diff projection, sticky file, navigation, search, copy, and horizontal scroll
+  behavior.
+- Thread id: `019e4ca7-b52e-74c3-b28f-c2e66eed457e` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker handled the bounded Rust maintainability packet without running jj
+  or git commands; version-control ownership and review stayed with the main thread.
+- Changed files: `src/diff.rs`, `src/diff/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
+  and `docs/process-observations.md`.
+- Implementation outcome: `src/diff.rs` now ends with `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/diff/tests.rs` and use Rust child-module privacy through `use super::*;`. The
+  production file measured 613 lines before the split and 317 lines after it, with 295 lines of
+  tests now in the child module.
+- Behavior-preservation evidence: the packet moved the existing tests unchanged in behavior and did
+  not alter diff projection behavior, sticky file behavior, file navigation behavior, search
+  behavior, copy options, horizontal scroll behavior, visibility, public API, or runtime behavior.
+  The test names, assertions, helpers, and imports stayed with the moved test module.
+- Validation trail:
+  - Worker validation passed: `cargo test diff -- --test-threads=1` with 32 tests and 535 filtered
+    out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `just md-check` after applying Panache wrapping.
+  - Main-thread review validation passed: `cargo test diff -- --test-threads=1` with 32 tests and
+    535 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+- Rework / surprise: rustfmt accepted the moved Rust test module as written; `just md-check`
+  initially reported Panache wrapping differences in the new notes, and applying those wraps fixed
+  the Markdown gate. No behavior rework was needed.
+- Evidence basis:
+  - Date: `2026-05-21 15:28:55 PDT` from worker-reported local `date`.
+  - Main review date: `2026-05-21 15:33:48 PDT` from local `date`.
+  - Files: `src/diff.rs`, `src/diff/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    this process note.
+
 ### 2026-05-21 (App screen projection test split)
 
 - Slice / task: move inline `src/app_screen.rs` tests into `src/app_screen/tests.rs` while
