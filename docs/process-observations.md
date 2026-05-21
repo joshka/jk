@@ -5,6 +5,40 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark action-plan submodule extraction)
+
+- Slice / task: implement the ledger slice `Bookmark Action Plan Submodule` on current jj change
+  `Extract bookmark action plans`.
+- Thread id: `019e496b-08e0-77e2-85d2-4366f1f65bc3`.
+- Model / routing: a `gpt-5.4` worker implemented the behavior-preserving extraction for main-thread
+  review.
+- Subagent reasoning note: after the user's later instruction, future subagents should default to
+  medium reasoning unless a higher level is specifically justified. This packet used high reasoning
+  because it was launched before that preference was given.
+- Files changed: `src/jj_actions.rs`, `src/jj_actions/bookmarks.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_actions/bookmarks.rs` now owns the bookmark mutation plan/value
+  surface, rename validation, and focused bookmark command-construction tests. `src/jj_actions.rs`
+  keeps the stable facade with a local `bookmarks` submodule declaration plus `pub use` re-exports,
+  matching the existing `git_sync` extraction pattern.
+- Behavior intent: preserve argv shape, preview text, fallback wording, labels, status wording,
+  public call sites, app behavior, and bookmark target-eligibility behavior exactly.
+- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check` passed.
+- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
+  largest-file output showed `src/jj_actions.rs` at 2478 lines and `src/jj_actions/bookmarks.rs` at
+  833 lines.
+- Evidence basis:
+  - Date: `2026-05-21 00:29:48 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
+    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/bookmarks.rs`, `src/bookmarks.rs`,
+    `src/bookmarks/action_targets.rs`, and `src/app/tests/bookmark_actions.rs`
+
 ### 2026-05-21 (Bookmark action-target resolver extraction)
 
 - Slice / task: implement the ledger slice `Bookmark Action Target Resolver` on current jj change

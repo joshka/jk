@@ -40,12 +40,12 @@ shape, documentation workflow, and agent workflow.
   construction; `src/app/action_lifecycle/preview.rs` owns the preview-pane construction helper.
 - Bookmark cohesion: `src/bookmarks.rs` owns bookmark list state, rendering, refresh, and selection;
   `src/bookmarks/action_targets.rs` owns fail-closed bookmark action-target resolution;
-  `src/jj_actions.rs` owns bookmark action plans and the remaining preview-first action plans;
-  `src/jj_rows.rs` owns bookmark row metadata pairing; `src/view_action_targets.rs` owns bookmark
-  action-target projection policy.
+  `src/jj_actions/bookmarks.rs` owns bookmark action plans; `src/jj_actions.rs` keeps the stable
+  facade and the remaining preview-first action plans; `src/jj_rows.rs` owns bookmark row metadata
+  pairing; `src/view_action_targets.rs` owns bookmark action-target projection policy.
 - Action planning: `src/jj_actions/git_sync.rs` owns the extracted git sync action-plan cluster;
-  `src/jj_actions.rs` keeps the stable facade and the remaining action-plan clusters, including the
-  rewrite action plan.
+  `src/jj_actions/bookmarks.rs` owns the extracted bookmark action-plan cluster; `src/jj_actions.rs`
+  keeps the stable facade and the remaining action-plan clusters, including the rewrite action plan.
 - View routing: `src/view_state.rs` keeps the view-level routing that chooses the next detailed
   screen.
 - Selection mechanics: `src/selection.rs` owns the restore helper and shared selection cursor
@@ -138,13 +138,14 @@ near the type that future edits are likely to land on first.
 
 ### Repeated Or High-Live-Context Surfaces
 
-- `src/jj_actions.rs`, `src/jj_rows.rs`, `src/bookmarks/action_targets.rs`, and
+- `src/jj_actions/bookmarks.rs`, `src/jj_rows.rs`, `src/bookmarks/action_targets.rs`, and
   `src/view_action_targets.rs` still share bookmark-related vertical concerns across action targets,
-  action plans, and row metadata, but the selected-row target policy now has a focused owner.
-- `src/jj_actions.rs` still mixes the remaining action-plan clusters, argv construction, preview
-  summaries, and fallback wording. The git sync cluster is already out of the generic path, while
-  the bookmark action-plan cluster remains in `src/jj_actions.rs`; the next bounded slice should
-  extract that cluster without reopening the whole planner.
+  action plans, and row metadata, but the selected-row target policy and bookmark planner now have
+  focused owners.
+- `src/jj_actions.rs` still mixes the remaining non-bookmark action-plan clusters, argv
+  construction, preview summaries, and fallback wording. The git sync and bookmark clusters are
+  already out of the generic path; the next bounded `jj_actions` slice should stay focused on the
+  rewrite cluster without reopening the whole planner.
 - `src/app/action_lifecycle/completion.rs` still concentrates the status/result construction
   branches for action outcomes. It is a smaller target than `src/jj_actions.rs`, but it remains a
   dense live-context surface.
@@ -173,12 +174,16 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 
 ### 2. Bookmark Action Plan Submodule
 
-- Owner: `src/jj_actions/bookmarks.rs`.
-- Purpose: move bookmark action-plan construction into a stable submodule while keeping the public
-  `jj_actions` facade intact.
-- Non-goals: no argv wording drift, no behavior change, and no public call-site churn.
-- Proof: `src/jj_actions.rs` still ranks among the largest and hottest files after the git-sync
-  extraction.
+- Status: completed in the `Extract bookmark action plans` packet.
+- Result: `src/jj_actions/bookmarks.rs` now owns `JjBookmarkMutationKind`, `JjBookmarkTarget`,
+  `JjBookmarkForgetTarget`, `JjBookmarkTrackingTarget`, `JjBookmarkMutationPlan`,
+  `validate_bookmark_rename_new_name`, and the focused bookmark command-construction tests.
+  `src/jj_actions.rs` keeps the stable public facade through re-exports.
+- Non-goals preserved: no argv wording drift, no behavior change, no public call-site churn, and no
+  target-eligibility changes.
+- Proof: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check`.
 
 ### 3. Bookmark Row Metadata Module
 
