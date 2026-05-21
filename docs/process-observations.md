@@ -5,6 +5,34 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Git sync action-plan extraction)
+
+- Slice / task: implement prioritized slice 2 from `docs/agent/source-maintainability-ledger.md`,
+  `Git Sync Action-Plan Cluster`, on current jj change `Extract git sync action plans`.
+- Thread id: `019e4950-6c88-7943-be05-31a9be227f0a`.
+- Model / routing: a `gpt-5.5` worker/subagent implemented the extraction and the main thread
+  reviewed it.
+- Implementation outcome: `src/jj_actions/git_sync.rs` now owns `JjGitFetch`, `JjGitPush`,
+  `JjGitPushTarget`, git fetch/push argv construction, dry-run labels, exact remote pattern
+  handling, direct run methods, and focused command-construction tests.
+- Facade outcome: `src/jj_actions.rs` keeps stable public call paths with a local `git_sync`
+  submodule declaration and `pub use` re-exports, without retaining git sync implementation detail.
+- Behavior intent: preserve command argv, dry-run labels, exact remote pattern behavior,
+  status/fallback wording, and app-level sync action expectations.
+- Worker validation trail: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check` all passed.
+- Main-thread validation after review: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check` all passed.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/jj_actions.rs`, `src/jj_actions/git_sync.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`
+
 ### 2026-05-20 (Assess next maintainability slices)
 
 - Slice / task: reassess the next maintainability packets after the recent cleanup work on current

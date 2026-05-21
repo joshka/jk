@@ -158,14 +158,15 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 - Non-goals: no preview behavior change, no keymap redesign, and no result-model reshaping.
 - Proof: focused preview tests covering current rendering and scroll behavior, plus `cargo check`.
 
-### 2. Git Sync Action-Plan Cluster
+### 2. Completed: Git Sync Action-Plan Cluster
 
-- Owner: `src/jj_actions.rs`.
-- Purpose: extract the git sync action-plan cluster now that the shared syntax helpers are already
-  out of the file.
-- Non-goals: no broad `jj_actions.rs` split, no public facade churn, and no wording drift in argv
-  labels or fallback result text.
-- Proof: command-construction tests for the moved cluster, plus the current compile pass.
+- Status: completed in the current packet.
+- Result: `src/jj_actions/git_sync.rs` owns `JjGitFetch`, `JjGitPush`, `JjGitPushTarget`, and their
+  command-construction tests; `src/jj_actions.rs` keeps the stable public facade through re-exports.
+- Non-goals preserved: no broad `jj_actions.rs` split, no public facade churn, and no wording drift
+  in argv labels or fallback result text.
+- Proof: `cargo test jj_actions -- --test-threads=1` keeps the moved git sync tests discoverable
+  through the `jj_actions` module path.
 
 ### 3. View Action-Target Projection Policy
 
