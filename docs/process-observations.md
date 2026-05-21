@@ -5,6 +5,42 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Root jj action plan split)
+
+- Slice / task: split describe/commit and abandon action-plan logic out of the `jj_actions` root so
+  the root can become a table-of-contents boundary with public re-exports.
+- Thread id: `019e4cf5-1017-76c1-8c42-b4c122314849` from the worker handoff.
+- Model / routing: GPT-5.5 with medium reasoning handled the judgment-heavy Rust split in the
+  `Split root jj action plans` jj change; the main thread reviewed the diff, updated tracking docs,
+  and reran validation.
+- Changed files: `src/jj_actions/mod.rs`, `src/jj_actions/describe/mod.rs`,
+  `src/jj_actions/describe/tests.rs`, `src/jj_actions/abandon/mod.rs`,
+  `src/jj_actions/abandon/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
+  `docs/agent/cleanup-wave-status.md`, and this process note.
+- Implementation outcome: `CommandOutput` remains in the root action-plan boundary; describe and
+  commit plans now live under `jj_actions::describe`; abandon plan, preview, title-template, and
+  empty/non-empty classifier now live under `jj_actions::abandon`; public imports from
+  `crate::jj_actions` continue to work through re-exports.
+- Behavior-preservation evidence: command argv, command labels, preview summaries, exact revset
+  quoting, abandon title/diff probes, status/result text, app-facing behavior, public imports, and
+  tests are preserved.
+- Process observation: GPT-5.5 medium was appropriate here because the task needed ownership
+  judgment and public-boundary preservation, not just file movement. The worker had one formatting
+  rework in `abandon/mod.rs`; main-thread validation found no behavior or API drift.
+- Validation trail:
+  - Worker validation passed: `cargo test jj_actions -- --test-threads=1`;
+    `cargo test app::tests::describe_commit_actions -- --test-threads=1`;
+    `cargo test app::tests::abandon_actions -- --test-threads=1`; `cargo check`; and
+    `rustup run nightly cargo fmt --check` after rustfmt fixed one wrapping diff.
+  - Main-thread validation passed: the same focused tests; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-21 16:57:11 PDT` from local `date`.
+  - Files: `src/jj_actions/mod.rs`, `src/jj_actions/describe/mod.rs`,
+    `src/jj_actions/describe/tests.rs`, `src/jj_actions/abandon/mod.rs`,
+    `src/jj_actions/abandon/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/cleanup-wave-status.md`, and this process note.
+
 ### 2026-05-21 (File and resolve directory-root conversion)
 
 - Slice / task: convert coherent file, resolve, and app-test `foo.rs` plus `foo/` pairs to

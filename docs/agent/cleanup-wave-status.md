@@ -37,6 +37,9 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   `jj_actions/working_copy`, and `operation_log/detail`.
 - The third module-layout conversion moved coherent file/resolve roots to `mod.rs` for `files`,
   `files/list`, `files/show`, `resolve`, and `app/tests`.
+- `jj_actions` now has a real table-of-contents root: describe/commit plans moved under
+  `jj_actions/describe`, abandon plans moved under `jj_actions/abandon`, and the root keeps
+  `CommandOutput` plus public action-plan re-exports.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -94,7 +97,7 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   splits, not blind path moves.
 - Remaining `foo.rs` plus `foo/` pairs after the first conversion are mostly larger roots or nested
   roots with feature/action policy: `action_menu`, `app`, `app/action_lifecycle`, `app/mode_input`,
-  `bookmarks`, `graph`, `jj`, `jj_actions`, `operation_log`, and `tui`.
+  `bookmarks`, `graph`, `jj`, `operation_log`, and `tui`.
 - App modal dispatch readability: `src/app/mode_input.rs` now mostly reads as a dispatch table plus
   named modal handlers. The next app-dispatch work should be based on measured remaining complexity,
   not another automatic extraction.

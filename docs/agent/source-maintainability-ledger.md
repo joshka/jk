@@ -118,6 +118,27 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 root jj action plan split:
+
+- `src/jj_actions/mod.rs` is now the action-plan boundary and table of contents. It keeps
+  `CommandOutput` plus public re-exports for the plan types consumed by views, menus, and app
+  lifecycle code.
+- Describe and commit planning moved to `src/jj_actions/describe/mod.rs`, with tests in
+  `src/jj_actions/describe/tests.rs`.
+- Abandon planning, diff/title preflight, preview text, and empty/non-empty classification moved to
+  `src/jj_actions/abandon/mod.rs`, with tests in `src/jj_actions/abandon/tests.rs`.
+- The packet removes the old `src/jj_actions.rs` plus `src/jj_actions/` pair and applies the epage
+  module-layout rule through a real topical split rather than a blind root rename.
+- The packet intentionally preserved public imports from `crate::jj_actions`, command argv, command
+  labels, preview summaries, exact revset quoting, abandon title/diff probes, status/result text,
+  app-facing behavior, and tests.
+- Validation passed: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test app::tests::describe_commit_actions -- --test-threads=1`;
+  `cargo test app::tests::abandon_actions -- --test-threads=1`; `cargo check`;
+  `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `action_menu`, `app`,
+  `app/action_lifecycle`, `app/mode_input`, `bookmarks`, `graph`, `jj`, `operation_log`, and `tui`.
+
 2026-05-21 file and resolve directory-root conversion:
 
 - A third safe subset of existing `foo.rs` plus `foo/` pairs moved to `foo/mod.rs` without content
