@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Mode input reducer test split)
+
+- Slice / task: move the inline `src/app/mode_input/reducers.rs` reducer tests beside the module
+  without changing reducer behavior, test names, expected strings, assertions, or visibility.
+- Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
+  implementation `019e4be9-902c-7d42-91a1-42bdc43c4b73`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the scoped source split and
+  process-note update. The main thread retained ownership of version-control operations, reviewed
+  the diff, updated the maintainability ledger, and reran focused validation.
+- Implementation outcome: `src/app/mode_input/reducers.rs` now keeps production code scanning
+  focused by replacing the inline test block with `#[cfg(test)] mod tests;`; the moved tests live in
+  `src/app/mode_input/reducers/tests.rs` with `use super::*;` and the existing `RolePromptOption`
+  import.
+- Behavior-preservation evidence: the moved module still runs the same 12 `mode_input` reducer test
+  names, including role prompt, describe prompt, commit prompt, bookmark name, and bookmark rename
+  coverage. The change only moved the test module and applied rustfmt line wrapping.
+- Size evidence after main review: `src/app/mode_input/reducers.rs` measured 290 lines and
+  `src/app/mode_input/reducers/tests.rs` measured 162 lines.
+- Validation trail:
+  - Worker validation passed: `cargo test mode_input -- --test-threads=1` with 12 passed;
+    `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test mode_input -- --test-threads=1` with 12
+    passed; `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
+    with `-D warnings`, `cargo check`, and `cargo test` with 557 passed / 2 ignored.
+- Rework / surprise: the first fmt check reported line wrapping needed in the new test file; after
+  applying the rustfmt-suggested wrapping, the requested Rust validation sequence passed.
+- Evidence basis:
+  - Date: `2026-05-21 12:03:44 PDT` from local `date`.
+  - Worker thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/mode_input/reducers.rs`, `src/app/mode_input/reducers/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Action plan root contract documentation)
 
 - Slice / task: document the root `jj_actions` action-planning boundary before further action-plan

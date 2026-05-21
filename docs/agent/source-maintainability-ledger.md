@@ -98,6 +98,19 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 mode input reducer test split:
+
+- `src/app/mode_input/reducers.rs` now declares its tests out-of-line in
+  `src/app/mode_input/reducers/tests.rs`, keeping production reducer contracts visible without
+  scrolling through the growing behavior matrix.
+- The split is behavior-neutral: the same 12 reducer tests still cover role prompt, describe,
+  commit, bookmark-name, and bookmark-rename prompt decisions.
+- After the move, `src/app/mode_input/reducers.rs` measured 290 lines and
+  `src/app/mode_input/reducers/tests.rs` measured 162 lines.
+- Focused validation covered `cargo test mode_input -- --test-threads=1`, `cargo check`,
+  `rustup run nightly cargo fmt --check`, and `just md-check`. Full `just check` also passed at the
+  top of the stack.
+
 2026-05-21 role prompt acceptance reducer extraction:
 
 - `src/app/mode_input/reducers.rs` now owns the pure role-prompt acceptance decision:
