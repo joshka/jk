@@ -1,56 +1,109 @@
 # Source Maintainability Ledger
 
-This ledger records the current bounded follow-up packets after the completed bookmark, rewrite,
-help projection, and path action-menu refactoring slices. It is not a standing "split the biggest
-files" queue. Reassess with fresh measurements before starting another source-shape packet.
+This ledger records the active maintainability objective for `jk` and the current evidence that can
+guide bounded follow-up packets. It is not a standing "split the biggest files" queue. Measurements
+nominate places to read first; they do not mandate refactors.
 
-Current evidence comes from the 2026-05-21 row-extraction reassessment packet:
-`just largest-rust-files`, `wc -l src/*.rs src/jj_rows/*.rs`, direct reads of the row loaders and
-current large modules, and the ownership rules in [`architecture.md`](architecture.md) and
-[`rust-style.md`](rust-style.md).
+Before starting a source-shape packet, gather fresh measurements and read the owning module. Prefer
+product work and local documentation improvements over movement that only changes line counts.
 
-## Quality Bar
+## Active Quality Bar
 
-- Favor reader locality and low cognitive burden over generic file splitting.
-- Keep ownership vertical: move rules, data, and wording toward the concept that changes for the
-  same reason.
+The current maintainability objective is documentation-first readability with vertical ownership.
+Future packets should make the code easier for a maintainer to read locally without weakening the
+rendered-`jj` presentation contract.
+
+- Document durable ownership and caller-facing contracts on central modules, public types, and
+  crate-visible boundaries.
+- Keep behavior vertical: put rules, data, wording, tests, and docs near the concept that changes
+  for the same reason.
+- Put each rule where a maintainer would look when the user-visible concept changes. Ask which
+  product concept owns the decision before asking what kind of code it is.
+- Favor direct readable control flow over generic abstractions. Extract only when a named owner
+  reduces live context, hides fewer side effects, or makes an invariant harder to violate.
 - Preserve rendered `jj` output, argv shape, labels, refresh behavior, selection behavior, and
-  app-level routing unless the slice explicitly owns that contract.
-- Use docs and tests as proof of ownership. Each packet should say what moved, what did not move,
-  and what focused validation preserved the contract.
+  app-level routing unless the packet explicitly owns that contract.
+- Treat current kind-of-code buckets such as `jj_rows`, `jj_actions`, `action_menu`, `tui`, and
+  `view_state` as temporary homes or shared infrastructure only when they hold genuinely shared
+  contracts. They should not hide feature-specific product decisions.
+- Treat line counts, visibility counts, repeated helper shapes, and regex hot spots as prompts for
+  review, not proof that a split is correct.
+- Each packet should say what changed, what intentionally stayed put, and which focused validation
+  preserved the contract.
 
-## Reassessment Snapshot
+### Destination Shape
 
-### Completed Slice History
+The long-term direction is feature roots plus shared infrastructure. The exact file names can
+change, but a maintainer should be able to start from a feature such as `operation_log`,
+`bookmarks`, `status`, `files`, or `log` and find the local row model, view behavior, action
+availability, and tests without first understanding global buckets.
 
-- `Bookmark Action Target Resolver`
-- `Bookmark Action Plan Submodule`
-- `Bookmark Row Metadata Module`
-- `Rewrite Action Plan Submodule`
-- `Action Preview Pane Construction Helper`
-- `Git Sync Action-Plan Cluster`
-- `Working-Copy Action Plan Cluster`
-- `Operation Recovery And Target Plan Cluster`
-- `View Action-Target Projection Policy`
-- `Simple Selection Restore Helper`
-- `Retired src/jj.rs Compatibility Re-exports`
-- `Documentation Drift Cleanup`
-- `Help Projection Policy Packet`
-- `File And Status Path Action-Menu Policy`
-- `Graph Revision Action-Menu Policy Packet`
-- `ViewSpec Navigation Provenance Packet`
-- `Status Hint Projection Packet`
+Feature modules should own product decisions that change together:
 
-Those packets closed the previous bookmark-, rewrite-, help-, and path-heavy queue. The next work
-should start from the current hotspots instead of replaying the old priority order.
+- view state and bindings;
+- row models, row interpretation, and rendered-output assumptions;
+- selection, search, copy, refresh, and reveal behavior;
+- feature-specific action availability and action target resolution;
+- feature tests and user-visible contracts.
 
-### Current Source-Shape Snapshot
+Shared modules should own cross-cutting mechanics that two feature owners can use without
+understanding each other's domain:
 
-Current largest Rust files from `just largest-rust-files` on 2026-05-21:
+- `jj`: process execution, syntax quoting, command construction, and view specs;
+- `actions`: command plans, argv/preview/run contracts, and command-output preservation after a view
+  has already chosen an action;
+- `ui`: shared chrome, modal rendering, menus, status hints, and theme primitives;
+- `app`: event loop, mode dispatch, action lifecycle, refresh/reveal orchestration, and services;
+- `selection`, `search`, `clipboard`, and similar helpers only when the rule is domain-neutral.
+
+Use the feature-policy versus shared-mechanics test before moving code: if two feature owners would
+not use a helper without learning each other's product rules, keep the rule with one feature for
+now.
+
+Examples for future packets:
+
+- Operation-log behavior should trend toward `operation_log`: rows and id pairing, movement/copy,
+  undo/redo/restore/revert availability, operation detail navigation, and tests.
+- Bookmark behavior should trend toward `bookmarks`: row metadata, safe mutation targets,
+  create/set/move/rename/delete/forget/track/untrack availability, and tests.
+- Cross-view action plans such as rebase, squash, absorb, new, edit, duplicate, split, restore,
+  revert, track, untrack, chmod, fetch, push, describe, and abandon may live under an action-plan
+  owner, but view-specific availability belongs with the feature that offers the action.
+- Rendered document scrolling, sticky file headings, and rendered jj document parsing may become a
+  document feature owner when that lowers reader burden more than today's separate helper modules.
+
+## Mechanical Audit Snapshot
+
+Snapshot date: 2026-05-21. Rerun these commands before using the measurements for new work.
+
+Commands used:
+
+```sh
+just largest-rust-files
+rg -n '^\s*pub(\(|\s)' src
+rg -n '^\s*pub\s' src
+rg -n '^\s*pub\(crate\)' src
+rg -n '^\s*pub\(super\)' src
+rg -n '^//!|^///|^\s*pub(\([^)]*\))?\s+(struct|enum|fn|const|static|trait|type|mod|use)\b' \
+  src/main.rs src/app.rs src/app_screen.rs src/command.rs src/action_menu.rs src/tui.rs \
+  src/jj_actions.rs src/jj_rows.rs
+rg -n '(ListState|selected|selection|restore|move_(up|down|to|selection|selected)|'\
+'select_(next|previous)|next_(item|row)|previous_(item|row)|clamp)' \
+  src/graph.rs src/status.rs src/file_list.rs src/resolve.rs src/bookmarks.rs \
+  src/operation_log.rs src/workspaces.rs
+rg -n '(complete|completion|result|outcome|finish|preview|execute|ActionOutput|'\
+'ActionResult|MutationPlan|FollowUp|status)' src/app/action_lifecycle src/jj_actions.rs
+rg -n '^\s*(match|if let|while let|for |loop\b)|\bmatch\b|else \{|\.and_then\(|\.map_or\(' \
+  src/*.rs src/app/*.rs src/app/action_lifecycle/*.rs src/jj_actions/*.rs src/jj_rows/*.rs \
+  src/action_menu/*.rs src/jj/*.rs src/tui/*.rs
+```
+
+### Largest Rust Files
+
+The largest production files reported by `just largest-rust-files` were:
 
 ```text
 1218 src/graph.rs
-1192 src/app/tests/bookmark_actions.rs
 1159 src/jj_actions.rs
  976 src/tui.rs
  973 src/bookmarks.rs
@@ -58,10 +111,8 @@ Current largest Rust files from `just largest-rust-files` on 2026-05-21:
  833 src/jj_actions/bookmarks.rs
  820 src/status.rs
  797 src/jj/view_spec.rs
- 778 src/app/tests/working_copy_actions.rs
  778 src/app/mode_input.rs
  773 src/jj.rs
- 760 src/jj_rows.rs
  743 src/action_menu/revision_actions.rs
  705 src/sticky_file_view.rs
  642 src/help.rs
@@ -69,210 +120,171 @@ Current largest Rust files from `just largest-rust-files` on 2026-05-21:
  632 src/command.rs
  628 src/app_screen.rs
  613 src/diff.rs
+ 597 src/rendered_jj.rs
 ```
 
-Current row-family line counts from `wc -l src/jj_rows.rs src/jj_rows/*.rs` after the 2026-05-21
-graph revision row extraction:
+The same report also listed large test files. Those test sizes are evidence to read the surrounding
+contracts, not evidence to split production code.
+
+### Rustdoc Coverage
+
+The named central files all have module docs. The mechanical immediate-doc scan still shows weak or
+missing item-level Rustdoc on many public or crate-visible contracts:
+
+- `src/main.rs`: module docs are enough for the binary entry point; `run` lives in `src/app.rs`.
+- `src/app.rs`: `run` lacks direct Rustdoc, though the module docs explain app orchestration.
+- `src/app_screen.rs`: `InteractionMode` is documented, but `ViewMenuOption`, `ViewMenuAction`, and
+  view-menu helpers are weakly documented.
+- `src/command.rs`: the central enums are documented, but many public constructors, binding helpers,
+  and prefix-match helpers have no direct caller-facing docs.
+- `src/action_menu.rs`: module docs exist, but the public action vocabulary, prompts, menu item
+  model, and facade are mostly undocumented at the item level.
+- `src/tui.rs`: module docs exist, but `Areas`, `Overlay`, and render facades have no direct docs.
+- `src/jj_actions.rs`: module docs and local comments explain preview-first plans, but public plan
+  types and argv/preview/run methods mostly lack Rustdoc.
+- `src/jj_rows.rs`: `FileListItem` and `ResolveEntry` are documented; the resolve/file-list loaders
+  and shared rendered-line helpers are weakly documented.
+
+This nominates a source documentation sweep before another broad source split. The sweep should add
+short ownership and contract docs only where a maintainer would otherwise need to reconstruct
+visibility, side effects, ids, argv shape, or output-shape assumptions.
+
+### Visibility Shape
+
+Broad visibility counts across `src`:
 
 ```text
-876 src/jj_rows/bookmarks.rs
-498 src/jj_rows/revisions.rs
-338 src/jj_rows/workspaces.rs
-282 src/jj_rows.rs
-251 src/jj_rows/operations.rs
+778 pub
+ 96 pub(crate)
+118 pub(super)
 ```
 
-The old 1440-line `src/jj.rs` and 1299-line `src/jj_rows.rs` measurements are stale. ViewSpec,
-operation rows, workspace rows, revision action-menu policy, and status hint projection changed the
-largest-file picture materially. The remaining source-shape pressure is now mostly view/action
-cohesion, not a single obvious "split the biggest file" queue.
+The highest per-file broad-visibility counts were in `src/app/services.rs`, test support,
+`src/jj_actions.rs`, `src/jj_actions/working_copy.rs`, `src/sticky_file_view.rs`,
+`src/jj_actions/bookmarks.rs`, `src/action_menu.rs`, `src/jj/view_spec.rs`, and `src/command.rs`.
+Use these counts to audit boundary clarity and documentation. Do not narrow visibility just to move
+the count.
 
-## Completed Current Slices
+### Repeated List Mechanics
 
-### Help Projection Policy Packet
+Selection, restore, movement, `ListState`, and clamp evidence across list-style views:
 
-- Status: completed on 2026-05-21 in the Codex main thread.
-- Owner: `src/help.rs`
-- Outcome: `src/help.rs` owns `HelpContext`, help sections and rows, generated help projection,
-  context visibility, and the `help_metadata` / `view_help_metadata` policy. `src/command.rs`
-  remains focused on command vocabulary, key labels, binding matching, and help-mode prefix matching
-  through the narrow `command_is_visible_in_help` helper.
-- Non-goals: no key binding changes, no dispatch changes, no `ViewEffect` changes, and no TUI help
-  layout redesign in `src/tui.rs`.
-- Proof: focused command/help projection tests, especially context-specific visibility cases,
-  `cargo check`, `just md-check`, and final `just check` with 533 passed / 2 ignored.
+```text
+172 src/graph.rs
+ 93 src/bookmarks.rs
+ 78 src/status.rs
+ 49 src/operation_log.rs
+ 47 src/file_list.rs
+ 44 src/resolve.rs
+ 42 src/workspaces.rs
+```
 
-### File And Status Path Action-Menu Policy
+The evidence shows a real repeated shape: views keep a `Selection`, build a Ratatui `ListState`,
+move next/previous/first/last, clamp after refresh, and often restore by key or previous index. This
+does not automatically justify a generic list-view abstraction. The current `Selection` and
+`restore_by_key_or_index` helpers already cover some shared mechanics, while each view still owns
+different ids, action menus, status messages, navigation effects, and refresh contracts.
 
-- Status: completed on 2026-05-21 in the Codex main thread.
-- Owner: `src/action_menu/path_actions.rs`
-- Outcome: `src/action_menu/path_actions.rs` owns `FileActionContext`, its working-copy and exact
-  revision scopes, status path menu construction, file path menu construction, chmod item
-  construction, and the focused path-action policy tests. `src/action_menu.rs` kept the shared
-  action vocabulary and the broad `ExactActionContext` routing surface until the revision packet
-  below moved that routing into its own owner.
-- Maintainability evidence: `src/action_menu.rs` dropped from 1246 lines in the reassessment
-  snapshot to 1028 lines after extraction, and the new `src/action_menu/path_actions.rs` is 246
-  lines including moved tests.
-- Non-goals preserved: no graph multi-revision menu redesign, no role-prompt redesign, no mutation
-  preview execution changes, and no new action vocabulary.
-- Proof: focused action-menu, file-action, and detail-restore tests, plus `cargo check`,
-  `cargo clippy -- -D warnings`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+Use this evidence for focused improvements only when a product change makes one repeated mechanic
+hard to audit in multiple places.
 
-### Graph Revision Action-Menu Policy Packet
+### Action Completion And Result Handling
 
-- Status: completed on 2026-05-21 in a Codex worker/subagent.
-- Owner: `src/action_menu/revision_actions.rs`
-- Outcome: `src/action_menu/revision_actions.rs` owns `ExactActionContext`, graph/detail/status/file
-  surface routing, multi-revision role-prompt item construction, single-revision action ordering,
-  detail selected-path insertion policy, and revision mutation item construction.
-  `src/action_menu.rs` keeps shared action vocabulary, prompt vocabulary, `FollowUp`,
-  `ActionMenuItem`, `ActionMenu`, the public `ExactActionContext` re-export, the public
-  `build_action_menu` facade, and the shared `short_id` helper used by path and revision policy.
-- Maintainability evidence: `src/action_menu.rs` dropped from 1028 lines after the path extraction
-  to 302 lines after this packet, while the new `src/action_menu/revision_actions.rs` is 743 lines
-  including moved tests. `src/action_menu/path_actions.rs` remains 246 lines and unchanged in
-  ownership.
-- Non-goals preserved: no label, shortcut, safety-tier, role-prompt wording, follow-up payload, path
-  action policy, action execution, or app lifecycle behavior changes.
-- Proof: focused `cargo test action_menu -- --test-threads=1` passed with graph, path, app, and TUI
-  action-menu tests; `cargo test detail_restore_actions -- --test-threads=1` passed; final gate
-  commands are recorded in `docs/process-observations.md`.
+Action lifecycle and mutation-plan evidence:
 
-### Operation Row Metadata Packet
+```text
+ 97 src/app/action_lifecycle/preview.rs
+ 86 src/app/action_lifecycle/completion.rs
+ 72 src/app/action_lifecycle/entry.rs
+ 48 src/app/action_lifecycle/rewrite_completion.rs
+ 18 src/app/action_lifecycle/shared.rs
+ 15 src/jj_actions.rs
+```
 
-- Status: completed on 2026-05-21 in the Codex main thread.
-- Owner: `src/jj_rows/operations.rs`
-- Outcome: `src/jj_rows/operations.rs` owns `OperationLogItem`, operation-log row loading, operation
-  id metadata loading, row grouping, operation id parsing, and the focused operation row drift
-  tests. `src/jj_rows.rs` keeps the stable facade for `OperationLogItem` and
-  `load_operation_log_entries`, plus shared row helpers and the remaining row families.
-- Maintainability evidence: `src/jj_rows.rs` dropped from 1299 lines in the reassessment snapshot to
-  1075 lines after extraction, and the new `src/jj_rows/operations.rs` is 251 lines including moved
-  tests.
-- Non-goals preserved: no graph revision grouping changes, no bookmark/file-list/resolve/workspace
-  row changes, no rendered ANSI conversion changes, no operation id shape changes, and no
-  process-boundary move into `src/jj.rs`.
-- Proof: focused `cargo test jj_rows -- --test-threads=1` passed during the extraction, with final
-  gate commands recorded in `docs/process-observations.md`.
+The clear owner for app-side completion policy is `src/app/action_lifecycle`, especially
+`completion.rs`, `preview.rs`, and `shared.rs`. `src/jj_actions.rs` owns plan-side argv, preview
+text, and execution helpers. A future packet should improve documentation or grouping at that
+boundary only if it can state which side owns result wording, refresh/reveal behavior, or command
+output preservation. Do not merge app lifecycle policy into mutation plans.
 
-### Workspace Row Loading Packet
+### Control-Flow Hot Spots
 
-- Status: completed on 2026-05-21 in the Codex main thread.
-- Owner: `src/jj_rows/workspaces.rs`
-- Outcome: `src/jj_rows/workspaces.rs` owns `WorkspaceContext`, `WorkspaceItem`,
-  `load_workspace_context`, the workspace metadata template, metadata loading, rendered-row pairing,
-  workspace metadata parsing, row-count drift behavior, and focused workspace row tests.
-  `src/jj_rows.rs` keeps the stable workspace facade plus shared row helpers and the remaining row
-  families.
-- Maintainability evidence: `src/jj_rows.rs` dropped from 1075 lines after the operation-row
-  extraction to 760 lines after this packet, and the new `src/jj_rows/workspaces.rs` is 338 lines
-  including moved tests.
-- Non-goals preserved: no graph revision grouping changes, no operation/bookmark/file-list/resolve
-  row changes, no rendered ANSI conversion changes, no workspace metadata JSON shape changes, no
-  row-count drift behavior changes, and no workspaces view behavior changes.
-- Proof: focused `cargo test jj_rows -- --test-threads=1` and
-  `cargo test workspaces -- --test-threads=1` passed during the extraction, with final gate commands
-  recorded in `docs/process-observations.md`.
+Cheap nested/control-flow counts nominated these files for readability review:
 
-### ViewSpec Navigation Provenance Packet
+```text
+51 src/app/mode_input.rs
+31 src/app/action_lifecycle/completion.rs
+28 src/graph.rs
+25 src/jj_actions.rs
+25 src/command.rs
+24 src/help.rs
+23 src/app.rs
+22 src/status.rs
+21 src/app/action_lifecycle/entry.rs
+```
 
-- Status: completed on 2026-05-21 in the Codex main thread.
-- Owner: `src/jj/view_spec.rs`
-- Outcome: `src/jj/view_spec.rs` owns `DiffFormat`, `ViewSpec`, constructor provenance, app and jj
-  labels, exact-change target policy, path provenance, diff-format arg rewriting,
-  `navigation_revset`, `show_context_revset`, and the direct startup revset parsers used by those
-  policies. `src/jj.rs` re-exports `DiffFormat` and `ViewSpec` while keeping `JjCommand`,
-  `LogViewMode`, command-word/prefix behavior, direct commands, process helpers, templates, and
-  output summarization.
-- Maintainability evidence: `src/jj.rs` dropped from 1440 lines in the reassessment snapshot to 773
-  lines after extraction, and the new `src/jj/view_spec.rs` is 797 lines including focused
-  provenance tests.
-- Non-goals preserved: no argv shape changes, no command word changes, no label wording changes, no
-  `--git` behavior changes, no exact-change safety changes, no direct startup revset fallback
-  changes, no process helper movement, and no `jj_actions.rs` mutation-plan movement.
-- Proof: focused `cargo test jj -- --test-threads=1` passed during the extraction, with final gate
-  commands recorded in `docs/process-observations.md`.
+The stricter indentation-oriented scan put `src/app/mode_input.rs` first again with 35 hits, ahead
+of `src/jj_actions.rs`, `src/command.rs`, `src/action_menu/revision_actions.rs`, and
+`src/view_state.rs`. That makes `src/app/mode_input.rs` the only clearly bounded app readability
+candidate in this snapshot.
 
-### Status Hint Projection Packet
+## Completed Source-Shape Context
 
-- Status: completed on 2026-05-21 in a Codex worker/subagent.
-- Owner: `src/tui/status_hints.rs`
-- Outcome: `src/tui/status_hints.rs` owns `StatusHints`, per-view status hint tables,
-  `status_hint_candidates`, `status_hint_spans`, status-hint key styling, and the width-fit helper
-  used only for status-bar hint projection. `src/tui.rs` re-exports `StatusHints`, calls the narrow
-  `status_hint_spans` facade from `status_line_text`, and keeps shared title/status chrome,
-  overlays, action-output layout, menu rendering, and overlay footer helpers.
-- Maintainability evidence: `src/tui.rs` dropped from 1134 lines before the packet to 976 lines
-  after extraction, and the new `src/tui/status_hints.rs` is 202 lines including focused projection
-  tests.
-- Non-goals preserved: no title/status layout redesign, no help overlay rendering changes, no
-  action-output overlay rendering changes, no menu rendering changes, no theme style changes, no
-  overlay footer movement, and no status hint vocabulary or truncation behavior changes.
-- Proof: focused `cargo test tui -- --test-threads=1` passed with the moved module tests and the
-  existing status chrome snapshots; final gate commands are recorded in
-  `docs/process-observations.md`.
+Recent completed packets already moved several coherent owners out of broad modules:
 
-### Graph Revision Row Loading Packet
+- help projection policy into `src/help.rs`;
+- path and revision action-menu policy into `src/action_menu/path_actions.rs` and
+  `src/action_menu/revision_actions.rs`;
+- operation, workspace, and revision row loading into `src/jj_rows/operations.rs`,
+  `src/jj_rows/workspaces.rs`, and `src/jj_rows/revisions.rs`;
+- ViewSpec navigation provenance into `src/jj/view_spec.rs`;
+- status hint projection into `src/tui/status_hints.rs`.
 
-- Status: completed on 2026-05-21 in a Codex worker/subagent.
-- Owner: `src/jj_rows/revisions.rs`
-- Outcome: `src/jj_rows/revisions.rs` owns `LogItem`, graph revision row loading, compact
-  log-context loading, revision metadata template execution, revision metadata parsing, rendered
-  graph row grouping, revision id pairing, and the focused revision grouping/parser tests.
-  `src/jj_rows.rs` keeps the stable revision row facade plus resolve rows, file-list rows,
-  `document_plain_text`, `line_text`, JSON field helpers, `RowMetadata`, `first_content_char`, and
-  `is_standalone_graph_line`.
-- Maintainability evidence: `src/jj_rows.rs` dropped from 760 lines after the workspace extraction
-  to 282 lines after this packet, while the new `src/jj_rows/revisions.rs` is 498 lines including
-  moved tests.
-- Non-goals preserved: no rendered ANSI conversion changes, no graph row grouping behavior changes,
-  no metadata drift fail-closed behavior changes, no compact log-context behavior changes, no
-  resolve row or file-list row changes, and no process-boundary movement into `src/jj.rs`.
-- Proof: focused `cargo test jj_rows -- --test-threads=1` and `cargo test graph -- --test-threads=1`
-  passed during the extraction, with final gate commands recorded in `docs/process-observations.md`.
+Those packets improved local contracts, but several are still organized by kind of code rather than
+by user-visible feature. Treat them as staging points, not the final product shape:
 
-## Current Row Extraction Reassessment
+- `src/jj_rows/*` proved row contracts and metadata pairing, but feature-owned row modules are the
+  better destination when a feature packet touches the related view behavior.
+- `src/jj_actions/*` proved command-plan boundaries, but action availability and target policy
+  should move toward feature roots rather than stay in global action-menu planning.
+- `src/action_menu/*` should shrink over time toward shared menu vocabulary and presentation; the
+  feature deciding that an action is available should own that decision.
 
-The graph revision row extraction has now completed. Broad `src/jj_rows` source-shape work should
-pause unless product work expands resolve rows, file-list rows, or metadata pairing enough to expose
-a sharper owner.
+Do not move code only to match a destination tree. Move it when a packet can preserve behavior, name
+the owning product concept, and make the reader path shorter.
 
-The remaining candidates from the prior ledger are not good standalone packets right now:
+## Next Packet Recommendations
 
-- Resolve-entry parsing is tiny and has no sibling behavior beyond its template, parser, and three
-  tests. Extracting it would create a small file but not reduce meaningful live context.
-- File-list path preservation is even smaller: one item type, one loader, exact path preservation,
-  and two focused tests. Wait until file-list behavior grows beyond "rendered row plus exact path."
-- Shared JSON helpers are reused by bookmark, workspace, and resolve metadata parsing, but their
-  current home is acceptable. A helper module would make readers jump for simple field accessors.
-- Facade re-exports are intentional. They keep callers stable after row-family splits and should not
-  become a separate source-shape packet.
+Recommended next bounded packet:
 
-## Other Large Files
+1. Source documentation sweep for central public and crate-visible contracts, starting with
+   `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/command.rs`, `src/app_screen.rs`,
+   and the loaders/helpers in `src/jj_rows.rs`. The docs should explicitly mark which contracts are
+   shared mechanics and which are feature policy that should migrate to a feature root when touched.
 
-- `src/graph.rs` is the largest production file at 1218 lines, but the direct read still shows one
-  cohesive view: bindings, selection, search, refresh, log-mode switching, exact revision selection,
-  copy options, graph-to-detail navigation, and graph action-menu opening. The long test tail mostly
-  proves those view contracts. Do not split it only for size; revisit if explicit multi-revision
-  selection or graph action-menu behavior grows enough to deserve a `graph/selection.rs`-style
-  owner.
-- `src/jj_actions.rs` is 1159 lines and already a facade over extracted bookmark, git-sync,
-  operation, rewrite, and working-copy action clusters. The remaining parent owns
-  description/commit, restore, file mutation, revert, and abandon plans. A future file-mutation or
-  abandon-confirmation packet may be valid if product work changes those flows, but there is no
-  docs-only reason to split it now.
-- `src/tui.rs` is 976 lines after status hints moved out. It still owns shared chrome and overlay
-  rendering. The only plausible future split is a concrete overlay family, such as action-output and
-  abandon-confirmation rendering, with snapshot proof. Do not start a broad overlay split.
-- `src/bookmarks.rs` is 973 lines, but production code is compact and the large tail is focused
-  bookmark safety tests. The existing `src/bookmarks/action_targets.rs` boundary handles the
-  nontrivial target-selection policy. Leave this alone until bookmark view behavior changes.
+Only consider these after the documentation sweep or when product work touches the area:
 
-## Next Worker Guidance
+1. Feature-root migration packet for one product concept, preferably `operation_log` or `bookmarks`,
+   bounded to one vertical owner such as rows plus action availability. Acceptance criteria should
+   prove that callers still see the same rendered rows, action labels, target safety, and focused
+   view behavior.
+1. App dispatch/readability packet for `src/app/mode_input.rs`, bounded to mode input control flow
+   and validated with focused command/input tests.
+1. Action lifecycle documentation or grouping packet if the owner is clearly app-side completion,
+   preview, or shared result wording. Keep `src/jj_actions.rs` focused on plan construction, preview
+   text, argv, and execution.
+1. Selection/list mechanics packet only when one repeated movement, restore, or clamp rule changes
+   across multiple list views and cannot stay readable through the existing `Selection` helpers.
 
-The next source-shape worker should pause `src/jj_rows` refactoring and take product work unless a
-new product change exposes a sharper row boundary. It should not extract resolve rows, file-list
-rows, JSON helpers, facade re-exports, or large view modules merely to reduce line counts. It should
-preserve rendered `jj` output, ANSI conversion, metadata drift behavior, graph-row grouping, and all
-caller-facing row facades.
+Pause broad source-shape splits where modules are cohesive:
+
+- `src/graph.rs` remains a large but coherent graph view with selection, search, refresh, log-mode
+  switching, copy, detail navigation, and graph action-menu opening.
+- `src/tui.rs` remains the shared chrome and overlay renderer after status hints moved out. Split
+  only a concrete overlay family with snapshot proof.
+- `src/bookmarks.rs` remains mostly view behavior plus focused tests; target-selection policy
+  already has `src/bookmarks/action_targets.rs`.
+- `src/jj_rows.rs` is now a facade plus small resolve/file-list/shared helpers. Do not extract tiny
+  row families, JSON helpers, or re-exports for size alone.
+- Do not create a `slices/` or other umbrella bucket. Prefer feature roots plus shared
+  infrastructure.

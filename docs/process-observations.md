@@ -5,6 +5,34 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Feature-root maintainability guidance)
+
+- Slice / task: incorporate main-thread user guidance that future refactoring should move
+  user-visible policy toward feature roots plus shared infrastructure, not toward more kind-of-code
+  buckets.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Model / routing: Codex main thread made the docs update directly at the user's request. No
+  subagent performed the edit.
+- Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
+- Guidance outcome: the ledger now states that maintainability packets should ask which product
+  concept owns a rule before asking what kind of code it is. It records the intended destination as
+  feature roots plus shared infrastructure, with feature modules owning view state, bindings, row
+  interpretation, selection/search/copy behavior, action availability, target resolution, and tests.
+- Boundary outcome: the ledger now treats current `jj_rows`, `jj_actions`, `action_menu`, `tui`, and
+  `view_state` modules as shared infrastructure or staging points only when they hold genuinely
+  shared contracts. It explicitly says not to create a `slices/` bucket and not to move code merely
+  to match a destination tree.
+- Process observation: the extraction wave improved local contracts but still leaned on kind-of-code
+  buckets. Future packets should migrate policy toward a feature owner only when a
+  behavior-preserving packet can name the product concept and shorten the reader path.
+- Validation trail:
+  - `just md-check` passed after applying Panache wrapping to the edited docs.
+- Evidence basis:
+  - Date: `2026-05-21 03:50:33 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: user-provided feature-root guidance and
+    `docs/agent/source-maintainability-ledger.md`
+
 ### 2026-05-21 (Graph revision row extraction)
 
 - Slice / task: extract graph revision rendered row loading and revision metadata pairing from broad
@@ -5000,3 +5028,31 @@ belong here.
   with the likely extraction around immediate action paths rather than another broad app split.
   Packet 39 did not add a new modal or preview surface; it reused the existing bookmark mutation
   preview/completion path.
+
+### 2026-05-21 (Maintainability quality-bar measurement packet)
+
+- Slice / task: refresh `docs/agent/source-maintainability-ledger.md` so it reflects the current
+  maintainability objective instead of the completed row-extraction queue.
+- Thread id: `019e4a24-7d95-7b42-8346-706c481b7401`.
+- Model / routing: Codex main thread. The user explicitly reserved jj orchestration for the main
+  thread, so this packet used shell measurement commands only and ran no `jj` or `git` commands.
+- Documentation outcome: the source maintainability ledger now states a documentation-first,
+  vertical-ownership, readability quality bar; records a mechanical audit snapshot; and recommends a
+  bounded source documentation sweep before further broad source-shape work.
+- Evidence gathered:
+  - `just largest-rust-files`
+  - broad visibility counts with `rg` for `pub`, `pub(crate)`, and `pub(super)` across `src`
+  - Rustdoc/module-doc scans for `src/main.rs`, `src/app.rs`, `src/app_screen.rs`, `src/command.rs`,
+    `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, and `src/jj_rows.rs`
+  - selection/list-mechanics scans across graph, status, file-list, resolve, bookmarks,
+    operation-log, and workspaces views
+  - action lifecycle/result handling scans in `src/app/action_lifecycle` and `src/jj_actions.rs`
+  - cheap nested/control-flow scans across source modules
+- Process observation: zsh treats a scalar variable containing space-separated paths as one path, so
+  path lists for measurement commands should be passed as explicit arguments or arrays.
+- Validation trail:
+  - `just md-check` passed.
+- Evidence basis:
+  - Date: `2026-05-21` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`
