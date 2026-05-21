@@ -9,11 +9,17 @@ use ratatui::style::{Color, Modifier, Style};
 pub fn active_row_style() -> Style {
     Style::default()
         .bg(Color::Rgb(48, 52, 60))
-        .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        .add_modifier(Modifier::BOLD)
 }
 
 pub fn marked_row_style() -> Style {
-    Style::default().add_modifier(Modifier::BOLD)
+    Style::default()
+        .bg(Color::Rgb(32, 47, 48))
+        .add_modifier(Modifier::BOLD)
+}
+
+pub fn overlay_background_style() -> Style {
+    Style::default().bg(Color::Rgb(18, 20, 24))
 }
 
 pub fn overlay_border_style() -> Style {
@@ -45,16 +51,15 @@ mod tests {
         let style = active_row_style();
 
         assert_eq!(style.fg, None);
-        assert!(style.add_modifier.contains(Modifier::REVERSED));
         assert!(style.add_modifier.contains(Modifier::BOLD));
     }
 
     #[test]
-    fn marked_row_style_preserves_foreground_and_background() {
+    fn marked_row_style_preserves_foreground() {
         let style = marked_row_style();
 
         assert_eq!(style.fg, None);
-        assert_eq!(style.bg, None);
+        assert!(style.bg.is_some());
         assert!(style.add_modifier.contains(Modifier::BOLD));
     }
 }

@@ -169,7 +169,11 @@ impl KeyPattern {
     }
 
     fn matches(self, key: KeyEvent) -> bool {
-        key.code == self.code && key.modifiers == self.modifiers
+        key.code == self.code
+            && (key.modifiers == self.modifiers
+                || (self.modifiers.is_empty()
+                    && key.modifiers == KeyModifiers::SHIFT
+                    && shifted_character_is_encoded_in_key_code(self.code)))
     }
 
     pub fn label(self) -> String {
@@ -253,6 +257,22 @@ impl KeySequence {
                 .all(|(key, pattern)| pattern.matches(*key)),
         }
     }
+
+    fn next_pattern(self, key_count: usize) -> Option<KeyPattern> {
+        match self {
+            Self::Single(_) => None,
+            Self::Multi(patterns) => patterns.get(key_count).copied(),
+        }
+    }
+}
+
+fn shifted_character_is_encoded_in_key_code(code: KeyCode) -> bool {
+    matches!(
+        code,
+        KeyCode::Char(character)
+            if character.is_ascii_uppercase()
+                || (!character.is_ascii_alphanumeric() && !character.is_ascii_whitespace())
+    )
 }
 
 impl KeyPattern {
@@ -408,6 +428,20 @@ pub fn match_help_binding_sequence(
     })
 }
 
+pub fn binding_prefix_next_labels(binding_groups: &[&[Binding]], keys: &[KeyEvent]) -> Vec<String> {
+    binding_prefix_next_labels_by(binding_groups, keys, |_| true)
+}
+
+pub fn help_binding_prefix_next_labels(
+    binding_groups: &[&[Binding]],
+    keys: &[KeyEvent],
+    context: HelpContext,
+) -> Vec<String> {
+    binding_prefix_next_labels_by(binding_groups, keys, |binding| {
+        command_is_visible_in_help(binding.command(), context)
+    })
+}
+
 fn match_binding_sequence_by(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
@@ -443,6 +477,34 @@ fn match_binding_sequence_by(
     } else {
         exact.map(BindingMatch::Exact)
     }
+}
+
+fn binding_prefix_next_labels_by(
+    binding_groups: &[&[Binding]],
+    keys: &[KeyEvent],
+    is_available: impl Fn(Binding) -> bool,
+) -> Vec<String> {
+    if keys.is_empty() {
+        return Vec::new();
+    }
+
+    let mut labels = Vec::new();
+    for bindings in binding_groups {
+        for binding in *bindings {
+            if !is_available(*binding) || !binding.key.matches_prefix(keys) {
+                continue;
+            }
+
+            let Some(pattern) = binding.key.next_pattern(keys.len()) else {
+                continue;
+            };
+            let label = pattern.label();
+            if !labels.iter().any(|existing| existing == &label) {
+                labels.push(label);
+            }
+        }
+    }
+    labels
 }
 
 pub fn project_help(
@@ -742,6 +804,16 @@ mod tests {
     }
 
     #[test]
+    fn uppercase_bindings_accept_shifted_character_events() {
+        let uppercase = Binding::new(KeyPattern::char('S'), Command::OpenStatus);
+        let lowercase = Binding::new(KeyPattern::char('s'), Command::View(ViewCommand::OpenShow));
+
+        assert!(uppercase.matches(key(KeyCode::Char('S'), KeyModifiers::SHIFT)));
+        assert!(!lowercase.matches(key(KeyCode::Char('S'), KeyModifiers::SHIFT)));
+        assert!(!uppercase.matches(key(KeyCode::Char('s'), KeyModifiers::NONE)));
+    }
+
+    #[test]
     fn find_binding_returns_first_matching_command() {
         let bindings = [
             Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
@@ -802,6 +874,25 @@ mod tests {
             Some(BindingMatch::Prefix {
                 fallback: Some(view[0])
             })
+        );
+    }
+
+    #[test]
+    fn binding_prefix_next_labels_list_available_suffixes() {
+        const GIT_FETCH: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('f')];
+        const GIT_PUSH: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('p')];
+        let bindings = [
+            Binding::new(KeyPattern::char('g'), Command::View(ViewCommand::MoveFirst)),
+            Binding::sequence(GIT_FETCH, Command::Fetch),
+            Binding::sequence(GIT_PUSH, Command::Push),
+        ];
+
+        assert_eq!(
+            binding_prefix_next_labels(
+                &[&bindings],
+                &[key(KeyCode::Char('g'), KeyModifiers::NONE)]
+            ),
+            vec!["f", "p"]
         );
     }
 

@@ -2185,16 +2185,33 @@
 
 ## Packet 38 UI/Keybinding Follow-Up
 
-- Status: planned follow-up work, not shipped behavior.
-- Scope: after Packet 38 and before broad Packet 39+ work, address the current log-screen and
-  keybinding bugs: visible space selection on the log, clearer current-row highlighting, PageUp and
-  PageDown scrolling, help-popup arrow-key handling, two-column help, shifted-capital handling for
-  `S` and related keys, status-bar shortcut prioritization, command-menu background/key-label
-  readability, and next-key discovery for multi-key prefixes like `g`.
-- Validation expectation: use focused view-level tests and rendering snapshots for the log, help,
-  status, and command-menu surfaces, plus keybinding dispatch tests for shifted capitals and prefix
-  hints when the implementation lands.
-- Next turn: promote this follow-up before Packet 39 or broader bookmark-tracking work.
+- Status: landed in the current `@` change after Packet 38 and before broad Packet 39+ work.
+- Files changed: `src/app.rs`, `src/app/mode_input.rs`, `src/app/tests/command_navigation.rs`,
+  `src/command.rs`, `src/graph.rs`, `src/theme.rs`, `src/tui.rs`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
+- Behavior: Space-selected graph rows now keep a marked-row background after the current row moves.
+  The current graph row uses a background and bold modifier without full reverse video, so
+  jj-rendered foreground colors remain visible. Physical PageUp and PageDown page graph selection
+  with saturating boundaries. A shifted `?` help-close inconsistency was repaired and re-reviewed
+  before the final validation.
+- Keybinding polish: shifted/capital character events now match uppercase plain bindings without
+  making lowercase bindings ambiguous, including shifted `S` opening status from the log. Help mode
+  consumes Up and Down without closing the popup or moving graph selection. Prefix status lines now
+  show possible next keys, including `g -> f/p/r` through the narrow `gp` push alias and bookmark
+  prefixes such as `b -> c/r/f`.
+- Chrome polish: generated help renders in two columns. Status-bar hints are ordered by likely
+  usefulness and added only while they fit. The command/help menu has an explicit background and
+  colored key labels.
+- Validation: `cargo test graph -- --test-threads=1`; `cargo test command -- --test-threads=1`;
+  `cargo test command_navigation -- --test-threads=1`; `cargo test tui -- --test-threads=1`;
+  `rustup run nightly cargo fmt --check`; `cargo check`; full `cargo test` passed with
+  `476 passed / 2 ignored` after the shifted `?` help-close repair; `cargo clippy -- -D warnings`;
+  `just md-check`; and `just check`.
+- Fragility-register decision: no `docs/plan/fragility-register.md` update was needed because this
+  follow-up did not add rendered-output parsing, jj semantic inference, or command-output
+  assumptions.
+- Next recommended slice: Packet 39: Bookmark Track/Untrack Flows, now that Packet 38 and its
+  shifted-`?` help-close repair have been re-reviewed with no blocking findings.
 
 ## App Refactor Audit Follow-Up
 

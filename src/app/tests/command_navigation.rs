@@ -98,7 +98,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('S'), KeyModifiers::NONE), 12)
+    app.handle_normal_key(key(KeyCode::Char('S'), KeyModifiers::SHIFT), 12)
         .unwrap();
     assert_eq!(app.view.command(), JjCommand::Status);
     assert!(app.pending_command.is_none());
@@ -177,6 +177,8 @@ fn generated_help_uses_same_multikey_and_view_entry_bindings_as_dispatch() {
     assert!(rows.contains(&("gf", "fetch")));
     assert!(rows.contains(&("F", "fetch remote")));
     assert!(rows.contains(&("gr", "fetch remote")));
+    assert!(rows.contains(&("p", "push selected revision")));
+    assert!(rows.contains(&("gp", "push selected revision")));
     assert!(rows.contains(&("v", "view menu")));
 
     let status_sections = crate::command::project_help(
@@ -225,6 +227,40 @@ fn help_menu_close_key_closes_without_executing() {
 }
 
 #[test]
+fn help_menu_close_key_accepts_shifted_question_mark() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    app.services.load_view = mock_load_view;
+
+    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+        .unwrap();
+    app.handle_mode_key_event(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::SHIFT), 12)
+        .unwrap();
+
+    assert_eq!(app.view.command(), JjCommand::Default);
+    assert!(matches!(app.mode, InteractionMode::Normal));
+    assert!(app.pending_command.is_none());
+}
+
+#[test]
+fn help_menu_ignores_arrow_keys_without_moving_log_selection() {
+    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
+        graph_item("first"),
+        graph_item("second"),
+    ])));
+
+    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::SHIFT), 12)
+        .unwrap();
+    assert!(matches!(app.mode, InteractionMode::Help));
+
+    app.handle_mode_key(KeyCode::Down, 12).unwrap();
+    app.handle_mode_key(KeyCode::Up, 12).unwrap();
+
+    assert!(matches!(app.mode, InteractionMode::Help));
+    assert_eq!(app.graph_selected_revision().as_deref(), Some("first"));
+    assert!(app.pending_command.is_none());
+}
+
+#[test]
 fn help_menu_does_not_execute_hidden_commands() {
     let show =
         crate::show::ShowView::test_new(ViewSpec::show("change-a".to_owned(), DiffFormat::Default));
@@ -250,6 +286,7 @@ fn help_menu_supports_multikey_options_and_fallbacks() {
 
     assert!(matches!(app.mode, InteractionMode::Help));
     assert!(app.pending_command.is_some());
+    assert_eq!(app.status.message(), "help: g -> f/p/r");
 
     app.handle_mode_key(KeyCode::Char('f'), 12).unwrap();
 
@@ -364,7 +401,7 @@ fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
         .unwrap();
     assert!(app.pending_command.is_some());
-    assert_eq!(app.status.message(), "prefix: b");
+    assert_eq!(app.status.message(), "prefix: b -> c/r/f");
 
     app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
         .unwrap();
@@ -382,6 +419,7 @@ fn multi_key_fetch_dispatches_from_git_prefix() {
     app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
         .unwrap();
     assert!(app.pending_command.is_some());
+    assert_eq!(app.status.message(), "prefix: g -> f/p/r");
 
     app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
         .unwrap();

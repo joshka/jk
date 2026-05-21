@@ -27,13 +27,22 @@ pub const BINDINGS: &[Binding] = &[
         KeyPattern::code(crossterm::event::KeyCode::Down),
         Command::View(ViewCommand::MoveDown),
     ),
+    Binding::new(
+        KeyPattern::code(crossterm::event::KeyCode::PageDown),
+        Command::View(ViewCommand::PageDown),
+    ),
     Binding::new(KeyPattern::char('k'), Command::View(ViewCommand::MoveUp)),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Up),
         Command::View(ViewCommand::MoveUp),
     ),
+    Binding::new(
+        KeyPattern::code(crossterm::event::KeyCode::PageUp),
+        Command::View(ViewCommand::PageUp),
+    ),
     Binding::new(KeyPattern::char('g'), Command::View(ViewCommand::MoveFirst)),
     Binding::sequence(GIT_FETCH_KEYS, Command::Fetch),
+    Binding::sequence(GIT_PUSH_KEYS, Command::Push),
     Binding::sequence(GIT_FETCH_REMOTE_KEYS, Command::FetchRemote),
     Binding::new(
         KeyPattern::code(crossterm::event::KeyCode::Home),
@@ -73,6 +82,7 @@ pub const BINDINGS: &[Binding] = &[
 ];
 
 const GIT_FETCH_KEYS: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('f')];
+const GIT_PUSH_KEYS: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('p')];
 const GIT_FETCH_REMOTE_KEYS: &[KeyPattern] = &[KeyPattern::char('g'), KeyPattern::char('r')];
 
 fn explicit_selection_style() -> Style {
@@ -156,6 +166,14 @@ impl GraphView {
                 self.select_previous();
                 ViewEffect::Handled
             }
+            ViewCommand::PageDown => {
+                self.page_down(context.page_size());
+                ViewEffect::Handled
+            }
+            ViewCommand::PageUp => {
+                self.page_up(context.page_size());
+                ViewEffect::Handled
+            }
             ViewCommand::MoveFirst => {
                 self.select_first();
                 ViewEffect::Handled
@@ -195,9 +213,7 @@ impl GraphView {
             ViewCommand::ToggleSelect => self.toggle_selection(),
             ViewCommand::OpenActionMenu => self.open_action_menu(),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),
-            ViewCommand::PageDown
-            | ViewCommand::PageUp
-            | ViewCommand::ToggleWrap
+            ViewCommand::ToggleWrap
             | ViewCommand::ScrollLeft
             | ViewCommand::ScrollRight
             | ViewCommand::NextFile
@@ -340,6 +356,20 @@ impl GraphView {
 
     pub fn select_last(&mut self) {
         self.selection.last(self.entries.len());
+    }
+
+    fn page_down(&mut self, page_size: usize) {
+        self.selection.set(
+            self.selection.index().saturating_add(page_size),
+            self.entries.len(),
+        );
+    }
+
+    fn page_up(&mut self, page_size: usize) {
+        self.selection.set(
+            self.selection.index().saturating_sub(page_size),
+            self.entries.len(),
+        );
     }
 
     fn toggle_selection(&mut self) -> ViewEffect {
@@ -741,6 +771,50 @@ mod tests {
     }
 
     #[test]
+    fn page_keys_move_selection_by_visible_page_with_saturating_bounds() {
+        let mut view = graph_view(
+            (0..5)
+                .map(|index| {
+                    log_item(
+                        &format!("row {index}"),
+                        Some(&format!("change-{index}")),
+                        None,
+                    )
+                })
+                .collect(),
+        );
+        let context = || CommandContext {
+            viewport_height: 3,
+            viewport_width: 80,
+            search: None,
+        };
+
+        assert_eq!(
+            view.execute(ViewCommand::PageDown, context()),
+            ViewEffect::Handled
+        );
+        assert_eq!(view.selected_revision(), Some("change-2"));
+
+        assert_eq!(
+            view.execute(ViewCommand::PageDown, context()),
+            ViewEffect::Handled
+        );
+        assert_eq!(view.selected_revision(), Some("change-4"));
+
+        assert_eq!(
+            view.execute(ViewCommand::PageUp, context()),
+            ViewEffect::Handled
+        );
+        assert_eq!(view.selected_revision(), Some("change-2"));
+
+        assert_eq!(
+            view.execute(ViewCommand::PageUp, context()),
+            ViewEffect::Handled
+        );
+        assert_eq!(view.selected_revision(), Some("change-0"));
+    }
+
+    #[test]
     fn reveal_change_id_keeps_current_mode_when_change_is_visible() {
         let mut view = graph_view(vec![
             log_item("first", Some("first"), None),
@@ -1091,7 +1165,7 @@ mod tests {
         assert_eq!(highlight.fg, None);
         assert_eq!(selected_cell.fg, Color::LightRed);
         assert_eq!(selected_cell.bg, highlight.bg.unwrap());
-        assert!(selected_cell.modifier.contains(Modifier::REVERSED));
+        assert!(!selected_cell.modifier.contains(Modifier::REVERSED));
         assert!(selected_cell.modifier.contains(Modifier::BOLD));
     }
 
@@ -1111,6 +1185,7 @@ mod tests {
         );
 
         assert_eq!(selected[0].style.fg, Some(Color::LightBlue));
+        assert!(selected[0].style.bg.is_some());
         assert!(selected[0].style.add_modifier.contains(Modifier::BOLD));
     }
 

@@ -7,7 +7,7 @@
 use std::time::Instant;
 
 use color_eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::DefaultTerminal;
 
 use crate::action_menu::{ActionKind, RolePrompt};
@@ -17,14 +17,17 @@ use crate::action_output::{
 use crate::app_screen::{InteractionMode, view_menu_options};
 use crate::app_status::StatusLine;
 use crate::clipboard;
-use crate::command::{Binding, BindingMatch, ViewCommand, ViewEffect, match_help_binding_sequence};
+use crate::command::{
+    Binding, BindingMatch, ViewCommand, ViewEffect, help_binding_prefix_next_labels,
+    match_help_binding_sequence,
+};
 use crate::jj::{
     JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget, JjCommitPlan, JjDescribePlan,
     JjRebasePlan, JjSquashPlan, validate_bookmark_rename_new_name,
 };
 use crate::search::SearchQuery;
 
-use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand, binding_key_label};
+use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand, prefix_status_message};
 
 impl App {
     pub(super) fn open_copy_menu(&mut self, viewport_height: u16) {
@@ -551,6 +554,9 @@ impl App {
             self.mode = InteractionMode::Normal;
             return Ok(true);
         }
+        if is_help_scroll_key(key) {
+            return Ok(true);
+        }
 
         if self.pending_command.is_some() {
             return self.handle_pending_help_key(key, viewport_height, Instant::now());
@@ -578,7 +584,15 @@ impl App {
                 });
                 self.status = StatusLine::with_message(
                     &self.view,
-                    format!("help: {}", binding_key_label(&keys)),
+                    prefix_status_message(
+                        "help",
+                        &keys,
+                        &help_binding_prefix_next_labels(
+                            &[APP_BINDINGS, self.view.bindings()],
+                            &keys,
+                            context,
+                        ),
+                    ),
                 );
                 Ok(true)
             }
@@ -616,7 +630,15 @@ impl App {
             Some(BindingMatch::Prefix { fallback }) => {
                 self.status = StatusLine::with_message(
                     &self.view,
-                    format!("help: {}", binding_key_label(&pending.keys)),
+                    prefix_status_message(
+                        "help",
+                        &pending.keys,
+                        &help_binding_prefix_next_labels(
+                            &[APP_BINDINGS, self.view.bindings()],
+                            &pending.keys,
+                            self.view.help_context(),
+                        ),
+                    ),
                 );
                 self.pending_command = Some(PendingCommand {
                     keys: pending.keys,
@@ -671,11 +693,15 @@ pub(in crate::app) fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjS
 }
 
 fn is_help_close_key(key: KeyEvent) -> bool {
-    key.modifiers.is_empty()
-        && matches!(
-            key.code,
-            KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q')
-        )
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('q') => key.modifiers.is_empty(),
+        KeyCode::Char('?') => key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT,
+        _ => false,
+    }
+}
+
+fn is_help_scroll_key(key: KeyEvent) -> bool {
+    key.modifiers.is_empty() && matches!(key.code, KeyCode::Down | KeyCode::Up)
 }
 
 fn bookmark_mutation_plan(

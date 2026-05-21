@@ -6,7 +6,7 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Text};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Clear, List, ListItem, Paragraph};
 use ratatui_macros::{line, span, vertical};
 
@@ -58,7 +58,7 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
         Overlay::None => {}
         Overlay::Help { sections } => {
             let content = help_overlay_text(&sections);
-            let area = centered_area(frame.area(), 62, content.lines.len() as u16 + 2);
+            let area = centered_area(frame.area(), 84, content.lines.len() as u16 + 2);
             frame.render_widget(Clear, area);
             frame.render_widget(help_overlay(content), area);
         }
@@ -312,7 +312,11 @@ fn status_line_text(status: &StatusLine, width: u16) -> Line<'_> {
         message = status.message()
     )]
     .spans;
-    let hint_spans = status_hint_spans(status.hints(), width).spans;
+    let message_width = line_width(status.message());
+    let available_hint_width = usize::from(width)
+        .saturating_sub(message_width)
+        .saturating_sub(2) as u16;
+    let hint_spans = status_hint_spans(status.hints(), available_hint_width).spans;
 
     if !hint_spans.is_empty() {
         spans.extend(line!["  "].spans);
@@ -323,245 +327,165 @@ fn status_line_text(status: &StatusLine, width: u16) -> Line<'_> {
 }
 
 fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
-    let compact = width < 60;
+    let mut spans = Vec::new();
+    let mut used_width = 0;
 
-    match (hints, compact) {
-        (StatusHints::Graph, true) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::Graph, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("Enter/l"),
-            " open  ",
-            key("Space"),
-            " select  ",
-            key("a"),
-            " action  ",
-            key("D/C"),
-            " describe/commit  ",
-            key("b/=/m"),
-            " bookmark  ",
-            key("f/p/r"),
-            " fetch/push/refresh  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::ShowDocument, true)
-        | (StatusHints::DiffDocument, true)
-        | (StatusHints::FileShowDocument, true)
-        | (StatusHints::OperationDetailDocument, true) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " scroll  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::ShowDocument, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " scroll  ",
-            key("Space/C-b"),
-            " page  ",
-            key("g/G"),
-            " ends  ",
-            key("[/]"),
-            " file  ",
-            key("h"),
-            " back  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::DiffDocument, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " scroll  ",
-            key("Space/C-b"),
-            " page  ",
-            key("g/G"),
-            " ends  ",
-            key("[/]"),
-            " file  ",
-            key("h"),
-            " back  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::Status, true) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " scroll  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::Status, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " scroll  ",
-            key("Space/C-b"),
-            " page  ",
-            key("/"),
-            " search  ",
-            key("y"),
-            " copy  ",
-            key("a"),
-            " actions  ",
-            key("D/C"),
-            " describe/commit @  ",
-            key("b/=/m"),
-            " bookmark @  ",
-            key("h"),
-            " back  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::Resolve, true) | (StatusHints::FileList, true) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::Resolve, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("Enter/l"),
-            " inspect  ",
-            key("/"),
-            " search  ",
-            key("y"),
-            " copy  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::FileList, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("Enter/l"),
-            " open  ",
-            key("/"),
-            " search  ",
-            key("y"),
-            " copy  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::FileShowDocument, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " scroll  ",
-            key("Space/C-b"),
-            " page  ",
-            key("/"),
-            " search  ",
-            key("h"),
-            " back  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::OperationDetailDocument, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " scroll  ",
-            key("Space/C-b"),
-            " page  ",
-            key("s/d"),
-            " show/diff  ",
-            key("h"),
-            " back  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::Bookmarks, true) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::Bookmarks, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("Enter/s"),
-            " show  ",
-            key("/"),
-            " search  ",
-            key("y"),
-            " copy  ",
-            key("x"),
-            " delete  ",
-            key("br"),
-            " rename  ",
-            key("bf"),
-            " forget  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::OperationLog, true) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("u"),
-            " undo  ",
-            key("C-r"),
-            " redo  ",
-            key("?"),
-            " help",
-        ],
-        (StatusHints::OperationLog, false) => line![
-            key("q"),
-            " quit  ",
-            key("j/k"),
-            " move  ",
-            key("u"),
-            " undo  ",
-            key("C-r"),
-            " redo  ",
-            key("s"),
-            " show  ",
-            key("d"),
-            " diff  ",
-            key("a"),
-            " action  ",
-            key("/"),
-            " search  ",
-            key("y"),
-            " copy id  ",
-            key("?"),
-            " help",
-        ],
+    for hint in status_hint_candidates(hints) {
+        let separator_width = if spans.is_empty() { 0 } else { 2 };
+        let item_width = line_width(hint.key) + 1 + line_width(hint.label);
+        if used_width + separator_width + item_width > usize::from(width) {
+            break;
+        }
+
+        if !spans.is_empty() {
+            spans.push(Span::raw("  "));
+        }
+        spans.push(key(hint.key));
+        spans.push(Span::raw(" "));
+        spans.push(Span::raw(hint.label));
+        used_width += separator_width + item_width;
+    }
+
+    Line::from(spans)
+}
+
+#[derive(Clone, Copy)]
+struct StatusHint {
+    key: &'static str,
+    label: &'static str,
+}
+
+impl StatusHint {
+    const fn new(key: &'static str, label: &'static str) -> Self {
+        Self { key, label }
+    }
+}
+
+const GRAPH_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "move"),
+    StatusHint::new("PgUp/PgDn", "page"),
+    StatusHint::new("Enter/l", "open"),
+    StatusHint::new("Space", "select"),
+    StatusHint::new("a", "action"),
+    StatusHint::new("S", "status"),
+    StatusHint::new("f/p/r", "sync"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const DOCUMENT_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "scroll"),
+    StatusHint::new("Space/C-b", "page"),
+    StatusHint::new("g/G", "ends"),
+    StatusHint::new("[/]", "file"),
+    StatusHint::new("h", "back"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const STATUS_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "scroll"),
+    StatusHint::new("Space/C-b", "page"),
+    StatusHint::new("/", "search"),
+    StatusHint::new("y", "copy"),
+    StatusHint::new("a", "actions"),
+    StatusHint::new("D/C", "describe/commit @"),
+    StatusHint::new("b/=/m", "bookmark @"),
+    StatusHint::new("h", "back"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const RESOLVE_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "move"),
+    StatusHint::new("Enter/l", "inspect"),
+    StatusHint::new("/", "search"),
+    StatusHint::new("y", "copy"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const FILE_LIST_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "move"),
+    StatusHint::new("Enter/l", "open"),
+    StatusHint::new("/", "search"),
+    StatusHint::new("y", "copy"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const FILE_SHOW_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "scroll"),
+    StatusHint::new("Space/C-b", "page"),
+    StatusHint::new("/", "search"),
+    StatusHint::new("h", "back"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const OPERATION_DETAIL_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "scroll"),
+    StatusHint::new("Space/C-b", "page"),
+    StatusHint::new("s/d", "show/diff"),
+    StatusHint::new("h", "back"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const BOOKMARKS_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "move"),
+    StatusHint::new("Enter/s", "show"),
+    StatusHint::new("/", "search"),
+    StatusHint::new("y", "copy"),
+    StatusHint::new("x", "delete"),
+    StatusHint::new("br", "rename"),
+    StatusHint::new("bf", "forget"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+const OPERATION_LOG_STATUS_HINTS: &[StatusHint] = &[
+    StatusHint::new("j/k", "move"),
+    StatusHint::new("u", "undo"),
+    StatusHint::new("C-r", "redo"),
+    StatusHint::new("s", "show"),
+    StatusHint::new("d", "diff"),
+    StatusHint::new("a", "action"),
+    StatusHint::new("/", "search"),
+    StatusHint::new("y", "copy id"),
+    StatusHint::new("q", "quit"),
+    StatusHint::new("?", "help"),
+];
+
+fn status_hint_candidates(hints: StatusHints) -> &'static [StatusHint] {
+    match hints {
+        StatusHints::Graph => GRAPH_STATUS_HINTS,
+        StatusHints::ShowDocument | StatusHints::DiffDocument => DOCUMENT_STATUS_HINTS,
+        StatusHints::Status => STATUS_STATUS_HINTS,
+        StatusHints::Resolve => RESOLVE_STATUS_HINTS,
+        StatusHints::FileList => FILE_LIST_STATUS_HINTS,
+        StatusHints::FileShowDocument => FILE_SHOW_STATUS_HINTS,
+        StatusHints::OperationDetailDocument => OPERATION_DETAIL_STATUS_HINTS,
+        StatusHints::Bookmarks => BOOKMARKS_STATUS_HINTS,
+        StatusHints::OperationLog => OPERATION_LOG_STATUS_HINTS,
     }
 }
 
 fn help_overlay(content: Text<'static>) -> Paragraph<'static> {
-    Paragraph::new(content).block(Block::bordered().title("Command menu"))
+    Paragraph::new(content)
+        .style(theme::overlay_background_style())
+        .block(overlay_block("Command menu"))
 }
 
 fn help_overlay_text(sections: &[HelpSection]) -> Text<'static> {
-    let mut lines = vec![
+    let split = sections.len().div_ceil(2);
+    let mut left = menu_help_lines();
+    for section in &sections[..split] {
+        append_help_section_lines(&mut left, section, true);
+    }
+
+    let mut right = Vec::new();
+    for (index, section) in sections[split..].iter().enumerate() {
+        append_help_section_lines(&mut right, section, index > 0);
+    }
+
+    Text::from(join_help_column_lines(&left, &right))
+}
+
+fn menu_help_lines() -> Vec<Line<'static>> {
+    vec![
         Line::styled(
             "Menu".to_owned(),
             Style::default()
@@ -569,30 +493,67 @@ fn help_overlay_text(sections: &[HelpSection]) -> Text<'static> {
                 .add_modifier(Modifier::BOLD),
         ),
         line![
-            span!(Modifier::BOLD; "Esc, q, ?"),
+            span!(theme::key_style(); "Esc, q, ?"),
             "  ",
             span!("close menu"),
         ],
-    ];
+    ]
+}
 
-    for section in sections {
+fn append_help_section_lines(
+    lines: &mut Vec<Line<'static>>,
+    section: &HelpSection,
+    leading_blank: bool,
+) {
+    if leading_blank {
         lines.push(Line::default());
-        lines.push(Line::styled(
-            section.title().to_owned(),
-            Style::default()
-                .fg(Color::Gray)
-                .add_modifier(Modifier::BOLD),
-        ));
-        for row in section.rows() {
-            lines.push(line![
-                span!(Modifier::BOLD; "{keys}", keys = row.keys()),
-                "  ",
-                span!("{action}", action = row.action()),
-            ]);
-        }
     }
+    lines.push(Line::styled(
+        section.title().to_owned(),
+        Style::default()
+            .fg(Color::Gray)
+            .add_modifier(Modifier::BOLD),
+    ));
+    for row in section.rows() {
+        lines.push(help_row_line(row));
+    }
+}
 
-    Text::from(lines)
+fn help_row_line(row: &crate::command::HelpRow) -> Line<'static> {
+    line![
+        span!(theme::key_style(); "{keys}", keys = row.keys()),
+        "  ",
+        span!("{action}", action = row.action()),
+    ]
+}
+
+fn join_help_column_lines(left: &[Line<'static>], right: &[Line<'static>]) -> Vec<Line<'static>> {
+    let line_count = left.len().max(right.len());
+    (0..line_count)
+        .map(|index| join_help_columns(left.get(index), right.get(index)))
+        .collect()
+}
+
+fn join_help_columns(left: Option<&Line<'static>>, right: Option<&Line<'static>>) -> Line<'static> {
+    let Some(left) = left else {
+        return right.cloned().unwrap_or_default();
+    };
+    let Some(right) = right else {
+        return left.clone();
+    };
+
+    let mut spans = left.spans.clone();
+    let padding = 38_usize.saturating_sub(line_display_width(left)) + 4;
+    spans.push(Span::raw(" ".repeat(padding)));
+    spans.extend(right.spans.clone());
+    Line::from(spans)
+}
+
+fn line_display_width(line: &Line<'_>) -> usize {
+    line.spans
+        .iter()
+        .map(|span| line_width(span.content.as_ref()))
+        .sum()
 }
 
 fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
@@ -852,6 +813,7 @@ fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
 
 fn overlay_block(title: impl Into<String>) -> Block<'static> {
     Block::bordered()
+        .style(theme::overlay_background_style())
         .border_style(theme::overlay_border_style())
         .title_style(theme::overlay_title_style())
         .title(title.into())
@@ -871,7 +833,7 @@ fn centered_area(area: ratatui::layout::Rect, width: u16, height: u16) -> ratatu
     }
 }
 
-fn key(label: &str) -> ratatui::text::Span<'_> {
+fn key(label: &'static str) -> ratatui::text::Span<'static> {
     span!(theme::key_style(); "{label}")
 }
 
@@ -960,17 +922,33 @@ mod tests {
             .join("\n");
 
         insta::assert_snapshot!(rendered, @r"
-        Menu
-        Esc, q, ?  close menu
-
+        Menu                                      Action Previews
+        Esc, q, ?  close menu                     D  describe selected revision
+                                                  p  push selected revision
         View Switching
         S  status
         v  view menu
-
-        Action Previews
-        D  describe selected revision
-        p  push selected revision
         ");
+    }
+
+    #[test]
+    fn help_overlay_has_background_and_colored_key_labels() {
+        let text = help_overlay_text(&[HelpSection::new(
+            HelpSectionKind::Views,
+            vec![HelpRow::new("S", "status")],
+        )]);
+        let mut terminal = Terminal::new(TestBackend::new(84, 8)).unwrap();
+
+        terminal
+            .draw(|frame| {
+                frame.render_widget(help_overlay(text), frame.area());
+            })
+            .unwrap();
+
+        let background = theme::overlay_background_style().bg.unwrap();
+        assert_eq!(terminal.backend().buffer()[(1, 1)].bg, background);
+        assert_eq!(terminal.backend().buffer()[(1, 2)].fg, Color::Yellow);
+        assert_eq!(terminal.backend().buffer()[(1, 5)].fg, Color::Yellow);
     }
 
     #[test]
@@ -984,7 +962,7 @@ mod tests {
 
         assert_snapshot!(render_chrome_snapshot(&status, 48), @r"
         title|jk log
-        status|push cancelled  q quit  j/k move  ? help
+        status|push cancelled  j/k move  PgUp/PgDn page
         ");
     }
 
@@ -999,7 +977,7 @@ mod tests {
 
         assert_snapshot!(render_chrome_snapshot(&status, 120), @r"
         title|jk operation-log
-        status|19 operations  q quit  j/k move  u undo  C-r redo  s show  d diff  a action  / search  y copy id  ? help
+        status|19 operations  j/k move  u undo  C-r redo  s show  d diff  a action  / search  y copy id  q quit  ? help
         ");
     }
 
@@ -1014,7 +992,7 @@ mod tests {
 
         assert_snapshot!(render_chrome_snapshot(&status, 100), @r"
         title|jk file list
-        status|1 files  q quit  j/k move  Enter/l open  / search  y copy  ? help
+        status|1 files  j/k move  Enter/l open  / search  y copy  q quit  ? help
         ");
     }
 
@@ -1029,7 +1007,7 @@ mod tests {
 
         assert_snapshot!(render_chrome_snapshot(&status, 100), @r"
         title|jk resolve
-        status|1 conflicts  q quit  j/k move  Enter/l inspect  / search  y copy  ? help
+        status|1 conflicts  j/k move  Enter/l inspect  / search  y copy  q quit  ? help
         ");
     }
 
@@ -1071,7 +1049,7 @@ mod tests {
         let selected_cell = &terminal.backend().buffer()[(1, 2)];
         let style = theme::active_row_style();
         assert_eq!(selected_cell.bg, style.bg.unwrap());
-        assert!(selected_cell.modifier.contains(Modifier::REVERSED));
+        assert!(!selected_cell.modifier.contains(Modifier::REVERSED));
         assert!(selected_cell.modifier.contains(Modifier::BOLD));
     }
 

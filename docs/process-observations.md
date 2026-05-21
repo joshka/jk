@@ -5,6 +5,31 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Shifted help-close key repair)
+
+- Slice / task: narrow repair for the current `@` UI/keybinding change so help closes on shifted `?`
+  as well as unshifted `?`.
+- Thread id: `019e4813-7bb8-7ac1-ac68-b3db1271c7aa`.
+- 5.5 review finding: a low-severity shifted-`?` close inconsistency showed up in the review pass.
+  Help could open through the shifted punctuation path, but the close path still accepted only the
+  unshifted modifier shape.
+- Starting evidence: `src/app/mode_input.rs` accepted `Char('?')` only when `KeyModifiers` was
+  empty, even though shared shifted-punctuation matching can open help with a shifted physical `?`.
+- Repair outcome: `is_help_close_key` now accepts `Char('?')` with either no modifiers or
+  `KeyModifiers::SHIFT`, while `Esc` and `q` still require empty modifiers. A focused regression
+  test covers closing help from a shifted `?`.
+- Final main-thread validation run after the repair:
+  - `cargo test command_navigation -- --test-threads=1`
+  - `cargo check`
+  - `rustup run nightly cargo fmt --check`
+  - `just md-check`
+  - `cargo test` passed with 476 passed / 2 ignored
+  - `just check`
+- Evidence basis:
+  - Date: `2026-05-20 18:08:41 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/app/mode_input.rs`, `src/app/tests/command_navigation.rs`,
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Packet 38 UI/keybinding follow-up planning)
 
 - Slice / task: docs-only planning update for the post-Packet-38 UI and keybinding bug list in the
@@ -3584,3 +3609,39 @@ belong here.
   - Date: `2026-05-20` from local `date +%F`
   - Files: `src/app/mode_input.rs`, `src/app/tests/bookmark_actions.rs`, `src/app/tests/support.rs`,
     `src/jj_actions.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+
+### 2026-05-20 (Packet 38 UI/keybinding follow-up)
+
+- Slice / task: implement Packet 38 Follow-Up: Log Screen And Keybinding Polish in
+  `vwtuopml Polish log and keybinding UI`.
+- Thread id: `019e4806-2ca5-7d80-9dd7-940edd52435f`.
+- Model / routing: gpt-5.5 high by user request because the change crossed key dispatch, graph
+  rendering styles, popup layout, status hints, and rendered UI tests.
+- Observable outcome: log Space selection now has a marked background that survives moving the
+  current row. The current log row preserves rendered foreground color and no longer relies on full
+  reverse-video text. PageUp and PageDown page graph selection with saturating bounds.
+- Key dispatch outcome: uppercase plain bindings accept shifted character events while lowercase
+  bindings remain distinct; shifted `S` opens status. Help mode consumes Up and Down without moving
+  the graph. Prefix status now shows next-key suffixes such as `g -> f/p/r` and `b -> c/r/f`; `gp`
+  is a narrow graph push alias for prefix discovery.
+- Rendering outcome: help renders in two columns, the command/help menu has an explicit background
+  and colored key labels, and status hints are included in usefulness order only while they fit.
+- Validation / proof run:
+  - `cargo test graph -- --test-threads=1`
+  - `cargo test command -- --test-threads=1`
+  - `cargo test command_navigation -- --test-threads=1`
+  - `cargo test tui -- --test-threads=1`
+  - `rustup run nightly cargo fmt --check`
+  - `cargo check`
+  - `cargo test` passed with 476 passed / 2 ignored
+  - `cargo clippy -- -D warnings`
+  - `just md-check`
+  - `just check`
+- Fragility-register decision: no entry was added because the change did not introduce new
+  rendered-output parsing, jj semantic inference, or command-output assumptions.
+- Evidence basis:
+  - Date: `2026-05-20` from local `date +%F`
+  - Thread id from `CODEX_THREAD_ID`
+  - Files: `src/app.rs`, `src/app/mode_input.rs`, `src/app/tests/command_navigation.rs`,
+    `src/command.rs`, `src/graph.rs`, `src/theme.rs`, `src/tui.rs`, `docs/plan/progress.md`,
+    `docs/process-observations.md`

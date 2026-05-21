@@ -15,7 +15,7 @@ use crate::app_screen::InteractionMode;
 use crate::app_status::{StatusKind, StatusLine};
 use crate::command::{
     Binding, BindingMatch, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect,
-    match_binding_sequence,
+    binding_prefix_next_labels, match_binding_sequence,
 };
 use crate::jj::{DiffFormat, JjBookmarkMutationKind, JjWorkingCopyNavigationKind};
 use crate::search::SearchQuery;
@@ -188,7 +188,11 @@ impl App {
                 });
                 self.status = StatusLine::with_message(
                     &self.view,
-                    format!("prefix: {}", binding_key_label(&keys)),
+                    prefix_status_message(
+                        "prefix",
+                        &keys,
+                        &binding_prefix_next_labels(&[APP_BINDINGS, self.view.bindings()], &keys),
+                    ),
                 );
                 Ok(false)
             }
@@ -226,7 +230,14 @@ impl App {
             Some(BindingMatch::Prefix { fallback }) => {
                 self.status = StatusLine::with_message(
                     &self.view,
-                    format!("prefix: {}", binding_key_label(&pending.keys)),
+                    prefix_status_message(
+                        "prefix",
+                        &pending.keys,
+                        &binding_prefix_next_labels(
+                            &[APP_BINDINGS, self.view.bindings()],
+                            &pending.keys,
+                        ),
+                    ),
                 );
                 self.pending_command = Some(PendingCommand {
                     keys: pending.keys,
@@ -511,6 +522,19 @@ fn binding_key_label(keys: &[crossterm::event::KeyEvent]) -> String {
         })
         .collect::<Vec<_>>()
         .join("")
+}
+
+fn prefix_status_message(
+    prefix: &str,
+    keys: &[crossterm::event::KeyEvent],
+    next: &[String],
+) -> String {
+    let keys = binding_key_label(keys);
+    if next.is_empty() {
+        format!("{prefix}: {keys}")
+    } else {
+        format!("{prefix}: {keys} -> {}", next.join("/"))
+    }
 }
 
 #[cfg(test)]
