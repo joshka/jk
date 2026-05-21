@@ -1529,7 +1529,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   vertical cohesion.
 - Files changed: `docs/agent/source-maintainability-ledger.md` and `docs/process-observations.md`.
 - Behavior intent: docs only; no source behavior, routing behavior, or tests changed.
-- Validation trail: `just md-check` passed.
+- Validation trail:
+  - Worker validation passed: `just md-check`.
+  - Main-thread review validation passed: `just md-check`.
 - Main-thread validation after review also ran `just md-check` and passed.
 - Evidence basis:
   - Date: `2026-05-21 00:10:09 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
@@ -6119,3 +6121,27 @@ belong here.
   - Main thread id from `CODEX_THREAD_ID`.
   - Files: `src/app/action_lifecycle/entry.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
     `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+
+### 2026-05-21 (Maintainability ledger refresh)
+
+- Slice / task: reconcile `docs/agent/source-maintainability-ledger.md` with completed documentation
+  and ownership packets so future maintainability work does not start from stale weak-doc
+  nominations.
+- Thread id: `019e4bff-1647-74f0-a856-42895755ba27` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker handled the bounded docs-only packet without running jj or git
+  commands; version-control ownership stayed with the main thread.
+- Changed files: `docs/agent/source-maintainability-ledger.md` and `docs/process-observations.md`.
+- Implementation outcome: the Rustdoc coverage section now labels the old weak-doc audit as a
+  snapshot and marks the completed `app_screen.rs`, `command.rs`, `action_menu.rs`, `tui.rs`,
+  `jj_actions.rs`, and `jj_rows.rs` nominations as stale for generic sweep purposes. The completed
+  source-shape context now includes file-list and graph/log row migrations plus central contract-doc
+  packets. Next packet recommendations now start with fresh measurement, app entry-point docs,
+  current mode-input boundary review, feature-owned action availability, and list mechanics only
+  when a repeated rule changes.
+- Validation trail: `just md-check` passed.
+- Rework / surprise: the ledger already contained the later packet evidence needed to supersede the
+  stale audit, so the update was a reconciliation rather than new source analysis.
+- Evidence basis:
+  - Date: `2026-05-21 12:24:40 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `docs/agent/source-maintainability-ledger.md` and `docs/process-observations.md`.

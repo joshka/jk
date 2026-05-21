@@ -433,25 +433,38 @@ contracts, not evidence to split production code.
 
 ### Rustdoc Coverage
 
-The named central files all have module docs. The mechanical immediate-doc scan still shows weak or
-missing item-level Rustdoc on many public or crate-visible contracts:
+The named central files all have module docs. The mechanical immediate-doc scan below is a snapshot,
+not the current recommended work queue. Later packets in this ledger added contract docs for several
+of the originally nominated files, so use the bullets as historical evidence of why those packets
+happened and rerun the scan before opening a new documentation packet.
 
 - `src/main.rs`: module docs are enough for the binary entry point; `run` lives in `src/app.rs`.
 - `src/app.rs`: `run` lacks direct Rustdoc, though the module docs explain app orchestration.
-- `src/app_screen.rs`: `InteractionMode` is documented, but `ViewMenuOption`, `ViewMenuAction`, and
-  view-menu helpers are weakly documented.
-- `src/command.rs`: the central enums are documented, but many public constructors, binding helpers,
-  and prefix-match helpers have no direct caller-facing docs.
-- `src/action_menu.rs`: module docs exist, but the public action vocabulary, prompts, menu item
-  model, and facade are mostly undocumented at the item level.
-- `src/tui.rs`: module docs exist, but `Areas`, `Overlay`, and render facades have no direct docs.
-- `src/jj_actions.rs`: module docs and local comments explain preview-first plans, but public plan
-  types and argv/preview/run methods mostly lack Rustdoc.
-- `src/jj_rows.rs`: shared rendered-line helpers and revision/log row facades are weakly documented.
+- `src/app_screen.rs`: stale nomination. Later packet evidence documents `InteractionMode`,
+  `ViewMenuOption`, and `view_menu_options` ownership around prompt status projection, borrowed
+  overlays, static view-menu data, clamping, and app-owned dispatch.
+- `src/command.rs`: stale as a generic sweep nomination. Later packet evidence documents command
+  vocabulary, binding metadata, key-pattern matching, prefix fallback ownership, label behavior, and
+  app-owned interpretation of view effects. Rerun a focused scan only when changing binding
+  constructors, prefix matching, help projection, or command-context contracts.
+- `src/action_menu.rs`: stale as a generic sweep nomination. Later packet evidence documents shared
+  menu presentation, stable action vocabulary, prompts, follow-up payload boundaries, feature-owned
+  availability, app-owned lifecycle, and `jj_actions` command plans.
+- `src/tui.rs`: stale as a generic sweep nomination. Later packet evidence documents the shared
+  chrome boundary, optional status hints, borrowed overlays, action-output sizing, confirmation
+  input rendering, fallback-friendly overlay styling, and clipped modal geometry.
+- `src/jj_actions.rs`: stale as a generic sweep nomination. Later packet evidence documents root
+  action-plan ownership, `CommandOutput`, exact revsets/filesets, forward-diff preview honesty, and
+  the boundary between feature availability, app lifecycle, and argv/preview/run contracts.
+- `src/jj_rows.rs`: stale as a generic sweep nomination. Later packet evidence documents the shared
+  rendered-row helper boundary after feature-owned row migrations, including plain-text flattening,
+  metadata drift handling, JSON field extraction, graph-line detection, rendered line extraction,
+  fail-closed metadata parsing, and intentional style loss.
 
-This nominates a source documentation sweep before another broad source split. The sweep should add
-short ownership and contract docs only where a maintainer would otherwise need to reconstruct
-visibility, side effects, ids, argv shape, or output-shape assumptions.
+This snapshot still supports small documentation work where current code requires a maintainer to
+reconstruct visibility, side effects, ids, argv shape, or output-shape assumptions. It no longer
+supports a broad weak-doc sweep over `app_screen.rs`, `command.rs`, `action_menu.rs`, `tui.rs`,
+`jj_actions.rs`, or `jj_rows.rs` without fresh evidence.
 
 ### Visibility Shape
 
@@ -532,6 +545,11 @@ of `src/jj_actions.rs`, `src/command.rs`, `src/action_menu/revision_actions.rs`,
 `src/view_state.rs`. That makes `src/app/mode_input.rs` the only clearly bounded app readability
 candidate in this snapshot.
 
+Later packet evidence partly supersedes this snapshot: `src/app/mode_input/reducers.rs` now owns
+pure prompt acceptance decisions and out-of-line reducer tests, while `src/app/mode_input.rs` still
+owns prompt side effects. Treat any follow-up as a fresh read of the current app mode-input
+boundary, not as an automatic continuation of the original control-flow count.
+
 ## Completed Source-Shape Context
 
 Recent completed packets already moved several coherent owners out of broad modules:
@@ -539,19 +557,20 @@ Recent completed packets already moved several coherent owners out of broad modu
 - help projection policy into `src/help.rs`;
 - path and revision action-menu policy into `src/action_menu/path_actions.rs` and
   `src/action_menu/revision_actions.rs`;
-- operation, bookmark, workspace, and resolve row loading into feature-owned `rows.rs` modules;
-- revision row loading into `src/jj_rows/revisions.rs` as a staging point;
+- operation, bookmark, workspace, resolve, file-list, and graph/log row loading into feature-owned
+  `rows.rs` modules;
 - ViewSpec navigation provenance into `src/jj/view_spec.rs`;
 - status hint projection into `src/tui/status_hints.rs`;
 - pure modal key reducers and prompt-plan helpers into `src/app/mode_input/reducers.rs`.
+- central ownership and contract docs for `src/app_screen.rs`, `src/command.rs`,
+  `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, and `src/jj_rows.rs`.
 
 Those packets improved local contracts, but several are still organized by kind of code rather than
 by user-visible feature. Treat them as staging points, not the final product shape:
 
-- `src/jj_rows/*` proved row contracts and metadata pairing, but feature-owned row modules are the
-  better destination when a feature packet touches the related view behavior. After the
-  operation-log, bookmark, workspace, resolve, and file-list row migrations, `src/jj_rows.rs` is
-  mostly shared helpers plus revision/log staging.
+- `src/jj_rows.rs` now mostly owns shared rendered-row helpers. Re-nominate it only with fresh
+  evidence that a helper boundary is unclear or that remaining shared mechanics are masking feature
+  policy.
 - `src/jj_actions/*` proved command-plan boundaries, but action availability and target policy
   should move toward feature roots rather than stay in global action-menu planning.
 - `src/action_menu/*` should shrink over time toward shared menu vocabulary and presentation; the
@@ -564,17 +583,20 @@ the owning product concept, and make the reader path shorter.
 
 Recommended bounded candidates:
 
-1. Source documentation sweep for central public and crate-visible contracts, starting with
-   `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/command.rs`, `src/app_screen.rs`,
-   and the loaders/helpers in `src/jj_rows.rs`. The docs should explicitly mark which contracts are
-   shared mechanics and which are feature policy that should migrate to a feature root when touched.
-1. Revision/log row migration only if the packet first defines the feature root (`graph` versus a
-   future `log`) and acceptance criteria across `src/graph.rs`, compact show context in
-   `src/show.rs`, and sticky file detail behavior in `src/sticky_file_view.rs`. Do not do this only
-   to reduce `src/jj_rows.rs` or `src/graph.rs` line counts.
-1. Action lifecycle documentation or grouping packet if the owner is clearly app-side completion,
-   preview, or shared result wording. Keep `src/jj_actions.rs` focused on plan construction, preview
-   text, argv, and execution.
+1. Fresh measurement pass before choosing the next packet. Rerun the audit commands and compare them
+   with the completed documentation and row-migration evidence above so future work starts from
+   current code instead of this snapshot.
+1. App entry-point contract docs only if the current `src/app.rs` surface still forces readers to
+   reconstruct `run`, terminal lifecycle, event-loop ownership, refresh/reveal orchestration, or
+   cross-view dispatch from call sites. Keep the packet comment/docs-only unless fresh evidence
+   shows a behavior-preserving extraction with one clear owner.
+1. Mode-input boundary review only after rereading the current reducer split. A useful packet would
+   name one remaining prompt-side-effect or status-wording rule that belongs in app orchestration
+   versus reducers; do not continue the old control-flow nomination mechanically.
+1. Feature-owned action availability packets when a product feature changes, especially around
+   status, files, bookmarks, operation log, or graph/log actions. Feature roots should own whether
+   an action is offered and which target it selects; `action_menu` should keep shared vocabulary and
+   presentation, while `jj_actions` should keep argv, preview, and execution contracts.
 1. Selection/list mechanics packet only when one repeated movement, restore, or clamp rule changes
    across multiple list views and cannot stay readable through the existing `Selection` helpers.
 
