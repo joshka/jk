@@ -5,6 +5,52 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (File-list row feature-root migration)
+
+- Slice / task: move file-list rendered-row loading and exact path parsing out of the generic
+  `jj_rows` bucket and into the `file_list` feature root.
+- Worker thread id: `019e4b47-3920-7a43-9e72-946abfc2dfd5`.
+- Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The user kept
+  VCS ownership in the main thread and explicitly prohibited jj/git commands.
+- Implementation outcome: `src/file_list/rows.rs` now owns `FileListItem`, `load_file_list_entries`,
+  exact non-empty path parsing, colorized rendered-line preservation, and the existing file-list row
+  tests.
+- Boundary evidence: `src/file_list.rs` declares `mod rows;` and re-exports the row item and loader
+  for crate-local callers and tests. `src/jj_rows.rs` no longer owns file-list rows and keeps only
+  shared rendered-row helpers plus revision/log row loading.
+- Caller evidence: `src/app/tests/support.rs`, `src/view_state.rs`,
+  `src/app/tests/detail_restore_actions.rs`, `src/app/tests/file_actions.rs`, and
+  `src/app/tests/bookmark_actions.rs` now construct or re-export file-list rows through
+  `crate::file_list`.
+- Rework / surprise: `rustup run nightly cargo fmt --check` initially failed only on import ordering
+  in `src/app/tests/support.rs`; running rustfmt applied that ordering change. `just md-check`
+  initially failed only on Panache wrapping in this process note and the source maintainability
+  ledger; `just md-fmt` applied those wrapping changes.
+- Validation trail:
+  - `cargo test file_list -- --test-threads=1` passed with 19 passed.
+  - `cargo test detail_restore_actions -- --test-threads=1` passed with 19 passed.
+  - `cargo test file_actions -- --test-threads=1` passed with 7 passed.
+  - `cargo test jj_rows -- --test-threads=1` passed with 11 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed after applying rustfmt, with the existing rustfmt
+    unstable-option warnings.
+  - `just md-check` passed after applying Panache wrapping.
+- Main-thread review validation passed: `cargo test file_list -- --test-threads=1` with 19 passed;
+  `cargo test detail_restore_actions -- --test-threads=1` with 19 passed;
+  `cargo test file_actions -- --test-threads=1` with 7 passed;
+  `cargo test jj_rows -- --test-threads=1` with 11 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:09:25 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b47-3920-7a43-9e72-946abfc2dfd5` from the worker handoff.
+  - Files: `src/file_list.rs`, `src/file_list/rows.rs`, `src/jj_rows.rs`,
+    `src/app/tests/support.rs`, `src/view_state.rs`, focused app tests,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Remaining row ownership reassessment)
 
 - Slice / task: reassess maintainability guidance after operation-log, bookmark, workspace, and

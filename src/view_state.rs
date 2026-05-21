@@ -428,7 +428,7 @@ mod tests {
         let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("abcdefg".to_owned()), Some("src/main.rs".to_owned()))
                 .with_exact_change_target(),
-            vec![crate::jj_rows::FileListItem::new(
+            vec![crate::file_list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],
@@ -491,7 +491,7 @@ mod tests {
         )));
         let file_list = ViewState::FileList(crate::file_list::FileListView::test_with_spec(
             ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned())),
-            vec![crate::jj_rows::FileListItem::new(
+            vec![crate::file_list::FileListItem::new(
                 Vec::new(),
                 "src/main.rs".to_owned(),
             )],

@@ -77,15 +77,26 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 file-list row migration:
+
+- `src/file_list/rows.rs` contains `FileListItem`, `load_file_list_entries`, the exact path parser,
+  and the file-list row tests that previously lived under `jj_rows`.
+- `src/file_list.rs` declares `mod rows;` and re-exports the file-list row item and loader for
+  crate-local app/view tests while continuing to own selection, search, copy, refresh, drill-down,
+  and file action behavior.
+- `src/jj_rows.rs` no longer owns file-list row loading or exact path parsing. It keeps shared
+  rendered-row helpers such as `document_plain_text`, `RowMetadata`, JSON field helpers, graph-line
+  helpers, and `line_text`, plus revision/log row loading.
+- `src/app/tests/support.rs`, focused app tests, and `src/view_state.rs` construct file-list rows
+  through `crate::file_list::...`, so tests now point at the feature owner.
+
 2026-05-21 row ownership reassessment:
 
-- `src/jj_rows.rs` is now a much smaller staging module: it declares only `mod revisions`,
-  re-exports revision log loaders, owns `FileListItem` and `load_file_list_entries`, and keeps
-  shared rendered row helpers such as `document_plain_text`, `RowMetadata`, JSON field helpers,
-  graph-line helpers, and `line_text`.
-- `src/file_list.rs` imports `FileListItem` and `load_file_list_entries` from `jj_rows`; this is the
-  cleanest remaining feature-root row migration because `file_list.rs` already owns the user-visible
-  `jj file list` view.
+- Before the file-list row migration, `src/jj_rows.rs` had already shrunk to revision/log rows,
+  file-list rows, and shared rendered-row helpers such as `document_plain_text`, `RowMetadata`, JSON
+  field helpers, graph-line helpers, and `line_text`.
+- The reassessment nominated file-list rows as the cleanest remaining feature-root row migration
+  because `src/file_list.rs` already owned the user-visible `jj file list` view.
 - Revision/log rows are broader than a size cleanup: `src/graph.rs` consumes `LogItem` and
   `load_entries`, while `src/show.rs` uses `load_compact_log_context` and `src/sticky_file_view.rs`
   uses `load_entries` for file-detail behavior. Do not move them until a packet defines the owner
@@ -99,9 +110,9 @@ Examples for future packets:
 - `src/resolve.rs` declares `mod rows;` and re-exports the resolve row item and loader for
   crate-local app/view tests, plus the test-only conflict template for `src/jj.rs` command argv
   tests.
-- `src/jj_rows.rs` no longer owns resolve row parsing or the resolve conflict template. It keeps
-  shared rendered-row helpers such as `line_text` and JSON string helpers because revision,
-  bookmark, workspace, resolve, and file-list row loaders still use them.
+- `src/jj_rows.rs` no longer owns resolve row parsing or the resolve conflict template. It kept
+  shared rendered-row helpers such as `line_text` and JSON string helpers for revision and
+  feature-owned row loaders.
 - `src/app/tests/support.rs`, focused detail-restore tests, and `src/jj.rs` tests now reference
   resolve row/template ownership through `crate::resolve::...`, so tests point at the feature owner.
 
@@ -201,8 +212,7 @@ missing item-level Rustdoc on many public or crate-visible contracts:
 - `src/tui.rs`: module docs exist, but `Areas`, `Overlay`, and render facades have no direct docs.
 - `src/jj_actions.rs`: module docs and local comments explain preview-first plans, but public plan
   types and argv/preview/run methods mostly lack Rustdoc.
-- `src/jj_rows.rs`: `FileListItem`, the file-list loader, and shared rendered-line helpers are
-  weakly documented.
+- `src/jj_rows.rs`: shared rendered-line helpers and revision/log row facades are weakly documented.
 
 This nominates a source documentation sweep before another broad source split. The sweep should add
 short ownership and contract docs only where a maintainer would otherwise need to reconstruct
@@ -305,8 +315,8 @@ by user-visible feature. Treat them as staging points, not the final product sha
 
 - `src/jj_rows/*` proved row contracts and metadata pairing, but feature-owned row modules are the
   better destination when a feature packet touches the related view behavior. After the
-  operation-log, bookmark, workspace, and resolve row migrations, `src/jj_rows.rs` is mostly shared
-  helpers plus revision/log and file-list staging.
+  operation-log, bookmark, workspace, resolve, and file-list row migrations, `src/jj_rows.rs` is
+  mostly shared helpers plus revision/log staging.
 - `src/jj_actions/*` proved command-plan boundaries, but action availability and target policy
   should move toward feature roots rather than stay in global action-menu planning.
 - `src/action_menu/*` should shrink over time toward shared menu vocabulary and presentation; the
@@ -317,15 +327,7 @@ the owning product concept, and make the reader path shorter.
 
 ## Next Packet Recommendations
 
-Recommended next bounded packet:
-
-1. File-list row feature-root migration, bounded to moving `FileListItem`, `load_file_list_entries`,
-   the file-list path parser, and their focused tests from `src/jj_rows.rs` into a `file_list`
-   feature-owned row module. Acceptance criteria should prove that `src/file_list.rs` still
-   preserves rendered `jj file list` rows, exact path text, selection/search/copy behavior, and file
-   action targets.
-
-Other bounded candidates:
+Recommended bounded candidates:
 
 1. Source documentation sweep for central public and crate-visible contracts, starting with
    `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/command.rs`, `src/app_screen.rs`,
@@ -349,8 +351,7 @@ Pause broad source-shape splits where modules are cohesive:
   only a concrete overlay family with snapshot proof.
 - `src/bookmarks.rs` remains mostly view behavior plus focused tests; target-selection policy
   already has `src/bookmarks/action_targets.rs`.
-- `src/jj_rows.rs` is now mostly shared helpers plus revision/log and file-list staging. Move
-  file-list rows next if continuing feature-root cleanup; leave revision/log rows until the
-  cross-view owner and behavior proof are clear.
+- `src/jj_rows.rs` is now mostly shared helpers plus revision/log staging. Leave revision/log rows
+  until the cross-view owner and behavior proof are clear.
 - Do not create a `slices/` or other umbrella bucket. Prefer feature roots plus shared
   infrastructure.

@@ -1085,7 +1085,7 @@ fn bookmark_rename_confirm_duplicate_name_failure_preserves_error_output() {
 #[test]
 fn file_list_x_is_not_bookmark_delete() {
     let mut app = test_app(ViewState::FileList(
-        crate::file_list::FileListView::test_new(vec![crate::jj_rows::FileListItem::new(
+        crate::file_list::FileListView::test_new(vec![crate::file_list::FileListItem::new(
             vec![ratatui::text::Line::from("src/lib.rs")],
             "src/lib.rs".to_owned(),
         )]),

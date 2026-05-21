@@ -9,13 +9,16 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
+mod rows;
+
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{JjCommand, ViewSpec};
-use crate::jj_rows::{FileListItem, load_file_list_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
+
+pub(crate) use rows::{FileListItem, load_file_list_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),

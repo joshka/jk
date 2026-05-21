@@ -18,6 +18,8 @@ pub(super) use crate::bookmarks::{
 };
 pub(super) use crate::command::{CommandContext, ViewCommand};
 #[allow(unused_imports)]
+pub(super) use crate::file_list::{FileListItem, load_file_list_entries};
+#[allow(unused_imports)]
 pub(super) use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
 #[allow(unused_imports)]
 pub(super) use crate::jj_actions::{
@@ -29,8 +31,7 @@ pub(super) use crate::jj_actions::{
 };
 #[allow(unused_imports)]
 pub(super) use crate::jj_rows::{
-    FileListItem, LogItem, document_plain_text, load_compact_log_context, load_entries,
-    load_file_list_entries,
+    LogItem, document_plain_text, load_compact_log_context, load_entries,
 };
 #[allow(unused_imports)]
 pub(super) use crate::resolve::{ResolveEntry, load_resolve_entries};
