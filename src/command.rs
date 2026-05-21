@@ -1,7 +1,8 @@
 //! Key binding metadata and command effects.
 //!
-//! Bindings are static Rust data. Help and status text live in `tui.rs`, so
-//! this module only owns the key-to-command mapping used by dispatch.
+//! Bindings are static Rust data. `tui.rs` renders the help and status chrome,
+//! while this module owns the command metadata and labels that feed those
+//! views and dispatch.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

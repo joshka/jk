@@ -1,8 +1,7 @@
 //! Terminal suspension runner for inherited-stdio commands.
 //!
-//! Packet 34c adds this primitive before Packet 34 wires it to product split
-//! UI. Until then, the module is tested directly and intentionally has no app
-//! call site.
+//! `jj_actions` and the app service boundary use this to suspend the UI, run
+//! a child command with inherited stdio, and restore the terminal afterward.
 
 #[cfg(test)]
 use std::ffi::OsStr;

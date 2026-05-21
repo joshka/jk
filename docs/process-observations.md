@@ -5,6 +5,20 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Stale source comment repair)
+
+- Slice / task: repair the stale source-ownership comments in `src/action_menu.rs`,
+  `src/command.rs`, `src/interactive_process.rs`, and `src/sticky_file_view.rs`.
+- Thread id: `019e4898-7f41-7f21-86f7-0c66cbbf4a30`.
+- Implementation outcome: the four module comments now describe current ownership and call-site
+  behavior instead of future or narrow assumptions.
+- Validation trail: worker `cargo check`, `rustup run nightly cargo fmt --check`, and
+  `just md-check`; main-thread `just check` passed with 517 tests / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-20 20:49:22 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/action_menu.rs`, `src/command.rs`, `src/interactive_process.rs`,
+    `src/sticky_file_view.rs`, and `docs/process-observations.md`
+
 ### 2026-05-20 (Action completion outcome helper)
 
 - Slice / task: implement the first corrective source-maintainability slice by extracting

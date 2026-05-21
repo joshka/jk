@@ -1,7 +1,8 @@
-//! Action-menu presentation models for future graph mutation preparation.
+//! Action-menu presentation models for graph, status, file, bookmark, sync,
+//! and operation surfaces.
 //!
-//! This module owns the user-visible action vocabulary for mutation prep.
-//! It intentionally does not execute commands or invoke `jj`.
+//! This module owns the user-visible action vocabulary, prompts, and follow-up
+//! context used to present those actions. Execution still happens elsewhere.
 
 use crate::jj::JjFileChmodMode;
 

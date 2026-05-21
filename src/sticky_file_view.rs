@@ -1,8 +1,8 @@
-//! Shared rendering and navigation for show/diff file documents.
+//! Shared rendering and navigation for rendered file documents.
 //!
-//! Show and diff are separate vertical slices, but both need the same sticky
+//! Show, diff, status, and operation-detail surfaces use the same sticky
 //! file-heading projection, search navigation, and file-to-file movement. This
-//! module is intentionally limited to that shared document behavior.
+//! module is limited to that shared document behavior.
 
 use color_eyre::Result;
 use ratatui::Frame;
@@ -14,11 +14,11 @@ use crate::jj::{ViewSpec, load_entries};
 use crate::rendered_jj::{DocumentLines, FileAnchor, PinnedDocument, project_with_active_file};
 use crate::search::{SearchQuery, highlight_line, line_matches};
 
-/// Rendered show/diff text plus file anchors and scroll state.
+/// Rendered file text plus file anchors and scroll state.
 ///
-/// This type owns document navigation for both detail views. It reloads from
-/// `jj` through `load_document`, then keeps scroll offsets clamped to the
-/// rendered lines rather than to a reconstructed repository model.
+/// This type owns document navigation for file-oriented detail views. It
+/// reloads from `jj` through `load_document`, then keeps scroll offsets clamped
+/// to the rendered lines rather than to a reconstructed repository model.
 pub struct StickyFileDocument {
     lines: DocumentLines,
     anchors: Vec<FileAnchor>,
