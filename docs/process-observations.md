@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Action menu ownership contract documentation)
+
+- Slice / task: document shared action-menu presentation and follow-up ownership so feature owners
+  keep action availability local while app lifecycle and `jj_actions` own preview and execution.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b71-7a95-7a92-8741-0204dff82d6c`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only sweep with write
+  scope limited to `src/action_menu.rs`. The main thread reviewed the diff and reran focused
+  validation.
+- Implementation outcome: `src/action_menu.rs` now documents shared menu ownership, action
+  vocabulary and shortcut stability, role-prompt exact revision values, follow-up payload
+  boundaries, builder-owned availability, and the split between menu state, app lifecycle, and
+  `jj_actions`.
+- Size evidence: after the change, `src/action_menu.rs` measured 356 lines.
+- Rework / surprise: none. The worker preserved behavior, public API shape, imports, tests, labels,
+  shortcuts, and safety wording.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `cargo test action_menu -- --test-threads=1` with 40
+    passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo check`;
+    `cargo test action_menu -- --test-threads=1` with 40 passed; and
+    `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+- Evidence basis:
+  - Date: `2026-05-21 09:51:12 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b71-7a95-7a92-8741-0204dff82d6c` from the worker handoff.
+  - Files: `src/action_menu.rs` and this process note.
+
 ### 2026-05-21 (App screen projection contract documentation)
 
 - Slice / task: document how transient `InteractionMode` state projects into status lines and shared

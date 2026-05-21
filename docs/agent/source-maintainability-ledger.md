@@ -77,6 +77,17 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 action menu ownership contract documentation:
+
+- `src/action_menu.rs` now documents the split between shared menu presentation contracts, stable
+  action vocabulary, role prompts, follow-up payloads, feature-owned availability, app-owned
+  lifecycle, and `jj_actions` command plans.
+- Follow-up docs now explicitly constrain payloads to exact revision strings, operation ids,
+  selected paths, role prompts, candidate lists, and chmod modes instead of UI selection state,
+  preview text, refresh policy, or reveal targets.
+- Focused validation covered `cargo check`, `cargo test action_menu -- --test-threads=1`, and
+  `rustup run nightly cargo fmt --check`.
+
 2026-05-21 app screen projection contract documentation:
 
 - `src/app_screen.rs` now documents how transient `InteractionMode` state projects into prompt

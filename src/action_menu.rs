@@ -1,8 +1,12 @@
 //! Action-menu presentation models for graph, status, file, bookmark, sync,
 //! and operation surfaces.
 //!
-//! This module owns the user-visible action vocabulary, prompts, and follow-up
-//! context used to present those actions. Execution still happens elsewhere.
+//! This module owns only shared menu contracts: the stable action vocabulary,
+//! safety marker text, role-prompt presentation state, and follow-up payloads
+//! handed back after a selection. Feature roots and their builders decide which
+//! actions are available for the current row or path context. The app action
+//! lifecycle and `jj_actions` own preview construction, process execution, and
+//! any refresh or reveal behavior after a command completes.
 
 mod path_actions;
 mod revision_actions;
@@ -36,7 +40,8 @@ impl SafetyTier {
 /// Stable action vocabulary shared by menus, prompts, and follow-up dispatch.
 ///
 /// This enum names user-visible verbs only. Feature-specific availability rules belong in the
-/// feature or action-menu builder that knows the selected row context.
+/// feature or action-menu builder that knows the selected row context. Labels and shortcuts are part
+/// of the shared presentation contract, but they are not command construction policy.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionKind {
     Edit,
@@ -98,7 +103,9 @@ impl ActionKind {
 /// One role/value pair in an action prompt that needs an explicit source or destination choice.
 ///
 /// Roles are presentation labels and dispatcher cues, not parsed revsets. The follow-up action plan
-/// is responsible for quoting selected values before passing them to `jj`.
+/// is responsible for quoting selected values before passing them to `jj`. Values are the exact
+/// revision strings selected by the builder, so callers should not normalize them while the prompt is
+/// open.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RolePromptOption {
     role: &'static str,
@@ -129,7 +136,9 @@ impl RolePromptOption {
 /// Prompt model for actions that need a role choice before preview.
 ///
 /// The prompt is immutable UI state owned by `InteractionMode`; choosing an option only creates the
-/// next follow-up, and never executes `jj` directly.
+/// next follow-up, and never executes `jj` directly. The role names currently consumed by app
+/// reducers are `"source"` and `"destination"`; additional role semantics belong with the reducer
+/// that turns a chosen prompt into a preview plan.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RolePrompt {
     title: &'static str,
@@ -191,10 +200,16 @@ impl RolePrompt {
 /// Deferred action payload produced by a selected menu item.
 ///
 /// Follow-ups intentionally carry exact strings from rendered row metadata or selected paths. The
-/// app turns them into preview-first `jj_actions` plans before any process side effects occur.
+/// app turns them into preview-first `jj_actions` plans before any process side effects occur. Keep
+/// payloads to the metadata needed to construct that plan: exact revision strings, operation ids,
+/// selected paths, role prompts, candidate lists, and chmod modes. UI selection state, command
+/// preview text, post-command status, refresh policy, and reveal targets belong in the app lifecycle
+/// or `jj_actions`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FollowUp {
+    /// User-visible terminal payload when a builder cannot form a safe mutation target.
     StatusMessage(String),
+    /// Revision-oriented payloads carry the exact target selected by a feature row.
     ExactRevision {
         revision: String,
     },
@@ -227,11 +242,13 @@ pub enum FollowUp {
     NewParents {
         parents: Vec<String>,
     },
+    /// Multi-target rewrite payloads preserve candidate ordering for the next app prompt or plan.
     RolePrompt(RolePrompt),
     AbsorbCandidates {
         source: String,
         destinations: Vec<String>,
     },
+    /// Path payloads carry the selected fileset string and, when needed, its revision context.
     FileTrack {
         path: String,
     },
@@ -248,7 +265,9 @@ pub enum FollowUp {
 /// One selectable row in an action menu.
 ///
 /// Items are pure presentation and dispatch data: label, shortcut, safety marker, and follow-up.
-/// They do not know whether the selected action is valid after a later refresh.
+/// They do not know whether the selected action is valid after a later refresh. Builders should
+/// attach only the metadata needed by `FollowUp`; any validation that depends on current repository
+/// state happens when the app constructs or executes the preview plan.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionMenuItem {
     action: ActionKind,
@@ -298,7 +317,8 @@ impl ActionMenuItem {
 /// Immutable action menu for the currently selected view item.
 ///
 /// Builders own action availability. The shared menu type only preserves item order and shortcut
-/// lookup for modal input.
+/// lookup for modal input. Rendering, selected-index clamping, and accepted-selection behavior are
+/// app and TUI responsibilities.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ActionMenu {
     items: Vec<ActionMenuItem>,
