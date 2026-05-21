@@ -149,6 +149,12 @@ pub(crate) enum InteractionMode {
 }
 
 impl InteractionMode {
+    /// Projects transient prompt state into the status line for the current draw.
+    ///
+    /// Only prompt-like modes override the stored status. Durable ready/error status belongs to
+    /// `app_status`, and accepting, cancelling, or mutating prompt input belongs to app dispatch.
+    /// This method should stay side-effect free so lifecycle code can ask what the screen would
+    /// show without changing the active mode.
     pub(crate) fn status_line(&self, view: &ViewState, stored_status: &StatusLine) -> StatusLine {
         match self {
             Self::SearchPrompt(input) => StatusLine::with_message(view, format!("/{input}")),
@@ -180,6 +186,12 @@ impl InteractionMode {
         }
     }
 
+    /// Borrows the active screen state as the shared TUI overlay model.
+    ///
+    /// This is a projection boundary only: the returned `Overlay` borrows menu options, prompts,
+    /// and action output owned by `InteractionMode` or static tables. Overlay chrome and layout
+    /// belong to `tui`, while key handling, command execution, and mode transitions stay in app
+    /// dispatch.
     pub(crate) fn overlay<'a>(
         &'a self,
         view: &'a ViewState,
@@ -311,10 +323,17 @@ pub struct ViewMenuOption {
 }
 
 impl ViewMenuOption {
+    /// Returns the user-visible menu label without implying any dispatch behavior.
+    ///
+    /// `tui` renders this text as provided; changing wording here is a user-visible screen change.
     pub fn label(self) -> &'static str {
         self.label
     }
 
+    /// Returns the app-owned action requested by this static menu row.
+    ///
+    /// The action is data for dispatch only. Opening views, changing diff format, refreshing, and
+    /// surfacing errors remain in the app navigation/lifecycle code.
     pub fn action(self) -> ViewMenuAction {
         self.action
     }
@@ -332,8 +351,9 @@ pub enum ViewMenuAction {
 
 /// Static view menu entries shown by shared TUI chrome.
 ///
-/// The labels are user-visible command names. Feature-specific view behavior and loading still
-/// belong to `ViewState` and the individual view modules.
+/// This table is the shared source for overlay rendering, selected-index clamping, and app
+/// navigation lookup. The labels are user-visible command names. Feature-specific view behavior and
+/// loading still belong to `ViewState` and the individual view modules.
 pub fn view_menu_options() -> &'static [ViewMenuOption] {
     &[
         ViewMenuOption {

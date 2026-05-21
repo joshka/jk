@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (App screen projection contract documentation)
+
+- Slice / task: document how transient `InteractionMode` state projects into status lines and shared
+  TUI overlays so future app dispatch and action-lifecycle cleanup can route screen behavior without
+  rediscovering ownership.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b6f-015e-7590-b2a4-e9c08afdfb86`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only sweep with write
+  scope limited to `src/app_screen.rs`. The main thread reviewed the diff and reran focused
+  validation.
+- Implementation outcome: `src/app_screen.rs` now documents prompt status projection, borrowed
+  overlay projection, view-menu labels as user-visible text, view-menu actions as app-dispatched
+  data, and the static view-menu table as the shared source for overlay rendering, selected-index
+  clamping, and navigation lookup.
+- Size evidence: after the change, `src/app_screen.rs` measured 659 lines.
+- Rework / surprise: none. The worker preserved behavior, API shape, imports, tests, status wording,
+  and overlay labels.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `cargo test app_screen -- --test-threads=1` with 7
+    passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo check`; `cargo test app_screen -- --test-threads=1`
+    with 7 passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+  - Full `just check` passed at the top of the stack, reporting fmt, Panache format/lint, clippy,
+    cargo check, and cargo test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:48:14 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b6f-015e-7590-b2a4-e9c08afdfb86` from the worker handoff.
+  - Files: `src/app_screen.rs` and this process note.
+
 ### 2026-05-21 (Shared row helper contract documentation)
 
 - Slice / task: document the remaining `src/jj_rows.rs` shared-helper boundary so future row work

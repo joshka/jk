@@ -77,6 +77,16 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 app screen projection contract documentation:
+
+- `src/app_screen.rs` now documents how transient `InteractionMode` state projects into prompt
+  status lines and borrowed `tui::Overlay` values without owning dispatch, command execution, or
+  side effects.
+- `ViewMenuOption` and `view_menu_options` now document the split between user-visible menu labels,
+  static menu data, selected-index clamping, and app-owned navigation/diff-format dispatch.
+- Focused validation covered `cargo check`, `cargo test app_screen -- --test-threads=1`, and
+  `rustup run nightly cargo fmt --check`.
+
 2026-05-21 shared row helper contract documentation:
 
 - `src/jj_rows.rs` now states that feature-specific row policy belongs in feature roots and this
