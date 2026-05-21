@@ -5,6 +5,45 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Operation recovery and target plan cluster extraction)
+
+- Slice / task: implement the ledger slice `Operation Recovery And Target Plan Cluster` on current
+  jj change `Extract operation action plans`.
+- Thread id: `019e498f-f892-7730-b6f9-256888722606`.
+- Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
+  extraction for main-thread review.
+- Files changed: `src/jj_actions.rs`, `src/jj_actions/operation.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/jj_actions/operation.rs` now owns `JjOperationRecoveryKind`,
+  `JjOperationRecovery`, `JjOperationTargetKind`, `JjOperationTarget`, their argv/preview/run
+  implementations, and the focused operation unit tests for undo/redo and exact restore/revert
+  targeting. `src/jj_actions.rs` keeps the stable facade with a local `operation` submodule
+  declaration plus `pub use` re-exports for existing callers.
+- Behavior intent: preserve operation argv shape, preview wording, fallback wording, labels,
+  operation-id targeting, app call sites, operation-log navigation behavior, and completion/refresh
+  policy exactly while reducing live context in `src/jj_actions.rs`.
+- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test operation_actions -- --test-threads=1`;
+  `cargo test operation_log -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check`.
+- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+  `cargo test operation_actions -- --test-threads=1`;
+  `cargo test operation_log -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; and `just md-check` all passed.
+- Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
+  largest-file output showed `src/jj_actions.rs` at 1159 lines.
+- Issue / rework note: main-thread review removed the broad `JjOperationTargetKind` facade re-export
+  and its temporary `#[allow(unused_imports)]` after reproducing the warning with a plain
+  `cargo check`. The reviewed cleanup kept the stable facade for the operation names used outside
+  `jj_actions` and updated the app operation tests to assert via `status_action()` instead of
+  relying on an unused internal enum re-export.
+- Evidence basis:
+  - Date: `2026-05-21 01:06:19 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
+    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/operation.rs`,
+    `src/app/tests/operation_actions.rs`, and `src/operation_log.rs`
+
 ### 2026-05-21 (Working-copy action-plan cluster extraction)
 
 - Slice / task: implement the ledger slice `Working-Copy Action Plan Cluster` on current jj change

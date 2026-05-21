@@ -162,10 +162,7 @@ fn operation_restore_preview_can_cancel_or_confirm_success() {
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { target, output } => {
-            assert_eq!(
-                target.kind(),
-                crate::jj_actions::JjOperationTargetKind::Restore
-            );
+            assert_eq!(target.status_action(), "restore");
             assert_eq!(target.operation_id(), operation_id.as_str());
             output
         }
@@ -298,10 +295,7 @@ fn operation_revert_preview_confirm_failure_keeps_output_readable() {
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { target, output } => {
-            assert_eq!(
-                target.kind(),
-                crate::jj_actions::JjOperationTargetKind::Revert
-            );
+            assert_eq!(target.status_action(), "revert");
             assert_eq!(target.operation_id(), operation_id.as_str());
             output
         }

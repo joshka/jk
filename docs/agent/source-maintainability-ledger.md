@@ -29,6 +29,7 @@ visibility and control-flow scans, and direct reads of the cited source files to
 - `Action Preview Pane Construction Helper`
 - `Git Sync Action-Plan Cluster`
 - `Working-Copy Action Plan Cluster`
+- `Operation Recovery And Target Plan Cluster`
 - `View Action-Target Projection Policy`
 - `Simple Selection Restore Helper`
 - `Retired src/jj.rs Compatibility Re-exports`
@@ -96,20 +97,7 @@ show a sharper bounded packet there than the ones below.
 
 ## Current Next Slices
 
-### 1. Operation Recovery And Target Plan Cluster
-
-- Owner: `src/jj_actions.rs`
-- Purpose: give global undo/redo and exact operation restore/revert a focused home:
-  `JjOperationRecoveryKind`, `JjOperationRecovery`, `JjOperationTargetKind`, and
-  `JjOperationTarget`. They are already a coherent vertical concept with separate preview wording,
-  fallback rules, and operation-id targeting, but they still occupy the top of the large facade
-  module.
-- Non-goals: no stacked-view refresh redesign in `src/app/action_lifecycle/completion.rs`; no
-  operation-log navigation change; no result wording change.
-- Proof: focused operation action tests through the stable `jj_actions` import path, plus
-  `cargo check`, `cargo clippy -- -D warnings`, and `just md-check`.
-
-### 2. Help Projection Policy Packet
+### 1. Help Projection Policy Packet
 
 - Owner: `src/command.rs`
 - Purpose: isolate the context-conditioned help policy currently concentrated in `help_metadata`,
@@ -120,7 +108,7 @@ show a sharper bounded packet there than the ones below.
 - Proof: focused command/help projection tests, especially context-specific visibility cases, plus
   `cargo check` and `just md-check`.
 
-### 3. File And Status Path Action-Menu Policy
+### 2. File And Status Path Action-Menu Policy
 
 - Owner: `src/action_menu.rs`
 - Purpose: isolate the path-scoped action-menu rules currently mixed across `ExactActionContext`,
