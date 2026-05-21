@@ -15,6 +15,9 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - View tests moved beside their features: tests moved out of production modules for file show, file
   list, operation detail, workspaces, and resolve. This keeps production files shorter while
   preserving behavior tests next to the code they describe.
+- App modal dispatch got its first reducer-shaped cleanup: copy, view, action, role, push-remote,
+  and fetch-remote menu key handling now have named helpers while `handle_active_mode_key` remains
+  the dispatch table.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -31,18 +34,19 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - They are easy to validate with focused view-level tests plus `cargo check`, formatting, and
   Markdown checks.
 
-## In Progress
+## Current State
 
-- Resolve view test split: the worker moved resolve view tests into `src/resolve/tests.rs`.
-  Main-thread review and validation have passed; the packet has been documented.
-- Status visibility: this document now provides a short map of the cleanup wave so the automatic
-  session does not require reading the full Codex thread.
+- The current top of stack refreshes this status map after the app modal key handler extraction.
+- Recent behavior-preserving packets have focused on locality, feature ownership, and making the
+  automatic session easier to audit from files rather than chat history.
+- The broad goal is still active. The completed packets do not prove the whole cleanup queue is
+  done.
 
 ## Likely Next Work
 
-- App modal dispatch readability: `src/app/mode_input.rs` still has a large central reducer. The
-  likely next valuable step is extracting named handlers for prompt and menu arms, but only where
-  the names match existing concepts and preserve key behavior.
+- App modal dispatch readability: `src/app/mode_input.rs` still has prompt and confirmation arms
+  inline. The likely next valuable step is extracting named handlers for text prompts or abandon
+  confirmation, but only where the names match existing concepts and preserve key behavior.
 - Action lifecycle readability: `src/app/action_lifecycle/*` should stay focused on dispatch,
   preview, completion, refresh, and reveal policy. Repeated completion/result handling should be
   audited before extracting helpers.
