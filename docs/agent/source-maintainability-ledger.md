@@ -4,6 +4,9 @@ This ledger records the active maintainability objective for `jk` and the curren
 guide bounded follow-up packets. It is not a standing "split the biggest files" queue. Measurements
 nominate places to read first; they do not mandate refactors.
 
+For a concise human-readable map of recent work, current focus, likely next work, and process
+observations, see [`cleanup-wave-status.md`](cleanup-wave-status.md).
+
 Before starting a source-shape packet, gather fresh measurements and read the owning module. Prefer
 product work and local documentation improvements over movement that only changes line counts.
 
