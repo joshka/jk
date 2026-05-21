@@ -390,7 +390,7 @@ pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
             ViewState::OperationLog(crate::operation_log::OperationLogView::test_new(vec![]))
         }
         JjCommand::OperationShow | JjCommand::OperationDiff => {
-            ViewState::OperationDetail(crate::operation_detail::OperationDetailView::test_new(
+            ViewState::OperationDetail(crate::operation_log::detail::OperationDetailView::test_new(
                 spec,
                 crate::rendered_jj::DocumentLines::new(Vec::new()),
             ))

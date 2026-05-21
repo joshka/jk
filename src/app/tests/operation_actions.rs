@@ -340,7 +340,7 @@ fn back_from_operation_detail_returns_to_operation_log() {
             Some(operation_id.clone()),
         ),
     ]);
-    let detail = crate::operation_detail::OperationDetailView::test_new(
+    let detail = crate::operation_log::detail::OperationDetailView::test_new(
         ViewSpec::operation_show(operation_id),
         crate::rendered_jj::DocumentLines::new(vec![ratatui::text::Line::from(
             "operation details",

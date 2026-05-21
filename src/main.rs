@@ -20,7 +20,6 @@ mod jj;
 mod jj_actions;
 mod jj_rows;
 mod jj_syntax;
-mod operation_detail;
 mod operation_log;
 mod rendered_jj;
 mod resolve;

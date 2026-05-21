@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Operation detail feature ownership)
+
+- Slice / task: move the root operation detail module under the operation-log feature root while
+  preserving operation show/diff detail behavior.
+- Thread id: main orchestration thread; no subagent was used because this was a small ownership move
+  continuing the feature-root refactoring direction.
+- Model / routing: GPT-5 Codex performed the implementation, review, validation, and evidence
+  updates in the main thread.
+- Changed files: `src/operation_log/detail.rs`, `src/operation_log.rs`, `src/main.rs`,
+  `src/view_state.rs`, app tests that construct operation detail views directly,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: operation detail is now addressed as `crate::operation_log::detail`.
+  `operation_log` owns the operation-log list, operation recovery action plans, operation row
+  parsing, and operation show/diff detail rendering entry point.
+- Behavior-preservation evidence: the packet moved the module and updated import paths only. It did
+  not change operation detail document rendering, scrolling, search, copy options, show/diff
+  switching, app routing, command construction, or test assertions.
+- Scope boundary: the packet did not split operation-detail tests, change operation-log action
+  policy, move shared document mechanics, or alter operation recovery command plans.
+- Validation trail:
+  - Main-thread validation passed: `cargo test operation -- --test-threads=1` with 46 passed and 521
+    filtered out; `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings.
+- Rework / surprise: no behavior rework was needed. Direct file inspection verified the corrected
+  module paths after the mechanical move.
+- Evidence basis:
+  - Date: `2026-05-21 15:53:59 PDT` from local `date`.
+  - Files: `src/operation_log/detail.rs`, `src/operation_log.rs`, `src/main.rs`,
+    `src/view_state.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (File list view test split)
 
 - Slice / task: move inline file-list view tests from `src/files/list.rs` into

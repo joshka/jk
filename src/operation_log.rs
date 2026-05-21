@@ -20,6 +20,7 @@ use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
 
 pub(crate) mod actions;
+pub(crate) mod detail;
 mod rows;
 
 #[cfg(test)]

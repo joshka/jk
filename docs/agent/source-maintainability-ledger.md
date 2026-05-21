@@ -103,6 +103,20 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 operation detail feature ownership:
+
+- The former root `src/operation_detail.rs` now lives at `src/operation_log/detail.rs`, and
+  `src/operation_log.rs` declares `pub(crate) mod detail;`.
+- This follows the feature-root direction by making `operation_log` the starting point for both
+  operation-log rows/actions and operation show/diff detail rendering. `view_state` and app tests
+  now import operation detail through `crate::operation_log::detail`.
+- The packet intentionally preserved operation detail rendering, scrolling, search, copy options,
+  show/diff switching, app routing, command specs, and test assertions.
+- Focused validation covered `cargo test operation -- --test-threads=1` with 46 passed and 521
+  filtered out, `cargo check`, and `rustup run nightly cargo fmt --check`.
+- Rework was limited to correcting module paths after the file move; no operation-log or
+  operation-detail runtime logic changed.
+
 2026-05-21 file list view test split:
 
 - `src/files/list.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
