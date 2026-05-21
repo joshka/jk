@@ -5,6 +5,37 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Shared chrome rendering contract documentation)
+
+- Slice / task: document shared terminal chrome and modal presentation boundaries so feature views
+  keep behavior local while `tui.rs` remains presentation-only.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b74-132a-73b0-8e7b-ce61337910c9`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only sweep with write
+  scope limited to `src/tui.rs`. The main thread reviewed the diff and reran focused plus full
+  validation.
+- Implementation outcome: `src/tui.rs` now documents shared chrome versus view/app ownership,
+  optional status hint fitting on narrow terminals, borrowed overlay/action-output presentation,
+  scroll/input ownership boundaries, action-output sizing, fallback-friendly overlay styling, and
+  clipped modal geometry.
+- Size evidence: after the change, `src/tui.rs` measured 592 lines.
+- Rework / surprise: none. The worker preserved behavior, public API shape, tests, labels, colors,
+  styles, layout numbers, imports, and module structure.
+- Validation trail:
+  - Worker validation passed: `cargo check`; `cargo test tui -- --test-threads=1` with 17 passed / 1
+    ignored; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - Main-thread review validation passed: `cargo check`; `cargo test tui -- --test-threads=1` with
+    17 passed / 1 ignored; and `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings.
+  - Full `just check` passed at the top of the stack, reporting fmt, Panache format/lint, clippy,
+    cargo check, and cargo test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:54:01 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b74-132a-73b0-8e7b-ce61337910c9` from the worker handoff.
+  - Files: `src/tui.rs` and this process note.
+
 ### 2026-05-21 (Action menu ownership contract documentation)
 
 - Slice / task: document shared action-menu presentation and follow-up ownership so feature owners

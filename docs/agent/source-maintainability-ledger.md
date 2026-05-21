@@ -77,6 +77,16 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 shared chrome rendering contract documentation:
+
+- `src/tui.rs` now documents the split between feature-owned main content and shared chrome-owned
+  title/status/overlay rendering.
+- The packet records presentation-only contracts for optional status hints, borrowed overlays,
+  action-output body/footer sizing, abandon-confirm input rendering, fallback-friendly overlay
+  styling, and clipped modal geometry.
+- Focused validation covered `cargo check`, `cargo test tui -- --test-threads=1`, and
+  `rustup run nightly cargo fmt --check`. Full `just check` also passed at the top of the stack.
+
 2026-05-21 action menu ownership contract documentation:
 
 - `src/action_menu.rs` now documents the split between shared menu presentation contracts, stable

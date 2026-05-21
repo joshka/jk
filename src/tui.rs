@@ -1,7 +1,10 @@
-//! Shared terminal chrome.
+//! Shared terminal chrome and modal presentation.
 //!
-//! View slices render their own main content. This module only owns the title
-//! bar, status bar, and modal overlays that frame those views.
+//! View slices render their own main content and own their selection, scroll, search, and command
+//! policy. `app_screen.rs` projects app interaction state into borrowed [`Overlay`] values; this
+//! module sizes, clears, styles, and renders those values as shared chrome around the active view.
+//! Future behavior belongs in the view, app screen, action lifecycle, or action output owner that
+//! holds the state being changed, not in this presentation layer.
 
 mod status_hints;
 
@@ -181,6 +184,9 @@ fn status_line_text(status: &StatusLine, width: u16) -> Line<'_> {
     let available_hint_width = usize::from(width)
         .saturating_sub(message_width)
         .saturating_sub(2) as u16;
+    // Hints are optional chrome. They fit only in the terminal width left after the primary status
+    // message, so a narrow terminal keeps the state message visible instead of forcing view content
+    // or status text to wrap.
     let hint_spans = status_hint_spans(status.hints(), available_hint_width).spans;
 
     if !hint_spans.is_empty() {
@@ -382,6 +388,8 @@ fn render_action_output(frame: &mut Frame<'_>, area: Rect, title: &str, output: 
     }
 
     let footer_height = u16::from(inner.height > 1);
+    // `ActionOutput` owns scroll position and key behavior. Chrome rendering only projects that
+    // offset into a body area and reserves the last usable row for command hints when it exists.
     let body_area = Rect {
         x: inner.x,
         y: inner.y,
@@ -423,6 +431,8 @@ fn render_abandon_confirm(
     }
 
     let footer_height = u16::from(inner.height > 1);
+    // Confirmation input is app-owned state. The overlay renders the current value as footer text
+    // but does not validate, mutate, or advance the prompt.
     let body_area = Rect {
         x: inner.x,
         y: inner.y,
@@ -483,6 +493,8 @@ fn action_output_area_with_footer(
     footer: &str,
 ) -> Rect {
     let lines = output.body_lines();
+    // Size to the widest visible contract text, then clamp to the terminal. This keeps previews and
+    // results readable without changing the output content or inventing wrapping policy here.
     let width = lines
         .iter()
         .map(|line| line_width(line))
@@ -540,6 +552,8 @@ fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
 }
 
 fn overlay_block(title: impl Into<String>) -> Block<'static> {
+    // All overlays share one fallback-friendly style contract: bordered, cleared, high-contrast
+    // presentation with theme-owned colors. Variant-specific behavior and state stay upstream.
     Block::bordered()
         .style(theme::overlay_background_style())
         .border_style(theme::overlay_border_style())
@@ -548,6 +562,8 @@ fn overlay_block(title: impl Into<String>) -> Block<'static> {
 }
 
 fn centered_area(area: ratatui::layout::Rect, width: u16, height: u16) -> ratatui::layout::Rect {
+    // Modal geometry is clipped to the current terminal instead of assuming a minimum size. The
+    // caller decides desired content dimensions; this helper only keeps the rectangle drawable.
     let width = width.min(area.width);
     let height = height.min(area.height);
     let x = area.x + area.width.saturating_sub(width) / 2;
