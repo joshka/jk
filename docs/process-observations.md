@@ -5,6 +5,44 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Log row ownership definition)
+
+- Slice / task: define the remaining graph/log row ownership boundary before moving revision rows
+  out of the generic `jj_rows` bucket.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Model / routing: GPT-5 Codex main thread with medium reasoning performed this slice directly
+  because the user explicitly requested the feature-root refactoring guidance in the main thread.
+- Implementation outcome: `src/sticky_file_view.rs` now loads rendered document lines directly
+  through `run_jj` with `ColorMode::Always` and `ansi_to_tui`, so show, diff, status, file-show, and
+  operation-detail document loading no longer depends on graph/log `LogItem` rows.
+- Documentation outcome: `docs/agent/architecture.md` now describes `jj_rows.rs` as a shrinking
+  graph/log row owner plus remaining shared helpers, and
+  `docs/agent/source-maintainability-ledger.md` records acceptance criteria for the next
+  revision-row move.
+- Boundary evidence: `src/graph.rs` still consumes `LogItem` and `load_entries`; `src/show.rs` still
+  consumes `load_compact_log_context`; `src/sticky_file_view.rs` no longer imports `load_entries`,
+  so document views stay independent of graph row identity.
+- Validation trail:
+  - `cargo test sticky_file_view -- --test-threads=1` passed with 5 passed.
+  - `cargo test show -- --test-threads=1` passed with 47 passed.
+  - `cargo test diff -- --test-threads=1` passed with 32 passed.
+  - `cargo test status -- --test-threads=1` passed with 44 passed.
+  - `cargo test operation_detail -- --test-threads=1` passed with 7 passed.
+  - `cargo test jj_rows -- --test-threads=1` passed with 11 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed.
+  - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
+    test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:12:41 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Files: `src/sticky_file_view.rs`, `src/jj_rows.rs`, `src/jj_rows/revisions.rs`, `src/graph.rs`,
+    `src/show.rs`, `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and
+    this process note.
+
 ### 2026-05-21 (File-list row feature-root migration)
 
 - Slice / task: move file-list rendered-row loading and exact path parsing out of the generic

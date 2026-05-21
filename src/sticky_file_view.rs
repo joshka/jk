@@ -4,14 +4,14 @@
 //! file-heading projection, search navigation, and file-to-file movement. This
 //! module is limited to that shared document behavior.
 
+use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Wrap};
 
-use crate::jj::ViewSpec;
-use crate::jj_rows::load_entries;
+use crate::jj::{ColorMode, ViewSpec, run_jj};
 use crate::rendered_jj::{DocumentLines, FileAnchor, PinnedDocument, project_with_active_file};
 use crate::search::{SearchQuery, highlight_line, line_matches};
 
@@ -329,12 +329,9 @@ impl StickyScroll {
 }
 
 pub fn load_document(spec: &ViewSpec) -> Result<DocumentLines> {
-    Ok(DocumentLines::new(
-        load_entries(spec)?
-            .into_iter()
-            .flat_map(|entry| entry.lines())
-            .collect(),
-    ))
+    let output = run_jj(spec, ColorMode::Always)?;
+
+    Ok(DocumentLines::new(output.stdout.into_text()?.lines))
 }
 
 pub fn render_document(

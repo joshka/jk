@@ -97,17 +97,17 @@ Keep modules aligned with user-visible concepts:
   command/navigation target provenance.
 - `jj_syntax.rs` owns exact revset/fileset/string quoting helpers and argv label helpers shared by
   `jj_actions.rs` and related command builders.
-- `jj_rows.rs` owns selectable rendered row models, row loaders, narrow metadata templates, metadata
-  pairing, row grouping, resolve-entry parsing, file-list path preservation, and conversion from
-  rendered ANSI output into Ratatui row items. It may call the `jj.rs` process helpers, but it
-  should not own command identity or navigation provenance.
+- `jj_rows.rs` currently owns only graph/log revision row loading and shared row-helper mechanics
+  that have not yet moved to narrower owners. It should keep shrinking as feature roots own their
+  row models. It may call the `jj.rs` process helpers for graph/log row loading, but it should not
+  own command identity, navigation provenance, document loading, or feature-specific row policy.
 - `graph.rs` owns the default/log graph view, graph-row selection, graph search, and graph-to-detail
   navigation.
 - `show.rs` and `diff.rs` own their view behavior and should stay distinct even when they share
   document mechanics.
 - `sticky_file_view.rs` owns shared rendered-file document mechanics for show, diff, status,
-  file-show, and operation-detail surfaces: sticky heading projection, file jumping, scroll state,
-  search, and render helpers.
+  file-show, and operation-detail surfaces: loading rendered document lines, sticky heading
+  projection, file jumping, scroll state, search, and render helpers.
 - `rendered_jj.rs` owns lightweight structure over rendered jj lines, including file heading
   detection and sticky projection inputs.
 - `search.rs`, `selection.rs`, `copy.rs`, and `clipboard.rs` own narrow support concepts and should

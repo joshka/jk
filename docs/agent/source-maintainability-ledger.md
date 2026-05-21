@@ -77,6 +77,22 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 log row ownership definition:
+
+- `src/sticky_file_view.rs` now loads rendered document lines directly through `run_jj` with
+  `ColorMode::Always`, so file-oriented document views no longer depend on graph/log row items just
+  to preserve styled output.
+- `src/jj_rows/revisions.rs` is now graph/log-specific in practice: `src/graph.rs` consumes
+  `LogItem` and `load_entries` for selectable graph rows, while `src/show.rs` consumes only
+  `load_compact_log_context` for sticky commit context.
+- The next source move should not blindly preserve the old `jj_rows` facade. A bounded
+  implementation packet should either move revision rows under `graph/rows.rs` and expose a narrow
+  compact-context loader for `show`, or first rename/introduce a true `log` feature root that owns
+  both the default graph view and its row model.
+- Acceptance criteria for that packet: graph selection, multi-select, reveal, search, copy,
+  visible-working-copy detection, compact show context, and rendered document loading must retain
+  their current output and tests. `sticky_file_view` should stay independent of `LogItem`.
+
 2026-05-21 file-list row migration:
 
 - `src/file_list/rows.rs` contains `FileListItem`, `load_file_list_entries`, the exact path parser,
