@@ -61,7 +61,7 @@ fn squash_plan_from_prompt_respects_explicit_roles() {
 #[test]
 fn new_action_menu_enter_opens_preview_with_exact_parents() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
         menu: crate::action_menu::build_action_menu(
@@ -92,7 +92,7 @@ fn new_action_menu_enter_opens_preview_with_exact_parents() {
 #[test]
 fn action_menu_shortcut_opens_item_without_moving_selection() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
         menu: crate::action_menu::build_action_menu(
@@ -114,7 +114,7 @@ fn action_menu_shortcut_opens_item_without_moving_selection() {
 #[test]
 fn action_menu_close_key_preserves_normal_context() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
         menu: crate::action_menu::build_action_menu(
@@ -132,7 +132,7 @@ fn action_menu_close_key_preserves_normal_context() {
 #[test]
 fn edit_action_menu_enter_opens_preview_with_exact_target() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
         menu: crate::action_menu::build_action_menu(
@@ -161,7 +161,7 @@ fn edit_action_menu_enter_opens_preview_with_exact_target() {
 #[test]
 fn edit_direct_key_requires_exact_selected_graph_row() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), None, None),
+        crate::graph::LogItem::new(Vec::new(), None, None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('e'), KeyModifiers::NONE), 12)
@@ -178,7 +178,7 @@ fn edit_direct_key_requires_exact_selected_graph_row() {
 #[test]
 fn next_direct_key_opens_preview_without_selected_row_targeting() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), None, None),
+        crate::graph::LogItem::new(Vec::new(), None, None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char(']'), KeyModifiers::NONE), 12)
@@ -201,7 +201,7 @@ fn next_direct_key_opens_preview_without_selected_row_targeting() {
 #[test]
 fn working_copy_navigation_preview_cancel_restores_normal_mode() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
         navigation: JjWorkingCopyNavigationPlan::edit("change-a"),
@@ -221,7 +221,7 @@ fn working_copy_navigation_preview_cancel_restores_normal_mode() {
 #[test]
 fn edit_confirm_success_refreshes_and_reveals_target() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.reveal_graph_change = mock_reveal_edit_target_in_recent;
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
@@ -248,7 +248,7 @@ fn edit_confirm_success_refreshes_and_reveals_target() {
 #[test]
 fn split_action_menu_enter_opens_exact_target_preview() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(
+        crate::graph::LogItem::new(
             vec![ratatui::text::Line::from("○  change")],
             Some("change-a".to_owned()),
             None,
@@ -284,7 +284,7 @@ fn split_action_menu_enter_opens_exact_target_preview() {
 #[test]
 fn duplicate_action_menu_enter_opens_exact_source_preview() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(
+        crate::graph::LogItem::new(
             vec![ratatui::text::Line::from("○  change")],
             Some("change-a".to_owned()),
             None,
@@ -321,8 +321,8 @@ fn duplicate_action_menu_enter_opens_exact_source_preview() {
 #[test]
 fn duplicate_preview_cancel_preserves_graph_selection() {
     let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("first".to_owned()), None),
-        crate::jj_rows::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("second".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -355,7 +355,7 @@ fn duplicate_preview_cancel_preserves_graph_selection() {
 #[test]
 fn duplicate_confirm_success_refreshes_and_uses_recent_source_fallback() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.reveal_graph_change = mock_reveal_duplicate_source_in_recent;
     app.mode = InteractionMode::DuplicatePreview {
@@ -425,7 +425,7 @@ fn duplicate_confirm_success_from_exact_detail_view_refreshes_without_graph_reve
 #[test]
 fn duplicate_failure_keeps_full_error_output_readable() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.duplicate_run = mock_duplicate_failure;
     app.mode = InteractionMode::DuplicatePreview {
@@ -460,7 +460,7 @@ fn duplicate_failure_keeps_full_error_output_readable() {
 #[test]
 fn split_visible_working_copy_uses_bare_command() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(
+        crate::graph::LogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("current-change".to_owned()),
             None,
@@ -488,8 +488,8 @@ fn split_visible_working_copy_uses_bare_command() {
 #[test]
 fn split_preview_cancel_preserves_graph_selection() {
     let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("first".to_owned()), None),
-        crate::jj_rows::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("second".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -522,7 +522,7 @@ fn split_preview_cancel_preserves_graph_selection() {
 #[test]
 fn split_confirm_success_refreshes_reveals_and_keeps_recovery_visible() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.reveal_graph_change = mock_reveal_edit_target_in_recent;
     app.mode = InteractionMode::SplitPreview {
@@ -554,7 +554,7 @@ fn split_confirm_success_refreshes_reveals_and_keeps_recovery_visible() {
 #[test]
 fn split_current_confirm_success_reveals_current_working_copy_when_possible() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
     ])));
     app.services.reveal_graph_change = mock_reveal_current_working_copy_in_recent;
     app.mode = InteractionMode::SplitPreview {
@@ -586,7 +586,7 @@ fn split_current_confirm_success_reveals_current_working_copy_when_possible() {
 #[test]
 fn split_failure_keeps_app_owned_result_without_claiming_captured_stderr() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
     ])));
     app.services.split_run = mock_split_failure_service;
     app.mode = InteractionMode::SplitPreview {
@@ -619,7 +619,7 @@ fn split_failure_keeps_app_owned_result_without_claiming_captured_stderr() {
 #[test]
 fn prev_confirm_success_resolves_current_working_copy_and_reveals_recent() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), None, None),
+        crate::graph::LogItem::new(Vec::new(), None, None),
     ])));
     app.services.reveal_graph_change = mock_reveal_current_working_copy_in_recent;
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
@@ -649,7 +649,7 @@ fn prev_confirm_success_resolves_current_working_copy_and_reveals_recent() {
 #[test]
 fn working_copy_navigation_failure_keeps_output_readable() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), None, None),
+        crate::graph::LogItem::new(Vec::new(), None, None),
     ])));
     app.services.working_copy_navigation_run = mock_working_copy_navigation_failure;
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
@@ -677,7 +677,7 @@ fn working_copy_navigation_failure_keeps_output_readable() {
 #[test]
 fn new_preview_cancel_restores_normal_mode() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::NewPreview {
         new_change: JjNewPlan::new(vec!["parent-a".to_owned()]),
@@ -698,7 +698,7 @@ fn new_preview_cancel_restores_normal_mode() {
 #[test]
 fn new_confirm_success_refreshes_and_reveals_working_copy() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.services.reveal_graph_change = mock_reveal_new_change_in_recent;
     app.mode = InteractionMode::NewPreview {
@@ -747,7 +747,7 @@ fn graph_new_trunk_uses_test_service_and_reveals_working_copy() {
 #[test]
 fn new_failure_keeps_full_error_output_readable() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.services.new_run = mock_new_failure;
     app.mode = InteractionMode::NewPreview {

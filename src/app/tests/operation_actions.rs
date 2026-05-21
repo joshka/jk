@@ -5,7 +5,7 @@ use super::support::*;
 #[test]
 fn push_remote_prompt_without_selection_stays_ready() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushRemotePrompt {
         target: JjGitPushTarget::Revision("abcdef".to_owned()),

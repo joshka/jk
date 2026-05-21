@@ -1,15 +1,10 @@
-//! Rendered `jj` row loading and narrow metadata pairing.
+//! Shared rendered `jj` row helpers.
 //!
-//! This module owns conversion from rendered jj terminal output and narrow
-//! machine-oriented metadata templates into the selectable row models consumed
-//! by the app's list views. Command identity, navigation provenance, and the
-//! process boundary stay in `jj.rs`.
+//! Feature-specific row models should live with the feature that owns the user-visible behavior.
+//! This module keeps domain-neutral helpers used by those row models.
 
-mod revisions;
 use ratatui::text::Line;
 use serde_json::Value;
-
-pub use self::revisions::{LogItem, load_compact_log_context, load_entries};
 
 /// Flatten rendered Ratatui lines to plain text for search and copy helpers.
 ///

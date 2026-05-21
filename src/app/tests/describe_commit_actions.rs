@@ -5,7 +5,7 @@ use super::support::*;
 #[test]
 fn describe_prompt_types_backspaces_and_opens_preview_for_exact_graph_target() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
@@ -64,7 +64,7 @@ fn describe_prompt_types_and_opens_preview_for_status_target() {
 #[test]
 fn describe_prompt_cancel_and_empty_input_do_not_open_preview() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
@@ -87,7 +87,7 @@ fn describe_prompt_cancel_and_empty_input_do_not_open_preview() {
 #[test]
 fn describe_requires_exact_graph_target_and_rejects_unsupported_context() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), None, None),
+        crate::graph::LogItem::new(Vec::new(), None, None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
@@ -120,7 +120,7 @@ fn describe_requires_exact_graph_target_and_rejects_unsupported_context() {
 #[test]
 fn describe_confirm_success_refreshes_reveals_and_keeps_undo_visible() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.reveal_graph_change = mock_reveal_described_change_in_recent;
     app.mode = InteractionMode::DescribePreview {
@@ -154,7 +154,7 @@ fn describe_confirm_success_refreshes_reveals_and_keeps_undo_visible() {
 #[test]
 fn describe_failure_and_refresh_failure_remain_inspectable() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.describe_run = mock_describe_failure;
     app.mode = InteractionMode::DescribePreview {
@@ -182,7 +182,7 @@ fn describe_failure_and_refresh_failure_remain_inspectable() {
     );
 
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.refresh_view = mock_refresh_failure;
     app.mode = InteractionMode::DescribePreview {
@@ -212,8 +212,8 @@ fn describe_failure_and_refresh_failure_remain_inspectable() {
 #[test]
 fn commit_prompt_is_honest_about_current_working_copy_target() {
     let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("historical".to_owned()), None),
-        crate::jj_rows::LogItem::new(Vec::new(), Some("selected-row".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("historical".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("selected-row".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -247,7 +247,7 @@ fn commit_prompt_is_honest_about_current_working_copy_target() {
 #[test]
 fn commit_prompt_cancel_and_empty_input_do_not_open_preview() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('C'), KeyModifiers::NONE), 12)
@@ -267,7 +267,7 @@ fn commit_prompt_cancel_and_empty_input_do_not_open_preview() {
 #[test]
 fn commit_confirm_success_and_failure_keep_output_readable() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::CommitPreview {
         commit: JjCommitPlan::new("Commit"),
@@ -295,7 +295,7 @@ fn commit_confirm_success_and_failure_keep_output_readable() {
     );
 
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.commit_run = mock_commit_failure;
     app.mode = InteractionMode::CommitPreview {
@@ -326,7 +326,7 @@ fn commit_confirm_success_and_failure_keep_output_readable() {
 #[test]
 fn commit_refresh_failure_keeps_undo_and_new_working_copy_effect_visible() {
     let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::jj_rows::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.refresh_view = mock_refresh_failure;
     app.mode = InteractionMode::CommitPreview {

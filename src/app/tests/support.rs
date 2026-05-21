@@ -20,6 +20,8 @@ pub(super) use crate::command::{CommandContext, ViewCommand};
 #[allow(unused_imports)]
 pub(super) use crate::file_list::{FileListItem, load_file_list_entries};
 #[allow(unused_imports)]
+pub(super) use crate::graph::{LogItem, load_compact_log_context, load_entries};
+#[allow(unused_imports)]
 pub(super) use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
 #[allow(unused_imports)]
 pub(super) use crate::jj_actions::{
@@ -30,9 +32,7 @@ pub(super) use crate::jj_actions::{
     JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
 };
 #[allow(unused_imports)]
-pub(super) use crate::jj_rows::{
-    LogItem, document_plain_text, load_compact_log_context, load_entries,
-};
+pub(super) use crate::jj_rows::document_plain_text;
 #[allow(unused_imports)]
 pub(super) use crate::resolve::{ResolveEntry, load_resolve_entries};
 pub(super) use crate::tui::Overlay;
@@ -512,8 +512,8 @@ pub(super) fn mock_reveal_current_working_copy_in_recent(
     Ok(true)
 }
 
-pub(super) fn graph_item(change_id: &str) -> crate::jj_rows::LogItem {
-    crate::jj_rows::LogItem::new(
+pub(super) fn graph_item(change_id: &str) -> crate::graph::LogItem {
+    crate::graph::LogItem::new(
         vec![ratatui::text::Line::from(change_id.to_owned())],
         Some(change_id.to_owned()),
         None,

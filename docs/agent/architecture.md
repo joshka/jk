@@ -97,12 +97,12 @@ Keep modules aligned with user-visible concepts:
   command/navigation target provenance.
 - `jj_syntax.rs` owns exact revset/fileset/string quoting helpers and argv label helpers shared by
   `jj_actions.rs` and related command builders.
-- `jj_rows.rs` currently owns only graph/log revision row loading and shared row-helper mechanics
-  that have not yet moved to narrower owners. It should keep shrinking as feature roots own their
-  row models. It may call the `jj.rs` process helpers for graph/log row loading, but it should not
-  own command identity, navigation provenance, document loading, or feature-specific row policy.
-- `graph.rs` owns the default/log graph view, graph-row selection, graph search, and graph-to-detail
-  navigation.
+- `jj_rows.rs` owns shared row-helper mechanics that have not yet moved to narrower owners. It
+  should keep shrinking as feature roots own their row models and should not own command identity,
+  navigation provenance, document loading, or feature-specific row policy.
+- `graph.rs` owns the default/log graph view, graph row loading, graph-row selection, graph search,
+  and graph-to-detail navigation. `graph/rows.rs` owns rendered `jj log` row grouping, revision
+  metadata pairing, compact log context, and the `LogItem` row contract.
 - `show.rs` and `diff.rs` own their view behavior and should stay distinct even when they share
   document mechanics.
 - `sticky_file_view.rs` owns shared rendered-file document mechanics for show, diff, status,

@@ -15,10 +15,13 @@ use crate::action_menu::{ExactActionContext, build_action_menu};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{JjCommand, LogViewMode, ViewSpec};
-use crate::jj_rows::{LogItem, load_entries};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;
+
+mod rows;
+
+pub use rows::{LogItem, load_compact_log_context, load_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('w'), Command::View(ViewCommand::CycleMode)),

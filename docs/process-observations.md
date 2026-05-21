@@ -5,6 +5,48 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Graph row feature-root migration)
+
+- Slice / task: move revision/log rendered-row loading and metadata pairing out of `jj_rows` and
+  into the graph feature root.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Model / routing: GPT-5 Codex main thread with medium reasoning performed this slice directly after
+  the preceding ownership packet made document loading independent of `LogItem`.
+- Implementation outcome: `src/graph/rows.rs` now owns `LogItem`, `load_entries`,
+  `load_compact_log_context`, rendered log row grouping, revision metadata template execution,
+  fail-closed metadata pairing, and the row tests that previously lived under
+  `src/jj_rows/revisions.rs`.
+- Boundary evidence: `src/graph.rs` declares `mod rows;` and re-exports the graph row surface for
+  crate-local callers; `src/show.rs`, `src/view_state.rs`, and focused app tests now use
+  `crate::graph` for graph row construction and compact log context; `src/jj_rows.rs` now keeps only
+  shared rendered-row helpers.
+- Rework / surprise: the initial compatibility re-export from `src/jj_rows.rs` compiled but created
+  unused-import warnings that would fail clippy. Removing the facade and updating callers to
+  `crate::graph` made the feature owner explicit.
+- Validation trail:
+  - `cargo test graph -- --test-threads=1` passed with 62 passed.
+  - `cargo test show -- --test-threads=1` passed with 47 passed.
+  - `cargo test jj_rows -- --test-threads=1` passed with 0 passed, reflecting helper-only status.
+  - `cargo test command_navigation -- --test-threads=1` passed with 35 passed.
+  - `cargo test view_state -- --test-threads=1` passed with 11 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` initially failed on import ordering in
+    `src/app/tests/support.rs` and `src/show.rs`; `rustup run nightly cargo fmt` applied the
+    ordering.
+  - `rustup run nightly cargo fmt --check` passed after formatting, with the existing rustfmt
+    unstable-option warnings.
+  - `just md-check` passed after Panache wrapping in this process note and the source
+    maintainability ledger.
+  - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
+    test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:15:58 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Files: `src/graph.rs`, `src/graph/rows.rs`, `src/jj_rows.rs`, `src/show.rs`,
+    `src/app/tests/support.rs`, focused app tests, `docs/agent/architecture.md`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Log row ownership definition)
 
 - Slice / task: define the remaining graph/log row ownership boundary before moving revision rows

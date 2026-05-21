@@ -77,21 +77,32 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 graph row ownership migration:
+
+- `src/graph/rows.rs` now owns `LogItem`, `load_entries`, `load_compact_log_context`, rendered log
+  row grouping, revision metadata template execution, fail-closed metadata pairing, and the row
+  tests that previously lived under `src/jj_rows/revisions.rs`.
+- `src/graph.rs` declares `mod rows;` and re-exports the graph row surface for crate-local app/view
+  tests while continuing to own graph selection, multi-select, reveal, search, copy, and
+  graph-to-detail navigation.
+- `src/jj_rows.rs` no longer has submodules or graph/log row exports. It keeps only shared row
+  helper mechanics such as plain-text flattening, metadata drift handling, JSON field helpers,
+  graph-line helpers, and `line_text`.
+- `src/show.rs`, `src/view_state.rs`, and focused app tests now construct or load graph rows through
+  `crate::graph`, so tests point at the feature owner instead of the old kind-of-code bucket.
+
 2026-05-21 log row ownership definition:
 
 - `src/sticky_file_view.rs` now loads rendered document lines directly through `run_jj` with
   `ColorMode::Always`, so file-oriented document views no longer depend on graph/log row items just
   to preserve styled output.
-- `src/jj_rows/revisions.rs` is now graph/log-specific in practice: `src/graph.rs` consumes
-  `LogItem` and `load_entries` for selectable graph rows, while `src/show.rs` consumes only
-  `load_compact_log_context` for sticky commit context.
-- The next source move should not blindly preserve the old `jj_rows` facade. A bounded
-  implementation packet should either move revision rows under `graph/rows.rs` and expose a narrow
-  compact-context loader for `show`, or first rename/introduce a true `log` feature root that owns
-  both the default graph view and its row model.
-- Acceptance criteria for that packet: graph selection, multi-select, reveal, search, copy,
-  visible-working-copy detection, compact show context, and rendered document loading must retain
-  their current output and tests. `sticky_file_view` should stay independent of `LogItem`.
+- At the time of this packet, `src/jj_rows/revisions.rs` was graph/log-specific in practice:
+  `src/graph.rs` consumed `LogItem` and `load_entries` for selectable graph rows, while
+  `src/show.rs` consumed only `load_compact_log_context` for sticky commit context.
+- This packet set the acceptance criteria for the follow-up graph row migration: graph selection,
+  multi-select, reveal, search, copy, visible-working-copy detection, compact show context, and
+  rendered document loading had to retain their current output and tests, while `sticky_file_view`
+  stayed independent of `LogItem`.
 
 2026-05-21 file-list row migration:
 
@@ -113,10 +124,10 @@ Examples for future packets:
   field helpers, graph-line helpers, and `line_text`.
 - The reassessment nominated file-list rows as the cleanest remaining feature-root row migration
   because `src/file_list.rs` already owned the user-visible `jj file list` view.
-- Revision/log rows are broader than a size cleanup: `src/graph.rs` consumes `LogItem` and
-  `load_entries`, while `src/show.rs` uses `load_compact_log_context` and `src/sticky_file_view.rs`
-  uses `load_entries` for file-detail behavior. Do not move them until a packet defines the owner
-  and acceptance criteria across graph, compact show context, and sticky file detail consumers.
+- Before the log row ownership definition, revision/log rows were broader than a size cleanup:
+  `src/graph.rs` consumed `LogItem` and `load_entries`, while `src/show.rs` used
+  `load_compact_log_context` and `src/sticky_file_view.rs` used `load_entries` for file-detail
+  behavior. The follow-up packet split document loading before moving graph rows.
 
 2026-05-21 resolve row migration:
 

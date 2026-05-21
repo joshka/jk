@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn push_target_from_graph_uses_exact_revision() {
         let view = ViewState::Graph(graph::GraphView::test_new(vec![
-            crate::jj_rows::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
+            crate::graph::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
         ]));
 
         assert_eq!(
@@ -354,7 +354,7 @@ mod tests {
     #[test]
     fn push_target_from_graph_requires_exact_revision() {
         let view = ViewState::Graph(graph::GraphView::test_new(vec![
-            crate::jj_rows::LogItem::new(Vec::new(), None, None),
+            crate::graph::LogItem::new(Vec::new(), None, None),
         ]));
 
         assert_eq!(
@@ -378,7 +378,7 @@ mod tests {
     #[test]
     fn bookmark_target_from_graph_and_status_is_exact() {
         let view = ViewState::Graph(graph::GraphView::test_new(vec![
-            crate::jj_rows::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
+            crate::graph::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
         ]));
 
         assert_eq!(
@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn bookmark_target_from_graph_requires_exact_revision() {
         let view = ViewState::Graph(graph::GraphView::test_new(vec![
-            crate::jj_rows::LogItem::new(Vec::new(), None, None),
+            crate::graph::LogItem::new(Vec::new(), None, None),
         ]));
 
         assert_eq!(

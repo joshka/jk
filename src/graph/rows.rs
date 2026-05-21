@@ -10,7 +10,7 @@ use ratatui::text::Line;
 
 use crate::jj::{ColorMode, JjCommand, ViewSpec, run_jj, run_jj_template_lines};
 
-use super::{RowMetadata, first_content_char, is_standalone_graph_line, line_text};
+use crate::jj_rows::{RowMetadata, first_content_char, is_standalone_graph_line, line_text};
 
 /// One selectable item parsed from rendered graph output.
 ///

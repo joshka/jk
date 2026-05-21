@@ -11,8 +11,8 @@ use ratatui::text::Line;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
+use crate::graph::load_compact_log_context;
 use crate::jj::{JjCommand, ViewSpec};
-use crate::jj_rows::load_compact_log_context;
 use crate::rendered_jj::PinnedDocument;
 use crate::search::SearchQuery;
 use crate::sticky_file_view::{self, StickyFileDocument};
