@@ -1,24 +1,17 @@
-//! `jj bookmark list` view state, rendering, and item-based navigation.
+//! Bookmark list view state, rendering, and item-based navigation.
 //!
 //! The first pass keeps bookmark rows close to rendered `jj` output while
 //! carrying exact bookmark names and target ids separately for copy,
 //! search, refresh, and open-show behavior.
-
-mod action_targets;
-pub(crate) mod actions;
-mod rows;
 
 use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
-use self::action_targets::BookmarkActionTargetResolver;
-use self::actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
-pub(crate) use self::rows::{
-    BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
-    RemoteBookmarkTrackingState, load_bookmark_entries,
-};
+use super::action_targets::BookmarkActionTargetResolver;
+use super::actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
+use super::{BookmarkItem, load_bookmark_entries};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{JjCommand, ViewSpec};
@@ -70,9 +63,9 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Selectable bookmark output from `jj bookmark list`.
 pub struct BookmarksView {
-    spec: ViewSpec,
-    entries: Vec<BookmarkItem>,
-    selection: Selection,
+    pub(super) spec: ViewSpec,
+    pub(super) entries: Vec<BookmarkItem>,
+    pub(super) selection: Selection,
 }
 
 impl BookmarksView {
@@ -108,7 +101,7 @@ impl BookmarksView {
     }
 
     pub fn bindings(&self) -> &'static [Binding] {
-        BINDINGS
+        super::BINDINGS
     }
 
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
@@ -226,14 +219,14 @@ impl BookmarksView {
         BookmarkActionTargetResolver::new(self.selected_entry(), &self.entries, self.spec.args())
     }
 
-    fn search_matches(&self, query: &SearchQuery) -> usize {
+    pub(super) fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
             .filter(|entry| entry_matches(&entry.lines(), query))
             .count()
     }
 
-    fn next_match(&mut self, query: &SearchQuery) -> bool {
+    pub(super) fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
             .find(|index| entry_matches(&self.entries[*index].lines(), query))
@@ -244,7 +237,7 @@ impl BookmarksView {
         true
     }
 
-    fn previous_match(&mut self, query: &SearchQuery) -> bool {
+    pub(super) fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
             .chain(((self.selection.index() + 1)..self.entries.len()).rev())
@@ -256,7 +249,7 @@ impl BookmarksView {
         true
     }
 
-    fn copy_options(&self) -> Vec<CopyOption> {
+    pub(super) fn copy_options(&self) -> Vec<CopyOption> {
         let Some(entry) = self.selected_entry() else {
             return Vec::new();
         };
@@ -273,7 +266,7 @@ impl BookmarksView {
         options
     }
 
-    fn refresh_with_loader(
+    pub(super) fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<BookmarkItem>>,
     ) -> Result<()> {
@@ -326,6 +319,3 @@ fn restore_selection(
 
     selection.set(previous_index, entries.len());
 }
-
-#[cfg(test)]
-mod tests;

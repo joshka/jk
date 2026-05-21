@@ -7572,3 +7572,34 @@ belong here.
   - Thread id from `CODEX_THREAD_ID`.
   - Files: `src/jj.rs`, `src/jj/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
+
+### 2026-05-21 (Bookmark feature-root split)
+
+- Slice / task: apply the epage module-layout rule to the existing bookmark split module while
+  keeping bookmark feature behavior and public imports stable.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: `gpt-5.5` medium worker handled the bounded Rust split. The main thread owned jj
+  change creation, review, validation reruns, and documentation updates.
+- Changed files: `src/bookmarks/mod.rs`, `src/bookmarks/view.rs`, `src/bookmarks/tests.rs`,
+  `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: `src/bookmarks/mod.rs` is now a feature-root table of contents, and
+  bookmark view behavior moved to `src/bookmarks/view.rs`. Existing callers still use
+  `crate::bookmarks::BookmarksView` and `crate::bookmarks::BINDINGS`; rows, action-target policy,
+  and bookmark action plans stay under the bookmark feature.
+- Behavior-preservation evidence: the packet did not intentionally change rendered bookmark output,
+  key bindings, movement, open-show behavior, search wrapping, copy options, refresh selection
+  restoration, exact bookmark target resolution, status wording, or bookmark action behavior.
+- Rework / surprise: the worker made several moved view internals `pub(super)` so the existing
+  root-level bookmark tests could keep covering private behavior after the split. Main review
+  accepted this as test-local visibility rather than broader public API exposure.
+- Validation trail: worker validation passed and main-thread review reran
+  `cargo test bookmarks -- --test-threads=1` with 40 tests,
+  `cargo test app::tests::bookmark_actions -- --test-threads=1` with 27 tests, `cargo check`, and
+  `rustup run nightly cargo fmt --check` with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 17:02:31 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/bookmarks/mod.rs`, `src/bookmarks/view.rs`, `src/bookmarks/tests.rs`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.

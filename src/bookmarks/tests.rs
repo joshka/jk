@@ -2,11 +2,16 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifi
 use ratatui::text::Line;
 
 use super::*;
+use crate::bookmarks::actions::{
+    JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget,
+};
 use crate::bookmarks::{
     BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState, RemoteBookmarkTrackingState,
 };
-use crate::command::{Command, find_binding};
-use crate::jj::JjCommand;
+use crate::command::{Binding, Command, CommandContext, ViewCommand, ViewEffect, find_binding};
+use crate::jj::{JjCommand, ViewSpec};
+use crate::search::SearchQuery;
+use crate::selection::Selection;
 
 fn bookmark_item(
     text: &[&str],

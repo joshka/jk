@@ -102,11 +102,13 @@ Examples for future packets:
   navigation, and view tests; `src/operation_log/actions.rs` owns undo/redo and exact operation
   restore/revert argv, preview, and run contracts. Future operation-detail rendering should move
   toward `operation_log/detail.rs` when that shortens the reader path.
-- Bookmark behavior now starts from `bookmarks`: `src/bookmarks/rows.rs` owns rendered row loading,
-  bookmark metadata template parsing and pairing, local/remote state classification, and fail-closed
-  drift tests; `src/bookmarks/action_targets.rs` owns safe mutation targets. Future bookmark
-  create/set/move/rename/delete/forget/track/untrack availability belongs under the bookmark feature
-  before a shared action plan exists.
+- Bookmark behavior now starts from `bookmarks`: `src/bookmarks/mod.rs` is the feature root and
+  table of contents; `src/bookmarks/view.rs` owns rendered view behavior, bindings, selection,
+  search, copy, refresh, and open-show behavior; `src/bookmarks/rows/mod.rs` owns rendered row
+  loading, bookmark metadata template parsing and pairing, local/remote state classification, and
+  fail-closed drift tests; `src/bookmarks/action_targets.rs` owns safe mutation targets. Future
+  bookmark create/set/move/rename/delete/forget/track/untrack availability belongs under the
+  bookmark feature before a shared action plan exists.
 - Cross-view action plans such as rebase, squash, absorb, new, edit, duplicate, split, restore,
   revert, track, untrack, chmod, fetch, push, describe, and abandon may live under an action-plan
   owner, but view-specific availability belongs with the feature that offers the action.
@@ -117,6 +119,25 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 bookmark feature-root split:
+
+- `src/bookmarks/mod.rs` is now the bookmark feature root and table of contents. It declares
+  `action_targets`, `actions`, `rows`, `view`, and tests, and preserves the caller-facing
+  `crate::bookmarks::BookmarksView` and `crate::bookmarks::BINDINGS` paths.
+- Bookmark view behavior moved to `src/bookmarks/view.rs`: rendered list projection, bindings,
+  movement, open-show behavior, search, copy options, refresh, and action-target resolution are now
+  in a named child module instead of the directory root.
+- The packet removes the old `src/bookmarks.rs` plus `src/bookmarks/` pair and applies the epage
+  module-layout rule through a feature split rather than a blind root rename.
+- The packet intentionally preserved rendered bookmark rows, key bindings, selection behavior,
+  search wrapping, copy options, refresh selection restoration, exact target resolution, public
+  imports, status wording, and bookmark action behavior.
+- Validation passed: `cargo test bookmarks -- --test-threads=1`;
+  `cargo test app::tests::bookmark_actions -- --test-threads=1`; `cargo check`; and
+  `rustup run nightly cargo fmt --check`.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `action_menu`, `app`,
+  `app/action_lifecycle`, `app/mode_input`, `graph`, `jj`, `operation_log`, and `tui`.
 
 2026-05-21 root jj action plan split:
 
