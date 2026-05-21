@@ -5,6 +5,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Working-copy action-plan test split)
+
+- Slice / task: move inline tests from `src/jj_actions/working_copy.rs` into
+  `src/jj_actions/working_copy/tests.rs` for the existing jj change.
+- Thread id: `019e4c7b-d134-7fc3-b136-ddbfae519998` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
+  packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
+  were run.
+- Implementation outcome: `working_copy.rs` now ends with `#[cfg(test)] mod tests;`, while the moved
+  sibling module uses `use super::*;` to preserve private access to working-copy command-plan
+  helpers, split target inspection, and interactive command construction.
+- Behavior-preservation evidence: the packet moved the existing ten working-copy action-plan tests
+  without changing their names, assertions, helper access, argv expectations, preview wording
+  checks, labels, visibility, or public API.
+- Readability evidence: before the packet, `src/jj_actions/working_copy.rs` measured 639 lines with
+  tests inline. After the split it measured 441 lines, with 197 lines in
+  `src/jj_actions/working_copy/tests.rs`, keeping production command-plan code easier to scan while
+  keeping tests beside the owning module.
+- Validation trail:
+  - Worker validation passed: `cargo test jj_actions::working_copy -- --test-threads=1` with 10
+    passed and 557 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test jj_actions::working_copy -- --test-threads=1`
+    with 10 passed and 557 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: no behavior rework was needed. Working-copy command behavior, argv, preview
+  summaries, labels, visibility, and public API stayed unchanged.
+- Evidence basis:
+  - Date: `2026-05-21 14:40:58 PDT` from local `date`.
+  - Main review date: `2026-05-21 14:44:06 PDT` from local `date`.
+  - Files: `src/jj_actions/working_copy.rs`, `src/jj_actions/working_copy/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Bookmark action-plan test split)
 
 - Slice / task: move inline tests from `src/jj_actions/bookmarks.rs` into

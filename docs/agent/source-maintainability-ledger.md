@@ -103,6 +103,22 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 working-copy action-plan test split:
+
+- `src/jj_actions/working_copy.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live
+  in `src/jj_actions/working_copy/tests.rs` with `use super::*;` for private access to command-plan
+  helpers, split target inspection, and interactive command construction.
+- This improves local readability by keeping working-copy creation, duplication, split, and
+  navigation argv and preview-summary code visible without scrolling through 197 lines of inline
+  tests. The production file measured 639 lines before the split and 441 lines after it.
+- The packet intentionally preserved all ten working-copy action-plan test names, assertions, helper
+  access, argv expectations, preview wording checks, labels, visibility, and public API.
+- Focused validation covered `cargo test jj_actions::working_copy -- --test-threads=1` with 10
+  passed and 557 filtered out, `cargo check`, `rustup run nightly cargo fmt --check`, and
+  `just md-check` after this documentation update.
+- Rework was limited to moving the extracted test block into a Rust child module; no working-copy
+  command behavior, argv, preview summaries, labels, visibility, or public API changed.
+
 2026-05-21 bookmark action-plan test split:
 
 - `src/jj_actions/bookmarks.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
