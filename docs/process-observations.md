@@ -5,6 +5,59 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Mode input reducer extraction)
+
+- Slice / task: extract pure modal key reducers and prompt-plan helpers from `src/app/mode_input.rs`
+  into a focused local submodule without changing modal behavior.
+- Thread id: `019e4a4e-e51e-73d1-9890-d19b60b630d1`.
+- Model / routing: GPT-5 Codex worker implemented the readability packet. The user explicitly kept
+  jj orchestration on the main thread, so the worker avoided jj/git commands and used direct file
+  reads, `apply_patch`, and validation commands only.
+- Files changed: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and this process note.
+- Implementation outcome: `src/app/mode_input/reducers.rs` now owns `TextPromptKey`,
+  `reduce_text_prompt_key`, `MenuKey`, `reduce_menu_key`, `reduce_view_menu_key`, `ConfirmationKey`,
+  `reduce_confirmation_key`, help close/scroll key checks, role-prompt plan helpers, and bookmark
+  prompt-plan construction. `src/app/mode_input.rs` keeps app-owned modal dispatch, status updates,
+  preview opening, confirmations, action lifecycle handoff, and help prefix execution.
+- Rework / surprise: the first focused `cargo test working_copy_actions -- --test-threads=1` compile
+  found a mechanical extraction error where `ActionOutput::page_up` was called without the original
+  `visible_lines` argument. Restoring `page_up(visible_lines)` preserved the prior scroll contract.
+  `rustup run nightly cargo fmt --check` then failed only on formatting in the new reducer
+  signature; running rustfmt fixed it.
+- Validation trail:
+  - `cargo test command_navigation -- --test-threads=1` passed with 35 passed.
+  - `cargo test rewrite_actions -- --test-threads=1` passed with 16 passed.
+  - `cargo test bookmark_actions -- --test-threads=1` passed with 27 passed.
+  - `cargo test abandon_actions -- --test-threads=1` passed with 7 passed.
+  - `cargo test working_copy_actions -- --test-threads=1` passed with 27 passed.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed.
+  - `rustup run nightly cargo fmt --check` passed after applying rustfmt. The command still printed
+    the repo's existing rustfmt unstable-option warnings.
+  - `just md-check` passed after applying Panache wrapping to this process note.
+- Main-thread review validation passed: `cargo test command_navigation -- --test-threads=1` with 35
+  passed; `cargo test rewrite_actions -- --test-threads=1` with 16 passed;
+  `cargo test bookmark_actions -- --test-threads=1` with 27 passed;
+  `cargo test abandon_actions -- --test-threads=1` with 7 passed;
+  `cargo test working_copy_actions -- --test-threads=1` with 27 passed;
+  `cargo test file_actions -- --test-threads=1` with 7 passed;
+  `cargo test operation_actions -- --test-threads=1` with 10 passed; `cargo check`;
+  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
+  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored, and
+  its largest-file output included `src/app/mode_input.rs` at 613 lines.
+- Main-thread review outcome: the extraction stayed behavior-preserving. The reducer module contains
+  only key/prompt reduction and prompt-plan construction, while `src/app/mode_input.rs` still owns
+  modal side effects, status text, preview opening, confirmation execution, help-prefix dispatch,
+  and action lifecycle handoff.
+- Evidence basis:
+  - Date: `2026-05-21 04:39:22 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`
+  - Worker thread id `019e4a4e-e51e-73d1-9890-d19b60b630d1` from the worker handoff
+  - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
+    `src/app/mode_input.rs`, and focused tests under `src/app/tests`
+
 ### 2026-05-21 (Central contract documentation sweep)
 
 - Slice / task: add documentation-only Rustdoc and private invariant comments for central public and

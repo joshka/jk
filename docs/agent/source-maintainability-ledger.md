@@ -238,7 +238,8 @@ Recent completed packets already moved several coherent owners out of broad modu
 - operation, workspace, and revision row loading into `src/jj_rows/operations.rs`,
   `src/jj_rows/workspaces.rs`, and `src/jj_rows/revisions.rs`;
 - ViewSpec navigation provenance into `src/jj/view_spec.rs`;
-- status hint projection into `src/tui/status_hints.rs`.
+- status hint projection into `src/tui/status_hints.rs`;
+- pure modal key reducers and prompt-plan helpers into `src/app/mode_input/reducers.rs`.
 
 Those packets improved local contracts, but several are still organized by kind of code rather than
 by user-visible feature. Treat them as staging points, not the final product shape:
@@ -268,8 +269,6 @@ Only consider these after the documentation sweep or when product work touches t
    bounded to one vertical owner such as rows plus action availability. Acceptance criteria should
    prove that callers still see the same rendered rows, action labels, target safety, and focused
    view behavior.
-1. App dispatch/readability packet for `src/app/mode_input.rs`, bounded to mode input control flow
-   and validated with focused command/input tests.
 1. Action lifecycle documentation or grouping packet if the owner is clearly app-side completion,
    preview, or shared result wording. Keep `src/jj_actions.rs` focused on plan construction, preview
    text, argv, and execution.
