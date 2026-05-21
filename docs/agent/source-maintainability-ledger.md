@@ -175,12 +175,14 @@ one bounded, behavior-preserving slice at a time, and prove that the new owner r
 ### 3. Action Planning Cohesion
 
 - Owner: `src/jj_actions.rs`.
-- Purpose: identify which plan and value clusters change together before extracting any submodule.
-  Candidate clusters include preview-first mutation plans, file mutation plans, bookmark plans, and
-  operation recovery plans.
+- Status: inventory completed in the current packet; extraction remains future work.
+- Purpose: split coherent plan and value clusters only after their source contracts are named.
+  Current clusters are operation recovery/targeting, git sync, working-copy creation/copy/split,
+  describe/commit, working-copy navigation, content and file mutations, bookmark mutations, graph
+  rewrite plans, and abandon safety.
 - Non-goals: no mechanical line-count split and no public facade churn.
-- Proof: a source-comment or inventory pass first; then behavior-preserving extraction with
-  command-construction tests for each moved cluster.
+- Proof: source-comment inventory first; then behavior-preserving extraction with
+  command-construction tests for each moved cluster when an extraction packet starts.
 
 ### 4. Vertical Ownership For Rows, Views, And Actions
 

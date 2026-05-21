@@ -5,6 +5,31 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Action planning cohesion inventory)
+
+- Slice / task: implement the ledger slice `Action Planning Cohesion` as a documentation and
+  source-comment inventory pass only on current jj change `Inventory action planning cohesion`.
+- Thread id: `019e4936-6962-7ec0-a60b-38676d87896a`.
+- Model / routing: a `gpt-5.5` worker/subagent implemented the source-comment inventory; the main
+  thread reviewed it.
+- Files changed: `src/jj_actions.rs`, `docs/agent/source-maintainability-ledger.md`, and this
+  process note.
+- Implementation outcome: `src/jj_actions.rs` now names the existing action-plan clusters near the
+  relevant source sections: operation recovery/targeting, git sync, working-copy
+  creation/copy/split, describe/commit, working-copy navigation, content and file mutations,
+  bookmark mutations, graph rewrite plans, and abandon safety.
+- Behavior intent: no module extraction, app dispatch change, command behavior change, argv wording
+  change, result wording change, or test change was made.
+- Validation trail: worker ran `cargo check`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; the main thread ran the same checks after review; all passed.
+- Residual risk: extraction boundaries are named but not yet proven by moved-code tests because no
+  extraction happened in this packet.
+- Evidence basis:
+  - Date: `2026-05-20 23:26:39 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `src/jj_actions.rs`, `docs/development/rules/refactoring.md`, and
+    `docs/development/rules/documentation.md`
+
 ### 2026-05-20 (Retire jj.rs compatibility re-exports)
 
 - Slice / task: retire the remaining `src/jj.rs` compatibility re-exports so action-plan and

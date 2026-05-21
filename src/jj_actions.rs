@@ -22,6 +22,7 @@ use crate::jj_syntax::{
 
 const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 
+// Shared result envelope for preview and confirmed command output.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
     message: String,
@@ -37,6 +38,8 @@ impl CommandOutput {
     }
 }
 
+// Operation recovery plans keep global undo/redo separate from selected
+// operation restore/revert, which target one exact operation id.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjOperationRecoveryKind {
     Undo,
@@ -221,6 +224,8 @@ impl JjOperationTarget {
     }
 }
 
+// Git sync plans own fetch/push target selection, dry-run preview argv, and
+// remote handling without taking over row loading or status policy.
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjGitPushTarget {
@@ -391,6 +396,8 @@ impl JjGitPush {
     }
 }
 
+// Graph rewrite plans move selected changes relative to an explicit
+// destination while leaving final graph simulation to jj.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRebasePlan {
     sources: Vec<String>,
@@ -409,6 +416,8 @@ pub struct JjAbsorbPlan {
     destinations: Vec<String>,
 }
 
+// Working-copy creation and copy plans produce a new or duplicated change from
+// selected graph context; split is the interactive patch-selection variant.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjNewPlan {
     parents: Vec<String>,
@@ -430,6 +439,8 @@ pub struct JjSplitPlan {
     target: JjSplitTarget,
 }
 
+// Description finalization plans update messages without opening an editor;
+// commit always targets @ and describe may target @ or an exact change.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjDescribeTarget {
     ExactChange(String),
@@ -447,6 +458,8 @@ pub struct JjCommitPlan {
     message: String,
 }
 
+// Working-copy navigation plans move @ through jj topology commands and keep
+// selection-sensitive edit distinct from selection-independent next/prev.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjWorkingCopyNavigationKind {
     Edit,
@@ -460,6 +473,8 @@ pub struct JjWorkingCopyNavigationPlan {
     target_change_id: Option<String>,
 }
 
+// Content mutation plans preview the diff jj will remove or reverse-apply, and
+// file mutation plans restrict paths through exact root-file filesets.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRestorePlan {
     target: JjRestoreTarget,
@@ -502,6 +517,8 @@ pub struct JjRevertPlan {
     revision: String,
 }
 
+// Bookmark mutation plans keep local-name changes, remote tracking metadata,
+// and forget/delete semantics in one exact-pattern command family.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjBookmarkMutationKind {
     Create,
@@ -544,6 +561,8 @@ pub struct JjBookmarkMutationPlan {
     tracking_target: Option<Box<JjBookmarkTrackingTarget>>,
 }
 
+// Working-copy creation starts here; keep new/duplicate/split extraction
+// together because callers depend on their shared graph-selection contract.
 impl JjNewPlan {
     pub fn new(parents: Vec<String>) -> Self {
         Self { parents }.normalize()
@@ -1054,6 +1073,8 @@ impl JjWorkingCopyNavigationPlan {
     }
 }
 
+// Content/file mutation plans share exact change/path targeting and preview
+// honesty about showing jj's source diff rather than simulating the result.
 impl JjRestorePlan {
     pub fn for_revision(revision: impl Into<String>) -> Self {
         Self {
@@ -1456,6 +1477,8 @@ impl JjRevertPlan {
     }
 }
 
+// Bookmark mutation owns all bookmark subcommand argv so exact-name matching,
+// tracking metadata, and preview wording stay consistent.
 impl JjBookmarkMutationKind {
     pub fn label(self) -> &'static str {
         match self {
@@ -1983,6 +2006,8 @@ pub fn validate_bookmark_rename_new_name(
     Ok(())
 }
 
+// Rewrite plans share explicit source/destination roles and avoid parsing or
+// predicting jj's final graph shape.
 impl JjRebasePlan {
     pub fn new(sources: Vec<String>, destination: impl Into<String>) -> Self {
         Self {
@@ -2217,6 +2242,8 @@ impl JjAbsorbPlan {
     }
 }
 
+// Abandon safety owns the preflight probes and strong-confirm preview; keep it
+// separate from rewrite plans because it classifies destructive risk first.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjAbandonPlan {
     revision: String,
