@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 command vocabulary test split:
+
+- `src/command.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/command/tests.rs` with `use super::*;` for private access to command matching helpers.
+- This improves local readability by keeping command vocabulary, key-label, binding matching, prefix
+  matching, and help-filtering code visible without scrolling through 159 lines of inline tests. The
+  production file measured 714 lines before the split and 553 lines after it.
+- The packet intentionally preserved all eight command vocabulary test names, assertions, helper
+  functions, key labels, binding matching, prefix matching, help filtering, visibility, and public
+  API.
+- Focused validation covered `cargo test command -- --test-threads=1` with 86 passed and 481
+  filtered out, `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check` after
+  this documentation update.
+- Rework was limited to applying rustfmt's wrapping for one assertion in the moved test module and
+  Panache wrapping for the new notes; no command behavior, key labels, binding matching, prefix
+  matching, help filtering, visibility, or public API changed.
+
 2026-05-21 jj command-boundary test split:
 
 - `src/jj.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in `src/jj/tests.rs`

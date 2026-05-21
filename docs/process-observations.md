@@ -5,6 +5,42 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Command vocabulary test split)
+
+- Slice / task: move inline tests from `src/command.rs` into `src/command/tests.rs` for the existing
+  jj change.
+- Thread id: `019e4c87-fba0-79a0-b08f-70d31cea8d9b` from `CODEX_THREAD_ID`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
+  packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
+  were run.
+- Implementation outcome: `command.rs` now ends with `#[cfg(test)] mod tests;`, while the moved
+  sibling module uses `use super::*;` to preserve private access to key-pattern matching,
+  binding-sequence matching, help-filtered matching, prefix-label helpers, and the test key helper.
+- Behavior-preservation evidence: the packet moved the existing eight command vocabulary tests
+  without changing their names, assertions, helper functions, key labels, binding matching, prefix
+  matching, help filtering, visibility, or public API.
+- Readability evidence: before the packet, `src/command.rs` measured 714 lines with tests inline.
+  After the split it measured 553 lines, with 159 lines in `src/command/tests.rs`, keeping
+  production command vocabulary and matching code easier to scan while keeping tests beside the
+  owning module.
+- Validation trail:
+  - Worker validation passed: `cargo test command -- --test-threads=1` with 86 passed and 481
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test command -- --test-threads=1` with 86 passed
+    and 481 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
+- Rework / surprise: the first format check reported one rustfmt wrapping difference in the moved
+  test file, and the first Markdown check reported Panache wrapping for the new notes. After
+  applying those formatting-only changes, validation passed. No behavior rework was needed; command
+  behavior, key labels, binding matching, prefix matching, help filtering, visibility, and public
+  API stayed unchanged.
+- Evidence basis:
+  - Date: `2026-05-21 14:55:16 PDT` from local `date`.
+  - Main review date: `2026-05-21 14:57:06 PDT` from local `date`.
+  - Files: `src/command.rs`, `src/command/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
+    and this process note.
+
 ### 2026-05-21 (ViewSpec test split)
 
 - Slice / task: move inline tests from `src/jj/view_spec.rs` into `src/jj/view_spec/tests.rs` for
