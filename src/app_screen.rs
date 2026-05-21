@@ -18,6 +18,11 @@ use crate::jj::{
 use crate::tui::Overlay;
 use crate::view_state::ViewState;
 
+/// Transient screen state for help, prompts, menus, and action previews.
+///
+/// `App` owns the active mode and projects it into status-line and overlay
+/// output on each draw; prompt data stays here until the dispatcher consumes
+/// it.
 pub(crate) enum InteractionMode {
     Normal,
     Help,

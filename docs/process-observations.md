@@ -5,6 +5,21 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Central app and command contracts)
+
+- Slice / task: document ownership and invariants for central app and command contracts in
+  `src/command.rs`, `src/app_screen.rs`, `src/app/services.rs`, and `src/app.rs`.
+- Thread id: `019e48a8-00a9-7eb0-8865-0b028b5b0ad1`.
+- Implementation outcome: added short ownership comments for `Command`, `ViewCommand`,
+  `CommandContext`, `ViewEffect`, `InteractionMode`, `AppServices`, and `PendingCommand` so future
+  dispatch changes keep the app/view/effect boundaries intact.
+- Validation trail: worker `cargo check`, `rustup run nightly cargo fmt --check`, and
+  `just md-check`; main-thread `just check` passed with 517 tests / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-20 21:06:18 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Files: `src/command.rs`, `src/app_screen.rs`, `src/app/services.rs`, `src/app.rs`, and
+    `docs/process-observations.md`
+
 ### 2026-05-20 (Stale source comment repair)
 
 - Slice / task: repair the stale source-ownership comments in `src/action_menu.rs`,

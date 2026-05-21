@@ -95,6 +95,11 @@ fn current_viewport_width() -> u16 {
         .unwrap_or(u16::MAX)
 }
 
+/// Pending multi-key input tracked until the prefix resolves or expires.
+///
+/// `App` keeps the original keys, any exact fallback binding, and the timeout
+/// together so prefix dispatch can finish, cancel, or replay without rebuilding
+/// state from the current view.
 #[derive(Clone)]
 struct PendingCommand {
     keys: Vec<crossterm::event::KeyEvent>,

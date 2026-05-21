@@ -11,6 +11,11 @@ use crate::copy::CopyOption;
 use crate::jj::{JjCommand, JjOperationRecoveryKind};
 use crate::search::SearchQuery;
 
+/// App-level dispatch vocabulary for global bindings and view-facing effects.
+///
+/// `App` matches these variants to top-level bindings first, then routes the
+/// view-specific variants through `ViewCommand`. Keep the enum aligned with the
+/// dispatcher because the variants define the commands the app can execute.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Command {
     Quit,
@@ -49,6 +54,11 @@ pub enum Command {
     View(ViewCommand),
 }
 
+/// View-local commands that may inspect the current viewport and search state.
+///
+/// These commands stay on the presentation side of the boundary: they can
+/// return a `ViewEffect`, but `App` owns the actual state transition that
+/// follows.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewCommand {
     CycleMode,
@@ -384,6 +394,10 @@ impl HelpSection {
     }
 }
 
+/// Snapshot of the live viewport and search state for one view dispatch.
+///
+/// `App` rebuilds this for each key event, so view code must treat it as
+/// read-only input for the current dispatch instead of retained state.
 pub struct CommandContext<'a> {
     pub viewport_height: u16,
     pub viewport_width: u16,
@@ -396,6 +410,10 @@ impl CommandContext<'_> {
     }
 }
 
+/// One-way output from a view command back to the app dispatcher.
+///
+/// The app interprets these effects and performs the resulting navigation,
+/// refresh, or status update; views do not mutate app-owned state directly.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ViewEffect {
     Ignored,

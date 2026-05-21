@@ -49,6 +49,11 @@ pub(in crate::app) type RefreshView = fn(&mut ViewState) -> Result<()>;
 pub(in crate::app) type RevealGraphChange = fn(&mut ViewState, &str, LogViewMode) -> Result<bool>;
 pub(in crate::app) type LoadView = fn(ViewSpec) -> Result<ViewState>;
 
+/// Injectable app-side effect boundary used by dispatch and tests.
+///
+/// `App` owns this function table so command handling can run jj processes,
+/// refresh views, and load alternate views without hard-coding the side
+/// effects into the dispatcher itself.
 pub(in crate::app) struct AppServices {
     pub(in crate::app) new_run: NewRun,
     pub(in crate::app) duplicate_run: DuplicateRun,
