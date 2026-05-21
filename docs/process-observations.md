@@ -5,6 +5,45 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Maintainability queue reassessment after bookmark and rewrite slices)
+
+- Slice / task: reassess the maintainability ledger on current jj change
+  `Reassess maintainability queue` after the completed bookmark and rewrite refactoring packets.
+- Thread id: `019e4983-76fb-7773-91a2-f43f9146c1bd`.
+- Model / routing: a `gpt-5.4` worker with medium reasoning updated the docs for main-thread review.
+- Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
+- Behavior intent: docs only. No Rust source, command behavior, view behavior, or test behavior
+  changed.
+- Measurements gathered:
+  - `just largest-rust-files` still shows `src/jj_actions.rs` (2056), `src/jj.rs` (1440),
+    `src/jj_rows.rs` (1299), `src/command.rs` (1255), `src/action_menu.rs` (1246), `src/graph.rs`
+    (1218), and `src/tui.rs` (1134) as the largest production files.
+  - Cheap visibility scans found 768 unrestricted `pub` lines and 393 restricted-visibility lines,
+    with the largest production counts in `src/jj_actions.rs`, `src/jj_rows.rs`,
+    `src/action_menu.rs`, `src/sticky_file_view.rs`, `src/command.rs`, and `src/jj.rs`.
+  - Cheap control-flow scans found current hotspots in `src/jj_actions.rs`, `src/app/mode_input.rs`,
+    `src/command.rs`, `src/jj.rs`, `src/action_menu.rs`, `src/app/action_lifecycle/completion.rs`,
+    `src/jj_rows.rs`, `src/app.rs`, and `src/tui.rs`.
+- Documentation outcome: the ledger now treats the bookmark and rewrite packets as completed
+  history, records the refreshed evidence snapshot, and recommends four bounded next slices:
+  working-copy action plans, operation recovery/target plans, help projection policy, and
+  file/status path action-menu policy. It also records why `src/jj.rs`, `src/graph.rs`, and
+  `src/tui.rs` are not the next packet despite their size.
+- Validation trail: `just md-check`.
+- Main-thread validation after review: `just md-check` passed.
+- Model / process observation: the cheap scans were useful for ranking candidates, but they still
+  needed direct source reads to separate coherent large owners (`src/jj.rs`, `src/graph.rs`,
+  `src/tui.rs`) from actual mixed-concept packets (`src/jj_actions.rs`, `src/command.rs`,
+  `src/action_menu.rs`).
+- Main-thread spot-check note: the main thread rechecked the broad visibility scan and found
+  `src/jj_actions.rs` at 152 unrestricted `pub` lines, correcting the ledger from 150.
+- Evidence basis:
+  - Date: `2026-05-21 00:51:33 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
+    `docs/agent/rust-style.md`, `src/jj_actions.rs`, `src/command.rs`, `src/action_menu.rs`,
+    `src/graph.rs`, `src/tui.rs`, `src/jj.rs`, and `src/app/action_lifecycle/completion.rs`
+
 ### 2026-05-21 (Rewrite action-plan submodule extraction)
 
 - Slice / task: implement the ledger slice `Rewrite Action Plan Submodule` on current jj change
