@@ -30,58 +30,13 @@ impl App {
         let command_label = describe.command_label();
         let reveal_change_id = describe.target().exact_change_id().map(str::to_owned);
         let result_message = match self.run_describe(&describe) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let mut reveal_error = None;
-                    let revealed_in_recent = match reveal_change_id.as_deref() {
-                        Some(change_id) => {
-                            match self.reveal_graph_change(change_id, LogViewMode::Recent) {
-                                Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height, current_viewport_width());
-                                    Some(switched_modes)
-                                }
-                                Err(error) => {
-                                    self.status = StatusLine::error(&self.view, error.to_string());
-                                    reveal_error = Some(format!(
-                                        "{} | reveal failed: {} | jj undo",
-                                        output.trim(),
-                                        error
-                                    ));
-                                    None
-                                }
-                            }
-                        }
-                        None => None,
-                    };
-
-                    let message = match revealed_in_recent {
-                        Some(switched_modes) => {
-                            if switched_modes {
-                                format!("{} | showing recent work | jj undo", output.trim())
-                            } else {
-                                format!("{} | jj undo", output.trim())
-                            }
-                        }
-                        None => match reveal_error.as_deref() {
-                            Some(message) => message.to_owned(),
-                            None => format!("{} | jj undo", output.trim()),
-                        },
-                    };
-                    if reveal_error.is_none() {
-                        self.status = StatusLine::with_message(&self.view, message.as_str());
-                    }
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("{} | refresh failed: {error} | jj undo", output.trim())
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action_revealing_change(
+                output,
+                reveal_change_id.as_deref(),
+                viewport_height,
+                " | jj undo",
+            ),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::DescribePreview {
@@ -98,28 +53,12 @@ impl App {
     ) {
         let command_label = commit.command_label();
         let result_message = match self.run_commit(&commit) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!(
-                        "{} | new working-copy change created on top | jj undo",
-                        output.trim()
-                    );
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!(
-                        "{} | refresh failed: {error} | new working-copy change created on top | jj undo",
-                        output.trim()
-                    )
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action(
+                output,
+                viewport_height,
+                " | new working-copy change created on top | jj undo",
+            ),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::CommitPreview {
@@ -136,22 +75,8 @@ impl App {
     ) {
         let command_label = mutation.command_label();
         let result_message = match self.run_bookmark_mutation(&mutation) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!("{} | jj undo", output.trim());
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("{} | refresh failed: {error} | jj undo", output.trim())
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::BookmarkMutationPreview {
@@ -168,25 +93,10 @@ impl App {
     ) {
         let command_label = mutation.command_label();
         let result_message = match self.run_file_mutation(&mutation) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!("{} | jj undo | jj op show -p", output.trim());
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!(
-                        "{} | refresh failed: {error} | jj undo | jj op show -p",
-                        output.trim()
-                    )
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
+            Ok(output) => {
+                self.finish_successful_action(output, viewport_height, " | jj undo | jj op show -p")
             }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::FileMutationPreview {
@@ -218,55 +128,14 @@ impl App {
                     }
                 };
 
-                match self.refresh_view_state() {
-                    Ok(()) => {
-                        self.view.clamp(viewport_height, current_viewport_width());
-                        let mut reveal_error = None;
-                        let revealed_in_recent =
-                            match self.reveal_graph_change(&new_change_id, LogViewMode::Recent) {
-                                Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height, current_viewport_width());
-                                    Some(switched_modes)
-                                }
-                                Err(error) => {
-                                    self.status = StatusLine::error(&self.view, error.to_string());
-                                    reveal_error = Some(format!(
-                                        "{} | reveal failed: {} | jj undo",
-                                        output.trim(),
-                                        error
-                                    ));
-                                    None
-                                }
-                            };
-
-                        let message = match revealed_in_recent {
-                            Some(switched_modes) => {
-                                if switched_modes {
-                                    format!("{} | showing recent work | jj undo", output.trim())
-                                } else {
-                                    format!("{} | jj undo", output.trim())
-                                }
-                            }
-                            None => match reveal_error.as_deref() {
-                                Some(message) => message.to_owned(),
-                                None => format!("{} | jj undo", output.trim()),
-                            },
-                        };
-                        if reveal_error.is_none() {
-                            self.status = StatusLine::with_message(&self.view, message.as_str());
-                        }
-                        message
-                    }
-                    Err(error) => {
-                        self.status = StatusLine::error(&self.view, error.to_string());
-                        format!("{} | refresh failed: {error} | jj undo", output.trim())
-                    }
-                }
+                self.finish_successful_action_revealing_change(
+                    output,
+                    Some(new_change_id.as_str()),
+                    viewport_height,
+                    " | jj undo",
+                )
             }
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::NewPreview {
@@ -284,10 +153,7 @@ impl App {
         let command_label = duplicate.command_label();
         let result_message = match self.run_duplicate(&duplicate) {
             Ok(output) => self.finish_successful_duplicate(&duplicate, output, viewport_height),
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::DuplicatePreview {
@@ -377,10 +243,7 @@ impl App {
                     }
                 }
             },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::PushPreview {
@@ -415,10 +278,7 @@ impl App {
                     }
                 }
             },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::FetchPreview {
@@ -435,26 +295,12 @@ impl App {
     ) {
         let command_label = recovery.command_label().to_owned();
         let result_message = match self.run_operation_recovery(&recovery) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!("{} | {}", output.trim(), recovery.success_hint());
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!(
-                        "{} | refresh failed: {error} | {}",
-                        output.trim(),
-                        recovery.success_hint()
-                    )
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action(
+                output,
+                viewport_height,
+                &format!(" | {}", recovery.success_hint()),
+            ),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::OperationRecoveryPreview {
@@ -579,10 +425,7 @@ impl App {
                     format!("{} | refresh failed: {error} | jj undo", output.trim())
                 }
             },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::OperationTargetPreview {

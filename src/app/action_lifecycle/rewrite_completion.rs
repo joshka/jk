@@ -8,10 +8,10 @@ use crate::app_screen::InteractionMode;
 use crate::app_status::StatusLine;
 use crate::jj::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan, LogViewMode,
+    JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
 };
 
-use super::super::{App, current_viewport_width};
+use super::super::App;
 
 impl App {
     pub(in crate::app) fn confirm_working_copy_navigation(
@@ -51,56 +51,14 @@ impl App {
                     }
                 };
 
-                match self.refresh_view_state() {
-                    Ok(()) => {
-                        self.view.clamp(viewport_height, current_viewport_width());
-                        let mut reveal_error = None;
-                        let revealed_in_recent = match self
-                            .reveal_graph_change(&reveal_change_id, LogViewMode::Recent)
-                        {
-                            Ok(switched_modes) => {
-                                self.view.clamp(viewport_height, current_viewport_width());
-                                Some(switched_modes)
-                            }
-                            Err(error) => {
-                                self.status = StatusLine::error(&self.view, error.to_string());
-                                reveal_error = Some(format!(
-                                    "{} | reveal failed: {} | jj undo",
-                                    output.trim(),
-                                    error
-                                ));
-                                None
-                            }
-                        };
-
-                        let message = match revealed_in_recent {
-                            Some(switched_modes) => {
-                                if switched_modes {
-                                    format!("{} | showing recent work | jj undo", output.trim())
-                                } else {
-                                    format!("{} | jj undo", output.trim())
-                                }
-                            }
-                            None => match reveal_error.as_deref() {
-                                Some(message) => message.to_owned(),
-                                None => format!("{} | jj undo", output.trim()),
-                            },
-                        };
-                        if reveal_error.is_none() {
-                            self.status = StatusLine::with_message(&self.view, message.as_str());
-                        }
-                        message
-                    }
-                    Err(error) => {
-                        self.status = StatusLine::error(&self.view, error.to_string());
-                        format!("{} | refresh failed: {error} | jj undo", output.trim())
-                    }
-                }
+                self.finish_successful_action_revealing_change(
+                    output,
+                    Some(reveal_change_id.as_str()),
+                    viewport_height,
+                    " | jj undo",
+                )
             }
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::WorkingCopyNavigationPreview {
@@ -117,22 +75,8 @@ impl App {
     ) {
         let command_label = abandon.command_label();
         let result_message = match self.run_abandon(&abandon) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!("{} | jj undo", output.trim());
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("{} | refresh failed: {error} | jj undo", output.trim())
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::AbandonPreview {
@@ -184,22 +128,8 @@ impl App {
     ) {
         let command_label = restore.command_label();
         let result_message = match self.run_restore(&restore) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!("{} | jj undo", output.trim());
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("{} | refresh failed: {error} | jj undo", output.trim())
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::RestorePreview {
@@ -216,22 +146,8 @@ impl App {
     ) {
         let command_label = revert.command_label();
         let result_message = match self.run_revert(&revert) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!("{} | jj undo", output.trim());
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("{} | refresh failed: {error} | jj undo", output.trim())
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::RevertPreview {
@@ -249,64 +165,13 @@ impl App {
         let command_label = rebase.command_label(false);
         let primary_source = rebase.sources().first().cloned();
         let result_message = match self.run_rebase(&rebase) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let mut reveal_error = None;
-                    let revealed_in_recent = match primary_source.as_deref() {
-                        Some(change_id) => {
-                            match self.reveal_graph_change(change_id, LogViewMode::Recent) {
-                                Ok(switched_modes) => {
-                                    self.view.clamp(viewport_height, current_viewport_width());
-                                    Some(switched_modes)
-                                }
-                                Err(error) => {
-                                    self.status = StatusLine::error(&self.view, error.to_string());
-                                    reveal_error = Some(format!(
-                                        "{} | reveal failed: {} | jj undo | jj op show -p",
-                                        output.trim(),
-                                        error
-                                    ));
-                                    None
-                                }
-                            }
-                        }
-                        None => None,
-                    };
-
-                    let message = match revealed_in_recent {
-                        Some(switched_modes) => {
-                            if switched_modes {
-                                format!(
-                                    "{} | showing recent work | jj undo | jj op show -p",
-                                    output.trim()
-                                )
-                            } else {
-                                format!("{} | jj undo | jj op show -p", output.trim())
-                            }
-                        }
-                        None => match reveal_error.as_deref() {
-                            Some(message) => message.to_owned(),
-                            None => format!("{} | jj undo | jj op show -p", output.trim()),
-                        },
-                    };
-                    if reveal_error.is_none() {
-                        self.status = StatusLine::with_message(&self.view, message.as_str());
-                    }
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!(
-                        "{} | refresh failed: {error} | jj undo | jj op show -p",
-                        output.trim()
-                    )
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action_revealing_change(
+                output,
+                primary_source.as_deref(),
+                viewport_height,
+                " | jj undo | jj op show -p",
+            ),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::RebasePreview {
@@ -324,54 +189,13 @@ impl App {
         let command_label = squash.command_label(false);
         let destination = squash.destination().to_owned();
         let result_message = match self.run_squash(&squash) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let mut reveal_error = None;
-                    let revealed_in_recent =
-                        match self.reveal_graph_change(&destination, LogViewMode::Recent) {
-                            Ok(switched_modes) => {
-                                self.view.clamp(viewport_height, current_viewport_width());
-                                Some(switched_modes)
-                            }
-                            Err(error) => {
-                                self.status = StatusLine::error(&self.view, error.to_string());
-                                reveal_error = Some(format!(
-                                    "{} | reveal failed: {} | jj undo",
-                                    output.trim(),
-                                    error
-                                ));
-                                None
-                            }
-                        };
-
-                    let message = match revealed_in_recent {
-                        Some(switched_modes) => {
-                            if switched_modes {
-                                format!("{} | showing recent work | jj undo", output.trim())
-                            } else {
-                                format!("{} | jj undo", output.trim())
-                            }
-                        }
-                        None => match reveal_error.as_deref() {
-                            Some(message) => message.to_owned(),
-                            None => format!("{} | jj undo", output.trim()),
-                        },
-                    };
-                    if reveal_error.is_none() {
-                        self.status = StatusLine::with_message(&self.view, message.as_str());
-                    }
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!("{} | refresh failed: {error} | jj undo", output.trim())
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
-            }
+            Ok(output) => self.finish_successful_action_revealing_change(
+                output,
+                Some(destination.as_str()),
+                viewport_height,
+                " | jj undo",
+            ),
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::SquashPreview {
@@ -388,25 +212,10 @@ impl App {
     ) {
         let command_label = absorb.command_label();
         let result_message = match self.run_absorb(&absorb) {
-            Ok(output) => match self.refresh_view_state() {
-                Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    let message = format!("{} | jj undo | jj op show -p", output.trim());
-                    self.status = StatusLine::with_message(&self.view, message.as_str());
-                    message
-                }
-                Err(error) => {
-                    self.status = StatusLine::error(&self.view, error.to_string());
-                    format!(
-                        "{} | refresh failed: {error} | jj undo | jj op show -p",
-                        output.trim()
-                    )
-                }
-            },
-            Err(error) => {
-                self.status = StatusLine::error(&self.view, error.to_string());
-                error.to_string()
+            Ok(output) => {
+                self.finish_successful_action(output, viewport_height, " | jj undo | jj op show -p")
             }
+            Err(error) => self.finish_failed_action(error),
         };
 
         self.mode = InteractionMode::AbsorbPreview {

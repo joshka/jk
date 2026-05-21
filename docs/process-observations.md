@@ -5,6 +5,22 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-20 (Action completion outcome helper)
+
+- Slice / task: implement the first corrective source-maintainability slice by extracting
+  behavior-preserving action completion outcome helpers.
+- Thread id: `019e4890-0c9d-7040-8e30-3f69e6753f01`.
+- Implementation outcome: `src/app/action_lifecycle/shared.rs` now owns shared failed-action,
+  refresh, and refresh-plus-reveal completion outcomes used by `completion.rs` and
+  `rewrite_completion.rs`; duplicate, split, sync, and stacked operation flows stayed inline where
+  their result wording or refresh policy is action-specific.
+- Validation trail: `cargo check`; focused app action tests for describe/commit, bookmark, file,
+  rewrite, working-copy, and operation actions; `cargo clippy -- -D warnings`; and
+  `rustup run nightly cargo fmt --check`; main-thread `just check` passed with 517 tests / 2
+  ignored.
+- Review outcome: a follow-up gpt-5.5 high read-only review reported no findings and noted that the
+  helper preserved refresh, reveal, status-kind, and result-message sequencing.
+
 ### 2026-05-20 (Source maintainability ledger)
 
 - Slice / task: orchestration-only documentation edit for the current maintainability audit jj

@@ -1,9 +1,97 @@
-//! Small shared wording helpers for action lifecycle modules.
+//! Small shared completion and wording helpers for action lifecycle modules.
 //!
-//! These helpers are kept separate because preview and completion code both need identical
-//! status context language without owning command construction.
+//! These helpers are kept separate because preview and completion code both need identical status
+//! context language, and confirmed actions share the same refresh/reveal/status outcome policy
+//! without owning command construction.
 
-use crate::jj::{JjBookmarkMutationPlan, JjGitFetch, JjGitPushTarget};
+use std::fmt::Display;
+
+use crate::app_status::StatusLine;
+use crate::jj::{JjBookmarkMutationPlan, JjGitFetch, JjGitPushTarget, LogViewMode};
+
+use super::super::{App, current_viewport_width};
+
+impl App {
+    pub(in crate::app::action_lifecycle) fn finish_failed_action(
+        &mut self,
+        error: impl Display,
+    ) -> String {
+        let message = error.to_string();
+        self.status = StatusLine::error(&self.view, message.clone());
+        message
+    }
+
+    pub(in crate::app::action_lifecycle) fn finish_successful_action(
+        &mut self,
+        output: String,
+        viewport_height: u16,
+        success_suffix: &str,
+    ) -> String {
+        match self.refresh_view_state() {
+            Ok(()) => {
+                self.view.clamp(viewport_height, current_viewport_width());
+                let message = format!("{}{}", output.trim(), success_suffix);
+                self.status = StatusLine::with_message(&self.view, message.as_str());
+                message
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                format!(
+                    "{} | refresh failed: {error}{success_suffix}",
+                    output.trim()
+                )
+            }
+        }
+    }
+
+    pub(in crate::app::action_lifecycle) fn finish_successful_action_revealing_change(
+        &mut self,
+        output: String,
+        reveal_change_id: Option<&str>,
+        viewport_height: u16,
+        success_suffix: &str,
+    ) -> String {
+        match self.refresh_view_state() {
+            Ok(()) => {
+                self.view.clamp(viewport_height, current_viewport_width());
+                let revealed_in_recent = match reveal_change_id {
+                    Some(change_id) => {
+                        match self.reveal_graph_change(change_id, LogViewMode::Recent) {
+                            Ok(switched_modes) => {
+                                self.view.clamp(viewport_height, current_viewport_width());
+                                Some(switched_modes)
+                            }
+                            Err(error) => {
+                                self.status = StatusLine::error(&self.view, error.to_string());
+                                return format!(
+                                    "{} | reveal failed: {error}{success_suffix}",
+                                    output.trim()
+                                );
+                            }
+                        }
+                    }
+                    None => None,
+                };
+
+                let message = match revealed_in_recent {
+                    Some(true) => {
+                        format!("{} | showing recent work{success_suffix}", output.trim())
+                    }
+                    Some(false) | None => format!("{}{}", output.trim(), success_suffix),
+                };
+                self.status = StatusLine::with_message(&self.view, message.as_str());
+                message
+            }
+            Err(error) => {
+                self.status = StatusLine::error(&self.view, error.to_string());
+                format!(
+                    "{} | refresh failed: {error}{success_suffix}",
+                    output.trim()
+                )
+            }
+        }
+    }
+}
 
 pub(in crate::app::action_lifecycle) fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
