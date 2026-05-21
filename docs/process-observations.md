@@ -5,6 +5,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Graph test module extraction)
+
+- Slice / task: move graph view tests out of `src/graph.rs` and into the graph feature directory so
+  production graph behavior is easier to scan while tests stay local to the feature owner.
+- Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
+- Worker thread id: `019e4b54-a8ab-7130-b326-8ff41dde948b`.
+- Model / routing: GPT-5 Codex worker with medium reasoning performed the mechanical extraction with
+  write scope limited to `src/graph.rs` and `src/graph/tests.rs`. The main thread kept jj ownership,
+  reviewed the result, and reran validation.
+- Implementation outcome: `src/graph.rs` now ends with `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/graph/tests.rs` and continue to exercise graph selection, reveal, action-menu, page
+  movement, highlight, copy, and exact-revision behavior.
+- Size evidence: after the move, `wc -l src/graph.rs src/graph/tests.rs src/graph/rows.rs` reported
+  605 lines in `src/graph.rs`, 613 in `src/graph/tests.rs`, and 498 in `src/graph/rows.rs`.
+- Rework / surprise: none beyond the expected module extraction.
+- Validation trail:
+  - Worker validation passed: `cargo test graph -- --test-threads=1` with 62 passed; `cargo check`;
+    and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings.
+  - Main-thread review validation passed: `cargo test graph -- --test-threads=1` with 62 passed;
+    `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
+  - `just md-check` passed after Panache wrapping in this process note.
+  - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
+    test passed with 545 passed / 2 ignored.
+- Evidence basis:
+  - Date: `2026-05-21 09:19:56 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
+  - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+  - Worker thread id `019e4b54-a8ab-7130-b326-8ff41dde948b` from the worker handoff.
+  - Files: `src/graph.rs`, `src/graph/tests.rs`, and this process note.
+
 ### 2026-05-21 (Graph row feature-root migration)
 
 - Slice / task: move revision/log rendered-row loading and metadata pairing out of `jj_rows` and
