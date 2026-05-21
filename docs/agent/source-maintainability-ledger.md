@@ -103,6 +103,25 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 jj command-boundary test split:
+
+- `src/jj.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in `src/jj/tests.rs`
+  with `use super::*;` for private access to command construction, color, output summarization,
+  remote parsing, and exact-change-id helpers.
+- This improves local readability by keeping the `jj` process boundary, argv construction, rendered
+  output loading, color handling, and output summarization code visible without scrolling through
+  296 lines of inline tests. The production file measured 773 lines before the split and 476 lines
+  after it.
+- The packet intentionally preserved all `jj` test names, assertions, helper functions, argv
+  expectations, parsing behavior, output summarization behavior, color handling, visibility, and
+  public API.
+- Focused validation covered `cargo test jj::tests -- --test-threads=1` with 29 passed and 538
+  filtered out, `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check` after
+  this documentation update.
+- Rework was limited to moving the extracted test block into a Rust child module and applying
+  Panache wrapping to the new notes; no `jj` command behavior, argv construction, parsing, output
+  summarization, color handling, visibility, or public API changed.
+
 2026-05-21 ViewSpec test split:
 
 - `src/jj/view_spec.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in

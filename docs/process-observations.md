@@ -6438,3 +6438,36 @@ belong here.
   - Thread id from `CODEX_THREAD_ID`.
   - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
+
+### 2026-05-21 (jj command-boundary test split)
+
+- Slice / task: move the inline `src/jj.rs` tests into an out-of-line child module while preserving
+  the existing `jj` command/process boundary behavior.
+- Thread id: `019e4c83-b932-7e10-8f67-e6f4556cb6ef` from `CODEX_THREAD_ID`.
+- Model / routing: medium worker handled the bounded Rust maintainability packet without running jj
+  or git commands; version-control ownership stayed with the main thread.
+- Changed files: `src/jj.rs`, `src/jj/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: `src/jj.rs` now ends with `#[cfg(test)] mod tests;`; the moved tests live
+  in `src/jj/tests.rs` and use Rust child-module privacy through `use super::*;`. The production
+  file measured 773 lines before the split and 476 lines after it, with 296 lines of tests now in
+  the child module.
+- Behavior-preservation evidence: the packet moved the existing tests unchanged in behavior and did
+  not alter `jj` command behavior, argv construction, parsing, output summarization, color handling,
+  visibility, or public API. The test names, assertions, imports, and `operation_id` helper stayed
+  with the moved test module.
+- Rework / surprise: rustfmt accepted the moved Rust test module as written; `just md-check`
+  initially reported Panache wrapping differences in the new notes, and applying those wraps fixed
+  the Markdown gate.
+- Validation trail: `cargo test jj::tests -- --test-threads=1` passed with 29 tests and 538 filtered
+  out; `cargo check` passed; `rustup run nightly cargo fmt --check` passed with the existing rustfmt
+  unstable-option warnings; and `just md-check` passed after this documentation update.
+- Main-thread review validation: `cargo test jj::tests -- --test-threads=1` passed with 29 tests and
+  538 filtered out; `cargo check` passed; `rustup run nightly cargo fmt --check` passed with the
+  existing rustfmt unstable-option warnings; and `just md-check` passed.
+- Evidence basis:
+  - Date: `2026-05-21 14:49:36 PDT` from local `date`.
+  - Main review date: `2026-05-21 14:52:53 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/jj.rs`, `src/jj/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.
