@@ -20,6 +20,9 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
   the dispatch table.
 - App text prompts now follow the same pattern: search, log revset, describe, commit, bookmark
   create/move/set, and bookmark rename prompt handling moved into named helpers.
+- App abandon preview and confirmation handling now also have named modal helpers, keeping empty
+  abandon rechecks, non-empty confirmation, cancellation, and output-closing behavior out of the
+  main dispatch table.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -38,8 +41,7 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 
 ## Current State
 
-- The current top of stack refreshes this status map after the app modal text prompt handler
-  extraction.
+- The current top of stack refreshes this status map after the app abandon modal handler extraction.
 - Recent behavior-preserving packets have focused on locality, feature ownership, and making the
   automatic session easier to audit from files rather than chat history.
 - The broad goal is still active. The completed packets do not prove the whole cleanup queue is
@@ -47,9 +49,9 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 
 ## Likely Next Work
 
-- App modal dispatch readability: `src/app/mode_input.rs` still has abandon preview and confirmation
-  arms inline. The likely next valuable step is extracting named handlers for those flows, but only
-  if the names match existing concepts and preserve key behavior.
+- App modal dispatch readability: `src/app/mode_input.rs` now mostly reads as a dispatch table plus
+  named modal handlers. The next app-dispatch work should be based on measured remaining complexity,
+  not another automatic extraction.
 - Action lifecycle readability: `src/app/action_lifecycle/*` should stay focused on dispatch,
   preview, completion, refresh, and reveal policy. Repeated completion/result handling should be
   audited before extracting helpers.
