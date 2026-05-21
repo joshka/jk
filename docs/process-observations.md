@@ -5,6 +5,35 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Operation detail test split)
+
+- Slice / task: move inline operation-detail tests from `src/operation_log/detail.rs` into
+  `src/operation_log/detail/tests.rs` while preserving rendered operation detail behavior.
+- Thread id: main orchestration thread; no subagent was used because this was a small local
+  follow-up to the operation-log feature-root move.
+- Model / routing: GPT-5 Codex performed the implementation, review, validation, and evidence
+  updates in the main thread.
+- Changed files: `src/operation_log/detail.rs`, `src/operation_log/detail/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/operation_log/detail.rs` now ends with `#[cfg(test)] mod tests;`; the
+  moved tests live in `src/operation_log/detail/tests.rs` and use Rust child-module privacy through
+  `use super::*;`.
+- Behavior-preservation evidence: the packet moved the existing three operation-detail tests without
+  changing their names, assertions, helper functions, imports, plain-document rendering behavior,
+  no-sticky-heading behavior, show/diff switching behavior, public API, or runtime behavior.
+- Scope boundary: the packet did not change operation-log list behavior, operation recovery action
+  plans, operation row parsing, app routing, or production operation-detail code beyond the test
+  module declaration.
+- Validation trail:
+  - Main-thread validation passed: `cargo test operation_log::detail -- --test-threads=1` with 3
+    passed and 564 filtered out; `cargo check`; and `rustup run nightly cargo fmt --check` with
+    existing rustfmt unstable-option warnings.
+- Rework / surprise: no Rust behavior or formatting rework was needed after the move.
+- Evidence basis:
+  - Date: `2026-05-21 15:55:57 PDT` from local `date`.
+  - Files: `src/operation_log/detail.rs`, `src/operation_log/detail/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Operation detail feature ownership)
 
 - Slice / task: move the root operation detail module under the operation-log feature root while

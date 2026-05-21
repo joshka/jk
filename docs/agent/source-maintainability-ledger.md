@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 operation detail test split:
+
+- `src/operation_log/detail.rs` now declares `#[cfg(test)] mod tests;`, and the moved tests live in
+  `src/operation_log/detail/tests.rs` with `use super::*;` for private access to operation-detail
+  view state.
+- This matches the view-level test layout used by file and document views and improves local
+  readability by keeping operation detail rendering, scrolling, search, copy, and show/diff
+  switching tests out of the production detail module.
+- The packet intentionally preserved all three operation-detail test names, assertions, helper
+  functions, imports, plain-document behavior, no-sticky-heading behavior, show/diff switching,
+  public API, and runtime behavior.
+- Focused validation covered `cargo test operation_log::detail -- --test-threads=1` with 3 passed
+  and 564 filtered out, `cargo check`, and `rustup run nightly cargo fmt --check`.
+- Rework was limited to moving the extracted test block into a Rust child module; no production
+  operation-detail code changed beyond replacing the inline test block with the sibling test module
+  declaration.
+
 2026-05-21 operation detail feature ownership:
 
 - The former root `src/operation_detail.rs` now lives at `src/operation_log/detail.rs`, and
