@@ -31,6 +31,9 @@ pub use self::workspaces::{WorkspaceContext, WorkspaceItem, load_workspace_conte
 pub(crate) const RESOLVE_CONFLICT_TEMPLATE: &str = r#"self.conflicted_files().map(|entry| "{\"path\":" ++ json(entry.path()) ++ ",\"file_type\":" ++ json(entry.file_type()) ++ ",\"side_count\":" ++ json(entry.conflict_side_count()) ++ "}\n").join("")"#;
 
 /// One selectable file item parsed from rendered file-list output.
+///
+/// The rendered line is kept as the presentation source, and `path` is only the exact file-list
+/// text used by follow-up navigation or file actions.
 #[derive(Clone, Debug)]
 pub struct FileListItem {
     lines: Vec<Line<'static>>,
@@ -65,6 +68,9 @@ impl FileListItem {
 }
 
 /// One conflicted path reported by the resolve template contract.
+///
+/// Invalid or drifted template rows are preserved as raw text so the resolve view can show a useful
+/// row instead of silently dropping a conflicted file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolveEntry {
     path: Option<String>,
@@ -113,6 +119,10 @@ impl ResolveEntry {
     }
 }
 
+/// Load conflicted paths using jj's structured conflict template.
+///
+/// Process and template errors are returned to the caller. Per-row JSON drift is represented as
+/// `ResolveEntry::unparsed` so the view can degrade row-by-row.
 pub fn load_resolve_entries(spec: &ViewSpec) -> Result<Vec<ResolveEntry>> {
     Ok(
         run_jj_template_lines(spec, RESOLVE_CONFLICT_TEMPLATE, true)?
@@ -122,6 +132,10 @@ pub fn load_resolve_entries(spec: &ViewSpec) -> Result<Vec<ResolveEntry>> {
     )
 }
 
+/// Load a rendered file-list view and pair each visible row with its exact path text.
+///
+/// This preserves jj's colorized output and filters only empty rows. The loader does not infer file
+/// status or ownership beyond the rendered path string.
 pub fn load_file_list_entries(spec: &ViewSpec) -> Result<Vec<FileListItem>> {
     let output = run_jj(spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
@@ -135,10 +149,16 @@ pub fn load_file_list_entries(spec: &ViewSpec) -> Result<Vec<FileListItem>> {
         .collect())
 }
 
+/// Flatten rendered Ratatui lines to plain text for search and copy helpers.
+///
+/// Style is intentionally discarded at this boundary; callers that render content should keep the
+/// original `Line` values.
 pub fn document_plain_text(lines: &[Line<'static>]) -> String {
     lines.iter().map(line_text).collect::<Vec<_>>().join("\n")
 }
 
+// Metadata loaders fail closed when their side-channel row count no longer
+// matches rendered jj rows; selection should stay usable without guessed ids.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum RowMetadata<T> {
     Valid(Vec<T>),

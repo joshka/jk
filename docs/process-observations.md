@@ -5,6 +5,43 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Central contract documentation sweep)
+
+- Slice / task: add documentation-only Rustdoc and private invariant comments for central public and
+  crate-visible contracts.
+- Thread id: `019e4a38-3b4e-7152-8261-7f020bc8ff6a`.
+- Model / routing: GPT-5 Codex worker with medium reasoning implemented the documentation sweep. The
+  main thread kept jj orchestration, so the worker used direct file reads and validation commands
+  without source-control inspection.
+- Files changed: `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/command.rs`,
+  `src/app_screen.rs`, `src/jj_rows.rs`, `src/app.rs`, and this process note.
+- Documentation outcome: shared action-menu contracts now clarify preview-first safety, pure menu
+  state, follow-up ownership, role-prompt payloads, and where feature-specific action availability
+  should live. Shared TUI contracts now clarify that chrome owns title/status/modal presentation,
+  while feature views own main content and feature policy.
+- Documentation outcome: action plans now explain argv ownership, preview/run boundaries,
+  rendered-output preservation, exact change/fileset quoting, and which plans intentionally avoid
+  simulating jj's final graph. Command binding docs now clarify multi-key prefix matching, fallback
+  ownership, help visibility filtering, and key-label normalization.
+- Documentation outcome: view-menu and row-loader docs now state their app-dispatch and rendered-jj
+  boundaries, including resolve row drift handling, file-list path preservation, plain-text
+  flattening, and row-metadata fail-closed behavior.
+- Rework / surprise: `src/app.rs` received a tiny `run` Rustdoc addition because the ledger called
+  it out and it is the binary side-effect boundary. No behavior, naming, visibility, or
+  source-control state was intentionally changed.
+- Validation trail:
+  - `rustup run nightly cargo fmt --check` passed. The command still printed the repo's existing
+    rustfmt unstable-option warnings.
+  - `cargo check` passed.
+  - `cargo clippy -- -D warnings` passed in main-thread review.
+  - `just md-check` passed.
+  - `cargo doc --no-deps` passed in main-thread review, proving the new intra-doc links resolve.
+- Evidence basis:
+  - Date: `2026-05-21 04:08:17 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
+  - Thread id from `CODEX_THREAD_ID`
+  - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
+    `docs/agent/documentation.md`, `docs/agent/rust-style.md`, and the changed source files
+
 ### 2026-05-21 (Feature-root maintainability guidance)
 
 - Slice / task: incorporate main-thread user guidance that future refactoring should move

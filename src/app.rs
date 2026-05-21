@@ -31,6 +31,11 @@ mod services;
 
 use self::services::AppServices;
 
+/// Start the terminal application from process arguments.
+///
+/// This is the binary boundary: it loads the initial rendered jj view, enters the Ratatui event
+/// loop, and lets app-owned dispatch surface terminal, clipboard, and jj errors through
+/// `color_eyre`.
 pub fn run() -> Result<()> {
     let mut app = App::load(env::args_os().skip(1).collect())?;
 

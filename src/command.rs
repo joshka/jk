@@ -98,6 +98,7 @@ pub struct Binding {
 }
 
 impl Binding {
+    /// Bind one key pattern to an app command.
     pub const fn new(key: KeyPattern, command: Command) -> Self {
         Self {
             key: KeySequence::Single(key),
@@ -105,6 +106,10 @@ impl Binding {
         }
     }
 
+    /// Bind a fixed multi-key sequence to an app command.
+    ///
+    /// The sequence slice must be static because global binding tables are static. Prefix timeout
+    /// and fallback behavior are owned by `App`, not by the binding metadata.
     pub const fn sequence(keys: &'static [KeyPattern], command: Command) -> Self {
         Self {
             key: KeySequence::Multi(keys),
@@ -127,6 +132,7 @@ impl Binding {
 }
 
 impl Command {
+    /// Return the jj operation recovery kind represented by this global command, if any.
     pub fn operation_recovery(self) -> Option<JjOperationRecoveryKind> {
         match self {
             Self::OperationUndo => Some(JjOperationRecoveryKind::Undo),
@@ -167,6 +173,10 @@ impl Command {
     }
 }
 
+/// One physical key pattern used by a binding.
+///
+/// Matching normalizes terminal events where crossterm reports shifted printable characters with a
+/// `SHIFT` modifier even though the key code already contains the shifted character.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct KeyPattern {
     code: KeyCode,
@@ -198,6 +208,7 @@ impl KeyPattern {
                     && shifted_character_is_encoded_in_key_code(self.code)))
     }
 
+    /// Human-readable key label used in help, status hints, and pending-prefix messages.
     pub fn label(self) -> String {
         let code = match self.code {
             KeyCode::Backspace => "Backspace".to_owned(),
@@ -312,7 +323,9 @@ impl KeyPattern {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BindingMatch {
+    /// A complete binding with no longer available sequence sharing the same prefix.
     Exact(Binding),
+    /// A valid prefix for longer bindings, optionally with an exact binding to run on timeout.
     Prefix { fallback: Option<Binding> },
 }
 
@@ -359,6 +372,11 @@ pub fn find_binding(bindings: &[Binding], key: KeyEvent) -> Option<Binding> {
         .find(|binding| binding.matches(key))
 }
 
+/// Match pending key events against binding groups in priority order.
+///
+/// The matcher is pure and does not apply timeouts. If both an exact binding and longer binding
+/// share a prefix, callers receive `Prefix { fallback }` so `App` can wait briefly before running
+/// the fallback.
 pub fn match_binding_sequence(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
@@ -366,6 +384,10 @@ pub fn match_binding_sequence(
     match_binding_sequence_by(binding_groups, keys, |_| true)
 }
 
+/// Match pending key events against commands visible in the active help context.
+///
+/// This keeps help/prefix hints aligned with `help.rs` projection without letting help visibility
+/// change the underlying command tables.
 pub fn match_help_binding_sequence(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
@@ -376,10 +398,12 @@ pub fn match_help_binding_sequence(
     })
 }
 
+/// Return unique next-key labels for bindings that continue the pending prefix.
 pub fn binding_prefix_next_labels(binding_groups: &[&[Binding]], keys: &[KeyEvent]) -> Vec<String> {
     binding_prefix_next_labels_by(binding_groups, keys, |_| true)
 }
 
+/// Return unique next-key labels after applying active help-context visibility.
 pub fn help_binding_prefix_next_labels(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],

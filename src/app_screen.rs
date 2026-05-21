@@ -301,6 +301,9 @@ impl InteractionMode {
     }
 }
 
+/// One static row in the view-switching menu.
+///
+/// The option is copied into overlay projection only; dispatch remains in `app.rs`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ViewMenuOption {
     label: &'static str,
@@ -317,12 +320,20 @@ impl ViewMenuOption {
     }
 }
 
+/// Action selected from the global view menu.
+///
+/// Opening a view and changing diff format are app-owned effects; the menu only supplies the
+/// user's requested target.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewMenuAction {
     Open(JjCommand),
     DiffFormat(DiffFormat),
 }
 
+/// Static view menu entries shown by shared TUI chrome.
+///
+/// The labels are user-visible command names. Feature-specific view behavior and loading still
+/// belong to `ViewState` and the individual view modules.
 pub fn view_menu_options() -> &'static [ViewMenuOption] {
     &[
         ViewMenuOption {

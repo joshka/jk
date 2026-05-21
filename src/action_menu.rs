@@ -12,6 +12,10 @@ pub use revision_actions::ExactActionContext;
 
 const PREVIEW_REQUIRED_MARKER: &str = "Preview required before execution.";
 
+/// Safety policy shown before a menu action can mutate repository state.
+///
+/// The menu only advertises the requirement. Preview construction, command execution, and
+/// post-command refresh stay in the app action lifecycle and `jj_actions`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SafetyTier {
     PreviewFirst,
@@ -23,11 +27,16 @@ impl SafetyTier {
         matches!(self, Self::PreviewFirst)
     }
 
+    /// User-facing marker appended to action menus and role prompts.
     pub fn preview_marker(&self) -> &'static str {
         PREVIEW_REQUIRED_MARKER
     }
 }
 
+/// Stable action vocabulary shared by menus, prompts, and follow-up dispatch.
+///
+/// This enum names user-visible verbs only. Feature-specific availability rules belong in the
+/// feature or action-menu builder that knows the selected row context.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionKind {
     Edit,
@@ -86,6 +95,10 @@ impl ActionKind {
     }
 }
 
+/// One role/value pair in an action prompt that needs an explicit source or destination choice.
+///
+/// Roles are presentation labels and dispatcher cues, not parsed revsets. The follow-up action plan
+/// is responsible for quoting selected values before passing them to `jj`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RolePromptOption {
     role: &'static str,
@@ -113,6 +126,10 @@ impl RolePromptOption {
     }
 }
 
+/// Prompt model for actions that need a role choice before preview.
+///
+/// The prompt is immutable UI state owned by `InteractionMode`; choosing an option only creates the
+/// next follow-up, and never executes `jj` directly.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RolePrompt {
     title: &'static str,
@@ -171,6 +188,10 @@ impl RolePrompt {
     }
 }
 
+/// Deferred action payload produced by a selected menu item.
+///
+/// Follow-ups intentionally carry exact strings from rendered row metadata or selected paths. The
+/// app turns them into preview-first `jj_actions` plans before any process side effects occur.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FollowUp {
     StatusMessage(String),
@@ -224,6 +245,10 @@ pub enum FollowUp {
     },
 }
 
+/// One selectable row in an action menu.
+///
+/// Items are pure presentation and dispatch data: label, shortcut, safety marker, and follow-up.
+/// They do not know whether the selected action is valid after a later refresh.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionMenuItem {
     action: ActionKind,
@@ -270,6 +295,10 @@ impl ActionMenuItem {
     }
 }
 
+/// Immutable action menu for the currently selected view item.
+///
+/// Builders own action availability. The shared menu type only preserves item order and shortcut
+/// lookup for modal input.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ActionMenu {
     items: Vec<ActionMenuItem>,
@@ -293,6 +322,11 @@ impl ActionMenu {
     }
 }
 
+/// Build the shared revision action menu for an exact graph/detail context.
+///
+/// This facade exists so callers do not depend on the current staging module. New
+/// feature-specific action policy should move toward that feature owner instead of growing this
+/// shared wrapper.
 pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     revision_actions::build_action_menu(context)
 }

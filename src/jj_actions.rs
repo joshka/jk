@@ -33,7 +33,10 @@ pub use working_copy::{
 
 const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 
-// Shared result envelope for preview and confirmed command output.
+/// Shared result envelope for preview and confirmed command output.
+///
+/// The message is already presentation-ready text. Callers preserve it in the action-output pane
+/// instead of reparsing stdout or reconstructing jj wording.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
     message: String,
@@ -49,33 +52,43 @@ impl CommandOutput {
     }
 }
 
-// Description finalization plans update messages without opening an editor;
-// commit always targets @ and describe may target @ or an exact change.
+/// Target for non-interactive `jj describe --message` finalization.
+///
+/// Exact changes come from rendered row metadata and are quoted before argv construction; the
+/// working-copy target stays as jj's `@` revset.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjDescribeTarget {
     ExactChange(String),
     CurrentWorkingCopy,
 }
 
+/// Preview-first plan for updating a change description without opening an editor.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjDescribePlan {
     target: JjDescribeTarget,
     message: String,
 }
 
+/// Preview-first plan for committing the current working-copy change.
+///
+/// This plan never consumes graph selection; `jj commit` always acts on `@` and creates the next
+/// working-copy change according to jj's normal behavior.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjCommitPlan {
     message: String,
 }
 
-// Content mutation plans preview the diff jj will remove or reverse-apply, and
-// file mutation plans restrict paths through exact root-file filesets.
+/// Preview-first plan for `jj restore`.
+///
+/// Previews show the forward diff that jj will remove. `jk` does not simulate the resulting graph
+/// or file content.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRestorePlan {
     target: JjRestoreTarget,
     path: Option<String>,
 }
 
+/// File mutation subcommand represented by a preview-first plan.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjFileMutationKind {
     Track,
@@ -83,18 +96,27 @@ pub enum JjFileMutationKind {
     Chmod(JjFileChmodMode),
 }
 
+/// File executable-bit mode accepted by `jj file chmod`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjFileChmodMode {
     Executable,
     Normal,
 }
 
+/// Exact target scope for a file mutation.
+///
+/// Paths are stored as repository-root file paths and converted to exact root-file filesets during
+/// argv construction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjFileMutationTarget {
     WorkingCopy { path: String },
     ExactRevision { revision: String, path: String },
 }
 
+/// Preview-first plan for `jj file track`, `untrack`, and `chmod`.
+///
+/// The plan owns argv construction for exact filesets. It does not decide whether a file action is
+/// available; that policy belongs to the selected view/action-menu owner.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjFileMutationPlan {
     kind: JjFileMutationKind,
@@ -107,6 +129,10 @@ enum JjRestoreTarget {
     CurrentWorkingCopy,
 }
 
+/// Preview-first plan for reverse-applying one exact revision into `@`.
+///
+/// Previews show the selected revision's forward diff because that is the source jj will
+/// reverse-apply.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRevertPlan {
     revision: String,
@@ -641,8 +667,10 @@ impl JjRevertPlan {
     }
 }
 
-// Abandon safety owns the preflight probes and strong-confirm preview; keep it
-// separate from rewrite plans because it classifies destructive risk first.
+/// Preview-first plan for abandoning one exact revision.
+///
+/// Abandon safety owns the preflight probes and strong-confirm preview; keep it separate from
+/// rewrite plans because it classifies destructive risk before command execution.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjAbandonPlan {
     revision: String,
@@ -724,6 +752,10 @@ impl JjAbandonPlan {
     }
 }
 
+/// Preflight result for an abandon confirmation screen.
+///
+/// The preview keeps jj's diff summary text and only classifies empty versus non-empty changes for
+/// confirmation strength. It does not decide refresh or reveal behavior after abandon completes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjAbandonPreview {
     revision: String,

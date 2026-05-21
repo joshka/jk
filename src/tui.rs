@@ -23,6 +23,10 @@ use crate::theme;
 pub use status_hints::StatusHints;
 use status_hints::status_hint_spans;
 
+/// Fixed chrome layout for one terminal frame.
+///
+/// View renderers receive only `main`; this keeps title and status ownership in shared chrome
+/// instead of leaking frame geometry into feature views.
 #[derive(Clone, Copy, Debug)]
 pub struct Areas {
     pub title: Rect,
@@ -30,6 +34,10 @@ pub struct Areas {
     pub status: Rect,
 }
 
+/// Split the available terminal area into title, main content, and status rows.
+///
+/// The layout is deliberately stable at one row of chrome above and below the view so small
+/// terminals degrade by shrinking the view, not by changing view-local rendering contracts.
 pub fn areas(area: Rect) -> Areas {
     let [title, main, status] = vertical![==1, >=1, ==1].areas(area);
     Areas {
@@ -39,11 +47,16 @@ pub fn areas(area: Rect) -> Areas {
     }
 }
 
+/// Draw shared title and status chrome without touching the view's main content area.
 pub fn render_chrome(frame: &mut Frame<'_>, areas: Areas, status: &StatusLine) {
     frame.render_widget(title_bar(status), areas.title);
     frame.render_widget(status_line(status, areas.status.width), areas.status);
 }
 
+/// Draw the active modal overlay over an already rendered frame.
+///
+/// Overlays are presentation-only. Selection indexes and output scroll offsets are owned by
+/// `InteractionMode` or `ActionOutput`; this function only sizes, clears, and renders the modal.
 pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Overlay<'_>) {
     match overlay {
         Overlay::None => {}
@@ -103,6 +116,11 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
     }
 }
 
+/// Borrowed overlay projection for the current interaction mode.
+///
+/// The enum carries references so drawing never takes ownership of prompt/menu/action state. Add
+/// only shared modal presentation here; feature-specific availability and command policy belong in
+/// the view, action menu, or action plan that produced the state.
 pub enum Overlay<'a> {
     None,
     Help {
