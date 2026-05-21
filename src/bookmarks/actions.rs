@@ -1,9 +1,9 @@
 //! Bookmark action plans and validation.
 //!
 //! This module owns bookmark mutation argv construction, exact-name quoting,
-//! preview summaries, and rename validation. App prompt policy, selected-row
-//! target resolution, and bookmark row metadata stay with their existing
-//! owners.
+//! preview summaries, and rename validation for the bookmarks feature. App
+//! prompt policy stays in the action lifecycle; selected-row target resolution
+//! and bookmark row metadata stay in sibling bookmark modules.
 
 use color_eyre::Result;
 

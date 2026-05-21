@@ -9,11 +9,11 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
+use super::actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
 use super::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState,
 };
-use crate::jj_actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
 
 pub(super) struct BookmarkActionTargetResolver<'a> {
     selected: Option<&'a BookmarkItem>,

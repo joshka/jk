@@ -233,9 +233,8 @@ Current ownership:
   action means; `action_output.rs` decides how output panes move.
 - `command.rs` owns binding metadata and the command/effect vocabulary shared between app-level
   dispatch and individual views.
-- `jj_actions.rs` owns preview-first `jj` action and mutation plans, including argv construction,
-  labels, preview summaries, direct run methods, and fallback result wording for user-confirmed
-  mutation flows.
+- `jj_actions.rs` owns preview-first `jj` action and mutation plans that have not moved to narrower
+  feature owners. It keeps the top-level re-export boundary consumed by app and menu code.
 - `jj.rs` owns view-spec command construction, direct process helpers, diff-format arguments, and
   command/navigation target provenance.
 - `jj_syntax.rs` owns exact revset/fileset/string quoting helpers and argv label helpers shared by
@@ -248,7 +247,9 @@ Current ownership:
   operation-log row grouping, operation-id metadata parsing and pairing, and metadata drift tests.
 - `bookmarks.rs` owns the bookmarks feature view, bookmark selection/copy/search, and bookmark
   action availability. `bookmarks/rows.rs` owns bookmark row metadata and local/remote state
-  classification; `bookmarks/action_targets.rs` owns safe bookmark mutation target resolution.
+  classification; `bookmarks/action_targets.rs` owns safe bookmark mutation target resolution;
+  `bookmarks/actions.rs` owns bookmark mutation argv construction, preview summaries, exact-name
+  quoting, and rename validation.
 - `graph.rs` owns the default/log graph view, graph row loading, graph-row selection, graph search,
   and graph-to-detail navigation. `graph/rows.rs` owns rendered `jj log` row grouping, revision
   metadata pairing, compact log context, and the `LogItem` row contract.

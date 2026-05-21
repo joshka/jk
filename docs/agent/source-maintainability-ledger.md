@@ -103,6 +103,23 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 bookmark action-plan owner move:
+
+- Bookmark mutation command plans moved from `src/jj_actions/bookmarks.rs` to
+  `src/bookmarks/actions.rs`, with their existing sibling tests moved from
+  `src/jj_actions/bookmarks/tests.rs` to `src/bookmarks/actions/tests.rs`.
+- `src/bookmarks.rs` now declares `pub(crate) mod actions;`, while `src/jj_actions.rs` keeps
+  re-exporting the app-facing bookmark action-plan boundary. This reduces caller churn while making
+  bookmark create/set/move/rename/delete/forget/track/untrack behavior discoverable from the
+  bookmark feature root.
+- `src/bookmarks/action_targets.rs` now imports bookmark action target types from the sibling
+  `actions` module instead of from the global `jj_actions` bucket.
+- The packet intentionally preserved command argv, preview wording, exact-name quoting, rename
+  validation, run behavior, test names, and public app-facing re-exports.
+- Focused validation covered `cargo test bookmarks::actions -- --test-threads=1` with 8 passed and
+  559 filtered out, `cargo test bookmarks -- --test-threads=1` with 40 passed and 527 filtered out,
+  `cargo check`, `rustup run nightly cargo fmt --check`, and `just md-check`.
+
 2026-05-21 feature-root refactoring guidance:
 
 - `docs/agent/architecture.md` now records the target feature-root plus shared-infrastructure shape

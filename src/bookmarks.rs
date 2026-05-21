@@ -5,6 +5,7 @@
 //! search, refresh, and open-show behavior.
 
 mod action_targets;
+pub(crate) mod actions;
 mod rows;
 
 use color_eyre::Result;
@@ -13,6 +14,7 @@ use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
 use self::action_targets::BookmarkActionTargetResolver;
+use self::actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
 pub(crate) use self::rows::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState, load_bookmark_entries,
@@ -20,7 +22,6 @@ pub(crate) use self::rows::{
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::{JjCommand, ViewSpec};
-use crate::jj_actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;

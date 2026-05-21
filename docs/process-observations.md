@@ -5,6 +5,41 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Bookmark action-plan owner move)
+
+- Slice / task: move bookmark mutation action plans from the global `jj_actions` bucket to the
+  bookmark feature root.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread GPT-5 Codex performed the packet directly because the user explicitly
+  requested main-thread work for the feature-root refactoring direction.
+- Implementation outcome: `src/bookmarks/actions.rs` now owns bookmark create/set/move/rename/
+  delete/forget/track/untrack command plans, exact-name quoting, preview summaries, direct run
+  behavior, and rename validation. `src/jj_actions.rs` keeps re-exporting the app-facing bookmark
+  plan types so callers do not churn during the ownership move.
+- Behavior-preservation evidence: the moved tests live in `src/bookmarks/actions/tests.rs` with
+  their existing names and assertions. The Rust diff is limited to the module path move, sibling
+  imports from `bookmarks/action_targets.rs`, module declaration in `bookmarks.rs`, and the
+  `jj_actions.rs` re-export path.
+- Readability evidence: bookmark mutation behavior is now reachable from the bookmark feature root
+  beside row metadata and target resolution. Measured files after the move: 588 lines in
+  `src/bookmarks/actions.rs`, 243 lines in `src/bookmarks/actions/tests.rs`, 331 lines in
+  `src/bookmarks.rs`, and 870 lines in `src/jj_actions.rs`.
+- Validation trail:
+  - Main-thread validation passed: `cargo test bookmarks::actions -- --test-threads=1` with 8 passed
+    and 559 filtered out; `cargo test bookmarks -- --test-threads=1` with 40 passed and 527 filtered
+    out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `just md-check`.
+- Rework / surprise: the first compile after the move exposed one unused `JjBookmarkTrackingTarget`
+  re-export from `jj_actions.rs`. Removing that no-longer-used compatibility export cleared the
+  warning without affecting current callers. The first format checks reported rustfmt import/module
+  ordering and Panache wrapping differences; formatting-only updates cleared them.
+- Evidence basis:
+  - Date: `2026-05-21 15:05:38 PDT` from local `date`.
+  - Files: `src/bookmarks/actions.rs`, `src/bookmarks/actions/tests.rs`,
+    `src/bookmarks/action_targets.rs`, `src/bookmarks.rs`, `src/jj_actions.rs`,
+    `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and this process
+    note.
+
 ### 2026-05-21 (Feature-root refactoring guidance)
 
 - Slice / task: record the user's requested feature-root plus shared-infrastructure refactoring

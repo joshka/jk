@@ -5,9 +5,8 @@
 //! command that will run, exact revsets/filesets where a target comes from rendered metadata, and
 //! `jj`'s own preview output where available instead of simulating final graph or file results.
 //!
-//! Family modules own their narrower command areas:
+//! Family modules and feature-owned action modules own their narrower command areas:
 //!
-//! - [`bookmarks`] owns bookmark mutation targets and plans.
 //! - [`git_sync`] owns Git fetch and push plans.
 //! - [`operation`] owns operation recovery plans.
 //! - [`rewrite`] owns rewrite plans such as absorb, rebase, and squash.
@@ -25,18 +24,17 @@ use crate::jj_syntax::{exact_change_id_revset, root_file_fileset};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-mod bookmarks;
 mod git_sync;
 mod operation;
 mod rewrite;
 mod working_copy;
 
 // Re-export plan types as the boundary consumed by views, menus, and the app lifecycle. The
-// submodules keep family-specific policy local while this root module keeps the top-level action
-// vocabulary discoverable from one import path.
-pub use bookmarks::{
+// owning modules keep family-specific policy local while this root module keeps the top-level
+// action vocabulary discoverable from one import path.
+pub use crate::bookmarks::actions::{
     JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget,
-    JjBookmarkTrackingTarget, validate_bookmark_rename_new_name,
+    validate_bookmark_rename_new_name,
 };
 pub use git_sync::{JjGitFetch, JjGitPush, JjGitPushTarget};
 pub use operation::{JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget};
