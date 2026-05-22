@@ -24,13 +24,8 @@ Use the repo guidance in this order when maintainability, ownership, or structur
 - [`docs/agent/workflow.md`](docs/agent/workflow.md): canonical implementation workflow,
   maintainability packet shape, completion bar, and the small current maintainability doctrine that
   future work should follow by default.
-- [`docs/agent/cleanup-wave-status.md`](docs/agent/cleanup-wave-status.md): current cleanup status,
-  what completion means, and the active post-traversal queue summary.
-- [`docs/agent/source-cleanup-audit.md`](docs/agent/source-cleanup-audit.md): supporting evidence
-  and measurements for the queue, not the ownership source of truth.
-- [`docs/agent/source-maintainability-ledger.md`](docs/agent/source-maintainability-ledger.md) and
-  [`docs/process-observations.md`](docs/process-observations.md): historical records and packet
-  evidence, not active structure guidance.
+- [`docs/reference/README.md`](docs/reference/README.md): current product-facing reference entry
+  point for screens, workflows, and the single-view model.
 
 Rendered `jj` output is the default presentation source. Preserve user templates, colors, graph
 symbols, diff style, wording, and command behavior wherever practical. Parse the minimum structure
@@ -38,9 +33,10 @@ needed for presentation-adjacent navigation, sticky file context, search, and co
 the rest opaque. Prefer code or structured contracts over parsed CLI output for semantic state.
 Treat stdout -> ANSI -> styled spans -> Ratatui items as a fragile pipeline when the feature needs
 semantics that could be represented directly in code. When work depends on underspecified output,
-pipeline reconstruction, semantic inference from rendered text, or duplicated `jj` behavior, load
-[`docs/plan/integration-strategy.md`](docs/plan/integration-strategy.md) and record assumptions in
-[`docs/plan/fragility-register.md`](docs/plan/fragility-register.md).
+pipeline reconstruction, semantic inference from rendered text, or duplicated `jj` behavior, treat
+that as evidence for stronger `jj`-side abstractions such as structured output, `jj_cli`, `jj_lib`,
+shared rendering/config APIs, or future upstream UI-facing contracts. Record the soft agreement in
+the owning docs, tests, or source comments instead of leaving it in chat context.
 
 ## Always-On Agent Guidance
 
@@ -54,8 +50,8 @@ sibling checkout or generated scripts.
   choose the path that satisfies the goal and explain the tradeoff.
 - Keep durable context on disk. Put repository-specific facts, assumptions, decisions, and follow-up
   notes in tracked docs or ignored `AGENTS.override.md` files rather than relying on chat context.
-- Keep `docs/process-observations.md` current each turn with stable, file-backed or command-backed
-  evidence (thread id, date, and concrete references) before concluding user-facing work.
+- Keep durable docs in this repo focused on current product, contributor, and maintenance guidance.
+  Do not add packet logs, phase trackers, progress ledgers, or model/process experiments here.
 - Prefer tools and checks over repeated prompting. If the same correction would be needed again,
   make it mechanical through code, tests, lint configuration, scripts, templates, or local guidance.
 - Distill conventions from accepted artifacts before inventing style. Start from nearby code, tests,
@@ -270,6 +266,8 @@ Use the deeper agent guidance when the change touches the relevant area:
   and validation expectations.
 - [`docs/agent/workflow.md`](docs/agent/workflow.md) for agent workflow, review posture, and handoff
   notes.
+- [`docs/reference/README.md`](docs/reference/README.md) for the durable current-state reference
+  surface covering screens, workflows, and the view model.
 
 ## Testing Guidelines
 

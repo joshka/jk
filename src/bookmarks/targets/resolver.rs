@@ -14,14 +14,13 @@ use super::helpers::{
     remote_peer_is_tracked, remote_peer_is_untracked, remote_tracking, remote_tracking_summary,
     require_matching_peer_targets, require_selected_target,
 };
+use super::peers::VisibleBookmarkPeers;
 
 pub(in crate::bookmarks) struct BookmarkActionTargetResolver<'a> {
     /// Currently selected bookmark row, if any.
     selected: Option<&'a BookmarkItem>,
-    /// All visible bookmark rows used to resolve peers and ambiguity.
-    entries: &'a [BookmarkItem],
-    /// View args used to detect whether all-remotes metadata is safely unfiltered.
-    spec_args: &'a [String],
+    /// Visible bookmark peers and metadata coverage used for exact action targeting.
+    peers: VisibleBookmarkPeers<'a>,
 }
 
 impl<'a> BookmarkActionTargetResolver<'a> {
@@ -33,8 +32,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
     ) -> Self {
         Self {
             selected,
-            entries,
-            spec_args,
+            peers: VisibleBookmarkPeers::new(entries, spec_args),
         }
     }
 
@@ -100,23 +98,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         action: &str,
         name: &str,
     ) -> Result<Option<&BookmarkItem>> {
-        let peers = self
-            .entries
-            .iter()
-            .filter(|entry| {
-                entry.bookmark_name() == name
-                    && matches!(entry.state(), BookmarkRowState::Local { .. })
-            })
-            .collect::<Vec<_>>();
-
-        match peers.as_slice() {
-            [] => Ok(None),
-            [peer] => Ok(Some(peer)),
-            _ => Err(eyre!(
-                "bookmark {action} disabled: selected bookmark has ambiguous local peers; found {} local rows named '{name}'",
-                peers.len()
-            )),
-        }
+        self.peers.visible_local_peer_target(action, name)
     }
 
     /// Resolves a remote-row forget target only when local-peer and remote uniqueness checks pass.
@@ -153,13 +135,13 @@ impl<'a> BookmarkActionTargetResolver<'a> {
             ));
         }
 
-        if self.has_local_bookmark_peer(name) {
+        if self.peers.has_local_bookmark_peer(name) {
             return Err(eyre!(
                 "bookmark forget disabled: selected remote bookmark has a local peer"
             ));
         }
 
-        let remote_siblings = self.remote_bookmark_peer_count(name);
+        let remote_siblings = self.peers.remote_bookmark_peer_count(name);
         if remote_siblings != 1 {
             return Err(eyre!(
                 "bookmark forget disabled: selected remote bookmark is not unique; found {remote_siblings} remote peers named '{name}'"
@@ -227,12 +209,14 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         local: &BookmarkItem,
         tracking: &LocalBookmarkRemoteState,
     ) -> Result<(&'a str, JjBookmarkTrackingTarget)> {
-        self.require_safe_local_tracking_context("track", name)?;
+        self.peers
+            .require_safe_local_tracking_context("track", name)?;
 
         match tracking {
             LocalBookmarkRemoteState::UntrackedRemotePresent => {
                 let remote =
-                    self.exactly_one_remote_peer(name, "track", remote_peer_is_untracked)?;
+                    self.peers
+                        .exactly_one_remote_peer(name, "track", remote_peer_is_untracked)?;
                 require_matching_peer_targets("track", local, remote)?;
                 let remote_name = remote_name(remote).expect("remote peer has remote state");
                 Ok((
@@ -270,12 +254,14 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         local: &BookmarkItem,
         tracking: &LocalBookmarkRemoteState,
     ) -> Result<(&'a str, JjBookmarkTrackingTarget)> {
-        self.require_safe_local_tracking_context("untrack", name)?;
+        self.peers
+            .require_safe_local_tracking_context("untrack", name)?;
 
         match tracking {
             LocalBookmarkRemoteState::Tracked { .. } => {
                 let remote =
-                    self.exactly_one_remote_peer(name, "untrack", remote_peer_is_tracked)?;
+                    self.peers
+                        .exactly_one_remote_peer(name, "untrack", remote_peer_is_tracked)?;
                 require_matching_peer_targets("untrack", local, remote)?;
                 let remote_name = remote_name(remote).expect("remote peer has remote state");
                 Ok((
@@ -304,86 +290,5 @@ impl<'a> BookmarkActionTargetResolver<'a> {
                 "bookmark untrack disabled: selected local bookmark has ambiguous remote metadata"
             )),
         }
-    }
-
-    /// Enforces the all-remotes and uniqueness preconditions for local tracking actions.
-    fn require_safe_local_tracking_context(&self, action: &str, name: &str) -> Result<()> {
-        if !self.has_unfiltered_all_remotes_metadata() {
-            return Err(eyre!(
-                "bookmark {action} disabled: selected local bookmark requires unfiltered all-remotes metadata"
-            ));
-        }
-
-        let local_peers = self.local_bookmark_peer_count(name);
-        if local_peers != 1 {
-            return Err(eyre!(
-                "bookmark {action} disabled: selected local bookmark is ambiguous; found {local_peers} local rows named '{name}'"
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// Returns one eligible remote peer or reports why the remote peer set is unsafe.
-    fn exactly_one_remote_peer(
-        &self,
-        name: &str,
-        action: &str,
-        is_eligible: impl Fn(&BookmarkItem) -> bool,
-    ) -> Result<&BookmarkItem> {
-        let peers = self
-            .entries
-            .iter()
-            .filter(|entry| entry.bookmark_name() == name && is_eligible(entry))
-            .collect::<Vec<_>>();
-
-        match peers.as_slice() {
-            [peer] => Ok(peer),
-            [] => Err(eyre!(
-                "bookmark {action} disabled: selected local bookmark has no exactly typed eligible remote sibling"
-            )),
-            _ => Err(eyre!(
-                "bookmark {action} disabled: selected local bookmark has ambiguous remote siblings; found {} eligible remote rows named '{name}'",
-                peers.len()
-            )),
-        }
-    }
-
-    /// Returns whether any visible local peer exists for the bookmark name.
-    fn has_local_bookmark_peer(&self, name: &str) -> bool {
-        self.entries.iter().any(|entry| {
-            entry.bookmark_name() == name && matches!(entry.state(), BookmarkRowState::Local { .. })
-        })
-    }
-
-    /// Counts visible local peers with the same exact bookmark name.
-    fn local_bookmark_peer_count(&self, name: &str) -> usize {
-        self.entries
-            .iter()
-            .filter(|entry| {
-                entry.bookmark_name() == name
-                    && matches!(entry.state(), BookmarkRowState::Local { .. })
-            })
-            .count()
-    }
-
-    /// Counts visible remote peers with the same exact bookmark name.
-    fn remote_bookmark_peer_count(&self, name: &str) -> usize {
-        self.entries
-            .iter()
-            .filter(|entry| {
-                entry.bookmark_name() == name
-                    && matches!(entry.state(), BookmarkRowState::Remote { .. })
-            })
-            .count()
-    }
-
-    /// Returns whether the view args prove unfiltered all-remotes metadata coverage.
-    fn has_unfiltered_all_remotes_metadata(&self) -> bool {
-        !self.spec_args.is_empty()
-            && self
-                .spec_args
-                .iter()
-                .all(|arg| matches!(arg.as_str(), "--all-remotes" | "-a"))
     }
 }

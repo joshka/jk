@@ -14,8 +14,9 @@ source of truth; generated media stays out of the repository.
 
 ## Current Specs
 
-- `static-log.tape` captures the default graph view and a short navigation path.
-- `operation-recovery.tape` captures operation-log undo handling as the safety/recovery example.
+- `static-log.tape` captures the default graph view plus shipped `j`, `s`, `h`, and `q` navigation.
+- `operation-recovery.tape` captures operation-log startup plus shipped `u` undo handling as the
+  safety/recovery example.
 
 ## Workflow
 

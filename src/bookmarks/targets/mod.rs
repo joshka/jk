@@ -7,6 +7,7 @@
 //! ambiguous metadata stays disabled with the existing user-facing wording.
 
 mod helpers;
+mod peers;
 mod resolver;
 
 pub(super) use resolver::BookmarkActionTargetResolver;

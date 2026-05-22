@@ -5,7 +5,7 @@ deciding how much validation is needed.
 
 This is the canonical active guidance for implementation workflow, maintainability packet shape, and
 completion criteria. Use [`architecture.md`](architecture.md) for the ownership map, and use
-[`cleanup-wave-status.md`](cleanup-wave-status.md) for the current post-traversal queue.
+[`../reference/README.md`](../reference/README.md) for the current product-facing reference surface.
 
 ## Current Maintainability Doctrine
 
@@ -14,10 +14,11 @@ Future `jk` work should follow these rules by default:
 - prefer feature roots over kind-of-code buckets;
 - treat shared modules as boring mechanics after the feature has made the product decision;
 - keep shared action families after target selection, and keep availability with the feature;
-- move active guidance with structure, while letting historical ledgers preserve old paths;
+- move active guidance with structure, while letting historical or external records preserve old
+  paths;
 - record coherent no-move decisions when a shared root could otherwise look unreviewed;
-- treat the runtime-path cleanup as done, and use the post-traversal reader-pain queue for the next
-  maintainability packets;
+- treat the runtime-path cleanup as done, and choose the next maintainability packets from measured
+  reader pain in the current source tree instead of from old packet trackers;
 - require both behavior-preservation proof and durable ownership memory before claiming a
   maintainability wave is complete.
 
@@ -29,11 +30,11 @@ For future `jk` work, use the active guidance in this order:
 1. `architecture.md` for current structure and ownership.
 1. `rust-style.md` for Rust/module-shape decisions once the owner is known.
 1. `workflow.md` for packet shape, validation posture, and completion criteria.
-1. `cleanup-wave-status.md` and `source-cleanup-audit.md` for the current queue and supporting
-   evidence.
+1. `../reference/README.md`, `../reference/screens.md`, `../reference/workflows.md`, and
+   `../reference/view-model.md` for the durable current product reference surface.
 
-Treat `source-maintainability-ledger.md` and `docs/process-observations.md` as historical records,
-not as the current ownership map.
+Treat packet logs, phase trackers, and sibling planning-repo artifacts as history or working
+material, not as the current ownership map.
 
 ## Start With The Existing Shape
 
@@ -68,7 +69,7 @@ For maintainability work, optimize for correct future change rather than for sup
 - Stop splitting when a module reads as one coherent owner. Record the no-move decision when the
   module could otherwise look like an unreviewed dumping ground.
 - When structure moves, update active guidance in the same wave. Historical ledgers may preserve old
-  paths; active guidance may not.
+  paths elsewhere; active guidance in this repo may not.
 - Treat maintainability completion as two claims: changed surfaces still behave correctly, and the
   repo now has durable ownership memory for what changed, what stayed, and what remains.
 
@@ -92,7 +93,8 @@ Before editing:
 
 - identify the owning module;
 - identify whether rendered jj output should remain the presentation source;
-- identify whether the change introduces a soft agreement that belongs in the fragility register;
+- identify whether the change introduces a soft agreement that should be called out in the owning
+  docs, tests, or source comments;
 - check existing tests for the behavior;
 - decide the narrowest useful validation command.
 

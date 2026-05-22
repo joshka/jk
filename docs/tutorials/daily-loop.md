@@ -41,6 +41,12 @@ previewed mutation paths, so check help/previews before confirming.
 - Use this when you want a fresh editable change without leaving `jk`.
 - If the new change was not what you wanted, `jj undo` is the recovery path.
 
+## Utility Views
+
+- Press `B` for bookmarks, `R` for resolve, `X` for workspaces, and `O` for operation log.
+- These views stay focused: they expose search, copy, and exact-target actions where the current
+  metadata is strong enough, but they do not turn into broad dashboards.
+
 ## When To Use Help
 
 - Press `?` whenever the screen changes or you forget the current bindings.

@@ -65,7 +65,7 @@ The working hypothesis is:
 
 This keeps the debate practical. If rendered output plus narrow parsing is enough for
 presentation-adjacent flows, that is a useful result. If the tool repeatedly needs `jj_cli`,
-`jj_lib`, a future RPC API, or code extracted from `jj`, that is also useful evidence.
+`jj_lib`, an upstream UI-facing API, or code extracted from `jj`, that is also useful evidence.
 
 ### Prefer Depth Over Panes
 
@@ -99,10 +99,11 @@ compact, current, and available in-app.
 The goal is not to expose every possible `jj` command as a first-class button. The goal is to make
 the important navigation and inspection loops obvious.
 
-## Ideas To Preserve From The Old Main Branch
+## Ideas To Preserve From The Prototype Branch
 
-The old `main` branch was built with a broad, vibe-driven approach. Its code should not be treated
-as the direction for this branch, but it contains useful product ideas and visual references.
+The old `prototype` branch was built with a broad, vibe-driven approach. Its code should not be
+treated as the direction for this branch, but it contains useful product ideas and visual
+references.
 
 Useful ideas to preserve:
 
@@ -116,27 +117,16 @@ Useful ideas to preserve:
 - compact help and keymap views;
 - command prompt and confirmation flows for selected high-value actions;
 - preview-before-confirm behavior for risky mutations;
-- VHS screenshots and GIFs as design references and future regression assets.
+- VHS screenshots and GIFs as design references and possible regression assets when they remain easy
+  to regenerate.
 
-Useful local artifacts include:
-
-- `target/vhs/static-log.png`;
-- `target/vhs/static-status.png`;
-- `target/vhs/static-help.png`;
-- `target/vhs/static-operation-log.png`;
-- `target/vhs/static-file-list.png`;
-- `target/vhs/static-bookmark-list.png`;
-- `target/vhs/tutorial-dynamic-navigation.gif`;
-- `target/vhs/tutorial-dynamic-safety.gif`;
-- `target/vhs/tutorial-dynamic-command-history.gif`;
-- `target/vhs/tutorial-dynamic-remote-ops.gif`.
-
-These artifacts should be mined for product intent, interaction patterns, and visual density. They
-should not be treated as implementation requirements.
+Useful prototype references include the old VHS captures and screenshots when they are available in
+local artifacts, ignored `target/vhs/` output, or external attachments. Mine them for product
+intent, interaction patterns, and visual density, not as implementation requirements.
 
 ## Ideas To Avoid Inheriting
 
-The old branch should not steer implementation by inertia. Avoid inheriting:
+The `prototype` branch should not steer implementation by inertia. Avoid inheriting:
 
 - pane-first or dashboard-first layout;
 - a command launcher as the center of the product;
@@ -148,10 +138,9 @@ The old branch should not steer implementation by inertia. Avoid inheriting:
 When an old idea is still valuable, reintroduce it deliberately in the current code shape with
 focused tests.
 
-## Near-Term Product Priorities
+## Product Priorities
 
-The healthiest near-term direction is to make the core loop excellent before expanding command
-coverage:
+The core loop should stay excellent even as command coverage expands:
 
 1. Graph navigation.
 1. `show` and `diff` drill-down.
@@ -162,8 +151,8 @@ coverage:
 1. Compact help/keymap discovery.
 1. Focused status and operation-log views.
 
-Mutation workflows should come later and should start with high-signal, low-surprise flows. Risky
-operations need explicit confirmation and a clear preview when possible.
+Mutation workflows should stay selective, high-signal, and low-surprise. Risky operations need
+explicit confirmation and a clear preview when possible.
 
 ## Decision Filter
 
@@ -176,4 +165,4 @@ Use this filter for new product ideas:
 1. Can it fail honestly when `jj` output or config differs?
 1. Does it make fragile integration assumptions visible?
 
-If the answer is mostly no, the idea probably belongs outside `jk` for now.
+If the answer is mostly no, the idea probably belongs outside `jk`.

@@ -13,13 +13,18 @@
 - Use `=` on graph or status to set a bookmark and `m` to move one.
 - Use `br` in the bookmarks view to rename a local bookmark row.
 - Use `x` in the bookmarks view to delete a local bookmark row.
+- Use `bf` in the bookmarks view to forget a tracked local bookmark or a single exact remote-only
+  bookmark row when metadata proves that target safely.
+- Use `bt` and `bu` in the bookmarks view to track or untrack the exact selected remote bookmark, or
+  a local bookmark row with exactly one eligible remote peer.
 - The bookmark list is useful for inspection and for selecting exact bookmark targets.
-- Remote and tracking behavior stays outside the current bookmark contract.
+- Remote and tracking actions stay guided and exact-targeted rather than becoming a broad remote
+  dashboard.
 
 ## Resolve
 
 - Press `R` or run `jk resolve` to open the resolve screen.
-- The screen is read-only in this packet.
+- The screen is currently read-only.
 - It lists conflicted paths with their file type and side count.
 - Use `Enter`, `l`, or `Right` when the row has an exact path and you want to inspect the file.
 - Search, copy, refresh, back, and help behave like the other selectable list screens.

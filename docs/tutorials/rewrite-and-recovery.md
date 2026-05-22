@@ -16,6 +16,13 @@
 - Commit always targets `@`; it does not take the selected graph row as an argument.
 - Both flows preview the exact command before they run.
 
+## Edit And Navigate Working Copy
+
+- `e` edits the selected exact graph revision.
+- `]` moves to the next editable change from `@`.
+- `[` moves to the previous editable change from `@`.
+- The next/previous flows are based on the current working copy, not the highlighted graph row.
+
 ## Abandon
 
 - `a` opens the action menu on an exact graph row.

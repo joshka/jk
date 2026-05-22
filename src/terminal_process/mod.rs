@@ -2,6 +2,12 @@
 //!
 //! `actions` and the app service boundary use this to suspend the UI, run
 //! a child command with inherited stdio, and restore the terminal afterward.
+//!
+//! This root intentionally keeps command intent, terminal lifecycle, and the
+//! runner's combined error reporting together. Splitting those into separate
+//! helpers would make the restore-on-failure and restore-after-panic contract
+//! harder to read locally, even though the pieces resemble reusable process or
+//! terminal utilities.
 
 #[cfg(test)]
 use std::ffi::OsStr;

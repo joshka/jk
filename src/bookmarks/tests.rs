@@ -581,6 +581,35 @@ fn bookmark_tracking_targets_reject_ambiguous_local_remote_siblings() {
 }
 
 #[test]
+fn bookmark_tracking_targets_reject_remote_rows_with_ambiguous_local_peers() {
+    let remote = bookmark_item(&["main@origin: abc"], "main", Some("a"), None).with_state(
+        BookmarkRowState::Remote {
+            remote: "origin".to_owned(),
+            tracking: RemoteBookmarkTrackingState::Untracked { synced: false },
+            local_peer: BookmarkLocalPeerState::Present,
+        },
+    );
+    let local_one = bookmark_item(&["main: abc"], "main", Some("a"), None).with_state(
+        BookmarkRowState::Local {
+            tracking: LocalBookmarkRemoteState::UntrackedRemotePresent,
+        },
+    );
+    let local_two = bookmark_item(&["main: abc"], "main", Some("a"), None).with_state(
+        BookmarkRowState::Local {
+            tracking: LocalBookmarkRemoteState::UntrackedRemotePresent,
+        },
+    );
+    let view = all_remotes_bookmarks_view(vec![remote, local_one, local_two]);
+
+    assert_eq!(
+        view.selected_bookmark_tracking_target(JjBookmarkMutationKind::Track)
+            .unwrap_err()
+            .to_string(),
+        "bookmark track disabled: selected bookmark has ambiguous local peers; found 2 local rows named 'main'"
+    );
+}
+
+#[test]
 fn search_wraps_by_bookmark_item() {
     let mut view = bookmarks_view(vec![
         bookmark_item(&["@  alpha", "│  target"], "alpha", Some("a"), Some("aa")),

@@ -9,18 +9,19 @@ history, drilling into `show`/`diff`, checking status, and returning without lea
 
 `jk` currently ships these surfaces:
 
-- a default graph view and explicit `log`, `show`, `diff`, `status`, `bookmarks`, and
-  `operation-log` startup views;
+- a default graph view and explicit `log`, `show`, `diff`, `status`, `resolve`, `bookmarks`,
+  `workspaces`, and `operation-log` startup views;
 - one-active-view navigation with `show`/`diff` drill-down, back, refresh, and search;
-- focused utility views for files, bookmarks, status, and operation history;
+- focused utility views for files, bookmarks, status, resolve, workspaces, and operation history;
 - copy menus for selected revisions, files, bookmarks, and operation-log rows;
 - direct `jj` actions for fetch (`f`, plus `gf` from graph) and graph `c` / `jj new trunk`;
-- preview/result-gated (guided) mutation flows for push, operation undo/redo, graph action-menu
-  `new`, abandon, rebase, and related action-menu flows where implemented.
+- guided mutation flows for describe, commit, push, bookmark mutation, operation undo/redo, graph
+  action-menu `new`, abandon, rebase, squash, absorb, restore, and related action-menu flows where
+  exact targets are available.
 
-This README only describes shipped behavior. Planned packets live in
-[`docs/plan/next-implementation-slices.md`](docs/plan/next-implementation-slices.md), and shipped
-progress is tracked in [`docs/plan/progress.md`](docs/plan/progress.md).
+This README only describes shipped behavior. The current product surface is mapped in
+[`docs/reference/`](docs/reference/README.md), and the implementation guidance for contributors
+lives under [`docs/agent/`](docs/agent/workflow.md).
 
 Short walkthroughs for the supported daily loops live in
 [`docs/tutorials/`](docs/tutorials/README.md). The tracked demo setup used by some of those examples
@@ -49,7 +50,9 @@ cargo run -- log -r 'mine() & mutable()'
 cargo run -- show @
 cargo run -- diff -r @
 cargo run -- status
+cargo run -- resolve
 cargo run -- bookmarks
+cargo run -- workspaces
 cargo run -- operation-log
 ```
 
@@ -70,6 +73,8 @@ Global keys outside menus:
 - `J` switches back to the default `jk` view;
 - `S` opens status;
 - `B` opens bookmarks;
+- `R` opens resolve;
+- `X` opens workspaces;
 - `O` opens operation log;
 - `f` fetches;
 - `p` opens push;
@@ -100,10 +105,14 @@ Show and diff views:
 - `s` switches from diff to show;
 - `d` switches from show to diff.
 
-Bookmarks and operation log are item-based views. Bookmarks open the selected change with `s`, `l`,
-`Right`, or `Enter` when a target change id is present. Operation log opens operation `show` with
-`s`, `l`, `Right`, or `Enter`, operation `diff` with `d`, and global repo recovery with `u` for undo
-and `Ctrl-r` for redo.
+Bookmarks, resolve, workspaces, and operation log are item-based utility views. Bookmarks open the
+selected change with `s`, `l`, `Right`, or `Enter` when a target change id is present, and bookmark
+mutation flows such as rename/delete/forget/track/untrack are available from the shipped bookmark
+bindings when row metadata makes them exact. Resolve opens file inspection with `Enter`, `l`, or
+`Right` when the selected conflict row has an exact path. Workspaces expose search and copy over
+rendered rows plus exact workspace metadata when it is available. Operation log opens operation
+`show` with `s`, `l`, `Right`, or `Enter`, operation `diff` with `d`, and global repo recovery with
+`u` for undo and `Ctrl-r` for redo.
 
 ## Safety Notes
 
@@ -112,6 +121,8 @@ and `Ctrl-r` for redo.
   intended fallback.
 - Guided flows (for example push, operation undo/redo, graph action-menu `new`, abandon, and rebase)
   show preview or result text before execution.
+- Bookmark track/untrack, rename/delete/forget, and revision-targeted restore/revert stay disabled
+  unless `jk` has exact row metadata for the target it would pass to `jj`.
 - Where `jj` exposes an exact target, `jk` keeps that target exact instead of guessing from a label.
 - Successful mutations keep the undo path visible when `jj` supports one.
 - Operation-log undo and redo act on the repo cursor, not on the selected row.
@@ -130,7 +141,9 @@ and `Ctrl-r` for redo.
 ## Contributor References
 
 - [`docs/product-direction.md`](docs/product-direction.md) for the product shape.
-- [`docs/plan/progress.md`](docs/plan/progress.md) for shipped packet history.
-- [`docs/plan/next-implementation-slices.md`](docs/plan/next-implementation-slices.md) for planned
-  packets and their boundaries.
+- [`docs/reference/README.md`](docs/reference/README.md) for the current screens, workflows, and
+  view model.
+- [`docs/agent/architecture.md`](docs/agent/architecture.md) for the implementation ownership map.
+- [`docs/agent/workflow.md`](docs/agent/workflow.md) for maintainability packet shape and completion
+  criteria.
 - [`docs/agent/documentation.md`](docs/agent/documentation.md) for doc style and truthfulness.

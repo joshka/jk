@@ -5,7 +5,7 @@ execution, view behavior, rendering, navigation, search, copying, or terminal li
 
 This is the canonical active guidance for current structure and ownership. Use
 [`workflow.md`](workflow.md) for packet shape and completion criteria, and use
-[`cleanup-wave-status.md`](cleanup-wave-status.md) for the current queue and completion framing.
+[`../reference/README.md`](../reference/README.md) for the current product-facing reference surface.
 
 ## Product Boundary
 
@@ -32,24 +32,32 @@ Rendered `jj` output is the default presentation source, but it is not the prefe
 semantic data. When a feature depends on underspecified output shape, reconstructed terminal output,
 or duplicated `jj` behavior, treat that as an explicit integration choice.
 
-Use [`../plan/integration-strategy.md`](../plan/integration-strategy.md) when deciding between:
+Choose the strongest honest contract that preserves `jj` fidelity without recreating `jj` locally:
 
-- rendered output as-is;
-- rendered output plus a narrow parser;
-- structured output or a purpose-built template;
-- shared semantic, rendering, config, template, graph, or style APIs;
-- `jj_cli` or `jj_lib`;
-- a future UI/RPC API;
-- upstream extraction or in-tree work.
+- rendered output as-is when the feature only needs presentation;
+- rendered output plus a narrow parser when the need is presentation-adjacent and tightly tested;
+- structured output or purpose-built narrow templates when `jj` can expose exact data directly;
+- shared semantic, rendering, config, template, graph, or style APIs when the feature needs both
+  exact semantics and user-configured display fidelity;
+- `jj_cli` or `jj_lib` when command behavior, repository state, revset/fileset semantics,
+  transactions, or template/config behavior would otherwise be reimplemented in `jk`;
+- future upstream UI-facing contracts when external tools need stronger guarantees than subprocess
+  rendering can provide.
 
-Use [`../plan/fragility-register.md`](../plan/fragility-register.md) to record parser assumptions,
-inferred structure, duplicated semantics, and the preferred mitigation. Favor contracts that fail
-loudly when `jj` changes: compile errors, schema failures, focused parser tests, or snapshot diffs.
+Record parser assumptions, inferred structure, duplicated semantics, and the preferred mitigation in
+the owning feature docs, tests, or source comments. Favor contracts that fail loudly when `jj`
+changes: compile errors, schema failures, focused parser tests, or snapshot diffs.
 
 Also consider pipeline fragility. The path from `jj` semantics to stdout, ANSI parsing, intermediate
 spans, and Ratatui items can lose information even when the rendered output looks correct. A direct
 code path that shares `jj` template, config, graph, and styling behavior can be less fragile, but
 only if that behavior is actually shared rather than locally copied.
+
+The key rationale is that high-fidelity `jj` presentation is hard to preserve through subprocesses
+without either rerunning `jj` for every semantic need or duplicating `jj`'s template, config, graph,
+and formatting logic inside `jk`. When that pressure appears, treat it as evidence for stronger
+`jj`-side abstractions rather than as a reason to let `jk` silently grow its own shadow model of
+`jj`.
 
 When a feature needs semantic meaning that `jj` already has internally, do not make rendered CLI
 output the first design choice. Prefer structured output, narrow machine-oriented templates, shared

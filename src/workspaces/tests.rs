@@ -137,6 +137,51 @@ fn refresh_preserves_selected_workspace_name_when_possible() {
 }
 
 #[test]
+fn refresh_falls_back_to_previous_index_when_workspace_metadata_disappears() {
+    let mut view = WorkspacesView::test_new(workspace_context(vec![
+        workspace_item("default: one", Some("default")),
+        workspace_item("other: two", Some("other")),
+        workspace_item("third: three", Some("third")),
+    ]));
+    view.selection.set(1, view.item_count());
+
+    view.refresh_with_loader(|_| {
+        Ok(workspace_context(vec![
+            WorkspaceItem::new(vec![Line::from("default: rendered")], None, None, None),
+            WorkspaceItem::new(vec![Line::from("other: rendered")], None, None, None),
+            WorkspaceItem::new(vec![Line::from("third: rendered")], None, None, None),
+        ]))
+    })
+    .unwrap();
+
+    assert_eq!(view.selection.index(), 1);
+    assert_eq!(view.selected_entry().and_then(WorkspaceItem::name), None);
+}
+
+#[test]
+fn refresh_clamps_by_previous_index_when_metadata_disappears_and_list_shrinks() {
+    let mut view = WorkspacesView::test_new(workspace_context(vec![
+        workspace_item("default: one", Some("default")),
+        workspace_item("other: two", Some("other")),
+        workspace_item("third: three", Some("third")),
+    ]));
+    view.selection.set(2, view.item_count());
+
+    view.refresh_with_loader(|_| {
+        Ok(workspace_context(vec![WorkspaceItem::new(
+            vec![Line::from("default: rendered")],
+            None,
+            None,
+            None,
+        )]))
+    })
+    .unwrap();
+
+    assert_eq!(view.selection.index(), 0);
+    assert_eq!(view.selected_entry().and_then(WorkspaceItem::name), None);
+}
+
+#[test]
 fn empty_and_degraded_output_is_readable() {
     let context = WorkspaceContext::new(
         None,
