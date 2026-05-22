@@ -1,4 +1,4 @@
-//! `jj operation log` view state, rendering, and item-based navigation.
+//! Operation-log view state, rendering, and item-based navigation.
 //!
 //! The first pass keeps the operation log close to rendered `jj` output while
 //! carrying exact operation ids separately for copy, search, and refresh
@@ -11,6 +11,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
+use super::{OperationLogItem, load_operation_log_entries};
 use crate::action_menu::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
@@ -18,17 +19,6 @@ use crate::jj::ViewSpec;
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;
-
-pub(crate) mod actions;
-pub(crate) mod detail;
-mod rows;
-
-#[cfg(test)]
-pub(crate) use rows::OPERATION_ID_TEMPLATE;
-pub(crate) use rows::{OperationLogItem, load_operation_log_entries};
-
-#[cfg(test)]
-mod tests;
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
@@ -83,9 +73,9 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Selectable rendered operation-log output.
 pub struct OperationLogView {
-    spec: ViewSpec,
-    entries: Vec<OperationLogItem>,
-    selection: Selection,
+    pub(super) spec: ViewSpec,
+    pub(super) entries: Vec<OperationLogItem>,
+    pub(super) selection: Selection,
 }
 
 impl OperationLogView {
@@ -112,7 +102,7 @@ impl OperationLogView {
     }
 
     pub fn bindings(&self) -> &'static [Binding] {
-        BINDINGS
+        super::BINDINGS
     }
 
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
@@ -215,14 +205,14 @@ impl OperationLogView {
         self.entries.iter().map(OperationLogItem::line_count).sum()
     }
 
-    fn search_matches(&self, query: &SearchQuery) -> usize {
+    pub(super) fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
             .filter(|entry| entry_matches(&entry.lines(), query))
             .count()
     }
 
-    fn next_match(&mut self, query: &SearchQuery) -> bool {
+    pub(super) fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
             .find(|index| entry_matches(&self.entries[*index].lines(), query))
@@ -233,7 +223,7 @@ impl OperationLogView {
         true
     }
 
-    fn previous_match(&mut self, query: &SearchQuery) -> bool {
+    pub(super) fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
             .chain(((self.selection.index() + 1)..self.entries.len()).rev())
@@ -245,7 +235,7 @@ impl OperationLogView {
         true
     }
 
-    fn copy_options(&self) -> Vec<CopyOption> {
+    pub(super) fn copy_options(&self) -> Vec<CopyOption> {
         let Some(entry) = self.entries.get(self.selection.index()) else {
             return Vec::new();
         };
@@ -265,7 +255,7 @@ impl OperationLogView {
             .map(str::to_owned)
     }
 
-    fn refresh_with_loader(
+    pub(super) fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<OperationLogItem>>,
     ) -> Result<()> {

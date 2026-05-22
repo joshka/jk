@@ -1,5 +1,10 @@
 use ratatui::text::Line;
 
+use crate::action_menu::{ActionKind, FollowUp};
+use crate::command::{Command, CommandContext, ViewCommand, ViewEffect};
+use crate::jj::ViewSpec;
+use crate::search::SearchQuery;
+
 use super::*;
 
 fn operation_item(text: &[&str], operation_id: Option<&str>) -> OperationLogItem {

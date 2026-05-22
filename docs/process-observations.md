@@ -7603,3 +7603,35 @@ belong here.
   - Files: `src/bookmarks/mod.rs`, `src/bookmarks/view.rs`, `src/bookmarks/tests.rs`,
     `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
+
+### 2026-05-21 (Operation-log feature-root split)
+
+- Slice / task: apply the epage module-layout rule to the existing operation-log split module while
+  keeping recovery and operation-detail navigation behavior stable.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: `gpt-5.5` medium worker handled the bounded Rust split. The main thread owned jj
+  change creation, review, validation reruns, and documentation updates.
+- Changed files: `src/operation_log/mod.rs`, `src/operation_log/view.rs`,
+  `src/operation_log/tests.rs`, `docs/agent/cleanup-wave-status.md`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/operation_log/mod.rs` is now a feature-root table of contents, and
+  operation-log view behavior moved to `src/operation_log/view.rs`. Existing callers still use
+  `crate::operation_log::OperationLogView`, `crate::operation_log::BINDINGS`, `OperationLogItem`,
+  `load_operation_log_entries`, and test-only `OPERATION_ID_TEMPLATE`.
+- Behavior-preservation evidence: the packet did not intentionally change rendered operation-log
+  output, key bindings, movement, search wrapping, copy options, refresh selection restoration,
+  operation show/diff routing, undo/redo bindings, selected-row restore/revert action-menu wording
+  or payloads, public imports, or status wording.
+- Rework / surprise: as with the bookmark split, the worker used `pub(super)` for moved view
+  internals so root-level view tests could continue to cover private behavior. Main review accepted
+  this as test-local visibility rather than broader public API exposure.
+- Validation trail: worker validation passed and main-thread review reran
+  `cargo test operation_log -- --test-threads=1` with 29 tests,
+  `cargo test app::tests::operation -- --test-threads=1` with 10 tests, `cargo check`, and
+  `rustup run nightly cargo fmt --check` with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 17:07:11 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/operation_log/mod.rs`, `src/operation_log/view.rs`, `src/operation_log/tests.rs`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.

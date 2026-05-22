@@ -96,12 +96,12 @@ Examples for future packets:
   bookmark rows map to safe bookmark mutations?" points to `bookmarks`; "how do we quote a jj exact
   string pattern?" points to `jj`; "how is an action preview executed once a plan exists?" points to
   app action lifecycle; and "how does a modal list render?" points to shared UI.
-- Operation-log behavior now starts from `operation_log`: `src/operation_log/rows.rs` owns rendered
-  row grouping, operation-id template parsing and pairing, and fail-closed metadata drift tests;
-  `src/operation_log.rs` owns movement/copy, undo/redo/restore/revert availability, operation detail
-  navigation, and view tests; `src/operation_log/actions.rs` owns undo/redo and exact operation
-  restore/revert argv, preview, and run contracts. Future operation-detail rendering should move
-  toward `operation_log/detail.rs` when that shortens the reader path.
+- Operation-log behavior now starts from `operation_log`: `src/operation_log/mod.rs` is the feature
+  root and table of contents; `src/operation_log/view.rs` owns rendered view behavior, bindings,
+  movement, search, copy, refresh, operation detail navigation, and selected-row recovery action
+  menus; `src/operation_log/rows/mod.rs` owns rendered row grouping, operation-id template parsing
+  and pairing, and fail-closed metadata drift tests; `src/operation_log/actions.rs` owns undo/redo
+  and exact operation restore/revert argv, preview, and run contracts.
 - Bookmark behavior now starts from `bookmarks`: `src/bookmarks/mod.rs` is the feature root and
   table of contents; `src/bookmarks/view.rs` owns rendered view behavior, bindings, selection,
   search, copy, refresh, and open-show behavior; `src/bookmarks/rows/mod.rs` owns rendered row
@@ -119,6 +119,27 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 operation-log feature-root split:
+
+- `src/operation_log/mod.rs` is now the operation-log feature root and table of contents. It
+  declares `actions`, `detail`, `rows`, `view`, and tests, and preserves the caller-facing
+  `crate::operation_log::OperationLogView`, `crate::operation_log::BINDINGS`, `OperationLogItem`,
+  `load_operation_log_entries`, and test-only `OPERATION_ID_TEMPLATE` paths.
+- Operation-log view behavior moved to `src/operation_log/view.rs`: rendered list projection,
+  bindings, movement, operation show/diff navigation, search, copy options, refresh, and selected
+  operation restore/revert action menu construction are now in a named child module instead of the
+  directory root.
+- The packet removes the old `src/operation_log.rs` plus `src/operation_log/` pair and applies the
+  epage module-layout rule through a feature split rather than a blind root rename.
+- The packet intentionally preserved rendered operation-log rows, key bindings, movement, search
+  wrapping, copy options, refresh selection restoration, operation show/diff routing, undo/redo
+  bindings, restore/revert action-menu wording and payloads, public imports, and status wording.
+- Validation passed: `cargo test operation_log -- --test-threads=1`;
+  `cargo test app::tests::operation -- --test-threads=1`; `cargo check`; and
+  `rustup run nightly cargo fmt --check`.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `action_menu`, `app`,
+  `app/action_lifecycle`, `app/mode_input`, `graph`, `jj`, and `tui`.
 
 2026-05-21 bookmark feature-root split:
 

@@ -43,6 +43,9 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - `bookmarks` now has a real feature root: the root is a table of contents, bookmark view behavior
   lives in `bookmarks/view.rs`, rows and action-target policy stay under the same feature, and
   callers still use `crate::bookmarks::BookmarksView`.
+- `operation_log` now has the same feature-root shape: the root is a table of contents, operation
+  view behavior lives in `operation_log/view.rs`, and rows, operation detail, and recovery actions
+  stay under the operation-log feature.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -87,7 +90,7 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 ## Current State
 
 - The current top of stack splits the bookmark feature root after the root `jj_actions` action-plan
-  split.
+  split, then applies the same feature-root shape to `operation_log`.
 - Recent behavior-preserving packets have focused on locality, feature ownership, and making the
   automatic session easier to audit from files rather than chat history.
 - The broad goal is still active. The completed packets do not prove the whole cleanup queue is
@@ -96,11 +99,11 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 ## Likely Next Work
 
 - Module layout cleanup: continue applying the epage Rust style rule to existing split modules.
-  Larger roots such as `app`, `operation_log`, `graph`, `action_menu`, `jj`, and `tui` should move
-  toward table-of-contents `mod.rs` files through topical splits, not blind path moves.
+  Larger roots such as `app`, `graph`, `action_menu`, `jj`, and `tui` should move toward
+  table-of-contents `mod.rs` files through topical splits, not blind path moves.
 - Remaining `foo.rs` plus `foo/` pairs after the first conversion are mostly larger roots or nested
   roots with feature/action policy: `action_menu`, `app`, `app/action_lifecycle`, `app/mode_input`,
-  `graph`, `jj`, `operation_log`, and `tui`.
+  `graph`, `jj`, and `tui`.
 - App modal dispatch readability: `src/app/mode_input.rs` now mostly reads as a dispatch table plus
   named modal handlers. The next app-dispatch work should be based on measured remaining complexity,
   not another automatic extraction.
