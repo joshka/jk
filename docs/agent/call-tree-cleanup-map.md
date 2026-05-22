@@ -1,12 +1,11 @@
 # Call Tree Cleanup Map
 
-This map turns the cleanup goal into a concrete traversal tree that follows the
-runtime path from `main()` into app startup, dispatch, action flow, view
-dispatch, and downstream feature owners.
+This map turns the cleanup goal into a concrete traversal tree that follows the runtime path from
+`main()` into app startup, dispatch, action flow, view dispatch, and downstream feature owners.
 
-The list is intentionally broader than only modules. It tracks the
-module/function seams that determine ownership, behavior preservation, and
-where future structural cleanup should land. The current pass counts 98 nodes.
+The list is intentionally broader than only modules. It tracks the module/function seams that
+determine ownership, behavior preservation, and where future structural cleanup should land. The
+current pass counts 98 nodes.
 
 ## Entry And Startup
 

@@ -1,89 +1,67 @@
 # Source Cleanup Audit
 
 This audit records mechanical measurements for the maintainability cleanup wave. Measurements are
-evidence for choosing what to read next; they are not a refactoring order by themselves. A packet
-should still prove that the chosen move lowers reader burden, keeps behavior local to the owning
-concept, and preserves rendered `jj` behavior.
+evidence for choosing what to read next; they are not a refactoring order by themselves.
 
-Captured: `2026-05-21 16:21:25 PDT`.
+Captured: `2026-05-22 11:11:16 PDT`.
 
 ## Current Measurements
 
-- Rust source total from `find src -name '*.rs' -maxdepth 4 -print0 | xargs -0 wc -l`: `34,452`
+- Rust source total from `find src -maxdepth 4 -name '*.rs' -print0 | xargs -0 wc -l`: `37,055`
   lines.
-- Visibility entries from `rg "^pub(\(| |$)|pub\(crate\)|pub\(super\)" src -n | wc -l`: `471`.
-- Inline `#[cfg(test)] mod tests { ... }` blocks from `rg -U`: `19`.
-- Match expressions in `src/app/modals.rs`, `src/app.rs`, and `src/app/actions/*` from a simple
-  `rg "match .*\{|match$"` count: `108`.
+- Visibility entries from `rg "^pub(\\(| |$)|pub\\(crate\\)|pub\\(super\\)" src -n | wc -l`: `737`.
+- Inline `#[cfg(test)] mod tests { ... }` blocks from `rg -U`: `24`.
 
 ## Largest Files
 
-The largest files are currently dominated by app tests and feature/action modules. The list below is
-a prompt for reading, not a command to split every file.
+The largest files are now dominated by tests. The list below is still a prompt for reading, not an
+automatic split queue.
 
 ```text
 1196 src/app/tests/bookmark_actions.rs
  778 src/app/tests/working_copy_actions.rs
- 648 src/app/modals.rs
- 643 src/bookmarks/tests.rs
- 613 src/graph/tests.rs
- 605 src/graph.rs
+ 648 src/bookmarks/tests.rs
+ 608 src/log/tests.rs
  596 src/app/tests/command_navigation.rs
- 592 src/tui.rs
- 588 src/bookmarks/actions.rs
- 585 src/app/tests/support.rs
- 583 src/status.rs
- 575 src/operation_log.rs
- 571 src/app/actions/entry.rs
- 569 src/app.rs
- 568 src/document.rs
- 564 src/bookmarks/action_targets.rs
- 562 src/interactive.rs
- 553 src/command.rs
- 541 src/app/actions/preview.rs
- 535 src/app/tests/detail_restore_actions.rs
- 531 src/app/services.rs
+ 531 src/app/tests/detail_restore_actions.rs
  529 src/app/tests/rewrite_actions.rs
- 528 src/view_state.rs
- 498 src/graph/rows.rs
+ 485 src/app/tests/sync_actions.rs
+ 466 src/app/tests/support/services.rs
+ 465 src/bookmarks/rows/tests.rs
+ 421 src/tui/tests.rs
+ 413 src/bookmarks/actions/plan.rs
+ 408 src/jj/view_spec/mod.rs
+ 389 src/bookmarks/targets/resolver.rs
+ 377 src/operation_log/detail.rs
+ 369 src/workspaces/rows.rs
+ 355 src/app/tests/operation_actions.rs
+ 351 src/app/tests/describe_commit_actions.rs
+ 336 src/jj/view_spec/tests.rs
+ 327 src/terminal_process/mod.rs
 ```
 
-## Inline Test Blocks
+## What The Measurements Mean Now
 
-Remaining inline test blocks fall into two groups:
+- The cleanup wave has largely shifted source-size pressure away from mixed production owners and
+  into explicit test modules.
+- The remaining large production files are mostly coherent roots or feature-local owners, so future
+  work should start with reader pain rather than with file size alone.
+- Remaining inline test blocks should move only when the production module becomes harder to scan or
+  when a sibling test file would better preserve feature locality.
 
-- Small shared helpers where inline tests may still be fine: `search`, `selection`, `theme`,
-  `syntax`, `files/list/rows`, `resolve/rows`, `tui/status_hints`.
-- Larger feature or shared modules worth reading before deciding: `operation_log`,
-  `operation_log/rows`, `operation_log/actions`, `workspaces/rows`, `graph/rows`, `action_pane`,
-  `view_state`, `interactive`, `action_menu/path_actions`, `actions/git_sync`, and
-  `actions/rewrite`.
+## Candidate Future Reads
 
-Do not move a test block only because it appears in this list. Move it when the production module is
-harder to scan and the sibling test module would still preserve reader locality.
-
-## Candidate Next Targets
-
-- `src/app/modals.rs`: after menu, text-prompt, and abandon extraction, the dispatch table is mostly
-  named modal handlers. Further work should be based on reading the remaining helper order and
-  tests, not on line count alone.
-- `src/app/actions/entry.rs` and `src/app/actions/preview.rs`: read for repeated preview/completion
-  setup before extracting any helper. Preserve status wording, output panes, refresh/reveal
-  behavior, and command execution contracts.
-- `src/status.rs` and `src/operation_log.rs`: feature-view modules still carry view behavior and
-  tests inline. Any split should keep row model, action availability, copy behavior, and tests easy
-  to find from the feature root.
-- `src/graph.rs` and `src/graph/rows.rs`: graph selection and rendered-row assumptions are central
-  product behavior. Prefer contract comments and focused tests before moving code.
-- `src/tui.rs`: shared chrome already has useful ownership docs. Future cleanup should avoid turning
-  `tui` into a feature-policy bucket.
+- `src/bookmarks/actions/plan.rs`: still the largest production action-plan file.
+- `src/jj/view_spec/mod.rs`: still a central shared boundary with startup and navigation policy.
+- `src/bookmarks/targets/resolver.rs`: still a dense feature-owned target policy file.
+- `src/operation_log/detail.rs`: still a larger rendered-document feature surface.
+- `src/workspaces/rows.rs`: still a non-trivial feature-owned row and metadata pairing surface.
+- `src/terminal_process/mod.rs`: still a shared effect boundary worth re-reading before future
+  process-handling changes.
 
 ## Process Guidance
 
-- Start with a fresh measurement before a major source-shape packet.
-- Read the owning module and nearby tests before choosing a move.
-- Prefer documentation contracts when the module is readable but ownership assumptions are implicit.
-- Prefer extraction only when a name removes live context or puts behavior with the product concept
-  that owns it.
-- Keep behavior-preserving validation specific to the touched surface, then run `cargo check` and
-  formatting or Markdown checks as appropriate.
+- Re-measure before choosing another broad cleanup packet.
+- Prefer a no-move decision when a large file is coherent and well owned.
+- Use focused validation for the surface being changed, then rerun the broader gate when deciding
+  whether the cleanup objective is actually complete.

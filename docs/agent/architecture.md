@@ -220,9 +220,9 @@ Current ownership:
   such as default fetch and new-from-trunk, and confirmed action result handling.
 - `app/actions/input.rs` owns common action-preview key flow between pending result panes and action
   confirmation.
-- `app/services.rs` owns the app side-effect seam for tests. App submodules call that narrow
-  service surface directly for jj/view effects, and `App` keeps only the small wrappers that must
-  couple those effects to current app-owned state such as the active `ViewState`.
+- `app/services.rs` owns the app side-effect seam for tests. App submodules call that narrow service
+  surface directly for jj/view effects, and `App` keeps only the small wrappers that must couple
+  those effects to current app-owned state such as the active `ViewState`.
 - `modes/mod.rs` owns app-level modal and prompt state, including help, copy, view-format,
   action-menu, role-prompt, text-prompt, action-preview/result, push-remote, operation-action, and
   working-copy navigation screens. It projects the current `InteractionMode` into status-line text

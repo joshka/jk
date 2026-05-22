@@ -5,337 +5,394 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
-### 2026-05-22 (Rewrite action family split pass)
+### 2026-05-22 (Completion audit and cleanup doc refresh)
 
-- Slice / task: continue down the app action path by splitting the shared
-  rewrite plan owner into concrete rebase, squash, and absorb plan modules.
+- Slice / task: verify the broader cleanup objective against current source state, refresh stale
+  cleanup status docs, and rerun the repo gate.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/actions/rewrite/mod.rs`,
-  `src/actions/rewrite/rebase.rs`, `src/actions/rewrite/squash.rs`,
-  `src/actions/rewrite/absorb.rs`, `src/actions/rewrite/tests.rs`,
-  `docs/agent/call-tree-cleanup-map.md`, and this process note.
+- Changed files: `docs/agent/cleanup-wave-status.md`, `docs/agent/source-cleanup-audit.md`,
+  `docs/agent/architecture.md`, `docs/agent/call-tree-cleanup-map.md`,
+  `docs/process-observations.md`, and the current `src/actions/describe` / `src/actions/abandon`
+  subtree files.
 - Implementation outcome:
-  - `src/actions/rewrite.rs` became a real `src/actions/rewrite/` root that
-    now serves as the family boundary and re-export surface.
-  - `src/actions/rewrite/rebase.rs` now owns `JjRebasePlan` argv,
-    normalization, direct-run behavior, and preview wording.
-  - `src/actions/rewrite/squash.rs` now owns `JjSquashPlan` argv,
-    normalization, direct-run behavior, and preview wording.
-  - `src/actions/rewrite/absorb.rs` now owns `JjAbsorbPlan` exact-revset argv,
-    destination filtering, direct-run behavior, and preview wording.
-  - `src/actions/rewrite/tests.rs` keeps the family characterization focused on
-    argv shape and preview wording instead of leaving tests embedded in one
-    broad file.
+  - Refreshed `docs/agent/cleanup-wave-status.md` so it now describes the current post-traversal
+    tree instead of the earlier pre-split module state.
+  - Refreshed `docs/agent/source-cleanup-audit.md` with current measurements and current candidate
+    reads instead of the old `graph`, `app.rs`, and `tui.rs` era file list.
+  - Reformatted `docs/process-observations.md`, `docs/agent/architecture.md`, and
+    `docs/agent/call-tree-cleanup-map.md` with Panache so the repo Markdown gate reflects the
+    current source shape.
+  - Renamed the `actions/describe` child owner from `describe.rs` to `plan.rs` to satisfy
+    `clippy::module_inception` without suppressing the lint.
+- Completion evidence:
+  - `cargo check` passed after the `clippy::module_inception` rename.
+  - `just check` passed end to end after the doc refresh and rename.
+  - The gate ran `cargo clippy -- -D warnings`, `cargo check`, and `cargo test` successfully; the
+    test run reported `561` passed and `2` ignored manual terminal-proof tests.
+- Evidence basis:
+  - Date: `2026-05-22 11:11:16 PDT` from local `date`.
+  - Files: the changed files listed above and the successful `just check` output from this turn.
+
+### 2026-05-22 (Describe action family split pass)
+
+- Slice / task: continue down the app action path by splitting the shared describe owner into target
+  policy, describe plan, and commit plan modules.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/describe/mod.rs`, `src/actions/describe/target.rs`,
+  `src/actions/describe/plan.rs`, `src/actions/describe/commit.rs`, and this process note.
+- Implementation outcome:
+  - `src/actions/describe/mod.rs` now serves as the family boundary and re-export surface for
+    describe-target, describe-plan, and commit-plan ownership.
+  - `src/actions/describe/target.rs` now owns exact-change versus working-copy target policy, revset
+    argv fragments, and target preview wording.
+  - `src/actions/describe/plan.rs` now owns `JjDescribePlan` argv, preview wording, and direct-run
+    behavior.
+  - `src/actions/describe/commit.rs` now owns `JjCommitPlan` argv, preview wording, and direct-run
+    behavior.
 - Behavior-preservation evidence:
   - `cargo check` passed after the subtree conversion.
-  - `cargo test rewrite_actions -- --test-threads=1` passed with 16 app-level
-    rewrite preview/result tests.
-  - `cargo test working_copy_actions -- --test-threads=1` passed with 27
-    working-copy and rewrite-plan prompt tests.
-  - `cargo test actions::rewrite -- --test-threads=1` passed with 8 rewrite
-    plan unit tests.
+  - `cargo test describe_commit_actions -- --test-threads=1` passed with 10 app-level
+    describe/commit prompt, preview, and result tests.
+  - `cargo test actions::describe -- --test-threads=1` passed with 9 describe-family plan and
+    app-surface tests.
+- Evidence basis:
+  - Date: `2026-05-22 11:09:20 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Abandon action family split pass)
+
+- Slice / task: continue down the app action path by splitting the abandon owner into
+  command/preflight plan and preview classification modules.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/abandon/mod.rs`, `src/actions/abandon/plan.rs`,
+  `src/actions/abandon/preview.rs`, `src/actions/abandon/tests.rs`, and this process note.
+- Implementation outcome:
+  - `src/actions/abandon/mod.rs` now serves as the family boundary and re-export surface for the
+    abandon plan and preflight preview types.
+  - `src/actions/abandon/plan.rs` now owns exact-revision argv construction, diff-summary and title
+    preflight probes, and direct-run behavior.
+  - `src/actions/abandon/preview.rs` now owns empty versus non-empty classification and user-facing
+    confirmation wording.
+  - `src/actions/abandon/tests.rs` now imports the preflight template through the plan owner instead
+    of relying on a single mixed module scope.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the subtree conversion.
+  - `cargo test abandon_actions -- --test-threads=1` passed with 7 app-level abandon prompt,
+    preview, and confirmation tests.
+  - `cargo test actions::abandon -- --test-threads=1` passed with 8 abandon plan, preview, and
+    app-surface tests.
+- Evidence basis:
+  - Date: `2026-05-22 11:09:20 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Shared action root audit)
+
+- Slice / task: re-read the remaining shared action roots after the action family splits to decide
+  whether they still hid feature policy.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Changed files: this process note only.
+- Implementation outcome:
+  - Left `src/actions/mod.rs` intact after review because it now reads as a coherent family boundary
+    and top-level re-export surface rather than a mixed policy owner.
+  - Left `src/app/actions/shared.rs` intact after review because it currently reads as one cohesive
+    set of shared completion/result-wording helpers for the app action lifecycle, not as leaked
+    feature policy.
+- Evidence basis:
+  - Date: `2026-05-22 11:09:20 PDT` from local `date`.
+  - Files: `src/actions/mod.rs`, `src/app/actions/shared.rs`, and this process note.
+
+### 2026-05-22 (Rewrite action family split pass)
+
+- Slice / task: continue down the app action path by splitting the shared rewrite plan owner into
+  concrete rebase, squash, and absorb plan modules.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/rewrite/mod.rs`, `src/actions/rewrite/rebase.rs`,
+  `src/actions/rewrite/squash.rs`, `src/actions/rewrite/absorb.rs`, `src/actions/rewrite/tests.rs`,
+  `docs/agent/call-tree-cleanup-map.md`, and this process note.
+- Implementation outcome:
+  - `src/actions/rewrite.rs` became a real `src/actions/rewrite/` root that now serves as the family
+    boundary and re-export surface.
+  - `src/actions/rewrite/rebase.rs` now owns `JjRebasePlan` argv, normalization, direct-run
+    behavior, and preview wording.
+  - `src/actions/rewrite/squash.rs` now owns `JjSquashPlan` argv, normalization, direct-run
+    behavior, and preview wording.
+  - `src/actions/rewrite/absorb.rs` now owns `JjAbsorbPlan` exact-revset argv, destination
+    filtering, direct-run behavior, and preview wording.
+  - `src/actions/rewrite/tests.rs` keeps the family characterization focused on argv shape and
+    preview wording instead of leaving tests embedded in one broad file.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the subtree conversion.
+  - `cargo test rewrite_actions -- --test-threads=1` passed with 16 app-level rewrite preview/result
+    tests.
+  - `cargo test working_copy_actions -- --test-threads=1` passed with 27 working-copy and
+    rewrite-plan prompt tests.
+  - `cargo test actions::rewrite -- --test-threads=1` passed with 8 rewrite plan unit tests.
 - Evidence basis:
   - Date: `2026-05-22 11:04:24 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (Git sync action family split pass)
 
-- Slice / task: continue down the app action path by splitting the shared git
-  sync owner into fetch and push plan modules.
+- Slice / task: continue down the app action path by splitting the shared git sync owner into fetch
+  and push plan modules.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/actions/git_sync/mod.rs`,
-  `src/actions/git_sync/fetch.rs`, `src/actions/git_sync/push.rs`,
-  `src/actions/git_sync/tests.rs`, `docs/agent/call-tree-cleanup-map.md`, and
-  this process note.
+- Changed files: `src/actions/git_sync/mod.rs`, `src/actions/git_sync/fetch.rs`,
+  `src/actions/git_sync/push.rs`, `src/actions/git_sync/tests.rs`,
+  `docs/agent/call-tree-cleanup-map.md`, and this process note.
 - Implementation outcome:
-  - `src/actions/git_sync.rs` became a real `src/actions/git_sync/` root that
-    now serves as the family boundary and re-export surface.
-  - `src/actions/git_sync/fetch.rs` now owns `JjGitFetch` remote override
-    handling, exact-pattern construction, preview wording, and direct-run
-    behavior.
-  - `src/actions/git_sync/push.rs` now owns `JjGitPushTarget`, `JjGitPush`
-    dry-run argv construction, remote override handling, and direct-run
-    behavior.
-  - `src/actions/git_sync/tests.rs` keeps the sync family characterization
-    focused on argv shape and preview-facing target behavior instead of leaving
-    tests embedded in one broad file.
+  - `src/actions/git_sync.rs` became a real `src/actions/git_sync/` root that now serves as the
+    family boundary and re-export surface.
+  - `src/actions/git_sync/fetch.rs` now owns `JjGitFetch` remote override handling, exact-pattern
+    construction, preview wording, and direct-run behavior.
+  - `src/actions/git_sync/push.rs` now owns `JjGitPushTarget`, `JjGitPush` dry-run argv
+    construction, remote override handling, and direct-run behavior.
+  - `src/actions/git_sync/tests.rs` keeps the sync family characterization focused on argv shape and
+    preview-facing target behavior instead of leaving tests embedded in one broad file.
 - Behavior-preservation evidence:
   - `cargo check` passed after the subtree conversion.
-  - `cargo test sync_actions -- --test-threads=1` passed with 20 app-level
-    fetch/push preview and result tests.
-  - `cargo test actions::git_sync -- --test-threads=1` passed with 9 git sync
-    plan unit tests.
-  - `cargo test bookmark_actions -- --test-threads=1` passed with 27
-    bookmark-to-push prompt and preview tests.
+  - `cargo test sync_actions -- --test-threads=1` passed with 20 app-level fetch/push preview and
+    result tests.
+  - `cargo test actions::git_sync -- --test-threads=1` passed with 9 git sync plan unit tests.
+  - `cargo test bookmark_actions -- --test-threads=1` passed with 27 bookmark-to-push prompt and
+    preview tests.
 - Evidence basis:
   - Date: `2026-05-22 11:04:24 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (Copy menu model ownership pass)
 
-- Slice / task: audit the remaining small root helpers and move only the one
-  that was carrying shared modal vocabulary instead of an independent domain.
+- Slice / task: audit the remaining small root helpers and move only the one that was carrying
+  shared modal vocabulary instead of an independent domain.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/main.rs`, `src/menus/mod.rs`,
-  `src/menus/model/mod.rs`, `src/menus/model/copy.rs`,
-  `src/command/vocabulary.rs`, `src/modes/state.rs`,
+- Changed files: `src/main.rs`, `src/menus/mod.rs`, `src/menus/model/mod.rs`,
+  `src/menus/model/copy.rs`, `src/command/vocabulary.rs`, `src/modes/state.rs`,
   `src/operation_log/detail.rs`, `src/operation_log/view/mod.rs`,
-  `src/operation_log/view/commands.rs`, `src/diff/commands.rs`,
-  `src/status/view/commands.rs`, `src/bookmarks/view/commands.rs`,
-  `src/show/commands.rs`, `src/files/list/commands.rs`,
-  `src/files/list/tests.rs`, `src/files/show/commands.rs`,
-  `src/files/show/tests.rs`, `src/resolve/state.rs`,
-  `src/resolve/tests.rs`, `src/workspaces/commands.rs`,
-  `src/workspaces/tests.rs`, `src/tui/overlays/mod.rs`,
-  `src/tui/overlays/menus.rs`, `src/log/view/commands.rs`,
-  `src/log/rows/tests.rs`, `docs/agent/call-tree-cleanup-map.md`, and this
-  process note.
+  `src/operation_log/view/commands.rs`, `src/diff/commands.rs`, `src/status/view/commands.rs`,
+  `src/bookmarks/view/commands.rs`, `src/show/commands.rs`, `src/files/list/commands.rs`,
+  `src/files/list/tests.rs`, `src/files/show/commands.rs`, `src/files/show/tests.rs`,
+  `src/resolve/state.rs`, `src/resolve/tests.rs`, `src/workspaces/commands.rs`,
+  `src/workspaces/tests.rs`, `src/tui/overlays/mod.rs`, `src/tui/overlays/menus.rs`,
+  `src/log/view/commands.rs`, `src/log/rows/tests.rs`, `docs/agent/call-tree-cleanup-map.md`, and
+  this process note.
 - Implementation outcome:
   - Removed the crate-root `src/copy.rs` helper and moved `CopyOption` into
-    `src/menus/model/copy.rs`, with `src/menus/mod.rs` re-exporting it as part
-    of the shared menu-model surface.
-  - Updated command vocabulary, interaction mode state, overlay rendering, and
-    the feature views that emit copy-menu options to import `CopyOption` from
-    `crate::menus` instead of a standalone root helper.
-  - Restored the missing `src/log/rows/tests.rs` module so the log-row subtree
-    once again has executable characterization for metadata parsing and
-    rendered-row grouping.
-  - Left `src/selection.rs` and `src/clipboard.rs` in place after review:
-    `Selection` still reads as a narrow domain-neutral state helper, and
-    `clipboard::copy` remains the app-local side-effect boundary.
+    `src/menus/model/copy.rs`, with `src/menus/mod.rs` re-exporting it as part of the shared
+    menu-model surface.
+  - Updated command vocabulary, interaction mode state, overlay rendering, and the feature views
+    that emit copy-menu options to import `CopyOption` from `crate::menus` instead of a standalone
+    root helper.
+  - Restored the missing `src/log/rows/tests.rs` module so the log-row subtree once again has
+    executable characterization for metadata parsing and rendered-row grouping.
+  - Left `src/selection.rs` and `src/clipboard.rs` in place after review: `Selection` still reads as
+    a narrow domain-neutral state helper, and `clipboard::copy` remains the app-local side-effect
+    boundary.
 - Behavior-preservation evidence:
   - `cargo check` passed after re-exporting `CopyOption` through `src/menus`.
-  - `cargo test command_navigation -- --test-threads=1` passed with 35 focused
-    app dispatch and help/copy menu tests.
-  - `cargo test tui::tests -- --test-threads=1` passed with 15 shared chrome
-    and overlay presentation tests.
-  - `cargo test log::rows -- --test-threads=1` passed with 12 log and
-    operation-log row grouping tests after restoring `src/log/rows/tests.rs`.
-  - `cargo test bookmarks::tests -- --test-threads=1` passed with 19 bookmark
-    view and target-resolution tests, including copy-option coverage.
-  - `cargo test files::list -- --test-threads=1` passed with 8 file-list view
-    tests, including exact-path copy behavior.
-  - `cargo test resolve -- --test-threads=1` passed with 24 resolve-related
-    tests, including exact-path copy behavior.
-  - `cargo test workspaces -- --test-threads=1` passed with 11 workspace view
-    and row pairing tests, including degraded copy-option coverage.
+  - `cargo test command_navigation -- --test-threads=1` passed with 35 focused app dispatch and
+    help/copy menu tests.
+  - `cargo test tui::tests -- --test-threads=1` passed with 15 shared chrome and overlay
+    presentation tests.
+  - `cargo test log::rows -- --test-threads=1` passed with 12 log and operation-log row grouping
+    tests after restoring `src/log/rows/tests.rs`.
+  - `cargo test bookmarks::tests -- --test-threads=1` passed with 19 bookmark view and
+    target-resolution tests, including copy-option coverage.
+  - `cargo test files::list -- --test-threads=1` passed with 8 file-list view tests, including
+    exact-path copy behavior.
+  - `cargo test resolve -- --test-threads=1` passed with 24 resolve-related tests, including
+    exact-path copy behavior.
+  - `cargo test workspaces -- --test-threads=1` passed with 11 workspace view and row pairing tests,
+    including degraded copy-option coverage.
 - Evidence basis:
   - Date: `2026-05-22 11:01:06 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (Diff feature view split pass)
 
-- Slice / task: continue across the document-view siblings by splitting the
-  `jj diff` view owner into render, command, and sticky-document state
-  submodules.
+- Slice / task: continue across the document-view siblings by splitting the `jj diff` view owner
+  into render, command, and sticky-document state submodules.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/diff/mod.rs`, `src/diff/render.rs`,
-  `src/diff/commands.rs`, `src/diff/state.rs`, `src/diff/tests.rs`, and this
-  process note.
+- Changed files: `src/diff/mod.rs`, `src/diff/render.rs`, `src/diff/commands.rs`,
+  `src/diff/state.rs`, `src/diff/tests.rs`, and this process note.
 - Implementation outcome:
-  - `src/diff/mod.rs` stays the feature root but now only owns the type,
-    binding table, and ownership split.
+  - `src/diff/mod.rs` stays the feature root but now only owns the type, binding table, and
+    ownership split.
   - `src/diff/render.rs` now owns sticky document projection rendering.
-  - `src/diff/commands.rs` now owns search, file navigation, copy projection,
-    and show/file-list drill-down behavior.
-  - `src/diff/state.rs` now owns loading, refresh, scroll/wrap helpers, and
-    sticky-document state movement.
+  - `src/diff/commands.rs` now owns search, file navigation, copy projection, and show/file-list
+    drill-down behavior.
+  - `src/diff/state.rs` now owns loading, refresh, scroll/wrap helpers, and sticky-document state
+    movement.
 - Behavior-preservation evidence:
   - `cargo check` passed after the subtree conversion.
-  - `cargo test diff -- --test-threads=1` passed with 32 diff-focused and
-    dependent tests.
+  - `cargo test diff -- --test-threads=1` passed with 32 diff-focused and dependent tests.
 - Evidence basis:
   - Date: `2026-05-22 02:22:36 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (Show feature view split pass)
 
-- Slice / task: continue across the document-view siblings by splitting the
-  `jj show` view owner into render, command, and sticky-document state
-  submodules.
+- Slice / task: continue across the document-view siblings by splitting the `jj show` view owner
+  into render, command, and sticky-document state submodules.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/show/mod.rs`, `src/show/render.rs`,
-  `src/show/commands.rs`, `src/show/state.rs`, `src/show/tests.rs`, and this
-  process note.
+- Changed files: `src/show/mod.rs`, `src/show/render.rs`, `src/show/commands.rs`,
+  `src/show/state.rs`, `src/show/tests.rs`, and this process note.
 - Implementation outcome:
-  - `src/show/mod.rs` stays the feature root but now only owns the type,
-    binding table, and ownership split.
-  - `src/show/render.rs` now owns sticky projection rendering and pinned
-    compact-context projection.
-  - `src/show/commands.rs` now owns search, file navigation, copy projection,
-    and diff/file-list drill-down behavior.
-  - `src/show/state.rs` now owns loading, refresh, scroll/wrap helpers, and
-    sticky-document state movement.
+  - `src/show/mod.rs` stays the feature root but now only owns the type, binding table, and
+    ownership split.
+  - `src/show/render.rs` now owns sticky projection rendering and pinned compact-context projection.
+  - `src/show/commands.rs` now owns search, file navigation, copy projection, and diff/file-list
+    drill-down behavior.
+  - `src/show/state.rs` now owns loading, refresh, scroll/wrap helpers, and sticky-document state
+    movement.
 - Behavior-preservation evidence:
   - `cargo check` passed after the subtree conversion.
-  - `cargo test show -- --test-threads=1` passed with 47 show-focused and
-    dependent tests.
+  - `cargo test show -- --test-threads=1` passed with 47 show-focused and dependent tests.
 - Evidence basis:
   - Date: `2026-05-22 02:22:36 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (Operation-log feature view split pass)
 
-- Slice / task: continue across the `view_state` sibling feature views by
-  splitting the operation-log list surface into render, command, and
-  refresh/state submodules.
+- Slice / task: continue across the `view_state` sibling feature views by splitting the
+  operation-log list surface into render, command, and refresh/state submodules.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/operation_log/view/mod.rs`,
-  `src/operation_log/view/render.rs`,
-  `src/operation_log/view/commands.rs`,
-  `src/operation_log/view/state.rs`, `src/operation_log/tests.rs`, and this
-  process note.
+- Changed files: `src/operation_log/view/mod.rs`, `src/operation_log/view/render.rs`,
+  `src/operation_log/view/commands.rs`, `src/operation_log/view/state.rs`,
+  `src/operation_log/tests.rs`, and this process note.
 - Implementation outcome:
   - `src/operation_log/view.rs` became a real `src/operation_log/view/` root.
-  - `src/operation_log/view/render.rs` now owns list projection and
-    search-highlighted row rendering.
-  - `src/operation_log/view/commands.rs` now owns movement, detail opening,
-    search navigation, copy projection, and recovery action-menu construction.
-  - `src/operation_log/view/state.rs` now owns loading, refresh, and selection
-    restoration by exact operation id.
-  - The operation-log feature still starts from `operation_log/mod.rs`, but its
-    list-view owner no longer mixes rendering, command dispatch, and refresh
-    restoration in one 339-line file.
+  - `src/operation_log/view/render.rs` now owns list projection and search-highlighted row
+    rendering.
+  - `src/operation_log/view/commands.rs` now owns movement, detail opening, search navigation, copy
+    projection, and recovery action-menu construction.
+  - `src/operation_log/view/state.rs` now owns loading, refresh, and selection restoration by exact
+    operation id.
+  - The operation-log feature still starts from `operation_log/mod.rs`, but its list-view owner no
+    longer mixes rendering, command dispatch, and refresh restoration in one 339-line file.
 - Behavior-preservation evidence:
   - `cargo check` passed after the subtree conversion.
-  - `cargo test operation_log -- --test-threads=1` passed with 29
-    operation-log-focused and dependent tests.
+  - `cargo test operation_log -- --test-threads=1` passed with 29 operation-log-focused and
+    dependent tests.
 - Evidence basis:
   - Date: `2026-05-22 02:20:23 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (Status feature view split pass)
 
-- Slice / task: continue across the `view_state` sibling feature views by
-  splitting the `jj status` view owner into render, command, and refresh/state
-  submodules.
+- Slice / task: continue across the `view_state` sibling feature views by splitting the `jj status`
+  view owner into render, command, and refresh/state submodules.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Changed files: `src/status/view/mod.rs`, `src/status/view/render.rs`,
-  `src/status/view/commands.rs`, `src/status/view/state.rs`,
-  `src/status/view/tests.rs`, and this process note.
+  `src/status/view/commands.rs`, `src/status/view/state.rs`, `src/status/view/tests.rs`, and this
+  process note.
 - Implementation outcome:
   - `src/status/view.rs` became a real `src/status/view/` root.
-  - `src/status/view/render.rs` now owns list projection and search-highlighted
-    row rendering.
-  - `src/status/view/commands.rs` now owns movement, search navigation, copy
-    projection, and exact-path action gating.
-  - `src/status/view/state.rs` now owns loading, refresh, and selection
-    restoration over exact paths or row text, plus the small test constructors.
-  - The status feature still starts from `status/mod.rs`, but its view owner no
-    longer mixes rendering, command dispatch, and refresh restoration in one
-    382-line file.
+  - `src/status/view/render.rs` now owns list projection and search-highlighted row rendering.
+  - `src/status/view/commands.rs` now owns movement, search navigation, copy projection, and
+    exact-path action gating.
+  - `src/status/view/state.rs` now owns loading, refresh, and selection restoration over exact paths
+    or row text, plus the small test constructors.
+  - The status feature still starts from `status/mod.rs`, but its view owner no longer mixes
+    rendering, command dispatch, and refresh restoration in one 382-line file.
 - Behavior-preservation evidence:
   - `cargo check` passed after the subtree conversion.
-  - `cargo test status -- --test-threads=1` passed with 45 status-focused and
-    dependent tests.
+  - `cargo test status -- --test-threads=1` passed with 45 status-focused and dependent tests.
 - Evidence basis:
   - Date: `2026-05-22 02:17:17 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (Log feature view split pass)
 
-- Slice / task: continue down the traversal into the first major feature root
-  by splitting the log view owner into separate render, command, and
-  refresh/mode state submodules.
+- Slice / task: continue down the traversal into the first major feature root by splitting the log
+  view owner into separate render, command, and refresh/mode state submodules.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/log/view/mod.rs`, `src/log/view/render.rs`,
-  `src/log/view/commands.rs`, `src/log/view/state.rs`, and this process note.
+- Changed files: `src/log/view/mod.rs`, `src/log/view/render.rs`, `src/log/view/commands.rs`,
+  `src/log/view/state.rs`, and this process note.
 - Implementation outcome:
-  - `src/log/view.rs` became a real `src/log/view/` root instead of a single
-    mixed file.
-  - `src/log/view/render.rs` now owns list rendering, highlighted row lines,
-    and selected-row styling behavior.
-  - `src/log/view/commands.rs` now owns view-command execution, selection and
-    paging movement, search navigation, copy options, and action-menu opening.
-  - `src/log/view/state.rs` now owns loading, refresh, log-mode switching,
-    reveal-by-change-id behavior, and selection restoration/pruning helpers.
-  - The feature root still starts from `log/mod.rs`, but the view behavior no
-    longer mixes render projection, refresh semantics, and command handling in
-    one 666-line file.
+  - `src/log/view.rs` became a real `src/log/view/` root instead of a single mixed file.
+  - `src/log/view/render.rs` now owns list rendering, highlighted row lines, and selected-row
+    styling behavior.
+  - `src/log/view/commands.rs` now owns view-command execution, selection and paging movement,
+    search navigation, copy options, and action-menu opening.
+  - `src/log/view/state.rs` now owns loading, refresh, log-mode switching, reveal-by-change-id
+    behavior, and selection restoration/pruning helpers.
+  - The feature root still starts from `log/mod.rs`, but the view behavior no longer mixes render
+    projection, refresh semantics, and command handling in one 666-line file.
 - Behavior-preservation evidence:
   - `cargo check` passed after the subtree conversion.
-  - `cargo test log -- --test-threads=1` passed with 92 log-focused and
-    dependent tests.
+  - `cargo test log -- --test-threads=1` passed with 92 log-focused and dependent tests.
 - Evidence basis:
   - Date: `2026-05-22 02:14:37 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (View-state routing and target split pass)
 
-- Slice / task: continue one level deeper from app dispatch into the active-view
-  dispatcher by separating generic view routing, shared state helpers, and
-  action-target projection.
+- Slice / task: continue one level deeper from app dispatch into the active-view dispatcher by
+  separating generic view routing, shared state helpers, and action-target projection.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/view_state/mod.rs`, `src/view_state/routing.rs`,
-  `src/view_state/state.rs`, `src/view_state/targets.rs`,
-  `src/view_state/tests.rs`, and this process note.
+- Changed files: `src/view_state/mod.rs`, `src/view_state/routing.rs`, `src/view_state/state.rs`,
+  `src/view_state/targets.rs`, `src/view_state/tests.rs`, and this process note.
 - Implementation outcome:
-  - `src/view_state/mod.rs` is now a real root that defines only the active
-    view enum and the ownership split.
-  - `src/view_state/routing.rs` now owns load/render/bindings/execute/refresh,
-    clamp, and generic shared metadata such as help context and status hints.
-  - `src/view_state/state.rs` now owns shared scroll, line-count, item-count,
-    log-mode, and log-reveal helpers.
-  - `src/view_state/targets.rs` now owns the thin delegation layer from
-    `ViewState` into `ViewActionTargets`.
-  - `src/view_state/tests.rs` now imports the projected types it actually uses
-    instead of relying on broad root imports from the old mixed module.
+  - `src/view_state/mod.rs` is now a real root that defines only the active view enum and the
+    ownership split.
+  - `src/view_state/routing.rs` now owns load/render/bindings/execute/refresh, clamp, and generic
+    shared metadata such as help context and status hints.
+  - `src/view_state/state.rs` now owns shared scroll, line-count, item-count, log-mode, and
+    log-reveal helpers.
+  - `src/view_state/targets.rs` now owns the thin delegation layer from `ViewState` into
+    `ViewActionTargets`.
+  - `src/view_state/tests.rs` now imports the projected types it actually uses instead of relying on
+    broad root imports from the old mixed module.
 - Behavior-preservation evidence:
   - `cargo check` passed after the `view_state` split.
-  - `cargo test view_state -- --test-threads=1` passed with 11 focused
-    `view_state` and dependent tests.
+  - `cargo test view_state -- --test-threads=1` passed with 11 focused `view_state` and dependent
+    tests.
 - Evidence basis:
   - Date: `2026-05-22 02:07:59 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (App runtime dispatch split pass)
 
-- Slice / task: continue down the runtime tree by separating the app event-loop
-  root from the prefix-dispatch and view-effect state machines it still owned.
+- Slice / task: continue down the runtime tree by separating the app event-loop root from the
+  prefix-dispatch and view-effect state machines it still owned.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
-- Changed files: `src/app/mod.rs`, `src/app/dispatch.rs`,
-  `src/app/effects.rs`, `src/app/tests/support.rs`,
-  `src/app/navigation/mod.rs`, and this process note.
+- Changed files: `src/app/mod.rs`, `src/app/dispatch.rs`, `src/app/effects.rs`,
+  `src/app/tests/support.rs`, `src/app/navigation/mod.rs`, and this process note.
 - Implementation outcome:
-  - `src/app/mod.rs` now keeps the terminal loop, shared app state, normal-key
-    entry, and view-command dispatch instead of also carrying the prefix and
-    view-effect interpreters.
-  - `src/app/dispatch.rs` now owns multi-key prefix timeout, fallback replay,
-    app-level binding execution, and prefix status formatting.
-  - `src/app/effects.rs` now owns app-level interpretation of `ViewEffect`
-    values such as stack pushes, copy/action menu opening, search status, and
-    `RunNewTrunk`.
-  - The app root shrank from 635 lines to 292 lines after the split; the moved
-    mechanics now live behind purpose-led owners instead of one mixed runtime
-    file.
+  - `src/app/mod.rs` now keeps the terminal loop, shared app state, normal-key entry, and
+    view-command dispatch instead of also carrying the prefix and view-effect interpreters.
+  - `src/app/dispatch.rs` now owns multi-key prefix timeout, fallback replay, app-level binding
+    execution, and prefix status formatting.
+  - `src/app/effects.rs` now owns app-level interpretation of `ViewEffect` values such as stack
+    pushes, copy/action menu opening, search status, and `RunNewTrunk`.
+  - The app root shrank from 635 lines to 292 lines after the split; the moved mechanics now live
+    behind purpose-led owners instead of one mixed runtime file.
 - Behavior-preservation evidence:
   - `cargo check` passed after the initial root split.
-  - `cargo check` passed after fixing the app-private helper visibility and
-    stale startup-parser imports.
-  - `cargo test command_navigation -- --test-threads=1` passed with 35 focused
-    navigation and prefix-dispatch tests.
+  - `cargo check` passed after fixing the app-private helper visibility and stale startup-parser
+    imports.
+  - `cargo test command_navigation -- --test-threads=1` passed with 35 focused navigation and
+    prefix-dispatch tests.
 - Evidence basis:
   - Date: `2026-05-22 02:07:59 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
 
 ### 2026-05-22 (App traversal map and navigation split pass)
 
-- Slice / task: begin the call-tree-driven cleanup with a durable traversal map, then split the
-  app action-entry and navigation owners along their actual runtime concerns.
+- Slice / task: begin the call-tree-driven cleanup with a durable traversal map, then split the app
+  action-entry and navigation owners along their actual runtime concerns.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Changed files: `docs/agent/call-tree-cleanup-map.md`, `src/app/actions/entry/mod.rs`,
   `src/app/actions/entry/menu.rs`, `src/app/actions/entry/prompts.rs`,
-  `src/app/actions/entry/remote.rs`, `src/app/navigation/mod.rs`,
-  `src/app/navigation/startup.rs`, `src/app/navigation/stack.rs`,
-  `src/app/navigation/view_menu.rs`, and this process note.
+  `src/app/actions/entry/remote.rs`, `src/app/navigation/mod.rs`, `src/app/navigation/startup.rs`,
+  `src/app/navigation/stack.rs`, `src/app/navigation/view_menu.rs`, and this process note.
 - Implementation outcome:
-  - Added a tracked 98-node traversal map rooted at `main -> app::run -> App::load` so the
-    remaining cleanup can move down the runtime path with a shared on-disk checklist.
+  - Added a tracked 98-node traversal map rooted at `main -> app::run -> App::load` so the remaining
+    cleanup can move down the runtime path with a shared on-disk checklist.
   - Turned `src/app/actions/entry/mod.rs` into a real subtree whose root now delegates to menu
     routing, prompt opening, and remote-selection policy instead of carrying the whole
     implementation.
-  - Turned `src/app/navigation.rs` into a real subtree whose root now delegates to startup
-    loading, stack/detail transitions, and top-level view-menu plus diff-format policy.
+  - Turned `src/app/navigation.rs` into a real subtree whose root now delegates to startup loading,
+    stack/detail transitions, and top-level view-menu plus diff-format policy.
 - Behavior-preservation evidence:
   - `cargo check` passed after adding the traversal map.
   - `markdownlint-cli2 docs/agent/call-tree-cleanup-map.md` passed after reformatting the map for
@@ -354,26 +411,24 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Slice / task: finish the remaining uncovered non-test `src/` leaves by documenting the shared
   menus root, terminal theme helpers, and active-view action-target projection surface.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
-- Changed files: `src/menus/mod.rs`, `src/theme.rs`, `src/view_action_targets.rs`, and this
-  process note.
+- Changed files: `src/menus/mod.rs`, `src/theme.rs`, `src/view_action_targets.rs`, and this process
+  note.
 - Implementation outcome: the final leaf slice now documents the shared menu facade helper, the
-  app-owned fallback styles, and the active-view target projector that turns current view state
-  into push/bookmark/restore/revert action targets.
+  app-owned fallback styles, and the active-view target projector that turns current view state into
+  push/bookmark/restore/revert action targets.
 - Behavior-preservation evidence:
   - `cargo test menus -- --test-threads=1` passed with 10 menu-focused tests.
   - `cargo test tui -- --test-threads=1` passed with 17 TUI tests and 1 ignored manual
     terminal-proof test.
   - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 command
     navigation tests.
-  - `cargo test sync_actions -- --test-threads=1` passed with 20 sync-focused and dependent
-    tests.
+  - `cargo test sync_actions -- --test-threads=1` passed with 20 sync-focused and dependent tests.
   - `cargo test bookmark_actions -- --test-threads=1` passed with 27 bookmark-action-focused app
     tests.
   - `cargo check` passed after the documentation update.
 - Completion evidence:
   - The audited non-test `src/` tree has no remaining uncovered files in this pass: `COUNT=0` from
-    the local tree-audit script run against `src/**/*.rs` excluding `tests.rs` and `tests/`
-    paths.
+    the local tree-audit script run against `src/**/*.rs` excluding `tests.rs` and `tests/` paths.
 - Evidence basis:
   - Date: `2026-05-22 01:49:53 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
@@ -384,18 +439,16 @@ be supported by the work log, repo state, or direct transcript evidence.
   fetch/push plans, bookmark mutation plans, and bookmark action-target resolver that connect
   selected rows to exact mutation inputs.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
-- Changed files: `src/actions/git_sync.rs`, `src/bookmarks/actions.rs`,
-  `src/bookmarks/targets.rs`, and this process note.
-- Implementation outcome: the sync slice now documents push and fetch targets, remote overrides,
-  and command/preview helpers; the bookmark slices now document mutation payload fields, target
-  enums, and the resolver state and checks that gate forget/track/untrack on trusted metadata.
+- Changed files: `src/actions/git_sync.rs`, `src/bookmarks/actions.rs`, `src/bookmarks/targets.rs`,
+  and this process note.
+- Implementation outcome: the sync slice now documents push and fetch targets, remote overrides, and
+  command/preview helpers; the bookmark slices now document mutation payload fields, target enums,
+  and the resolver state and checks that gate forget/track/untrack on trusted metadata.
 - Behavior-preservation evidence:
-  - `cargo test sync_actions -- --test-threads=1` passed with 20 sync-focused and dependent
-    tests.
+  - `cargo test sync_actions -- --test-threads=1` passed with 20 sync-focused and dependent tests.
   - `cargo test bookmark_actions -- --test-threads=1` passed with 27 bookmark-action-focused app
     tests.
-  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent
-    tests.
+  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
   - Date: `2026-05-22 01:48:18 PDT` from local `date`.
@@ -416,10 +469,10 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `cargo test rewrite -- --test-threads=1` passed with 25 rewrite-focused and dependent tests.
   - `cargo test file_actions -- --test-threads=1` passed with 7 file-action-focused and dependent
     tests.
-  - `cargo test app::tests::rewrite_actions -- --test-threads=1` passed with 16 focused app
-    rewrite tests.
-  - `cargo test app::tests::file_actions -- --test-threads=1` passed with 6 focused app file
-    action tests.
+  - `cargo test app::tests::rewrite_actions -- --test-threads=1` passed with 16 focused app rewrite
+    tests.
+  - `cargo test app::tests::file_actions -- --test-threads=1` passed with 6 focused app file action
+    tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
   - Date: `2026-05-22 01:46:05 PDT` from local `date`.
@@ -431,18 +484,17 @@ be supported by the work log, repo state, or direct transcript evidence.
   describe/commit plans and the abandon preflight/confirmation plans that the app preview flow
   consumes directly.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
-- Changed files: `src/actions/describe/mod.rs`, `src/actions/abandon/mod.rs`, and this process
-  note.
+- Changed files: `src/actions/describe/mod.rs`, `src/actions/abandon/mod.rs`, and this process note.
 - Implementation outcome: the describe/commit slice now documents target and message ownership plus
   command and preview helpers, and the abandon slice now documents exact revision targeting,
   preflight probe helpers, preview payload fields, and empty versus non-empty confirmation state.
 - Behavior-preservation evidence:
   - `cargo test describe -- --test-threads=1` passed with 16 describe-focused and dependent tests.
   - `cargo test abandon -- --test-threads=1` passed with 15 abandon-focused and dependent tests.
-  - `cargo test app::tests::describe_commit_actions -- --test-threads=1` passed with 10 focused
-    app describe/commit tests.
-  - `cargo test app::tests::abandon_actions -- --test-threads=1` passed with 7 focused app
-    abandon tests.
+  - `cargo test app::tests::describe_commit_actions -- --test-threads=1` passed with 10 focused app
+    describe/commit tests.
+  - `cargo test app::tests::abandon_actions -- --test-threads=1` passed with 7 focused app abandon
+    tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
   - Date: `2026-05-22 01:43:42 PDT` from local `date`.
@@ -459,8 +511,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - working-copy family now documents plan fields, target enums, command builders, preview/result
   surfaces, and the app-owned wording hooks around interactive split and working-copy navigation.
 - Behavior-preservation evidence:
-  - `cargo test working_copy -- --test-threads=1` passed with 50 working-copy-focused and
-    dependent tests.
+  - `cargo test working_copy -- --test-threads=1` passed with 50 working-copy-focused and dependent
+    tests.
   - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
     app-working-copy tests.
   - `cargo check` passed after the documentation update.
@@ -490,9 +542,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   feature by documenting conflict-row parsing and the read-only resolve list view.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/resolve/rows.rs`, `src/resolve/mod.rs`, and this process note.
-- Implementation outcome: the resolve slice now documents exact-path versus degraded raw-row
-  state, the conflict-row template parsing contract, and the view's selection/search/copy/open and
-  refresh ownership around those rows.
+- Implementation outcome: the resolve slice now documents exact-path versus degraded raw-row state,
+  the conflict-row template parsing contract, and the view's selection/search/copy/open and refresh
+  ownership around those rows.
 - Behavior-preservation evidence:
   - `cargo test resolve -- --test-threads=1` passed with 24 resolve-focused and dependent tests.
   - `cargo check` passed after the documentation update.
@@ -503,8 +555,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 ### 2026-05-22 (Workspaces feature contract pass)
 
 - Slice / task: continue from the shared rendered-row helpers into the `workspaces` feature by
-  documenting workspace metadata pairing, the loaded root/list context, and the read-only
-  workspaces view surface.
+  documenting workspace metadata pairing, the loaded root/list context, and the read-only workspaces
+  view surface.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/workspaces/rows.rs`, `src/workspaces/mod.rs`, and this process note.
 - Implementation outcome: the workspaces slice now documents the loaded root/list context fields,
@@ -524,14 +576,13 @@ be supported by the work log, repo state, or direct transcript evidence.
   documenting bookmark row metadata pairing and classification, the selectable bookmark list view,
   and the feature-root ownership split.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
-- Changed files: `src/bookmarks/rows/mod.rs`, `src/bookmarks/view.rs`, `src/bookmarks/mod.rs`,
-  and this process note.
+- Changed files: `src/bookmarks/rows/mod.rs`, `src/bookmarks/view.rs`, `src/bookmarks/mod.rs`, and
+  this process note.
 - Implementation outcome: the bookmarks slice now documents preserved rendered row lines, trusted
   bookmark ids and targets, local/remote/tracking row state, bookmark-list selection and refresh
   behavior, and the root split between rows, view, targets, and actions.
 - Behavior-preservation evidence:
-  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent
-    tests.
+  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
   - Date: `2026-05-22 01:37:08 PDT` from local `date`.
@@ -551,8 +602,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `cargo test log -- --test-threads=1` passed with 92 log-focused and dependent tests.
   - `cargo test operation_log -- --test-threads=1` passed with 29 operation-log-focused and
     dependent tests.
-  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent
-    tests.
+  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent tests.
   - `cargo test workspaces -- --test-threads=1` passed with 11 workspaces-focused and dependent
     tests.
   - `cargo check` passed after the documentation update.
@@ -566,11 +616,10 @@ be supported by the work log, repo state, or direct transcript evidence.
   type that owns row-index movement and key-or-index restoration across refreshed collections.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/selection.rs` and this process note.
-- Implementation outcome: `selection.rs` now documents the owned selection index plus the
-  movement, clamping, and restore semantics that feature views rely on when row sets change.
+- Implementation outcome: `selection.rs` now documents the owned selection index plus the movement,
+  clamping, and restore semantics that feature views rely on when row sets change.
 - Behavior-preservation evidence:
-  - `cargo test selection -- --test-threads=1` passed with 28 selection-focused and dependent
-    tests.
+  - `cargo test selection -- --test-threads=1` passed with 28 selection-focused and dependent tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
   - Date: `2026-05-22 01:33:41 PDT` from local `date`.
@@ -583,12 +632,12 @@ be supported by the work log, repo state, or direct transcript evidence.
   action plans, and the feature root ownership story.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/operation_log/detail.rs`, `src/operation_log/view.rs`,
-  `src/operation_log/rows.rs`, `src/operation_log/actions.rs`, `src/operation_log/mod.rs`, and
-  this process note.
+  `src/operation_log/rows.rs`, `src/operation_log/actions.rs`, `src/operation_log/mod.rs`, and this
+  process note.
 - Implementation outcome: the operation-log slice now documents plain rendered operation detail
   state, list selection and refresh behavior, fail-closed operation-id pairing, repository-wide
-  versus exact-operation recovery plans, and the feature-root split between rows, list view,
-  detail view, and actions.
+  versus exact-operation recovery plans, and the feature-root split between rows, list view, detail
+  view, and actions.
 - Behavior-preservation evidence:
   - `cargo test operation_log -- --test-threads=1` passed with 29 operation-log-focused and
     dependent tests.
@@ -599,8 +648,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Copy boundary contract pass)
 
-- Slice / task: unwind from the `show` and `diff` views into the shared copy path by documenting
-  the modal payload in `copy.rs` and the clipboard side-effect boundary in `clipboard.rs`.
+- Slice / task: unwind from the `show` and `diff` views into the shared copy path by documenting the
+  modal payload in `copy.rs` and the clipboard side-effect boundary in `clipboard.rs`.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/copy.rs`, `src/clipboard.rs`, and this process note.
 - Implementation outcome: the copy path now documents which fields control the modal label versus
@@ -614,12 +663,12 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Show and diff detail-view contract pass)
 
-- Slice / task: continue the shared-document runtime path into the `show` and `diff` feature
-  roots by documenting the two detail views that consume `StickyFileDocument` directly.
+- Slice / task: continue the shared-document runtime path into the `show` and `diff` feature roots
+  by documenting the two detail views that consume `StickyFileDocument` directly.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/show/mod.rs`, `src/diff/mod.rs`, and this process note.
-- Implementation outcome: the detail-view slice now documents the durable state in `ShowView`
-  and `DiffView`, the view-owned render/refresh/search/scroll/file-navigation methods, and the
+- Implementation outcome: the detail-view slice now documents the durable state in `ShowView` and
+  `DiffView`, the view-owned render/refresh/search/scroll/file-navigation methods, and the
   difference between show's pinned compact log context and diff's file-only sticky projection.
 - Behavior-preservation evidence:
   - `cargo test show -- --test-threads=1` passed with 47 show-focused and dependent tests.
@@ -631,15 +680,14 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Shared document contract pass)
 
-- Slice / task: continue the file-show runtime path into the shared `documents` layer by
-  documenting the rendered document model, sticky-file viewport behavior, and the documents module
-  root.
+- Slice / task: continue the file-show runtime path into the shared `documents` layer by documenting
+  the rendered document model, sticky-file viewport behavior, and the documents module root.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
-- Changed files: `src/documents/rendered.rs`, `src/documents/sticky.rs`, `src/documents/mod.rs`,
-  and this process note.
-- Implementation outcome: the shared document layer now documents preserved rendered lines,
-  detected file anchors, pinned sticky projection, sticky scroll and viewport state, and the root
-  ownership story connecting rendered structure to shared document navigation/rendering.
+- Changed files: `src/documents/rendered.rs`, `src/documents/sticky.rs`, `src/documents/mod.rs`, and
+  this process note.
+- Implementation outcome: the shared document layer now documents preserved rendered lines, detected
+  file anchors, pinned sticky projection, sticky scroll and viewport state, and the root ownership
+  story connecting rendered structure to shared document navigation/rendering.
 - Behavior-preservation evidence:
   - `cargo test documents -- --test-threads=1` passed with 14 documents-focused tests.
   - `cargo test files -- --test-threads=1` passed with 27 files-focused and dependent tests.
@@ -675,8 +723,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Changed files: `src/status/actions.rs`, `src/status/rows.rs`, `src/status/view.rs`,
   `src/status/mod.rs`, and this process note.
 - Implementation outcome: the status slice now documents the `StatusFileAction` payload fields, the
-  exact-path row contract and disabled-path reasons, the status view state and command behavior,
-  and the feature-root ownership story that ties actions, rows, and view state together.
+  exact-path row contract and disabled-path reasons, the status view state and command behavior, and
+  the feature-root ownership story that ties actions, rows, and view state together.
 - Behavior-preservation evidence:
   - `cargo test status -- --test-threads=1` passed with 45 status-focused and dependent tests.
   - `cargo check` passed after the documentation update.
@@ -707,8 +755,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/jj/syntax.rs` and this process note.
 - Implementation outcome: `jj/syntax.rs` now documents the helper functions that build user-facing
-  command labels, exact-change-id revsets, root-file filesets, exact string patterns, and the
-  shared literal-quoting routine behind those surfaces.
+  command labels, exact-change-id revsets, root-file filesets, exact string patterns, and the shared
+  literal-quoting routine behind those surfaces.
 - Behavior-preservation evidence:
   - `cargo test jj -- --test-threads=1` passed with 60 `jj` tests and 2 ignored manual terminal
     proof tests.
@@ -719,8 +767,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Interactive terminal runner contract pass)
 
-- Slice / task: unwind out of the action subtree into `src/terminal_process/mod.rs` and document
-  the inherited-stdio terminal lifecycle boundary used by interactive commands.
+- Slice / task: unwind out of the action subtree into `src/terminal_process/mod.rs` and document the
+  inherited-stdio terminal lifecycle boundary used by interactive commands.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/terminal_process/mod.rs` and this process note.
 - Implementation outcome: `terminal_process/mod.rs` now documents the `InteractiveCommand`,
@@ -737,9 +785,9 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Action support leaf contract pass)
 
-- Slice / task: finish the remaining local leaves under `src/app/actions/` by documenting the
-  shared refresh/wording helpers in `shared.rs` and the common preview-key reducer in `input.rs`
-  before unwinding out of the action subtree.
+- Slice / task: finish the remaining local leaves under `src/app/actions/` by documenting the shared
+  refresh/wording helpers in `shared.rs` and the common preview-key reducer in `input.rs` before
+  unwinding out of the action subtree.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/app/actions/shared.rs`, `src/app/actions/input.rs`, and this process note.
 - Implementation outcome: `shared.rs` now documents the shared success/failure/reveal helpers and
@@ -748,8 +796,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   calls.
 - Behavior-preservation evidence:
   - `cargo test app::tests::bookmark_actions -- --test-threads=1` passed with 27 focused tests.
-  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
-    tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused tests.
   - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
@@ -763,9 +810,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   action panes.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/tui/overlays.rs` and this process note.
-- Implementation outcome: `overlays.rs` now documents the payload fields on each `Overlay`
-  variant and the helper methods that render help, menus, remote prompts, action panes, abandon
-  confirm, role prompts, and centered overlay geometry.
+- Implementation outcome: `overlays.rs` now documents the payload fields on each `Overlay` variant
+  and the helper methods that render help, menus, remote prompts, action panes, abandon confirm,
+  role prompts, and centered overlay geometry.
 - Behavior-preservation evidence:
   - `cargo test tui -- --test-threads=1` passed with 17 TUI tests and 1 ignored manual
     terminal-proof test.
@@ -776,13 +823,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Status-hint projection contract pass)
 
-- Slice / task: continue the `App::run()` TUI branch into `src/tui/status_hints.rs` and document
-  the shared status-hint vocabulary plus the width-fit projection used by chrome rendering.
+- Slice / task: continue the `App::run()` TUI branch into `src/tui/status_hints.rs` and document the
+  shared status-hint vocabulary plus the width-fit projection used by chrome rendering.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/tui/status_hints.rs` and this process note.
-- Implementation outcome: `status_hints.rs` now documents the meaning of each `StatusHints`
-  variant, the per-view hint projection contract, and the local width/count helpers that keep hint
-  items complete on narrow terminals.
+- Implementation outcome: `status_hints.rs` now documents the meaning of each `StatusHints` variant,
+  the per-view hint projection contract, and the local width/count helpers that keep hint items
+  complete on narrow terminals.
 - Behavior-preservation evidence:
   - `cargo test tui -- --test-threads=1` passed with 17 TUI tests and 1 ignored manual
     terminal-proof test.
@@ -810,17 +857,16 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Rewrite completion contract pass)
 
-- Slice / task: continue the action-branch descent into `src/app/actions/rewrite_completion.rs`
-  and document the rewrite-specific confirmation layer that runs commands, refreshes views, and
-  reveals rewritten targets after preview acceptance.
+- Slice / task: continue the action-branch descent into `src/app/actions/rewrite_completion.rs` and
+  document the rewrite-specific confirmation layer that runs commands, refreshes views, and reveals
+  rewritten targets after preview acceptance.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/app/actions/rewrite_completion.rs` and this process note.
-- Implementation outcome: `rewrite_completion.rs` now documents the confirm methods for
-  working-copy navigation, abandon, restore, revert, rebase, squash, and absorb, including the
-  re-check path for empty abandon and the reveal policy for edit/next/prev, rebase, and squash.
+- Implementation outcome: `rewrite_completion.rs` now documents the confirm methods for working-copy
+  navigation, abandon, restore, revert, rebase, squash, and absorb, including the re-check path for
+  empty abandon and the reveal policy for edit/next/prev, rebase, and squash.
 - Behavior-preservation evidence:
-  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
-    tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused tests.
   - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
@@ -829,19 +875,18 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (General action completion contract pass)
 
-- Slice / task: continue the action-branch descent into `src/app/actions/completion.rs` and
-  document the confirmation layer that runs commands, refreshes views, reveals targets, and leaves
-  finished output on result panes.
+- Slice / task: continue the action-branch descent into `src/app/actions/completion.rs` and document
+  the confirmation layer that runs commands, refreshes views, reveals targets, and leaves finished
+  output on result panes.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/app/actions/completion.rs` and this process note.
 - Implementation outcome: `completion.rs` now documents the confirm methods for describe, commit,
-  bookmark/file mutations, new, duplicate, fetch/push, split, and operation actions, plus the
-  helper methods that own duplicate reveal fallback, split reveal behavior, and stacked repo-view
-  refresh after operation mutations.
+  bookmark/file mutations, new, duplicate, fetch/push, split, and operation actions, plus the helper
+  methods that own duplicate reveal fallback, split reveal behavior, and stacked repo-view refresh
+  after operation mutations.
 - Behavior-preservation evidence:
   - `cargo test app::tests::bookmark_actions -- --test-threads=1` passed with 27 focused tests.
-  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
-    tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused tests.
   - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
@@ -858,8 +903,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   operation actions, working-copy navigation, mutation previews, and rewrite previews, plus the
   local helpers that normalize preview-pane error handling and rewrite-source status context.
 - Behavior-preservation evidence:
-  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
-    tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused tests.
   - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
@@ -878,8 +922,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   push/fetch remote selection before handing off to previews.
 - Behavior-preservation evidence:
   - `cargo test app::tests::bookmark_actions -- --test-threads=1` passed with 27 focused tests.
-  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
-    tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused tests.
   - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
   - `cargo check` passed after the documentation update.
 - Evidence basis:
@@ -909,9 +952,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   and matching/highlighting boundary that modal search prompt acceptance creates.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/search.rs` and this process note.
-- Implementation outcome: `search.rs` now documents the `SearchQuery` fields, smart-case
-  constructor semantics, line/entry match helpers, and the rendered-line highlighting pipeline that
-  active views use after the app sets a query.
+- Implementation outcome: `search.rs` now documents the `SearchQuery` fields, smart-case constructor
+  semantics, line/entry match helpers, and the rendered-line highlighting pipeline that active views
+  use after the app sets a query.
 - Behavior-preservation evidence:
   - `cargo test search -- --test-threads=1` passed with 15 focused and dependent search tests.
   - `cargo check` passed after the documentation update.
@@ -1070,13 +1113,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (jj root export contract pass)
 
-- Slice / task: continue unwinding into `src/jj/mod.rs` and document the root-module export
-  contract that higher layers import from the `jj` boundary.
+- Slice / task: continue unwinding into `src/jj/mod.rs` and document the root-module export contract
+  that higher layers import from the `jj` boundary.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/jj/mod.rs` and this process note.
 - Implementation outcome: `jj/mod.rs` now explains the kinds of boundary surface it re-exports and
-  documents the intended role of the command, syntax, `ViewSpec`, and process helpers exposed at
-  the module root.
+  documents the intended role of the command, syntax, `ViewSpec`, and process helpers exposed at the
+  module root.
 - Behavior-preservation evidence:
   - `cargo test jj -- --test-threads=1` passed with 60 tests and 2 ignored manual terminal proofs.
   - `cargo check` passed after the documentation update.
@@ -1090,9 +1133,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   contracts for binding execution, view-command dispatch, and multi-key prefix status wording.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/app/mod.rs` and this process note.
-- Implementation outcome: `app/mod.rs` now states where app-level bindings converge with
-  view-level commands, where shared view execution is delegated, and how pending prefix keys are
-  surfaced in status text.
+- Implementation outcome: `app/mod.rs` now states where app-level bindings converge with view-level
+  commands, where shared view execution is delegated, and how pending prefix keys are surfaced in
+  status text.
 - Behavior-preservation evidence:
   - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 focused tests.
   - `cargo check` passed after the documentation update.
@@ -1102,14 +1145,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (Navigation contract pass)
 
-- Slice / task: continue unwinding into `src/app/navigation.rs` and document the app-owned
-  contracts for startup parsing, detail-spec construction, top-level shipped-view opening,
-  log-revset prompting, and diff-format application.
+- Slice / task: continue unwinding into `src/app/navigation.rs` and document the app-owned contracts
+  for startup parsing, detail-spec construction, top-level shipped-view opening, log-revset
+  prompting, and diff-format application.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/app/navigation.rs` and this process note.
-- Implementation outcome: `navigation.rs` now states which helpers preserve exact-change
-  provenance, which open only shipped top-level views, and when the app replaces versus extends the
-  back stack.
+- Implementation outcome: `navigation.rs` now states which helpers preserve exact-change provenance,
+  which open only shipped top-level views, and when the app replaces versus extends the back stack.
 - Behavior-preservation evidence:
   - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 focused tests.
   - `cargo check` passed after the documentation update.
@@ -1123,8 +1165,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   app-facing dispatch contract carried by the `ViewState` enum and its core routing methods.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/view_state/mod.rs` and this process note.
-- Implementation outcome: `ViewState` now documents the meaning of each active-view variant and
-  the shared routing responsibilities for render, bindings, command execution, refresh, clamp,
+- Implementation outcome: `ViewState` now documents the meaning of each active-view variant and the
+  shared routing responsibilities for render, bindings, command execution, refresh, clamp,
   `ViewSpec` access, status hints, and help context.
 - Behavior-preservation evidence:
   - `cargo test view_state -- --test-threads=1` passed with 11 focused tests.
@@ -1166,12 +1208,12 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-22 (jj startup-boundary consolidation)
 
-- Slice / task: continue the caller-callee descent from `log::rows` into the `jj` boundary,
-  document the startup-path data carriers, and consolidate the shared `ViewSpec` execution path in
+- Slice / task: continue the caller-callee descent from `log::rows` into the `jj` boundary, document
+  the startup-path data carriers, and consolidate the shared `ViewSpec` execution path in
   `src/jj/process.rs` before descending into argv construction in `src/jj/command.rs`.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
-- Changed files: `src/jj/process.rs`, `src/jj/command.rs`, `src/log/rows.rs`,
-  `src/log/view.rs`, `src/app/mod.rs`, and this process note.
+- Changed files: `src/jj/process.rs`, `src/jj/command.rs`, `src/log/rows.rs`, `src/log/view.rs`,
+  `src/app/mod.rs`, and this process note.
 - Implementation outcome: `run_jj` and `run_jj_template_lines` now share one local
   `run_view_command` boundary for `ViewSpec`-driven process execution; startup-path structs on the
   app/log side now document field ownership; and the `jj` command vocabulary plus argv builder are
@@ -1189,8 +1231,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 - Slice / task: continue the maintainability pass in strict caller-callee order from `main()` down
   through `app::run()`, `App::run()`, `App::load()`, `AppServices::load_view()`,
-  `ViewState::load()`, `LogView::load()`, and `load_entries()`, updating ownership docs at each
-  step without jumping sideways to unrelated siblings.
+  `ViewState::load()`, `LogView::load()`, and `load_entries()`, updating ownership docs at each step
+  without jumping sideways to unrelated siblings.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
 - Changed files: `src/app/mod.rs`, `src/app/navigation.rs`, `src/app/services.rs`,
   `src/view_state/mod.rs`, `src/log/view.rs`, `src/log/rows.rs`, and this process note.
@@ -1199,8 +1241,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   service seam, view dispatch, and initial rendered log row loading.
 - Behavior-preservation evidence:
   - `cargo check` passed after the documentation updates.
-  - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 tests,
-    covering startup command parsing, top-level view loading, and navigation/prefix behavior.
+  - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 tests, covering
+    startup command parsing, top-level view loading, and navigation/prefix behavior.
 - Evidence basis:
   - Date: `2026-05-22 00:43:17 PDT` from local `date`.
   - Files: the changed files listed above and this process note.
@@ -1211,12 +1253,12 @@ be supported by the work log, repo state, or direct transcript evidence.
   remove the duplicate `App` passthrough layer above `AppServices` while documenting the surviving
   ownership boundary in each touched file.
 - Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
-- Changed files: `src/main.rs`, `src/app/mod.rs`, `src/app/navigation.rs`,
-  `src/app/services.rs`, `src/app/actions/mod.rs`, `src/app/actions/preview.rs`,
-  `src/app/actions/completion.rs`, `src/app/actions/rewrite_completion.rs`,
-  `src/app/actions/entry/mod.rs`, `docs/agent/architecture.md`, and this process note.
-- Implementation outcome: `AppServices` remains the single injectable jj/view effect seam;
-  `app` submodules now call that seam directly for pure side-effect dispatch; `App` keeps only
+- Changed files: `src/main.rs`, `src/app/mod.rs`, `src/app/navigation.rs`, `src/app/services.rs`,
+  `src/app/actions/mod.rs`, `src/app/actions/preview.rs`, `src/app/actions/completion.rs`,
+  `src/app/actions/rewrite_completion.rs`, `src/app/actions/entry/mod.rs`,
+  `docs/agent/architecture.md`, and this process note.
+- Implementation outcome: `AppServices` remains the single injectable jj/view effect seam; `app`
+  submodules now call that seam directly for pure side-effect dispatch; `App` keeps only
   `refresh_view_state` and `reveal_log_change`, the two wrappers that must couple the seam to the
   current app-owned `ViewState`.
 - Behavior-preservation evidence:
@@ -1236,8 +1278,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence gathered:
   - `find docs/plan docs/agent -type f | sort | xargs wc -l` reported `10,292` total lines across
     `docs/plan` and `docs/agent`.
-  - `docs/plan/progress.md` is `2,352` lines, `docs/plan/next-implementation-slices.md` is
-    `1,657` lines, and `docs/agent/source-maintainability-ledger.md` is `1,540` lines.
+  - `docs/plan/progress.md` is `2,352` lines, `docs/plan/next-implementation-slices.md` is `1,657`
+    lines, and `docs/agent/source-maintainability-ledger.md` is `1,540` lines.
   - `jj --no-pager status` showed an unrelated in-flight module-layout refactor, so this audit was
     kept read-only except for this process note.
   - `jj workspace add --help` confirms that a side workspace such as `../jk-planning` can be added
@@ -1248,10 +1290,11 @@ be supported by the work log, repo state, or direct transcript evidence.
   in-tree so future work can still find the archived material.
 - Evidence basis:
   - Date: `2026-05-21 19:29:33 PDT` from local `date`.
-  - Files: `docs/plan/README.md`, `docs/plan/progress.md`, `docs/plan/next-implementation-slices.md`,
-    `docs/plan/screen-priority.md`, `docs/plan/open-questions.md`,
-    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-cleanup-audit.md`,
-    `docs/agent/source-maintainability-ledger.md`, and this process note.
+  - Files: `docs/plan/README.md`, `docs/plan/progress.md`,
+    `docs/plan/next-implementation-slices.md`, `docs/plan/screen-priority.md`,
+    `docs/plan/open-questions.md`, `docs/agent/cleanup-wave-status.md`,
+    `docs/agent/source-cleanup-audit.md`, `docs/agent/source-maintainability-ledger.md`, and this
+    process note.
 
 ### 2026-05-21 (Root jj action plan split)
 
@@ -9129,9 +9172,9 @@ belong here.
   feature-local subtree without changing the `documents` public surface.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/documents/sticky.rs` moved to `src/documents/sticky/mod.rs` with
-  named children `viewport.rs`, `scroll.rs`, `render.rs`, and `file_navigation.rs`; existing tests
-  stayed colocated in `src/documents/sticky/tests.rs`.
+- Changed source shape: `src/documents/sticky.rs` moved to `src/documents/sticky/mod.rs` with named
+  children `viewport.rs`, `scroll.rs`, `render.rs`, and `file_navigation.rs`; existing tests stayed
+  colocated in `src/documents/sticky/tests.rs`.
 - Implementation outcome: `StickyFileDocument` remains the owning boundary for shared sticky-file
   document behavior, while child modules now separate viewport state, meaningful-scroll semantics,
   render/search helpers, and file-heading navigation. The `src/documents/mod.rs` re-export surface
@@ -9139,10 +9182,10 @@ belong here.
 - Behavior preserved: sticky heading projection, no-wrap horizontal scrolling, search wrapping,
   meaningful scroll skipping, and file-heading activation offsets all stayed under the existing
   tests instead of moving into a new shared bucket.
-- Validation trail: `cargo check`; `cargo test documents::sticky -- --test-threads=1` with 5
-  tests; `cargo test show -- --test-threads=1` with 47 tests; `cargo test diff -- --test-threads=1`
-  with 32 tests; `cargo test files::show -- --test-threads=1` with 8 tests; `rustup run nightly
-  cargo fmt` completed with the existing rustfmt unstable-option warnings.
+- Validation trail: `cargo check`; `cargo test documents::sticky -- --test-threads=1` with 5 tests;
+  `cargo test show -- --test-threads=1` with 47 tests; `cargo test diff -- --test-threads=1` with 32
+  tests; `cargo test files::show -- --test-threads=1` with 8 tests; `rustup run nightly   cargo fmt`
+  completed with the existing rustfmt unstable-option warnings.
 - Evidence basis:
   - Date: `2026-05-22 08:48:27 PDT` from local `date`.
   - Files: `src/documents/mod.rs`, `src/documents/sticky/mod.rs`,
@@ -9152,8 +9195,8 @@ belong here.
 
 ### 2026-05-22 (`documents/rendered` ownership split)
 
-- Slice / task: clean traversal node `84` by converting `src/documents/rendered.rs` into a
-  subtree that separates anchor recognition from sticky projection.
+- Slice / task: clean traversal node `84` by converting `src/documents/rendered.rs` into a subtree
+  that separates anchor recognition from sticky projection.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/documents/rendered.rs` moved to `src/documents/rendered/mod.rs` with
@@ -9171,8 +9214,7 @@ belong here.
   - Date: `2026-05-22 08:48:27 PDT` from local `date`.
   - Files: `src/documents/mod.rs`, `src/documents/rendered/mod.rs`,
     `src/documents/rendered/anchors.rs`, `src/documents/rendered/projection.rs`,
-    `src/documents/rendered/tests.rs`, `docs/agent/call-tree-cleanup-map.md`, and this process
-    note.
+    `src/documents/rendered/tests.rs`, `docs/agent/call-tree-cleanup-map.md`, and this process note.
 
 ### 2026-05-22 (`jj/command` ownership split)
 
@@ -9180,9 +9222,9 @@ belong here.
   `src/jj/command.rs` into a subtree.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/jj/command.rs` moved to `src/jj/command/mod.rs` with `log_mode.rs`
-  and `argv.rs`; `src/jj/mod.rs` kept the same external re-export surface, with
-  `CHANGE_ID_TEMPLATE` narrowed back to test-only export scope.
+- Changed source shape: `src/jj/command.rs` moved to `src/jj/command/mod.rs` with `log_mode.rs` and
+  `argv.rs`; `src/jj/mod.rs` kept the same external re-export surface, with `CHANGE_ID_TEMPLATE`
+  narrowed back to test-only export scope.
 - Implementation outcome: `JjCommand` remains visible at the command root, while log-view revset
   cycling and argv/query helpers now live in named local owners. This makes the command boundary
   read top-down without mixing shipped command families, log-mode policy, and direct helper argv.
@@ -9194,8 +9236,7 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-22 08:48:27 PDT` from local `date`.
   - Files: `src/jj/mod.rs`, `src/jj/command/mod.rs`, `src/jj/command/log_mode.rs`,
-    `src/jj/command/argv.rs`, `src/jj/tests.rs`, `src/jj/view_spec/tests.rs`, and this process
-    note.
+    `src/jj/command/argv.rs`, `src/jj/tests.rs`, `src/jj/view_spec/tests.rs`, and this process note.
 
 ### 2026-05-22 (`jj/process` ownership split)
 
@@ -9229,18 +9270,19 @@ belong here.
 - Changed source shape: `src/app/input.rs` moved to `src/app/input/mod.rs` with `abandon.rs`,
   `prompts.rs`, `menus.rs`, and `help.rs`; the root kept the public modal-entry points and mode
   dispatch table.
-- Implementation outcome: the root now owns modal entry and high-level `InteractionMode`
-  dispatch, while child modules own abandon preview/confirmation flow, text-prompt accept/cancel
-  behavior, menu and remote-selection reducers, and help-overlay prefix handling. The one
-  cross-app handoff `execute_help_binding` stayed visible to the app subtree because `dispatch.rs`
-  still calls it after prefix resolution.
+- Implementation outcome: the root now owns modal entry and high-level `InteractionMode` dispatch,
+  while child modules own abandon preview/confirmation flow, text-prompt accept/cancel behavior,
+  menu and remote-selection reducers, and help-overlay prefix handling. The one cross-app handoff
+  `execute_help_binding` stayed visible to the app subtree because `dispatch.rs` still calls it
+  after prefix resolution.
 - Behavior preserved: modal key routing, help-prefix fallback behavior, copy-menu behavior, prompt
-  cancellation and preview opening, remote-selection menus, and abandon confirmation flow all
-  stayed under the existing focused app tests.
+  cancellation and preview opening, remote-selection menus, and abandon confirmation flow all stayed
+  under the existing focused app tests.
 - Validation trail: `cargo check`; `cargo test command_navigation -- --test-threads=1` with 35
-  tests; `cargo test abandon_actions -- --test-threads=1` with 7 tests; `cargo test
-  bookmark_actions -- --test-threads=1` with 27 tests; `cargo test describe_commit_actions -- --test-threads=1`
-  with 10 tests; `cargo test sync_actions -- --test-threads=1` with 20 tests.
+  tests; `cargo test abandon_actions -- --test-threads=1` with 7 tests;
+  `cargo test   bookmark_actions -- --test-threads=1` with 27 tests;
+  `cargo test describe_commit_actions -- --test-threads=1` with 10 tests;
+  `cargo test sync_actions -- --test-threads=1` with 20 tests.
 - Evidence basis:
   - Date: `2026-05-22 08:48:27 PDT` from local `date`.
   - Files: `src/app/input/mod.rs`, `src/app/input/abandon.rs`, `src/app/input/prompts.rs`,
@@ -9249,23 +9291,23 @@ belong here.
 
 ### 2026-05-22 (`modes` ownership split)
 
-- Slice / task: continue the modal runtime path by converting `src/modes/mod.rs` into a subtree
-  that separates transient interaction state from projection and static view-menu data.
+- Slice / task: continue the modal runtime path by converting `src/modes/mod.rs` into a subtree that
+  separates transient interaction state from projection and static view-menu data.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/modes/mod.rs` now acts as the subtree root over `state.rs`,
-  `projection.rs`, and `view_menu.rs`; `src/modes/tests.rs` now imports the concrete helper types
-  it uses instead of depending on the old single-file root scope.
+  `projection.rs`, and `view_menu.rs`; `src/modes/tests.rs` now imports the concrete helper types it
+  uses instead of depending on the old single-file root scope.
 - Implementation outcome: `state.rs` owns the `InteractionMode` enum, `projection.rs` owns
-  status-line and overlay projection, and `view_menu.rs` owns `ViewMenuOption`,
-  `ViewMenuAction`, and the static top-level view-menu table. The public `modes` surface for app
-  dispatch and TUI callers stayed stable.
+  status-line and overlay projection, and `view_menu.rs` owns `ViewMenuOption`, `ViewMenuAction`,
+  and the static top-level view-menu table. The public `modes` surface for app dispatch and TUI
+  callers stayed stable.
 - Behavior preserved: prompt status-line overrides, overlay projection for action panes and abandon
   confirmation, shipped view-menu entries and diff-format rows, and help/view-menu navigation all
   stayed under the existing `modes`, navigation, and TUI tests.
-- Validation trail: `cargo check`; `cargo test modes -- --test-threads=1` with 9 tests; `cargo
-  test command_navigation -- --test-threads=1` with 35 tests; `cargo test tui::tests -- --test-threads=1`
-  with 15 tests.
+- Validation trail: `cargo check`; `cargo test modes -- --test-threads=1` with 9 tests;
+  `cargo   test command_navigation -- --test-threads=1` with 35 tests;
+  `cargo test tui::tests -- --test-threads=1` with 15 tests.
 - Evidence basis:
   - Date: `2026-05-22 08:48:27 PDT` from local `date`.
   - Files: `src/modes/mod.rs`, `src/modes/state.rs`, `src/modes/projection.rs`,
@@ -9277,19 +9319,19 @@ belong here.
   converting `src/view_action_targets.rs` into a subtree.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/view_action_targets.rs` moved to `src/view_action_targets/mod.rs`
-  with `bookmark_targets.rs` and `exact_context.rs`. `src/view_state/targets.rs` kept the same
-  facade over `ViewActionTargets`.
-- Implementation outcome: push/bookmark target projection and selected bookmark-name policy now
-  live in `bookmark_targets.rs`, while exact restore/revert action contexts for detail, file, and
-  status views live in `exact_context.rs`. The root keeps only the `ViewActionTargets` type and its
-  stable per-call-site methods.
+- Changed source shape: `src/view_action_targets.rs` moved to `src/view_action_targets/mod.rs` with
+  `bookmark_targets.rs` and `exact_context.rs`. `src/view_state/targets.rs` kept the same facade
+  over `ViewActionTargets`.
+- Implementation outcome: push/bookmark target projection and selected bookmark-name policy now live
+  in `bookmark_targets.rs`, while exact restore/revert action contexts for detail, file, and status
+  views live in `exact_context.rs`. The root keeps only the `ViewActionTargets` type and its stable
+  per-call-site methods.
 - Behavior preserved: push-target rules, bookmark mutation target rules, bookmark forget target
   projection, exact restore/revert context rules, and status-file action mapping all stayed under
   the existing `view_state` and bookmark tests.
 - Validation trail: `cargo check`; `cargo test view_state -- --test-threads=1` with 11 tests;
-  `cargo test bookmarks::tests -- --test-threads=1` with 19 tests; `cargo test
-  exact_restore_revert_context -- --test-threads=1` with 4 tests.
+  `cargo test bookmarks::tests -- --test-threads=1` with 19 tests;
+  `cargo test   exact_restore_revert_context -- --test-threads=1` with 4 tests.
 - Evidence basis:
   - Date: `2026-05-22 08:48:27 PDT` from local `date`.
   - Files: `src/view_action_targets/mod.rs`, `src/view_action_targets/bookmark_targets.rs`,
@@ -9306,42 +9348,40 @@ belong here.
   `highlight.rs`, and `tests.rs`; `line_text` narrowed back to a test-only root export after the
   split.
 - Implementation outcome: `query.rs` now owns `SearchQuery`, smart-case parsing, and match-range
-  discovery, while `highlight.rs` owns plain-text extraction, line/entry matching, and styled
-  match highlighting. The root keeps the stable shared API used by app input and feature views.
+  discovery, while `highlight.rs` owns plain-text extraction, line/entry matching, and styled match
+  highlighting. The root keeps the stable shared API used by app input and feature views.
 - Behavior preserved: search prompt semantics, smart-case matching, wrapped and no-wrap document
   search movement, item-based search in bookmarks/workspaces/resolve, and span-preserving
   highlighting all stayed under the existing focused tests.
-- Validation trail: `cargo check`; `cargo test search -- --test-threads=1` with 15 tests; `cargo
-  test files::show -- --test-threads=1` with 8 tests; `cargo test resolve -- --test-threads=1`
-  with 24 tests.
+- Validation trail: `cargo check`; `cargo test search -- --test-threads=1` with 15 tests;
+  `cargo   test files::show -- --test-threads=1` with 8 tests;
+  `cargo test resolve -- --test-threads=1` with 24 tests.
 - Evidence basis:
   - Date: `2026-05-22 08:48:27 PDT` from local `date`.
   - Files: `src/search/mod.rs`, `src/search/query.rs`, `src/search/highlight.rs`,
-    `src/search/tests.rs`, `src/files/show/tests.rs`, `src/resolve/tests.rs`, and this process
-    note.
+    `src/search/tests.rs`, `src/files/show/tests.rs`, `src/resolve/tests.rs`, and this process note.
 
 ### 2026-05-22 (`resolve` ownership split and `view_state` target fold)
 
-- Slice / task: continue the feature-root traversal by converting `src/resolve/mod.rs` into a
-  local subtree, then re-check whether cross-view action-target policy deserved its own root after
-  the surrounding `view_state` cleanup.
+- Slice / task: continue the feature-root traversal by converting `src/resolve/mod.rs` into a local
+  subtree, then re-check whether cross-view action-target policy deserved its own root after the
+  surrounding `view_state` cleanup.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/resolve/mod.rs` now stays as the feature root over `render.rs`,
-  `state.rs`, `rows.rs`, and `tests.rs`. The temporary `src/view_action_targets/` subtree was
-  folded back into `src/view_state/targets/mod.rs` with local `bookmark_targets.rs` and
-  `exact_context.rs`, and the standalone `src/view_action_targets.rs` module declaration was
-  removed from `src/main.rs`.
+  `state.rs`, `rows.rs`, and `tests.rs`. The temporary `src/view_action_targets/` subtree was folded
+  back into `src/view_state/targets/mod.rs` with local `bookmark_targets.rs` and `exact_context.rs`,
+  and the standalone `src/view_action_targets.rs` module declaration was removed from `src/main.rs`.
 - Implementation outcome: `resolve` now keeps bindings and type-level ownership at the root, with
-  render projection in `render.rs` and load/refresh/search/copy/action behavior in `state.rs`.
-  The action-target helpers proved to be `ViewState`-specific policy rather than shared mechanics,
-  so their owner is now the `view_state` subtree instead of a sibling root.
+  render projection in `render.rs` and load/refresh/search/copy/action behavior in `state.rs`. The
+  action-target helpers proved to be `ViewState`-specific policy rather than shared mechanics, so
+  their owner is now the `view_state` subtree instead of a sibling root.
 - Behavior preserved: resolve startup routing, conflict-row navigation, exact-path copy behavior,
   refresh selection restoration, exact restore/revert context projection, bookmark/push target
   rules, and command-navigation entry points all stayed under the existing focused tests.
-- Validation trail: `cargo check`; `cargo test resolve -- --test-threads=1` with 24 tests; `cargo
-  test view_state -- --test-threads=1` with 11 tests; `cargo test command_navigation -- --test-threads=1`
-  with 35 tests.
+- Validation trail: `cargo check`; `cargo test resolve -- --test-threads=1` with 24 tests;
+  `cargo   test view_state -- --test-threads=1` with 11 tests;
+  `cargo test command_navigation -- --test-threads=1` with 35 tests.
 - Evidence basis:
   - Date: `2026-05-22 09:14:44 PDT` from local validation commands in this turn.
   - Files: `src/resolve/mod.rs`, `src/resolve/render.rs`, `src/resolve/state.rs`,
@@ -9357,8 +9397,8 @@ belong here.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: the crate-root `src/action_pane/` module moved into
   `src/app/actions/pane.rs`; `src/app/actions/mod.rs` now re-exports the pane types and helpers,
-  `src/app/mod.rs` exposes the `actions` subtree to the rest of the crate, and `src/main.rs`
-  no longer declares a standalone `action_pane` module.
+  `src/app/mod.rs` exposes the `actions` subtree to the rest of the crate, and `src/main.rs` no
+  longer declares a standalone `action_pane` module.
 - Implementation outcome: action preview/result scroll state, body-line projection, and shared
   accept/cancel key reduction now live beside the preview/completion reducers that own their app
   lifecycle. The command-plan root in `src/actions` stayed untouched because it owns jj argv and
@@ -9366,9 +9406,10 @@ belong here.
 - Behavior preserved: action-pane body rendering, scroll clamping, preview/result overlay titles,
   command-navigation entry points, and shared action preview key handling all stayed under the
   existing focused tests.
-- Validation trail: `cargo check`; `cargo test app::actions::pane -- --test-threads=1` with
-  4 tests; `cargo test command_navigation -- --test-threads=1` with 35 tests; `cargo test modes
-  -- --test-threads=1` with 9 tests; `cargo test tui::tests -- --test-threads=1` with 15 tests.
+- Validation trail: `cargo check`; `cargo test app::actions::pane -- --test-threads=1` with 4 tests;
+  `cargo test command_navigation -- --test-threads=1` with 35 tests;
+  `cargo test modes   -- --test-threads=1` with 9 tests; `cargo test tui::tests -- --test-threads=1`
+  with 15 tests.
 - Evidence basis:
   - Date: `2026-05-22 09:25:42 PDT` from local validation commands in this turn.
   - Files: `src/app/actions/mod.rs`, `src/app/actions/pane.rs`, `src/app/actions/input.rs`,
@@ -9385,27 +9426,27 @@ belong here.
   `tui` subtree.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/app/actions/preview.rs` moved to
-  `src/app/actions/preview/mod.rs` with `sync.rs`, `operation.rs`, `mutation.rs`,
-  `working_copy.rs`, and `rewrite.rs`; the common preview pane/error helper stayed at the root.
-  `src/theme.rs` moved to `src/tui/theme.rs`, `src/tui/mod.rs` now owns that module, and the old
-  crate-root `theme` declaration was removed from `src/main.rs`.
+- Changed source shape: `src/app/actions/preview.rs` moved to `src/app/actions/preview/mod.rs` with
+  `sync.rs`, `operation.rs`, `mutation.rs`, `working_copy.rs`, and `rewrite.rs`; the common preview
+  pane/error helper stayed at the root. `src/theme.rs` moved to `src/tui/theme.rs`, `src/tui/mod.rs`
+  now owns that module, and the old crate-root `theme` declaration was removed from `src/main.rs`.
 - Implementation outcome: preview-opening policy is now local to the family that owns it:
-  fetch/push, operation recovery, describe/commit/bookmark/file mutation, working-copy actions,
-  and rewrite/abandon flows each have a local file. The theme helpers proved to be shared
-  presentation primitives for view highlights and overlays, so they now live under `tui` instead
-  of at crate root.
-- Behavior preserved: preview status-context wording, remote fetch/push previews, operation
-  recovery previews, new/duplicate/split/edit preview flows, rewrite previews, abandon preview
-  fallback behavior, active-row highlighting, overlay styles, and status-hint key styling all
-  stayed under the existing focused tests.
+  fetch/push, operation recovery, describe/commit/bookmark/file mutation, working-copy actions, and
+  rewrite/abandon flows each have a local file. The theme helpers proved to be shared presentation
+  primitives for view highlights and overlays, so they now live under `tui` instead of at crate
+  root.
+- Behavior preserved: preview status-context wording, remote fetch/push previews, operation recovery
+  previews, new/duplicate/split/edit preview flows, rewrite previews, abandon preview fallback
+  behavior, active-row highlighting, overlay styles, and status-hint key styling all stayed under
+  the existing focused tests.
 - Validation trail: `cargo check`; `cargo test sync_actions -- --test-threads=1` with 20 tests;
-  `cargo test working_copy_actions -- --test-threads=1` with 27 tests; `cargo test
-  describe_commit_actions -- --test-threads=1` with 10 tests; `cargo test operation_actions
-  -- --test-threads=1` with 10 tests; `cargo test rewrite_actions -- --test-threads=1` with
-  16 tests; `cargo test tui::tests -- --test-threads=1` with 15 tests; `cargo test log
-  -- --test-threads=1` with 92 tests; `cargo test operation_log -- --test-threads=1` with
-  29 tests; `cargo test workspaces -- --test-threads=1` with 11 tests.
+  `cargo test working_copy_actions -- --test-threads=1` with 27 tests;
+  `cargo test   describe_commit_actions -- --test-threads=1` with 10 tests;
+  `cargo test operation_actions   -- --test-threads=1` with 10 tests;
+  `cargo test rewrite_actions -- --test-threads=1` with 16 tests;
+  `cargo test tui::tests -- --test-threads=1` with 15 tests; `cargo test log   -- --test-threads=1`
+  with 92 tests; `cargo test operation_log -- --test-threads=1` with 29 tests;
+  `cargo test workspaces -- --test-threads=1` with 11 tests.
 - Evidence basis:
   - Date: `2026-05-22 09:43:40 PDT` from local validation commands in this turn.
   - Files: `src/app/actions/preview/mod.rs`, `src/app/actions/preview/sync.rs`,
@@ -9414,8 +9455,8 @@ belong here.
     `src/tui/theme.rs`, `src/tui/mod.rs`, `src/tui/overlays.rs`, `src/tui/status_hints.rs`,
     `src/tui/tests.rs`, `src/log/view/mod.rs`, `src/log/view/render.rs`,
     `src/operation_log/view/render.rs`, `src/status/view/render.rs`, `src/resolve/render.rs`,
-    `src/files/list.rs`, `src/bookmarks/view.rs`, `src/workspaces/mod.rs`, `src/main.rs`, and
-    this process note.
+    `src/files/list.rs`, `src/bookmarks/view.rs`, `src/workspaces/mod.rs`, `src/main.rs`, and this
+    process note.
 
 ### 2026-05-22 (`app/actions/completion` family split and `app` status-line fold)
 
@@ -9423,35 +9464,35 @@ belong here.
   action families, then fold the app-owned status-line state out of crate root and into `app`.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/app/actions/completion.rs` and
-  `src/app/actions/rewrite_completion.rs` became `src/app/actions/completion/mod.rs` with
-  `mutation.rs`, `sync.rs`, `operation.rs`, `working_copy.rs`, and `rewrite.rs`. The old
-  standalone `status_line.rs` moved to `src/app/status_line.rs`; `src/app/mod.rs` now owns that
-  module and `src/main.rs` no longer declares a crate-root `status_line`.
+- Changed source shape: `src/app/actions/completion.rs` and `src/app/actions/rewrite_completion.rs`
+  became `src/app/actions/completion/mod.rs` with `mutation.rs`, `sync.rs`, `operation.rs`,
+  `working_copy.rs`, and `rewrite.rs`. The old standalone `status_line.rs` moved to
+  `src/app/status_line.rs`; `src/app/mod.rs` now owns that module and `src/main.rs` no longer
+  declares a crate-root `status_line`.
 - Implementation outcome: confirmed action execution now follows the same family structure as
   preview opening, instead of splitting rewrite versus non-rewrite policy across two large files.
-  Status-line state, count wording, and error/ready projection now live under `app`, while `tui`
-  and `modes` continue to render or borrow that app-owned state.
+  Status-line state, count wording, and error/ready projection now live under `app`, while `tui` and
+  `modes` continue to render or borrow that app-owned state.
 - Behavior preserved: describe/commit/bookmark/file mutation result handling, fetch/push result
   panes, operation recovery and operation-target completion, new/duplicate/split result handling,
   working-copy navigation, abandon/restore/revert/rebase/squash/absorb completion behavior,
   status-chrome rendering, prompt status overrides, and command-navigation status refresh behavior
   all stayed under the existing focused tests.
 - Validation trail: `cargo check`; `cargo test sync_actions -- --test-threads=1` with 20 tests;
-  `cargo test working_copy_actions -- --test-threads=1` with 27 tests; `cargo test
-  operation_actions -- --test-threads=1` with 10 tests; `cargo test rewrite_actions
-  -- --test-threads=1` with 16 tests; `cargo test describe_commit_actions -- --test-threads=1`
-  with 10 tests; `cargo test modes -- --test-threads=1` with 9 tests; `cargo test tui::tests
-  -- --test-threads=1` with 15 tests; `cargo test command_navigation -- --test-threads=1` with
-  35 tests.
+  `cargo test working_copy_actions -- --test-threads=1` with 27 tests;
+  `cargo test   operation_actions -- --test-threads=1` with 10 tests;
+  `cargo test rewrite_actions   -- --test-threads=1` with 16 tests;
+  `cargo test describe_commit_actions -- --test-threads=1` with 10 tests;
+  `cargo test modes -- --test-threads=1` with 9 tests; `cargo test tui::tests   -- --test-threads=1`
+  with 15 tests; `cargo test command_navigation -- --test-threads=1` with 35 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:00:08 PDT` from local validation commands in this turn.
   - Files: `src/app/actions/completion/mod.rs`, `src/app/actions/completion/mutation.rs`,
     `src/app/actions/completion/sync.rs`, `src/app/actions/completion/operation.rs`,
     `src/app/actions/completion/working_copy.rs`, `src/app/actions/completion/rewrite.rs`,
     `src/app/status_line.rs`, `src/app/mod.rs`, `src/modes/projection.rs`, `src/tui/chrome.rs`,
-    `src/tui/overlays.rs`, `src/tui/tests.rs`, `src/app/tests/support.rs`, `src/main.rs`, and
-    this process note.
+    `src/tui/overlays.rs`, `src/tui/tests.rs`, `src/app/tests/support.rs`, `src/main.rs`, and this
+    process note.
 
 ### 2026-05-22 (`rendered_rows` subtree split)
 
@@ -9459,25 +9500,25 @@ belong here.
   like a mixed bucket without forcing bad ownership moves for the narrower support modules.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/rendered_rows.rs` moved to `src/rendered_rows/mod.rs` with
-  `text.rs`, `metadata.rs`, and `graph.rs`. `copy.rs` and `clipboard.rs` were inspected and left
-  in place because they still own honest, narrow mechanics instead of hidden feature policy.
+- Changed source shape: `src/rendered_rows.rs` moved to `src/rendered_rows/mod.rs` with `text.rs`,
+  `metadata.rs`, and `graph.rs`. `copy.rs` and `clipboard.rs` were inspected and left in place
+  because they still own honest, narrow mechanics instead of hidden feature policy.
 - Implementation outcome: rendered-line flattening, metadata drift/JSON extraction, and graph-line
-  detection now have local owners inside the `rendered_rows` subtree instead of one mixed file.
-  The public/shared API stayed stable for the row-heavy feature roots that depend on it.
-- Behavior preserved: log row grouping and metadata alignment, operation-log row grouping,
-  bookmark metadata parsing, workspace metadata parsing, and document plain-text extraction for
-  copy/search paths all stayed under the existing focused tests.
-- Validation trail: `cargo check`; `cargo test log -- --test-threads=1` with 92 tests; `cargo
-  test operation_log -- --test-threads=1` with 29 tests; `cargo test workspaces
-  -- --test-threads=1` with 11 tests; `cargo test bookmarks::rows -- --test-threads=1` with
-  10 tests.
+  detection now have local owners inside the `rendered_rows` subtree instead of one mixed file. The
+  public/shared API stayed stable for the row-heavy feature roots that depend on it.
+- Behavior preserved: log row grouping and metadata alignment, operation-log row grouping, bookmark
+  metadata parsing, workspace metadata parsing, and document plain-text extraction for copy/search
+  paths all stayed under the existing focused tests.
+- Validation trail: `cargo check`; `cargo test log -- --test-threads=1` with 92 tests;
+  `cargo   test operation_log -- --test-threads=1` with 29 tests;
+  `cargo test workspaces   -- --test-threads=1` with 11 tests;
+  `cargo test bookmarks::rows -- --test-threads=1` with 10 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:08:53 PDT` from local validation commands in this turn.
-  - Files: `src/rendered_rows/mod.rs`, `src/rendered_rows/text.rs`,
-    `src/rendered_rows/metadata.rs`, `src/rendered_rows/graph.rs`, `src/log/rows.rs`,
-    `src/operation_log/rows.rs`, `src/bookmarks/rows/mod.rs`, `src/workspaces/rows.rs`,
-    `src/operation_log/detail.rs`, `src/status/view/commands.rs`, and this process note.
+  - Files: `src/rendered_rows/mod.rs`, `src/rendered_rows/text.rs`, `src/rendered_rows/metadata.rs`,
+    `src/rendered_rows/graph.rs`, `src/log/rows.rs`, `src/operation_log/rows.rs`,
+    `src/bookmarks/rows/mod.rs`, `src/workspaces/rows.rs`, `src/operation_log/detail.rs`,
+    `src/status/view/commands.rs`, and this process note.
 
 ### 2026-05-22 (`workspaces` view subtree split)
 
@@ -9487,9 +9528,9 @@ belong here.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/workspaces/mod.rs` now acts as the feature root over `render.rs`,
   `commands.rs`, `state.rs`, and the existing `rows.rs` plus `tests.rs`.
-- Implementation outcome: the root keeps the type, bindings, and core identity; `render.rs` owns
-  the header/list projection, `commands.rs` owns selection/search/copy behavior, and `state.rs`
-  owns refresh plus selection restoration. The workspace metadata and row parsing logic stayed in
+- Implementation outcome: the root keeps the type, bindings, and core identity; `render.rs` owns the
+  header/list projection, `commands.rs` owns selection/search/copy behavior, and `state.rs` owns
+  refresh plus selection restoration. The workspace metadata and row parsing logic stayed in
   `rows.rs`.
 - Behavior preserved: workspace startup routing, movement/search behavior, copy options, degraded
   header output, and selection restoration by workspace name all stayed under the existing focused
@@ -9499,8 +9540,8 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-22 10:15:23 PDT` from local validation commands in this turn.
   - Files: `src/workspaces/mod.rs`, `src/workspaces/render.rs`, `src/workspaces/commands.rs`,
-    `src/workspaces/state.rs`, `src/workspaces/rows.rs`, `src/workspaces/tests.rs`, and this
-    process note.
+    `src/workspaces/state.rs`, `src/workspaces/rows.rs`, `src/workspaces/tests.rs`, and this process
+    note.
 
 ### 2026-05-22 (`bookmarks` view subtree split)
 
@@ -9509,18 +9550,18 @@ belong here.
   action-target policy entry points in one file.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/bookmarks/view.rs` became `src/bookmarks/view/mod.rs` with
-  `render.rs`, `commands.rs`, and `state.rs`.
+- Changed source shape: `src/bookmarks/view.rs` became `src/bookmarks/view/mod.rs` with `render.rs`,
+  `commands.rs`, and `state.rs`.
 - Implementation outcome: the root now keeps the type, bindings, and action-target accessors;
-  `render.rs` owns list projection, `commands.rs` owns movement/search/copy/open-show behavior,
-  and `state.rs` owns refresh plus selection restoration. The bookmark metadata parsing and row
-  state logic stayed in `src/bookmarks/rows/mod.rs`.
+  `render.rs` owns list projection, `commands.rs` owns movement/search/copy/open-show behavior, and
+  `state.rs` owns refresh plus selection restoration. The bookmark metadata parsing and row state
+  logic stayed in `src/bookmarks/rows/mod.rs`.
 - Behavior preserved: bookmark startup routing, bookmark movement/search/copy behavior, exact
-  open-show targeting, selected local-bookmark gating, forget/track/untrack target resolution,
-  and app-level bookmark action flows all stayed under the existing focused tests.
-- Validation trail: `cargo check`; `cargo test bookmarks::tests -- --test-threads=1` with
-  19 tests; `cargo test bookmark_actions -- --test-threads=1` with 27 tests; `cargo test
-  command_navigation -- --test-threads=1` with 35 tests.
+  open-show targeting, selected local-bookmark gating, forget/track/untrack target resolution, and
+  app-level bookmark action flows all stayed under the existing focused tests.
+- Validation trail: `cargo check`; `cargo test bookmarks::tests -- --test-threads=1` with 19 tests;
+  `cargo test bookmark_actions -- --test-threads=1` with 27 tests;
+  `cargo test   command_navigation -- --test-threads=1` with 35 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:25:38 PDT` from local validation commands in this turn.
   - Files: `src/bookmarks/view/mod.rs`, `src/bookmarks/view/render.rs`,
@@ -9535,21 +9576,21 @@ belong here.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/files/list.rs` became `src/files/list/mod.rs` with `render.rs`,
   `commands.rs`, `state.rs`, and the existing `rows.rs` plus `tests.rs`.
-- Implementation outcome: the root now keeps the type, bindings, and identity, `render.rs` owns
-  list projection, `commands.rs` owns movement/search/copy/open-item behavior, and `state.rs`
-  owns refresh plus selection restoration by exact path. The path parser and row construction stayed
-  in `rows.rs`.
+- Implementation outcome: the root now keeps the type, bindings, and identity, `render.rs` owns list
+  projection, `commands.rs` owns movement/search/copy/open-item behavior, and `state.rs` owns
+  refresh plus selection restoration by exact path. The path parser and row construction stayed in
+  `rows.rs`.
 - Behavior preserved: file-list startup routing, exact open-file targeting, search wrapping,
   exact-path copy behavior, selection restoration by file path, and app-level file action entry
   points all stayed under the existing focused tests.
 - Validation trail: `cargo check`; `cargo test files::list -- --test-threads=1` with 8 tests;
-  `cargo test file_actions -- --test-threads=1` with 7 tests; `cargo test command_navigation
-  -- --test-threads=1` with 35 tests.
+  `cargo test file_actions -- --test-threads=1` with 7 tests;
+  `cargo test command_navigation   -- --test-threads=1` with 35 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:33:52 PDT` from local validation commands in this turn.
-  - Files: `src/files/list/mod.rs`, `src/files/list/render.rs`,
-    `src/files/list/commands.rs`, `src/files/list/state.rs`, `src/files/list/tests.rs`,
-    `src/files/list/rows.rs`, and this process note.
+  - Files: `src/files/list/mod.rs`, `src/files/list/render.rs`, `src/files/list/commands.rs`,
+    `src/files/list/state.rs`, `src/files/list/tests.rs`, `src/files/list/rows.rs`, and this process
+    note.
 
 ### 2026-05-22 (`files/show` view subtree split)
 
@@ -9567,16 +9608,15 @@ belong here.
   rendered content.
 - Behavior preserved: file-show projection, search wrapping, exact-path copy behavior, wrap and
   horizontal-scroll behavior, vertical-scroll stability, refresh clamping after content changes,
-  file action availability, and command-navigation integration all stayed under the existing
-  focused tests.
-- Validation trail: `cargo test files::show -- --test-threads=1` with 8 tests; `cargo test
-  file_actions -- --test-threads=1` with 7 tests; `cargo test command_navigation
-  -- --test-threads=1` with 35 tests.
+  file action availability, and command-navigation integration all stayed under the existing focused
+  tests.
+- Validation trail: `cargo test files::show -- --test-threads=1` with 8 tests;
+  `cargo test   file_actions -- --test-threads=1` with 7 tests;
+  `cargo test command_navigation   -- --test-threads=1` with 35 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:39:00 PDT` from local validation commands in this turn.
-  - Files: `src/files/show/mod.rs`, `src/files/show/render.rs`,
-    `src/files/show/commands.rs`, `src/files/show/state.rs`, `src/files/show/tests.rs`, and this
-    process note.
+  - Files: `src/files/show/mod.rs`, `src/files/show/render.rs`, `src/files/show/commands.rs`,
+    `src/files/show/state.rs`, `src/files/show/tests.rs`, and this process note.
 
 ### 2026-05-22 (`command` subtree split)
 
@@ -9585,8 +9625,8 @@ belong here.
   contract.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/command/mod.rs` now acts as a root over `bindings.rs`,
-  `vocabulary.rs`, and the existing `tests.rs`.
+- Changed source shape: `src/command/mod.rs` now acts as a root over `bindings.rs`, `vocabulary.rs`,
+  and the existing `tests.rs`.
 - Implementation outcome: the root now keeps the public command boundary and help re-exports,
   `vocabulary.rs` owns the app/view command enums plus view-effect and viewport context contracts,
   and `bindings.rs` owns key-shape labeling, prefix matching, and help-filtered binding helpers.
@@ -9623,8 +9663,8 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-22 10:12:19 PDT` from local validation commands in this turn.
   - Files: `src/actions/files/mod.rs`, `src/actions/files/restore.rs`,
-    `src/actions/files/mutation.rs`, `src/actions/files/revert.rs`,
-    `src/actions/files/tests.rs`, and this process note.
+    `src/actions/files/mutation.rs`, `src/actions/files/revert.rs`, `src/actions/files/tests.rs`,
+    and this process note.
 
 ### 2026-05-22 (`menus/revision_actions` subtree split)
 
@@ -9638,8 +9678,7 @@ belong here.
   `ExactActionContext` and surface classification, and `menu.rs` owns menu item ordering,
   role-prompt construction, split/edit/new/rewrite follow-ups, and path-aware mutation row
   insertion. The parent `menus` module still owns the shared action vocabulary and path-action
-  helpers. The old test leakage from `super::*` was replaced with explicit imports in
-  `tests.rs`.
+  helpers. The old test leakage from `super::*` was replaced with explicit imports in `tests.rs`.
 - Behavior preserved: exact revision/detail/status/file action-menu availability, multi-source
   rewrite prompts, visible-working-copy split wording, path restore insertion, and bookmark action
   flows that open these menus all stayed under the existing focused tests.
@@ -9653,22 +9692,22 @@ belong here.
 
 ### 2026-05-22 (`bookmarks/targets` subtree split)
 
-- Slice / task: continue down the bookmark branch by separating visible-row resolver policy from
-  the peer-validation and metadata-formatting helpers that support it.
+- Slice / task: continue down the bookmark branch by separating visible-row resolver policy from the
+  peer-validation and metadata-formatting helpers that support it.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/bookmarks/targets.rs` became `src/bookmarks/targets/mod.rs` with
   `resolver.rs` and `helpers.rs`.
-- Implementation outcome: the root now keeps the bookmark target-resolution boundary,
-  `resolver.rs` owns `BookmarkActionTargetResolver` plus the selected-row, local-peer, and
-  all-remotes safety checks, and `helpers.rs` owns remote/local peer validation helpers, exact
-  target matching, and user-visible remote/local tracking summary wording. Visibility stayed
-  narrowed to `crate::bookmarks` instead of becoming broadly public.
-- Behavior preserved: selected local-bookmark gating, forget target resolution, track/untrack
-  target resolution, ambiguity and drift failures, remote-peer uniqueness checks, and app-level
-  bookmark action flows all stayed under the existing focused tests.
-- Validation trail: `cargo check`; `cargo test bookmarks::tests -- --test-threads=1` with
-  19 tests; `cargo test bookmark_actions -- --test-threads=1` with 27 tests.
+- Implementation outcome: the root now keeps the bookmark target-resolution boundary, `resolver.rs`
+  owns `BookmarkActionTargetResolver` plus the selected-row, local-peer, and all-remotes safety
+  checks, and `helpers.rs` owns remote/local peer validation helpers, exact target matching, and
+  user-visible remote/local tracking summary wording. Visibility stayed narrowed to
+  `crate::bookmarks` instead of becoming broadly public.
+- Behavior preserved: selected local-bookmark gating, forget target resolution, track/untrack target
+  resolution, ambiguity and drift failures, remote-peer uniqueness checks, and app-level bookmark
+  action flows all stayed under the existing focused tests.
+- Validation trail: `cargo check`; `cargo test bookmarks::tests -- --test-threads=1` with 19 tests;
+  `cargo test bookmark_actions -- --test-threads=1` with 27 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:18:48 PDT` from local validation commands in this turn.
   - Files: `src/bookmarks/targets/mod.rs`, `src/bookmarks/targets/resolver.rs`,
@@ -9682,17 +9721,17 @@ belong here.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/app/actions/input.rs` became `src/app/actions/input/mod.rs` with
   `app.rs` and `mode.rs`.
-- Implementation outcome: the root now keeps the shared preview event and confirmation payload
-  types plus the one-key reducer helper, `app.rs` owns `App::handle_common_action_preview_key`
-  and the confirmation dispatch into completion methods, and `mode.rs` owns
+- Implementation outcome: the root now keeps the shared preview event and confirmation payload types
+  plus the one-key reducer helper, `app.rs` owns `App::handle_common_action_preview_key` and the
+  confirmation dispatch into completion methods, and `mode.rs` owns
   `InteractionMode::common_action_preview_event` for the shared preview/result-pane mode family.
   Imports and visibility stayed scoped to the existing `app::actions` and `crate::app` boundaries
   instead of widening the surface.
 - Behavior preserved: preview pane scroll/cancel/confirm behavior, completed-result closing,
   status-line cancellation wording, bookmark mutation preview flow, and working-copy preview flow
   all stayed under the existing focused tests.
-- Validation trail: `cargo check`; `cargo test bookmark_actions -- --test-threads=1` with
-  27 tests; `cargo test working_copy_actions -- --test-threads=1` with 27 tests.
+- Validation trail: `cargo check`; `cargo test bookmark_actions -- --test-threads=1` with 27 tests;
+  `cargo test working_copy_actions -- --test-threads=1` with 27 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:21:32 PDT` from local validation commands in this turn.
   - Files: `src/app/actions/input/mod.rs`, `src/app/actions/input/app.rs`,
@@ -9704,16 +9743,16 @@ belong here.
   shared menu/help widgets and the action-pane-specific chrome/layout helpers.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/tui/overlays.rs` became `src/tui/overlays/mod.rs` with `menus.rs`
-  and `action_pane.rs`.
+- Changed source shape: `src/tui/overlays.rs` became `src/tui/overlays/mod.rs` with `menus.rs` and
+  `action_pane.rs`.
 - Implementation outcome: the root now keeps the borrowed `Overlay` enum plus top-level render
-  dispatch, `menus.rs` owns help/copy/view/action/remote/role prompt widgets and shared modal
-  block geometry, and `action_pane.rs` owns preview/result pane title selection, footer wording,
+  dispatch, `menus.rs` owns help/copy/view/action/remote/role prompt widgets and shared modal block
+  geometry, and `action_pane.rs` owns preview/result pane title selection, footer wording,
   action-pane sizing, and abandon-confirm footer rendering. Test-facing re-exports stayed behind
   `#[cfg(test)]`.
-- Behavior preserved: help overlay projection, menu and role-prompt styling, action-pane preview
-  and result titles, footer wording, abandon-confirm footer text, modal centering, and app-level
-  command navigation/help overlay behavior all stayed under the existing focused tests.
+- Behavior preserved: help overlay projection, menu and role-prompt styling, action-pane preview and
+  result titles, footer wording, abandon-confirm footer text, modal centering, and app-level command
+  navigation/help overlay behavior all stayed under the existing focused tests.
 - Validation trail: `cargo check`; `cargo test tui::tests -- --test-threads=1` with 15 tests;
   `cargo test command_navigation -- --test-threads=1` with 35 tests.
 - Evidence basis:
@@ -9753,17 +9792,17 @@ belong here.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/bookmarks/actions.rs` became `src/bookmarks/actions/mod.rs` with
   `plan.rs`, `targets.rs`, `validation.rs`, and the existing `tests.rs`.
-- Implementation outcome: the root now keeps the bookmark action boundary, `targets.rs` owns
-  exact revision/forget/tracking payloads plus their preview-facing helpers, `plan.rs` owns
-  mutation kind/plan argv construction and preview summaries, and `validation.rs` owns the rename
-  input rule set. The selected-row target resolution stayed in `bookmarks/targets`, and prompt
-  lifecycle policy stayed in the app action flow.
-- Behavior preserved: create/set/move/delete/forget/track/untrack argv shape, exact-pattern
-  quoting, create/set current-working-copy targeting, tracking preview wording, rename preview
-  wording, rename validation errors, and app-level bookmark action flows all stayed under the
-  existing focused tests.
-- Validation trail: `cargo check`; `cargo test bookmarks::actions -- --test-threads=1` with
-  8 tests; `cargo test bookmark_actions -- --test-threads=1` with 27 tests.
+- Implementation outcome: the root now keeps the bookmark action boundary, `targets.rs` owns exact
+  revision/forget/tracking payloads plus their preview-facing helpers, `plan.rs` owns mutation
+  kind/plan argv construction and preview summaries, and `validation.rs` owns the rename input rule
+  set. The selected-row target resolution stayed in `bookmarks/targets`, and prompt lifecycle policy
+  stayed in the app action flow.
+- Behavior preserved: create/set/move/delete/forget/track/untrack argv shape, exact-pattern quoting,
+  create/set current-working-copy targeting, tracking preview wording, rename preview wording,
+  rename validation errors, and app-level bookmark action flows all stayed under the existing
+  focused tests.
+- Validation trail: `cargo check`; `cargo test bookmarks::actions -- --test-threads=1` with 8 tests;
+  `cargo test bookmark_actions -- --test-threads=1` with 27 tests.
 - Evidence basis:
   - Date: `2026-05-22 10:30:30 PDT` from local validation commands in this turn.
   - Files: `src/bookmarks/actions/mod.rs`, `src/bookmarks/actions/plan.rs`,
@@ -9799,8 +9838,7 @@ belong here.
   from the production jj and view-loading wiring inside the app-owned effect boundary.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/app/services.rs` became `src/app/services/mod.rs` with
-  `defaults.rs`.
+- Changed source shape: `src/app/services.rs` became `src/app/services/mod.rs` with `defaults.rs`.
 - Implementation outcome: the root now keeps the typed function aliases, the `AppServices` field
   table, the thin accessor methods, and the two `App` wrappers for current-view refresh and reveal.
   `defaults.rs` now owns the production jj runners, refresh/reveal forwarding, and default
@@ -9814,8 +9852,8 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-22` from local validation commands in this turn.
   - Files: `src/app/services/mod.rs`, `src/app/services/defaults.rs`,
-    `src/app/navigation/startup.rs`, `src/app/actions/completion/working_copy.rs`,
-    and this process note.
+    `src/app/navigation/startup.rs`, `src/app/actions/completion/working_copy.rs`, and this process
+    note.
 
 ### 2026-05-22 (`menus/model` subtree split)
 
@@ -9826,20 +9864,19 @@ belong here.
 - Changed source shape: `src/menus/model.rs` became `src/menus/model/mod.rs` with `action.rs`,
   `prompt.rs`, and `menu.rs`.
 - Implementation outcome: the root now just states the shared menu-model owner and re-export
-  surface. `action.rs` owns `ActionKind`, `SafetyTier`, and the preview-required marker;
-  `prompt.rs` owns `RolePrompt` and `RolePromptOption`; and `menu.rs` owns `FollowUp`,
-  `ActionMenuItem`, and `ActionMenu`.
+  surface. `action.rs` owns `ActionKind`, `SafetyTier`, and the preview-required marker; `prompt.rs`
+  owns `RolePrompt` and `RolePromptOption`; and `menu.rs` owns `FollowUp`, `ActionMenuItem`, and
+  `ActionMenu`.
 - Behavior preserved: the public `crate::menus` surface, action shortcuts and labels, role-prompt
   status text, follow-up payload shapes, revision-action menu building, operation-log action-menu
   behavior, and help or navigation consumers all stayed under the existing focused tests.
 - Validation trail: `cargo check`; `cargo test revision_actions -- --test-threads=1` with 7 tests;
-  `cargo test app::tests::command_navigation -- --test-threads=1` with 35 tests; `cargo test
-  operation_log -- --test-threads=1` with 29 tests.
+  `cargo test app::tests::command_navigation -- --test-threads=1` with 35 tests;
+  `cargo test   operation_log -- --test-threads=1` with 29 tests.
 - Evidence basis:
   - Date: `2026-05-22` from local validation commands in this turn.
-  - Files: `src/menus/model/mod.rs`, `src/menus/model/action.rs`,
-    `src/menus/model/prompt.rs`, `src/menus/model/menu.rs`, `src/menus/mod.rs`,
-    and this process note.
+  - Files: `src/menus/model/mod.rs`, `src/menus/model/action.rs`, `src/menus/model/prompt.rs`,
+    `src/menus/model/menu.rs`, `src/menus/mod.rs`, and this process note.
 
 ### 2026-05-22 (`help` subtree split)
 
@@ -9849,21 +9886,20 @@ belong here.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/help/mod.rs` now acts as a root over `model.rs`, `projection.rs`,
   `metadata.rs`, and the existing `tests.rs`.
-- Implementation outcome: the root now just states and re-exports the help owner. `model.rs`
-  owns `HelpContext`, `HelpSectionKind`, `HelpRow`, and `HelpSection`; `projection.rs` owns
-  help-row grouping and the public `project_help` pipeline; and `metadata.rs` owns the
-  command/view-command visibility and wording tables that drive help projection.
-- Behavior preserved: the `crate::command` help re-export surface, help binding filtering,
-  generated help grouping, operation-log help wording, document-view wrap and scroll help,
-  command-navigation help behavior, and TUI help overlay projection all stayed under the existing
-  focused tests.
+- Implementation outcome: the root now just states and re-exports the help owner. `model.rs` owns
+  `HelpContext`, `HelpSectionKind`, `HelpRow`, and `HelpSection`; `projection.rs` owns help-row
+  grouping and the public `project_help` pipeline; and `metadata.rs` owns the command/view-command
+  visibility and wording tables that drive help projection.
+- Behavior preserved: the `crate::command` help re-export surface, help binding filtering, generated
+  help grouping, operation-log help wording, document-view wrap and scroll help, command-navigation
+  help behavior, and TUI help overlay projection all stayed under the existing focused tests.
 - Validation trail: `cargo check`; `cargo test help -- --test-threads=1` with 23 tests;
-  `cargo test command_navigation -- --test-threads=1` with 35 tests; `cargo test tui::tests
-  -- --test-threads=1` with 15 tests.
+  `cargo test command_navigation -- --test-threads=1` with 35 tests;
+  `cargo test tui::tests   -- --test-threads=1` with 15 tests.
 - Evidence basis:
   - Date: `2026-05-22` from local validation commands in this turn.
-  - Files: `src/help/mod.rs`, `src/help/model.rs`, `src/help/projection.rs`,
-    `src/help/metadata.rs`, `src/help/tests.rs`, and this process note.
+  - Files: `src/help/mod.rs`, `src/help/model.rs`, `src/help/projection.rs`, `src/help/metadata.rs`,
+    `src/help/tests.rs`, and this process note.
 
 ### 2026-05-22 (`app/reducers` subtree split)
 
@@ -9871,8 +9907,8 @@ belong here.
   and confirmation-pane reducers into local owners instead of one broad modal-input bucket.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/app/reducers/mod.rs` now acts as a root over `prompts.rs`,
-  `menu.rs`, `confirmation.rs`, and the existing `tests.rs`.
+- Changed source shape: `src/app/reducers/mod.rs` now acts as a root over `prompts.rs`, `menu.rs`,
+  `confirmation.rs`, and the existing `tests.rs`.
 - Implementation outcome: the root now just states the reducer owner and re-export surface used by
   `app/input`. `prompts.rs` owns text-prompt editing plus prompt-accept and rewrite-plan building;
   `menu.rs` owns menu navigation, role-prompt decisions, and help-overlay local key handling; and
@@ -9882,13 +9918,12 @@ belong here.
   prompt to rebase or squash plan conversion, help overlay close and scroll keys, view menu
   movement, and working-copy rewrite preview flows all stayed under the existing focused tests.
 - Validation trail: `cargo check`; `cargo test app::reducers -- --test-threads=1` with 12 tests;
-  `cargo test command_navigation -- --test-threads=1` with 35 tests; `cargo test
-  working_copy_actions -- --test-threads=1` with 27 tests.
+  `cargo test command_navigation -- --test-threads=1` with 35 tests;
+  `cargo test   working_copy_actions -- --test-threads=1` with 27 tests.
 - Evidence basis:
   - Date: `2026-05-22` from local validation commands in this turn.
-  - Files: `src/app/reducers/mod.rs`, `src/app/reducers/prompts.rs`,
-    `src/app/reducers/menu.rs`, `src/app/reducers/confirmation.rs`,
-    `src/app/reducers/tests.rs`, and this process note.
+  - Files: `src/app/reducers/mod.rs`, `src/app/reducers/prompts.rs`, `src/app/reducers/menu.rs`,
+    `src/app/reducers/confirmation.rs`, `src/app/reducers/tests.rs`, and this process note.
 
 ### 2026-05-22 (`command/bindings` subtree split)
 
@@ -9898,20 +9933,20 @@ belong here.
 - Model / routing: main-thread structural refactor. No worker was used.
 - Changed source shape: `src/command/bindings.rs` became `src/command/bindings/mod.rs` with
   `matching.rs`.
-- Implementation outcome: the root now owns `KeyPattern`, `Binding`, and the private
-  `KeySequence` plus the user-visible key labeling and shifted-character normalization rules.
-  `matching.rs` now owns `BindingMatch`, exact and prefix sequence matching, help-visible
-  binding filtering, and next-key label derivation for pending prefixes.
+- Implementation outcome: the root now owns `KeyPattern`, `Binding`, and the private `KeySequence`
+  plus the user-visible key labeling and shifted-character normalization rules. `matching.rs` now
+  owns `BindingMatch`, exact and prefix sequence matching, help-visible binding filtering, and
+  next-key label derivation for pending prefixes.
 - Behavior preserved: key labels, shifted uppercase matching, exact and prefix binding matching,
-  help-visible binding filtering, pending-prefix next-key labels, and app command-navigation
-  prefix fallback behavior all stayed under the existing focused tests.
+  help-visible binding filtering, pending-prefix next-key labels, and app command-navigation prefix
+  fallback behavior all stayed under the existing focused tests.
 - Validation trail: `cargo check`; `cargo test command -- --test-threads=1` with 86 tests;
-  `cargo test command_navigation -- --test-threads=1` with 35 tests; `cargo test help
-  -- --test-threads=1` with 23 tests.
+  `cargo test command_navigation -- --test-threads=1` with 35 tests;
+  `cargo test help   -- --test-threads=1` with 23 tests.
 - Evidence basis:
   - Date: `2026-05-22` from local validation commands in this turn.
-  - Files: `src/command/bindings/mod.rs`, `src/command/bindings/matching.rs`,
-    `src/command/mod.rs`, `src/command/tests.rs`, and this process note.
+  - Files: `src/command/bindings/mod.rs`, `src/command/bindings/matching.rs`, `src/command/mod.rs`,
+    `src/command/tests.rs`, and this process note.
 
 ### 2026-05-22 (`jj/view_spec` args split)
 
@@ -9920,8 +9955,8 @@ belong here.
   format state.
 - Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread structural refactor. No worker was used.
-- Changed source shape: `src/jj/view_spec/mod.rs` now acts as a root over `args.rs` and the
-  existing `tests.rs`.
+- Changed source shape: `src/jj/view_spec/mod.rs` now acts as a root over `args.rs` and the existing
+  `tests.rs`.
 - Implementation outcome: the root now keeps `DiffFormat`, `ViewSpec`, exact-target provenance,
   app/jj labeling, and detail-navigation methods. `args.rs` now owns the direct-startup parsing
   helpers for `--git`, `jj show` positional revsets, `jj diff` revision options, and generic
@@ -9931,12 +9966,12 @@ belong here.
   operation show/diff target handling, and app command-navigation startup parsing all stayed under
   the existing focused tests.
 - Validation trail: `cargo check`; `cargo test jj::view_spec -- --test-threads=1` with 31 tests;
-  `cargo test command_navigation -- --test-threads=1` with 35 tests; `cargo test show
-  -- --test-threads=1` with 47 tests.
+  `cargo test command_navigation -- --test-threads=1` with 35 tests;
+  `cargo test show   -- --test-threads=1` with 47 tests.
 - Evidence basis:
   - Date: `2026-05-22` from local validation commands in this turn.
-  - Files: `src/jj/view_spec/mod.rs`, `src/jj/view_spec/args.rs`,
-    `src/jj/view_spec/tests.rs`, `src/app/navigation/startup.rs`, and this process note.
+  - Files: `src/jj/view_spec/mod.rs`, `src/jj/view_spec/args.rs`, `src/jj/view_spec/tests.rs`,
+    `src/app/navigation/startup.rs`, and this process note.
 
 ### 2026-05-22 (`bookmarks/rows` subtree split)
 
@@ -9955,9 +9990,9 @@ belong here.
   bookmark state classification, fail-closed degradation on row-count drift, exact target id
   pairing, bookmark movement and search behavior, and bookmark action gating all stayed under the
   existing focused tests.
-- Validation trail: `cargo check`; `cargo test bookmarks::rows -- --test-threads=1` with
-  10 tests; `cargo test bookmarks::tests -- --test-threads=1` with 19 tests; `cargo test
-  bookmark_actions -- --test-threads=1` with 27 tests.
+- Validation trail: `cargo check`; `cargo test bookmarks::rows -- --test-threads=1` with 10 tests;
+  `cargo test bookmarks::tests -- --test-threads=1` with 19 tests;
+  `cargo test   bookmark_actions -- --test-threads=1` with 27 tests.
 - Evidence basis:
   - Date: `2026-05-22` from local validation commands in this turn.
   - Files: `src/bookmarks/rows/mod.rs`, `src/bookmarks/rows/metadata.rs`,

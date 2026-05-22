@@ -1,4 +1,5 @@
-use super::*;
+use super::plan::DESCRIPTION_FIRST_LINE_TEMPLATE;
+use super::{JjAbandonPlan, JjAbandonPreview};
 
 #[test]
 fn abandon_plan_uses_exact_revision_command_shape() {
