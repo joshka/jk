@@ -1,7 +1,4 @@
 //! Binary entry point for `jk`.
-//!
-//! This crate installs `color_eyre` and then hands control to `app::run`.
-//! Process setup stays here; feature behavior starts in the app boundary.
 
 mod actions;
 mod app;
@@ -16,15 +13,14 @@ mod jj;
 mod log;
 mod menus;
 mod modes;
-mod rendered_rows;
-mod terminal_process;
-
 mod operation_log;
+mod rendered_rows;
 mod resolve;
 mod search;
 mod selection;
 mod show;
 mod status;
+mod terminal_process;
 mod tui;
 mod view_state;
 mod workspaces;
