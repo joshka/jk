@@ -6,7 +6,8 @@
 //! how the app-level diff format toggle rewrites args, and how direct startup
 //! commands recover a navigation revset from argv.
 
-use super::{JjCommand, LogViewMode, option_value};
+use super::command::option_value;
+use super::{JjCommand, LogViewMode};
 
 /// The diff presentation selected by `jk`'s view-format modal.
 ///
@@ -44,8 +45,8 @@ impl DiffFormat {
 /// from parsing a direct startup revset such as `main` or `@`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ViewSpec {
-    pub(super) command: JjCommand,
-    pub(super) args: Vec<String>,
+    command: JjCommand,
+    args: Vec<String>,
     target: Option<String>,
     target_is_exact_change: bool,
     path: Option<String>,

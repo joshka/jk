@@ -7674,3 +7674,38 @@ belong here.
   - Files: `src/action_menu/mod.rs`, `src/action_menu/model.rs`,
     `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
+
+### 2026-05-21 (jj command-boundary root split)
+
+- Slice / task: apply the epage module-layout rule to the existing `jj` split module while
+  preserving the `crate::jj` command/process API.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: `gpt-5.5` medium worker handled the bounded Rust split. The main thread owned jj
+  change creation, review, validation reruns, and documentation updates.
+- Changed files: `src/jj/mod.rs`, `src/jj/command.rs`, `src/jj/process.rs`,
+  `src/jj/view_spec/mod.rs`, `docs/agent/cleanup-wave-status.md`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `src/jj/mod.rs` is now a table-of-contents root. Command vocabulary,
+  log-view modes, revset constants, and argv construction moved to `src/jj/command.rs`; process
+  execution, color handling, direct runners, output parsing, workspace root loading, and exact
+  change-id resolution moved to `src/jj/process.rs`.
+- Behavior-preservation evidence: the packet did not intentionally change jj argv construction,
+  command labels, log view mode behavior, rendered output loading, color handling, workspace root
+  loading, git remote parsing, output summarization, exact change-id parsing, `ViewSpec` behavior,
+  or public imports from `crate::jj`.
+- Rework / surprise: the worker split initially introduced custom visibility. After the user
+  clarified the preference for private or plain `pub` only, main review removed custom visibility
+  from `src/jj`, kept `ViewSpec` fields private, and routed sibling access through methods.
+- Process observation: the ledger now records that custom visibility should not be a default design
+  tool. Use private structure or plain `pub`; require a design note before adding `pub(crate)`,
+  `pub(super)`, or `pub(in ...)`.
+- Validation trail: worker validation passed and main-thread review reran
+  `cargo test jj -- --test-threads=1` with 107 passed and 2 ignored,
+  `cargo test view_state -- --test-threads=1` with 11 tests, `cargo check`, and
+  `rustup run nightly cargo fmt --check` with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 17:22:44 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/jj/mod.rs`, `src/jj/command.rs`, `src/jj/process.rs`, `src/jj/view_spec/mod.rs`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.

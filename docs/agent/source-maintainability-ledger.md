@@ -58,6 +58,10 @@ for example `name/mod.rs` plus `name/tests.rs`, rather than `name/tests/mod.rs` 
 a second level only when the child concept has enough internal structure to repay the extra
 navigation.
 
+Prefer either private items or plain `pub` items. Avoid custom visibility such as `pub(crate)`,
+`pub(super)`, and `pub(in ...)` unless a dedicated design note justifies why plain public-within-a
+private-module or private structure is worse.
+
 Treat long module names as naming pressure after structural ownership is stable. Names such as
 `jj_actions`, `rendered_jj`, `sticky_file_view`, and `interactive_process` may be accurate but
 verbose; evaluate shorter names in dedicated rename packets so import churn, docs, and tests stay
@@ -129,6 +133,28 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 jj command-boundary root split:
+
+- `src/jj/mod.rs` is now the `jj` command-boundary root and table of contents. It declares
+  `command`, `process`, `view_spec`, and tests while preserving stable imports from `crate::jj`.
+- `src/jj/command.rs` owns `JjCommand`, `LogViewMode`, revset constants, command words,
+  operation-log prefix args, direct command argv helpers, and template command argument assembly.
+- `src/jj/process.rs` owns process execution, color handling, direct command runners, interactive
+  command construction, workspace root loading, git remote parsing, output summarization, rendered
+  template loading, and exact change-id resolution.
+- `src/jj/view_spec/mod.rs` keeps `ViewSpec` fields private and uses normal accessors across the
+  sibling split. The final reviewed packet contains no custom visibility inside `src/jj`.
+- The packet removes the old `src/jj.rs` plus `src/jj/` pair and applies the epage module-layout
+  rule through a single-level command/process split.
+- The packet intentionally preserved jj argv construction, command labels, log view modes, rendered
+  output loading, color handling including `NO_COLOR` removal, workspace root loading, git remote
+  parsing, output summarization, exact change-id parsing, `ViewSpec` behavior, and public imports.
+- Validation passed: `cargo test jj -- --test-threads=1`;
+  `cargo test view_state -- --test-threads=1`; `cargo check`; and
+  `rustup run nightly cargo fmt --check`.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `app`, `app/action_lifecycle`,
+  `app/mode_input`, `graph`, and `tui`.
 
 2026-05-21 action-menu root split:
 
