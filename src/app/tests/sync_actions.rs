@@ -4,7 +4,7 @@ use super::support::*;
 
 #[test]
 fn default_fetch_runs_immediately_and_keeps_result_output() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
     app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
         .unwrap();
@@ -33,7 +33,7 @@ fn default_fetch_runs_immediately_and_keeps_result_output() {
 
 #[test]
 fn graph_remote_fetch_key_opens_remote_prompt_for_multiple_remotes() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
     app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
         .unwrap();
@@ -51,7 +51,7 @@ fn graph_remote_fetch_key_opens_remote_prompt_for_multiple_remotes() {
 
 #[test]
 fn fetch_remote_prompt_selects_remote_for_preview() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.open_fetch_remote_prompt();
 
     app.handle_mode_key(crossterm::event::KeyCode::Down, 12)
@@ -85,7 +85,7 @@ fn fetch_remote_prompt_selects_remote_for_preview() {
 
 #[test]
 fn fetch_remote_skips_prompt_for_single_remote() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.git_remotes_load = mock_single_remote;
 
     app.open_fetch_remote_prompt();
@@ -106,7 +106,7 @@ fn fetch_remote_skips_prompt_for_single_remote() {
 
 #[test]
 fn fetch_remote_reports_no_remotes_with_readable_output() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.git_remotes_load = mock_no_remotes;
 
     app.open_fetch_remote_prompt();
@@ -132,7 +132,7 @@ fn fetch_remote_reports_no_remotes_with_readable_output() {
 
 #[test]
 fn fetch_remote_reports_remote_list_errors_with_readable_output() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.git_remotes_load = mock_remotes_failure;
 
     app.open_fetch_remote_prompt();
@@ -155,7 +155,7 @@ fn fetch_remote_reports_remote_list_errors_with_readable_output() {
 
 #[test]
 fn fetch_preview_enter_runs_remote_fetch_and_keeps_result_output() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.open_fetch_preview("origin".to_owned());
 
     app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
@@ -179,7 +179,7 @@ fn fetch_preview_enter_runs_remote_fetch_and_keeps_result_output() {
 
 #[test]
 fn fetch_failure_keeps_error_output() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.git_fetch_run = mock_fetch_failure;
     app.open_fetch_preview("origin".to_owned());
 
@@ -206,7 +206,7 @@ fn fetch_failure_keeps_error_output() {
 
 #[test]
 fn fetch_success_with_refresh_error_keeps_output() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.refresh_view = mock_refresh_failure;
     app.open_fetch_preview("origin".to_owned());
 
@@ -226,23 +226,23 @@ fn fetch_success_with_refresh_error_keeps_output() {
 }
 
 #[test]
-fn open_push_prompt_requires_exact_graph_revision() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
+fn open_push_prompt_requires_exact_log_revision() {
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
     assert!(!app.open_push_prompt().unwrap());
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
-        "push from graph requires a selected row with an exact revision"
+        "push from log requires a selected row with an exact revision"
     );
 }
 
 #[test]
 fn open_push_prompt_skips_remote_prompt_for_single_remote() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.git_remotes_load = mock_single_remote;
 
@@ -261,14 +261,14 @@ fn open_push_prompt_skips_remote_prompt_for_single_remote() {
     );
     assert_eq!(
         output.status_context().map(String::as_str),
-        Some("graph push targets exact selected revision 'abcdef' on remote origin")
+        Some("log push targets exact selected revision 'abcdef' on remote origin")
     );
 }
 
 #[test]
 fn open_push_prompt_keeps_remote_prompt_for_multiple_remotes() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.git_remotes_load = mock_multiple_remotes;
 
@@ -290,8 +290,8 @@ fn open_push_prompt_keeps_remote_prompt_for_multiple_remotes() {
 
 #[test]
 fn open_push_prompt_reports_no_remote_error() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.git_remotes_load = mock_no_remotes;
 
@@ -315,14 +315,14 @@ fn open_push_prompt_reports_unsupported_view_error() {
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
-        "push is only available from graph, status, or bookmarks views"
+        "push is only available from log, status, or bookmarks views"
     );
 }
 
 #[test]
 fn push_preview_context_names_status_default_resolution() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
 
     app.open_push_preview(JjGitPushTarget::Status, "origin".to_owned());
@@ -373,15 +373,15 @@ fn push_preview_context_names_exact_bookmark() {
 
 #[test]
 fn push_result_keeps_context_until_closed() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_revision("abcdef".to_owned()).with_remote("origin"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj git push --dry-run --remote origin --revision abcdef".to_owned(),
             "preview only".to_owned(),
-            Some("graph push targets exact selected revision 'abcdef' on remote origin".to_owned()),
+            Some("log push targets exact selected revision 'abcdef' on remote origin".to_owned()),
         ),
     };
 
@@ -395,7 +395,7 @@ fn push_result_keeps_context_until_closed() {
     assert!(output.completed());
     assert_eq!(
         output.status_context().map(String::as_str),
-        Some("graph push targets exact selected revision 'abcdef' on remote origin")
+        Some("log push targets exact selected revision 'abcdef' on remote origin")
     );
     assert!(
         output
@@ -411,12 +411,12 @@ fn push_result_keeps_context_until_closed() {
 
 #[test]
 fn push_preview_entering_cancel_restores_normal_mode() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_status().with_remote("origin"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj git push --remote origin --revision abcdef".to_owned(),
             "preview only".to_owned(),
             None,
@@ -433,16 +433,16 @@ fn push_preview_entering_cancel_restores_normal_mode() {
 
 #[test]
 fn push_confirm_success_with_refresh_error_keeps_output() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.refresh_view = mock_refresh_failure;
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_revision("abcdef".to_owned()).with_remote("origin"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj git push --dry-run --remote origin --revision abcdef".to_owned(),
             "preview only".to_owned(),
-            Some("graph push targets exact selected revision 'abcdef' on remote origin".to_owned()),
+            Some("log push targets exact selected revision 'abcdef' on remote origin".to_owned()),
         ),
     };
 
@@ -463,12 +463,12 @@ fn push_confirm_success_with_refresh_error_keeps_output() {
 
 #[test]
 fn push_preview_completion_stays_until_closed() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_status().with_remote("origin"),
-        output: ActionOutput::finished(
+        output: ActionPane::finished(
             "jj git push --remote origin".to_owned(),
             "pushed".to_owned(),
             Some("status push uses jj default target resolution for remote origin".to_owned()),

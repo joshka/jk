@@ -161,27 +161,31 @@ indirection without improving the reader path.
 
 The code is organized by vertical slices where practical:
 
-- `app.rs` owns the terminal event loop, key dispatch, modal state, view stack, refresh, and
+- `app/mod.rs` owns the terminal event loop, key dispatch, modal state, view stack, refresh, and
   cross-view transitions.
-- `view_state.rs` routes app-level view operations to graph, show, and diff view implementations.
-- `command.rs` owns key binding metadata and the command/effect vocabulary shared between app
+- `view_state/mod.rs` routes app-level view operations to log, show, and diff view implementations.
+- `command/mod.rs` owns key binding metadata and the command/effect vocabulary shared between app
   dispatch and individual views.
-- `jj.rs` builds `jj` commands, owns `ViewSpec`, loads rendered CLI output, and parses only the
-  minimal graph/revset metadata `jk` needs.
-- `graph.rs` owns the default/log graph view, graph-row selection, graph search, and graph-to-detail
+- `menus/mod.rs` owns shared menu vocabulary and prompt models. Feature roots own action
+  availability and target selection.
+- `jj/mod.rs` is the `jj` process and command-construction boundary. It owns `ViewSpec`, CLI process
+  helpers, and `jj` syntax helpers while parsing only the minimal graph/revset metadata `jk` needs.
+- `log/mod.rs` owns the default/log view, log-row selection, log search, and log-to-detail
   navigation.
-- `show.rs` and `diff.rs` own their view policy and should stay distinct even when they share
-  document mechanics.
-- `sticky_file_view.rs` owns shared show/diff document scrolling, file jumping, sticky heading
-  projection, and document search.
-- `rendered_jj.rs` owns lightweight structure over rendered jj lines, including file heading
-  detection and sticky projection inputs.
+- `show/mod.rs` and `diff/mod.rs` own their view policy and should stay distinct even when they
+  share document mechanics.
+- `documents/mod.rs` owns shared rendered document structure, show/diff/status/operation-detail
+  document scrolling, file jumping, sticky heading projection, and document search.
+- `rendered_rows.rs` owns only shared rendered-row helpers; feature-specific row policy belongs in
+  feature roots such as `log/rows.rs`, `bookmarks/rows/mod.rs`, and `operation_log/rows.rs`.
 - `search.rs`, `selection.rs`, `copy.rs`, and `clipboard.rs` own narrow support concepts and should
   not accumulate view policy.
-- `tui.rs` owns shared chrome only: layout, status/header rendering, overlays, and modal
+- `terminal_process/mod.rs` owns inherited-stdio terminal suspension and restoration for interactive
+  commands.
+- `tui/mod.rs` owns shared chrome only: layout, status/header rendering, overlays, and modal
   presentation.
 
-Avoid letting `ui`, `jj`, `actions`, `jj_rows`, `action_menu`, `tui`, or `view_state` become dumping
+Avoid letting `ui`, `jj`, `actions`, `rendered_rows`, `menus`, `tui`, or `view_state` become dumping
 grounds for feature policy. Add a module only when it gives a real concept a local home. Avoid broad
 reorganization unless it improves the reader path for a concrete change.
 
@@ -284,7 +288,7 @@ screenshots only for meaningful TUI rendering changes.
 
 `jk` intentionally starts from shelling out to `jj` and presenting rendered jj output. This
 preserves user config, templates, colors, graph symbols, and jj CLI behavior. Navigation should
-prefer change ids from graph rows; commit ids are exposed for copying.
+prefer change ids from log rows; commit ids are exposed for copying.
 
 Treat integration choices as theory testing. Rendered output is preferred first for presentation,
 but semantic state should prefer structured or code contracts. Fragile parser assumptions, repeated

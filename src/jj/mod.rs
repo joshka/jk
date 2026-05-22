@@ -7,10 +7,14 @@
 
 mod command;
 mod process;
+mod syntax;
 mod view_spec;
 
 pub use command::{JjCommand, LogViewMode};
 pub use process::{git_remotes, new_trunk, resolve_exact_change_id};
+pub use syntax::{
+    command_label_from_argv, exact_change_id_revset, exact_string_pattern, root_file_fileset,
+};
 pub use view_spec::{DiffFormat, ViewSpec};
 
 pub use process::{

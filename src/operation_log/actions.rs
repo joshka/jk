@@ -7,8 +7,8 @@
 
 use color_eyre::Result;
 
+use crate::actions::CommandOutput;
 use crate::jj::run_direct_args;
-use crate::jj_actions::CommandOutput;
 
 // Operation recovery plans keep global undo/redo separate from selected
 // operation restore/revert, which target one exact operation id.

@@ -84,7 +84,7 @@ fn open_action_menu_rejects_direct_show_startup_revset() {
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
-        "restore/revert from jk show main requires an exact graph-derived revision target"
+        "restore/revert from jk show main requires an exact log-derived revision target"
     );
     assert!(matches!(app.status.kind(), StatusKind::Error));
 }
@@ -101,16 +101,14 @@ fn open_action_menu_rejects_bookmark_derived_show() {
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
-        "restore/revert from jk show change-a requires an exact graph-derived revision target"
+        "restore/revert from jk show change-a requires an exact log-derived revision target"
     );
     assert!(matches!(app.status.kind(), StatusKind::Error));
 }
 
 #[test]
-fn detail_navigation_marks_graph_targets_exact() {
-    let app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(
-        Vec::new(),
-    )));
+fn detail_navigation_marks_log_targets_exact() {
+    let app = test_app(ViewState::Log(crate::log::LogView::test_new(Vec::new())));
 
     let show = app
         .detail_spec(JjCommand::Show, "change-a".to_owned())
@@ -319,9 +317,8 @@ fn restore_action_menu_enter_opens_path_preview() {
         ),
     ));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::detail("change-a")
-                .with_selected_path("src/main.rs"),
+        menu: crate::menus::build_action_menu(
+            &crate::menus::ExactActionContext::detail("change-a").with_selected_path("src/main.rs"),
         ),
         selected: 0,
     };
@@ -359,9 +356,8 @@ fn restore_action_menu_path_shortcut_opens_path_preview() {
         ),
     ));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::detail("change-a")
-                .with_selected_path("src/main.rs"),
+        menu: crate::menus::build_action_menu(
+            &crate::menus::ExactActionContext::detail("change-a").with_selected_path("src/main.rs"),
         ),
         selected: 1,
     };
@@ -382,7 +378,7 @@ fn restore_preview_cancel_restores_normal_mode() {
     )));
     app.mode = InteractionMode::RestorePreview {
         restore: JjRestorePlan::for_revision("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj restore --changes-in exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("restore preview context".to_owned()),
@@ -402,7 +398,7 @@ fn restore_confirm_success_and_failure_keep_output_readable() {
     )));
     app.mode = InteractionMode::RestorePreview {
         restore: JjRestorePlan::for_path("change-a", "src/main.rs"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj restore --changes-in exactly(change_id(\"change-a\"), 1) root-file:\"src/main.rs\""
                 .to_owned(),
             "preview only".to_owned(),
@@ -427,7 +423,7 @@ fn restore_confirm_success_and_failure_keep_output_readable() {
     app.services.restore_run = mock_restore_failure;
     app.mode = InteractionMode::RestorePreview {
         restore: JjRestorePlan::for_revision("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj restore --changes-in exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             None,
@@ -456,9 +452,9 @@ fn revert_action_menu_enter_opens_preview_and_cancel_restores_normal_mode() {
         ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
     )));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::detail("change-a"),
-        ),
+        menu: crate::menus::build_action_menu(&crate::menus::ExactActionContext::detail(
+            "change-a",
+        )),
         selected: 2,
     };
 
@@ -490,7 +486,7 @@ fn revert_confirm_success_and_failure_keep_output_readable() {
     )));
     app.mode = InteractionMode::RevertPreview {
         revert: JjRevertPlan::new("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj revert -r exactly(change_id(\"change-a\"), 1) -o @".to_owned(),
             "preview only".to_owned(),
             Some("revert preview context".to_owned()),
@@ -511,7 +507,7 @@ fn revert_confirm_success_and_failure_keep_output_readable() {
     app.services.revert_run = mock_revert_failure;
     app.mode = InteractionMode::RevertPreview {
         revert: JjRevertPlan::new("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj revert -r exactly(change_id(\"change-a\"), 1) -o @".to_owned(),
             "preview only".to_owned(),
             None,

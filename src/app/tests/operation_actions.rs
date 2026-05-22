@@ -4,8 +4,8 @@ use super::support::*;
 
 #[test]
 fn push_remote_prompt_without_selection_stays_ready() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushRemotePrompt {
         target: JjGitPushTarget::Revision("abcdef".to_owned()),
@@ -342,9 +342,7 @@ fn back_from_operation_detail_returns_to_operation_log() {
     ]);
     let detail = crate::operation_log::detail::OperationDetailView::test_new(
         ViewSpec::operation_show(operation_id),
-        crate::rendered_jj::DocumentLines::new(vec![ratatui::text::Line::from(
-            "operation details",
-        )]),
+        crate::documents::DocumentLines::new(vec![ratatui::text::Line::from("operation details")]),
     );
     let mut app = test_app(ViewState::OperationDetail(detail));
     app.stack.push(ViewState::OperationLog(operation_log));

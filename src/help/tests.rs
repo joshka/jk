@@ -14,7 +14,7 @@ fn project_help_groups_bindings_by_command() {
         Command::View(ViewCommand::OpenShow),
     )];
 
-    let sections = project_help(&global, &view, HelpContext::Graph);
+    let sections = project_help(&global, &view, HelpContext::Log);
 
     assert_eq!(sections[0].title(), "View Switching");
     assert_eq!(sections[0].rows()[0], HelpRow::new("s", "open show"));
@@ -26,7 +26,7 @@ fn project_help_groups_bindings_by_command() {
 fn project_help_exposes_push_only_in_supported_contexts() {
     let global = [Binding::new(KeyPattern::char('p'), Command::Push)];
 
-    let graph_help = project_help(&global, &[], HelpContext::Graph);
+    let graph_help = project_help(&global, &[], HelpContext::Log);
     let status_help = project_help(&global, &[], HelpContext::Status);
     let bookmarks_help = project_help(&global, &[], HelpContext::Bookmarks);
     let show_help = project_help(&global, &[], HelpContext::Show);
@@ -57,7 +57,7 @@ fn project_help_exposes_describe_and_commit_in_honest_contexts() {
         Binding::new(KeyPattern::char('C'), Command::Commit),
     ];
 
-    let graph_help = project_help(&global, &[], HelpContext::Graph);
+    let graph_help = project_help(&global, &[], HelpContext::Log);
     let status_help = project_help(&global, &[], HelpContext::Status);
     let show_help = project_help(&global, &[], HelpContext::Show);
 
@@ -84,14 +84,14 @@ fn project_help_exposes_describe_and_commit_in_honest_contexts() {
 }
 
 #[test]
-fn project_help_exposes_graph_edit_next_and_prev_only_in_graph() {
+fn project_help_exposes_log_edit_next_and_prev_only_in_log() {
     let view = [
         Binding::new(KeyPattern::char('e'), Command::Edit),
         Binding::new(KeyPattern::char(']'), Command::NextEdit),
         Binding::new(KeyPattern::char('['), Command::PrevEdit),
     ];
 
-    let graph_help = project_help(&[], &view, HelpContext::Graph);
+    let graph_help = project_help(&[], &view, HelpContext::Log);
     let show_help = project_help(&[], &view, HelpContext::Show);
 
     assert_eq!(graph_help[0].title(), "Action Previews");
@@ -123,7 +123,7 @@ fn project_help_exposes_bookmark_mutations_only_in_honest_contexts() {
         Binding::sequence(BOOKMARK_UNTRACK, Command::BookmarkUntrack),
     ];
 
-    let graph_help = project_help(&global, &[], HelpContext::Graph);
+    let graph_help = project_help(&global, &[], HelpContext::Log);
     let status_help = project_help(&global, &[], HelpContext::Status);
     let bookmarks_help = project_help(&global, &[], HelpContext::Bookmarks);
     let show_help = project_help(&global, &[], HelpContext::Show);
@@ -227,7 +227,7 @@ fn document_help_exposes_wrap_commands_only_in_document_contexts() {
     ];
 
     let file_show_help = project_help(&[], &view, HelpContext::FileShow);
-    let graph_help = project_help(&[], &view, HelpContext::Graph);
+    let graph_help = project_help(&[], &view, HelpContext::Log);
 
     assert_eq!(file_show_help[0].title(), "Navigation");
     assert_eq!(

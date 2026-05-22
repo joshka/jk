@@ -9,7 +9,7 @@ use color_eyre::Result;
 use ratatui::text::Line;
 
 use crate::jj::{ColorMode, ViewSpec, run_jj};
-use crate::jj_rows::line_text;
+use crate::rendered_rows::line_text;
 
 /// One selectable file item parsed from rendered file-list output.
 ///

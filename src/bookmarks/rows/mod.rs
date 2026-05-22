@@ -14,7 +14,7 @@ use ratatui::text::Line;
 use serde_json::Value;
 
 use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
-use crate::jj_rows::{
+use crate::rendered_rows::{
     boolean_field, line_text, non_empty_string_field, optional_string_field, string_field,
 };
 

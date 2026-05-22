@@ -6,8 +6,8 @@
 
 use color_eyre::Result;
 
-use crate::action_menu::ExactActionContext;
-use crate::jj_actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
+use crate::actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
+use crate::menus::ExactActionContext;
 use crate::status::StatusFileAction;
 use crate::view_state::ViewState;
 
@@ -22,13 +22,13 @@ impl<'a> ViewActionTargets<'a> {
 
     pub(crate) fn push_target(&self) -> Result<Option<JjGitPushTarget>> {
         match self.view {
-            ViewState::Graph(view) => view
+            ViewState::Log(view) => view
                 .selected_revision()
                 .map(|revision| JjGitPushTarget::Revision(revision.to_owned()))
                 .map_or_else(
                     || {
                         Err(color_eyre::eyre::eyre!(
-                            "push from graph requires a selected row with an exact revision"
+                            "push from log requires a selected row with an exact revision"
                         ))
                     },
                     |target| Ok(Some(target)),
@@ -58,13 +58,13 @@ impl<'a> ViewActionTargets<'a> {
 
     pub(crate) fn bookmark_target(&self) -> Result<Option<JjBookmarkTarget>> {
         match self.view {
-            ViewState::Graph(view) => view
+            ViewState::Log(view) => view
                 .selected_revision()
                 .map(|revision| JjBookmarkTarget::exact_change(revision.to_owned()))
                 .map_or_else(
                     || {
                         Err(color_eyre::eyre::eyre!(
-                            "bookmark mutation from graph requires a selected row with an exact revision"
+                            "bookmark mutation from log requires a selected row with an exact revision"
                         ))
                     },
                     |target| Ok(Some(target)),
@@ -97,7 +97,7 @@ impl<'a> ViewActionTargets<'a> {
                 },
                 |name| Ok(Some(name)),
             ),
-            ViewState::Graph(_)
+            ViewState::Log(_)
             | ViewState::Show(_)
             | ViewState::Diff(_)
             | ViewState::Status(_)
@@ -117,7 +117,7 @@ impl<'a> ViewActionTargets<'a> {
             ViewState::Bookmarks(view) => view
                 .selected_bookmark_forget_target()
                 .map(|target| target.map(|(name, forget_target)| (name.to_owned(), forget_target))),
-            ViewState::Graph(_)
+            ViewState::Log(_)
             | ViewState::Show(_)
             | ViewState::Diff(_)
             | ViewState::Status(_)
@@ -132,7 +132,7 @@ impl<'a> ViewActionTargets<'a> {
 
     pub(crate) fn exact_restore_revert_context(&self) -> Result<Option<ExactActionContext>> {
         match self.view {
-            ViewState::Graph(_) => Ok(None),
+            ViewState::Log(_) => Ok(None),
             ViewState::Show(view) => view
                 .spec()
                 .exact_change_target()
@@ -140,7 +140,7 @@ impl<'a> ViewActionTargets<'a> {
                 .map(Some)
                 .ok_or_else(|| {
                     color_eyre::eyre::eyre!(
-                        "restore/revert from {} requires an exact graph-derived revision target",
+                        "restore/revert from {} requires an exact log-derived revision target",
                         view.spec().app_label()
                     )
                 }),
@@ -151,7 +151,7 @@ impl<'a> ViewActionTargets<'a> {
                 .map(Some)
                 .ok_or_else(|| {
                     color_eyre::eyre::eyre!(
-                        "restore/revert from {} requires an exact graph-derived revision target",
+                        "restore/revert from {} requires an exact log-derived revision target",
                         view.spec().app_label()
                     )
                 }),
@@ -171,7 +171,7 @@ impl<'a> ViewActionTargets<'a> {
                     return Ok(Some(ExactActionContext::working_copy_file_path(path)));
                 }
                 Err(color_eyre::eyre::eyre!(
-                    "file actions from {} require a working-copy file list or exact graph-derived revision target",
+                    "file actions from {} require a working-copy file list or exact log-derived revision target",
                     view.spec().app_label()
                 ))
             }
@@ -192,7 +192,7 @@ impl<'a> ViewActionTargets<'a> {
                     return Ok(Some(ExactActionContext::working_copy_file_path(path)));
                 }
                 Err(color_eyre::eyre::eyre!(
-                    "file actions from {} require a working-copy file show or exact graph-derived revision target",
+                    "file actions from {} require a working-copy file show or exact log-derived revision target",
                     view.spec().app_label()
                 ))
             }

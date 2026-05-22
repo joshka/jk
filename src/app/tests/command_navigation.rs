@@ -63,7 +63,7 @@ fn parses_default_resolve_startup_view() {
 
 #[test]
 fn open_resolve_uses_default_target() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
     app.open_resolve().unwrap();
 
@@ -103,7 +103,7 @@ fn rejects_unknown_startup_command() {
 
 #[test]
 fn direct_view_entry_keys_open_shipped_top_level_views() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('S'), KeyModifiers::SHIFT), 12)
@@ -111,7 +111,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
     assert_eq!(app.view.command(), JjCommand::Status);
     assert!(app.pending_command.is_none());
 
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('B'), KeyModifiers::NONE), 12)
@@ -119,7 +119,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
     assert_eq!(app.view.command(), JjCommand::Bookmarks);
     assert!(app.pending_command.is_none());
 
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('X'), KeyModifiers::NONE), 12)
@@ -127,7 +127,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
     assert_eq!(app.view.command(), JjCommand::Workspaces);
     assert!(app.pending_command.is_none());
 
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('O'), KeyModifiers::NONE), 12)
@@ -176,8 +176,8 @@ fn direct_default_key_loads_default_view_and_clears_stack() {
 fn generated_help_uses_same_multikey_and_view_entry_bindings_as_dispatch() {
     let sections = crate::command::project_help(
         APP_BINDINGS,
-        crate::graph::BINDINGS,
-        crate::command::HelpContext::Graph,
+        crate::log::BINDINGS,
+        crate::command::HelpContext::Log,
     );
     let rows = sections
         .iter()
@@ -215,7 +215,7 @@ fn generated_help_uses_same_multikey_and_view_entry_bindings_as_dispatch() {
 
 #[test]
 fn help_menu_executes_listed_command_and_closes() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
@@ -231,7 +231,7 @@ fn help_menu_executes_listed_command_and_closes() {
 
 #[test]
 fn help_menu_close_key_closes_without_executing() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
@@ -245,7 +245,7 @@ fn help_menu_close_key_closes_without_executing() {
 
 #[test]
 fn help_menu_close_key_accepts_shifted_question_mark() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
@@ -260,9 +260,9 @@ fn help_menu_close_key_accepts_shifted_question_mark() {
 
 #[test]
 fn help_menu_ignores_arrow_keys_without_moving_log_selection() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        graph_item("first"),
-        graph_item("second"),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        log_item("first"),
+        log_item("second"),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::SHIFT), 12)
@@ -294,7 +294,7 @@ fn help_menu_does_not_execute_hidden_commands() {
 
 #[test]
 fn help_menu_supports_multikey_options_and_fallbacks() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.git_fetch_run = mock_fetch_success;
 
     app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
@@ -314,8 +314,8 @@ fn help_menu_supports_multikey_options_and_fallbacks() {
 
 #[test]
 fn expired_help_prefix_runs_fallback_before_routing_next_key_to_opened_mode() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        graph_item("change-a"),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        log_item("change-a"),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
@@ -334,9 +334,9 @@ fn expired_help_prefix_runs_fallback_before_routing_next_key_to_opened_mode() {
 
 #[test]
 fn help_prefix_nonmatching_suffix_runs_fallback_then_routes_suffix() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        graph_item("first"),
-        graph_item("second"),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        log_item("first"),
+        log_item("second"),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
@@ -351,7 +351,7 @@ fn help_prefix_nonmatching_suffix_runs_fallback_then_routes_suffix() {
 
 #[test]
 fn help_menu_projection_groups_commands_by_user_operation() {
-    let view = ViewState::Graph(crate::graph::GraphView::test_new(vec![]));
+    let view = ViewState::Log(crate::log::LogView::test_new(vec![]));
     let mode = InteractionMode::Help;
 
     let Overlay::Help { sections } = mode.overlay(&view, APP_BINDINGS) else {
@@ -378,7 +378,7 @@ fn help_menu_projection_groups_commands_by_user_operation() {
 
 #[test]
 fn view_menu_selects_shipped_top_level_views() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
     app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
@@ -408,7 +408,7 @@ fn view_menu_selects_shipped_top_level_views() {
 
 #[test]
 fn view_menu_diff_format_status_names_show_diff_scope() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
     app.apply_view_menu_action(ViewMenuAction::DiffFormat(DiffFormat::Git), 12)
         .unwrap();
@@ -418,8 +418,8 @@ fn view_menu_diff_format_status_names_show_diff_scope() {
 
 #[test]
 fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
@@ -438,7 +438,7 @@ fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
 
 #[test]
 fn multi_key_fetch_dispatches_from_git_prefix() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
     app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
         .unwrap();
@@ -466,7 +466,7 @@ fn multi_key_fetch_dispatches_from_git_prefix() {
 }
 
 #[test]
-fn git_fetch_prefix_does_not_delay_non_graph_g_navigation() {
+fn git_fetch_prefix_does_not_delay_non_log_g_navigation() {
     let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[
         "working copy changes:",
         "M src/app.rs",
@@ -481,8 +481,8 @@ fn git_fetch_prefix_does_not_delay_non_graph_g_navigation() {
 
 #[test]
 fn expired_bookmark_prefix_runs_fallback_before_next_key() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
@@ -500,9 +500,9 @@ fn expired_bookmark_prefix_runs_fallback_before_next_key() {
 
 #[test]
 fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
-    let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("first".to_owned()), None),
-        crate::graph::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+    let mut graph = crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::log::LogItem::new(Vec::new(), Some("second".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -512,15 +512,15 @@ fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
             search: None,
         },
     );
-    let mut app = test_app(ViewState::Graph(graph));
+    let mut app = test_app(ViewState::Log(graph));
 
     app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
         .unwrap();
     app.pending_command.as_mut().unwrap().deadline = Instant::now() - Duration::from_millis(1);
     app.flush_expired_pending_command(12).unwrap();
 
-    let ViewState::Graph(graph) = &app.view else {
-        panic!("expected graph view");
+    let ViewState::Log(graph) = &app.view else {
+        panic!("expected log view");
     };
     assert_eq!(graph.selected_revision(), Some("first"));
     assert!(app.pending_command.is_none());
@@ -529,7 +529,7 @@ fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
 
 #[test]
 fn command_prefix_cancel_does_not_run_global_escape() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
         .unwrap();
@@ -544,8 +544,8 @@ fn command_prefix_cancel_does_not_run_global_escape() {
 
 #[test]
 fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.load_view = mock_load_view;
 

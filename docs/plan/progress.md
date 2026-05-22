@@ -2,11 +2,11 @@
 
 ## Packet 41: Workspace And Root Utility Surface
 
-- Files changed: `src/workspaces.rs`, `src/main.rs`, `src/jj.rs`, `src/jj_rows.rs`,
+- Files changed: `src/workspaces.rs`, `src/main.rs`, `src/jj.rs`, `src/rows.rs`,
   `src/view_state.rs`, `src/command.rs`, `src/app.rs`, `src/app/navigation.rs`,
   `src/app/action_lifecycle/entry.rs`, `src/app/action_lifecycle/completion.rs`,
-  `src/app/tests/command_navigation.rs`, `src/app/tests/support.rs`, `src/app_screen.rs`,
-  `src/app_status.rs`, `src/tui.rs`, `docs/plan/screens/workspaces.md`, `docs/plan/progress.md`,
+  `src/app/tests/command_navigation.rs`, `src/app/tests/support.rs`, `src/screen.rs`,
+  `src/status_line.rs`, `src/tui.rs`, `docs/plan/screens/workspaces.md`, `docs/plan/progress.md`,
   `docs/plan/fragility-register.md`, and `docs/process-observations.md`.
 - Behavior: `jk workspaces`, global `X`, and the view menu now open a read-only workspace/root
   screen. The header shows the current root from `jj root`; the list preserves rendered
@@ -41,17 +41,17 @@
 ## Packet 40: File Track/Untrack/Chmod Actions
 
 - Files changed: `src/status.rs`, `src/file_show.rs`, `src/view_state.rs`, `src/action_menu.rs`,
-  `src/jj_actions.rs`, `src/jj.rs`, `src/app/action_lifecycle/entry.rs`,
+  `src/actions.rs`, `src/jj.rs`, `src/app/action_lifecycle/entry.rs`,
   `src/app/action_lifecycle/preview.rs`, `src/app/action_lifecycle/completion.rs`,
-  `src/app/services.rs`, `src/app/action_flow.rs`, `src/app_screen.rs`, `src/app/mode_input.rs`,
+  `src/app/services.rs`, `src/app/action_flow.rs`, `src/screen.rs`, `src/app/mode_input.rs`,
   `src/tui.rs`, app/view tests, and packet docs.
 - Behavior: status `?` rows offer guided `jj file track`; exact tracked working-copy paths from
   status, file list, and file show offer guided `jj file untrack` and chmod `x`/`n`; exact
   graph-derived file list/show paths offer exact-revision chmod; direct arbitrary revsets and
   ambiguous status rows fail closed.
-- Command safety: every file target is one `root-file:"..."` fileset argument built by
-  `jj_actions.rs`, and file track/untrack/chmod place `--` before the fileset. Chmod exposes only
-  installed jj 0.41 `x` and `n` modes.
+- Command safety: every file target is one `root-file:"..."` fileset argument built by `actions.rs`,
+  and file track/untrack/chmod place `--` before the fileset. Chmod exposes only installed jj 0.41
+  `x` and `n` modes.
 - Proof / validation: disposable jj proof under `/tmp/jk-packet40-proof` verified file track, chmod
   `x`, chmod `n`, exact-revision chmod, status review, and undo; disposable jj proof under
   `/tmp/jk-packet40-untrack-proof` verified untrack after a tracked path became ignored, plus undo.
@@ -62,7 +62,7 @@
   `rustup run nightly cargo fmt --check`; `cargo clippy -- -D warnings`; full `cargo test` passed
   with 501 passed / 2 ignored.
 - Review note: final gpt-5.5 review found no correctness, path-safety, docs, or test blockers and
-  accepted Packet 40. Extraction of `src/jj_actions.rs` and `src/action_menu.rs` was deferred until
+  accepted Packet 40. Extraction of `src/actions.rs` and `src/action_menu.rs` was deferred until
   more file-action policy accumulates.
 - Remaining risk: status file-state gating still depends on narrow rendered `jj status` row parsing
   until a structured status contract is available.
@@ -73,7 +73,7 @@
 - Slice / task: remove known clippy baseline blockers (`dead_code` and `collapsible_if`) and keep
   behavior unchanged.
 - Files changed: `src/app/navigation.rs`, `src/bookmarks.rs`, `src/graph.rs`,
-  `src/operation_log.rs`, `src/jj_rows.rs`
+  `src/operation_log.rs`, `src/rows.rs`
 - Validation: `cargo check`; `cargo clippy -- -D warnings`; focused
   `cargo test bookmarks -- --test-threads=1`; focused `cargo test file_list -- --test-threads=1`;
   focused `cargo test graph -- --test-threads=1`; full `cargo test`;
@@ -940,15 +940,15 @@
 
 ## Pre-Packet-34 Interruption Packet A: App Decomposition And Screen Contracts
 
-- Files changed: `src/action_output.rs`, `src/app.rs`, `src/app_screen.rs`, `src/app_status.rs`,
+- Files changed: `src/action_output.rs`, `src/app.rs`, `src/screen.rs`, `src/status_line.rs`,
   `src/main.rs`, `src/tui.rs`, `docs/agent/architecture.md`,
   `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`, and
   `docs/process-observations.md`
 - Behavior: app dispatch remains the orchestration owner, but modal/screen state and overlay/status
-  projection now live in `app_screen.rs`; status-line construction and per-view count wording now
-  live in `app_status.rs`; action preview/result scroll-key handling now lives in
-  `action_output.rs`. No new user-visible commands, key remapping, parser behavior, or `jj` command
-  semantics were introduced.
+  projection now live in `screen.rs`; status-line construction and per-view count wording now live
+  in `status_line.rs`; action preview/result scroll-key handling now lives in `action_output.rs`. No
+  new user-visible commands, key remapping, parser behavior, or `jj` command semantics were
+  introduced.
 - Architecture contract: `docs/agent/architecture.md` now names owners for keys, screen state,
   overlay projection, status projection, command execution, and view behavior so later interruption
   packets can route work to a narrower owner instead of defaulting to `src/app.rs`.
@@ -1002,10 +1002,10 @@
   `docs/process-observations.md`
 - Behavior: audited the largest and most likely concept-mixed modules after the Packet A `app.rs`
   extraction: `src/jj.rs`, `src/tui.rs`, `src/graph.rs`, `src/command.rs`, `src/action_menu.rs`, and
-  `src/view_state.rs`, with `src/rendered_jj.rs` checked as context for row/rendered-output
-  ownership. The audit promotes `src/jj.rs` as the only immediate high-value split candidate and
-  records two bounded follow-up packets: Packet A1 for `jj` action-plan extraction and Packet A2 for
-  rendered row loading/parser extraction after A1 lands.
+  `src/view_state.rs`, with `src/rendered.rs` checked as context for row/rendered-output ownership.
+  The audit promotes `src/jj.rs` as the only immediate high-value split candidate and records two
+  bounded follow-up packets: Packet A1 for `jj` action-plan extraction and Packet A2 for rendered
+  row loading/parser extraction after A1 lands.
 - Findings: `src/jj.rs` mixes command-plan contracts, `ViewSpec` and view-mode command shape, direct
   process execution, selectable rendered row models, metadata pairing, row grouping, and parsers in
   one file, so future command packets and parser packets force reviewers through unrelated concepts.
@@ -1027,9 +1027,9 @@
 
 ## Interruption Packet A1: Extract `jj` Action Plans
 
-- Files changed: `src/jj_actions.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
+- Files changed: `src/actions.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
   `docs/plan/progress.md`, and `docs/process-observations.md`
-- Behavior: preview-first action and mutation plans moved from `src/jj.rs` into `src/jj_actions.rs`.
+- Behavior: preview-first action and mutation plans moved from `src/jj.rs` into `src/actions.rs`.
   The new owner holds operation recovery/target actions, git push, new, describe, commit,
   edit/next/prev, restore, revert, bookmark mutations, rebase, squash, absorb, abandon, exact
   change-id revset quoting, exact bookmark patterns, root-file fileset quoting, and abandon preview
@@ -1039,8 +1039,8 @@
   summaries, fallback messages, exact quoting helpers, and abandon preview behavior were moved with
   their tests rather than redesigned. `docs/plan/fragility-register.md` is unchanged because no
   parser, rendered-output assumption, or command semantic contract changed.
-- Verification: focused `cargo test jj_actions -- --test-threads=1`; full `cargo test`;
-  `cargo check`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; attempted
+- Verification: focused `cargo test actions -- --test-threads=1`; full `cargo test`; `cargo check`;
+  `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; attempted
   `cargo clippy -- -D warnings`; `just md-fmt`; `just md-check`; attempted `just check`.
 - Validation note: `cargo check` still reports the pre-existing dead-code warnings for
   `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`. Clippy remains blocked
@@ -1050,24 +1050,24 @@
   `rustup run nightly cargo fmt --check`, full tests, cargo check, and Markdown checks passed.
 - Remaining risk: `src/jj.rs` still owns rendered row loading, metadata pairing, and parser tests
   until Packet A2. The compatibility re-exports keep call-site churn low, but future work should
-  import directly from `jj_actions.rs` once the module boundary is established.
+  import directly from `actions.rs` once the module boundary is established.
 - Next slice: Interruption Packet A2: Extract `jj` Rendered Row Loading, after Packet A1 review
   confirms command-plan behavior was preserved.
 
 ## Interruption Packet A2: Extract `jj` Rendered Row Loading
 
-- Files changed: `src/jj_rows.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
+- Files changed: `src/rows.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
   `docs/plan/progress.md`, and `docs/process-observations.md`
 - Behavior: selectable rendered row models, row loaders, metadata-template pairing, row grouping,
   resolve JSON parsing, file-list path parsing, and row parser tests moved from `src/jj.rs` to
-  `src/jj_rows.rs`. `src/jj.rs` keeps `ViewSpec`, command identity, navigation target provenance,
+  `src/rows.rs`. `src/jj.rs` keeps `ViewSpec`, command identity, navigation target provenance,
   diff-format arguments, direct process helpers, and compatibility re-exports for existing imports.
 - Product boundary: this is a behavior-preserving extraction. Row grouping, bookmark metadata
   pairing, operation-id pairing, resolve JSON degradation, file-list path preservation, and
   ANSI-to-Ratatui conversion behavior were moved with their tests rather than redesigned.
   `docs/plan/fragility-register.md` remains unchanged because no parser assumption or
   rendered-output contract changed.
-- Verification: focused `cargo test jj_rows`; focused `cargo test jj::tests`; full `cargo test`;
+- Verification: focused `cargo test rows`; focused `cargo test jj::tests`; full `cargo test`;
   `cargo check`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; attempted
   `cargo clippy -- -D warnings`; `just md-check`.
 - Validation note: `cargo check` still reports pre-existing dead-code warnings for
@@ -1077,14 +1077,14 @@
   the existing local rustfmt configuration warnings about unstable options but exits successfully.
 - Remaining risk: row APIs are still compatibility re-exported through `src/jj.rs`, so call sites
   can continue compiling without a broad import rewrite. Future cleanup can switch imports to
-  `jj_rows.rs` directly if the module boundary remains accepted.
+  `rows.rs` directly if the module boundary remains accepted.
 - Final 5.5 acceptance found no findings for Packet A2.
 - Next slice: Interruption Packet B: Navigation And View Entry Contracts.
 
 ## Interruption Packet B: Navigation And View Entry Contracts
 
-- Files changed: `src/app.rs`, `src/app_screen.rs`, `src/bookmarks.rs`, `src/command.rs`,
-  `src/diff.rs`, `src/operation_log.rs`, `src/show.rs`, `src/status.rs`, `src/tui.rs`, `README.md`,
+- Files changed: `src/app.rs`, `src/screen.rs`, `src/bookmarks.rs`, `src/command.rs`, `src/diff.rs`,
+  `src/operation_log.rs`, `src/show.rs`, `src/status.rs`, `src/tui.rs`, `README.md`,
   `docs/plan/command-inventory.md`, `docs/plan/screens/bookmarks.md`, `docs/plan/screens/diff.md`,
   `docs/plan/screens/files.md`, `docs/plan/screens/help-keymap.md`,
   `docs/plan/screens/operation-log.md`, `docs/plan/screens/resolve.md`, `docs/plan/screens/show.md`,
@@ -1249,8 +1249,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 
 ### Packet D Review Repair
 
@@ -1278,8 +1278,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 - Final 5.5 acceptance:
   - Packet D accepted as-is after repair with no blocking findings.
   - Acceptance evidence: `theme::active_row_style()` leaves foreground unset;
@@ -1293,7 +1293,7 @@
 ## Interruption Packet E: Status File Actions
 
 - Files changed: `src/status.rs`, `src/view_state.rs`, `src/action_menu.rs`, `src/app.rs`,
-  `src/jj_actions.rs`, `src/command.rs`, `src/tui.rs`, `docs/plan/progress.md`,
+  `src/actions.rs`, `src/command.rs`, `src/tui.rs`, `docs/plan/progress.md`,
   `docs/process-observations.md`, and `docs/plan/fragility-register.md`.
 - Behavior: status is now a row-selectable view. Each rendered status line remains the presentation
   source, while `StatusRow` records whether the line confidently owns one exact repo-relative path.
@@ -1324,8 +1324,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 - Remaining risk: the exact-path parser intentionally recognizes only the narrow default single-path
   `jj status` row shape. If jj status output becomes configurable or gains structured output
   suitable for status files, this should move to a stronger contract instead of expanding
@@ -1382,8 +1382,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 
 ## App Decomposition Slice 3
 
@@ -1420,8 +1420,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 
 ## App Decomposition Slice 4
 
@@ -1450,8 +1450,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 
 ## App Decomposition Slice 5
 
@@ -1483,8 +1483,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 
 ## App Decomposition Slice 6
 
@@ -1514,15 +1514,15 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code and `collapsible_if`
-    findings in `src/file_show.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/bookmarks.rs`,
-    `src/graph.rs`, and `src/operation_log.rs`.
+    findings in `src/file_show.rs`, `src/jj.rs`, `src/rows.rs`, `src/bookmarks.rs`, `src/graph.rs`,
+    and `src/operation_log.rs`.
 
 ## Interruption Packet F: Fetch Remote Selection
 
-- Files changed: `src/jj_actions.rs`, `src/jj.rs`, `src/app/services.rs`, `src/app.rs`,
-  `src/app/action_lifecycle.rs`, `src/app/action_flow.rs`, `src/app/mode_input.rs`,
-  `src/app_screen.rs`, `src/tui.rs`, `src/command.rs`, `src/graph.rs`, `src/app/tests.rs`,
-  `docs/plan/progress.md`, `docs/process-observations.md`, and `docs/plan/fragility-register.md`.
+- Files changed: `src/actions.rs`, `src/jj.rs`, `src/app/services.rs`, `src/app.rs`,
+  `src/app/action_lifecycle.rs`, `src/app/action_flow.rs`, `src/app/mode_input.rs`, `src/screen.rs`,
+  `src/tui.rs`, `src/command.rs`, `src/graph.rs`, `src/app/tests.rs`, `docs/plan/progress.md`,
+  `docs/process-observations.md`, and `docs/plan/fragility-register.md`.
 - Behavior: default fetch remains a direct `jj git fetch` on `f` and graph `gf`, but the raw result
   now stays inspectable in the shared action-output result overlay after the command runs. Explicit
   remote fetch is available through global `F` and graph `gr`; one remote opens the fetch preview
@@ -1558,7 +1558,7 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-    `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+    `src/file_show.rs`, `src/jj.rs`, and `src/rows.rs`, plus known `collapsible_if` findings in
     `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 - Rework: an attempted `cargo test` invocation used two test-name filters in one command, which
   Cargo rejected. The focused `JjGitFetch` argv and remote parser tests were rerun as separate
@@ -1585,7 +1585,7 @@
 
 ## Interruption Packet G: File Viewing And Wrap Modes
 
-- Files changed: `src/sticky_file_view.rs`, `src/file_show.rs`, `src/show.rs`, `src/diff.rs`,
+- Files changed: `src/document.rs`, `src/file_show.rs`, `src/show.rs`, `src/diff.rs`,
   `src/command.rs`, `src/view_state.rs`, `src/app.rs`, `src/app/action_lifecycle.rs`,
   `src/app/tests.rs`, list-style view modules updated for exhaustive ignored command handling,
   `docs/plan/progress.md`, and `docs/process-observations.md`.
@@ -1595,13 +1595,13 @@
   them and clamps horizontal offset to the rendered document width for the current viewport width. A
   follow-up review repair made the app/view clamp path width-aware so refreshes and terminal resizes
   also clamp no-wrap horizontal offsets.
-- Ownership: `src/sticky_file_view.rs` owns the shared `DocumentDisplayMode` and `DocumentViewport`
-  policy, including Ratatui wrapping and horizontal scroll offset. File-show owns its
-  single-document viewport state directly; show and diff store viewport state inside
-  `StickyFileDocument`. `src/tui.rs` was not changed.
-- Coverage: `sticky_file_view` rendering tests cover wrapped Markdown-like long lines, no-wrap
-  clipping, horizontal offset revealing later columns, and sticky fixed/body rendering under
-  no-wrap. `file_show` tests cover toggle behavior, horizontal clamping, vertical scroll stability,
+- Ownership: `src/document.rs` owns the shared `DocumentDisplayMode` and `DocumentViewport` policy,
+  including Ratatui wrapping and horizontal scroll offset. File-show owns its single-document
+  viewport state directly; show and diff store viewport state inside `StickyFileDocument`.
+  `src/tui.rs` was not changed.
+- Coverage: `document` rendering tests cover wrapped Markdown-like long lines, no-wrap clipping,
+  horizontal offset revealing later columns, and sticky fixed/body rendering under no-wrap.
+  `file_show` tests cover toggle behavior, horizontal clamping, vertical scroll stability,
   source-line search, refresh clamping, and exact-path copy. Show/diff tests cover copy/file labels
   and file navigation under horizontal scroll. Follow-up clamp tests cover shared
   `StickyFileDocument` content shrink, file-show refresh/content shrink, and show/diff viewport
@@ -1610,7 +1610,7 @@
 - Validation:
   - `cargo check` passed with the existing dead-code warnings for `ViewSpec::bookmarks` and
     `FileListItem::row_text`.
-  - `cargo test sticky_file_view` passed with 5 focused tests.
+  - `cargo test document` passed with 5 focused tests.
   - `cargo test file_show` passed with 13 focused tests.
   - `cargo test horizontal_scroll` passed with 4 focused tests.
   - `cargo test document_help` passed with 1 focused test.
@@ -1626,8 +1626,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in `src/jj.rs` and
-    `src/jj_rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`,
-    and `src/operation_log.rs`.
+    `src/rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`, and
+    `src/operation_log.rs`.
 - Fragility: no rendered-output parser or ANSI assumptions changed, so
   `docs/plan/fragility-register.md` was not updated.
 - Remaining risk: render-time viewport clamping is defensive, but persisted state is now also
@@ -1704,14 +1704,14 @@
 
 ## Packet 34c: Interactive Split Process Runner
 
-- Files changed: `src/interactive_process.rs`, `src/jj.rs`, `src/main.rs`, `docs/plan/progress.md`,
-  and `docs/process-observations.md`.
+- Files changed: `src/interactive.rs`, `src/jj.rs`, `src/main.rs`, `docs/plan/progress.md`, and
+  `docs/process-observations.md`.
 
-- Behavior: added a focused `interactive_process` boundary for commands that must inherit the app's
-  stdin, stdout, and stderr instead of using `Command::output()`. The runner suspends the Ratatui
-  terminal by showing the cursor and leaving raw mode / the alternate screen, spawns and waits for
-  the child with inherited stdio, then re-enables raw mode, re-enters the alternate screen, and
-  clears the Ratatui terminal so the event loop can draw the next frame.
+- Behavior: added a focused `interactive` boundary for commands that must inherit the app's stdin,
+  stdout, and stderr instead of using `Command::output()`. The runner suspends the Ratatui terminal
+  by showing the cursor and leaving raw mode / the alternate screen, spawns and waits for the child
+  with inherited stdio, then re-enables raw mode, re-enters the alternate screen, and clears the
+  Ratatui terminal so the event loop can draw the next frame.
 
 - Command contract: `jj::interactive_jj_command` builds the future Packet 34 command path as
   `jj --no-pager <args...>` with inherited stdio. Existing captured command helpers and action plans
@@ -1758,8 +1758,7 @@
 - Validation:
   - `cargo check` passed with the existing dead-code warnings for `ViewSpec::bookmarks` and
     `FileListItem::row_text`.
-  - `cargo test interactive_process -- --test-threads=1` passed with 7 tests and 2 ignored manual
-    proofs.
+  - `cargo test interactive -- --test-threads=1` passed with 7 tests and 2 ignored manual proofs.
   - `cargo test interactive_jj_command_inherits_stdio_and_keeps_no_pager -- --test-threads=1`
     passed.
   - full `cargo test` passed with 425 tests and 2 ignored manual proofs.
@@ -1767,8 +1766,8 @@
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed after `just md-fmt` applied Panache wrapping to this entry.
   - `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in `src/jj.rs` and
-    `src/jj_rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`,
-    and `src/operation_log.rs`.
+    `src/rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`, and
+    `src/operation_log.rs`.
   - `cargo run` was smoke-tested in a PTY and quit with `q`; it rendered the TUI but was not
     warning-free because of the existing two `cargo check` warnings.
 
@@ -1787,7 +1786,7 @@
 
 ## Packet 34c Review Repair
 
-- Files changed: `src/interactive_process.rs`, `docs/plan/next-implementation-slices.md`,
+- Files changed: `src/interactive.rs`, `docs/plan/next-implementation-slices.md`,
   `docs/plan/progress.md`, and `docs/process-observations.md`.
 - Review findings addressed: Packet 34c docs now distinguish inherited-stdio terminal output from
   captured runner result text, and future Packet 34 is required to design explicit post-command
@@ -1802,7 +1801,7 @@
 - Final 5.5 re-review: `019e473c-f2f0-7ab2-b936-9d0261910255` (`gpt-5.5`, high) reported no findings
   and verified the prior three review findings were fixed: output visibility wording, canonical
   `/tmp` proof path validation, and the clean restore-status assertion.
-- Validation: `cargo test interactive_process -- --test-threads=1` passed with 7 passed, 2 ignored;
+- Validation: `cargo test interactive -- --test-threads=1` passed with 7 passed, 2 ignored;
   `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings;
   `just md-check` passed; `cargo check` passed with existing dead-code warnings for
   `ViewSpec::bookmarks` and `FileListItem::row_text`. Optional note: ignored live-terminal proofs
@@ -1811,10 +1810,9 @@
 ## Packet 34: Split Guided Flow
 
 - Files changed: `src/action_menu.rs`, `src/app.rs`, `src/app/action_flow.rs`,
-  `src/app/action_lifecycle.rs`, `src/app/mode_input.rs`, `src/app/services.rs`,
-  `src/app_screen.rs`, `src/graph.rs`, `src/jj.rs`, `src/jj_actions.rs`, `src/jj_rows.rs`,
-  `src/tui.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and
-  `docs/process-observations.md`.
+  `src/app/action_lifecycle.rs`, `src/app/mode_input.rs`, `src/app/services.rs`, `src/screen.rs`,
+  `src/graph.rs`, `src/jj.rs`, `src/actions.rs`, `src/rows.rs`, `src/tui.rs`,
+  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`.
 
 - Behavior: graph action menus now open a preview-first split flow. A visible current `@` row uses
   bare `jj split`; an exact non-current graph row uses
@@ -1855,7 +1853,7 @@
 
 - Validation so far: `cargo check`; `cargo test split -- --test-threads=1`;
   `cargo test action_menu -- --test-threads=1`; `cargo test app::tests::split -- --test-threads=1`;
-  `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test`;
+  `cargo test actions::tests::split -- --test-threads=1`; full `cargo test`;
   `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-check`.
 
 - Scope repair: initial 5.5 review `019e4750-9d7f-7be2-a0ce-8ab112a771f7` found no split behavior
@@ -1873,11 +1871,10 @@
   `FileListItem::row_text` warnings; `cargo test split -- --test-threads=1`;
   `cargo test   action_menu -- --test-threads=1`;
   `cargo test app::tests::split -- --test-threads=1`;
-  `cargo   test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 437
-  passed / 2 ignored; `rustup run nightly cargo fmt --check` passed with existing rustfmt config
-  warnings; `just md-check` passed; `cargo clippy -- -D warnings` still failed on the known
-  dead-code warnings plus `collapsible_if` in `src/bookmarks.rs`, `src/graph.rs`, and
-  `src/operation_log.rs`.
+  `cargo   test actions::tests::split -- --test-threads=1`; full `cargo test` passed with 437 passed
+  / 2 ignored; `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings;
+  `just md-check` passed; `cargo clippy -- -D warnings` still failed on the known dead-code warnings
+  plus `collapsible_if` in `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 
 - Warning / blocker status: `cargo check` and `cargo run` still report the existing dead-code
   warnings for `ViewSpec::bookmarks` and `FileListItem::row_text`. `cargo clippy -- -D warnings`
@@ -1996,8 +1993,8 @@
 ## Packet 35: Duplicate Guided Flow
 
 - Files changed: `src/action_menu.rs`, `src/app/action_flow.rs`, `src/app/action_lifecycle.rs`,
-  `src/app/mode_input.rs`, `src/app/services.rs`, `src/app/tests.rs`, `src/app_screen.rs`,
-  `src/graph.rs`, `src/jj.rs`, `src/jj_actions.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`,
+  `src/app/mode_input.rs`, `src/app/services.rs`, `src/app/tests.rs`, `src/screen.rs`,
+  `src/graph.rs`, `src/jj.rs`, `src/actions.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`,
   `docs/plan/progress.md`, and `docs/process-observations.md`.
 
 - Behavior: action menus now expose duplicate only for one exact selected graph or detail-view
@@ -2027,10 +2024,10 @@
   `cargo test duplicate -- --test-threads=1`; `cargo test action_menu -- --test-threads=1`;
   `cargo test app::tests::duplicate -- --test-threads=1`;
   `cargo test app::tests::split -- --test-threads=1`;
-  `cargo test jj_actions::tests::duplicate -- --test-threads=1`;
-  `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 443
-  passed / 2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
-  `just md-fmt`; `just md-check`; and `just check`.
+  `cargo test actions::tests::duplicate -- --test-threads=1`;
+  `cargo test actions::tests::split -- --test-threads=1`; full `cargo test` passed with 443 passed /
+  2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-fmt`;
+  `just md-check`; and `just check`.
 
 - Warning / blocker status: `cargo clippy -- -D warnings` remains blocked by the known baseline
   findings: dead code for `ViewSpec::bookmarks` and `FileListItem::row_text`, plus `collapsible_if`
@@ -2047,8 +2044,8 @@
 
 ## Packet 36: Bookmark Tracking Metadata Contract
 
-- Files changed: `src/jj_rows.rs`, `src/bookmarks.rs`, `src/jj.rs`,
-  `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`.
+- Files changed: `src/rows.rs`, `src/bookmarks.rs`, `src/jj.rs`, `docs/plan/fragility-register.md`,
+  `docs/plan/progress.md`, and `docs/process-observations.md`.
 
 - Metadata/template shape: the bookmark metadata side channel now emits JSONL with `name`, `remote`,
   `tracked`, `tracking_present`, `synced`, `target_change_id`, and `target_commit_id` from
@@ -2067,7 +2064,7 @@
   explicit local state rather than rendered labels.
 
 - Validation: `jj --no-pager bookmark list --help`; `jj --no-pager help -k templates`; manual
-  current-repo template sample with `--all-remotes`; `cargo test jj_rows -- --test-threads=1`;
+  current-repo template sample with `--all-remotes`; `cargo test rows -- --test-threads=1`;
   `cargo test bookmark -- --test-threads=1`; `cargo check`; full `cargo test` passed with 447 passed
   / 2 ignored after the review repair; `rustup run nightly cargo fmt`;
   `rustup run nightly cargo   fmt --check`; `just md-fmt`; and `just md-check`.
@@ -2145,10 +2142,10 @@
 
 ## Packet 37: Bookmark Rename Flow
 
-- Files changed: `src/app.rs`, `src/app_screen.rs`, `src/app/action_lifecycle/entry.rs`,
+- Files changed: `src/app.rs`, `src/screen.rs`, `src/app/action_lifecycle/entry.rs`,
   `src/app/action_lifecycle/shared.rs`, `src/app/mode_input.rs`,
   `src/app/tests/bookmark_actions.rs`, `src/app/tests/support.rs`, `src/command.rs`, `src/jj.rs`,
-  `src/jj_actions.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and
+  `src/actions.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and
   `docs/plan/screens/bookmarks.md`, `docs/process-observations.md`, and
   `docs/tutorials/bookmarks-and-conflicts.md`.
 
@@ -2194,7 +2191,7 @@
 
 - Files changed: `src/app.rs`, `src/app/action_lifecycle/entry.rs`, `src/app/mode_input.rs`,
   `src/app/tests/bookmark_actions.rs`, `src/bookmarks.rs`, `src/command.rs`, `src/jj.rs`,
-  `src/jj_actions.rs`, `src/jj_rows.rs`, `src/tui.rs`, `src/view_state.rs`,
+  `src/actions.rs`, `src/rows.rs`, `src/tui.rs`, `src/view_state.rs`,
   `docs/plan/command-inventory.md`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
   `docs/plan/screens/bookmarks.md`, `docs/plan/workflows/refs-and-workspaces.md`, and
   `docs/process-observations.md`.
@@ -2230,7 +2227,7 @@
   remote-only row and `jj --no-pager undo` restored `feature/name@origin`.
 
 - Validation: `cargo check`; `cargo test bookmark_forget -- --test-threads=1`;
-  `cargo test bookmark -- --test-threads=1`; `cargo test jj_rows -- --test-threads=1`; full
+  `cargo test bookmark -- --test-threads=1`; `cargo test rows -- --test-threads=1`; full
   `cargo test` passed with 470 passed / 2 ignored; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; `just md-check`; `just check`; disposable `/tmp` jj proof
   above.
@@ -2300,7 +2297,7 @@
 
 - Files changed: `src/app.rs`, `src/app/action_lifecycle/entry.rs`, `src/app/mode_input.rs`,
   `src/app/tests/bookmark_actions.rs`, `src/app/tests/command_navigation.rs`, `src/bookmarks.rs`,
-  `src/command.rs`, `src/jj.rs`, `src/jj_actions.rs`, `docs/plan/command-inventory.md`,
+  `src/command.rs`, `src/jj.rs`, `src/actions.rs`, `docs/plan/command-inventory.md`,
   `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
   `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/workflows/sync.md`, and
   `docs/process-observations.md`.

@@ -3,13 +3,13 @@ use std::process::Command;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use crate::interactive_process::InteractiveCommand;
+use crate::actions::CommandOutput;
 use crate::jj::ViewSpec;
 use crate::jj::command::{
     JJ_GIT_REMOTE_ARGS, JjCommand, NEW_TRUNK_ARGS, jj_command_args,
     resolve_exact_change_id_command_argv, workspace_root_command_args,
 };
-use crate::jj_actions::CommandOutput;
+use crate::terminal_process::InteractiveCommand;
 
 #[allow(dead_code)]
 pub fn git_remotes() -> Result<Vec<String>> {

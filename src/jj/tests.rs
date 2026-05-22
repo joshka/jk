@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 
 use super::*;
-use crate::jj_actions::JjGitFetch;
+use crate::actions::JjGitFetch;
 use crate::operation_log::OPERATION_ID_TEMPLATE;
 use crate::resolve::RESOLVE_CONFLICT_TEMPLATE;
 use crate::workspaces::WORKSPACE_METADATA_TEMPLATE;
@@ -250,7 +250,7 @@ fn interactive_jj_command_inherits_stdio_and_keeps_no_pager() {
     );
     assert_eq!(
         command.stdio_intent(),
-        crate::interactive_process::StdioIntent::Inherit
+        crate::terminal_process::StdioIntent::Inherit
     );
 }
 

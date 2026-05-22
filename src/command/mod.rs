@@ -7,11 +7,11 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::action_menu::ActionMenu;
+use crate::actions::JjOperationRecoveryKind;
 use crate::copy::CopyOption;
 use crate::help::command_is_visible_in_help;
 use crate::jj::JjCommand;
-use crate::jj_actions::JjOperationRecoveryKind;
+use crate::menus::ActionMenu;
 use crate::search::SearchQuery;
 
 #[cfg(test)]

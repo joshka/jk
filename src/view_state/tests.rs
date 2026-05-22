@@ -1,13 +1,15 @@
 use super::*;
 
 use crate::bookmarks;
-use crate::graph;
+use crate::log;
 
 #[test]
-fn push_target_from_graph_uses_exact_revision() {
-    let view = ViewState::Graph(graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
-    ]));
+fn push_target_from_log_uses_exact_revision() {
+    let view = ViewState::Log(log::LogView::test_new(vec![crate::log::LogItem::new(
+        Vec::new(),
+        Some("abcdefg".to_owned()),
+        None,
+    )]));
 
     assert_eq!(
         view.push_target().unwrap(),
@@ -16,14 +18,16 @@ fn push_target_from_graph_uses_exact_revision() {
 }
 
 #[test]
-fn push_target_from_graph_requires_exact_revision() {
-    let view = ViewState::Graph(graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
-    ]));
+fn push_target_from_log_requires_exact_revision() {
+    let view = ViewState::Log(log::LogView::test_new(vec![crate::log::LogItem::new(
+        Vec::new(),
+        None,
+        None,
+    )]));
 
     assert_eq!(
         view.push_target().unwrap_err().to_string(),
-        "push from graph requires a selected row with an exact revision"
+        "push from log requires a selected row with an exact revision"
     );
 }
 
@@ -40,10 +44,12 @@ fn push_target_from_bookmarks_uses_selected_name() {
 }
 
 #[test]
-fn bookmark_target_from_graph_and_status_is_exact() {
-    let view = ViewState::Graph(graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdefg".to_owned()), None),
-    ]));
+fn bookmark_target_from_log_and_status_is_exact() {
+    let view = ViewState::Log(log::LogView::test_new(vec![crate::log::LogItem::new(
+        Vec::new(),
+        Some("abcdefg".to_owned()),
+        None,
+    )]));
 
     assert_eq!(
         view.bookmark_target().unwrap(),
@@ -59,14 +65,16 @@ fn bookmark_target_from_graph_and_status_is_exact() {
 }
 
 #[test]
-fn bookmark_target_from_graph_requires_exact_revision() {
-    let view = ViewState::Graph(graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
-    ]));
+fn bookmark_target_from_log_requires_exact_revision() {
+    let view = ViewState::Log(log::LogView::test_new(vec![crate::log::LogItem::new(
+        Vec::new(),
+        None,
+        None,
+    )]));
 
     assert_eq!(
         view.bookmark_target().unwrap_err().to_string(),
-        "bookmark mutation from graph requires a selected row with an exact revision"
+        "bookmark mutation from log requires a selected row with an exact revision"
     );
 }
 
@@ -84,7 +92,7 @@ fn selected_local_bookmark_name_rejects_nonlocal_rows() {
 }
 
 #[test]
-fn exact_restore_revert_context_uses_graph_derived_detail_target_and_path() {
+fn exact_restore_revert_context_uses_log_derived_detail_target_and_path() {
     let show = ViewState::Show(crate::show::ShowView::test_new(ViewSpec::show(
         "abcdefg".to_owned(),
         crate::jj::DiffFormat::Default,
@@ -101,7 +109,7 @@ fn exact_restore_revert_context_uses_graph_derived_detail_target_and_path() {
         ViewSpec::file_show(Some("abcdefg".to_owned()), "src/main.rs".to_owned())
             .with_exact_change_target(),
         "src/main.rs",
-        crate::rendered_jj::DocumentLines::new(Vec::new()),
+        crate::documents::DocumentLines::new(Vec::new()),
     ));
 
     assert_eq!(
@@ -163,29 +171,29 @@ fn exact_restore_revert_context_rejects_direct_startup_detail_revsets() {
     let file_show = ViewState::FileShow(crate::files::show::FileShowView::new(
         ViewSpec::file_show(Some("main".to_owned()), "src/main.rs".to_owned()),
         "src/main.rs",
-        crate::rendered_jj::DocumentLines::new(Vec::new()),
+        crate::documents::DocumentLines::new(Vec::new()),
     ));
 
     assert_eq!(
         show.exact_restore_revert_context().unwrap_err().to_string(),
-        "restore/revert from jk show main requires an exact graph-derived revision target"
+        "restore/revert from jk show main requires an exact log-derived revision target"
     );
     assert_eq!(
         diff.exact_restore_revert_context().unwrap_err().to_string(),
-        "restore/revert from jk diff -r main requires an exact graph-derived revision target"
+        "restore/revert from jk diff -r main requires an exact log-derived revision target"
     );
     assert_eq!(
         file_list
             .exact_restore_revert_context()
             .unwrap_err()
             .to_string(),
-        "file actions from jk file list -r main require a working-copy file list or exact graph-derived revision target"
+        "file actions from jk file list -r main require a working-copy file list or exact log-derived revision target"
     );
     assert_eq!(
         file_show
             .exact_restore_revert_context()
             .unwrap_err()
             .to_string(),
-        "file actions from jk file show -r main src/main.rs require a working-copy file show or exact graph-derived revision target"
+        "file actions from jk file show -r main src/main.rs require a working-copy file show or exact log-derived revision target"
     );
 }

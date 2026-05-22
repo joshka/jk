@@ -140,7 +140,7 @@ fn help_binding_match_uses_visible_help_metadata() {
         match_help_binding_sequence(
             &[&bindings],
             &[key(KeyCode::Char('q'), KeyModifiers::NONE)],
-            HelpContext::Graph,
+            HelpContext::Log,
         ),
         None
     );

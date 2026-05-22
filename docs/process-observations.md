@@ -5,22 +5,47 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-21 (Planning and history surface audit)
+
+- Slice / task: audit the current planning and history documentation surface to decide whether to
+  keep it on `main` or archive execution history into a side workspace/bookmark.
+- Thread id: `019e4d82-096f-7cb0-ad2c-74c7623f16cf` from `CODEX_THREAD_ID`.
+- Evidence gathered:
+  - `find docs/plan docs/agent -type f | sort | xargs wc -l` reported `10,292` total lines across
+    `docs/plan` and `docs/agent`.
+  - `docs/plan/progress.md` is `2,352` lines, `docs/plan/next-implementation-slices.md` is
+    `1,657` lines, and `docs/agent/source-maintainability-ledger.md` is `1,540` lines.
+  - `jj --no-pager status` showed an unrelated in-flight module-layout refactor, so this audit was
+    kept read-only except for this process note.
+  - `jj workspace add --help` confirms that a side workspace such as `../jk-planning` can be added
+    directly from the same repo without switching normal source-control workflow away from `jj`.
+- Conclusion from evidence: the repo currently mixes durable product/architecture guidance with a
+  large execution journal. A cleanup should keep concise active guidance on `main`, move packet
+  history and maintainability ledgers behind an explicit archive surface, and leave a short pointer
+  in-tree so future work can still find the archived material.
+- Evidence basis:
+  - Date: `2026-05-21 19:29:33 PDT` from local `date`.
+  - Files: `docs/plan/README.md`, `docs/plan/progress.md`, `docs/plan/next-implementation-slices.md`,
+    `docs/plan/screen-priority.md`, `docs/plan/open-questions.md`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-cleanup-audit.md`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
 ### 2026-05-21 (Root jj action plan split)
 
-- Slice / task: split describe/commit and abandon action-plan logic out of the `jj_actions` root so
-  the root can become a table-of-contents boundary with public re-exports.
+- Slice / task: split describe/commit and abandon action-plan logic out of the `actions` root so the
+  root can become a table-of-contents boundary with public re-exports.
 - Thread id: `019e4cf5-1017-76c1-8c42-b4c122314849` from the worker handoff.
 - Model / routing: GPT-5.5 with medium reasoning handled the judgment-heavy Rust split in the
   `Split root jj action plans` jj change; the main thread reviewed the diff, updated tracking docs,
   and reran validation.
-- Changed files: `src/jj_actions/mod.rs`, `src/jj_actions/describe/mod.rs`,
-  `src/jj_actions/describe/tests.rs`, `src/jj_actions/abandon/mod.rs`,
-  `src/jj_actions/abandon/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
-  `docs/agent/cleanup-wave-status.md`, and this process note.
+- Changed files: `src/actions/mod.rs`, `src/actions/describe/mod.rs`,
+  `src/actions/describe/tests.rs`, `src/actions/abandon/mod.rs`, `src/actions/abandon/tests.rs`,
+  `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+  process note.
 - Implementation outcome: `CommandOutput` remains in the root action-plan boundary; describe and
-  commit plans now live under `jj_actions::describe`; abandon plan, preview, title-template, and
-  empty/non-empty classifier now live under `jj_actions::abandon`; public imports from
-  `crate::jj_actions` continue to work through re-exports.
+  commit plans now live under `actions::describe`; abandon plan, preview, title-template, and
+  empty/non-empty classifier now live under `actions::abandon`; public imports from `crate::actions`
+  continue to work through re-exports.
 - Behavior-preservation evidence: command argv, command labels, preview summaries, exact revset
   quoting, abandon title/diff probes, status/result text, app-facing behavior, public imports, and
   tests are preserved.
@@ -28,7 +53,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   judgment and public-boundary preservation, not just file movement. The worker had one formatting
   rework in `abandon/mod.rs`; main-thread validation found no behavior or API drift.
 - Validation trail:
-  - Worker validation passed: `cargo test jj_actions -- --test-threads=1`;
+  - Worker validation passed: `cargo test actions -- --test-threads=1`;
     `cargo test app::tests::describe_commit_actions -- --test-threads=1`;
     `cargo test app::tests::abandon_actions -- --test-threads=1`; `cargo check`; and
     `rustup run nightly cargo fmt --check` after rustfmt fixed one wrapping diff.
@@ -36,10 +61,10 @@ be supported by the work log, repo state, or direct transcript evidence.
     `rustup run nightly cargo fmt --check`; and `just md-check`.
 - Evidence basis:
   - Date: `2026-05-21 16:57:11 PDT` from local `date`.
-  - Files: `src/jj_actions/mod.rs`, `src/jj_actions/describe/mod.rs`,
-    `src/jj_actions/describe/tests.rs`, `src/jj_actions/abandon/mod.rs`,
-    `src/jj_actions/abandon/tests.rs`, `docs/agent/source-maintainability-ledger.md`,
-    `docs/agent/cleanup-wave-status.md`, and this process note.
+  - Files: `src/actions/mod.rs`, `src/actions/describe/mod.rs`, `src/actions/describe/tests.rs`,
+    `src/actions/abandon/mod.rs`, `src/actions/abandon/tests.rs`,
+    `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
+    process note.
 
 ### 2026-05-21 (File and resolve directory-root conversion)
 
@@ -78,9 +103,9 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Model / routing: GPT-5.4 mini with medium reasoning handled the path-only source move in the
   `Adopt nested module roots` jj change; the main thread reviewed that the source diff was
   path-only, refreshed tracking docs, and reran validation.
-- Changed source roots: `action_menu/revision_actions`, `app/action_lifecycle/entry`,
-  `app/mode_input/reducers`, `bookmarks/actions`, `bookmarks/rows`, `jj/view_spec`,
-  `jj_actions/files`, `jj_actions/working_copy`, and `operation_log/detail`.
+- Changed source roots: `action_menu/revision_actions`, `app/actions/entry`, `app/input/reducers`,
+  `bookmarks/actions`, `bookmarks/rows`, `jj/view_spec`, `actions/files`, `actions/working_copy`,
+  and `operation_log/detail`.
 - Implementation outcome: those nested modules now use directory roots such as
   `src/bookmarks/actions/mod.rs` instead of `src/bookmarks/actions.rs` plus
   `src/bookmarks/actions/`.
@@ -94,8 +119,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Worker validation passed: `cargo check`; focused tests for the moved roots; and
     `rustup run nightly cargo fmt --check`.
   - Main-thread validation passed: `cargo check`; focused tests for `revision_actions`,
-    `app::action_lifecycle::entry`, `reducers`, `bookmarks::actions`, `bookmarks::rows`,
-    `view_spec`, `jj_actions::files`, `working_copy`, and `operation_log::detail`;
+    `app::actions::entry`, `reducers`, `bookmarks::actions`, `bookmarks::rows`, `view_spec`,
+    `actions::files`, `working_copy`, and `operation_log::detail`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
 - Evidence basis:
   - Date: `2026-05-21 16:48:10 PDT` from local `date`.
@@ -110,9 +135,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Model / routing: GPT-5.4 mini with medium reasoning handled the path-only source move in the
   `Adopt module directory roots` jj change; the main thread reviewed that the source diff was
   path-only, updated guidance and status docs, and reran validation.
-- Changed source roots: `action_output`, `app_screen`, `command`, `diff`, `help`,
-  `interactive_process`, `rendered_jj`, `show`, `status`, `sticky_file_view`, `view_state`, and
-  `workspaces`.
+- Changed source roots: `action_pane`, `screen`, `command`, `diff`, `help`, `interactive`,
+  `rendered`, `show`, `status`, `document`, `view_state`, and `workspaces`.
 - Implementation outcome: those modules now use directory roots such as `src/status/mod.rs` instead
   of `src/status.rs` plus `src/status/`, matching the corrected rule that a split module should be
   an atomic directory.
@@ -125,11 +149,10 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Validation trail:
   - Worker validation passed: `cargo check`; `rustup run nightly cargo fmt --check`; and separate
     focused `cargo test <filter> -- --test-threads=1` runs after the attempted combined Cargo filter
-    failed with `unexpected argument 'app_screen'`.
-  - Main-thread validation passed: `cargo check`; focused tests for `action_output`, `app_screen`,
-    `command`, `diff`, `help`, `interactive_process`, `rendered_jj`, `show`, `status`,
-    `sticky_file_view`, `view_state`, and `workspaces`; `rustup run nightly cargo fmt --check`; and
-    `just md-check`.
+    failed with `unexpected argument 'screen'`.
+  - Main-thread validation passed: `cargo check`; focused tests for `action_pane`, `screen`,
+    `command`, `diff`, `help`, `interactive`, `rendered`, `show`, `status`, `document`,
+    `view_state`, and `workspaces`; `rustup run nightly cargo fmt --check`; and `just md-check`.
 - Evidence basis:
   - Date: `2026-05-21 16:44:21 PDT` from local `date`.
   - Files: moved source roots listed above, `AGENTS.md`,
@@ -151,8 +174,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Process observation: this correction changes the shape of future refactors. Recent test splits
   created many `foo.rs` plus `foo/tests.rs` pairs that now need follow-up layout packets. Small
   roots can be moved mechanically; larger roots such as `app`, `bookmarks`, `operation_log`,
-  `jj_actions`, `files`, `graph`, and `tui` need judgment-heavy topical splits rather than a blind
-  file move.
+  `actions`, `files`, `graph`, and `tui` need judgment-heavy topical splits rather than a blind file
+  move.
 - Evidence basis:
   - Source: Ed Page, "Guideline: Rust Style", project-structure sections P-MOD, P-DIR-MOD,
     P-PATH-MOD, and P-API.
@@ -161,18 +184,18 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Interactive process test split)
 
-- Slice / task: move inline inherited-stdio runner tests from `src/interactive_process.rs` into
-  `src/interactive_process/tests.rs` while preserving command intent, terminal suspend/restore,
+- Slice / task: move inline inherited-stdio runner tests from `src/interactive.rs` into
+  `src/interactive/tests.rs` while preserving command intent, terminal suspend/restore,
   restore-guard, fake lifecycle/spawner, error wording, and manual `/tmp` proof safeguards.
 - Thread id: `019e4ce7-58b5-7343-a352-015a84641b85` from the worker handoff.
 - Model / routing: GPT-5.4 mini with medium reasoning handled the bounded test-module move in the
   `Move interactive process tests` jj change; the main thread reviewed the diff, updated tracking
   docs, and reran validation.
-- Changed files: `src/interactive_process.rs`, `src/interactive_process/tests.rs`,
+- Changed files: `src/interactive.rs`, `src/interactive/tests.rs`,
   `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
   process note.
-- Implementation outcome: `src/interactive_process.rs` now declares `#[cfg(test)] mod tests;`; the
-  moved tests live in `src/interactive_process/tests.rs` and use Rust child-module privacy through
+- Implementation outcome: `src/interactive.rs` now declares `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/interactive/tests.rs` and use Rust child-module privacy through
   `use super::*;`.
 - Behavior-preservation evidence: all original test names, helpers, assertions, ignored-test
   attributes and messages, error wording expectations, fake lifecycle/spawner behavior, manual
@@ -181,31 +204,31 @@ be supported by the work log, repo state, or direct transcript evidence.
   set and acceptance criteria were exact. The main-thread review found no assertion drift in this
   packet.
 - Validation trail:
-  - Worker validation passed: `cargo test interactive_process -- --test-threads=1` with 7 passed, 2
-    ignored, and 558 filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
-  - Main-thread validation passed: `cargo test interactive_process -- --test-threads=1` with 7
-    passed, 2 ignored, and 558 filtered out; `cargo check`; `rustup run nightly cargo fmt --check`;
-    and `just md-check`.
+  - Worker validation passed: `cargo test interactive -- --test-threads=1` with 7 passed, 2 ignored,
+    and 558 filtered out; `cargo check`; and `rustup run nightly cargo fmt --check`.
+  - Main-thread validation passed: `cargo test interactive -- --test-threads=1` with 7 passed, 2
+    ignored, and 558 filtered out; `cargo check`; `rustup run nightly cargo fmt --check`; and
+    `just md-check`.
 - Evidence basis:
   - Date: `2026-05-21 16:41:14 PDT` from local `date`.
-  - Files: `src/interactive_process.rs`, `src/interactive_process/tests.rs`,
+  - Files: `src/interactive.rs`, `src/interactive/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
     process note.
 
 ### 2026-05-21 (Action output test split)
 
-- Slice / task: move inline action-output tests from `src/action_output.rs` into
-  `src/action_output/tests.rs` while preserving body projection, visible-line clamping, scroll
+- Slice / task: move inline action-output tests from `src/action_pane.rs` into
+  `src/action_pane/tests.rs` while preserving body projection, visible-line clamping, scroll
   boundaries, and key mapping behavior.
 - Thread id: `019e4ce5-5a29-78a1-bdc6-f0aaea34a222` from the worker handoff.
 - Model / routing: GPT-5.4 mini with medium reasoning handled the bounded test-module move in the
   `Move action output tests` jj change; the main thread reviewed the diff, updated tracking docs,
   and reran validation.
-- Changed files: `src/action_output.rs`, `src/action_output/tests.rs`,
+- Changed files: `src/action_pane.rs`, `src/action_pane/tests.rs`,
   `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
   process note.
-- Implementation outcome: `src/action_output.rs` now declares `#[cfg(test)] mod tests;`; the moved
-  tests live in `src/action_output/tests.rs` and use Rust child-module privacy through
+- Implementation outcome: `src/action_pane.rs` now declares `#[cfg(test)] mod tests;`; the moved
+  tests live in `src/action_pane/tests.rs` and use Rust child-module privacy through
   `use super::*;`.
 - Behavior-preservation evidence: all original test names, helpers, assertions, imports, body line
   expectations, visible-line expectations, scroll behavior, key mapping behavior, public API, and
@@ -214,13 +237,13 @@ be supported by the work log, repo state, or direct transcript evidence.
   behavioral drift. This is a good fit for narrow cleanup packets where the main thread can quickly
   inspect the full diff.
 - Validation trail:
-  - Worker validation passed: `cargo test action_output -- --test-threads=1` with 10 passed,
+  - Worker validation passed: `cargo test action_pane -- --test-threads=1` with 10 passed,
     `cargo check`, and `rustup run nightly cargo fmt --check`.
-  - Main-thread validation passed: `cargo test action_output -- --test-threads=1` with 10 passed and
+  - Main-thread validation passed: `cargo test action_pane -- --test-threads=1` with 10 passed and
     557 filtered out; `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
 - Evidence basis:
   - Date: `2026-05-21 16:36:44 PDT` from local `date`.
-  - Files: `src/action_output.rs`, `src/action_output/tests.rs`,
+  - Files: `src/action_pane.rs`, `src/action_pane/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
     process note.
 
@@ -298,8 +321,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Model / routing: GPT-5.4 mini with medium reasoning handled the bounded source documentation
   packet in the `Document source ownership contracts` jj change; the main thread reviewed the diff,
   updated tracking docs, and reran validation.
-- Changed files: `src/main.rs`, `src/app.rs`, `src/app_screen.rs`, `src/command.rs`,
-  `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/jj_rows.rs`,
+- Changed files: `src/main.rs`, `src/app.rs`, `src/modes.rs`, `src/command.rs`,
+  `src/action_menu.rs`, `src/tui.rs`, `src/actions.rs`, `src/rows.rs`,
   `docs/agent/source-maintainability-ledger.md`, `docs/agent/cleanup-wave-status.md`, and this
   process note.
 - Implementation outcome: central files now carry explicit contracts for process setup, app dispatch
@@ -373,13 +396,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 ### 2026-05-21 (Abandon modal key handler extraction)
 
 - Slice / task: extract named `App` helper methods for only the `AbandonPreview` and
-  `AbandonConfirm` `InteractionMode` arms in `src/app/mode_input.rs` while keeping
+  `AbandonConfirm` `InteractionMode` arms in `src/app/input.rs` while keeping
   `handle_active_mode_key` as the active-mode dispatch table.
 - Thread id: `019e4cd4-17f0-72e3-88b9-19884b12b10a` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex performed the bounded maintainability packet in the existing
   `Extract abandon modal handlers` jj working copy change. The user explicitly prohibited
   version-control commands, and no `jj` or `git` commands were run.
-- Changed files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+- Changed files: `src/app/input.rs`, `docs/agent/source-maintainability-ledger.md`, and
   `docs/process-observations.md`.
 - Implementation outcome: the abandon preview and abandon confirmation arms now dispatch to named
   helpers: `handle_abandon_preview_key` and `handle_abandon_confirm_key`.
@@ -406,18 +429,17 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 16:17:48 PDT` from local `date`.
   - Main review date: `2026-05-21 16:19:58 PDT` from local `date`.
-  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
-    note.
+  - Files: `src/app/input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Modal text prompt key handler extraction)
 
 - Slice / task: extract named `App` helper methods for text-prompt `InteractionMode` arms in
-  `src/app/mode_input.rs` while keeping `handle_active_mode_key` as the active-mode dispatch table.
+  `src/app/input.rs` while keeping `handle_active_mode_key` as the active-mode dispatch table.
 - Thread id: `019e4ccf-5087-7cc2-915f-41a0e5b52acc` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex performed the bounded maintainability packet in the existing
   `Extract modal text prompt handlers` jj working copy change. The user explicitly prohibited
   version-control commands, and no `jj` or `git` commands were run.
-- Changed files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+- Changed files: `src/app/input.rs`, `docs/agent/source-maintainability-ledger.md`, and
   `docs/process-observations.md`.
 - Implementation outcome: the `SearchPrompt`, `LogRevsetPrompt`, `DescribePrompt`, `CommitPrompt`,
   `BookmarkNamePrompt`, and `BookmarkRenamePrompt` arms now dispatch to named helpers:
@@ -448,18 +470,17 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 16:12:09 PDT` from local `date`.
   - Main review date: `2026-05-21 16:15:23 PDT` from local `date`.
-  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
-    note.
+  - Files: `src/app/input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Modal menu key handler extraction)
 
 - Slice / task: extract named `App` helper methods for menu-like `InteractionMode` arms in
-  `src/app/mode_input.rs` while keeping `handle_active_mode_key` as the active-mode dispatch table.
+  `src/app/input.rs` while keeping `handle_active_mode_key` as the active-mode dispatch table.
 - Thread id: `019e4cc9-680d-7933-b8bc-b8d6e867ee14` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex performed the bounded maintainability packet in the existing
   `Extract modal menu key handlers` jj working copy change. The user explicitly prohibited
   version-control commands, and no `jj` or `git` commands were run.
-- Changed files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+- Changed files: `src/app/input.rs`, `docs/agent/source-maintainability-ledger.md`, and
   `docs/process-observations.md`.
 - Implementation outcome: the `CopyMenu`, `ViewMenu`, `ActionMenu`, `RolePrompt`,
   `PushRemotePrompt`, and `FetchRemotePrompt` arms now dispatch to named helpers:
@@ -497,8 +518,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 16:06:49 PDT` from local `date`.
   - Main review date: `2026-05-21 16:08:55 PDT` from local `date`.
-  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
-    note.
+  - Files: `src/app/input.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Resolve view test split)
 
@@ -670,8 +690,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   construct file views directly.
 - Implementation outcome: `files` is now the feature root for file-oriented views. The list and show
   modules moved from root-level `file_list` and `file_show` modules to `crate::files::list` and
-  `crate::files::show`; file mutation command plans intentionally stayed in `jj_actions::files`
-  because they are cross-view action plans.
+  `crate::files::show`; file mutation command plans intentionally stayed in `actions::files` because
+  they are cross-view action plans.
 - Behavior-preservation evidence: the packet moved modules and updated import paths only. It did not
   change file-list row parsing, file-show document behavior, app routing, command construction,
   action target policy, or test assertions.
@@ -711,9 +731,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   changing their names, assertions, helper functions, imports, file-show projection behavior, exact
   path copy behavior, search behavior, refresh clamp behavior, wrap and horizontal scroll behavior,
   public API, or runtime behavior.
-- Scope boundary: the packet did not change `sticky_file_view.rs`, `show.rs`, `diff.rs`,
-  `rendered_jj.rs`, shared document mechanics, visibility, or production file-show code beyond the
-  test module declaration.
+- Scope boundary: the packet did not change `document.rs`, `show.rs`, `diff.rs`, `rendered.rs`,
+  shared document mechanics, visibility, or production file-show code beyond the test module
+  declaration.
 - Validation trail:
   - Worker validation passed: `cargo test file_show -- --test-threads=1` with 16 passed and 551
     filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
@@ -731,40 +751,39 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Rendered jj document test split)
 
-- Slice / task: move the inline `src/rendered_jj.rs` tests into `src/rendered_jj/tests.rs` while
+- Slice / task: move the inline `src/rendered.rs` tests into `src/rendered/tests.rs` while
   preserving file-heading extraction behavior, style preservation, active-file selection, sticky
   projection behavior, public API, and runtime behavior.
 - Thread id: `019e4cb1-53cf-7a31-939e-3fcfcd45cec5` from `CODEX_THREAD_ID`.
 - Model / routing: medium worker implemented the bounded maintainability packet in the current
   existing jj change without running jj or git commands; version-control ownership and review stayed
   with the main thread.
-- Changed files: `src/rendered_jj.rs`, `src/rendered_jj/tests.rs`,
+- Changed files: `src/rendered.rs`, `src/rendered/tests.rs`,
   `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
-- Implementation outcome: `src/rendered_jj.rs` now ends with `#[cfg(test)] mod tests;`; the moved
-  tests live in `src/rendered_jj/tests.rs` and use Rust child-module privacy through
-  `use super::*;`. The production file measured 597 lines before the split and 281 lines after it,
-  with 315 lines in the child test module.
+- Implementation outcome: `src/rendered.rs` now ends with `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/rendered/tests.rs` and use Rust child-module privacy through `use super::*;`. The
+  production file measured 597 lines before the split and 281 lines after it, with 315 lines in the
+  child test module.
 - Behavior-preservation evidence: the packet moved the existing nine rendered document tests without
   changing their names, assertions, helper functions, imports, inline insta snapshots, file-heading
   extraction behavior, style preservation, active-file selection, sticky projection behavior, public
   API, or runtime behavior.
-- Scope boundary: the packet did not change `sticky_file_view.rs`, `show.rs`, `diff.rs`, shared
-  document mechanics, visibility, or production rendered document code beyond the test module
-  declaration.
+- Scope boundary: the packet did not change `document.rs`, `show.rs`, `diff.rs`, shared document
+  mechanics, visibility, or production rendered document code beyond the test module declaration.
 - Validation trail:
-  - Worker validation passed: `cargo test rendered_jj -- --test-threads=1` with 9 tests and 558
+  - Worker validation passed: `cargo test rendered -- --test-threads=1` with 9 tests and 558
     filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
     unstable-option warnings; and `just md-check` after applying Panache wrapping.
-  - Main-thread review validation passed: `cargo test rendered_jj -- --test-threads=1` with 9 tests
-    and 558 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
-    rustfmt unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test rendered -- --test-threads=1` with 9 tests and
+    558 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+    unstable-option warnings; and `just md-check`.
 - Rework / surprise: no Rust behavior or formatting rework was needed after the move. The first
   Markdown check reported only Panache wrapping in this process note; applying the formatter fixed
   the gate.
 - Evidence basis:
   - Date: `2026-05-21 15:39:29 PDT` from worker-reported local `date`.
   - Main review date: `2026-05-21 15:43:02 PDT` from local `date`.
-  - Files: `src/rendered_jj.rs`, `src/rendered_jj/tests.rs`,
+  - Files: `src/rendered.rs`, `src/rendered/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Show view test split)
@@ -836,35 +855,35 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (App screen projection test split)
 
-- Slice / task: move inline `src/app_screen.rs` tests into `src/app_screen/tests.rs` while
-  preserving the existing app-level screen projection behavior.
+- Slice / task: move inline `src/modes.rs` tests into `src/modes/tests.rs` while preserving the
+  existing app-level screen projection behavior.
 - Thread id: `019e4ca3-dfa6-7392-b3b8-955bac708e33` from `CODEX_THREAD_ID`.
 - Model / routing: medium worker handled the bounded maintainability packet without running jj or
   git commands; version-control ownership and review stayed with the main thread.
-- Changed files: `src/app_screen.rs`, `src/app_screen/tests.rs`,
+- Changed files: `src/modes.rs`, `src/modes/tests.rs`,
   `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
-- Implementation outcome: `src/app_screen.rs` now ends with `#[cfg(test)] mod tests;`; the moved
-  tests live in `src/app_screen/tests.rs` and use Rust child-module privacy through `use super::*;`.
-  The production file measured 655 lines before the split and 399 lines after it, with 256 lines of
+- Implementation outcome: `src/modes.rs` now ends with `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/modes/tests.rs` and use Rust child-module privacy through `use super::*;`. The
+  production file measured 655 lines before the split and 399 lines after it, with 256 lines of
   tests now in the child module.
 - Behavior-preservation evidence: the packet moved the existing tests without changing production
   projection behavior. It preserved test names, assertions, helper-free setup, imports, screen
   status text, overlay titles, view-menu options, action-output projection, abandon-confirm
   projection, public API, and runtime behavior.
 - Validation trail:
-  - Worker validation passed: `cargo test app_screen -- --test-threads=1` with 7 tests and 560
-    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  - Worker validation passed: `cargo test screen -- --test-threads=1` with 7 tests and 560 filtered
+    out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test screen -- --test-threads=1` with 7 tests and
+    560 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
     unstable-option warnings; and `just md-check`.
-  - Main-thread review validation passed: `cargo test app_screen -- --test-threads=1` with 7 tests
-    and 560 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
-    rustfmt unstable-option warnings; and `just md-check`.
 - Rework / surprise: no code rework was needed after the move. Markdown wrapping was already clean
   on main-thread review.
 - Evidence basis:
   - Date: `2026-05-21 15:26:14 PDT` from worker-reported local `date`.
   - Main review date: `2026-05-21 15:27:44 PDT` from local `date`.
-  - Files: `src/app_screen.rs`, `src/app_screen/tests.rs`,
-    `docs/agent/source-maintainability-ledger.md`, and this process note.
+  - Files: `src/modes.rs`, `src/modes/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and
+    this process note.
 
 ### 2026-05-21 (Help projection test split)
 
@@ -903,63 +922,62 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (jj file/content action-plan module split)
 
-- Slice / task: extract restore, revert, and `jj file` mutation action plans from
-  `src/jj_actions.rs` into a coherent child module while preserving `crate::jj_actions` as the
-  app-facing import surface.
+- Slice / task: extract restore, revert, and `jj file` mutation action plans from `src/actions.rs`
+  into a coherent child module while preserving `crate::actions` as the app-facing import surface.
 - Thread id: `019e4c99-2219-7260-9da1-e99670f71fce` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex implemented the bounded maintainability packet in the current
   existing jj change. The user explicitly prohibited version-control commands, and no `jj` or `git`
   commands were run.
-- Implementation outcome: `src/jj_actions/files.rs` now owns `JjRestorePlan`, `JjFileMutationKind`,
+- Implementation outcome: `src/actions/files.rs` now owns `JjRestorePlan`, `JjFileMutationKind`,
   `JjFileChmodMode`, `JjFileMutationTarget`, `JjFileMutationPlan`, internal `JjRestoreTarget`, and
-  `JjRevertPlan`. `src/jj_actions.rs` declares `mod files;` and re-exports the public file/content
-  plan types so existing callers can keep importing from `crate::jj_actions`.
-- Behavior-preservation evidence: the moved tests live in `src/jj_actions/files/tests.rs` with their
+  `JjRevertPlan`. `src/actions.rs` declares `mod files;` and re-exports the public file/content plan
+  types so existing callers can keep importing from `crate::actions`.
+- Behavior-preservation evidence: the moved tests live in `src/actions/files/tests.rs` with their
   existing names and assertions. Describe, commit, and abandon tests stayed in
-  `src/jj_actions/tests.rs`. The packet intentionally preserved command argv, preview wording, exact
+  `src/actions/tests.rs`. The packet intentionally preserved command argv, preview wording, exact
   revset/fileset quoting, run behavior, public re-export names, and app behavior.
 - Scope boundary: the packet did not change status/file-list/view action availability or move
   describe, commit, abandon, git sync, rewrite, working-copy, bookmark, or operation-log behavior.
 - Validation trail:
-  - Worker validation passed: `cargo test jj_actions::files -- --test-threads=1` with 8 passed and
-    559 filtered out; `cargo test jj_actions -- --test-threads=1` with 42 passed and 525 filtered
-    out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+  - Worker validation passed: `cargo test actions::files -- --test-threads=1` with 8 passed and 559
+    filtered out; `cargo test actions -- --test-threads=1` with 42 passed and 525 filtered out;
+    `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
     warnings; and `just md-check` after applying Panache wrapping.
-  - Main-thread review validation passed: `cargo test jj_actions::files -- --test-threads=1` with 8
-    passed and 559 filtered out; `cargo test jj_actions -- --test-threads=1` with 42 passed and 525
+  - Main-thread review validation passed: `cargo test actions::files -- --test-threads=1` with 8
+    passed and 559 filtered out; `cargo test actions -- --test-threads=1` with 42 passed and 525
     filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
     unstable-option warnings; and `just md-check`.
 - Rework / surprise: preserving the app-facing re-export names for currently-unused
   `JjFileMutationKind` and `JjFileMutationTarget` produced an unused-import warning in the binary
   crate. A narrow `#[allow(unused_imports)]` was added to that compatibility re-export.
-- Readability evidence: after the extraction, `src/jj_actions.rs` measures 397 lines,
-  `src/jj_actions/files.rs` measures 491 lines, `src/jj_actions/tests.rs` measures 159 lines, and
-  `src/jj_actions/files/tests.rs` measures 206 lines.
+- Readability evidence: after the extraction, `src/actions.rs` measures 397 lines,
+  `src/actions/files.rs` measures 491 lines, `src/actions/tests.rs` measures 159 lines, and
+  `src/actions/files/tests.rs` measures 206 lines.
 - Evidence basis:
   - Date: `2026-05-21 15:13:06 PDT` from local `date`.
   - Main review date: `2026-05-21 15:19:16 PDT` from local `date`.
-  - Files: `src/jj_actions.rs`, `src/jj_actions/files.rs`, `src/jj_actions/files/tests.rs`,
-    `src/jj_actions/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
+  - Files: `src/actions.rs`, `src/actions/files.rs`, `src/actions/files/tests.rs`,
+    `src/actions/tests.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Operation-log action-plan owner move)
 
-- Slice / task: move operation recovery/action command plans from the global `jj_actions` bucket to
-  the operation-log feature owner while preserving app-facing re-export names.
+- Slice / task: move operation recovery/action command plans from the global `actions` bucket to the
+  operation-log feature owner while preserving app-facing re-export names.
 - Thread id: `019e4c95-505b-7d62-8c45-2cd377e1eda3` from `CODEX_THREAD_ID`.
 - Model / routing: medium worker implemented the bounded maintainability packet in the current
   existing jj change without running jj or git commands; the main thread handled jj ownership and
   review.
-- Changed files: `src/jj_actions.rs`, `src/operation_log.rs`, `src/operation_log/actions.rs`,
+- Changed files: `src/actions.rs`, `src/operation_log.rs`, `src/operation_log/actions.rs`,
   `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and
   `docs/process-observations.md`.
-- Implementation outcome: `src/jj_actions/operation.rs` moved to `src/operation_log/actions.rs` with
+- Implementation outcome: `src/actions/operation.rs` moved to `src/operation_log/actions.rs` with
   its inline tests preserved. `src/operation_log.rs` now declares the actions module, and
-  `src/jj_actions.rs` re-exports `JjOperationRecovery`, `JjOperationRecoveryKind`, and
+  `src/actions.rs` re-exports `JjOperationRecovery`, `JjOperationRecoveryKind`, and
   `JjOperationTarget` from `crate::operation_log::actions`.
 - Behavior-preservation evidence: command argv, command labels, preview wording, status action
   wording, run behavior, key behavior, and operation-log view behavior were not intentionally
   changed. The move mirrors the existing bookmark action-plan owner pattern while keeping app
-  imports stable through `jj_actions`.
+  imports stable through `actions`.
 - Validation trail:
   - Worker validation passed: `cargo test operation -- --test-threads=1` with 46 tests and 521
     filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
@@ -971,42 +989,42 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 15:09:05 PDT` from worker-reported local `date`.
   - Main review date: `2026-05-21 15:11:16 PDT` from local `date`.
   - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
-  - Files: `src/jj_actions.rs`, `src/operation_log.rs`, `src/operation_log/actions.rs`,
+  - Files: `src/actions.rs`, `src/operation_log.rs`, `src/operation_log/actions.rs`,
     `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and this process
     note.
 
 ### 2026-05-21 (Bookmark action-plan owner move)
 
-- Slice / task: move bookmark mutation action plans from the global `jj_actions` bucket to the
-  bookmark feature root.
+- Slice / task: move bookmark mutation action plans from the global `actions` bucket to the bookmark
+  feature root.
 - Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
 - Model / routing: main-thread GPT-5 Codex performed the packet directly because the user explicitly
   requested main-thread work for the feature-root refactoring direction.
 - Implementation outcome: `src/bookmarks/actions.rs` now owns bookmark create/set/move/rename/
   delete/forget/track/untrack command plans, exact-name quoting, preview summaries, direct run
-  behavior, and rename validation. `src/jj_actions.rs` keeps re-exporting the app-facing bookmark
-  plan types so callers do not churn during the ownership move.
+  behavior, and rename validation. `src/actions.rs` keeps re-exporting the app-facing bookmark plan
+  types so callers do not churn during the ownership move.
 - Behavior-preservation evidence: the moved tests live in `src/bookmarks/actions/tests.rs` with
   their existing names and assertions. The Rust diff is limited to the module path move, sibling
   imports from `bookmarks/action_targets.rs`, module declaration in `bookmarks.rs`, and the
-  `jj_actions.rs` re-export path.
+  `actions.rs` re-export path.
 - Readability evidence: bookmark mutation behavior is now reachable from the bookmark feature root
   beside row metadata and target resolution. Measured files after the move: 588 lines in
   `src/bookmarks/actions.rs`, 243 lines in `src/bookmarks/actions/tests.rs`, 331 lines in
-  `src/bookmarks.rs`, and 870 lines in `src/jj_actions.rs`.
+  `src/bookmarks.rs`, and 870 lines in `src/actions.rs`.
 - Validation trail:
   - Main-thread validation passed: `cargo test bookmarks::actions -- --test-threads=1` with 8 passed
     and 559 filtered out; `cargo test bookmarks -- --test-threads=1` with 40 passed and 527 filtered
     out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
     warnings; and `just md-check`.
 - Rework / surprise: the first compile after the move exposed one unused `JjBookmarkTrackingTarget`
-  re-export from `jj_actions.rs`. Removing that no-longer-used compatibility export cleared the
-  warning without affecting current callers. The first format checks reported rustfmt import/module
-  ordering and Panache wrapping differences; formatting-only updates cleared them.
+  re-export from `actions.rs`. Removing that no-longer-used compatibility export cleared the warning
+  without affecting current callers. The first format checks reported rustfmt import/module ordering
+  and Panache wrapping differences; formatting-only updates cleared them.
 - Evidence basis:
   - Date: `2026-05-21 15:05:38 PDT` from local `date`.
   - Files: `src/bookmarks/actions.rs`, `src/bookmarks/actions/tests.rs`,
-    `src/bookmarks/action_targets.rs`, `src/bookmarks.rs`, `src/jj_actions.rs`,
+    `src/bookmarks/action_targets.rs`, `src/bookmarks.rs`, `src/actions.rs`,
     `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and this process
     note.
 
@@ -1037,28 +1055,27 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Sticky file document test split)
 
-- Slice / task: move inline tests from `src/sticky_file_view.rs` into
-  `src/sticky_file_view/tests.rs` for the existing jj change.
+- Slice / task: move inline tests from `src/document.rs` into `src/document/tests.rs` for the
+  existing jj change.
 - Thread id: `019e4c8b-b05a-75b3-b676-4c1742bbb535` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
   packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
   were run.
-- Implementation outcome: `sticky_file_view.rs` now ends with `#[cfg(test)] mod tests;`, while the
-  moved sibling module uses `use super::*;` to preserve private access to rendered document helpers,
+- Implementation outcome: `document.rs` now ends with `#[cfg(test)] mod tests;`, while the moved
+  sibling module uses `use super::*;` to preserve private access to rendered document helpers,
   `StickyFileDocument::replace_lines`, and `StickyFileDocument::horizontal_offset`.
 - Behavior-preservation evidence: the packet moved the existing five sticky file view tests without
   changing their names, assertions, helper functions, snapshots, rendering semantics, sticky heading
   behavior, no-wrap behavior, scroll behavior, visibility, or public API.
-- Readability evidence: before the packet, `src/sticky_file_view.rs` measured 702 lines with tests
-  inline. After the split it measured 568 lines, with 132 lines in `src/sticky_file_view/tests.rs`,
-  keeping shared document rendering and scroll code easier to scan while keeping tests beside the
-  owning module.
+- Readability evidence: before the packet, `src/document.rs` measured 702 lines with tests inline.
+  After the split it measured 568 lines, with 132 lines in `src/document/tests.rs`, keeping shared
+  document rendering and scroll code easier to scan while keeping tests beside the owning module.
 - Validation trail:
-  - Worker validation passed: `cargo test sticky_file_view -- --test-threads=1` with 5 passed and
-    562 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
+  - Worker validation passed: `cargo test document -- --test-threads=1` with 5 passed and 562
+    filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing rustfmt
     unstable-option warnings; and `just md-check`.
-  - Main-thread review validation passed: `cargo test sticky_file_view -- --test-threads=1` with 5
-    passed and 562 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+  - Main-thread review validation passed: `cargo test document -- --test-threads=1` with 5 passed
+    and 562 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
     rustfmt unstable-option warnings; and `just md-check`.
 - Rework / surprise: the first format check reported one rustfmt wrapping difference in the moved
   test file. After applying that formatting-only change, validation passed. No behavior rework was
@@ -1067,7 +1084,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 14:59:08 PDT` from local `date`.
   - Main review date: `2026-05-21 15:00:56 PDT` from local `date`.
-  - Files: `src/sticky_file_view.rs`, `src/sticky_file_view/tests.rs`,
+  - Files: `src/document.rs`, `src/document/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Command vocabulary test split)
@@ -1141,8 +1158,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Working-copy action-plan test split)
 
-- Slice / task: move inline tests from `src/jj_actions/working_copy.rs` into
-  `src/jj_actions/working_copy/tests.rs` for the existing jj change.
+- Slice / task: move inline tests from `src/actions/working_copy.rs` into
+  `src/actions/working_copy/tests.rs` for the existing jj change.
 - Thread id: `019e4c7b-d134-7fc3-b136-ddbfae519998` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
   packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
@@ -1153,15 +1170,15 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Behavior-preservation evidence: the packet moved the existing ten working-copy action-plan tests
   without changing their names, assertions, helper access, argv expectations, preview wording
   checks, labels, visibility, or public API.
-- Readability evidence: before the packet, `src/jj_actions/working_copy.rs` measured 639 lines with
+- Readability evidence: before the packet, `src/actions/working_copy.rs` measured 639 lines with
   tests inline. After the split it measured 441 lines, with 197 lines in
-  `src/jj_actions/working_copy/tests.rs`, keeping production command-plan code easier to scan while
+  `src/actions/working_copy/tests.rs`, keeping production command-plan code easier to scan while
   keeping tests beside the owning module.
 - Validation trail:
-  - Worker validation passed: `cargo test jj_actions::working_copy -- --test-threads=1` with 10
-    passed and 557 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+  - Worker validation passed: `cargo test actions::working_copy -- --test-threads=1` with 10 passed
+    and 557 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
     rustfmt unstable-option warnings; and `just md-check`.
-  - Main-thread review validation passed: `cargo test jj_actions::working_copy -- --test-threads=1`
+  - Main-thread review validation passed: `cargo test actions::working_copy -- --test-threads=1`
     with 10 passed and 557 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with
     existing rustfmt unstable-option warnings; and `just md-check`.
 - Rework / surprise: no behavior rework was needed. Working-copy command behavior, argv, preview
@@ -1169,13 +1186,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 14:40:58 PDT` from local `date`.
   - Main review date: `2026-05-21 14:44:06 PDT` from local `date`.
-  - Files: `src/jj_actions/working_copy.rs`, `src/jj_actions/working_copy/tests.rs`,
+  - Files: `src/actions/working_copy.rs`, `src/actions/working_copy/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Bookmark action-plan test split)
 
-- Slice / task: move inline tests from `src/jj_actions/bookmarks.rs` into
-  `src/jj_actions/bookmarks/tests.rs` for the existing jj change.
+- Slice / task: move inline tests from `src/actions/bookmarks.rs` into
+  `src/actions/bookmarks/tests.rs` for the existing jj change.
 - Thread id: `019e4c78-0092-7742-8bd1-b0c032199cb9` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded source-shape
   packet. The user explicitly prohibited version-control commands, and no `jj` or `git` commands
@@ -1186,23 +1203,22 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Behavior-preservation evidence: the packet moved the existing eight bookmark action-plan tests
   without changing their names, assertions, helper access, argv expectations, preview wording
   checks, exact pattern quoting, labels, visibility, or public API.
-- Readability evidence: before the packet, `src/jj_actions/bookmarks.rs` measured 833 lines with
-  tests inline. After the split it measured 588 lines, with 243 lines in
-  `src/jj_actions/bookmarks/tests.rs`, keeping production command-plan code easier to scan while
-  keeping tests beside the owning module.
+- Readability evidence: before the packet, `src/actions/bookmarks.rs` measured 833 lines with tests
+  inline. After the split it measured 588 lines, with 243 lines in `src/actions/bookmarks/tests.rs`,
+  keeping production command-plan code easier to scan while keeping tests beside the owning module.
 - Validation trail:
-  - Worker validation passed: `cargo test jj_actions::bookmarks -- --test-threads=1`; `cargo check`;
+  - Worker validation passed: `cargo test actions::bookmarks -- --test-threads=1`; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
-  - Main-thread review validation passed: `cargo test jj_actions::bookmarks -- --test-threads=1`
-    with 8 passed and 559 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with
-    existing rustfmt unstable-option warnings; and `just md-check`.
+  - Main-thread review validation passed: `cargo test actions::bookmarks -- --test-threads=1` with 8
+    passed and 559 filtered out; `cargo check`; `rustup run nightly cargo fmt --check` with existing
+    rustfmt unstable-option warnings; and `just md-check`.
 - Rework / surprise: the first Markdown check reported Panache wrapping for the new notes. After
   applying that formatting-only change, Markdown validation passed. Bookmark command behavior, argv,
   preview summaries, exact pattern quoting, labels, visibility, and public API stayed unchanged.
 - Evidence basis:
   - Date: `2026-05-21 14:36:48 PDT` from local `date`.
   - Main review date: `2026-05-21 14:39:45 PDT` from local `date`.
-  - Files: `src/jj_actions/bookmarks.rs`, `src/jj_actions/bookmarks/tests.rs`,
+  - Files: `src/actions/bookmarks.rs`, `src/actions/bookmarks/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Bookmark row test split)
@@ -1274,8 +1290,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Extract new trunk refresh flow)
 
-- Slice / task: reduce nested control flow in `src/app/action_lifecycle/preview.rs::run_new_trunk`
-  for the current jj change `Extract new trunk refresh flow`.
+- Slice / task: reduce nested control flow in `src/app/actions/preview.rs::run_new_trunk` for the
+  current jj change `Extract new trunk refresh flow`.
 - Thread id: `019e4c0f-2b06-78d3-aeb6-56641966f403` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded Rust
   maintainability packet. The user explicitly kept version-control operations with the main thread,
@@ -1292,11 +1308,11 @@ be supported by the work log, repo state, or direct transcript evidence.
   recent-mode success status, so no new duplicate test was added.
 - Validation trail:
   - Worker validation passed: `cargo test working_copy_actions -- --test-threads=1` with 27 passed;
-    `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    `cargo test actions -- --test-threads=1` with 8 passed; `cargo check`;
     `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings; and
     `just md-check`.
   - Main-thread review validation passed: `cargo test working_copy_actions -- --test-threads=1` with
-    27 passed; `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    27 passed; `cargo test actions -- --test-threads=1` with 8 passed; `cargo check`;
     `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings; and
     `just md-check`.
 - Rework / surprise: the first Markdown check reported Panache wrapping for two lines in this
@@ -1304,14 +1320,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 12:42:18 PDT` from local `date`.
   - Main review date: `2026-05-21 12:46:12 PDT` from local `date`.
-  - Files: `src/app/action_lifecycle/preview.rs`, `docs/agent/source-maintainability-ledger.md`, and
-    this process note.
+  - Files: `src/app/actions/preview.rs`, `docs/agent/source-maintainability-ledger.md`, and this
+    process note.
 
 ### 2026-05-21 (Extract rewrite source context helper)
 
 - Slice / task: reduce duplicated rewrite preview status-context construction in
-  `src/app/action_lifecycle/preview.rs` for the current jj change
-  `Extract rewrite source context helper`.
+  `src/app/actions/preview.rs` for the current jj change `Extract rewrite source context helper`.
 - Thread id: `019e4c09-b356-7313-ac7b-04ff16507bab` from `CODEX_THREAD_ID`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the bounded Rust
   maintainability packet. The user explicitly kept version-control operations with the main thread,
@@ -1326,10 +1341,10 @@ be supported by the work log, repo state, or direct transcript evidence.
   short source labels are non-empty.
 - Validation trail:
   - Worker validation passed: `cargo test rewrite_actions -- --test-threads=1` with 16 passed;
-    `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    `cargo test input -- --test-threads=1` with 12 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Main-thread review validation passed: `cargo test rewrite_actions -- --test-threads=1` with 16
-    passed; `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    passed; `cargo test input -- --test-threads=1` with 12 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, the
     largest-file report, clippy with `-D warnings`, `cargo check`, and `cargo test` with 565 passed
@@ -1339,8 +1354,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   this process note.
 - Evidence basis:
   - Date: `2026-05-21 12:36:18 PDT` from local `date`.
-  - Files: `src/app/action_lifecycle/preview.rs`, `docs/agent/source-maintainability-ledger.md`, and
-    this process note.
+  - Files: `src/app/actions/preview.rs`, `docs/agent/source-maintainability-ledger.md`, and this
+    process note.
 
 ### 2026-05-21 (Refresh source audit measurements)
 
@@ -1354,8 +1369,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Implementation outcome: the ledger now records the 2026-05-21 largest-file, visibility,
   repeated-list-mechanic, action-lifecycle/result, control-flow, and immediate-doc scan counts from
   this packet. The recommendations now treat counts as read-first nominations, keep
-  `src/app/mode_input.rs` as the strongest bounded readability candidate, and avoid treating
-  `src/app.rs` as an automatic documentation target because it already has run-level docs.
+  `src/app/input.rs` as the strongest bounded readability candidate, and avoid treating `src/app.rs`
+  as an automatic documentation target because it already has run-level docs.
 - Validation trail:
   - Worker validation passed: `just md-check`.
   - Main-thread review validation passed: `just md-check`.
@@ -1397,9 +1412,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Sync remote prompt decision reducers)
 
-- Slice / task: extract pure push/fetch remote-list prompt branching from
-  `src/app/action_lifecycle/entry.rs` while preserving app-owned status, mode, preview, and service
-  side effects.
+- Slice / task: extract pure push/fetch remote-list prompt branching from `src/app/actions/entry.rs`
+  while preserving app-owned status, mode, preview, and service side effects.
 - Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
   implementation `019e4bf3-8ef4-7670-a5cb-1017f113e0d3`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the scoped implementation. The
@@ -1412,18 +1426,18 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Behavior-preservation evidence: the reducers keep the existing push no-remotes message, fetch
   no-remotes message, `jj git remote list` finished-output label, and fetch selection context
   strings. Existing sync action tests still cover app-level fetch/push prompt behavior and the new
-  `action_lifecycle` reducer tests cover empty, single, multiple, and error decisions for both
-  prompt families.
+  `actions` reducer tests cover empty, single, multiple, and error decisions for both prompt
+  families.
 - Main-thread review outcome: `load_git_remotes()`, status assignment, mode assignment, and preview
   opening stayed in `entry.rs`; the reducers only classify already-loaded remote-list results.
-- Size evidence: after the change, `src/app/action_lifecycle/entry.rs` measured 559 lines and
-  `src/app/action_lifecycle/entry/tests.rs` measured 84 lines.
+- Size evidence: after the change, `src/app/actions/entry.rs` measured 559 lines and
+  `src/app/actions/entry/tests.rs` measured 84 lines.
 - Validation trail:
   - Worker validation passed: `cargo test sync_actions -- --test-threads=1` with 20 passed;
-    `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    `cargo test actions -- --test-threads=1` with 8 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Main-thread review validation passed: `cargo test sync_actions -- --test-threads=1` with 20
-    passed; `cargo test action_lifecycle -- --test-threads=1` with 8 passed; `cargo check`;
+    passed; `cargo test actions -- --test-threads=1` with 8 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
     with `-D warnings`, `cargo check`, and `cargo test` with 565 passed / 2 ignored.
@@ -1432,32 +1446,31 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 12:15:17 PDT` from local `date`.
   - Worker thread id from `CODEX_THREAD_ID`.
-  - Files: `src/app/action_lifecycle/entry.rs`, `src/app/action_lifecycle/entry/tests.rs`,
+  - Files: `src/app/actions/entry.rs`, `src/app/actions/entry/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Mode input reducer test split)
 
-- Slice / task: move the inline `src/app/mode_input/reducers.rs` reducer tests beside the module
-  without changing reducer behavior, test names, expected strings, assertions, or visibility.
+- Slice / task: move the inline `src/app/input/reducers.rs` reducer tests beside the module without
+  changing reducer behavior, test names, expected strings, assertions, or visibility.
 - Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
   implementation `019e4be9-902c-7d42-91a1-42bdc43c4b73`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the scoped source split and
   process-note update. The main thread retained ownership of version-control operations, reviewed
   the diff, updated the maintainability ledger, and reran focused validation.
-- Implementation outcome: `src/app/mode_input/reducers.rs` now keeps production code scanning
-  focused by replacing the inline test block with `#[cfg(test)] mod tests;`; the moved tests live in
-  `src/app/mode_input/reducers/tests.rs` with `use super::*;` and the existing `RolePromptOption`
-  import.
-- Behavior-preservation evidence: the moved module still runs the same 12 `mode_input` reducer test
+- Implementation outcome: `src/app/input/reducers.rs` now keeps production code scanning focused by
+  replacing the inline test block with `#[cfg(test)] mod tests;`; the moved tests live in
+  `src/app/input/reducers/tests.rs` with `use super::*;` and the existing `RolePromptOption` import.
+- Behavior-preservation evidence: the moved module still runs the same 12 `input` reducer test
   names, including role prompt, describe prompt, commit prompt, bookmark name, and bookmark rename
   coverage. The change only moved the test module and applied rustfmt line wrapping.
-- Size evidence after main review: `src/app/mode_input/reducers.rs` measured 290 lines and
-  `src/app/mode_input/reducers/tests.rs` measured 162 lines.
+- Size evidence after main review: `src/app/input/reducers.rs` measured 290 lines and
+  `src/app/input/reducers/tests.rs` measured 162 lines.
 - Validation trail:
-  - Worker validation passed: `cargo test mode_input -- --test-threads=1` with 12 passed;
+  - Worker validation passed: `cargo test input -- --test-threads=1` with 12 passed; `cargo check`;
+    `rustup run nightly cargo fmt --check`; and `just md-check`.
+  - Main-thread review validation passed: `cargo test input -- --test-threads=1` with 12 passed;
     `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
-  - Main-thread review validation passed: `cargo test mode_input -- --test-threads=1` with 12
-    passed; `cargo check`; `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
     with `-D warnings`, `cargo check`, and `cargo test` with 557 passed / 2 ignored.
 - Rework / surprise: the first fmt check reported line wrapping needed in the new test file; after
@@ -1465,32 +1478,32 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 12:03:44 PDT` from local `date`.
   - Worker thread id from `CODEX_THREAD_ID`.
-  - Files: `src/app/mode_input/reducers.rs`, `src/app/mode_input/reducers/tests.rs`,
+  - Files: `src/app/input/reducers.rs`, `src/app/input/reducers/tests.rs`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Action plan root contract documentation)
 
-- Slice / task: document the root `jj_actions` action-planning boundary before further action-plan
+- Slice / task: document the root `actions` action-planning boundary before further action-plan
   cleanup so argv construction, previews, direct execution, and feature-owned availability stay
   separate.
 - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
 - Worker thread id: `019e4b76-8048-7f92-a5b0-09f4e57a0606`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only sweep with write
-  scope limited to `src/jj_actions.rs`. The main thread reviewed the diff, removed repetitive
-  low-value method comments, and reran focused validation including rustdoc generation for links.
-- Implementation outcome: `src/jj_actions.rs` now documents the root action-plan ownership boundary,
+  scope limited to `src/actions.rs`. The main thread reviewed the diff, removed repetitive low-value
+  method comments, and reran focused validation including rustdoc generation for links.
+- Implementation outcome: `src/actions.rs` now documents the root action-plan ownership boundary,
   the submodule family split, feature/menu-owned availability and target selection, app lifecycle
   ownership of prompt/confirmation/refresh/reveal/result transitions, `CommandOutput` semantics, and
   preview-honesty contracts for describe, commit, restore, file mutation, revert, and abandon plans.
-- Size evidence: after main-thread trimming, `src/jj_actions.rs` measured 872 lines.
+- Size evidence: after main-thread trimming, `src/actions.rs` measured 872 lines.
 - Rework / surprise: the worker stayed in scope and passed validation, but the first pass added too
   many repetitive comments on similarly shaped methods. Main-thread review kept the ownership and
   preview-honesty contracts and removed comments that restated method names.
 - Validation trail:
-  - Worker validation passed: `cargo check`; `cargo test jj_actions -- --test-threads=1` with 54
+  - Worker validation passed: `cargo check`; `cargo test actions -- --test-threads=1` with 54
     passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
     warnings.
-  - Main-thread review validation passed: `cargo check`; `cargo test jj_actions -- --test-threads=1`
+  - Main-thread review validation passed: `cargo check`; `cargo test actions -- --test-threads=1`
     with 54 passed; `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
     warnings; and `cargo doc --no-deps`.
   - Full `just check` passed at the top of the stack, reporting fmt, Panache format/lint, clippy,
@@ -1499,7 +1512,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 10:15:28 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id `019e4b76-8048-7f92-a5b0-09f4e57a0606` from the worker handoff.
-  - Files: `src/jj_actions.rs` and this process note.
+  - Files: `src/actions.rs` and this process note.
 
 ### 2026-05-21 (Shared chrome rendering contract documentation)
 
@@ -1535,7 +1548,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 ### 2026-05-21 (Action menu ownership contract documentation)
 
 - Slice / task: document shared action-menu presentation and follow-up ownership so feature owners
-  keep action availability local while app lifecycle and `jj_actions` own preview and execution.
+  keep action availability local while app lifecycle and `actions` own preview and execution.
 - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
 - Worker thread id: `019e4b71-7a95-7a92-8741-0204dff82d6c`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only sweep with write
@@ -1544,7 +1557,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Implementation outcome: `src/action_menu.rs` now documents shared menu ownership, action
   vocabulary and shortcut stability, role-prompt exact revision values, follow-up payload
   boundaries, builder-owned availability, and the split between menu state, app lifecycle, and
-  `jj_actions`.
+  `actions`.
 - Size evidence: after the change, `src/action_menu.rs` measured 356 lines.
 - Rework / surprise: none. The worker preserved behavior, public API shape, imports, tests, labels,
   shortcuts, and safety wording.
@@ -1570,20 +1583,18 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
 - Worker thread id: `019e4b6f-015e-7590-b2a4-e9c08afdfb86`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the docs-only sweep with write
-  scope limited to `src/app_screen.rs`. The main thread reviewed the diff and reran focused
-  validation.
-- Implementation outcome: `src/app_screen.rs` now documents prompt status projection, borrowed
-  overlay projection, view-menu labels as user-visible text, view-menu actions as app-dispatched
-  data, and the static view-menu table as the shared source for overlay rendering, selected-index
-  clamping, and navigation lookup.
-- Size evidence: after the change, `src/app_screen.rs` measured 659 lines.
+  scope limited to `src/modes.rs`. The main thread reviewed the diff and reran focused validation.
+- Implementation outcome: `src/modes.rs` now documents prompt status projection, borrowed overlay
+  projection, view-menu labels as user-visible text, view-menu actions as app-dispatched data, and
+  the static view-menu table as the shared source for overlay rendering, selected-index clamping,
+  and navigation lookup.
+- Size evidence: after the change, `src/modes.rs` measured 659 lines.
 - Rework / surprise: none. The worker preserved behavior, API shape, imports, tests, status wording,
   and overlay labels.
 - Validation trail:
-  - Worker validation passed: `cargo check`; `cargo test app_screen -- --test-threads=1` with 7
-    passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
-    warnings.
-  - Main-thread review validation passed: `cargo check`; `cargo test app_screen -- --test-threads=1`
+  - Worker validation passed: `cargo check`; `cargo test screen -- --test-threads=1` with 7 passed;
+    and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings.
+  - Main-thread review validation passed: `cargo check`; `cargo test screen -- --test-threads=1`
     with 7 passed; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
     warnings.
   - `just md-check` passed after Panache wrapping in this process note.
@@ -1593,30 +1604,30 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 09:48:14 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id `019e4b6f-015e-7590-b2a4-e9c08afdfb86` from the worker handoff.
-  - Files: `src/app_screen.rs` and this process note.
+  - Files: `src/modes.rs` and this process note.
 
 ### 2026-05-21 (Shared row helper contract documentation)
 
-- Slice / task: document the remaining `src/jj_rows.rs` shared-helper boundary so future row work
-  keeps feature-specific policy in feature roots.
+- Slice / task: document the remaining `src/rows.rs` shared-helper boundary so future row work keeps
+  feature-specific policy in feature roots.
 - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
 - Worker thread id: `019e4b6b-db96-77c0-a1da-a8b4f51759cd`.
 - Model / routing: GPT-5.4-mini worker with medium reasoning performed a small docs-only sweep with
-  write scope limited to `src/jj_rows.rs`. The main thread reviewed the result and tightened a few
+  write scope limited to `src/rows.rs`. The main thread reviewed the result and tightened a few
   comments from function-name narration into contracts about fail-closed metadata parsing and
   intentional style loss.
-- Implementation outcome: `src/jj_rows.rs` now states that it owns only domain-neutral rendered-row
+- Implementation outcome: `src/rows.rs` now states that it owns only domain-neutral rendered-row
   mechanics: plain-text flattening, metadata drift handling, JSON field extraction, graph-line
   detection, and rendered line text extraction.
-- Size evidence: after the change, `src/jj_rows.rs` measured 88 lines.
+- Size evidence: after the change, `src/rows.rs` measured 88 lines.
 - Rework / surprise: the mini worker stayed in scope and passed validation, but its first pass added
   a few generic helper comments that the main thread rewrote into more contract-oriented wording.
 - Validation trail:
-  - Worker validation passed: `cargo check`; `cargo test jj_rows -- --test-threads=1` with 0 tests
+  - Worker validation passed: `cargo check`; `cargo test rows -- --test-threads=1` with 0 tests
     matched; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
     warnings.
-  - Main-thread review validation passed: `cargo check`; `cargo test jj_rows -- --test-threads=1`
-    with 0 tests matched; and `rustup run nightly cargo fmt --check` with existing rustfmt
+  - Main-thread review validation passed: `cargo check`; `cargo test rows -- --test-threads=1` with
+    0 tests matched; and `rustup run nightly cargo fmt --check` with existing rustfmt
     unstable-option warnings.
   - `just md-check` passed.
   - Residual risk: this docs-only packet has no matching focused test filter; `cargo check` and
@@ -1625,7 +1636,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 09:45:50 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id `019e4b6b-db96-77c0-a1da-a8b4f51759cd` from the worker handoff.
-  - Files: `src/jj_rows.rs` and this process note.
+  - Files: `src/rows.rs` and this process note.
 
 ### 2026-05-21 (Command dispatch contract documentation)
 
@@ -1781,26 +1792,26 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Action-plan test module extraction)
 
-- Slice / task: move root action-plan tests out of `src/jj_actions.rs` and into the action-plan
-  module directory so production plan contracts are easier to scan.
+- Slice / task: move root action-plan tests out of `src/actions.rs` and into the action-plan module
+  directory so production plan contracts are easier to scan.
 - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
 - Worker thread id: `019e4b57-5181-7df3-a807-fa47b83e881b`.
 - Model / routing: GPT-5 Codex worker with medium reasoning performed the mechanical extraction with
-  write scope limited to `src/jj_actions.rs` and `src/jj_actions/tests.rs`. The main thread kept jj
+  write scope limited to `src/actions.rs` and `src/actions/tests.rs`. The main thread kept jj
   ownership, reviewed the result, and reran validation.
-- Implementation outcome: `src/jj_actions.rs` now declares `#[cfg(test)] mod tests;`; the moved
-  tests live in `src/jj_actions/tests.rs` and continue to cover describe, commit, restore, revert,
-  file mutation, and abandon preview contracts.
-- Size evidence: after the move, `wc -l src/jj_actions.rs src/jj_actions/tests.rs` reported 822
-  lines in `src/jj_actions.rs` and 364 in `src/jj_actions/tests.rs`.
+- Implementation outcome: `src/actions.rs` now declares `#[cfg(test)] mod tests;`; the moved tests
+  live in `src/actions/tests.rs` and continue to cover describe, commit, restore, revert, file
+  mutation, and abandon preview contracts.
+- Size evidence: after the move, `wc -l src/actions.rs src/actions/tests.rs` reported 822 lines in
+  `src/actions.rs` and 364 in `src/actions/tests.rs`.
 - Rework / surprise: none beyond the expected module extraction.
 - Validation trail:
-  - Worker validation passed: `cargo test jj_actions -- --test-threads=1` with 54 passed;
+  - Worker validation passed: `cargo test actions -- --test-threads=1` with 54 passed;
     `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
     warnings.
-  - Main-thread review validation passed: `cargo test jj_actions -- --test-threads=1` with 54
-    passed; `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt
-    unstable-option warnings.
+  - Main-thread review validation passed: `cargo test actions -- --test-threads=1` with 54 passed;
+    `cargo check`; and `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option
+    warnings.
   - `just md-check` passed after Panache wrapping in this process note.
   - Full `just check` passed, reporting fmt, Panache format/lint, clippy, cargo check, and cargo
     test passed with 545 passed / 2 ignored.
@@ -1808,7 +1819,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 09:24:11 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id `019e4b57-5181-7df3-a807-fa47b83e881b` from the worker handoff.
-  - Files: `src/jj_actions.rs`, `src/jj_actions/tests.rs`, and this process note.
+  - Files: `src/actions.rs`, `src/actions/tests.rs`, and this process note.
 
 ### 2026-05-21 (Graph test module extraction)
 
@@ -1842,26 +1853,26 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-21 (Graph row feature-root migration)
 
-- Slice / task: move revision/log rendered-row loading and metadata pairing out of `jj_rows` and
-  into the graph feature root.
+- Slice / task: move revision/log rendered-row loading and metadata pairing out of `rows` and into
+  the graph feature root.
 - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
 - Model / routing: GPT-5 Codex main thread with medium reasoning performed this slice directly after
   the preceding ownership packet made document loading independent of `LogItem`.
 - Implementation outcome: `src/graph/rows.rs` now owns `LogItem`, `load_entries`,
   `load_compact_log_context`, rendered log row grouping, revision metadata template execution,
   fail-closed metadata pairing, and the row tests that previously lived under
-  `src/jj_rows/revisions.rs`.
+  `src/rows/revisions.rs`.
 - Boundary evidence: `src/graph.rs` declares `mod rows;` and re-exports the graph row surface for
   crate-local callers; `src/show.rs`, `src/view_state.rs`, and focused app tests now use
-  `crate::graph` for graph row construction and compact log context; `src/jj_rows.rs` now keeps only
+  `crate::log` for graph row construction and compact log context; `src/rows.rs` now keeps only
   shared rendered-row helpers.
-- Rework / surprise: the initial compatibility re-export from `src/jj_rows.rs` compiled but created
+- Rework / surprise: the initial compatibility re-export from `src/rows.rs` compiled but created
   unused-import warnings that would fail clippy. Removing the facade and updating callers to
-  `crate::graph` made the feature owner explicit.
+  `crate::log` made the feature owner explicit.
 - Validation trail:
   - `cargo test graph -- --test-threads=1` passed with 62 passed.
   - `cargo test show -- --test-threads=1` passed with 47 passed.
-  - `cargo test jj_rows -- --test-threads=1` passed with 0 passed, reflecting helper-only status.
+  - `cargo test rows -- --test-threads=1` passed with 0 passed, reflecting helper-only status.
   - `cargo test command_navigation -- --test-threads=1` passed with 35 passed.
   - `cargo test view_state -- --test-threads=1` passed with 11 passed.
   - `cargo check` passed.
@@ -1878,34 +1889,34 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 09:15:58 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
-  - Files: `src/graph.rs`, `src/graph/rows.rs`, `src/jj_rows.rs`, `src/show.rs`,
+  - Files: `src/graph.rs`, `src/graph/rows.rs`, `src/rows.rs`, `src/show.rs`,
     `src/app/tests/support.rs`, focused app tests, `docs/agent/architecture.md`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Log row ownership definition)
 
 - Slice / task: define the remaining graph/log row ownership boundary before moving revision rows
-  out of the generic `jj_rows` bucket.
+  out of the generic `rows` bucket.
 - Main thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39`.
 - Model / routing: GPT-5 Codex main thread with medium reasoning performed this slice directly
   because the user explicitly requested the feature-root refactoring guidance in the main thread.
-- Implementation outcome: `src/sticky_file_view.rs` now loads rendered document lines directly
-  through `run_jj` with `ColorMode::Always` and `ansi_to_tui`, so show, diff, status, file-show, and
+- Implementation outcome: `src/document.rs` now loads rendered document lines directly through
+  `run_jj` with `ColorMode::Always` and `ansi_to_tui`, so show, diff, status, file-show, and
   operation-detail document loading no longer depends on graph/log `LogItem` rows.
-- Documentation outcome: `docs/agent/architecture.md` now describes `jj_rows.rs` as a shrinking
+- Documentation outcome: `docs/agent/architecture.md` now describes `rows.rs` as a shrinking
   graph/log row owner plus remaining shared helpers, and
   `docs/agent/source-maintainability-ledger.md` records acceptance criteria for the next
   revision-row move.
 - Boundary evidence: `src/graph.rs` still consumes `LogItem` and `load_entries`; `src/show.rs` still
-  consumes `load_compact_log_context`; `src/sticky_file_view.rs` no longer imports `load_entries`,
-  so document views stay independent of graph row identity.
+  consumes `load_compact_log_context`; `src/document.rs` no longer imports `load_entries`, so
+  document views stay independent of graph row identity.
 - Validation trail:
-  - `cargo test sticky_file_view -- --test-threads=1` passed with 5 passed.
+  - `cargo test document -- --test-threads=1` passed with 5 passed.
   - `cargo test show -- --test-threads=1` passed with 47 passed.
   - `cargo test diff -- --test-threads=1` passed with 32 passed.
   - `cargo test status -- --test-threads=1` passed with 44 passed.
   - `cargo test operation_detail -- --test-threads=1` passed with 7 passed.
-  - `cargo test jj_rows -- --test-threads=1` passed with 11 passed.
+  - `cargo test rows -- --test-threads=1` passed with 11 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
   - `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option
@@ -1916,14 +1927,14 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-21 09:12:41 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
-  - Files: `src/sticky_file_view.rs`, `src/jj_rows.rs`, `src/jj_rows/revisions.rs`, `src/graph.rs`,
-    `src/show.rs`, `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and
-    this process note.
+  - Files: `src/document.rs`, `src/rows.rs`, `src/rows/revisions.rs`, `src/graph.rs`, `src/show.rs`,
+    `docs/agent/architecture.md`, `docs/agent/source-maintainability-ledger.md`, and this process
+    note.
 
 ### 2026-05-21 (File-list row feature-root migration)
 
-- Slice / task: move file-list rendered-row loading and exact path parsing out of the generic
-  `jj_rows` bucket and into the `file_list` feature root.
+- Slice / task: move file-list rendered-row loading and exact path parsing out of the generic `rows`
+  bucket and into the `file_list` feature root.
 - Worker thread id: `019e4b47-3920-7a43-9e72-946abfc2dfd5`.
 - Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The user kept
   VCS ownership in the main thread and explicitly prohibited jj/git commands.
@@ -1931,7 +1942,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   exact non-empty path parsing, colorized rendered-line preservation, and the existing file-list row
   tests.
 - Boundary evidence: `src/file_list.rs` declares `mod rows;` and re-exports the row item and loader
-  for crate-local callers and tests. `src/jj_rows.rs` no longer owns file-list rows and keeps only
+  for crate-local callers and tests. `src/rows.rs` no longer owns file-list rows and keeps only
   shared rendered-row helpers plus revision/log row loading.
 - Caller evidence: `src/app/tests/support.rs`, `src/view_state.rs`,
   `src/app/tests/detail_restore_actions.rs`, `src/app/tests/file_actions.rs`, and
@@ -1945,7 +1956,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `cargo test file_list -- --test-threads=1` passed with 19 passed.
   - `cargo test detail_restore_actions -- --test-threads=1` passed with 19 passed.
   - `cargo test file_actions -- --test-threads=1` passed with 7 passed.
-  - `cargo test jj_rows -- --test-threads=1` passed with 11 passed.
+  - `cargo test rows -- --test-threads=1` passed with 11 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
   - `rustup run nightly cargo fmt --check` passed after applying rustfmt, with the existing rustfmt
@@ -1953,18 +1964,18 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `just md-check` passed after applying Panache wrapping.
 - Main-thread review validation passed: `cargo test file_list -- --test-threads=1` with 19 passed;
   `cargo test detail_restore_actions -- --test-threads=1` with 19 passed;
-  `cargo test file_actions -- --test-threads=1` with 7 passed;
-  `cargo test jj_rows -- --test-threads=1` with 11 passed; `cargo check`;
-  `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
-  unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
-  Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
+  `cargo test file_actions -- --test-threads=1` with 7 passed; `cargo test rows -- --test-threads=1`
+  with 11 passed; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check` with existing rustfmt unstable-option warnings;
+  `just md-check`; and full `just check`. Full `just check` reported fmt, Panache format/lint,
+  clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-21 09:09:25 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id `019e4b47-3920-7a43-9e72-946abfc2dfd5` from the worker handoff.
-  - Files: `src/file_list.rs`, `src/file_list/rows.rs`, `src/jj_rows.rs`,
-    `src/app/tests/support.rs`, `src/view_state.rs`, focused app tests,
-    `docs/agent/source-maintainability-ledger.md`, and this process note.
+  - Files: `src/file_list.rs`, `src/file_list/rows.rs`, `src/rows.rs`, `src/app/tests/support.rs`,
+    `src/view_state.rs`, focused app tests, `docs/agent/source-maintainability-ledger.md`, and this
+    process note.
 
 ### 2026-05-21 (Remaining row ownership reassessment)
 
@@ -1973,7 +1984,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Worker thread id: `019e4b44-5330-7922-b6a7-c6177e6372d8`.
 - Model / routing: GPT-5 Codex worker with medium reasoning updated docs only. The main thread
   provided current row-ownership evidence and requested Markdown validation.
-- Evidence outcome: `src/jj_rows.rs` now declares only `mod revisions`, re-exports revision log
+- Evidence outcome: `src/rows.rs` now declares only `mod revisions`, re-exports revision log
   loaders, owns `FileListItem` and `load_file_list_entries`, and keeps shared rendered-row helpers
   including `document_plain_text`, `RowMetadata`, JSON helpers, graph-line helpers, and `line_text`.
 - Recommendation outcome: `docs/agent/source-maintainability-ledger.md` now recommends a bounded
@@ -1981,18 +1992,18 @@ be supported by the work log, repo state, or direct transcript evidence.
   owns the user-visible `jj file list` view.
 - Deferred scope: revision/log row migration is explicitly deferred until a packet defines ownership
   and acceptance criteria across `src/graph.rs`, compact show context in `src/show.rs`, and sticky
-  file detail behavior in `src/sticky_file_view.rs`.
+  file detail behavior in `src/document.rs`.
 - Validation trail:
   - `just md-check` passed.
 - Evidence basis:
   - Date: `2026-05-21 09:00:47 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Worker thread id `019e4b44-5330-7922-b6a7-c6177e6372d8` from the worker handoff.
-  - Files: `src/jj_rows.rs`, `src/file_list.rs`, `src/graph.rs`, `src/show.rs`,
-    `src/sticky_file_view.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
+  - Files: `src/rows.rs`, `src/file_list.rs`, `src/graph.rs`, `src/show.rs`, `src/document.rs`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Resolve row feature-root migration)
 
-- Slice / task: move resolve conflict row loading and template parsing out of the generic `jj_rows`
+- Slice / task: move resolve conflict row loading and template parsing out of the generic `rows`
   bucket and into the `resolve` feature root.
 - Worker thread id: `019e4b2f-d862-7171-8b31-0a4b263eeed9`.
 - Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The main
@@ -2001,9 +2012,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   `RESOLVE_CONFLICT_TEMPLATE`, resolve JSON template parsing, local side-count parsing, and the
   existing resolve row parser tests.
 - Boundary evidence: `src/resolve.rs` declares `mod rows;` and re-exports the resolve row surface
-  for crate-local callers and tests. `src/jj_rows.rs` no longer owns resolve row parsing or the
-  resolve conflict template and keeps shared rendered-row helpers such as `line_text`,
-  `string_field`, and file-list loading.
+  for crate-local callers and tests. `src/rows.rs` no longer owns resolve row parsing or the resolve
+  conflict template and keeps shared rendered-row helpers such as `line_text`, `string_field`, and
+  file-list loading.
 - Caller evidence: `src/app/tests/support.rs` re-exports resolve row fixtures from `crate::resolve`;
   `src/app/tests/detail_restore_actions.rs` constructs resolve rows through
   `crate::resolve::ResolveEntry`; `src/jj.rs` tests import `RESOLVE_CONFLICT_TEMPLATE` from
@@ -2015,7 +2026,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Validation trail:
   - `cargo test resolve -- --test-threads=1` passed with 24 passed.
   - `cargo test detail_restore_actions -- --test-threads=1` passed with 19 passed.
-  - `cargo test jj_rows -- --test-threads=1` passed with 13 passed.
+  - `cargo test rows -- --test-threads=1` passed with 13 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
   - `rustup run nightly cargo fmt --check` passed after applying rustfmt, with the existing rustfmt
@@ -2023,7 +2034,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `just md-check` passed after applying Panache wrapping.
 - Main-thread review validation passed: `cargo test resolve -- --test-threads=1` with 24 passed;
   `cargo test detail_restore_actions -- --test-threads=1` with 19 passed;
-  `cargo test jj_rows -- --test-threads=1` with 13 passed; `cargo check`;
+  `cargo test rows -- --test-threads=1` with 13 passed; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
   unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
   Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
@@ -2031,14 +2042,14 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 08:59:00 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id `019e4b2f-d862-7171-8b31-0a4b263eeed9` from the worker handoff.
-  - Files: `src/resolve.rs`, `src/resolve/rows.rs`, `src/jj_rows.rs`, `src/jj.rs`,
+  - Files: `src/resolve.rs`, `src/resolve/rows.rs`, `src/rows.rs`, `src/jj.rs`,
     `src/app/tests/support.rs`, `src/app/tests/detail_restore_actions.rs`,
     `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Workspace row feature-root migration)
 
-- Slice / task: move workspace rendered-row loading and metadata pairing out of the generic
-  `jj_rows` bucket and into the `workspaces` feature root.
+- Slice / task: move workspace rendered-row loading and metadata pairing out of the generic `rows`
+  bucket and into the `workspaces` feature root.
 - Worker thread id: `019e4b2b-5072-73e2-a2e1-f13cc741cfb5`.
 - Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The main
   thread kept jj orchestration, reviewed the boundary, and reran validation.
@@ -2046,17 +2057,17 @@ be supported by the work log, repo state, or direct transcript evidence.
   `load_workspace_context`, `WORKSPACE_METADATA_TEMPLATE`, workspace metadata parsing and pairing,
   root/list/metadata degradation, and the existing fail-closed workspace row tests.
 - Boundary evidence: `src/workspaces.rs` declares `mod rows;` and re-exports the workspace row
-  surface for crate-local callers and tests. `src/jj_rows.rs` no longer declares or re-exports a
+  surface for crate-local callers and tests. `src/rows.rs` no longer declares or re-exports a
   workspace submodule and keeps shared rendered-row helpers such as `line_text`, `string_field`, and
   `non_empty_string_field`.
 - Caller evidence: `src/app/tests/support.rs` now re-exports workspace row fixtures from
   `crate::workspaces`; `src/jj.rs` tests import `WORKSPACE_METADATA_TEMPLATE` from
-  `crate::workspaces` while resolve templates remain under `jj_rows`.
+  `crate::workspaces` while resolve templates remain under `rows`.
 - Rework / surprise: `just md-check` initially failed only on Panache wrapping in this process note
   and the source maintainability ledger; `just md-fmt` applied those wrapping changes.
 - Validation trail:
   - `cargo test workspaces -- --test-threads=1` passed with 11 passed.
-  - `cargo test jj_rows -- --test-threads=1` passed with 16 passed.
+  - `cargo test rows -- --test-threads=1` passed with 16 passed.
   - `cargo test command_navigation -- --test-threads=1` passed with 35 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
@@ -2064,7 +2075,7 @@ be supported by the work log, repo state, or direct transcript evidence.
     warnings.
   - `just md-check` passed after applying Panache wrapping.
 - Main-thread review validation passed: `cargo test workspaces -- --test-threads=1` with 11 passed;
-  `cargo test jj_rows -- --test-threads=1` with 16 passed;
+  `cargo test rows -- --test-threads=1` with 16 passed;
   `cargo test command_navigation -- --test-threads=1` with 35 passed; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
   unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
@@ -2073,13 +2084,13 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 08:37:04 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id `019e4b2b-5072-73e2-a2e1-f13cc741cfb5` from the worker handoff.
-  - Files: `src/workspaces.rs`, `src/workspaces/rows.rs`, `src/jj_rows.rs`, `src/jj.rs`,
+  - Files: `src/workspaces.rs`, `src/workspaces/rows.rs`, `src/rows.rs`, `src/jj.rs`,
     `src/app/tests/support.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
     note.
 
 ### 2026-05-21 (Bookmark row feature-root migration)
 
-- Slice / task: move bookmark rendered-row loading and metadata pairing out of the generic `jj_rows`
+- Slice / task: move bookmark rendered-row loading and metadata pairing out of the generic `rows`
   bucket and into the `bookmarks` feature root.
 - Worker thread id: `019e4af1-ad55-7503-8177-018b372f08f1`.
 - Model / routing: GPT-5 Codex worker with medium reasoning implemented the row migration. The main
@@ -2090,9 +2101,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   local/remote state classification, and the existing fail-closed row tests.
 - Boundary evidence: `src/bookmarks.rs` declares `mod rows;` and re-exports the bookmark row surface
   for crate-local callers and tests. `src/bookmarks/action_targets.rs` still owns action target
-  policy, but imports row types from the `bookmarks` feature root. `src/jj_rows.rs` no longer
-  declares or re-exports a bookmark submodule and keeps only shared rendered-row helpers used by
-  multiple owners.
+  policy, but imports row types from the `bookmarks` feature root. `src/rows.rs` no longer declares
+  or re-exports a bookmark submodule and keeps only shared rendered-row helpers used by multiple
+  owners.
 - Caller evidence: `src/app/tests/support.rs`, `src/app/tests/bookmark_actions.rs`, other app tests,
   and `src/view_state.rs` now construct bookmark rows through `crate::bookmarks::...`.
 - Rework / surprise: the first `rustup run nightly cargo fmt --check` failed only on import ordering
@@ -2101,7 +2112,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Validation trail:
   - `cargo test bookmarks -- --test-threads=1` passed with 40 passed.
   - `cargo test bookmark_actions -- --test-threads=1` passed with 27 passed.
-  - `cargo test jj_rows -- --test-threads=1` passed with 20 passed.
+  - `cargo test rows -- --test-threads=1` passed with 20 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
   - `rustup run nightly cargo fmt --check` passed after applying rustfmt.
@@ -2109,24 +2120,24 @@ be supported by the work log, repo state, or direct transcript evidence.
     maintainability ledger.
 - Main-thread review validation passed: `cargo test bookmarks -- --test-threads=1` with 40 passed;
   `cargo test bookmark_actions -- --test-threads=1` with 27 passed;
-  `cargo test jj_rows -- --test-threads=1` with 20 passed; `cargo check`;
+  `cargo test rows -- --test-threads=1` with 20 passed; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
   unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
   Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored, and
   its largest-file output included `src/bookmarks.rs` at 977 lines, `src/bookmarks/rows.rs` at 876
-  lines, and no bookmark row module under `src/jj_rows`.
+  lines, and no bookmark row module under `src/rows`.
 - Evidence basis:
   - Date: `2026-05-21 08:14:18 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`.
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
   - Worker thread id from the worker handoff.
   - Files: `src/bookmarks.rs`, `src/bookmarks/rows.rs`, `src/bookmarks/action_targets.rs`,
-    `src/jj_rows.rs`, `src/app/tests/support.rs`, `src/app/tests/bookmark_actions.rs`,
+    `src/rows.rs`, `src/app/tests/support.rs`, `src/app/tests/bookmark_actions.rs`,
     `src/view_state.rs`, `docs/agent/source-maintainability-ledger.md`, and this process note.
 
 ### 2026-05-21 (Operation-log row feature-root migration)
 
 - Slice / task: move operation-log rendered-row loading and operation-id metadata pairing out of the
-  generic `jj_rows` bucket and into the `operation_log` feature root.
+  generic `rows` bucket and into the `operation_log` feature root.
 - Worker thread id: `019e4a64-8b0a-71f1-9402-1abb0fd6c080`.
 - Model / routing: GPT-5 Codex worker with medium reasoning implemented the migration. The main
   thread kept jj orchestration, reviewed the boundary, and reran validation.
@@ -2134,19 +2145,19 @@ be supported by the work log, repo state, or direct transcript evidence.
   `load_operation_log_entries`, `OPERATION_ID_TEMPLATE`, operation-id parsing, rendered operation
   row grouping, and fail-closed drift tests. `src/operation_log.rs` declares the row submodule and
   re-exports the item and loader for crate-local callers and tests.
-- Boundary evidence: `src/jj_rows.rs` no longer declares `mod operations` or re-exports
-  operation-log items. It keeps only the shared rendered-row mechanics used outside the feature:
-  `RowMetadata`, `is_standalone_graph_line`, `first_content_char`, and `line_text` are crate-visible
-  for the new feature-owned row loader.
+- Boundary evidence: `src/rows.rs` no longer declares `mod operations` or re-exports operation-log
+  items. It keeps only the shared rendered-row mechanics used outside the feature: `RowMetadata`,
+  `is_standalone_graph_line`, `first_content_char`, and `line_text` are crate-visible for the new
+  feature-owned row loader.
 - Caller evidence: app tests that construct operation-log rows now use
   `crate::operation_log::OperationLogItem`; `src/jj.rs` tests import `OPERATION_ID_TEMPLATE` from
-  `operation_log` while still using resolve and workspace templates from `jj_rows`.
+  `operation_log` while still using resolve and workspace templates from `rows`.
 - Rework / surprise: making `RowMetadata` crate-visible needed only enum-level visibility; Rust enum
   variants inherit the enum visibility and reject explicit variant qualifiers.
 - Validation trail:
   - `cargo test operation_log -- --test-threads=1` passed with 22 passed.
   - `cargo test operation_actions -- --test-threads=1` passed with 10 passed.
-  - `cargo test jj_rows -- --test-threads=1` passed with 30 passed.
+  - `cargo test rows -- --test-threads=1` passed with 30 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
   - `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option
@@ -2154,7 +2165,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `just md-check` passed.
 - Main-thread review validation passed: `cargo test operation_log -- --test-threads=1` with 22
   passed; `cargo test operation_actions -- --test-threads=1` with 10 passed;
-  `cargo test jj_rows -- --test-threads=1` with 30 passed; `cargo check`;
+  `cargo test rows -- --test-threads=1` with 30 passed; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
   unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
   Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored.
@@ -2162,28 +2173,28 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 07:13:38 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`
   - Worker thread id from the worker handoff
-  - Files: `src/operation_log.rs`, `src/operation_log/rows.rs`, `src/jj_rows.rs`, `src/jj.rs`,
+  - Files: `src/operation_log.rs`, `src/operation_log/rows.rs`, `src/rows.rs`, `src/jj.rs`,
     `src/app/tests/command_navigation.rs`, `src/app/tests/operation_actions.rs`,
     `src/app/tests/support.rs`, `docs/agent/source-maintainability-ledger.md`,
     `docs/process-observations.md`
 
 ### 2026-05-21 (Mode input reducer extraction)
 
-- Slice / task: extract pure modal key reducers and prompt-plan helpers from `src/app/mode_input.rs`
-  into a focused local submodule without changing modal behavior.
+- Slice / task: extract pure modal key reducers and prompt-plan helpers from `src/app/input.rs` into
+  a focused local submodule without changing modal behavior.
 - Thread id: `019e4a4e-e51e-73d1-9890-d19b60b630d1`.
 - Model / routing: GPT-5 Codex worker implemented the readability packet. The user explicitly kept
   jj orchestration on the main thread, so the worker avoided jj/git commands and used direct file
   reads, `apply_patch`, and validation commands only.
-- Files changed: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+- Files changed: `src/app/input.rs`, `src/app/input/reducers.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/app/mode_input/reducers.rs` now owns `TextPromptKey`,
+- Implementation outcome: `src/app/input/reducers.rs` now owns `TextPromptKey`,
   `reduce_text_prompt_key`, `MenuKey`, `reduce_menu_key`, `reduce_view_menu_key`, `ConfirmationKey`,
   `reduce_confirmation_key`, help close/scroll key checks, role-prompt plan helpers, and bookmark
-  prompt-plan construction. `src/app/mode_input.rs` keeps app-owned modal dispatch, status updates,
+  prompt-plan construction. `src/app/input.rs` keeps app-owned modal dispatch, status updates,
   preview opening, confirmations, action lifecycle handoff, and help prefix execution.
 - Rework / surprise: the first focused `cargo test working_copy_actions -- --test-threads=1` compile
-  found a mechanical extraction error where `ActionOutput::page_up` was called without the original
+  found a mechanical extraction error where `ActionPane::page_up` was called without the original
   `visible_lines` argument. Restoring `page_up(visible_lines)` preserved the prior scroll contract.
   `rustup run nightly cargo fmt --check` then failed only on formatting in the new reducer
   signature; running rustfmt fixed it.
@@ -2208,17 +2219,17 @@ be supported by the work log, repo state, or direct transcript evidence.
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
   unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
   Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored, and
-  its largest-file output included `src/app/mode_input.rs` at 613 lines.
+  its largest-file output included `src/app/input.rs` at 613 lines.
 - Main-thread review outcome: the extraction stayed behavior-preserving. The reducer module contains
-  only key/prompt reduction and prompt-plan construction, while `src/app/mode_input.rs` still owns
-  modal side effects, status text, preview opening, confirmation execution, help-prefix dispatch,
-  and action lifecycle handoff.
+  only key/prompt reduction and prompt-plan construction, while `src/app/input.rs` still owns modal
+  side effects, status text, preview opening, confirmation execution, help-prefix dispatch, and
+  action lifecycle handoff.
 - Evidence basis:
   - Date: `2026-05-21 04:39:22 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Main thread id `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`
   - Worker thread id `019e4a4e-e51e-73d1-9890-d19b60b630d1` from the worker handoff
-  - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
-    `src/app/mode_input.rs`, and focused tests under `src/app/tests`
+  - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`, `src/app/input.rs`,
+    and focused tests under `src/app/tests`
 
 ### 2026-05-21 (Central contract documentation sweep)
 
@@ -2228,8 +2239,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Model / routing: GPT-5 Codex worker with medium reasoning implemented the documentation sweep. The
   main thread kept jj orchestration, so the worker used direct file reads and validation commands
   without source-control inspection.
-- Files changed: `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, `src/command.rs`,
-  `src/app_screen.rs`, `src/jj_rows.rs`, `src/app.rs`, and this process note.
+- Files changed: `src/action_menu.rs`, `src/tui.rs`, `src/actions.rs`, `src/command.rs`,
+  `src/modes.rs`, `src/rows.rs`, `src/app.rs`, and this process note.
 - Documentation outcome: shared action-menu contracts now clarify preview-first safety, pure menu
   state, follow-up ownership, role-prompt payloads, and where feature-specific action availability
   should live. Shared TUI contracts now clarify that chrome owns title/status/modal presentation,
@@ -2270,7 +2281,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   concept owns a rule before asking what kind of code it is. It records the intended destination as
   feature roots plus shared infrastructure, with feature modules owning view state, bindings, row
   interpretation, selection/search/copy behavior, action availability, target resolution, and tests.
-- Boundary outcome: the ledger now treats current `jj_rows`, `jj_actions`, `action_menu`, `tui`, and
+- Boundary outcome: the ledger now treats current `rows`, `actions`, `action_menu`, `tui`, and
   `view_state` modules as shared infrastructure or staging points only when they hold genuinely
   shared contracts. It explicitly says not to create a `slices/` bucket and not to move code merely
   to match a destination tree.
@@ -2288,50 +2299,50 @@ be supported by the work log, repo state, or direct transcript evidence.
 ### 2026-05-21 (Graph revision row extraction)
 
 - Slice / task: extract graph revision rendered row loading and revision metadata pairing from broad
-  `src/jj_rows.rs`.
+  `src/rows.rs`.
 - Thread id: `019e4a1a-c8ee-7053-8f7e-6deab4c68dfe`.
 - Model / routing: GPT-5 Codex worker/subagent with medium reasoning implemented the extraction. The
   main thread reviewed and validated the result. The user explicitly prohibited jj/git commands, so
   the work used direct file reads, local measurements, and validation commands without
   source-control inspection.
-- Files changed: `src/jj_rows.rs`, `src/jj_rows/revisions.rs`,
+- Files changed: `src/rows.rs`, `src/rows/revisions.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_rows/revisions.rs` now owns `LogItem`, `load_entries`,
+- Implementation outcome: `src/rows/revisions.rs` now owns `LogItem`, `load_entries`,
   `load_compact_log_context`, revision metadata template execution, revision metadata parsing,
   rendered graph row grouping, revision id pairing, and focused revision grouping/parser tests.
-  `src/jj_rows.rs` re-exports the stable revision row facade and keeps resolve rows, file-list rows,
+  `src/rows.rs` re-exports the stable revision row facade and keeps resolve rows, file-list rows,
   `document_plain_text`, `line_text`, JSON field helpers, `RowMetadata`, `first_content_char`, and
   `is_standalone_graph_line`.
 - Behavior intent: preserve rendered ANSI conversion, graph row grouping, revision metadata drift
   fail-closed behavior, compact log-context behavior, resolve and file-list parsing, and the process
   boundary in `src/jj.rs` exactly.
-- Maintainability evidence: the row-family `wc -l` command showed `src/jj_rows.rs` at 282 lines and
-  `src/jj_rows/revisions.rs` at 498 lines after the extraction. The ledger recorded `src/jj_rows.rs`
-  at 760 lines before this packet.
+- Maintainability evidence: the row-family `wc -l` command showed `src/rows.rs` at 282 lines and
+  `src/rows/revisions.rs` at 498 lines after the extraction. The ledger recorded `src/rows.rs` at
+  760 lines before this packet.
 - Rework / surprise: `rustup run nightly cargo fmt --check` failed only on one trailing blank-line
-  formatting diff in `src/jj_rows.rs`; running rustfmt fixed it. The first `just md-check` failed
-  only on Panache wrapping in the edited docs; applying the suggested wrapping fixed it.
+  formatting diff in `src/rows.rs`; running rustfmt fixed it. The first `just md-check` failed only
+  on Panache wrapping in the edited docs; applying the suggested wrapping fixed it.
 - Validation trail:
-  - `cargo test jj_rows -- --test-threads=1` passed with 36 passed.
+  - `cargo test rows -- --test-threads=1` passed with 36 passed.
   - `cargo test graph -- --test-threads=1` passed with 55 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
   - `rustup run nightly cargo fmt --check` passed after applying rustfmt. The command still printed
     the repo's existing rustfmt unstable-option warnings.
   - `just md-check` passed after applying Panache wrapping to the edited docs.
-- Main-thread review validation passed: `cargo test jj_rows -- --test-threads=1` with 36 passed;
+- Main-thread review validation passed: `cargo test rows -- --test-threads=1` with 36 passed;
   `cargo test graph -- --test-threads=1` with 55 passed; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check` with existing rustfmt
   unstable-option warnings; `just md-check`; and full `just check`. Full `just check` reported fmt,
   Panache format/lint, clippy, cargo check, and cargo test passed with 545 passed / 2 ignored, and
-  its largest-file output no longer listed `src/jj_rows.rs` in the top 20. Packet line-count
-  evidence also showed `src/jj_rows.rs` at 282 lines and `src/jj_rows/revisions.rs` at 498 lines.
+  its largest-file output no longer listed `src/rows.rs` in the top 20. Packet line-count evidence
+  also showed `src/rows.rs` at 282 lines and `src/rows/revisions.rs` at 498 lines.
 - Evidence basis:
   - Date: `2026-05-21 03:39:12 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `AGENTS.md`, `docs/agent/source-maintainability-ledger.md`,
-    `docs/agent/architecture.md`, `docs/agent/rust-style.md`, `src/jj_rows.rs`,
-    `src/jj_rows/bookmarks.rs`, `src/jj_rows/operations.rs`, and `src/jj_rows/workspaces.rs`
+    `docs/agent/architecture.md`, `docs/agent/rust-style.md`, `src/rows.rs`,
+    `src/rows/bookmarks.rs`, `src/rows/operations.rs`, and `src/rows/workspaces.rs`
 
 ### 2026-05-21 (Row extraction reassessment)
 
@@ -2342,16 +2353,15 @@ be supported by the work log, repo state, or direct transcript evidence.
   reassessment. The user explicitly prohibited jj/git commands, so the work used normal shell
   measurements and direct file reads only.
 - Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
-- Evidence gathered: `just largest-rust-files`, `wc -l src/*.rs src/jj_rows/*.rs`, local date and
+- Evidence gathered: `just largest-rust-files`, `wc -l src/*.rs src/rows/*.rs`, local date and
   `CODEX_THREAD_ID`, plus direct reads of `AGENTS.md`,
   `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
-  `docs/agent/rust-style.md`, `src/jj_rows.rs`, `src/jj_rows/bookmarks.rs`,
-  `src/jj_rows/operations.rs`, `src/jj_rows/workspaces.rs`, `src/graph.rs`, `src/jj_actions.rs`,
-  `src/tui.rs`, and `src/bookmarks.rs`.
-- Reassessment outcome: the stale 1440-line `src/jj.rs` and 1299-line `src/jj_rows.rs` snapshots
-  were replaced with current evidence. `src/jj_rows.rs` is now 760 lines, with extracted bookmark,
+  `docs/agent/rust-style.md`, `src/rows.rs`, `src/rows/bookmarks.rs`, `src/rows/operations.rs`,
+  `src/rows/workspaces.rs`, `src/graph.rs`, `src/actions.rs`, `src/tui.rs`, and `src/bookmarks.rs`.
+- Reassessment outcome: the stale 1440-line `src/jj.rs` and 1299-line `src/rows.rs` snapshots were
+  replaced with current evidence. `src/rows.rs` is now 760 lines, with extracted bookmark,
   operation, and workspace row-family siblings. The only still-coherent row-family extraction is a
-  bounded graph revision row packet owned by a future `src/jj_rows/revisions.rs`; resolve rows,
+  bounded graph revision row packet owned by a future `src/rows/revisions.rs`; resolve rows,
   file-list rows, shared JSON helpers, facade re-exports, and the current large view/action modules
   should pause until product work exposes a sharper boundary.
 - Process observation: after several successful extraction packets, stale size evidence can keep an
@@ -2463,72 +2473,72 @@ be supported by the work log, repo state, or direct transcript evidence.
 ### 2026-05-21 (Workspace row loading extraction)
 
 - Slice / task: extract workspace rendered row loading and workspace metadata pairing from broad
-  `src/jj_rows.rs` on current change `Extract workspace row loading`.
+  `src/rows.rs` on current change `Extract workspace row loading`.
 - Thread id: `019e49b1-adbf-77c2-8aec-d534d9ec3fdb`.
 - Model / routing: worker/subagent `019e49b1-adbf-77c2-8aec-d534d9ec3fdb` with medium reasoning
   implemented the extraction. The main thread reviewed and validated the result. The user explicitly
   prohibited jj/git commands, so the work used direct file reads, local measurements, and validation
   commands without source-control inspection.
-- Files changed: `src/jj_rows.rs`, `src/jj_rows/workspaces.rs`,
+- Files changed: `src/rows.rs`, `src/rows/workspaces.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_rows/workspaces.rs` now owns `WorkspaceContext`, `WorkspaceItem`,
+- Implementation outcome: `src/rows/workspaces.rs` now owns `WorkspaceContext`, `WorkspaceItem`,
   `load_workspace_context`, the workspace metadata template, root/list/metadata context loading,
   rendered workspace row pairing, metadata parsing, row-count drift behavior, and focused workspace
-  row tests. `src/jj_rows.rs` re-exports the stable workspace row facade for existing callers and
-  keeps shared row helpers plus the remaining row families.
+  row tests. `src/rows.rs` re-exports the stable workspace row facade for existing callers and keeps
+  shared row helpers plus the remaining row families.
 - Behavior intent: preserve rendered ANSI conversion, workspace metadata JSON shape, row-count drift
   behavior, root/list error handling, workspaces view behavior, and existing app/test call sites
   exactly.
-- Maintainability evidence: `wc -l src/jj_rows.rs src/jj_rows/workspaces.rs` showed `src/jj_rows.rs`
-  at 760 lines and `src/jj_rows/workspaces.rs` at 338 lines after the extraction.
+- Maintainability evidence: `wc -l src/rows.rs src/rows/workspaces.rs` showed `src/rows.rs` at 760
+  lines and `src/rows/workspaces.rs` at 338 lines after the extraction.
 - Rework / surprise: the first `just md-check` failed only on Panache wrapping in the new ledger and
   process-observation entries; applying the suggested wrapping fixed the issue.
 - Validation trail:
-  - `cargo test jj_rows -- --test-threads=1` passed with 36 passed.
+  - `cargo test rows -- --test-threads=1` passed with 36 passed.
   - `cargo test workspaces -- --test-threads=1` passed with 11 passed.
   - `cargo check` passed.
   - `cargo clippy -- -D warnings` passed.
   - `rustup run nightly cargo fmt --check` passed. The command still printed the repo's existing
     rustfmt unstable-option warnings.
   - `just md-check` passed.
-- Main-thread review validation passed: `cargo test jj_rows -- --test-threads=1` with 36 passed;
+- Main-thread review validation passed: `cargo test rows -- --test-threads=1` with 36 passed;
   `cargo test workspaces -- --test-threads=1` with 11 passed; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; `just md-check`; and full
   `just check`. Full `just check` reported 533 passed / 2 ignored, and its largest-file output
-  included `src/jj_rows.rs` at 760 lines.
+  included `src/rows.rs` at 760 lines.
 - Evidence basis:
   - Date: `2026-05-21 01:43:07 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
-    `docs/agent/rust-style.md`, `docs/agent/testing.md`, `src/jj_rows.rs`,
-    `src/jj_rows/workspaces.rs`, `src/workspaces.rs`, and `src/jj.rs`
+    `docs/agent/rust-style.md`, `docs/agent/testing.md`, `src/rows.rs`, `src/rows/workspaces.rs`,
+    `src/workspaces.rs`, and `src/jj.rs`
 
 ### 2026-05-21 (Operation row metadata extraction)
 
 - Slice / task: extract operation-log rendered row loading and operation-id metadata pairing from
-  broad `src/jj_rows.rs` on current change `Extract operation row loading`.
+  broad `src/rows.rs` on current change `Extract operation row loading`.
 - Thread id: `019e49ab-e7d9-7b71-8f38-ce18e4e42eb1`.
 - Model / routing: worker/subagent `019e49ab-e7d9-7b71-8f38-ce18e4e42eb1` with medium reasoning
   implemented the extraction. The main thread reviewed and validated the result. The user explicitly
   prohibited jj/git commands, so the work used direct file reads, local measurements, and validation
   commands without source-control inspection.
-- Files changed: `src/jj_rows.rs`, `src/jj_rows/operations.rs`,
+- Files changed: `src/rows.rs`, `src/rows/operations.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_rows/operations.rs` now owns `OperationLogItem`,
+- Implementation outcome: `src/rows/operations.rs` now owns `OperationLogItem`,
   `load_operation_log_entries`, operation-id template execution, operation row grouping,
-  operation-id parsing, and focused operation row drift tests. `src/jj_rows.rs` re-exports the
-  stable operation row facade for existing callers and retains shared row helpers plus the remaining
-  row families.
+  operation-id parsing, and focused operation row drift tests. `src/rows.rs` re-exports the stable
+  operation row facade for existing callers and retains shared row helpers plus the remaining row
+  families.
 - Behavior intent: preserve rendered ANSI conversion, operation-log row grouping, operation id
   shape, row-count drift fail-closed behavior, operation-log view behavior, and existing app/test
   call sites exactly.
-- Maintainability evidence: `wc -l src/jj_rows.rs src/jj_rows/operations.rs` showed `src/jj_rows.rs`
-  at 1075 lines and `src/jj_rows/operations.rs` at 251 lines after the extraction.
+- Maintainability evidence: `wc -l src/rows.rs src/rows/operations.rs` showed `src/rows.rs` at 1075
+  lines and `src/rows/operations.rs` at 251 lines after the extraction.
 - Rework / surprise: the first patch moved the operation tests but left the original copies in
-  `src/jj_rows.rs`; a follow-up cleanup removed the duplicates and operation-only test helpers from
-  the parent module.
+  `src/rows.rs`; a follow-up cleanup removed the duplicates and operation-only test helpers from the
+  parent module.
 - Validation trail:
-  - `cargo test jj_rows -- --test-threads=1` passed with 36 passed.
+  - `cargo test rows -- --test-threads=1` passed with 36 passed.
   - `cargo test operation_log -- --test-threads=1` passed with 21 passed.
   - `cargo test operation_actions -- --test-threads=1` passed with 10 passed.
   - `cargo check` passed.
@@ -2536,18 +2546,18 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `rustup run nightly cargo fmt --check` passed after applying rustfmt. The command still printed
     the repo's existing rustfmt unstable-option warnings.
   - `just md-check` passed after applying Panache wrapping to the edited docs.
-- Main-thread review validation passed: `cargo test jj_rows -- --test-threads=1` with 36 passed;
+- Main-thread review validation passed: `cargo test rows -- --test-threads=1` with 36 passed;
   `cargo test operation_log -- --test-threads=1` with 21 passed;
   `cargo test operation_actions -- --test-threads=1` with 10 passed; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; `just md-check`; and full
   `just check`. Full `just check` reported 533 passed / 2 ignored, and its largest-file output
-  included `src/jj_rows.rs` at 1075 lines.
+  included `src/rows.rs` at 1075 lines.
 - Evidence basis:
   - Date: `2026-05-21 01:36:41 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
-    `docs/agent/rust-style.md`, `docs/agent/testing.md`, `src/jj_rows.rs`,
-    `src/jj_rows/operations.rs`, `src/operation_log.rs`, and `src/jj.rs`
+    `docs/agent/rust-style.md`, `docs/agent/testing.md`, `src/rows.rs`, `src/rows/operations.rs`,
+    `src/operation_log.rs`, and `src/jj.rs`
 
 ### 2026-05-21 (Source maintainability queue reassessment)
 
@@ -2559,11 +2569,11 @@ be supported by the work log, repo state, or direct transcript evidence.
   worker used direct file reads and local measurement commands without source-control inspection;
   the main thread reviewed the result.
 - Files changed: `docs/agent/source-maintainability-ledger.md` and this process note.
-- Evidence gathered: `just largest-rust-files`; `wc -l` over `src/jj.rs`, `src/jj_rows.rs`,
+- Evidence gathered: `just largest-rust-files`; `wc -l` over `src/jj.rs`, `src/rows.rs`,
   `src/graph.rs`, `src/tui.rs`, `src/action_menu.rs`, `src/bookmarks.rs`, `src/help.rs`,
-  `src/action_menu/path_actions.rs`, `src/command.rs`, and `src/jj_actions.rs`; cheap `rg` scans for
+  `src/action_menu/path_actions.rs`, `src/command.rs`, and `src/actions.rs`; cheap `rg` scans for
   visibility and control-flow density; and direct reads of `docs/agent/architecture.md`,
-  `docs/agent/rust-style.md`, `src/jj.rs`, `src/jj_rows.rs`, `src/graph.rs`, `src/tui.rs`,
+  `docs/agent/rust-style.md`, `src/jj.rs`, `src/rows.rs`, `src/graph.rs`, `src/tui.rs`,
   `src/action_menu.rs`, `src/action_menu/path_actions.rs`, and `src/bookmarks.rs`.
 - Documentation outcome: the ledger now records help projection and path action-menu extraction as
   completed history, refreshes current size/visibility/control-flow evidence, and names four bounded
@@ -2571,7 +2581,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   revision action-menu policy, and status hint projection.
 - Scope decision: the next packet recommendations are based on concept ownership rather than file
   size alone. The ledger explicitly defers broad `src/graph.rs`, `src/bookmarks.rs`, `src/tui.rs`
-  overlay, `src/jj_actions.rs`, and `src/app/services.rs` work where the current evidence shows a
+  overlay, `src/actions.rs`, and `src/app/services.rs` work where the current evidence shows a
   cohesive owner or no bounded safe slice.
 - Process observation: the first `just md-check` failed only on Panache wrapping in
   `docs/agent/source-maintainability-ledger.md`; applying the formatter-equivalent wrapping fixed
@@ -2583,7 +2593,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 01:31:38 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
-    `docs/agent/rust-style.md`, `src/jj.rs`, `src/jj_rows.rs`, `src/graph.rs`, `src/tui.rs`,
+    `docs/agent/rust-style.md`, `src/jj.rs`, `src/rows.rs`, `src/graph.rs`, `src/tui.rs`,
     `src/action_menu.rs`, `src/action_menu/path_actions.rs`, `src/bookmarks.rs`
 
 ### 2026-05-21 (Path action-menu policy extraction)
@@ -2637,36 +2647,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e498f-f892-7730-b6f9-256888722606`.
 - Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
   extraction for main-thread review.
-- Files changed: `src/jj_actions.rs`, `src/jj_actions/operation.rs`,
+- Files changed: `src/actions.rs`, `src/actions/operation.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_actions/operation.rs` now owns `JjOperationRecoveryKind`,
+- Implementation outcome: `src/actions/operation.rs` now owns `JjOperationRecoveryKind`,
   `JjOperationRecovery`, `JjOperationTargetKind`, `JjOperationTarget`, their argv/preview/run
   implementations, and the focused operation unit tests for undo/redo and exact restore/revert
-  targeting. `src/jj_actions.rs` keeps the stable facade with a local `operation` submodule
-  declaration plus `pub use` re-exports for existing callers.
+  targeting. `src/actions.rs` keeps the stable facade with a local `operation` submodule declaration
+  plus `pub use` re-exports for existing callers.
 - Behavior intent: preserve operation argv shape, preview wording, fallback wording, labels,
   operation-id targeting, app call sites, operation-log navigation behavior, and completion/refresh
-  policy exactly while reducing live context in `src/jj_actions.rs`.
-- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+  policy exactly while reducing live context in `src/actions.rs`.
+- Validation trail: `cargo test actions -- --test-threads=1`;
   `cargo test operation_actions -- --test-threads=1`;
   `cargo test operation_log -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; and `just md-check`.
-- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+- Main-thread validation after review passed: `cargo test actions -- --test-threads=1`;
   `cargo test operation_actions -- --test-threads=1`;
   `cargo test operation_log -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; and `just md-check` all passed.
 - Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
-  largest-file output showed `src/jj_actions.rs` at 1159 lines.
+  largest-file output showed `src/actions.rs` at 1159 lines.
 - Issue / rework note: main-thread review removed the broad `JjOperationTargetKind` facade re-export
   and its temporary `#[allow(unused_imports)]` after reproducing the warning with a plain
   `cargo check`. The reviewed cleanup kept the stable facade for the operation names used outside
-  `jj_actions` and updated the app operation tests to assert via `status_action()` instead of
-  relying on an unused internal enum re-export.
+  `actions` and updated the app operation tests to assert via `status_action()` instead of relying
+  on an unused internal enum re-export.
 - Evidence basis:
   - Date: `2026-05-21 01:06:19 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
-    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/operation.rs`,
+    `docs/agent/testing.md`, `src/actions.rs`, `src/actions/operation.rs`,
     `src/app/tests/operation_actions.rs`, and `src/operation_log.rs`
 
 ### 2026-05-21 (Working-copy action-plan cluster extraction)
@@ -2676,33 +2686,33 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e4988-13f7-7662-8450-f6d3fd1aded2`.
 - Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
   extraction for main-thread review.
-- Files changed: `src/jj_actions.rs`, `src/jj_actions/working_copy.rs`,
+- Files changed: `src/actions.rs`, `src/actions/working_copy.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_actions/working_copy.rs` now owns `JjNewPlan`, `JjDuplicatePlan`,
+- Implementation outcome: `src/actions/working_copy.rs` now owns `JjNewPlan`, `JjDuplicatePlan`,
   `JjSplitTarget`, `JjSplitPlan`, `JjWorkingCopyNavigationKind`, and `JjWorkingCopyNavigationPlan`,
   together with their argv/preview/run implementations and the focused working-copy unit tests.
-  `src/jj_actions.rs` keeps the stable facade through a local `working_copy` submodule declaration
-  plus `pub use` re-exports.
+  `src/actions.rs` keeps the stable facade through a local `working_copy` submodule declaration plus
+  `pub use` re-exports.
 - Behavior intent: preserve working-copy argv shape, preview wording, fallback wording, labels,
   split interactive behavior, graph-selection-versus-`@` contracts, and existing app call sites
-  exactly while reducing live context in `src/jj_actions.rs`.
-- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+  exactly while reducing live context in `src/actions.rs`.
+- Validation trail: `cargo test actions -- --test-threads=1`;
   `cargo test working_copy_actions -- --test-threads=1`;
   `cargo test command_navigation -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; and `just md-check`.
-- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+- Main-thread validation after review passed: `cargo test actions -- --test-threads=1`;
   `cargo test working_copy_actions -- --test-threads=1`;
   `cargo test command_navigation -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; and `just md-check` all passed.
 - Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
-  largest-file output showed `src/jj_actions.rs` at 1435 lines and `src/jj_actions/working_copy.rs`
-  at 639 lines.
+  largest-file output showed `src/actions.rs` at 1435 lines and `src/actions/working_copy.rs` at 639
+  lines.
 - Issue / rework note: none so far; record main-thread reruns here if review finds anything.
 - Evidence basis:
   - Date: `2026-05-21` from the turn environment
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
-    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/working_copy.rs`, and
+    `docs/agent/testing.md`, `src/actions.rs`, `src/actions/working_copy.rs`, and
     `src/app/tests/working_copy_actions.rs`
 
 ### 2026-05-21 (Maintainability queue reassessment after bookmark and rewrite slices)
@@ -2715,15 +2725,15 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Behavior intent: docs only. No Rust source, command behavior, view behavior, or test behavior
   changed.
 - Measurements gathered:
-  - `just largest-rust-files` still shows `src/jj_actions.rs` (2056), `src/jj.rs` (1440),
-    `src/jj_rows.rs` (1299), `src/command.rs` (1255), `src/action_menu.rs` (1246), `src/graph.rs`
-    (1218), and `src/tui.rs` (1134) as the largest production files.
+  - `just largest-rust-files` still shows `src/actions.rs` (2056), `src/jj.rs` (1440), `src/rows.rs`
+    (1299), `src/command.rs` (1255), `src/action_menu.rs` (1246), `src/graph.rs` (1218), and
+    `src/tui.rs` (1134) as the largest production files.
   - Cheap visibility scans found 768 unrestricted `pub` lines and 393 restricted-visibility lines,
-    with the largest production counts in `src/jj_actions.rs`, `src/jj_rows.rs`,
-    `src/action_menu.rs`, `src/sticky_file_view.rs`, `src/command.rs`, and `src/jj.rs`.
-  - Cheap control-flow scans found current hotspots in `src/jj_actions.rs`, `src/app/mode_input.rs`,
-    `src/command.rs`, `src/jj.rs`, `src/action_menu.rs`, `src/app/action_lifecycle/completion.rs`,
-    `src/jj_rows.rs`, `src/app.rs`, and `src/tui.rs`.
+    with the largest production counts in `src/actions.rs`, `src/rows.rs`, `src/action_menu.rs`,
+    `src/document.rs`, `src/command.rs`, and `src/jj.rs`.
+  - Cheap control-flow scans found current hotspots in `src/actions.rs`, `src/app/input.rs`,
+    `src/command.rs`, `src/jj.rs`, `src/action_menu.rs`, `src/app/actions/completion.rs`,
+    `src/rows.rs`, `src/app.rs`, and `src/tui.rs`.
 - Documentation outcome: the ledger now treats the bookmark and rewrite packets as completed
   history, records the refreshed evidence snapshot, and recommends four bounded next slices:
   working-copy action plans, operation recovery/target plans, help projection policy, and
@@ -2733,16 +2743,16 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Main-thread validation after review: `just md-check` passed.
 - Model / process observation: the cheap scans were useful for ranking candidates, but they still
   needed direct source reads to separate coherent large owners (`src/jj.rs`, `src/graph.rs`,
-  `src/tui.rs`) from actual mixed-concept packets (`src/jj_actions.rs`, `src/command.rs`,
+  `src/tui.rs`) from actual mixed-concept packets (`src/actions.rs`, `src/command.rs`,
   `src/action_menu.rs`).
 - Main-thread spot-check note: the main thread rechecked the broad visibility scan and found
-  `src/jj_actions.rs` at 152 unrestricted `pub` lines, correcting the ledger from 150.
+  `src/actions.rs` at 152 unrestricted `pub` lines, correcting the ledger from 150.
 - Evidence basis:
   - Date: `2026-05-21 00:51:33 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
-    `docs/agent/rust-style.md`, `src/jj_actions.rs`, `src/command.rs`, `src/action_menu.rs`,
-    `src/graph.rs`, `src/tui.rs`, `src/jj.rs`, and `src/app/action_lifecycle/completion.rs`
+    `docs/agent/rust-style.md`, `src/actions.rs`, `src/command.rs`, `src/action_menu.rs`,
+    `src/graph.rs`, `src/tui.rs`, `src/jj.rs`, and `src/app/actions/completion.rs`
 
 ### 2026-05-21 (Rewrite action-plan submodule extraction)
 
@@ -2751,26 +2761,26 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e497d-c099-7052-af9f-0b9d80bba0bd`.
 - Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
   extraction for main-thread review.
-- Files changed: `src/jj_actions.rs`, `src/jj_actions/rewrite.rs`,
+- Files changed: `src/actions.rs`, `src/actions/rewrite.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_actions/rewrite.rs` now owns `JjRebasePlan`, `JjSquashPlan`,
+- Implementation outcome: `src/actions/rewrite.rs` now owns `JjRebasePlan`, `JjSquashPlan`,
   `JjAbsorbPlan`, their argv/preview/run implementations, and the focused rewrite unit tests.
-  `src/jj_actions.rs` keeps the stable facade with a local `rewrite` submodule declaration plus
+  `src/actions.rs` keeps the stable facade with a local `rewrite` submodule declaration plus
   `pub use` re-exports for existing callers.
 - Behavior intent: preserve rewrite argv shape, preview wording, fallback wording, labels, dry-run
   behavior, role-prompt behavior, and app call sites exactly while reducing live context in
-  `src/jj_actions.rs`.
-- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+  `src/actions.rs`.
+- Validation trail: `cargo test actions -- --test-threads=1`;
   `cargo test rewrite_actions -- --test-threads=1`;
   `cargo test working_copy_actions -- --test-threads=1`; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and `just md-check` passed.
-- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+- Main-thread validation after review passed: `cargo test actions -- --test-threads=1`;
   `cargo test rewrite_actions -- --test-threads=1`;
   `cargo test working_copy_actions -- --test-threads=1`; `cargo check`;
   `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and `just md-check` all
   passed.
 - Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
-  largest-file output showed `src/jj_actions.rs` at 2056 lines.
+  largest-file output showed `src/actions.rs` at 2056 lines.
 - Issue / rework note: `just md-check` initially failed on Panache line reflow in
   `docs/agent/source-maintainability-ledger.md`; reflowing the completed-slice entry fixed the gate
   without changing meaning.
@@ -2778,7 +2788,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-21 00:47:17 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
-    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/rewrite.rs`,
+    `docs/agent/testing.md`, `src/actions.rs`, `src/actions/rewrite.rs`,
     `src/app/tests/rewrite_actions.rs`, and `src/app/tests/working_copy_actions.rs`
 
 ### 2026-05-21 (Bookmark row metadata module extraction)
@@ -2788,31 +2798,30 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e4974-550e-7230-98ba-8c085af511c1`.
 - Model / routing: a `gpt-5.4` worker with medium reasoning implemented the behavior-preserving
   extraction for main-thread review.
-- Files changed: `src/jj_rows.rs`, `src/jj_rows/bookmarks.rs`,
+- Files changed: `src/rows.rs`, `src/rows/bookmarks.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_rows/bookmarks.rs` now owns rendered bookmark row loading, trusted
+- Implementation outcome: `src/rows/bookmarks.rs` now owns rendered bookmark row loading, trusted
   metadata parsing, fail-closed row pairing, local/remote row-state classification, and the existing
-  bookmark metadata tests/helpers. `src/jj_rows.rs` keeps the stable facade with a local `bookmarks`
+  bookmark metadata tests/helpers. `src/rows.rs` keeps the stable facade with a local `bookmarks`
   submodule declaration plus re-exports for existing consumers.
 - Behavior intent: preserve rendered bookmark row grouping, metadata parse semantics, row-count
   mismatch degradation, target ids, bookmark names, local/remote state classification, and bookmark
   action-target inputs exactly.
-- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+- Validation trail: `cargo test rows -- --test-threads=1`;
   `cargo test bookmarks -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
   `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and
   `just md-check` passed.
-- Main-thread validation after review passed: `cargo test jj_rows -- --test-threads=1`;
+- Main-thread validation after review passed: `cargo test rows -- --test-threads=1`;
   `cargo test bookmarks -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
   `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`; and
   `just md-check` all passed.
 - Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
-  largest-file output showed `src/jj_rows.rs` at 1299 lines and `src/jj_rows/bookmarks.rs` at 876
-  lines.
+  largest-file output showed `src/rows.rs` at 1299 lines and `src/rows/bookmarks.rs` at 876 lines.
 - Evidence basis:
   - Date: `2026-05-21 00:34:07 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
-    `docs/agent/testing.md`, `src/jj_rows.rs`, `src/jj_rows/bookmarks.rs`, `src/bookmarks.rs`, and
+    `docs/agent/testing.md`, `src/rows.rs`, `src/rows/bookmarks.rs`, `src/bookmarks.rs`, and
     `src/bookmarks/action_targets.rs`
 
 ### 2026-05-21 (Bookmark action-plan submodule extraction)
@@ -2825,28 +2834,28 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Subagent reasoning note: after the user's later instruction, future subagents should default to
   medium reasoning unless a higher level is specifically justified. This packet used high reasoning
   because it was launched before that preference was given.
-- Files changed: `src/jj_actions.rs`, `src/jj_actions/bookmarks.rs`,
+- Files changed: `src/actions.rs`, `src/actions/bookmarks.rs`,
   `docs/agent/source-maintainability-ledger.md`, and this process note.
-- Implementation outcome: `src/jj_actions/bookmarks.rs` now owns the bookmark mutation plan/value
-  surface, rename validation, and focused bookmark command-construction tests. `src/jj_actions.rs`
+- Implementation outcome: `src/actions/bookmarks.rs` now owns the bookmark mutation plan/value
+  surface, rename validation, and focused bookmark command-construction tests. `src/actions.rs`
   keeps the stable facade with a local `bookmarks` submodule declaration plus `pub use` re-exports,
   matching the existing `git_sync` extraction pattern.
 - Behavior intent: preserve argv shape, preview text, fallback wording, labels, status wording,
   public call sites, app behavior, and bookmark target-eligibility behavior exactly.
-- Validation trail: `cargo test jj_actions -- --test-threads=1`;
+- Validation trail: `cargo test actions -- --test-threads=1`;
   `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; and `just md-check` passed.
-- Main-thread validation after review passed: `cargo test jj_actions -- --test-threads=1`;
+- Main-thread validation after review passed: `cargo test actions -- --test-threads=1`;
   `cargo test bookmark_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; and `just md-check`.
 - Full `just check` also passed after main-thread review with 533 passed / 2 ignored, and the
-  largest-file output showed `src/jj_actions.rs` at 2478 lines and `src/jj_actions/bookmarks.rs` at
-  833 lines.
+  largest-file output showed `src/actions.rs` at 2478 lines and `src/actions/bookmarks.rs` at 833
+  lines.
 - Evidence basis:
   - Date: `2026-05-21 00:29:48 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Thread id from `CODEX_THREAD_ID`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/rust-style.md`,
-    `docs/agent/testing.md`, `src/jj_actions.rs`, `src/jj_actions/bookmarks.rs`, `src/bookmarks.rs`,
+    `docs/agent/testing.md`, `src/actions.rs`, `src/actions/bookmarks.rs`, `src/bookmarks.rs`,
     `src/bookmarks/action_targets.rs`, and `src/app/tests/bookmark_actions.rs`
 
 ### 2026-05-21 (Bookmark action-target resolver extraction)
@@ -2937,25 +2946,25 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e4950-6c88-7943-be05-31a9be227f0a`.
 - Model / routing: a `gpt-5.5` worker/subagent implemented the extraction and the main thread
   reviewed it.
-- Implementation outcome: `src/jj_actions/git_sync.rs` now owns `JjGitFetch`, `JjGitPush`,
+- Implementation outcome: `src/actions/git_sync.rs` now owns `JjGitFetch`, `JjGitPush`,
   `JjGitPushTarget`, git fetch/push argv construction, dry-run labels, exact remote pattern
   handling, direct run methods, and focused command-construction tests.
-- Facade outcome: `src/jj_actions.rs` keeps stable public call paths with a local `git_sync`
-  submodule declaration and `pub use` re-exports, without retaining git sync implementation detail.
+- Facade outcome: `src/actions.rs` keeps stable public call paths with a local `git_sync` submodule
+  declaration and `pub use` re-exports, without retaining git sync implementation detail.
 - Behavior intent: preserve command argv, dry-run labels, exact remote pattern behavior,
   status/fallback wording, and app-level sync action expectations.
-- Worker validation trail: `cargo test jj_actions -- --test-threads=1`;
+- Worker validation trail: `cargo test actions -- --test-threads=1`;
   `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
   `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
   `just md-check` all passed.
-- Main-thread validation after review: `cargo test jj_actions -- --test-threads=1`;
+- Main-thread validation after review: `cargo test actions -- --test-threads=1`;
   `cargo test sync_actions -- --test-threads=1`; `cargo test bookmark_actions -- --test-threads=1`;
   `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
   `just md-check` all passed.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
   - Thread id from `CODEX_THREAD_ID`
-  - Files: `src/jj_actions.rs`, `src/jj_actions/git_sync.rs`,
+  - Files: `src/actions.rs`, `src/actions/git_sync.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Assess next maintainability slices)
@@ -2985,10 +2994,10 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e4948-98a5-7e23-8c73-028917266650`.
 - Model / routing: a `gpt-5.5` worker/subagent implemented the behavior-preserving extraction and
   worker validation; the main thread reviewed the result.
-- Implementation outcome: `src/app/action_lifecycle/preview.rs` now owns one
+- Implementation outcome: `src/app/actions/preview.rs` now owns one
   `preview_output_with_error_status` helper. The helper converts a successful preview/load result
-  into `ActionOutput::pending`, or records `StatusLine::error` and returns `ActionOutput::finished`
-  on failure. Callers still construct their exact `InteractionMode` variants, command labels, status
+  into `ActionPane::pending`, or records `StatusLine::error` and returns `ActionPane::finished` on
+  failure. Callers still construct their exact `InteractionMode` variants, command labels, status
   contexts, and preview text mappings locally.
 - Explicitly preserved special flows: default fetch execution, new-from-trunk, operation recovery,
   graph edit precheck, absorb empty-destination precheck, and abandon strong-confirm/recheck remain
@@ -3022,7 +3031,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
   - Thread id from `CODEX_THREAD_ID`
-  - Files: `src/app/action_lifecycle/preview.rs`, `docs/agent/architecture.md`,
+  - Files: `src/app/actions/preview.rs`, `docs/agent/architecture.md`,
     `docs/process-observations.md`
 
 ### 2026-05-20 (Selection helper Rustdoc correction)
@@ -3097,9 +3106,9 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e4936-6962-7ec0-a60b-38676d87896a`.
 - Model / routing: a `gpt-5.5` worker/subagent implemented the source-comment inventory; the main
   thread reviewed it.
-- Files changed: `src/jj_actions.rs`, `docs/agent/source-maintainability-ledger.md`, and this
-  process note.
-- Implementation outcome: `src/jj_actions.rs` now names the existing action-plan clusters near the
+- Files changed: `src/actions.rs`, `docs/agent/source-maintainability-ledger.md`, and this process
+  note.
+- Implementation outcome: `src/actions.rs` now names the existing action-plan clusters near the
   relevant source sections: operation recovery/targeting, git sync, working-copy
   creation/copy/split, describe/commit, working-copy navigation, content and file mutations,
   bookmark mutations, graph rewrite plans, and abandon safety.
@@ -3112,7 +3121,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Date: `2026-05-20 23:26:39 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
   - Source context: `docs/agent/source-maintainability-ledger.md`, `docs/agent/architecture.md`,
-    `src/jj_actions.rs`, `docs/development/rules/refactoring.md`, and
+    `src/actions.rs`, `docs/development/rules/refactoring.md`, and
     `docs/development/rules/documentation.md`
 
 ### 2026-05-20 (Retire jj.rs compatibility re-exports)
@@ -3125,8 +3134,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Files changed: `src/jj.rs`, direct import users across the app, view, and action modules,
   `src/app/tests/*`, and `docs/agent/architecture.md`,
   `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
-- Validation trail: `cargo check` passed; `cargo test jj_actions -- --test-threads=1` passed;
-  `cargo test jj_rows -- --test-threads=1` passed; `cargo test jj -- --test-threads=1` passed;
+- Validation trail: `cargo check` passed; `cargo test actions -- --test-threads=1` passed;
+  `cargo test rows -- --test-threads=1` passed; `cargo test jj -- --test-threads=1` passed;
   `rustup run nightly cargo fmt --check` passed; the main thread ran `just check` after review and
   it passed with 529 passed / 2 ignored; `just md-check` passed.
 - Residual risk: future import drift could reintroduce `src/jj.rs` as the compatibility path unless
@@ -3134,12 +3143,12 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-20 (App mode input dispatch readability)
 
-- Slice / task: reduce reader load in `src/app/mode_input.rs` on current jj change
+- Slice / task: reduce reader load in `src/app/input.rs` on current jj change
   `Clarify app mode input dispatch`.
 - Thread id: `019e4931-5110-78c0-aa49-dd53dabb37ef`.
 - Model / routing: a `gpt-5.5` worker/subagent implemented the packet and ran worker validation; the
   main thread reviewed the result.
-- Files changed: `src/app/mode_input.rs` and this process note.
+- Files changed: `src/app/input.rs` and this process note.
 - Implementation outcome: `handle_mode_key_event_with_terminal` now handles only help-mode and
   common action-preview pre-dispatch before delegating active modal dispatch to
   `handle_active_mode_key`. Repeated text prompt, menu, view-menu, and confirmation-output key
@@ -3180,14 +3189,14 @@ be supported by the work log, repo state, or direct transcript evidence.
   supplied evidence; a `gpt-5.4-mini` worker edited the ledger; main-thread review caught a
   visibility-versus-match count mix-up and a priority that re-opened closed app/command contract
   work.
-- Evidence basis: `just largest-rust-files` currently reports `src/jj_actions.rs` at `3557` and
-  `src/jj_rows.rs` at `2145`; the visibility scan found `283` public or restricted Rust items and
-  `162` restricted-visibility lines; the module-doc scan found only `src/main.rs` missing a leading
-  module doc; `docs/agent/architecture.md` still has sticky-file-view show/diff-only wording that
-  drifts from source usage.
+- Evidence basis: `just largest-rust-files` currently reports `src/actions.rs` at `3557` and
+  `src/rows.rs` at `2145`; the visibility scan found `283` public or restricted Rust items and `162`
+  restricted-visibility lines; the module-doc scan found only `src/main.rs` missing a leading module
+  doc; `docs/agent/architecture.md` still has sticky-file-view show/diff-only wording that drifts
+  from source usage.
 - Outcome: the ledger now separates visibility counts from match hotspots, marks the central
-  app/command contract docs as closed, records the active sticky_file_view architecture drift, and
-  adds `src/jj.rs` compatibility re-export cleanup as a future slice.
+  app/command contract docs as closed, records the active document architecture drift, and adds
+  `src/jj.rs` compatibility re-export cleanup as a future slice.
 - Validation trail: the worker ran `just md-check` after the corrections; the main thread ran
   `just md-check` again and it passed.
 - Model note: `gpt-5.4-mini` handled the bounded doc edit but needed review correction on evidence
@@ -3218,37 +3227,36 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ### 2026-05-20 (JJ syntax helper extraction)
 
-- Slice / task: extract pure `jj` syntax helpers from `src/jj_actions.rs` into a dedicated
-  `src/jj_syntax.rs` owner module.
+- Slice / task: extract pure `jj` syntax helpers from `src/actions.rs` into a dedicated
+  `src/syntax.rs` owner module.
 - Thread id: `019e4900-9038-7a72-8493-bdda2ac1f215`.
-- Implementation outcome: `src/jj_syntax.rs` now owns exact change revsets, `root-file` fileset
-  literals, exact string patterns, and a small argv display-label helper; `src/jj_actions.rs`
-  imports those helpers, and `JjGitFetch::exact_remote_pattern` now reuses the shared exact-string
-  pattern builder.
-- Validation trail: `cargo test jj_syntax -- --test-threads=1`;
-  `cargo test jj_actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+- Implementation outcome: `src/syntax.rs` now owns exact change revsets, `root-file` fileset
+  literals, exact string patterns, and a small argv display-label helper; `src/actions.rs` imports
+  those helpers, and `JjGitFetch::exact_remote_pattern` now reuses the shared exact-string pattern
+  builder.
+- Validation trail: `cargo test syntax -- --test-threads=1`;
+  `cargo test actions -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
   `rustup run nightly cargo fmt --check`; `just md-check`; main-thread `just check` passed after the
   stale fetch expectations were repaired in a follow-up.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
-  - Files: `src/jj_syntax.rs`, `src/jj_actions.rs`, `src/main.rs`, and
-    `docs/process-observations.md`
+  - Files: `src/syntax.rs`, `src/actions.rs`, `src/main.rs`, and `docs/process-observations.md`
 
 ### 2026-05-20 (Connector-prefixed revision metadata repair)
 
 - Slice / task: close the review gap where graph-prefixed revision rows were still rejected when the
   graph connectors preceded the revision marker.
 - Thread id: `019e48fc-7033-7893-81e9-a44444bb19d1`.
-- Implementation outcome: `src/jj_rows.rs` now strips only the graph prefix before parsing `@`, `○`,
-  or `◆` revision metadata rows, while still rejecting junk-with-marker rows and keeping
-  operation-log metadata strict.
-- Validation trail: `cargo test jj_rows -- --test-threads=1`;
-  `cargo test graph -- --test-threads=1`; `cargo test operation_log -- --test-threads=1`;
-  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
-  `just md-check`; main-thread `just check` passed with 526 tests / 2 ignored.
+- Implementation outcome: `src/rows.rs` now strips only the graph prefix before parsing `@`, `○`, or
+  `◆` revision metadata rows, while still rejecting junk-with-marker rows and keeping operation-log
+  metadata strict.
+- Validation trail: `cargo test rows -- --test-threads=1`; `cargo test graph -- --test-threads=1`;
+  `cargo test operation_log -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; main-thread `just check` passed with 526
+  tests / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
-  - Files: `src/jj_rows.rs` and `docs/process-observations.md`
+  - Files: `src/rows.rs` and `docs/process-observations.md`
 - Review outcome: a follow-up gpt-5.5 high read-only review reported no issues after the
   connector-prefix repair. The remaining named risk is future `jj` graph connector glyph drift,
   which should fail closed by withholding exact ids until the whitelist and tests are updated.
@@ -3258,54 +3266,53 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Slice / task: follow up on the review finding that graph-enabled revision metadata rows were being
   parsed as if they were bare template payloads.
 - Thread id: `019e48f6-8954-7a53-bc04-7661876eab0f`.
-- Implementation outcome: `src/jj_rows.rs` now accepts the actual `@  ...` and `○  ...` `jj log -T`
+- Implementation outcome: `src/rows.rs` now accepts the actual `@  ...` and `○  ...` `jj log -T`
   revision metadata rows, still fails closed on junk with embedded valid ids, and keeps
   operation-log metadata strict and unprefixed.
-- Validation trail: `cargo test jj_rows -- --test-threads=1`;
-  `cargo test graph -- --test-threads=1`; `cargo test operation_log -- --test-threads=1`;
-  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
-  `just md-check`; main-thread `just check` passed with 526 tests / 2 ignored.
+- Validation trail: `cargo test rows -- --test-threads=1`; `cargo test graph -- --test-threads=1`;
+  `cargo test operation_log -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
+  `rustup run nightly cargo fmt --check`; `just md-check`; main-thread `just check` passed with 526
+  tests / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
-  - Files: `src/jj_rows.rs` and `docs/process-observations.md`
+  - Files: `src/rows.rs` and `docs/process-observations.md`
 
 ### 2026-05-20 (Revision metadata graph-noise repair)
 
 - Slice / task: keep graph-enabled revision metadata pairing from dropping ids when jj emits elision
   or connector-only template rows.
 - Thread id: `019e48eb-6dca-7b00-9b21-40033c901861`.
-- Implementation outcome: `src/jj_rows.rs` now skips the known graph-only revision metadata shapes
+- Implementation outcome: `src/rows.rs` now skips the known graph-only revision metadata shapes
   before row-count matching, while malformed revision-like metadata still fails closed.
-- Validation trail: `cargo test jj_rows -- --test-threads=1`;
-  `cargo test graph -- --test-threads=1`; `cargo check`; `cargo clippy -- -D warnings`;
-  `rustup run nightly cargo fmt --check`; `just md-check`; main-thread `just check` passed with 525
-  tests / 2 ignored.
+- Validation trail: `cargo test rows -- --test-threads=1`; `cargo test graph -- --test-threads=1`;
+  `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
+  `just md-check`; main-thread `just check` passed with 525 tests / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-20 22:05:16 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/jj_rows.rs` and `docs/process-observations.md`
+  - Files: `src/rows.rs` and `docs/process-observations.md`
 
 ### 2026-05-20 (Fail closed on row metadata drift)
 
 - Slice / task: harden log and operation-log row metadata pairing so drift withholds exact ids while
   preserving rendered rows.
 - Thread id: `019e48c5-d735-76e3-8dbd-39bee59cc7cd`.
-- Implementation outcome: `src/jj_rows.rs` treats revision and operation metadata as all-or-nothing
+- Implementation outcome: `src/rows.rs` treats revision and operation metadata as all-or-nothing
   row-order contracts. Malformed, missing, extra, or row-count-mismatched metadata now leaves
   rendered log and operation rows visible with exact ids set to `None`.
 - Fragility note: `docs/plan/fragility-register.md` records the tightened fail-closed contract for
   revision identity and operation-log ids.
-- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+- Validation trail: `cargo test rows -- --test-threads=1`;
   `cargo test operation_log -- --test-threads=1`; `cargo test graph -- --test-threads=1`;
   `cargo check`; `cargo clippy -- -D warnings`; `rustup run nightly cargo fmt --check`;
   `just md-check`; main-thread `just check` passed with 524 tests / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
-  - Files: `src/jj_rows.rs`, `docs/plan/fragility-register.md`, and `docs/process-observations.md`
+  - Files: `src/rows.rs`, `docs/plan/fragility-register.md`, and `docs/process-observations.md`
 
 ### 2026-05-20 (Central app and command contracts)
 
 - Slice / task: document ownership and invariants for central app and command contracts in
-  `src/command.rs`, `src/app_screen.rs`, `src/app/services.rs`, and `src/app.rs`.
+  `src/command.rs`, `src/modes.rs`, `src/app/services.rs`, and `src/app.rs`.
 - Thread id: `019e48a8-00a9-7eb0-8865-0b028b5b0ad1`.
 - Implementation outcome: added short ownership comments for `Command`, `ViewCommand`,
   `CommandContext`, `ViewEffect`, `InteractionMode`, `AppServices`, and `PendingCommand` so future
@@ -3314,13 +3321,13 @@ be supported by the work log, repo state, or direct transcript evidence.
   `just md-check`; main-thread `just check` passed with 517 tests / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-20 21:06:18 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/command.rs`, `src/app_screen.rs`, `src/app/services.rs`, `src/app.rs`, and
+  - Files: `src/command.rs`, `src/modes.rs`, `src/app/services.rs`, `src/app.rs`, and
     `docs/process-observations.md`
 
 ### 2026-05-20 (Stale source comment repair)
 
 - Slice / task: repair the stale source-ownership comments in `src/action_menu.rs`,
-  `src/command.rs`, `src/interactive_process.rs`, and `src/sticky_file_view.rs`.
+  `src/command.rs`, `src/interactive.rs`, and `src/document.rs`.
 - Thread id: `019e4898-7f41-7f21-86f7-0c66cbbf4a30`.
 - Implementation outcome: the four module comments now describe current ownership and call-site
   behavior instead of future or narrow assumptions.
@@ -3328,18 +3335,18 @@ be supported by the work log, repo state, or direct transcript evidence.
   `just md-check`; main-thread `just check` passed with 517 tests / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-20 20:49:22 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/action_menu.rs`, `src/command.rs`, `src/interactive_process.rs`,
-    `src/sticky_file_view.rs`, and `docs/process-observations.md`
+  - Files: `src/action_menu.rs`, `src/command.rs`, `src/interactive.rs`, `src/document.rs`, and
+    `docs/process-observations.md`
 
 ### 2026-05-20 (Action completion outcome helper)
 
 - Slice / task: implement the first corrective source-maintainability slice by extracting
   behavior-preserving action completion outcome helpers.
 - Thread id: `019e4890-0c9d-7040-8e30-3f69e6753f01`.
-- Implementation outcome: `src/app/action_lifecycle/shared.rs` now owns shared failed-action,
-  refresh, and refresh-plus-reveal completion outcomes used by `completion.rs` and
-  `rewrite_completion.rs`; duplicate, split, sync, and stacked operation flows stayed inline where
-  their result wording or refresh policy is action-specific.
+- Implementation outcome: `src/app/actions/shared.rs` now owns shared failed-action, refresh, and
+  refresh-plus-reveal completion outcomes used by `completion.rs` and `rewrite_completion.rs`;
+  duplicate, split, sync, and stacked operation flows stayed inline where their result wording or
+  refresh policy is action-specific.
 - Validation trail: `cargo check`; focused app action tests for describe/commit, bookmark, file,
   rewrite, working-copy, and operation actions; `cargo clippy -- -D warnings`; and
   `rustup run nightly cargo fmt --check`; main-thread `just check` passed with 517 tests / 2
@@ -3353,8 +3360,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   change; no Rust or source behavior changes.
 - Thread id: `019e488c-bb4f-76e2-989f-e2e48696e589`.
 - Evidence read: `jj --no-pager status` showed an empty working copy on the audit change;
-  `just largest-rust-files` reported `src/jj_actions.rs` at 3601 lines, `src/jj_rows.rs` at 1836,
-  and `src/bookmarks.rs` at 1477.
+  `just largest-rust-files` reported `src/actions.rs` at 3601 lines, `src/rows.rs` at 1836, and
+  `src/bookmarks.rs` at 1477.
 - Guidance basis: read the repo-local docs guidance plus `../practice` guidance for Rust
   maintainability, documentation workflow, code shape, reader locality, and cohesion.
 - Documentation outcome: `docs/agent/source-maintainability-ledger.md` now records the audit's
@@ -3395,25 +3402,25 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Thread id: `019e4870-6d2c-7b23-afd8-1ecb726878b5`.
 - Model choice in task prompt: `gpt-5.5 high`.
 - Implementation outcome: `src/tui.rs` now has one ordinary action-output render path plus the
-  existing `Overlay::AbandonConfirm` render path. `src/app_screen.rs` still owns `InteractionMode`
+  existing `Overlay::AbandonConfirm` render path. `src/modes.rs` still owns `InteractionMode`
   projection and maps ordinary action preview/result modes to the common action-output overlay with
   the existing titles; `AbandonConfirm` stays on its dedicated overlay.
 - Evidence that duplicate overlay variants were removed: `rg` for the previous per-action
-  `Overlay::*Preview` names in `src/tui.rs` and `src/app_screen.rs` returned no matches.
-- Line-count evidence after the change: `src/tui.rs` 1134 LOC, `src/app_screen.rs` 622 LOC, and
-  `src/action_output.rs` 245 LOC.
+  `Overlay::*Preview` names in `src/tui.rs` and `src/modes.rs` returned no matches.
+- Line-count evidence after the change: `src/tui.rs` 1134 LOC, `src/modes.rs` 622 LOC, and
+  `src/action_pane.rs` 245 LOC.
 - Validation run:
   - `cargo check`
   - `cargo test tui -- --test-threads=1`
-  - `cargo test app_screen -- --test-threads=1`
-  - `cargo test action_output -- --test-threads=1`
+  - `cargo test screen -- --test-threads=1`
+  - `cargo test action_pane -- --test-threads=1`
   - `cargo clippy -- -D warnings`
   - `rustup run nightly cargo fmt --check`
   - full `cargo test` passed with 517 passed / 2 ignored
   - `just check`
 - Evidence basis:
   - Date: `2026-05-20 19:55:31 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/app_screen.rs`, `src/tui.rs`, and `docs/process-observations.md`
+  - Files: `src/modes.rs`, `src/tui.rs`, and `docs/process-observations.md`
 
 ### 2026-05-20 (Packet 41 workspace/root surface)
 
@@ -3431,7 +3438,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   `name`, `target.change_id()`, and `target.commit_id()`. The implemented template intentionally
   excludes `root`.
 - Implementation outcome: `src/workspaces.rs` owns selection, render, bindings, search, copy, and
-  refresh for the new screen. `src/jj_rows.rs` owns opaque rendered row pairing with exact metadata,
+  refresh for the new screen. `src/rows.rs` owns opaque rendered row pairing with exact metadata,
   and degrades on metadata command, malformed JSON, or row-count failure without parsing rendered
   labels.
 - Validation run during implementation:
@@ -3452,7 +3459,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   Packet 42, and points the immediate follow-up at the maintainability corrective packets.
 - Evidence basis:
   - Date: `2026-05-20 19:40:18 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/workspaces.rs`, `src/jj.rs`, `src/jj_rows.rs`, `src/view_state.rs`,
+  - Files: `src/workspaces.rs`, `src/jj.rs`, `src/rows.rs`, `src/view_state.rs`,
     `src/app/navigation.rs`, `src/app/tests/command_navigation.rs`,
     `docs/plan/screens/workspaces.md`, `docs/plan/fragility-register.md`, `docs/plan/progress.md`,
     and `docs/process-observations.md`
@@ -3465,8 +3472,8 @@ be supported by the work log, repo state, or direct transcript evidence.
 - 5.5 review finding: a low-severity shifted-`?` close inconsistency showed up in the review pass.
   Help could open through the shifted punctuation path, but the close path still accepted only the
   unshifted modifier shape.
-- Starting evidence: `src/app/mode_input.rs` accepted `Char('?')` only when `KeyModifiers` was
-  empty, even though shared shifted-punctuation matching can open help with a shifted physical `?`.
+- Starting evidence: `src/app/input.rs` accepted `Char('?')` only when `KeyModifiers` was empty,
+  even though shared shifted-punctuation matching can open help with a shifted physical `?`.
 - Repair outcome: `is_help_close_key` now accepts `Char('?')` with either no modifiers or
   `KeyModifiers::SHIFT`, while `Esc` and `q` still require empty modifiers. A focused regression
   test covers closing help from a shifted `?`.
@@ -3479,8 +3486,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `just check`
 - Evidence basis:
   - Date: `2026-05-20 18:08:41 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/app/mode_input.rs`, `src/app/tests/command_navigation.rs`,
-    `docs/process-observations.md`
+  - Files: `src/app/input.rs`, `src/app/tests/command_navigation.rs`, `docs/process-observations.md`
 
 ### 2026-05-20 (Packet 38 UI/keybinding follow-up planning)
 
@@ -3508,7 +3514,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   `--tracked`, `--conflicted`, `-r`, or name filters could hide same-name peers. That could enable
   remote-only `jj bookmark forget --include-remotes exact:"<name>"` from a filtered view without a
   global proof that no local peer and exactly one remote peer existed.
-- Repair outcome: `src/jj_rows.rs` now treats only bare `--all-remotes`/`-a` bookmark-list args as
+- Repair outcome: `src/rows.rs` now treats only bare `--all-remotes`/`-a` bookmark-list args as
   unfiltered all-remotes metadata. Any additional arg downgrades metadata to visible-only, which
   leaves remote rows without visible local peers as `BookmarkLocalPeerState::Unknown` and blocks
   remote-only forget. Local rows can still prove tracked or remote-backed forget when their selected
@@ -3525,7 +3531,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `cargo check`
   - `cargo test bookmark_forget -- --test-threads=1`
   - `cargo test bookmark -- --test-threads=1`
-  - `cargo test jj_rows -- --test-threads=1`
+  - `cargo test rows -- --test-threads=1`
   - `cargo clippy -- -D warnings`
   - `rustup run nightly cargo fmt --check`
   - `just md-check`
@@ -3533,7 +3539,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `just check`
 - Evidence basis:
   - Date: `2026-05-20 17:41:03 PDT` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/jj_rows.rs`, `src/app/tests/bookmark_actions.rs`, `docs/plan/command-inventory.md`,
+  - Files: `src/rows.rs`, `src/app/tests/bookmark_actions.rs`, `docs/plan/command-inventory.md`,
     `docs/plan/fragility-register.md`, `docs/plan/progress.md`, and `docs/process-observations.md`
 
 ### 2026-05-20 (Packet 38 bookmark forget repair)
@@ -3541,16 +3547,16 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Slice / task: finish and repair Packet 38 bookmark forget in jj change `Add bookmark forget flow`.
 - Thread id: `019e47ea-7ba0-7df1-ba9d-2f029fa79662`.
 - Starting evidence: user-provided handoff said the first worker left partial edits in `src/app.rs`,
-  `src/command.rs`, `src/jj.rs`, and `src/jj_actions.rs`, with `cargo check` failing because
+  `src/command.rs`, `src/jj.rs`, and `src/actions.rs`, with `cargo check` failing because
   `open_bookmark_forget_preview` was missing and `bookmark_plan_from_prompt` /
   `bookmark_mutation_plan` did not handle `JjBookmarkMutationKind::Forget`. `jj --no-pager status`
   in this turn confirmed `@` was `zkwppzvx 6f2913aa Add bookmark forget flow` with those four Rust
   files modified.
 - Repair outcome: `src/bookmarks.rs` now gates forget targets from typed `BookmarkRowState`
   metadata, `src/view_state.rs` carries the exact selected forget target to app lifecycle,
-  `src/app/action_lifecycle/entry.rs` opens the missing preview, and `src/app/mode_input.rs` is
-  exhaustive for the non-prompt forget kind. The partial `src/jj_actions.rs` command-builder work
-  was preserved and covered with command-shape tests.
+  `src/app/actions/entry.rs` opens the missing preview, and `src/app/input.rs` is exhaustive for the
+  non-prompt forget kind. The partial `src/actions.rs` command-builder work was preserved and
+  covered with command-shape tests.
 - Model / process observation: the repair succeeded by treating the partial worker output as owned
   work-in-progress rather than reverting it. The key missing boundary was not command construction;
   it was the metadata-gated selection path from bookmarks view to the app preview lifecycle.
@@ -3571,9 +3577,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   row, and `jj --no-pager undo` restored `feature/name@origin`.
 - Evidence basis:
   - Date: `2026-05-20` from local `date '+%Y-%m-%d %H:%M:%S %Z'`
-  - Files: `src/bookmarks.rs`, `src/view_state.rs`, `src/app/action_lifecycle/entry.rs`,
-    `src/app/mode_input.rs`, `src/app/tests/bookmark_actions.rs`, `src/command.rs`,
-    `src/jj_actions.rs`, `src/tui.rs`, `docs/plan/progress.md`, `docs/plan/fragility-register.md`,
+  - Files: `src/bookmarks.rs`, `src/view_state.rs`, `src/app/actions/entry.rs`, `src/app/input.rs`,
+    `src/app/tests/bookmark_actions.rs`, `src/command.rs`, `src/actions.rs`, `src/tui.rs`,
+    `docs/plan/progress.md`, `docs/plan/fragility-register.md`,
     `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/screens/bookmarks.md`,
     `docs/process-observations.md`
 
@@ -3598,7 +3604,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `just md-check`
 - Evidence basis:
   - Files: `src/app/navigation.rs`, `src/bookmarks.rs`, `src/graph.rs`, `src/operation_log.rs`,
-    `src/jj_rows.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+    `src/rows.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
   - Date: `2026-05-20` from local `date +%F`
   - Command log available in this session transcript and workspace state
 
@@ -3613,7 +3619,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   attempted clippy run that failed on the known baseline findings, and the post-repair full
   `cargo test` count is recorded as 447 passed / 2 ignored.
 - Validation / proof run during repair:
-  - `cargo test jj_rows -- --test-threads=1`
+  - `cargo test rows -- --test-threads=1`
   - `cargo test bookmark -- --test-threads=1`
   - `cargo check`
   - `rustup run nightly cargo fmt --check`
@@ -3621,7 +3627,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - `just md-check`
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
-  - Files: `src/jj_rows.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+  - Files: `src/rows.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Post-Packet-34 app coherence gate)
 
@@ -3634,8 +3640,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   draw/event loop, pending key-prefix dispatch, normal binding routing, refresh, view execution, and
   `ViewEffect` routing. Detailed policy moved to existing app owners instead of new line-count-only
   modules.
-- Ownership outcome: `src/app/action_lifecycle.rs` owns action-menu opening, default fetch, and
-  new-from-trunk result handling; `src/app/mode_input.rs` owns copy-menu opening next to modal key
+- Ownership outcome: `src/app/actions.rs` owns action-menu opening, default fetch, and
+  new-from-trunk result handling; `src/app/input.rs` owns copy-menu opening next to modal key
   reducers; `src/app/navigation.rs` owns log revset, view-menu, and diff-format selection policy;
   `src/app/services.rs` owns thin App service forwarding as a documented test seam.
 - Test-shape observation: focused app tests stayed in `src/app/tests.rs` because the tested behavior
@@ -3659,9 +3665,9 @@ be supported by the work log, repo state, or direct transcript evidence.
   `ViewSpec::bookmarks` and `FileListItem::row_text`. Clippy remains blocked by those two baseline
   dead-code warnings plus the known `collapsible_if` findings in `src/bookmarks.rs`, `src/graph.rs`,
   and `src/operation_log.rs`.
-- Residual risk: `src/app/action_lifecycle.rs` remains large at 1,929 lines, but its size is
-  concentrated around one owner concept: app-owned action preview/result lifecycle. Future rewrite
-  packets should avoid adding action policy back to `src/app.rs`.
+- Residual risk: `src/app/actions.rs` remains large at 1,929 lines, but its size is concentrated
+  around one owner concept: app-owned action preview/result lifecycle. Future rewrite packets should
+  avoid adding action policy back to `src/app.rs`.
 - Evidence basis:
   - Thread: `019e475b-d453-7ee0-96dd-d74393564ae8`
   - Date: `2026-05-20` from local `date +%F`
@@ -3672,9 +3678,9 @@ be supported by the work log, repo state, or direct transcript evidence.
     `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`,
     `cargo clippy -- -D warnings`, `just md-fmt`, `just md-check`, `printenv CODEX_THREAD_ID`,
     `date +%F`
-  - Files: `src/app.rs`, `src/app/action_lifecycle.rs`, `src/app/mode_input.rs`,
-    `src/app/navigation.rs`, `src/app/services.rs`, `src/app/tests.rs`,
-    `docs/agent/architecture.md`, `docs/plan/progress.md`, `docs/process-observations.md`
+  - Files: `src/app.rs`, `src/app/actions.rs`, `src/app/input.rs`, `src/app/navigation.rs`,
+    `src/app/services.rs`, `src/app/tests.rs`, `docs/agent/architecture.md`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Interruption Packet H validation discipline)
 
@@ -3829,18 +3835,18 @@ be supported by the work log, repo state, or direct transcript evidence.
 - User request: move preview-first `jj` action and mutation command plans out of `src/jj.rs` into a
   coherent owner module without changing command semantics, parser behavior, `ViewSpec`, or
   user-visible commands.
-- Observable outcome: `src/jj_actions.rs` now owns action-plan types and tests for operation
+- Observable outcome: `src/actions.rs` now owns action-plan types and tests for operation
   recovery/target actions, git push, new, describe, commit, edit/next/prev, restore, revert,
   bookmark mutations, rebase, squash, absorb, abandon, exact revset/fileset quoting, exact bookmark
   patterns, and abandon preview text. `src/jj.rs` retains view specs, rendered row item models,
   metadata loading, row grouping, parsers, direct process helpers, and compatibility re-exports for
   existing `crate::jj::...` imports.
-- Architecture outcome: `docs/agent/architecture.md` now names `jj_actions.rs` as the owner for
+- Architecture outcome: `docs/agent/architecture.md` now names `actions.rs` as the owner for
   preview-first mutation command contracts while keeping `jj.rs` responsible for process helpers,
   view-spec command construction, and rendered-output conversion.
 - Validation / proof run during implementation:
   - `cargo check`
-  - `cargo test jj_actions -- --test-threads=1`
+  - `cargo test actions -- --test-threads=1`
   - full `cargo test`
   - `rustup run nightly cargo fmt`
   - `rustup run nightly cargo fmt --check`
@@ -3862,11 +3868,11 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Thread: `019e45bd-abf2-7e92-a7d4-3dffc70518c1`
   - Date: `2026-05-20` from local `date +%F`
-  - Commands: `jj --no-pager status`, `cargo check`, `cargo test jj_actions -- --test-threads=1`,
+  - Commands: `jj --no-pager status`, `cargo check`, `cargo test actions -- --test-threads=1`,
     `cargo test`, `rustup run nightly cargo fmt`, `rustup run nightly cargo fmt --check`,
     `cargo clippy -- -D warnings`, `just md-fmt`, `just md-check`, `just check`,
     `printenv CODEX_THREAD_ID`, `date +%F`
-  - Files: `src/jj_actions.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
+  - Files: `src/actions.rs`, `src/jj.rs`, `src/main.rs`, `docs/agent/architecture.md`,
     `docs/plan/progress.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Interruption Packet A follow-up module coherence audit)
@@ -3896,7 +3902,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Commands: `jj --no-pager status`, `wc -l`, `rg`, `sed`, `printenv CODEX_THREAD_ID`, `date +%F`,
     `just md-check`
   - Files: `src/jj.rs`, `src/tui.rs`, `src/graph.rs`, `src/command.rs`, `src/action_menu.rs`,
-    `src/view_state.rs`, `src/rendered_jj.rs`, `docs/plan/next-implementation-slices.md`,
+    `src/view_state.rs`, `src/rendered.rs`, `docs/plan/next-implementation-slices.md`,
     `docs/plan/progress.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Interruption Packet A follow-up module audit planning)
@@ -3930,15 +3936,15 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Slice / task: implement Interruption Packet A in jj change `Decompose app screen contracts`.
 - Scope: behavior-preserving extraction from oversized `src/app.rs`; no new commands, no Packet 34
   split flow, no key remapping, no parser or `jj` command semantic changes.
-- Observable outcome: `src/app_screen.rs` now owns app-level modal/prompt state plus status/overlay
-  projection; `src/app_status.rs` owns status-line construction and count wording;
-  `src/action_output.rs` owns action preview/result visible-line and key-handling behavior.
+- Observable outcome: `src/modes.rs` now owns app-level modal/prompt state plus status/overlay
+  projection; `src/status_line.rs` owns status-line construction and count wording;
+  `src/action_pane.rs` owns action preview/result visible-line and key-handling behavior.
   `src/app.rs` keeps orchestration, mode transitions, command-result application, and view-stack
   behavior.
 - Architecture outcome: `docs/agent/architecture.md` now records the screen/action ownership map and
   routes future keys, overlays, status projection, command execution, and view behavior to
   non-overlapping owners where possible.
-- Validation: focused `cargo test app_`; focused `cargo test action_output`; full `cargo test`;
+- Validation: focused `cargo test app_`; focused `cargo test action_pane`; full `cargo test`;
   `cargo check`; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
   `just md-fmt`; `just md-check`; attempted `cargo clippy -- -D warnings`; attempted `just check`.
 - Warning / blocker status: `cargo check` passes but still reports existing dead-code warnings for
@@ -3951,14 +3957,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Evidence basis:
   - Thread: `019e45a9-a7fd-7b12-b932-0da3e6153997`
   - Date: `2026-05-20` from local `date +%F`
-  - Commands: `jj --no-pager status`, `cargo test app_`, `cargo test action_output`, `cargo test`,
+  - Commands: `jj --no-pager status`, `cargo test app_`, `cargo test action_pane`, `cargo test`,
     `cargo check`, `cargo clippy -- -D warnings`, `rustup run nightly cargo fmt`,
     `rustup run nightly cargo fmt --check`, `just md-fmt`, `just md-check`, `just check`,
     `printenv CODEX_THREAD_ID`, `date +%F`
-  - Files: `src/action_output.rs`, `src/app.rs`, `src/app_screen.rs`, `src/app_status.rs`,
-    `src/main.rs`, `src/tui.rs`, `docs/agent/architecture.md`,
-    `docs/plan/next-implementation-slices.md`, `docs/plan/progress.md`,
-    `docs/process-observations.md`
+  - Files: `src/action_pane.rs`, `src/app.rs`, `src/modes.rs`, `src/status_line.rs`, `src/main.rs`,
+    `src/tui.rs`, `docs/agent/architecture.md`, `docs/plan/next-implementation-slices.md`,
+    `docs/plan/progress.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Pre-Packet-34 maintainability interruption)
 
@@ -4088,9 +4093,8 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Date: `2026-05-20` from local `date +%F`
   - Commands: `printenv CODEX_THREAD_ID`, `date +%F`, `just md-check`
   - Files: `src/command.rs`, `src/app.rs`, `src/jj.rs`, `src/diff.rs`, `src/graph.rs`,
-    `src/show.rs`, `src/sticky_file_view.rs`, `docs/plan/progress.md`,
-    `docs/tutorials/daily-loop.md`, `docs/tutorials/bookmarks-and-conflicts.md`,
-    `docs/process-observations.md`
+    `src/show.rs`, `src/document.rs`, `docs/plan/progress.md`, `docs/tutorials/daily-loop.md`,
+    `docs/tutorials/bookmarks-and-conflicts.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Packet 30 edit/next/prev navigation flows)
 
@@ -4099,7 +4103,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 - Worker / model: `019e453c-d27e-7193-bd03-ea6e6aab8678` / `gpt-5` (Codex).
 - Scope given: keep main-thread work orchestration-only, avoid jj/git mutations in the project
   checkout, add exact-row `edit` plus `next --edit` / `prev --edit` graph entry points, preserve raw
-  ambiguity failures in `ActionOutput`, refresh and reveal current `@` after success, and update
+  ambiguity failures in `ActionPane`, refresh and reveal current `@` after success, and update
   progress, fragility, and process docs.
 - Exploration decisions carried into implementation: `edit` stayed graph-only and exact-row only,
   using `exactly(change_id(...), 1)` instead of broad revsets. `next` and `prev` stayed graph-only
@@ -4631,7 +4635,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   current exact graph row previews `jj new <change-id>`. Explicit graph multi-select previews
   `jj new <parent-1> <parent-2> ...` in graph row order. The preview lists all exact parent ids,
   confirmation runs the positional command shape, successful execution refreshes and reveals the new
-  `@` change with recent-mode fallback, and failures remain readable in a completed ActionOutput
+  `@` change with recent-mode fallback, and failures remain readable in a completed ActionPane
   overlay.
 
 - Manual proof outcome: disposable repo `/tmp/jk-packet18-proof.gGQtDR` was initialized with
@@ -4688,7 +4692,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   semantics global, avoid selected-operation restore/revert behavior, add tests, and prove behavior
   in an isolated `/tmp` jj repo.
 
-- Observable outcome: operation-log `u` now opens a scrollable ActionOutput preview for global
+- Observable outcome: operation-log `u` now opens a scrollable ActionPane preview for global
   `jj undo`, and `C-r` opens the same flow for global `jj redo`. Preview text, help text, and app
   tests explicitly state that the selected operation-log row is not an argument. Successful recovery
   refreshes the current view and leaves the completed output readable; failed redo output remains in
@@ -4797,7 +4801,7 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 - Scope given: preserve unrelated edits, stay primarily within `src/jj.rs` and `src/app.rs`,
   revalidate empty abandon previews immediately before execution, switch to typed confirmation if
-  the recheck sees non-empty content, preserve recheck failures in `ActionOutput`, verify exact
+  the recheck sees non-empty content, preserve recheck failures in `ActionPane`, verify exact
   change-id revset syntax from `jj help`, and update progress, fragility, and process notes.
 
 - Observable outcome: abandon execution, diff-summary probes, and title lookup now use
@@ -4842,13 +4846,13 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 - Scope given: add a guided `jj abandon` flow only where the selected change target is exact,
   require stronger typed confirmation for non-empty changes, keep `jj undo` visible after success,
-  preserve Packet 13 `ActionOutput` readability for failures, update packet docs, and run mutation
+  preserve Packet 13 `ActionPane` readability for failures, update packet docs, and run mutation
   proof only in a disposable `/tmp` jj repo.
 
 - Observable outcome: graph single-row action menus now carry an exact abandon revision into an
   abandon preview; empty `jj diff --summary` previews run on Enter, non-empty previews move to a
   typed exact-id confirmation mode, wrong input does not run the command, success refreshes the
-  active view and includes `jj undo`, and failures remain readable in a completed `ActionOutput`.
+  active view and includes `jj undo`, and failures remain readable in a completed `ActionPane`.
 
 - Evidence basis:
   - Thread: `019e440c-4c27-7893-a08f-fdeb54c02c7b`
@@ -4901,7 +4905,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   preserve other workers' edits, make push and rebase preview/result/error output readable in small
   terminals, and update progress and process notes after validation.
 
-- Observable outcome: added a small `ActionOutput` modal-state type, routed push and rebase
+- Observable outcome: added a small `ActionPane` modal-state type, routed push and rebase
   previews/results/errors through the shared scrollable overlay, kept footer keys visible while the
   body scrolls, and added focused app, state, and rendering tests for scroll bounds, close behavior,
   selection preservation, and existing push/rebase completion behavior.
@@ -4913,14 +4917,14 @@ be supported by the work log, repo state, or direct transcript evidence.
     - `printenv CODEX_THREAD_ID`
     - `date +%F`
     - `cargo check`
-    - `cargo test action_output`
+    - `cargo test action_pane`
     - `cargo test push_preview`
     - `cargo test rebase_preview`
     - `cargo test`
     - `rustup run nightly cargo fmt`
     - `just md-check`
-  - Files: `src/action_output.rs`, `src/app.rs`, `src/main.rs`, `src/tui.rs`,
-    `docs/plan/progress.md`, `docs/process-observations.md`
+  - Files: `src/action_pane.rs`, `src/app.rs`, `src/main.rs`, `src/tui.rs`, `docs/plan/progress.md`,
+    `docs/process-observations.md`
 
 ### 2026-05-20 (Packet 13 confirm completion repair)
 
@@ -4928,7 +4932,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   state and close to a second confirm after command success.
 
 - Fix outcome: `confirm_rebase` now always replaces the pending rebase preview with a completed
-  `ActionOutput` after successful `run` + `refresh`, including reveal failure context
+  `ActionPane` after successful `run` + `refresh`, including reveal failure context
   (`reveal failed: ...`) in the completed output text. Enter now closes that state.
 
 - Evidence basis:
@@ -4939,7 +4943,7 @@ be supported by the work log, repo state, or direct transcript evidence.
     - `date +%F`
     - `cargo check`
     - `cargo test rebase_`
-    - `cargo test action_output`
+    - `cargo test action_pane`
     - `cargo test push_preview`
     - `rustup run nightly cargo fmt`
   - Files: `src/app.rs`, `docs/process-observations.md`
@@ -5218,7 +5222,7 @@ be supported by the work log, repo state, or direct transcript evidence.
   - Commands:
     - `jj --no-pager status`
     - `rg -n "Slice 12|stack|rebase|source|destination|acceptance"       docs/plan/implementation-slices.md`
-    - `rg -n "action_menu|Move|rebase|source|destination|preview|confirm|stack"       src/action_menu.rs src/app.rs src/jj.rs src/tui.rs`
+    - `rg -n "menus|Move|rebase|source|destination|preview|confirm|stack"       src/action_menu.rs src/app.rs src/jj.rs src/tui.rs`
     - `cargo test`
     - `jj --no-pager rebase --help`
   - Files: `docs/plan/implementation-slices.md`, `src/action_menu.rs`, `src/app.rs`, `src/jj.rs`,
@@ -5583,7 +5587,7 @@ belong here.
 - Observable outcome: `src/app.rs` now skips the push remote picker when exactly one remote is
   discovered, keeps the picker for multiple remotes, preserves no-remote and unsupported-view
   errors, and stores explicit status/bookmark/revision target semantics in the scrollable
-  `ActionOutput` preview/result context.
+  `ActionPane` preview/result context.
 - Observable outcome: `src/jj.rs` has focused command-construction coverage for remote and no-remote
   push shapes, including default status pushes, exact bookmarks, and exact revisions.
 - Validation / proof run during implementation:
@@ -5619,7 +5623,7 @@ belong here.
 - Observable outcome: `src/app.rs` now routes `ActionKind::Squash` role prompts into a scrollable
   preview, requires Enter confirmation before running, refreshes after success, prefers revealing
   the destination, keeps `jj undo` visible after successful execution and refresh/reveal failures,
-  and preserves command error text in `ActionOutput`.
+  and preserves command error text in `ActionPane`.
 - Observable outcome: `src/action_menu.rs` and `src/graph.rs` now use action labels that explicitly
   name source revisions and destination for multi-revision rewrite actions.
 - Manual proof: `jj --no-pager squash --help` was read before choosing the command shape. A
@@ -5661,7 +5665,7 @@ belong here.
   delete. Graph targets use `exactly(change_id("<id>"), 1)`, status targets use `@`, and move/delete
   bookmark names use exact jj string patterns.
 - Observable outcome: `src/app.rs` now routes graph/status `b`, `=`, and `m` through a typed
-  bookmark-name prompt and scrollable ActionOutput preview/result. `src/bookmarks.rs` and
+  bookmark-name prompt and scrollable ActionPane preview/result. `src/bookmarks.rs` and
   `src/view_state.rs` now distinguish selected local bookmark rows so bookmarks-view `x` deletes
   only a selected exact local bookmark.
 - Deferred behavior: track and untrack remain unexposed because `BookmarkItem` has no explicit
@@ -5765,7 +5769,7 @@ belong here.
 - Implementation evidence: `src/operation_log.rs` now builds restore/revert actions only from a
   selected `OperationLogItem::operation_id()`. `src/jj.rs` now has exact operation-target command
   construction for `operation restore` and `operation revert`. `src/app.rs` routes both actions
-  through scrollable preview/result `ActionOutput`.
+  through scrollable preview/result `ActionPane`.
 - Validation / proof run during implementation:
   - `cargo check`
   - `cargo test operation_ -- --test-threads=1`
@@ -5796,13 +5800,13 @@ belong here.
 - Starting state: `jj --no-pager status` reported an empty working copy at
   `tpxlzkvv 25c2ce4b (empty) Extract jj rendered rows` with parent
   `qsotyvls 02bbf1b3 Extract jj action plans`.
-- Implementation evidence: `src/jj_rows.rs` now owns `LogItem`, `BookmarkItem`, `FileListItem`,
+- Implementation evidence: `src/rows.rs` now owns `LogItem`, `BookmarkItem`, `FileListItem`,
   `ResolveEntry`, `OperationLogItem`, row loaders, narrow metadata templates, row grouping, bookmark
   metadata pairing, operation-id pairing, resolve JSON parsing, file-list path preservation, and
   parser tests. `src/jj.rs` keeps `ViewSpec`, command identity, navigation target provenance, direct
   process helpers, and compatibility re-exports.
 - Validation / proof run during implementation:
-  - `cargo test jj_rows`
+  - `cargo test rows`
   - `cargo test jj::tests`
   - `cargo check`
   - full `cargo test`
@@ -5811,8 +5815,8 @@ belong here.
   - attempted `cargo clippy -- -D warnings`
   - `just md-check`
 - Rework status: the first mechanical copy temporarily carried `ViewSpec` argument helper functions
-  into `src/jj_rows.rs`; focused `cargo test jj_rows` exposed them as dead-code warnings, and they
-  were removed before the full validation run.
+  into `src/rows.rs`; focused `cargo test rows` exposed them as dead-code warnings, and they were
+  removed before the full validation run.
 - Rework status: `just md-check` initially found Panache formatting diffs in
   `docs/agent/architecture.md`, `docs/plan/progress.md`, and `docs/process-observations.md`;
   `just md-fmt` reformatted those files and the rerun passed.
@@ -5836,9 +5840,9 @@ belong here.
   generated help. `src/app.rs` owns pending-prefix state, timeout fallback, Esc cancellation, and
   screen-level tests for `bc` bookmark create, `gf` fetch, generated help agreement, direct
   `S`/`B`/`O`, view-menu selection, and `l`/Right plus `h`/Left navigation.
-- Observable outcome: `src/app_screen.rs` now projects a shipped-view menu rather than a
-  diff-format-only menu, while preserving diff-format options as menu entries. `src/bookmarks.rs`
-  and `src/operation_log.rs` add `l`/Right detail entry; `src/show.rs`, `src/diff.rs`, and
+- Observable outcome: `src/modes.rs` now projects a shipped-view menu rather than a diff-format-only
+  menu, while preserving diff-format options as menu entries. `src/bookmarks.rs` and
+  `src/operation_log.rs` add `l`/Right detail entry; `src/show.rs`, `src/diff.rs`, and
   `src/status.rs` add Right as file-list expansion.
 - Rework / stuck points: the first app test run exposed that existing bookmark-create tests typed
   through `handle_mode_key` immediately after bare `b`; because bare `b` is now an ambiguous prefix,
@@ -5874,7 +5878,7 @@ belong here.
   dispatch and help share the same grammar before more rewrite keys arrive, but Packet C should
   decide whether a leader-style help/menu should absorb or remove those fallback ambiguities.
 - Model routing note: 5.5 high was justified for this slice. The hard part was not typing the
-  bindings but preserving working `S`/`B`/`O`, routing view-menu ownership through `app_screen.rs`,
+  bindings but preserving working `S`/`B`/`O`, routing view-menu ownership through `modes.rs`,
   keeping generated help and dispatch coupled, and documenting the intentional key-behavior change
   without pulling in Packet 34 or command-palette scope.
 
@@ -5937,8 +5941,8 @@ belong here.
   `zqoytxpu 6e7634dd (empty) Implement help leader menu`, with parent
   `nutzpkvo db3810b9 Implement view entry contracts`.
 - Explorer evidence used: Packet B already had generated help rows filtered by `HelpContext` in
-  `src/command.rs`, modal projection in `src/app_screen.rs`, and a reusable `execute_binding` path
-  in `src/app.rs`. Packet C reused those owners instead of adding a separate command palette.
+  `src/command.rs`, modal projection in `src/modes.rs`, and a reusable `execute_binding` path in
+  `src/app.rs`. Packet C reused those owners instead of adding a separate command palette.
 - Observable outcome: `src/command.rs` now exposes a help-aware binding matcher that uses the same
   metadata as generated help. The metadata groups rows by navigation, view switching, search/copy,
   repository actions, action previews, recovery, and app commands.
@@ -6043,7 +6047,7 @@ belong here.
 - Observable outcome: `src/view_state.rs` now exposes status exact paths through the existing
   restore/revert context boundary, while `src/action_menu.rs` distinguishes status paths from
   graph/detail revision contexts and offers only working-copy path restore.
-- Observable outcome: `src/jj_actions.rs` added an explicit working-copy restore target so status
+- Observable outcome: `src/actions.rs` added an explicit working-copy restore target so status
   restore uses `jj restore root-file:"<path>"` rather than pretending `@` is an exact change-id
   revset.
 - Rework / stuck points: an initial parser accepted long alphabetic prefixes, so
@@ -6144,7 +6148,7 @@ belong here.
   existing warnings, and `rustup run nightly cargo fmt --check` passed with the existing rustfmt
   config warnings.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-  `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+  `src/file_show.rs`, `src/jj.rs`, and `src/rows.rs`, plus known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 
 ## 2026-05-20 App Decomposition Slice 3
@@ -6174,7 +6178,7 @@ belong here.
   loaded log spec kept those args and cleared the stack.
   `direct_default_key_loads_default_view_and_clears_stack` dispatches `J` from the same setup and
   checks that the loaded default spec has empty args and clears the stack.
-- Review repair outcome: `GraphView::test_with_spec` was added for test builds, and `mock_load_view`
+- Review repair outcome: `LogView::test_with_spec` was added for test builds, and `mock_load_view`
   now uses it for Default/Log graph loads. This keeps app tests honest about the `ViewSpec` that
   navigation passed through `AppServices::load_view`.
 - Size evidence: pre-slice `wc -l` reported 3,434 lines in `src/app.rs`, 332 lines in
@@ -6192,7 +6196,7 @@ belong here.
 - Validation note: `cargo check` still reports the existing dead-code warnings for
   `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-  `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+  `src/file_show.rs`, `src/jj.rs`, and `src/rows.rs`, plus known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 
 ## 2026-05-20 App Decomposition Slice 4
@@ -6205,7 +6209,7 @@ belong here.
   `docs/plan/progress.md`, `docs/process-observations.md`, `src/app.rs`, `src/graph.rs`, and the
   added `src/app/navigation.rs`, `src/app/services.rs`, and `src/app/tests.rs`. No jj description,
   stack, or working-copy mutation command was run.
-- Observable outcome: `src/app/action_flow.rs` now owns common action preview key flow. It maps
+- Observable outcome: `src/app/preview_input.rs` now owns common action preview key flow. It maps
   action-output keys to stay-open, close-completed, cancel-pending, or confirm-pending events, then
   calls the existing `App::confirm_*` methods for describe, commit, bookmark mutation, new, rebase,
   restore, revert, squash, absorb, push, operation recovery, operation target, and working-copy
@@ -6214,13 +6218,13 @@ belong here.
   `handle_common_action_preview_key` before borrowing `self.mode` in `handle_mode_key_event`. The
   duplicated preview arms were removed from the main modal dispatch, and abandon preview / typed
   abandon confirmation remain local to `src/app.rs`.
-- Boundary evidence: `action_output.rs` still owns scroll keys and visible-line math through
-  `handle_action_output_key`; `app/action_flow.rs` owns app consequences such as cancellation status
+- Boundary evidence: `action_pane.rs` still owns scroll keys and visible-line math through
+  `handle_action_pane_key`; `app/preview_input.rs` owns app consequences such as cancellation status
   messages, result closing, and confirm dispatch. Existing confirm methods and output wording were
   not moved.
 - Size evidence: pre-slice `wc -l src/app.rs` reported 3,264 lines. After rustfmt,
-  `wc -l src/app.rs src/app/action_flow.rs` reported 2,889 lines in `src/app.rs`, 345 lines in
-  `src/app/action_flow.rs`, and 3,234 lines total for those two files.
+  `wc -l src/app.rs src/app/preview_input.rs` reported 2,889 lines in `src/app.rs`, 345 lines in
+  `src/app/preview_input.rs`, and 3,234 lines total for those two files.
 - Rework / stuck points: no behavior repair was needed after extraction. `cargo check` compiled the
   new module boundary on the first run after rustfmt, with only the existing dead-code warnings.
 - Validation / proof run during implementation:
@@ -6235,7 +6239,7 @@ belong here.
 - Validation note: `cargo check` still reports the existing dead-code warnings for
   `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-  `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+  `src/file_show.rs`, `src/jj.rs`, and `src/rows.rs`, plus known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 
 ## 2026-05-20 App Decomposition Slice 5
@@ -6246,29 +6250,27 @@ belong here.
   descriptions unchanged.
 - Starting state: `jj --no-pager status` showed existing app-decomposition working-copy edits in
   `docs/plan/progress.md`, `docs/process-observations.md`, `src/app.rs`, `src/graph.rs`, and the
-  added `src/app/action_flow.rs`, `src/app/navigation.rs`, `src/app/services.rs`, and
+  added `src/app/preview_input.rs`, `src/app/navigation.rs`, `src/app/services.rs`, and
   `src/app/tests.rs`. No jj mutation command was run; jj was used only for read-only inspection.
-- Observable outcome: `src/app/action_lifecycle.rs` now owns `App` methods for action menu
-  follow-ups, prompt opening, preview opening, confirmation/result flows, stacked repo-view refresh
-  after operation recovery, working-copy navigation reveal, and abandon recheck/confirmation. The
-  moved methods keep their existing names so modal dispatch in `src/app.rs` still reads as
-  coordinator code.
-- Observable outcome: `src/app/action_flow.rs` remains focused on shared action-output preview key
+- Observable outcome: `src/app/actions.rs` now owns `App` methods for action menu follow-ups, prompt
+  opening, preview opening, confirmation/result flows, stacked repo-view refresh after operation
+  recovery, working-copy navigation reveal, and abandon recheck/confirmation. The moved methods keep
+  their existing names so modal dispatch in `src/app.rs` still reads as coordinator code.
+- Observable outcome: `src/app/preview_input.rs` remains focused on shared action-output preview key
   handling from Slice 4. It still maps output keys to stay-open, close-completed, cancel-pending, or
-  confirm-pending events, then calls the lifecycle confirmation methods now defined in
-  `action_lifecycle.rs`.
+  confirm-pending events, then calls the lifecycle confirmation methods now defined in `actions.rs`.
 - Boundary evidence: `src/app.rs` still owns modal/key dispatch, role/text prompt reducers,
   `execute_view`, `apply_view_effect`, view-menu behavior, `run_new_trunk`, and `apply_diff_format`.
-  `src/app/tests.rs` now imports `ActionOutput`, `FollowUp`, `JjDescribeTarget`, `JjGitPushTarget`,
+  `src/app/tests.rs` now imports `ActionPane`, `FollowUp`, `JjDescribeTarget`, `JjGitPushTarget`,
   and `JjOperationRecoveryKind` directly because those names are no longer re-exported accidentally
   through `src/app.rs` imports.
-- Rework / stuck point: the first move put the lifecycle block into `action_flow.rs`, creating a
-  single large module. That was split into `action_lifecycle.rs` before final validation so the
-  common preview-key flow and action lifecycle orchestration have separate named homes.
-- Size evidence: pre-slice `wc -l src/app.rs src/app/action_flow.rs` reported 2,889 lines in
-  `src/app.rs` and 345 lines in `src/app/action_flow.rs`. After rustfmt, `wc -l` reported 1,355
-  lines in `src/app.rs`, 345 lines in `src/app/action_flow.rs`, and 1,563 lines in
-  `src/app/action_lifecycle.rs`.
+- Rework / stuck point: the first move put the lifecycle block into `preview_input.rs`, creating a
+  single large module. That was split into `actions.rs` before final validation so the common
+  preview-key flow and action lifecycle orchestration have separate named homes.
+- Size evidence: pre-slice `wc -l src/app.rs src/app/preview_input.rs` reported 2,889 lines in
+  `src/app.rs` and 345 lines in `src/app/preview_input.rs`. After rustfmt, `wc -l` reported 1,355
+  lines in `src/app.rs`, 345 lines in `src/app/preview_input.rs`, and 1,563 lines in
+  `src/app/actions.rs`.
 - Validation / proof run during implementation:
   - `cargo check`
   - `cargo test app -- --test-threads=1`
@@ -6279,7 +6281,7 @@ belong here.
 - Validation note: `cargo check` still reports the existing dead-code warnings for
   `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-  `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+  `src/file_show.rs`, `src/jj.rs`, and `src/rows.rs`, plus known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 
 ## 2026-05-20 App Decomposition Slice 6
@@ -6290,20 +6292,20 @@ belong here.
   and leaving the jj stack and descriptions unchanged.
 - Starting state: `jj --no-pager status` showed existing app-decomposition working-copy edits in
   `docs/plan/progress.md`, `docs/process-observations.md`, `src/app.rs`, `src/graph.rs`, and the
-  added `src/app/action_flow.rs`, `src/app/action_lifecycle.rs`, `src/app/navigation.rs`,
+  added `src/app/preview_input.rs`, `src/app/actions.rs`, `src/app/navigation.rs`,
   `src/app/services.rs`, and `src/app/tests.rs`. No jj mutation command was run; jj was used only
   for read-only inspection.
-- Observable outcome: `src/app/mode_input.rs` now owns `App::handle_mode_key_event`, help-mode
-  prefix handling, help binding execution, prompt-plan helpers, and modal key behavior for search,
-  custom revsets, copy/view/action menus, role prompts, text prompts, abandon confirmation, and push
-  remote selection.
-- Observable outcome: `src/app.rs` now declares `mod mode_input;` and remains focused on terminal
-  event handling, pending normal command prefixes, normal binding dispatch, refresh/fetch,
+- Observable outcome: `src/app/input.rs` now owns `App::handle_mode_key_event`, help-mode prefix
+  handling, help binding execution, prompt-plan helpers, and modal key behavior for search, custom
+  revsets, copy/view/action menus, role prompts, text prompts, abandon confirmation, and push remote
+  selection.
+- Observable outcome: `src/app.rs` now declares `mod input; mod reducers;` and remains focused on
+  terminal event handling, pending normal command prefixes, normal binding dispatch, refresh/fetch,
   view-effect application, view-menu actions, `run_new_trunk`, and `apply_diff_format`.
 - Boundary evidence: common action-output preview key handling still stays in
-  `src/app/action_flow.rs`; selected action follow-ups, preview/result lifecycle, and stacked
-  repo-view refresh still stay in `src/app/action_lifecycle.rs`. The action lifecycle module comment
-  was updated so it points modal dispatch readers to `mode_input`.
+  `src/app/preview_input.rs`; selected action follow-ups, preview/result lifecycle, and stacked
+  repo-view refresh still stay in `src/app/actions.rs`. The action lifecycle module comment was
+  updated so it points modal dispatch readers to `input`.
 - Rework / stuck point: after the move, `cargo test app -- --test-threads=1` exposed app tests that
   had been receiving names through broad `src/app.rs` imports. The repair made test imports explicit
   and exposed `rebase_plan_from_prompt` / `squash_plan_from_prompt` only inside `crate::app` for
@@ -6313,8 +6315,8 @@ belong here.
   one verifies that a stacked-refresh failure remains visible in both the completed output body and
   status.
 - Size evidence: pre-slice `wc -l src/app.rs` reported 1,355 lines. After rustfmt, `wc -l` reported
-  781 lines in `src/app.rs`, 603 lines in `src/app/mode_input.rs`, 1,563 lines in
-  `src/app/action_lifecycle.rs`, and 4,050 lines in `src/app/tests.rs`.
+  781 lines in `src/app.rs`, 603 lines in `src/app/input.rs`, 1,563 lines in `src/app/actions.rs`,
+  and 4,050 lines in `src/app/tests.rs`.
 - Validation / proof run during implementation:
   - `cargo check`
   - `cargo test app -- --test-threads=1`
@@ -6326,7 +6328,7 @@ belong here.
 - Validation note: `cargo check` still reports the existing dead-code warnings for
   `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-  `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+  `src/file_show.rs`, `src/jj.rs`, and `src/rows.rs`, plus known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 
 ## 2026-05-20 Interruption Packet F
@@ -6341,13 +6343,13 @@ belong here.
   `docs/agent/workflow.md`, `docs/development/rules/refactoring.md`,
   `docs/development/rules/testing.md`, `docs/development/rules/review.md`, and
   `~/.codex/guides/rust-maintainability.md`.
-- Observable outcome: `src/jj_actions.rs` now has a `JjGitFetch` plan that distinguishes default
+- Observable outcome: `src/actions.rs` now has a `JjGitFetch` plan that distinguishes default
   `jj git fetch` from remote-specific fetch. The current argv uses `--remote` plus
   `exact:"<remote>"`, with preview wording that exposes the selected remote and exact pattern.
-- Observable outcome: `src/app.rs`, `src/app/action_lifecycle.rs`, `src/app/action_flow.rs`,
-  `src/app/mode_input.rs`, `src/app_screen.rs`, and `src/tui.rs` now route default fetch results,
-  remote-list selection, remote fetch preview, confirmation, result output, cancellation, and
-  completed-output closing through the existing action-output surface.
+- Observable outcome: `src/app.rs`, `src/app/actions.rs`, `src/app/preview_input.rs`,
+  `src/app/input.rs`, `src/modes.rs`, and `src/tui.rs` now route default fetch results, remote-list
+  selection, remote fetch preview, confirmation, result output, cancellation, and completed-output
+  closing through the existing action-output surface.
 - Observable outcome: `src/command.rs` and `src/graph.rs` keep `f` and graph `gf` as default fetch
   while adding global `F` and graph `gr` for remote-specific fetch. This avoids making bare `f` wait
   for a multi-key prefix timeout.
@@ -6375,7 +6377,7 @@ belong here.
 - Validation note: `cargo check` still reports the existing dead-code warnings for
   `FileShowView::new`, `ViewSpec::bookmarks`, and `FileListItem::row_text`.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-  `src/file_show.rs`, `src/jj.rs`, and `src/jj_rows.rs`, plus known `collapsible_if` findings in
+  `src/file_show.rs`, `src/jj.rs`, and `src/rows.rs`, plus known `collapsible_if` findings in
   `src/bookmarks.rs`, `src/graph.rs`, and `src/operation_log.rs`.
 - Review expectation: review Packet F for fetch target wording, exact remote pattern use, default
   fetch behavior preservation, raw credential/error output preservation, command construction,
@@ -6393,9 +6395,9 @@ belong here.
   `docs/agent/architecture.md`, `docs/agent/testing.md`, `docs/agent/workflow.md`,
   `docs/development/rules/refactoring.md`, `docs/development/rules/testing.md`,
   `docs/development/rules/review.md`, and `~/.codex/guides/rust-maintainability.md`.
-- Observable outcome: `src/sticky_file_view.rs` now owns `DocumentDisplayMode` and
-  `DocumentViewport`, keeping wrapped rendering as the default and applying Ratatui horizontal
-  scroll only in no-wrap mode.
+- Observable outcome: `src/document.rs` now owns `DocumentDisplayMode` and `DocumentViewport`,
+  keeping wrapped rendering as the default and applying Ratatui horizontal scroll only in no-wrap
+  mode.
 - Observable outcome: `src/file_show.rs`, `src/show.rs`, and `src/diff.rs` wire document-local `zw`,
   `zh`, and `zl` bindings to toggle wrap and move horizontally without changing source-line vertical
   offsets, search, copy, or sticky file labels.
@@ -6415,7 +6417,7 @@ belong here.
   sticky file heading. The snapshot was corrected after inspecting the TestBackend output.
 - Validation run during implementation:
   - `cargo check`
-  - `cargo test sticky_file_view`
+  - `cargo test document`
   - `cargo test file_show`
   - `cargo test horizontal_scroll`
   - `cargo test document_help`
@@ -6433,14 +6435,13 @@ belong here.
 - Validation note: `cargo check` still reports existing dead-code warnings for `ViewSpec::bookmarks`
   and `FileListItem::row_text`.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known dead-code findings in
-  `src/jj.rs` and `src/jj_rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`,
+  `src/jj.rs` and `src/rows.rs`, plus known `collapsible_if` findings in `src/bookmarks.rs`,
   `src/graph.rs`, and `src/operation_log.rs`.
 - Fragility note: no rendered-output parser, ANSI parsing, or file-heading assumptions changed; no
   fragility-register update was made.
 - Review expectation: review Packet G for formatting preservation, no-wrap ergonomics,
   horizontal/vertical scroll behavior, search/copy stability, sticky context, generated help
-  scoping, parser fragility, and whether document-display ownership stayed in
-  `src/sticky_file_view.rs`.
+  scoping, parser fragility, and whether document-display ownership stayed in `src/document.rs`.
 
 ## 2026-05-20 Packet 34a Split Process-Boundary Spike
 
@@ -6549,7 +6550,7 @@ belong here.
   patch editor, or any active-repo mutation proof. Any mutation/manual proof had to use a disposable
   `/tmp` jj repo with mutation commands run from that repo's `cwd`.
 
-- Observable outcome: `src/interactive_process.rs` now owns `InteractiveCommand`,
+- Observable outcome: `src/interactive.rs` now owns `InteractiveCommand`,
   `run_with_ratatui_terminal`, the test-seamed `run_interactive_command`, inherited-stdio process
   spawning, terminal suspension/restoration, nonzero status reporting, and a restore guard for
   panic-adjacent spawner failures. `src/jj.rs` now has `interactive_jj_command` for
@@ -6595,7 +6596,7 @@ belong here.
 
 - Validation / proof run:
   - `cargo check`
-  - `cargo test interactive_process -- --test-threads=1`
+  - `cargo test interactive -- --test-threads=1`
   - `cargo test interactive_jj_command_inherits_stdio_and_keeps_no_pager -- --test-threads=1`
   - `cargo test`
   - `rustup run nightly cargo fmt`
@@ -6619,7 +6620,7 @@ belong here.
 - Evidence basis:
   - Thread: `019e471a-9e74-78c1-aa7f-7a79de3fd17a`
   - Date: `2026-05-20` from local `date +%F`
-  - Files: `src/interactive_process.rs`, `src/jj.rs`, `src/main.rs`, `docs/plan/progress.md`,
+  - Files: `src/interactive.rs`, `src/jj.rs`, `src/main.rs`, `docs/plan/progress.md`,
     `docs/process-observations.md`
 
 ## 2026-05-20 Packet 34c Review Repair
@@ -6640,7 +6641,7 @@ belong here.
   `docs/plan/progress.md` and this file clarify that `Error: Failed to edit diff` was observed child
   terminal output from `jj --no-pager split --tool false`, not captured runner result text.
 
-- Test repair: `src/interactive_process.rs` ignored proof tests now canonicalize the proof repo and
+- Test repair: `src/interactive.rs` ignored proof tests now canonicalize the proof repo and
   canonical `/tmp` before accepting `JK_INTERACTIVE_PROOF_REPO`, rejecting paths that resolve
   outside temp storage such as `/tmp/../Users/...`. The real Ratatui ignored proof now asserts that
   the runner result is a clean child nonzero status and explicitly fails if the result contains
@@ -6651,7 +6652,7 @@ belong here.
   clean restore-status assertion.
 
 - Validation / proof run:
-  - `cargo test interactive_process -- --test-threads=1` passed with 7 passed, 2 ignored.
+  - `cargo test interactive -- --test-threads=1` passed with 7 passed, 2 ignored.
   - `rustup run nightly cargo fmt --check` passed with existing rustfmt config warnings.
   - `just md-check` passed.
   - `cargo check` passed with existing dead-code warnings for `ViewSpec::bookmarks` and
@@ -6668,17 +6669,17 @@ belong here.
   targets, use the Packet 34c inherited-stdio runner, avoid in-app patch editing, keep post-command
   status app-owned, and keep all mutation/manual proof in a disposable `/tmp` jj repo.
 
-- Code outcome: `src/jj_actions.rs` now owns `JjSplitPlan`, with bare `jj split` for the
+- Code outcome: `src/actions.rs` now owns `JjSplitPlan`, with bare `jj split` for the
   current-working-copy target and `jj split --revision exactly(change_id("<id>"), 1)` for exact
   graph targets. `src/action_menu.rs` now gives split a real follow-up instead of a placeholder
   status. `src/graph.rs` treats rows rendered with a visible `@` marker as current-working-copy
   split launch context, while exact non-current rows keep exact revision targeting.
 
-- App outcome: `src/app_screen.rs`, `src/app/action_flow.rs`, `src/app/action_lifecycle.rs`,
-  `src/app/mode_input.rs`, `src/app/services.rs`, `src/app.rs`, and `src/tui.rs` now carry a
-  `SplitPreview` overlay through preview, cancel, confirm, result, refresh, and reveal. Production
-  confirmation requires a live Ratatui terminal and calls the Packet 34c inherited-stdio runner;
-  tests use the app service seam without launching an editor.
+- App outcome: `src/modes.rs`, `src/app/preview_input.rs`, `src/app/actions.rs`, `src/app/input.rs`,
+  `src/app/services.rs`, `src/app.rs`, and `src/tui.rs` now carry a `SplitPreview` overlay through
+  preview, cancel, confirm, result, refresh, and reveal. Production confirmation requires a live
+  Ratatui terminal and calls the Packet 34c inherited-stdio runner; tests use the app service seam
+  without launching an editor.
 
 - Output visibility decision: split result text is app-owned. It names command label, child/runner
   status, `jj undo`, and `jj op show -p`, and states that jj editor/output was live terminal output
@@ -6711,7 +6712,7 @@ belong here.
   - `cargo test split -- --test-threads=1`
   - `cargo test action_menu -- --test-threads=1`
   - `cargo test app::tests::split -- --test-threads=1`
-  - `cargo test jj_actions::tests::split -- --test-threads=1`
+  - `cargo test actions::tests::split -- --test-threads=1`
   - `cargo test`
   - `rustup run nightly cargo fmt`
   - `rustup run nightly cargo fmt --check`
@@ -6756,9 +6757,9 @@ belong here.
 
   ```text
        841 src/app.rs
-       389 src/app/action_flow.rs
-      1813 src/app/action_lifecycle.rs
-       642 src/app/mode_input.rs
+       389 src/app/preview_input.rs
+      1813 src/app/actions.rs
+       642 src/app/input.rs
        193 src/app/navigation.rs
        362 src/app/services.rs
       4521 src/app/tests.rs
@@ -6801,7 +6802,7 @@ belong here.
 - Validation trail: `cargo check` passed with the known `ViewSpec::bookmarks` and
   `FileListItem::row_text` warnings; focused `cargo test split -- --test-threads=1`,
   `cargo test action_menu -- --test-threads=1`, `cargo test app::tests::split -- --test-threads=1`,
-  and `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 437
+  and `cargo test actions::tests::split -- --test-threads=1`; full `cargo test` passed with 437
   passed / 2 ignored; `rustup run nightly cargo fmt --check` passed with existing rustfmt config
   warnings; `just md-check` passed; `cargo clippy -- -D warnings` still failed on the known
   dead-code warnings plus `collapsible_if` in `src/bookmarks.rs`, `src/graph.rs`, and
@@ -6814,7 +6815,7 @@ belong here.
     `cargo check`, `cargo test split -- --test-threads=1`,
     `cargo test action_menu -- --test-threads=1`,
     `cargo test app::tests::split -- --test-threads=1`,
-    `cargo test jj_actions::tests::split -- --test-threads=1`, full `cargo test`,
+    `cargo test actions::tests::split -- --test-threads=1`, full `cargo test`,
     `rustup run nightly cargo fmt --check`, `just md-check`, `cargo clippy -- -D warnings`
   - Files: `docs/plan/progress.md`, `docs/process-observations.md`
 
@@ -6848,10 +6849,10 @@ belong here.
   `cargo test action_menu -- --test-threads=1`;
   `cargo test app::tests::duplicate -- --test-threads=1`;
   `cargo test app::tests::split -- --test-threads=1`;
-  `cargo test jj_actions::tests::duplicate -- --test-threads=1`;
-  `cargo test jj_actions::tests::split -- --test-threads=1`; full `cargo test` passed with 443
-  passed / 2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
-  `just md-fmt`; `just md-check`; and `just check`.
+  `cargo test actions::tests::duplicate -- --test-threads=1`;
+  `cargo test actions::tests::split -- --test-threads=1`; full `cargo test` passed with 443 passed /
+  2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`; `just md-fmt`;
+  `just md-check`; and `just check`.
 - Clippy note: `cargo clippy -- -D warnings` remains blocked by the known baseline findings:
   `ViewSpec::bookmarks`, `FileListItem::row_text`, and `collapsible_if` in `src/bookmarks.rs`,
   `src/graph.rs`, and `src/operation_log.rs`.
@@ -6874,16 +6875,15 @@ belong here.
   `tracking_present()`, `tracking_ahead_count()`, `tracking_behind_count()`, and `synced()`. A
   current-repo `--all-remotes` sample confirmed JSON-safe template output for local rows, tracked
   remote rows, and untracked remote rows without reading `@origin`-style labels.
-- Observable outcome: `src/jj_rows.rs` now emits bookmark metadata as JSONL and parses explicit
-  `name`, `remote`, `tracked`, `tracking_present`, `synced`, `target_change_id`, and
-  `target_commit_id` fields. `BookmarkItem` carries typed local, remote, and unknown row state;
-  `src/bookmarks.rs` gates local delete on the typed local state instead of `is_local()` over a
-  boolean flag.
+- Observable outcome: `src/rows.rs` now emits bookmark metadata as JSONL and parses explicit `name`,
+  `remote`, `tracked`, `tracking_present`, `synced`, `target_change_id`, and `target_commit_id`
+  fields. `BookmarkItem` carries typed local, remote, and unknown row state; `src/bookmarks.rs`
+  gates local delete on the typed local state instead of `is_local()` over a boolean flag.
 - Conservative degradation: missing metadata, malformed metadata, and row-count mismatch now produce
   `BookmarkRowState::Unknown` rows with rendered labels preserved but target ids absent. Default
   bookmark output is classified as visible-row coverage, so local rows remain tracking-ambiguous
   unless `--all-remotes` proves local-only or tracked state.
-- Validation trail: `cargo test jj_rows -- --test-threads=1`;
+- Validation trail: `cargo test rows -- --test-threads=1`;
   `cargo test bookmark -- --test-threads=1`; `cargo check`; full `cargo test` passed with 447 passed
   / 2 ignored; `rustup run nightly cargo fmt`; `rustup run nightly cargo fmt --check`;
   `just md-fmt`; and `just md-check`. `cargo clippy -- -D warnings` was attempted separately and
@@ -6911,12 +6911,12 @@ belong here.
   `docs/development/rules/change-shape.md`, `docs/development/rules/testing.md`,
   `docs/development/rules/agent-workflow.md`, `docs/agent/architecture.md`, `docs/agent/testing.md`,
   `docs/agent/workflow.md`, the Rust maintainability guide, `src/app.rs`, app submodules,
-  `src/app_screen.rs`, `src/view_state.rs`, `src/jj_actions.rs`, `docs/plan/progress.md`,
+  `src/modes.rs`, `src/view_state.rs`, `src/actions.rs`, `docs/plan/progress.md`,
   `docs/plan/fragility-register.md`, and this file.
 
 - Observable outcome: `src/app.rs` remained 505 LOC and orchestration-only. The oversized
-  `src/app/action_lifecycle.rs` became a 10-line module root with child modules for entry/prompt
-  setup, preview opening, general completions, rewrite completions, and shared wording helpers. The
+  `src/app/actions.rs` became a 10-line module root with child modules for entry/prompt setup,
+  preview opening, general completions, rewrite completions, and shared wording helpers. The
   oversized app test file became a 15-line module root with behavior-focused child modules and
   shared support fixtures.
 
@@ -6925,17 +6925,17 @@ belong here.
   ```text
   Before:
        505 src/app.rs
-      2045 src/app/action_lifecycle.rs
+      2045 src/app/actions.rs
       4744 src/app/tests.rs
 
   After:
        505 src/app.rs
-        10 src/app/action_lifecycle.rs
-       584 src/app/action_lifecycle/completion.rs
-       362 src/app/action_lifecycle/entry.rs
-       694 src/app/action_lifecycle/preview.rs
-       417 src/app/action_lifecycle/rewrite_completion.rs
-        70 src/app/action_lifecycle/shared.rs
+        10 src/app/actions.rs
+       584 src/app/actions/completion.rs
+       362 src/app/actions/entry.rs
+       694 src/app/actions/preview.rs
+       417 src/app/actions/rewrite_completion.rs
+        70 src/app/actions/shared.rs
         15 src/app/tests.rs
        303 src/app/tests/abandon_actions.rs
        392 src/app/tests/bookmark_actions.rs
@@ -6973,16 +6973,16 @@ belong here.
 - Model / routing: gpt-5.5 high, read-only audit.
 - Observable outcome: `src/app.rs` is 511 LOC and now owns only app orchestration, key dispatch, and
   `ViewEffect` routing. The remaining app module sizes are acceptable because ownership stays
-  coherent. Watch items are `src/app/action_lifecycle/preview.rs` about 694 LOC,
-  `src/app/mode_input.rs` about 695 LOC, and `src/app/tests/support.rs` about 550 LOC.
+  coherent. Watch items are `src/app/actions/preview.rs` about 694 LOC, `src/app/input.rs` about 695
+  LOC, and `src/app/tests/support.rs` about 550 LOC.
 - Target band: `src/app.rs` is healthy in the 450-650 LOC range, should be reviewed around 750-800
   LOC, and is suspect at 900-1000 LOC. Extracted dispatch/lifecycle modules can reach 600-750 LOC
   only when they have a clear owner.
 - Audit finding: the 5.5 high read-only audit found no blocking refactor slice. The next likely
-  refactor, if `src/app/action_lifecycle/preview.rs` grows, is naming and ownership around the
-  immediate action paths.
-- Evidence basis: `wc -l src/app.rs src/app/action_lifecycle/preview.rs src/app/mode_input.rs`.
-- Evidence basis: `wc -l src/app/tests/support.rs src/app/action_lifecycle.rs src/app/tests.rs`.
+  refactor, if `src/app/actions/preview.rs` grows, is naming and ownership around the immediate
+  action paths.
+- Evidence basis: `wc -l src/app.rs src/app/actions/preview.rs src/app/input.rs`.
+- Evidence basis: `wc -l src/app/tests/support.rs src/app/actions.rs src/app/tests.rs`.
 - Supporting commands: `printenv CODEX_THREAD_ID` and `date +%F`.
 
 ### 2026-05-20 (Packet 37 bookmark rename flow)
@@ -7005,15 +7005,15 @@ belong here.
   `jj bookmark rename [OPTIONS] <OLD> <NEW>` and exposes `--overwrite-existing`. Packet 37 keeps
   overwrite out of command construction.
 
-- Observable outcome: `src/jj_actions.rs` now includes `JjBookmarkMutationKind::Rename` and builds
-  argv as `["bookmark", "rename", old, new]`. `src/app.rs` binds `br` to rename, while
-  `src/app/action_lifecycle/entry.rs` opens a rename prompt only from selected exact local bookmark
-  rows. `src/app/mode_input.rs` rejects empty, unchanged, whitespace/control, option-like,
-  remote-syntax, empty-component, and common Git-ref-reserved new names before preview.
+- Observable outcome: `src/actions.rs` now includes `JjBookmarkMutationKind::Rename` and builds argv
+  as `["bookmark", "rename", old, new]`. `src/app.rs` binds `br` to rename, while
+  `src/app/actions/entry.rs` opens a rename prompt only from selected exact local bookmark rows.
+  `src/app/input.rs` rejects empty, unchanged, whitespace/control, option-like, remote-syntax,
+  empty-component, and common Git-ref-reserved new names before preview.
 
-- Preview/result behavior: rename reuses the existing bookmark ActionOutput preview/result pane,
-  shows old and new names, preserves duplicate-name or command failure output, refreshes the active
-  view on success, and keeps `jj undo` visible. Delete wording remains delete/not-forget, and future
+- Preview/result behavior: rename reuses the existing bookmark ActionPane preview/result pane, shows
+  old and new names, preserves duplicate-name or command failure output, refreshes the active view
+  on success, and keeps `jj undo` visible. Delete wording remains delete/not-forget, and future
   forget wording remains a separate Packet 38 concern. The bookmarks tutorial and screen plan now
   name `br` as the rename key instead of stale `R` wording.
 
@@ -7060,8 +7060,8 @@ belong here.
   - `just md-check`
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
-  - Files: `src/app/mode_input.rs`, `src/app/tests/bookmark_actions.rs`, `src/app/tests/support.rs`,
-    `src/jj_actions.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
+  - Files: `src/app/input.rs`, `src/app/tests/bookmark_actions.rs`, `src/app/tests/support.rs`,
+    `src/actions.rs`, `docs/plan/progress.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Packet 38 UI/keybinding follow-up)
 
@@ -7095,7 +7095,7 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
   - Thread id from `CODEX_THREAD_ID`
-  - Files: `src/app.rs`, `src/app/mode_input.rs`, `src/app/tests/command_navigation.rs`,
+  - Files: `src/app.rs`, `src/app/input.rs`, `src/app/tests/command_navigation.rs`,
     `src/command.rs`, `src/graph.rs`, `src/theme.rs`, `src/tui.rs`, `docs/plan/progress.md`,
     `docs/process-observations.md`
 
@@ -7139,12 +7139,11 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-20` from local `date +%F`
   - Thread id from `CODEX_THREAD_ID`
-  - Files: `src/bookmarks.rs`, `src/jj_actions.rs`, `src/jj.rs`, `src/app.rs`,
-    `src/app/action_lifecycle/entry.rs`, `src/app/mode_input.rs`,
-    `src/app/tests/bookmark_actions.rs`, `src/app/tests/command_navigation.rs`, `src/command.rs`,
-    `docs/plan/fragility-register.md`, `docs/plan/workflows/sync.md`,
-    `docs/plan/workflows/refs-and-workspaces.md`, `docs/plan/command-inventory.md`,
-    `docs/plan/progress.md`, `docs/process-observations.md`
+  - Files: `src/bookmarks.rs`, `src/actions.rs`, `src/jj.rs`, `src/app.rs`,
+    `src/app/actions/entry.rs`, `src/app/input.rs`, `src/app/tests/bookmark_actions.rs`,
+    `src/app/tests/command_navigation.rs`, `src/command.rs`, `docs/plan/fragility-register.md`,
+    `docs/plan/workflows/sync.md`, `docs/plan/workflows/refs-and-workspaces.md`,
+    `docs/plan/command-inventory.md`, `docs/plan/progress.md`, `docs/process-observations.md`
 
 ### 2026-05-20 (Packet 40 file hygiene actions)
 
@@ -7156,10 +7155,10 @@ belong here.
 - Audit facts preserved: installed jj is `0.41.0`; `--` is accepted before file filesets; file
   mutation targets must be one `root-file:"..."` fileset argument; `jj file chmod` modes are `x` and
   `n`; `jj file untrack` requires ignored paths.
-- Observable implementation outcome: `src/jj_actions.rs` owns `JjFileMutationPlan` for
-  `jj file track`, `jj file untrack`, and `jj file chmod`. The app routes these plans through the
-  existing ActionOutput preview/result lifecycle in `src/app/action_lifecycle/preview.rs`,
-  `src/app/action_lifecycle/completion.rs`, and `src/app/action_flow.rs`.
+- Observable implementation outcome: `src/actions.rs` owns `JjFileMutationPlan` for `jj file track`,
+  `jj file untrack`, and `jj file chmod`. The app routes these plans through the existing ActionPane
+  preview/result lifecycle in `src/app/actions/preview.rs`, `src/app/actions/completion.rs`, and
+  `src/app/preview_input.rs`.
 - Safety outcome: `src/status.rs` parses only clean single-path status rows for file actions. Status
   `?` rows enable track; tracked rows enable untrack; chmod is blocked for deleted or missing status
   paths; conflicts, renames, headers, absolute paths, parent-relative paths, whitespace-ambiguous
@@ -7171,7 +7170,7 @@ belong here.
 - Proof outcome: disposable repo `/tmp/jk-packet40-proof` verified file track, chmod executable,
   chmod normal, exact-revision chmod, status review, and undo. Disposable repo
   `/tmp/jk-packet40-untrack-proof` verified untrack after a tracked path became ignored, plus undo.
-- Validation trail: `cargo check`; `cargo test jj_actions::tests::file_ --no-fail-fast`;
+- Validation trail: `cargo check`; `cargo test actions::tests::file_ --no-fail-fast`;
   `cargo test exact_revision_file_chmod --no-fail-fast`; `cargo test status_parser --no-fail-fast`;
   `cargo test app::tests::file_actions --no-fail-fast`; `cargo test action_menu --no-fail-fast`;
   `cargo test view_state::tests::exact_restore_revert_context --no-fail-fast`;
@@ -7189,9 +7188,9 @@ belong here.
   - Date: `2026-05-20` from local `date +%F`
   - Thread id from `CODEX_THREAD_ID`
   - Files: `src/status.rs`, `src/file_show.rs`, `src/view_state.rs`, `src/action_menu.rs`,
-    `src/jj_actions.rs`, `src/app/action_lifecycle/entry.rs`, `src/app/action_lifecycle/preview.rs`,
-    `src/app/action_lifecycle/completion.rs`, `src/app/services.rs`, `src/app/action_flow.rs`,
-    `src/app_screen.rs`, `src/app/mode_input.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`,
+    `src/actions.rs`, `src/app/actions/entry.rs`, `src/app/actions/preview.rs`,
+    `src/app/actions/completion.rs`, `src/app/services.rs`, `src/app/preview_input.rs`,
+    `src/modes.rs`, `src/app/input.rs`, `src/tui.rs`, `docs/plan/fragility-register.md`,
     `docs/plan/progress.md`, `docs/plan/command-inventory.md`, `docs/plan/screens/files.md`,
     `docs/plan/screens/status.md`
 
@@ -7278,9 +7277,9 @@ belong here.
 - A prior gpt-5.5 high read-only audit found no blocking app refactor needed before Packet 39. The
   stable observation recorded in `docs/plan/progress.md` is that `src/app.rs` was about 511 LOC and
   still owned app orchestration, key dispatch, and `ViewEffect` routing coherently.
-- The audit's recommended next refactor trigger was growth in `src/app/action_lifecycle/preview.rs`,
-  with the likely extraction around immediate action paths rather than another broad app split.
-  Packet 39 did not add a new modal or preview surface; it reused the existing bookmark mutation
+- The audit's recommended next refactor trigger was growth in `src/app/actions/preview.rs`, with the
+  likely extraction around immediate action paths rather than another broad app split. Packet 39 did
+  not add a new modal or preview surface; it reused the existing bookmark mutation
   preview/completion path.
 
 ### 2026-05-21 (Maintainability quality-bar measurement packet)
@@ -7296,11 +7295,11 @@ belong here.
 - Evidence gathered:
   - `just largest-rust-files`
   - broad visibility counts with `rg` for `pub`, `pub(crate)`, and `pub(super)` across `src`
-  - Rustdoc/module-doc scans for `src/main.rs`, `src/app.rs`, `src/app_screen.rs`, `src/command.rs`,
-    `src/action_menu.rs`, `src/tui.rs`, `src/jj_actions.rs`, and `src/jj_rows.rs`
+  - Rustdoc/module-doc scans for `src/main.rs`, `src/app.rs`, `src/modes.rs`, `src/command.rs`,
+    `src/action_menu.rs`, `src/tui.rs`, `src/actions.rs`, and `src/rows.rs`
   - selection/list-mechanics scans across graph, status, file-list, resolve, bookmarks,
     operation-log, and workspaces views
-  - action lifecycle/result handling scans in `src/app/action_lifecycle` and `src/jj_actions.rs`
+  - action lifecycle/result handling scans in `src/app/actions` and `src/actions.rs`
   - cheap nested/control-flow scans across source modules
 - Process observation: zsh treats a scalar variable containing space-separated paths as one path, so
   path lists for measurement commands should be passed as explicit arguments or arrays.
@@ -7314,8 +7313,7 @@ belong here.
 ### 2026-05-21 (Role prompt acceptance reducer extraction)
 
 - Slice / task: extract the pure `InteractionMode::RolePrompt` accept decision from
-  `src/app/mode_input.rs` into `src/app/mode_input/reducers.rs` while preserving app-owned side
-  effects.
+  `src/app/input.rs` into `src/app/input/reducers.rs` while preserving app-owned side effects.
 - Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
   implementation `019e4ba8-1144-7fe0-b09c-925e8970ba5e`.
 - Model / routing: worker/subagent `019e4ba8-1144-7fe0-b09c-925e8970ba5e` with medium reasoning
@@ -7326,7 +7324,7 @@ belong here.
   process and maintainability documentation.
 - Implementation outcome: `reducers.rs` now owns `RolePromptDecision` and
   `reduce_role_prompt_accept`, including rebase/squash plan construction and the previous status
-  fallback classification. `mode_input.rs` now resets the mode and applies only preview/status side
+  fallback classification. `input.rs` now resets the mode and applies only preview/status side
   effects after interpreting that decision.
 - Behavior-preservation evidence: the reducer keeps the existing status wording by continuing to use
   `RolePrompt::status_message()`, opens the same rebase and squash preview plans, uses an error
@@ -7341,34 +7339,34 @@ belong here.
 - Validation trail:
   - Worker validation passed: `cargo test command_navigation -- --test-threads=1` with 35 passed;
     `cargo test rewrite_actions -- --test-threads=1` with 16 passed;
-    `cargo test mode_input -- --test-threads=1` with 4 passed; `cargo check`;
+    `cargo test input -- --test-threads=1` with 4 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Main-thread review validation passed: `cargo test command_navigation -- --test-threads=1` with
     35 passed; `cargo test rewrite_actions -- --test-threads=1` with 16 passed;
-    `cargo test mode_input -- --test-threads=1` with 4 passed; `cargo check`;
+    `cargo test input -- --test-threads=1` with 4 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
     with `-D warnings`, `cargo check`, and `cargo test` with 549 passed / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-21 11:51:45 PDT` from local `date`.
   - Thread id from `CODEX_THREAD_ID`.
-  - Files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+  - Files: `src/app/input.rs`, `src/app/input/reducers.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.
 
 ### 2026-05-21 (Text prompt acceptance reducer extraction)
 
 - Slice / task: extract pure accept decisions for describe, commit, bookmark-name, and
-  bookmark-rename prompts from `src/app/mode_input.rs` into `src/app/mode_input/reducers.rs`.
+  bookmark-rename prompts from `src/app/input.rs` into `src/app/input/reducers.rs`.
 - Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
   implementation `019e4be3-d196-7000-a1d9-d2ba609e117d`.
 - Model / routing: worker/subagent `019e4be3-d196-7000-a1d9-d2ba609e117d` with medium reasoning
   implemented the extraction without jj/git commands. The main thread reviewed the diff, tightened
   the decision shape, reran validation, and updated the maintainability ledger.
-- Changed files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+- Changed files: `src/app/input.rs`, `src/app/input/reducers.rs`,
   `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
 - Implementation outcome: `reducers.rs` now owns prompt-specific pure reducers that return a shared
   prompt accept decision carrying preview plan data or the existing cancellation status wording.
-  `mode_input.rs` still owns mode reset, `StatusLine` assignment, and preview opening.
+  `input.rs` still owns mode reset, `StatusLine` assignment, and preview opening.
 - Behavior-preservation evidence: describe and commit accept reducers trim prompt text before
   building plans and keep the exact empty-description cancellation strings. Bookmark-name accept
   trims the prompt name, keeps the mutation kind label in the empty-name status, and still builds
@@ -7378,19 +7376,19 @@ belong here.
 - Main-thread review outcome: four parallel prompt-decision enums were collapsed into one narrow
   generic `PromptAcceptDecision<T>`. Prompt-specific reducer function names remain the reader entry
   points, while the repeated result shape no longer adds four concepts to import and match.
-- Size evidence after main review: `src/app/mode_input.rs` measured 574 lines and
-  `src/app/mode_input/reducers.rs` measured 459 lines.
+- Size evidence after main review: `src/app/input.rs` measured 574 lines and
+  `src/app/input/reducers.rs` measured 459 lines.
 - Rework / surprise: worker validation initially had a formatting-only failure; rustfmt was applied
   and validation was rerun. Main review found the process note was missing its file evidence tail,
   repaired it, and then hit another formatting-only rustfmt diff after collapsing the decision enum
   shape.
 - Validation trail:
-  - Worker validation passed: `cargo test mode_input -- --test-threads=1` with 12 passed;
+  - Worker validation passed: `cargo test input -- --test-threads=1` with 12 passed;
     `cargo test describe_commit_actions -- --test-threads=1` with 10 passed;
     `cargo test bookmark_actions -- --test-threads=1` with 27 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
-  - Main-thread review validation passed: `cargo test mode_input -- --test-threads=1` with 12
-    passed; `cargo test describe_commit_actions -- --test-threads=1` with 10 passed;
+  - Main-thread review validation passed: `cargo test input -- --test-threads=1` with 12 passed;
+    `cargo test describe_commit_actions -- --test-threads=1` with 10 passed;
     `cargo test bookmark_actions -- --test-threads=1` with 27 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
@@ -7398,19 +7396,19 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-21 11:58:40 PDT` from local `date`.
   - Thread id from `CODEX_THREAD_ID`.
-  - Files: `src/app/mode_input.rs`, `src/app/mode_input/reducers.rs`,
+  - Files: `src/app/input.rs`, `src/app/input/reducers.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.
 
 ### 2026-05-21 (Sync refresh completion helper)
 
 - Slice / task: extract the shared fetch/push success-refresh completion shape from
-  `src/app/action_lifecycle/completion.rs` into action lifecycle shared mechanics.
+  `src/app/actions/completion.rs` into action lifecycle shared mechanics.
 - Thread ids: main orchestration/review `019e42d3-ba3c-78a1-9623-d684a45bcc39`; worker
   implementation `019e4bee-b86a-74c2-a9eb-eb74c803e314`.
 - Model / routing: medium worker implemented the extraction without running jj or git commands. The
   main thread reviewed the helper boundary, reran focused validation, and updated the
   maintainability ledger.
-- Changed files: `src/app/action_lifecycle/completion.rs`, `src/app/action_lifecycle/shared.rs`,
+- Changed files: `src/app/actions/completion.rs`, `src/app/actions/shared.rs`,
   `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
 - Implementation outcome: `shared.rs` now owns `finish_successful_sync_action`, which handles the
   refresh, viewport clamp, success status assignment, and refresh-failure result wording for sync
@@ -7423,25 +7421,25 @@ belong here.
 - Main-thread review outcome: command execution, command labels, command failures, and preview-mode
   assignment stayed in `completion.rs`; the shared helper owns only the post-success refresh and
   result/status projection.
-- Size evidence after main review: `src/app/action_lifecycle/completion.rs` measured 437 lines and
-  `src/app/action_lifecycle/shared.rs` measured 192 lines.
+- Size evidence after main review: `src/app/actions/completion.rs` measured 437 lines and
+  `src/app/actions/shared.rs` measured 192 lines.
 - Rework / surprise: `rustup run nightly cargo fmt --check` initially failed only because the new
   push completion call needed rustfmt wrapping; formatting was applied and the check passed.
   `just md-check` then caught only Panache wrapping in this process note; the wrapping was adjusted
   and the check passed.
 - Validation trail:
   - Worker validation passed: `cargo test sync_actions -- --test-threads=1` with 20 passed;
-    `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    `cargo test input -- --test-threads=1` with 12 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Main-thread review validation passed: `cargo test sync_actions -- --test-threads=1` with 20
-    passed; `cargo test mode_input -- --test-threads=1` with 12 passed; `cargo check`;
+    passed; `cargo test input -- --test-threads=1` with 12 passed; `cargo check`;
     `rustup run nightly cargo fmt --check`; and `just md-check`.
   - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, clippy
     with `-D warnings`, `cargo check`, and `cargo test` with 557 passed / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-21 12:09:55 PDT` from local `date`.
   - Thread id from `CODEX_THREAD_ID`.
-  - Files: `src/app/action_lifecycle/completion.rs`, `src/app/action_lifecycle/shared.rs`,
+  - Files: `src/app/actions/completion.rs`, `src/app/actions/shared.rs`,
     `docs/agent/source-maintainability-ledger.md`, `docs/process-observations.md`.
 
 ### 2026-05-21 (Document action entry ownership)
@@ -7455,15 +7453,15 @@ belong here.
   commands. After the user explicitly asked to do the feature-root guidance in the main thread, the
   main thread closed the still-running worker, reviewed its doc-only diff, and made the remaining
   guidance changes directly.
-- Changed files: `src/app/action_lifecycle/entry.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
+- Changed files: `src/app/actions/entry.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
   `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
 - Implementation outcome: `entry.rs` now states that it owns routing from accepted menu/key actions
   to prompts, previews, or status messages. The module docs point availability and exact targets to
   feature views/action menus, preview pane/status construction to `preview.rs`, confirmed result
-  handling to `completion.rs`/`shared.rs`, and command-plan argv/preview/run contracts to
-  `jj_actions`. `AGENTS.md` and `docs/agent/architecture.md` now state the feature-policy versus
-  shared-mechanics rule in product terms, including that `actions` owns cross-view command plans
-  after a feature has selected targets, not whether a feature offers the action.
+  handling to `completion.rs`/`shared.rs`, and command-plan argv/preview/run contracts to `actions`.
+  `AGENTS.md` and `docs/agent/architecture.md` now state the feature-policy versus shared-mechanics
+  rule in product terms, including that `actions` owns cross-view command plans after a feature has
+  selected targets, not whether a feature offers the action.
 - Behavior-preservation evidence: the packet changed comments and documentation only. No match arms,
   constants, command plans, status strings, mode assignments, or preview calls were changed.
 - Rework / surprise: the worker did not finish before the main-thread interruption; it was closed
@@ -7471,15 +7469,15 @@ belong here.
   without racing concurrent writes.
 - Validation trail:
   - Main-thread review validation passed: `cargo check`; `rustup run nightly cargo fmt --check` with
-    existing rustfmt unstable-option warnings; `cargo test action_lifecycle -- --test-threads=1`
-    with 8 passed; and `just md-check`.
+    existing rustfmt unstable-option warnings; `cargo test actions -- --test-threads=1` with 8
+    passed; and `just md-check`.
   - Full `just check` passed at the top of the stack, including fmt, Panache Markdown checks, the
     largest-file report, clippy with `-D warnings`, `cargo check`, and `cargo test` with 565 passed
     / 2 ignored.
 - Evidence basis:
   - Date: `2026-05-21 12:18:39 PDT` from local `date`.
   - Main thread id from `CODEX_THREAD_ID`.
-  - Files: `src/app/action_lifecycle/entry.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
+  - Files: `src/app/actions/entry.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
     `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
 
 ### 2026-05-21 (Maintainability ledger refresh)
@@ -7492,12 +7490,12 @@ belong here.
   commands; version-control ownership stayed with the main thread.
 - Changed files: `docs/agent/source-maintainability-ledger.md` and `docs/process-observations.md`.
 - Implementation outcome: the Rustdoc coverage section now labels the old weak-doc audit as a
-  snapshot and marks the completed `app_screen.rs`, `command.rs`, `action_menu.rs`, `tui.rs`,
-  `jj_actions.rs`, and `jj_rows.rs` nominations as stale for generic sweep purposes. The completed
-  source-shape context now includes file-list and graph/log row migrations plus central contract-doc
-  packets. Next packet recommendations now start with fresh measurement, app entry-point docs,
-  current mode-input boundary review, feature-owned action availability, and list mechanics only
-  when a repeated rule changes.
+  snapshot and marks the completed `modes.rs`, `command.rs`, `menus.rs`, `tui.rs`, `actions.rs`, and
+  `rows.rs` nominations as stale for generic sweep purposes. The completed source-shape context now
+  includes file-list and graph/log row migrations plus central contract-doc packets. Next packet
+  recommendations now start with fresh measurement, app entry-point docs, current mode-input
+  boundary review, feature-owned action availability, and list mechanics only when a repeated rule
+  changes.
 - Validation trail: `just md-check` passed.
 - Rework / surprise: the ledger already contained the later packet evidence needed to supersede the
   stale audit, so the update was a reconciliation rather than new source analysis.
@@ -7508,14 +7506,14 @@ belong here.
 
 ### 2026-05-21 (Text prompt side-effect helper)
 
-- Slice / task: reduce `src/app/mode_input.rs` branching in the text prompt accept path while
-  preserving the existing pure reducer boundary in `src/app/mode_input/reducers.rs`.
+- Slice / task: reduce `src/app/input.rs` branching in the text prompt accept path while preserving
+  the existing pure reducer boundary in `src/app/input/reducers.rs`.
 - Thread id: `019e4c05-d241-7fe1-8a0d-3cf1f40237fd` from `CODEX_THREAD_ID`.
 - Model / routing: medium worker handled the bounded Rust maintainability packet without running jj
   or git commands; version-control ownership stayed with the main thread.
-- Changed files: `src/app/mode_input.rs` and `docs/process-observations.md`.
-- Implementation outcome: `mode_input.rs` now has a private `apply_text_prompt_accept_decision`
-  helper that resets the mode to normal, opens the feature-specific preview callback for
+- Changed files: `src/app/input.rs` and `docs/process-observations.md`.
+- Implementation outcome: `input.rs` now has a private `apply_text_prompt_accept_decision` helper
+  that resets the mode to normal, opens the feature-specific preview callback for
   `PromptAcceptDecision::Preview`, or assigns the status line for
   `PromptAcceptDecision::StatusMessage`. The four describe, commit, bookmark-name, and
   bookmark-rename accept arms still name their prompt-specific reducers and preview methods at the
@@ -7526,7 +7524,7 @@ belong here.
   effects.
 - Rework / surprise: `rustup run nightly cargo fmt --check` initially failed only because the new
   describe helper call needed rustfmt wrapping; formatting was applied and the check passed.
-- Validation trail: `cargo test mode_input -- --test-threads=1` passed with 12 tests;
+- Validation trail: `cargo test input -- --test-threads=1` passed with 12 tests;
   `cargo test describe_commit_actions -- --test-threads=1` passed with 10 tests;
   `cargo test bookmark_actions -- --test-threads=1` passed with 27 tests; `cargo check` passed;
   `rustup run nightly cargo fmt --check` passed with the existing rustfmt unstable-option warnings;
@@ -7537,7 +7535,7 @@ belong here.
 - Evidence basis:
   - Date: `2026-05-21 12:32:03 PDT` from local `date`.
   - Thread id from `CODEX_THREAD_ID`.
-  - Files: `src/app/mode_input.rs`, `docs/agent/source-maintainability-ledger.md`, and
+  - Files: `src/app/input.rs`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
 
 ### 2026-05-21 (jj command-boundary test split)
@@ -7661,9 +7659,9 @@ belong here.
   generally flat. The ledger now records a one-level default such as `name/mod.rs` plus
   `name/tests.rs`, and treats deeper `name/tests/mod.rs` structures as something to justify rather
   than a default.
-- Naming observation: the user called out `jj_actions`, `rendered_jj`, `sticky_file_view`, and
-  `interactive_process` as verbose. The ledger records these as dedicated naming-cleanup candidates
-  to evaluate after structural ownership is stable, not as incidental edits inside layout packets.
+- Naming observation: the user called out `actions`, `rendered`, `document`, and `interactive` as
+  verbose. The ledger records these as dedicated naming-cleanup candidates to evaluate after
+  structural ownership is stable, not as incidental edits inside layout packets.
 - Validation trail: worker validation passed and main-thread review reran
   `cargo test action_menu -- --test-threads=1` with 40 tests,
   `cargo test app::tests::bookmark_actions -- --test-threads=1` with 27 tests, `cargo check`, and
@@ -7726,7 +7724,7 @@ belong here.
 - Behavior-preservation evidence: the packet did not intentionally change graph rendering, key
   bindings, movement, page movement, search, copy options, current revision selection, explicit
   multi-selection, mode switching, refresh/reveal behavior, open show/diff routing, fetch/push key
-  sequences, action-menu labels or payloads, or public imports from `crate::graph`.
+  sequences, action-menu labels or payloads, or public imports from `crate::log`.
 - Rework / surprise: the worker avoided custom visibility by adding `#[cfg(test)] pub` helpers for
   deterministic loader-injected tests and private rendering helpers. Main review accepted this
   because production fields stayed private and tests remained in the one-level `graph/tests.rs`
@@ -7742,3 +7740,162 @@ belong here.
   - Files: `src/graph/mod.rs`, `src/graph/view.rs`, `src/graph/tests.rs`,
     `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
+
+### 2026-05-21 (TUI chrome root split)
+
+- Slice / task: apply the epage module-layout rule to the existing TUI split module while preserving
+  shared chrome and overlay presentation behavior.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: `gpt-5.5` medium worker handled the bounded Rust split. The main thread owned jj
+  change creation, review, validation reruns, and documentation updates.
+- Changed files: `src/tui/mod.rs`, `src/tui/chrome.rs`, `src/tui/overlays.rs`, `src/tui/tests.rs`,
+  `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: `src/tui/mod.rs` is now a table-of-contents root. Title/status chrome
+  moved to `src/tui/chrome.rs`, overlay rendering moved to `src/tui/overlays.rs`, and status hints
+  remain in `src/tui/status_hints.rs`. Public imports such as `Areas`, `Overlay`, `StatusHints`,
+  `areas`, `render_chrome`, and `render_overlay` remain available from `crate::tui`.
+- Behavior-preservation evidence: the packet did not intentionally change title/status chrome,
+  status hint fitting, help overlay columns, copy/view/action/remote/role prompts, action output,
+  abandon confirmation overlays, overlay styling, centered-area behavior, key styles, snapshots, or
+  public imports.
+- Rework / surprise: the worker used plain `pub` helpers in private child modules so
+  `src/tui/tests.rs` could keep snapshotting specific overlay widgets without custom visibility.
+  Main review accepted this because the helpers are not re-exported from `crate::tui`.
+- Validation trail: worker validation passed and main-thread review reran
+  `cargo test tui -- --test-threads=1` with 17 passed and 1 ignored,
+  `cargo test screen -- --test-threads=1` with 7 tests, `cargo check`, and
+  `rustup run nightly cargo fmt --check` with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 17:34:40 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/tui/mod.rs`, `src/tui/chrome.rs`, `src/tui/overlays.rs`, `src/tui/tests.rs`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.
+
+### 2026-05-21 (Combined app root moves)
+
+- Slice / task: finish the remaining existing `foo.rs` plus `foo/` cleanup as one mechanical pass
+  rather than continuing with separate packets.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread mechanical refactor. No worker was used because the user explicitly
+  asked to stop working in packets and treat the remaining refactor as a single approach.
+- Changed files: `src/app/mod.rs`, `src/app/actions/mod.rs`, `src/app/input/mod.rs`,
+  `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: `src/app.rs`, `src/app/actions.rs`, and `src/app/input.rs` moved to their
+  corresponding `mod.rs` roots. A fresh scan found no remaining `foo.rs` plus `foo/` pairs.
+- Behavior-preservation evidence: the move did not intentionally change app command dispatch,
+  active-mode handling, action lifecycle behavior, service wiring, tests, or public imports.
+- Process observation: some refactors are better treated as mechanical moves rather than separate
+  planning packets. IDE-style rename/move operations are appropriate when the contract is only file
+  layout and the compiler can verify the path update.
+- Validation trail: main-thread validation passed with `cargo check`;
+  `cargo test app -- --test-threads=1` with 217 tests; `cargo test input -- --test-threads=1` with
+  12 tests; `cargo test actions -- --test-threads=1` with 8 tests; and
+  `rustup run nightly cargo fmt --check` with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 17:50:53 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/app/mod.rs`, `src/app/actions/mod.rs`, `src/app/input/mod.rs`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.
+
+### 2026-05-21 (Purpose-Led Module Naming Cleanup)
+
+- Slice / task: fix bad module names after the module-layout pass, while checking for similar
+  redundant or over-broad names.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread mechanical refactor. No worker was used because the user explicitly
+  asked to do this refactor in the main thread and to stop working in packets for this cleanup.
+- Changed files: `src/actions/mod.rs`, `src/rendered_document/mod.rs`, `src/file_document/mod.rs`,
+  `src/terminal_process/mod.rs`, `src/rendered_rows.rs`, `src/jj/syntax.rs`, `src/main.rs`, call
+  sites across `src/`, `AGENTS.md`, `docs/agent/cleanup-wave-status.md`,
+  `docs/agent/source-maintainability-ledger.md`, and `docs/process-observations.md`.
+- Implementation outcome: `rendered_jj` became `rendered_document` because it owns rendered jj
+  document lines and sticky projection inputs; `sticky_file_view` became `file_document` because it
+  owns shared file-document navigation and rendering; `interactive_process` became
+  `terminal_process` because it owns terminal suspension for inherited-stdio commands; `jj_rows.rs`
+  became `rendered_rows.rs` because it owns shared helpers for rendered rows; and `jj_syntax.rs`
+  moved to `jj/syntax.rs` because revset/fileset quoting belongs at the jj boundary.
+- Negative evidence / non-change: `actions`, `screen`, and `status_line` were not renamed. Their
+  current names match the concepts they own, while the changed names had become too broad or too
+  implementation-prefix-shaped after earlier mechanical cleanup.
+- Rework / surprise: a broad path replacement briefly changed feature-local row module declarations
+  to the shared helper module name and rewrote `rendered_document::`/`file_document::` prefixes
+  inside already-renamed paths. `cargo check` caught the mistake immediately; the repair restored
+  feature-local row modules and kept only the shared helper module as `rendered_rows`.
+- Process observation: rename work should be mechanical only after the target name is chosen from
+  module purpose. Prefix removal is not a naming rule; a shorter name is worse if it hides whether
+  the module owns rendered document structure, file-document behavior, row helpers, or terminal
+  suspension.
+- Validation trail: main-thread validation passed with focused tests for the renamed boundaries:
+  `cargo test actions -- --test-threads=1`, `cargo test rendered_document -- --test-threads=1`,
+  `cargo test file_document -- --test-threads=1`, `cargo test terminal_process -- --test-threads=1`,
+  `cargo test rendered_rows -- --test-threads=1`, `cargo test syntax -- --test-threads=1`,
+  `cargo test screen -- --test-threads=1`, and `cargo test status_line -- --test-threads=1`. The
+  full finish gate `just check` also passed, including Panache Markdown checks, largest-file
+  reporting, `cargo clippy -- -D warnings`, `cargo check`, and all 565 non-ignored tests with 2
+  ignored manual terminal-process proofs.
+- Evidence basis:
+  - Date: `2026-05-21 18:04:24 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/actions/mod.rs`, `src/rendered_document/mod.rs`, `src/file_document/mod.rs`,
+    `src/terminal_process/mod.rs`, `src/rendered_rows.rs`, `src/jj/syntax.rs`, `src/main.rs`,
+    `AGENTS.md`, `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`,
+    and `docs/process-observations.md`.
+
+### 2026-05-21 (Menu and bookmark module names)
+
+- Slice / task: apply the attended module-structure follow-up by renaming the shared action-menu
+  root to `menus` and flattening bookmark target/action module names.
+- Thread id: `019e4850-33e4-7643-9fa3-4e14ac066e15` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread mechanical refactor. No worker was used.
+- Changed source files: `src/action_menu/` moved to `src/menus/`; `src/bookmarks/action_targets.rs`
+  moved to `src/bookmarks/targets.rs`; `src/bookmarks/actions/mod.rs` moved to
+  `src/bookmarks/actions.rs`; source imports and tests now use `crate::menus` and
+  `bookmarks::targets`.
+- Implementation outcome: `menus/mod.rs` now names the shared menu model home without carrying the
+  old `action_menu` bucket name. Bookmark target resolution is now the shorter
+  `bookmarks/targets.rs`, while `bookmarks/actions.rs` directly owns bookmark mutation argv,
+  preview, run, and validation contracts.
+- Rework / surprise: the first mechanical replacement was too broad and temporarily renamed local
+  variables and a TUI helper function from `action_menu` to `menus`. The repair kept the module path
+  as `crate::menus` but restored local function/variable names where they still describe an action
+  menu instance.
+- Validation trail: `cargo check`; `cargo test menus -- --test-threads=1` with 10 tests;
+  `cargo test bookmarks::actions -- --test-threads=1` with 8 tests; `rustup run nightly cargo fmt`
+  completed with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 18:21:40 PDT` from local `date`.
+  - Files: `src/menus/mod.rs`, `src/menus/model.rs`, `src/menus/path_actions.rs`,
+    `src/menus/revision_actions/mod.rs`, `src/bookmarks/targets.rs`, `src/bookmarks/actions.rs`,
+    `src/bookmarks/mod.rs`, `src/bookmarks/view.rs`, `src/main.rs`, `AGENTS.md`,
+    `docs/agent/architecture.md`, and this process note.
+
+### 2026-05-21 (Architectural module names)
+
+- Slice / task: apply the attended module-structure gap analysis against
+  `target/module-structure-audit.md` after user feedback that `graph`, `action_output`,
+  `action_lifecycle`, and `mode_input` were weak concept names.
+- Thread id: `019e4850-33e4-7643-9fa3-4e14ac066e15` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread mechanical refactor. No worker was used for this follow-up.
+- Changed source shape: `graph` moved to `log` with `LogView`; `action_output` moved to
+  `action_pane`; app modal input moved to `app/input.rs` plus `app/reducers`; app action lifecycle
+  glue moved to `app/actions`; app screen state moved to `modes`; `file_document` and
+  `rendered_document` merged under `documents`; status split into `status/view.rs`,
+  `status/rows.rs`, and `status/actions.rs`; leaf file and operation-detail modules were flattened.
+- Implementation outcome: feature roots now name screens or durable concepts instead of historical
+  implementation buckets. Remaining uses of "graph" in source are reserved for jj graph output,
+  graph glyph parsing, `--no-graph`, or output honesty text that says jk is not simulating jj's
+  final graph.
+- Validation trail: repeated `cargo check` passed after each major move; final focused coverage
+  passed for `log`, `action_pane`, `status`, `documents`, `files`, `modes`, `reducers`, and
+  `view_state`; `cargo check --tests`, `rustup run nightly cargo fmt`, and `just md-check` passed.
+- Evidence basis:
+  - Date: `2026-05-21 18:37:44 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files include `src/log/*`, `src/action_pane/*`, `src/app/actions/*`, `src/app/input.rs`,
+    `src/app/reducers/*`, `src/modes/*`, `src/documents/*`, `src/status/*`, `src/files/list.rs`,
+    `src/files/show.rs`, `src/operation_log/detail.rs`, `AGENTS.md`, `docs/agent/architecture.md`,
+    `docs/agent/cleanup-wave-status.md`, and this process note.

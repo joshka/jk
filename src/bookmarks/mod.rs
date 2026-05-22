@@ -4,9 +4,9 @@
 //! search, refresh, and action targeting can preserve user-visible `jj`
 //! presentation while using trusted parsed fields only where needed.
 
-mod action_targets;
 pub(crate) mod actions;
 mod rows;
+mod targets;
 mod view;
 
 pub(crate) use self::rows::{

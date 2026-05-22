@@ -12,10 +12,10 @@ use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
 use super::{OperationLogItem, load_operation_log_entries};
-use crate::action_menu::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
 use crate::jj::ViewSpec;
+use crate::menus::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::{Selection, restore_by_key_or_index};
 use crate::theme;

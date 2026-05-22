@@ -11,11 +11,12 @@ use ratatui::text::Line;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
-use crate::graph::load_compact_log_context;
+use crate::documents;
+use crate::documents::PinnedDocument;
+use crate::documents::StickyFileDocument;
 use crate::jj::{JjCommand, ViewSpec};
-use crate::rendered_jj::PinnedDocument;
+use crate::log::load_compact_log_context;
 use crate::search::SearchQuery;
-use crate::sticky_file_view::{self, StickyFileDocument};
 
 const TOGGLE_WRAP_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('w')];
 const SCROLL_LEFT_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('h')];
@@ -104,7 +105,7 @@ impl ShowView {
     pub(crate) fn test_new(spec: ViewSpec) -> Self {
         Self {
             spec,
-            document: StickyFileDocument::new(crate::rendered_jj::DocumentLines::new(Vec::new())),
+            document: StickyFileDocument::new(crate::documents::DocumentLines::new(Vec::new())),
             compact_context: Vec::new(),
         }
     }
@@ -120,7 +121,7 @@ impl ShowView {
     }
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
-        sticky_file_view::render_document_with_viewport(
+        documents::render_document_with_viewport(
             frame,
             area,
             self.projection(),
@@ -325,7 +326,7 @@ impl ShowView {
         }
         options.push(CopyOption::new(
             "visible context",
-            sticky_file_view::lines_text(self.projection().fixed_lines()),
+            documents::lines_text(self.projection().fixed_lines()),
         ));
         options
     }

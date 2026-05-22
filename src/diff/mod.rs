@@ -9,10 +9,11 @@ use ratatui::layout::Rect;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
+use crate::documents;
+use crate::documents::PinnedDocument;
+use crate::documents::StickyFileDocument;
 use crate::jj::{JjCommand, ViewSpec};
-use crate::rendered_jj::PinnedDocument;
 use crate::search::SearchQuery;
-use crate::sticky_file_view::{self, StickyFileDocument};
 
 const TOGGLE_WRAP_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('w')];
 const SCROLL_LEFT_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('h')];
@@ -100,7 +101,7 @@ impl DiffView {
     pub(crate) fn test_new(spec: ViewSpec) -> Self {
         Self {
             spec,
-            document: StickyFileDocument::new(crate::rendered_jj::DocumentLines::new(Vec::new())),
+            document: StickyFileDocument::new(crate::documents::DocumentLines::new(Vec::new())),
         }
     }
 
@@ -110,7 +111,7 @@ impl DiffView {
     }
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
-        sticky_file_view::render_document_with_viewport(
+        documents::render_document_with_viewport(
             frame,
             area,
             self.projection(),

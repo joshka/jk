@@ -4,12 +4,12 @@ use super::support::*;
 
 #[test]
 fn rebase_preview_entering_cancel_restores_normal_mode() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::RebasePreview {
         rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj rebase -r source-a -o dest".to_owned(),
             "preview only".to_owned(),
             Some("rebase preview context".to_owned()),
@@ -26,12 +26,12 @@ fn rebase_preview_entering_cancel_restores_normal_mode() {
 
 #[test]
 fn rebase_preview_completion_stays_until_closed() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::RebasePreview {
         rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::finished(
+        output: ActionPane::finished(
             "jj rebase -r source-a -o dest".to_owned(),
             "rebased".to_owned(),
             None,
@@ -49,15 +49,15 @@ fn rebase_preview_completion_stays_until_closed() {
 
 #[test]
 fn rebase_confirm_success_with_reveal_failure_stays_completed() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.rebase_run = mock_rebase_success;
     app.services.refresh_view = mock_refresh_ok;
-    app.services.reveal_graph_change = mock_reveal_graph_change_error;
+    app.services.reveal_log_change = mock_reveal_log_change_error;
     app.mode = InteractionMode::RebasePreview {
         rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj rebase -r source-a -o dest".to_owned(),
             "preview only".to_owned(),
             Some("rebase preview context".to_owned()),
@@ -83,7 +83,7 @@ fn rebase_confirm_success_with_reveal_failure_stays_completed() {
         output
             .body_lines()
             .join("\n")
-            .contains("reveal failed: refreshed graph did not include the new working-copy change")
+            .contains("reveal failed: refreshed log did not include the new working-copy change")
     );
     assert!(
         output
@@ -94,7 +94,7 @@ fn rebase_confirm_success_with_reveal_failure_stays_completed() {
     assert!(matches!(app.status.kind(), StatusKind::Error));
     assert_eq!(
         app.status.message(),
-        "refreshed graph did not include the new working-copy change"
+        "refreshed log did not include the new working-copy change"
     );
 
     assert!(
@@ -104,21 +104,21 @@ fn rebase_confirm_success_with_reveal_failure_stays_completed() {
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
-        "refreshed graph did not include the new working-copy change"
+        "refreshed log did not include the new working-copy change"
     );
 }
 
 #[test]
 fn rebase_confirm_success_keeps_review_and_undo_paths_visible() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("source-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("source-a".to_owned()), None),
     ])));
     app.services.rebase_run = mock_rebase_success;
     app.services.refresh_view = mock_refresh_ok;
-    app.services.reveal_graph_change = mock_reveal_rebased_source_in_recent;
+    app.services.reveal_log_change = mock_reveal_rebased_source_in_recent;
     app.mode = InteractionMode::RebasePreview {
         rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj rebase -r source-a -o dest".to_owned(),
             "preview only".to_owned(),
             Some("rebase preview context".to_owned()),
@@ -143,13 +143,13 @@ fn rebase_confirm_success_keeps_review_and_undo_paths_visible() {
 
 #[test]
 fn rebase_failure_keeps_full_error_output_readable() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("source-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("source-a".to_owned()), None),
     ])));
     app.services.rebase_run = mock_rebase_failure;
     app.mode = InteractionMode::RebasePreview {
         rebase: JjRebasePlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj rebase -r source-a -o dest".to_owned(),
             "preview only".to_owned(),
             None,
@@ -184,8 +184,8 @@ fn rebase_role_prompt_enters_preview_with_explicit_plan() {
         ],
         "Preview required before execution.",
     );
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::RolePrompt {
         action: ActionKind::Rebase,
@@ -211,7 +211,7 @@ fn rebase_role_prompt_enters_preview_with_explicit_plan() {
     assert!(preview_output.contains("command: jj rebase -r source-a -o dest"));
     assert!(preview_output.contains("source revision: source-a"));
     assert!(preview_output.contains("destination revision: dest"));
-    assert!(preview_output.contains("current graph context:"));
+    assert!(preview_output.contains("current log context:"));
     assert!(preview_output.contains("source rows are selected in jk"));
     assert!(preview_output.contains("destination is the current row"));
     assert!(preview_output.contains("expected jj effect:"));
@@ -235,8 +235,8 @@ fn squash_role_prompt_enters_preview_with_explicit_plan() {
         ],
         "Preview required before execution.",
     );
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::RolePrompt {
         action: ActionKind::Squash,
@@ -272,12 +272,12 @@ fn squash_role_prompt_enters_preview_with_explicit_plan() {
 
 #[test]
 fn squash_preview_cancel_restores_normal_mode() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::SquashPreview {
         squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj squash --from source-a --into dest --use-destination-message".to_owned(),
             "preview only".to_owned(),
             Some("squash preview context".to_owned()),
@@ -294,13 +294,13 @@ fn squash_preview_cancel_restores_normal_mode() {
 
 #[test]
 fn squash_confirm_success_refreshes_and_reveals_destination() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
-    app.services.reveal_graph_change = mock_reveal_squash_destination_in_recent;
+    app.services.reveal_log_change = mock_reveal_squash_destination_in_recent;
     app.mode = InteractionMode::SquashPreview {
         squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj squash --from source-a --into dest --use-destination-message".to_owned(),
             "preview only".to_owned(),
             Some("squash preview context".to_owned()),
@@ -329,13 +329,13 @@ fn squash_confirm_success_refreshes_and_reveals_destination() {
 
 #[test]
 fn squash_confirm_refresh_failure_keeps_undo_visible() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.refresh_view = mock_refresh_failure;
     app.mode = InteractionMode::SquashPreview {
         squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj squash --from source-a --into dest --use-destination-message".to_owned(),
             "preview only".to_owned(),
             Some("squash preview context".to_owned()),
@@ -358,13 +358,13 @@ fn squash_confirm_refresh_failure_keeps_undo_visible() {
 
 #[test]
 fn squash_failure_keeps_full_error_output_readable() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.services.squash_run = mock_squash_failure;
     app.mode = InteractionMode::SquashPreview {
         squash: JjSquashPlan::new(vec!["source-a".to_owned()], "dest".to_owned()),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj squash --from source-a --into dest --use-destination-message".to_owned(),
             "preview only".to_owned(),
             None,
@@ -394,14 +394,14 @@ fn squash_failure_keeps_full_error_output_readable() {
 
 #[test]
 fn absorb_action_menu_enter_opens_preview_with_current_source_and_candidates() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("source".to_owned()), None),
-        crate::graph::LogItem::new(Vec::new(), Some("dest-a".to_owned()), None),
-        crate::graph::LogItem::new(Vec::new(), Some("dest-b".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+        crate::log::LogItem::new(Vec::new(), Some("dest-a".to_owned()), None),
+        crate::log::LogItem::new(Vec::new(), Some("dest-b".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::with_current("source")
+        menu: crate::menus::build_action_menu(
+            &crate::menus::ExactActionContext::with_current("source")
                 .with_sources(["source", "dest-a", "dest-b"]),
         ),
         selected: 3,
@@ -434,12 +434,12 @@ fn absorb_action_menu_enter_opens_preview_with_current_source_and_candidates() {
 
 #[test]
 fn absorb_preview_cancel_restores_normal_mode() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("source".to_owned()), None),
     ])));
     app.mode = InteractionMode::AbsorbPreview {
         absorb: JjAbsorbPlan::new("source", vec!["dest-a".to_owned()]),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj absorb --from exactly(change_id(\"source\"), 1) --into exactly(change_id(\"dest-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("absorb preview context".to_owned()),
@@ -455,12 +455,12 @@ fn absorb_preview_cancel_restores_normal_mode() {
 
 #[test]
 fn absorb_confirm_success_keeps_undo_and_operation_review_visible() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("source".to_owned()), None),
     ])));
     app.mode = InteractionMode::AbsorbPreview {
         absorb: JjAbsorbPlan::new("source", vec!["dest-a".to_owned()]),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj absorb --from exactly(change_id(\"source\"), 1) --into exactly(change_id(\"dest-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("absorb preview context".to_owned()),
@@ -482,13 +482,13 @@ fn absorb_confirm_success_keeps_undo_and_operation_review_visible() {
 
 #[test]
 fn absorb_failure_keeps_full_error_output_readable() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("source".to_owned()), None),
     ])));
     app.services.absorb_run = mock_absorb_failure;
     app.mode = InteractionMode::AbsorbPreview {
         absorb: JjAbsorbPlan::new("source", vec!["dest-a".to_owned()]),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj absorb --from exactly(change_id(\"source\"), 1) --into exactly(change_id(\"dest-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             None,
@@ -514,8 +514,8 @@ fn absorb_failure_keeps_full_error_output_readable() {
 
 #[test]
 fn absorb_without_candidates_returns_clear_status() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("source".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("source".to_owned()), None),
     ])));
 
     app.open_absorb_preview(JjAbsorbPlan::new("source", Vec::new()));

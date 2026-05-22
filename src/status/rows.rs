@@ -1,0 +1,193 @@
+//! Rendered `jj status` rows and selected-path action contracts.
+//!
+//! The status view keeps every rendered row visible, but only rows with one validated
+//! repo-relative path become file-action targets. Ambiguous rows fail closed with an explanatory
+//! status message.
+
+use color_eyre::Result;
+use ratatui::text::Line;
+
+use crate::documents::DocumentLines;
+use crate::documents::load_document;
+use crate::jj::ViewSpec;
+
+use super::actions::StatusFileAction;
+
+#[derive(Clone, Debug)]
+pub(in crate::status) struct StatusRow {
+    line: Line<'static>,
+    path: StatusPathContract,
+}
+
+impl StatusRow {
+    fn new(line: Line<'static>, path: StatusPathContract) -> Self {
+        Self { line, path }
+    }
+
+    pub(in crate::status) fn line(&self) -> &Line<'static> {
+        &self.line
+    }
+
+    #[cfg(test)]
+    pub(in crate::status) fn exact_path(&self) -> std::result::Result<&str, String> {
+        match &self.path {
+            StatusPathContract::Action(action) if action.restore_allowed() => Ok(action.path()),
+            StatusPathContract::Action(_) => Err(
+                "status file action unavailable: selected status row is not path-restorable"
+                    .to_owned(),
+            ),
+            StatusPathContract::Disabled(message) => Err((*message).to_owned()),
+            StatusPathContract::None => Err(
+                "status file action unavailable: selected row has no exact file path".to_owned(),
+            ),
+        }
+    }
+
+    pub(in crate::status) fn exact_path_option(&self) -> Option<&str> {
+        match &self.path {
+            StatusPathContract::Action(action) => Some(action.path()),
+            StatusPathContract::Disabled(_) | StatusPathContract::None => None,
+        }
+    }
+
+    pub(in crate::status) fn file_action(&self) -> std::result::Result<StatusFileAction, String> {
+        match &self.path {
+            StatusPathContract::Action(action) => Ok(action.clone()),
+            StatusPathContract::Disabled(message) => Err((*message).to_owned()),
+            StatusPathContract::None => Err(
+                "status file action unavailable: selected row has no exact file path".to_owned(),
+            ),
+        }
+    }
+
+    pub(in crate::status) fn row_text(&self) -> String {
+        line_text(&self.line)
+    }
+}
+
+#[derive(Clone, Debug)]
+enum StatusPathContract {
+    Action(StatusFileAction),
+    Disabled(&'static str),
+    None,
+}
+
+pub(in crate::status) fn load_status_rows(spec: &ViewSpec) -> Result<Vec<StatusRow>> {
+    Ok(status_rows_from_document(load_document(spec)?))
+}
+
+fn status_rows_from_document(document: DocumentLines) -> Vec<StatusRow> {
+    document
+        .lines()
+        .iter()
+        .cloned()
+        .map(parse_status_row)
+        .collect()
+}
+
+pub(in crate::status) fn parse_status_row(line: Line<'static>) -> StatusRow {
+    let text = line_text(&line);
+    let path = parse_status_path_contract(&text);
+    StatusRow::new(line, path)
+}
+
+fn parse_status_path_contract(text: &str) -> StatusPathContract {
+    let Some(separator_index) = text.find(char::is_whitespace) else {
+        return StatusPathContract::None;
+    };
+    let status = &text[..separator_index];
+    if status.is_empty()
+        || status.len() > 2
+        || status.chars().any(|character| !is_status_code(character))
+    {
+        return StatusPathContract::None;
+    }
+    let separator_and_path = &text[separator_index..];
+    let Some(path) = separator_and_path.strip_prefix(' ') else {
+        return StatusPathContract::Disabled(
+            "status file action unavailable: selected path separator is ambiguous",
+        );
+    };
+    if path.is_empty() {
+        return StatusPathContract::Disabled(
+            "status file action unavailable: selected status row has no file path",
+        );
+    }
+    if status == "R" {
+        return StatusPathContract::Disabled(
+            "status file action unavailable: renamed status rows contain multiple paths",
+        );
+    }
+    if status.contains('U') {
+        return StatusPathContract::Disabled(
+            "status file action unavailable: conflicted status rows are not file hygiene targets",
+        );
+    }
+
+    if let Err(message) = validate_repo_relative_path(path) {
+        return StatusPathContract::Disabled(message);
+    }
+
+    match status {
+        "?" => StatusPathContract::Action(StatusFileAction::Track {
+            path: path.to_owned(),
+        }),
+        "M" | "A" => StatusPathContract::Action(StatusFileAction::Tracked {
+            path: path.to_owned(),
+            restore_allowed: true,
+            chmod_allowed: true,
+        }),
+        "D" => StatusPathContract::Action(StatusFileAction::Tracked {
+            path: path.to_owned(),
+            restore_allowed: true,
+            chmod_allowed: false,
+        }),
+        "!" => StatusPathContract::Action(StatusFileAction::Tracked {
+            path: path.to_owned(),
+            restore_allowed: false,
+            chmod_allowed: false,
+        }),
+        _ => StatusPathContract::Disabled(
+            "status file action unavailable: selected status kind is not a file hygiene target",
+        ),
+    }
+}
+
+fn is_status_code(character: char) -> bool {
+    character.is_ascii_alphabetic() || matches!(character, '?' | '!')
+}
+
+fn validate_repo_relative_path(path: &str) -> std::result::Result<(), &'static str> {
+    if path.trim() != path {
+        return Err(
+            "status file action unavailable: selected path has ambiguous surrounding whitespace",
+        );
+    }
+    if path.starts_with('/') {
+        return Err("status file action unavailable: selected path is absolute");
+    }
+    if path.contains('\0') || path.contains('\n') {
+        return Err("status file action unavailable: selected path contains invalid control text");
+    }
+    if path.contains(" => ") || (path.starts_with('{') && path.ends_with('}')) {
+        return Err(
+            "status file action unavailable: selected row appears to contain multiple paths",
+        );
+    }
+    if path
+        .split('/')
+        .any(|component| matches!(component, "" | "." | ".."))
+    {
+        return Err(
+            "status file action unavailable: selected path is not a clean repo-relative path",
+        );
+    }
+    Ok(())
+}
+
+fn line_text(line: &Line<'_>) -> String {
+    line.spans
+        .iter()
+        .map(|span| span.content.as_ref())
+        .collect()
+}

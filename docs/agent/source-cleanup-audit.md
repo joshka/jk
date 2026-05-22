@@ -13,8 +13,8 @@ Captured: `2026-05-21 16:21:25 PDT`.
   lines.
 - Visibility entries from `rg "^pub(\(| |$)|pub\(crate\)|pub\(super\)" src -n | wc -l`: `471`.
 - Inline `#[cfg(test)] mod tests { ... }` blocks from `rg -U`: `19`.
-- Match expressions in `src/app/mode_input.rs`, `src/app.rs`, and `src/app/action_lifecycle/*` from
-  a simple `rg "match .*\{|match$"` count: `108`.
+- Match expressions in `src/app/modals.rs`, `src/app.rs`, and `src/app/actions/*` from a simple
+  `rg "match .*\{|match$"` count: `108`.
 
 ## Largest Files
 
@@ -24,7 +24,7 @@ a prompt for reading, not a command to split every file.
 ```text
 1196 src/app/tests/bookmark_actions.rs
  778 src/app/tests/working_copy_actions.rs
- 648 src/app/mode_input.rs
+ 648 src/app/modals.rs
  643 src/bookmarks/tests.rs
  613 src/graph/tests.rs
  605 src/graph.rs
@@ -34,13 +34,13 @@ a prompt for reading, not a command to split every file.
  585 src/app/tests/support.rs
  583 src/status.rs
  575 src/operation_log.rs
- 571 src/app/action_lifecycle/entry.rs
+ 571 src/app/actions/entry.rs
  569 src/app.rs
- 568 src/sticky_file_view.rs
+ 568 src/document.rs
  564 src/bookmarks/action_targets.rs
- 562 src/interactive_process.rs
+ 562 src/interactive.rs
  553 src/command.rs
- 541 src/app/action_lifecycle/preview.rs
+ 541 src/app/actions/preview.rs
  535 src/app/tests/detail_restore_actions.rs
  531 src/app/services.rs
  529 src/app/tests/rewrite_actions.rs
@@ -53,23 +53,23 @@ a prompt for reading, not a command to split every file.
 Remaining inline test blocks fall into two groups:
 
 - Small shared helpers where inline tests may still be fine: `search`, `selection`, `theme`,
-  `jj_syntax`, `files/list/rows`, `resolve/rows`, `tui/status_hints`.
+  `syntax`, `files/list/rows`, `resolve/rows`, `tui/status_hints`.
 - Larger feature or shared modules worth reading before deciding: `operation_log`,
-  `operation_log/rows`, `operation_log/actions`, `workspaces/rows`, `graph/rows`, `action_output`,
-  `view_state`, `interactive_process`, `action_menu/path_actions`, `jj_actions/git_sync`, and
-  `jj_actions/rewrite`.
+  `operation_log/rows`, `operation_log/actions`, `workspaces/rows`, `graph/rows`, `action_pane`,
+  `view_state`, `interactive`, `action_menu/path_actions`, `actions/git_sync`, and
+  `actions/rewrite`.
 
 Do not move a test block only because it appears in this list. Move it when the production module is
 harder to scan and the sibling test module would still preserve reader locality.
 
 ## Candidate Next Targets
 
-- `src/app/mode_input.rs`: after menu, text-prompt, and abandon extraction, the dispatch table is
-  mostly named modal handlers. Further work should be based on reading the remaining helper order
-  and tests, not on line count alone.
-- `src/app/action_lifecycle/entry.rs` and `src/app/action_lifecycle/preview.rs`: read for repeated
-  preview/completion setup before extracting any helper. Preserve status wording, output panes,
-  refresh/reveal behavior, and command execution contracts.
+- `src/app/modals.rs`: after menu, text-prompt, and abandon extraction, the dispatch table is mostly
+  named modal handlers. Further work should be based on reading the remaining helper order and
+  tests, not on line count alone.
+- `src/app/actions/entry.rs` and `src/app/actions/preview.rs`: read for repeated preview/completion
+  setup before extracting any helper. Preserve status wording, output panes, refresh/reveal
+  behavior, and command execution contracts.
 - `src/status.rs` and `src/operation_log.rs`: feature-view modules still carry view behavior and
   tests inline. Any split should keep row model, action availability, copy behavior, and tests easy
   to find from the feature root.

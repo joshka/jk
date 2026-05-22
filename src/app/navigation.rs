@@ -11,9 +11,9 @@ use std::ffi::OsString;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use crate::app_screen::{InteractionMode, ViewMenuAction, view_menu_options};
-use crate::app_status::StatusLine;
 use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
+use crate::modes::{InteractionMode, ViewMenuAction, view_menu_options};
+use crate::status_line::StatusLine;
 
 use super::App;
 use super::services::AppServices;
@@ -181,7 +181,7 @@ impl App {
             return;
         }
 
-        match self.view.set_graph_mode(LogViewMode::CustomRevset(revset)) {
+        match self.view.set_log_mode(LogViewMode::CustomRevset(revset)) {
             Ok(()) => self.status = StatusLine::with_message(&self.view, "mode: custom revset"),
             Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
         }

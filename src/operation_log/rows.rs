@@ -4,14 +4,14 @@
 //! `jj operation log` rows are preserved as styled lines, while operation ids
 //! come from a narrow metadata template and are paired only when row counts
 //! still match. Shared graph-line classification and row-metadata drift policy
-//! stay in `jj_rows` because revision rows use the same mechanics.
+//! stay in `rows` because revision rows use the same mechanics.
 
 use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
 use ratatui::text::Line;
 
 use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
-use crate::jj_rows::{RowMetadata, first_content_char, is_standalone_graph_line, line_text};
+use crate::rendered_rows::{RowMetadata, first_content_char, is_standalone_graph_line, line_text};
 
 pub(crate) const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
 

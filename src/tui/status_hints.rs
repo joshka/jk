@@ -7,7 +7,7 @@ use crate::theme;
 
 #[derive(Clone, Copy, Debug)]
 pub enum StatusHints {
-    Graph,
+    Log,
     ShowDocument,
     DiffDocument,
     Status,
@@ -55,7 +55,7 @@ impl StatusHint {
     }
 }
 
-const GRAPH_STATUS_HINTS: &[StatusHint] = &[
+const LOG_STATUS_HINTS: &[StatusHint] = &[
     StatusHint::new("j/k", "move"),
     StatusHint::new("PgUp/PgDn", "page"),
     StatusHint::new("Enter/l", "open"),
@@ -155,7 +155,7 @@ const OPERATION_LOG_STATUS_HINTS: &[StatusHint] = &[
 
 fn status_hint_candidates(hints: StatusHints) -> &'static [StatusHint] {
     match hints {
-        StatusHints::Graph => GRAPH_STATUS_HINTS,
+        StatusHints::Log => LOG_STATUS_HINTS,
         StatusHints::ShowDocument | StatusHints::DiffDocument => DOCUMENT_STATUS_HINTS,
         StatusHints::Status => STATUS_STATUS_HINTS,
         StatusHints::Resolve => RESOLVE_STATUS_HINTS,
@@ -190,13 +190,13 @@ mod tests {
     #[test]
     fn status_hint_spans_fit_complete_items_only() {
         assert_eq!(
-            plain_text(status_hint_spans(StatusHints::Graph, 27)),
+            plain_text(status_hint_spans(StatusHints::Log, 27)),
             "j/k move  PgUp/PgDn page"
         );
     }
 
     #[test]
     fn status_hint_spans_return_empty_when_first_item_does_not_fit() {
-        assert_eq!(plain_text(status_hint_spans(StatusHints::Graph, 7)), "");
+        assert_eq!(plain_text(status_hint_spans(StatusHints::Log, 7)), "");
     }
 }

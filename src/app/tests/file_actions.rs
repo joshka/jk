@@ -168,13 +168,13 @@ fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
     assert!(matches!(direct.mode, InteractionMode::Normal));
     assert_eq!(
         direct.status.message(),
-        "file actions from jk file list -r main require a working-copy file list or exact graph-derived revision target"
+        "file actions from jk file list -r main require a working-copy file list or exact log-derived revision target"
     );
 
     let mut resolve = test_app(ViewState::FileShow(crate::files::show::FileShowView::new(
         ViewSpec::file_show(Some("@".to_owned()), "src/main.rs".to_owned()),
         "src/main.rs",
-        crate::rendered_jj::DocumentLines::new(Vec::new()),
+        crate::documents::DocumentLines::new(Vec::new()),
     )));
 
     resolve
@@ -184,7 +184,7 @@ fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
     assert!(matches!(resolve.mode, InteractionMode::Normal));
     assert_eq!(
         resolve.status.message(),
-        "file actions from jk file show -r @ src/main.rs require a working-copy file show or exact graph-derived revision target"
+        "file actions from jk file show -r @ src/main.rs require a working-copy file show or exact log-derived revision target"
     );
 }
 
@@ -193,14 +193,14 @@ fn file_mutation_confirm_preserves_result_output_and_refreshes() {
     let mut app = test_app(ViewState::FileShow(crate::files::show::FileShowView::new(
         ViewSpec::file_show(None, "src/main.rs".to_owned()),
         "src/main.rs",
-        crate::rendered_jj::DocumentLines::new(Vec::new()),
+        crate::documents::DocumentLines::new(Vec::new()),
     )));
     app.mode = InteractionMode::FileMutationPreview {
         mutation: JjFileMutationPlan::chmod_working_copy(
             "src/main.rs",
-            crate::jj_actions::JjFileChmodMode::Normal,
+            crate::actions::JjFileChmodMode::Normal,
         ),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj file chmod n -- root-file:\"src/main.rs\"".to_owned(),
             "preview only".to_owned(),
             Some("file chmod context".to_owned()),
@@ -224,7 +224,7 @@ fn file_mutation_confirm_preserves_result_output_and_refreshes() {
     app.services.file_mutation_run = mock_file_mutation_failure;
     app.mode = InteractionMode::FileMutationPreview {
         mutation: JjFileMutationPlan::untrack("src/main.rs"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj file untrack -- root-file:\"src/main.rs\"".to_owned(),
             "preview only".to_owned(),
             None,

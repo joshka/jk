@@ -9,8 +9,8 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
-use super::action_targets::BookmarkActionTargetResolver;
 use super::actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
+use super::targets::BookmarkActionTargetResolver;
 use super::{BookmarkItem, load_bookmark_entries};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;

@@ -8,7 +8,7 @@ use crate::command::{Binding, Command, ViewCommand};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HelpContext {
-    Graph,
+    Log,
     Show,
     Diff,
     Status,
@@ -157,30 +157,30 @@ fn help_metadata(
         Command::Quit | Command::Help => None,
         Command::SearchPrompt => Some((HelpSectionKind::SearchCopy, "search")),
         Command::PromptLogRevset => {
-            (context == HelpContext::Graph).then_some((HelpSectionKind::Views, "custom revset"))
+            (context == HelpContext::Log).then_some((HelpSectionKind::Views, "custom revset"))
         }
         Command::OpenStatus => Some((HelpSectionKind::Views, "status")),
         Command::OpenResolve => Some((HelpSectionKind::Views, "resolve")),
         Command::OpenBookmarks => Some((HelpSectionKind::Views, "bookmarks")),
         Command::OpenWorkspaces => Some((HelpSectionKind::Views, "workspaces")),
         Command::OpenOperationLog => Some((HelpSectionKind::Views, "operation log")),
-        Command::Edit => (context == HelpContext::Graph)
+        Command::Edit => (context == HelpContext::Log)
             .then_some((HelpSectionKind::Actions, "edit selected revision")),
-        Command::NextEdit => (context == HelpContext::Graph).then_some((
+        Command::NextEdit => (context == HelpContext::Log).then_some((
             HelpSectionKind::Actions,
             "next editable change from @ (ignores selection)",
         )),
-        Command::PrevEdit => (context == HelpContext::Graph).then_some((
+        Command::PrevEdit => (context == HelpContext::Log).then_some((
             HelpSectionKind::Actions,
             "previous editable change from @ (ignores selection)",
         )),
         Command::Describe => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Actions, "describe selected revision")),
+            HelpContext::Log => Some((HelpSectionKind::Actions, "describe selected revision")),
             HelpContext::Status => Some((HelpSectionKind::Actions, "describe @")),
             _ => None,
         },
         Command::Commit => match context {
-            HelpContext::Graph => Some((
+            HelpContext::Log => Some((
                 HelpSectionKind::Actions,
                 "commit @ and create new change (ignores selection)",
             )),
@@ -190,17 +190,17 @@ fn help_metadata(
             _ => None,
         },
         Command::BookmarkCreate => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Actions, "create bookmark here")),
+            HelpContext::Log => Some((HelpSectionKind::Actions, "create bookmark here")),
             HelpContext::Status => Some((HelpSectionKind::Actions, "create bookmark at @")),
             _ => None,
         },
         Command::BookmarkSet => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Actions, "set bookmark here")),
+            HelpContext::Log => Some((HelpSectionKind::Actions, "set bookmark here")),
             HelpContext::Status => Some((HelpSectionKind::Actions, "set bookmark to @")),
             _ => None,
         },
         Command::BookmarkMove => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Actions, "move bookmark here")),
+            HelpContext::Log => Some((HelpSectionKind::Actions, "move bookmark here")),
             HelpContext::Status => Some((HelpSectionKind::Actions, "move bookmark to @")),
             _ => None,
         },
@@ -240,7 +240,7 @@ fn help_metadata(
             "redo most recently undone operation (global)",
         )),
         Command::Push => match context {
-            HelpContext::Graph => Some((HelpSectionKind::Actions, "push selected revision")),
+            HelpContext::Log => Some((HelpSectionKind::Actions, "push selected revision")),
             HelpContext::Bookmarks => Some((HelpSectionKind::Actions, "push selected bookmark")),
             HelpContext::Status => Some((HelpSectionKind::Actions, "push status")),
             _ => None,
@@ -293,7 +293,7 @@ fn view_help_metadata(
         ViewCommand::OpenFiles => {
             let action = match context {
                 HelpContext::Show | HelpContext::Diff | HelpContext::Status => "open file list",
-                HelpContext::Graph
+                HelpContext::Log
                 | HelpContext::Resolve
                 | HelpContext::FileList
                 | HelpContext::FileShow
@@ -308,7 +308,7 @@ fn view_help_metadata(
             let action = match context {
                 HelpContext::FileList => "open file",
                 HelpContext::Resolve => "inspect conflict",
-                HelpContext::Graph
+                HelpContext::Log
                 | HelpContext::Show
                 | HelpContext::Diff
                 | HelpContext::Status
@@ -322,7 +322,7 @@ fn view_help_metadata(
         }
         ViewCommand::OpenShow => {
             let action = match context {
-                HelpContext::Graph | HelpContext::Diff => "open show",
+                HelpContext::Log | HelpContext::Diff => "open show",
                 HelpContext::Bookmarks => "open show",
                 HelpContext::OperationLog | HelpContext::OperationDetail => "operation show",
                 HelpContext::Show
@@ -336,7 +336,7 @@ fn view_help_metadata(
         }
         ViewCommand::OpenDiff => {
             let action = match context {
-                HelpContext::Graph | HelpContext::Show => "open diff",
+                HelpContext::Log | HelpContext::Show => "open diff",
                 HelpContext::OperationLog | HelpContext::OperationDetail => "operation diff",
                 HelpContext::Bookmarks
                 | HelpContext::Workspaces
@@ -351,13 +351,13 @@ fn view_help_metadata(
         ViewCommand::StartSearch => None,
         ViewCommand::NextSearchMatch => Some((HelpSectionKind::SearchCopy, "next match")),
         ViewCommand::PreviousSearchMatch => Some((HelpSectionKind::SearchCopy, "previous match")),
-        ViewCommand::ToggleSelect => (context == HelpContext::Graph).then_some((
+        ViewCommand::ToggleSelect => (context == HelpContext::Log).then_some((
             HelpSectionKind::Actions,
             "toggle exact revision selection (preview target)",
         )),
         ViewCommand::OpenActionMenu => matches!(
             context,
-            HelpContext::Graph
+            HelpContext::Log
                 | HelpContext::Show
                 | HelpContext::Diff
                 | HelpContext::Status

@@ -5,12 +5,17 @@
 
 pub(super) use super::super::navigation::initial_view;
 pub(super) use super::super::{APP_BINDINGS, App};
-pub(super) use crate::action_menu::{ActionKind, FollowUp, RolePrompt, RolePromptOption};
-pub(super) use crate::action_output::{ActionOutput, action_output_visible_lines};
-pub(super) use crate::app::mode_input::{rebase_plan_from_prompt, squash_plan_from_prompt};
+pub(super) use crate::action_pane::{ActionPane, action_pane_visible_lines};
+#[allow(unused_imports)]
+pub(super) use crate::actions::{
+    JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
+    JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan,
+    JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
+    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
+    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
+};
+pub(super) use crate::app::input::{rebase_plan_from_prompt, squash_plan_from_prompt};
 pub(super) use crate::app::services::AppServices;
-pub(super) use crate::app_screen::{InteractionMode, ViewMenuAction};
-pub(super) use crate::app_status::{StatusKind, StatusLine};
 #[allow(unused_imports)]
 pub(super) use crate::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
@@ -20,21 +25,16 @@ pub(super) use crate::command::{CommandContext, ViewCommand};
 #[allow(unused_imports)]
 pub(super) use crate::files::list::{FileListItem, load_file_list_entries};
 #[allow(unused_imports)]
-pub(super) use crate::graph::{LogItem, load_compact_log_context, load_entries};
-#[allow(unused_imports)]
 pub(super) use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
 #[allow(unused_imports)]
-pub(super) use crate::jj_actions::{
-    JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
-    JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan,
-    JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
-    JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
-    JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
-};
+pub(super) use crate::log::{LogItem, load_compact_log_context, load_entries};
+pub(super) use crate::menus::{ActionKind, FollowUp, RolePrompt, RolePromptOption};
+pub(super) use crate::modes::{InteractionMode, ViewMenuAction};
 #[allow(unused_imports)]
-pub(super) use crate::jj_rows::document_plain_text;
+pub(super) use crate::rendered_rows::document_plain_text;
 #[allow(unused_imports)]
 pub(super) use crate::resolve::{ResolveEntry, load_resolve_entries};
+pub(super) use crate::status_line::{StatusKind, StatusLine};
 pub(super) use crate::tui::Overlay;
 pub(super) use crate::view_state::ViewState;
 #[allow(unused_imports)]
@@ -364,7 +364,7 @@ pub(super) fn mock_remotes_failure() -> Result<Vec<String>> {
 pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
     let view = match spec.command() {
         JjCommand::Default | JjCommand::Log => {
-            ViewState::Graph(crate::graph::GraphView::test_with_spec(spec, vec![]))
+            ViewState::Log(crate::log::LogView::test_with_spec(spec, vec![]))
         }
         JjCommand::Show => ViewState::Show(crate::show::ShowView::test_new(spec)),
         JjCommand::Diff => ViewState::Diff(crate::diff::DiffView::test_new(spec)),
@@ -376,7 +376,7 @@ pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
         JjCommand::FileShow => ViewState::FileShow(crate::files::show::FileShowView::new(
             spec,
             "src/main.rs",
-            crate::rendered_jj::DocumentLines::new(Vec::new()),
+            crate::documents::DocumentLines::new(Vec::new()),
         )),
         JjCommand::Bookmarks => {
             ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![]))
@@ -392,7 +392,7 @@ pub(super) fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
         JjCommand::OperationShow | JjCommand::OperationDiff => {
             ViewState::OperationDetail(crate::operation_log::detail::OperationDetailView::test_new(
                 spec,
-                crate::rendered_jj::DocumentLines::new(Vec::new()),
+                crate::documents::DocumentLines::new(Vec::new()),
             ))
         }
     };
@@ -424,13 +424,13 @@ pub(super) fn mock_refresh_failure(_view: &mut ViewState) -> Result<()> {
     Err(eyre!("view refresh failed"))
 }
 
-pub(super) fn mock_reveal_graph_change_error(
+pub(super) fn mock_reveal_log_change_error(
     _view: &mut ViewState,
     _change_id: &str,
     _fallback_mode: LogViewMode,
 ) -> Result<bool> {
     Err(eyre!(
-        "refreshed graph did not include the new working-copy change"
+        "refreshed log did not include the new working-copy change"
     ))
 }
 
@@ -474,7 +474,7 @@ pub(super) fn mock_reveal_duplicate_source_in_recent(
     Ok(true)
 }
 
-pub(super) fn mock_reveal_graph_change_unexpected(
+pub(super) fn mock_reveal_log_change_unexpected(
     _view: &mut ViewState,
     _change_id: &str,
     _fallback_mode: LogViewMode,
@@ -512,20 +512,20 @@ pub(super) fn mock_reveal_current_working_copy_in_recent(
     Ok(true)
 }
 
-pub(super) fn graph_item(change_id: &str) -> crate::graph::LogItem {
-    crate::graph::LogItem::new(
+pub(super) fn log_item(change_id: &str) -> crate::log::LogItem {
+    crate::log::LogItem::new(
         vec![ratatui::text::Line::from(change_id.to_owned())],
         Some(change_id.to_owned()),
         None,
     )
 }
 
-pub(super) fn default_reveal_graph_change(
+pub(super) fn default_reveal_log_change(
     view: &mut ViewState,
     change_id: &str,
     fallback_mode: LogViewMode,
 ) -> Result<bool> {
-    view.reveal_graph_change(change_id, fallback_mode)
+    view.reveal_log_change(change_id, fallback_mode)
 }
 
 pub(super) fn test_services() -> AppServices {
@@ -556,7 +556,7 @@ pub(super) fn test_services() -> AppServices {
     services.push_preview_run = mock_push_preview_success;
     services.push_run = mock_push_success;
     services.refresh_view = mock_refresh_ok;
-    services.reveal_graph_change = default_reveal_graph_change;
+    services.reveal_log_change = default_reveal_log_change;
     services
 }
 

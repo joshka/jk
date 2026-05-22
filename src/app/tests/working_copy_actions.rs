@@ -60,12 +60,12 @@ fn squash_plan_from_prompt_respects_explicit_roles() {
 
 #[test]
 fn new_action_menu_enter_opens_preview_with_exact_parents() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::with_current("current")
+        menu: crate::menus::build_action_menu(
+            &crate::menus::ExactActionContext::with_current("current")
                 .with_sources(["parent-a", "parent-b"]),
         ),
         selected: 0,
@@ -91,12 +91,12 @@ fn new_action_menu_enter_opens_preview_with_exact_parents() {
 
 #[test]
 fn action_menu_shortcut_opens_item_without_moving_selection() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::with_current("current")
+        menu: crate::menus::build_action_menu(
+            &crate::menus::ExactActionContext::with_current("current")
                 .with_sources(["parent-a", "parent-b"]),
         ),
         selected: 3,
@@ -113,13 +113,13 @@ fn action_menu_shortcut_opens_item_without_moving_selection() {
 
 #[test]
 fn action_menu_close_key_preserves_normal_context() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::with_current("change-a"),
-        ),
+        menu: crate::menus::build_action_menu(&crate::menus::ExactActionContext::with_current(
+            "change-a",
+        )),
         selected: 4,
     };
 
@@ -131,13 +131,13 @@ fn action_menu_close_key_preserves_normal_context() {
 
 #[test]
 fn edit_action_menu_enter_opens_preview_with_exact_target() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::with_current("change-a"),
-        ),
+        menu: crate::menus::build_action_menu(&crate::menus::ExactActionContext::with_current(
+            "change-a",
+        )),
         selected: 0,
     };
 
@@ -154,14 +154,14 @@ fn edit_action_menu_enter_opens_preview_with_exact_target() {
     assert_eq!(navigation.kind(), JjWorkingCopyNavigationKind::Edit);
     assert_eq!(navigation.target_change_id(), Some("change-a"));
     assert_eq!(command_label, "jj edit exactly(change_id(\"change-a\"), 1)");
-    assert!(body.contains("target: exact selected graph revision change-a"));
+    assert!(body.contains("target: exact selected log revision change-a"));
     assert!(body.contains("moves @ to edit that revision directly"));
 }
 
 #[test]
-fn edit_direct_key_requires_exact_selected_graph_row() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
+fn edit_direct_key_requires_exact_selected_log_row() {
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('e'), KeyModifiers::NONE), 12)
@@ -170,15 +170,15 @@ fn edit_direct_key_requires_exact_selected_graph_row() {
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
-        "edit from graph requires a selected row with an exact revision"
+        "edit from log requires a selected row with an exact revision"
     );
     assert!(matches!(app.status.kind(), StatusKind::Error));
 }
 
 #[test]
 fn next_direct_key_opens_preview_without_selected_row_targeting() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char(']'), KeyModifiers::NONE), 12)
@@ -194,18 +194,18 @@ fn next_direct_key_opens_preview_without_selected_row_targeting() {
     };
     assert_eq!(navigation.kind(), JjWorkingCopyNavigationKind::Next);
     assert_eq!(command_label, "jj next --edit");
-    assert!(body.contains("highlighted graph row is not an argument to jj next --edit"));
+    assert!(body.contains("highlighted log row is not an argument to jj next --edit"));
     assert!(body.contains("runs jj topology movement relative to @"));
 }
 
 #[test]
 fn working_copy_navigation_preview_cancel_restores_normal_mode() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
         navigation: JjWorkingCopyNavigationPlan::edit("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj edit exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("edit preview context".to_owned()),
@@ -220,13 +220,13 @@ fn working_copy_navigation_preview_cancel_restores_normal_mode() {
 
 #[test]
 fn edit_confirm_success_refreshes_and_reveals_target() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
-    app.services.reveal_graph_change = mock_reveal_edit_target_in_recent;
+    app.services.reveal_log_change = mock_reveal_edit_target_in_recent;
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
         navigation: JjWorkingCopyNavigationPlan::edit("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj edit exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("edit preview context".to_owned()),
@@ -247,17 +247,17 @@ fn edit_confirm_success_refreshes_and_reveals_target() {
 
 #[test]
 fn split_action_menu_enter_opens_exact_target_preview() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(
             vec![ratatui::text::Line::from("○  change")],
             Some("change-a".to_owned()),
             None,
         ),
     ])));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::with_current("change-a"),
-        ),
+        menu: crate::menus::build_action_menu(&crate::menus::ExactActionContext::with_current(
+            "change-a",
+        )),
         selected: 2,
     };
 
@@ -276,24 +276,24 @@ fn split_action_menu_enter_opens_exact_target_preview() {
         command_label,
         "jj split --revision exactly(change_id(\"change-a\"), 1)"
     );
-    assert!(body.contains("target: exact selected graph revision change-a"));
+    assert!(body.contains("target: exact selected log revision change-a"));
     assert!(body.contains("jj's diff editor"));
     assert!(body.contains("jk is not an in-app patch editor"));
 }
 
 #[test]
 fn duplicate_action_menu_enter_opens_exact_source_preview() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(
             vec![ratatui::text::Line::from("○  change")],
             Some("change-a".to_owned()),
             None,
         ),
     ])));
     app.mode = InteractionMode::ActionMenu {
-        menu: crate::action_menu::build_action_menu(
-            &crate::action_menu::ExactActionContext::with_current("change-a"),
-        ),
+        menu: crate::menus::build_action_menu(&crate::menus::ExactActionContext::with_current(
+            "change-a",
+        )),
         selected: 4,
     };
 
@@ -319,10 +319,10 @@ fn duplicate_action_menu_enter_opens_exact_source_preview() {
 }
 
 #[test]
-fn duplicate_preview_cancel_preserves_graph_selection() {
-    let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("first".to_owned()), None),
-        crate::graph::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+fn duplicate_preview_cancel_preserves_log_selection() {
+    let mut graph = crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::log::LogItem::new(Vec::new(), Some("second".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -332,10 +332,10 @@ fn duplicate_preview_cancel_preserves_graph_selection() {
             search: None,
         },
     );
-    let mut app = test_app(ViewState::Graph(graph));
+    let mut app = test_app(ViewState::Log(graph));
     app.mode = InteractionMode::DuplicatePreview {
         duplicate: JjDuplicatePlan::exact_change("second"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj duplicate exactly(change_id(\"second\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("duplicate preview context".to_owned()),
@@ -344,8 +344,8 @@ fn duplicate_preview_cancel_preserves_graph_selection() {
 
     app.handle_mode_key(KeyCode::Esc, 12).unwrap();
 
-    let ViewState::Graph(graph) = &app.view else {
-        panic!("expected graph view");
+    let ViewState::Log(graph) = &app.view else {
+        panic!("expected log view");
     };
     assert_eq!(graph.selected_revision(), Some("second"));
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -354,13 +354,13 @@ fn duplicate_preview_cancel_preserves_graph_selection() {
 
 #[test]
 fn duplicate_confirm_success_refreshes_and_uses_recent_source_fallback() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
-    app.services.reveal_graph_change = mock_reveal_duplicate_source_in_recent;
+    app.services.reveal_log_change = mock_reveal_duplicate_source_in_recent;
     app.mode = InteractionMode::DuplicatePreview {
         duplicate: JjDuplicatePlan::exact_change("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj duplicate exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("duplicate exact source change-a from jk".to_owned()),
@@ -391,10 +391,10 @@ fn duplicate_confirm_success_from_exact_detail_view_refreshes_without_graph_reve
     let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
         ViewSpec::show("change-a".to_owned(), DiffFormat::Default).with_exact_change_target(),
     )));
-    app.services.reveal_graph_change = mock_reveal_graph_change_unexpected;
+    app.services.reveal_log_change = mock_reveal_log_change_unexpected;
     app.mode = InteractionMode::DuplicatePreview {
         duplicate: JjDuplicatePlan::exact_change("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj duplicate exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("duplicate exact source change-a from jk".to_owned()),
@@ -412,7 +412,7 @@ fn duplicate_confirm_success_from_exact_detail_view_refreshes_without_graph_reve
     assert!(body.contains("Duplicated source change-a"));
     assert!(body.contains("refresh: active view refreshed"));
     assert!(body.contains(
-        "reveal: source fallback not attempted because the active view cannot reveal graph changes"
+        "reveal: source fallback not attempted because the active view cannot reveal log changes"
     ));
     assert!(body.contains("recovery: jj undo"));
     assert!(body.contains("review: jj op show -p"));
@@ -424,13 +424,13 @@ fn duplicate_confirm_success_from_exact_detail_view_refreshes_without_graph_reve
 
 #[test]
 fn duplicate_failure_keeps_full_error_output_readable() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.duplicate_run = mock_duplicate_failure;
     app.mode = InteractionMode::DuplicatePreview {
         duplicate: JjDuplicatePlan::exact_change("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj duplicate exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
             None,
@@ -459,8 +459,8 @@ fn duplicate_failure_keeps_full_error_output_readable() {
 
 #[test]
 fn split_visible_working_copy_uses_bare_command() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(
             vec![ratatui::text::Line::from("@  current")],
             Some("current-change".to_owned()),
             None,
@@ -486,10 +486,10 @@ fn split_visible_working_copy_uses_bare_command() {
 }
 
 #[test]
-fn split_preview_cancel_preserves_graph_selection() {
-    let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("first".to_owned()), None),
-        crate::graph::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+fn split_preview_cancel_preserves_log_selection() {
+    let mut graph = crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::log::LogItem::new(Vec::new(), Some("second".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -499,10 +499,10 @@ fn split_preview_cancel_preserves_graph_selection() {
             search: None,
         },
     );
-    let mut app = test_app(ViewState::Graph(graph));
+    let mut app = test_app(ViewState::Log(graph));
     app.mode = InteractionMode::SplitPreview {
         split: JjSplitPlan::exact_change("second"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj split --revision exactly(change_id(\"second\"), 1)".to_owned(),
             "preview only".to_owned(),
             Some("split preview context".to_owned()),
@@ -511,8 +511,8 @@ fn split_preview_cancel_preserves_graph_selection() {
 
     app.handle_mode_key(KeyCode::Esc, 12).unwrap();
 
-    let ViewState::Graph(graph) = &app.view else {
-        panic!("expected graph view");
+    let ViewState::Log(graph) = &app.view else {
+        panic!("expected log view");
     };
     assert_eq!(graph.selected_revision(), Some("second"));
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -521,16 +521,16 @@ fn split_preview_cancel_preserves_graph_selection() {
 
 #[test]
 fn split_confirm_success_refreshes_reveals_and_keeps_recovery_visible() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
-    app.services.reveal_graph_change = mock_reveal_edit_target_in_recent;
+    app.services.reveal_log_change = mock_reveal_edit_target_in_recent;
     app.mode = InteractionMode::SplitPreview {
         split: JjSplitPlan::exact_change("change-a"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj split --revision exactly(change_id(\"change-a\"), 1)".to_owned(),
             "preview only".to_owned(),
-            Some("split exact graph revision change-a from jk".to_owned()),
+            Some("split exact log revision change-a from jk".to_owned()),
         ),
     };
 
@@ -553,13 +553,13 @@ fn split_confirm_success_refreshes_reveals_and_keeps_recovery_visible() {
 
 #[test]
 fn split_current_confirm_success_reveals_current_working_copy_when_possible() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
     ])));
-    app.services.reveal_graph_change = mock_reveal_current_working_copy_in_recent;
+    app.services.reveal_log_change = mock_reveal_current_working_copy_in_recent;
     app.mode = InteractionMode::SplitPreview {
         split: JjSplitPlan::current_working_copy(),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj split".to_owned(),
             "preview only".to_owned(),
             Some("split current working-copy change (@) from jk".to_owned()),
@@ -585,13 +585,13 @@ fn split_current_confirm_success_reveals_current_working_copy_when_possible() {
 
 #[test]
 fn split_failure_keeps_app_owned_result_without_claiming_captured_stderr() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("current-change".to_owned()), None),
     ])));
     app.services.split_run = mock_split_failure_service;
     app.mode = InteractionMode::SplitPreview {
         split: JjSplitPlan::current_working_copy(),
-        output: ActionOutput::pending("jj split".to_owned(), "preview only".to_owned(), None),
+        output: ActionPane::pending("jj split".to_owned(), "preview only".to_owned(), None),
     };
 
     app.handle_mode_key(KeyCode::Enter, 12).unwrap();
@@ -618,13 +618,13 @@ fn split_failure_keeps_app_owned_result_without_claiming_captured_stderr() {
 
 #[test]
 fn prev_confirm_success_resolves_current_working_copy_and_reveals_recent() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), None, None),
     ])));
-    app.services.reveal_graph_change = mock_reveal_current_working_copy_in_recent;
+    app.services.reveal_log_change = mock_reveal_current_working_copy_in_recent;
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
         navigation: JjWorkingCopyNavigationPlan::prev(),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj prev --edit".to_owned(),
             "preview only".to_owned(),
             Some("prev preview context".to_owned()),
@@ -648,13 +648,13 @@ fn prev_confirm_success_resolves_current_working_copy_and_reveals_recent() {
 
 #[test]
 fn working_copy_navigation_failure_keeps_output_readable() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), None, None),
     ])));
     app.services.working_copy_navigation_run = mock_working_copy_navigation_failure;
     app.mode = InteractionMode::WorkingCopyNavigationPreview {
         navigation: JjWorkingCopyNavigationPlan::next(),
-        output: ActionOutput::pending("jj next --edit".to_owned(), "preview only".to_owned(), None),
+        output: ActionPane::pending("jj next --edit".to_owned(), "preview only".to_owned(), None),
     };
 
     app.handle_mode_key(KeyCode::Enter, 12).unwrap();
@@ -676,12 +676,12 @@ fn working_copy_navigation_failure_keeps_output_readable() {
 
 #[test]
 fn new_preview_cancel_restores_normal_mode() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::NewPreview {
         new_change: JjNewPlan::new(vec!["parent-a".to_owned()]),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj new parent-a".to_owned(),
             "preview only".to_owned(),
             Some("new preview context".to_owned()),
@@ -697,13 +697,13 @@ fn new_preview_cancel_restores_normal_mode() {
 
 #[test]
 fn new_confirm_success_refreshes_and_reveals_working_copy() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
-    app.services.reveal_graph_change = mock_reveal_new_change_in_recent;
+    app.services.reveal_log_change = mock_reveal_new_change_in_recent;
     app.mode = InteractionMode::NewPreview {
         new_change: JjNewPlan::new(vec!["parent-a".to_owned(), "parent-b".to_owned()]),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj new parent-a parent-b".to_owned(),
             "preview only".to_owned(),
             Some("new preview context".to_owned()),
@@ -730,9 +730,9 @@ fn new_confirm_success_refreshes_and_reveals_working_copy() {
 #[test]
 fn graph_new_trunk_uses_test_service_and_reveals_working_copy() {
     NEW_TRUNK_CALLS.store(0, Ordering::SeqCst);
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![])));
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.resolve_revision = mock_resolve_trunk_and_current_change_id;
-    app.services.reveal_graph_change = mock_reveal_new_change_in_recent;
+    app.services.reveal_log_change = mock_reveal_new_change_in_recent;
 
     app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
         .unwrap();
@@ -746,13 +746,13 @@ fn graph_new_trunk_uses_test_service_and_reveals_working_copy() {
 
 #[test]
 fn new_failure_keeps_full_error_output_readable() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("parent-a".to_owned()), None),
     ])));
     app.services.new_run = mock_new_failure;
     app.mode = InteractionMode::NewPreview {
         new_change: JjNewPlan::new(vec!["parent-a".to_owned()]),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj new parent-a".to_owned(),
             "preview only".to_owned(),
             None,

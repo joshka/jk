@@ -75,13 +75,13 @@ fn tracked_remote_bookmark(name: &str, remote: &str) -> crate::bookmarks::Bookma
 }
 
 #[test]
-fn action_output_scroll_keys_clamp_to_visible_body() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
+fn action_pane_scroll_keys_clamp_to_visible_body() {
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("abcdef".to_owned()), None),
     ])));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_status().with_remote("origin"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj git push --preview --remote origin".to_owned(),
             (0..8)
                 .map(|line| format!("line {line}"))
@@ -106,7 +106,7 @@ fn action_output_scroll_keys_clamp_to_visible_body() {
     };
     assert_eq!(
         output.scroll(),
-        output.max_scroll(action_output_visible_lines(4))
+        output.max_scroll(action_pane_visible_lines(4))
     );
 
     app.handle_mode_key(crossterm::event::KeyCode::PageUp, 4)
@@ -124,10 +124,10 @@ fn action_output_scroll_keys_clamp_to_visible_body() {
 }
 
 #[test]
-fn closing_action_output_preserves_graph_selection() {
-    let mut graph = crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("first".to_owned()), None),
-        crate::graph::LogItem::new(Vec::new(), Some("second".to_owned()), None),
+fn closing_action_pane_preserves_log_selection() {
+    let mut graph = crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("first".to_owned()), None),
+        crate::log::LogItem::new(Vec::new(), Some("second".to_owned()), None),
     ]);
     graph.execute(
         ViewCommand::MoveDown,
@@ -137,10 +137,10 @@ fn closing_action_output_preserves_graph_selection() {
             search: None,
         },
     );
-    let mut app = test_app(ViewState::Graph(graph));
+    let mut app = test_app(ViewState::Log(graph));
     app.mode = InteractionMode::PushPreview {
         push: JjGitPush::for_status().with_remote("origin"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj git push --preview --remote origin".to_owned(),
             "preview only".to_owned(),
             None,
@@ -150,17 +150,17 @@ fn closing_action_output_preserves_graph_selection() {
     app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
         .unwrap();
 
-    let ViewState::Graph(graph) = &app.view else {
-        panic!("expected graph view");
+    let ViewState::Log(graph) = &app.view else {
+        panic!("expected log view");
     };
     assert_eq!(graph.selected_revision(), Some("second"));
     assert!(matches!(app.mode, InteractionMode::Normal));
 }
 
 #[test]
-fn bookmark_create_prompt_uses_exact_graph_target() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+fn bookmark_create_prompt_uses_exact_log_target() {
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
@@ -224,8 +224,8 @@ fn bookmark_set_prompt_uses_status_current_working_copy_target() {
 
 #[test]
 fn bookmark_move_prompt_uses_exact_pattern_preview() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('m'), KeyModifiers::NONE), 12)
@@ -253,8 +253,8 @@ fn bookmark_move_prompt_uses_exact_pattern_preview() {
 
 #[test]
 fn bookmark_prompt_cancel_and_empty_input_do_not_open_preview() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
@@ -278,8 +278,8 @@ fn bookmark_prompt_cancel_and_empty_input_do_not_open_preview() {
 
 #[test]
 fn bookmark_mutation_rejects_unsupported_and_inexact_contexts() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), None, None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
     app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
@@ -289,7 +289,7 @@ fn bookmark_mutation_rejects_unsupported_and_inexact_contexts() {
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
-        "bookmark mutation from graph requires a selected row with an exact revision"
+        "bookmark mutation from log requires a selected row with an exact revision"
     );
 
     let mut app = test_app(ViewState::OperationLog(
@@ -299,7 +299,7 @@ fn bookmark_mutation_rejects_unsupported_and_inexact_contexts() {
         .unwrap();
     assert_eq!(
         app.status.message(),
-        "bookmark move is only available from graph or status views"
+        "bookmark move is only available from log or status views"
     );
 }
 
@@ -959,7 +959,7 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
     ));
     app.mode = InteractionMode::BookmarkMutationPreview {
         mutation: JjBookmarkMutationPlan::rename("feature/name", "feature/renamed"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj bookmark rename feature/name feature/renamed".to_owned(),
             "preview only".to_owned(),
             Some("bookmark rename context".to_owned()),
@@ -999,7 +999,7 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
     app.services.bookmark_mutation_run = mock_bookmark_mutation_failure;
     app.mode = InteractionMode::BookmarkMutationPreview {
         mutation: JjBookmarkMutationPlan::rename("feature/name", "main"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj bookmark rename feature/name main".to_owned(),
             "preview only".to_owned(),
             None,
@@ -1035,7 +1035,7 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
     ));
     app.mode = InteractionMode::BookmarkMutationPreview {
         mutation: JjBookmarkMutationPlan::rename("feature/name", "feature/renamed"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj bookmark rename feature/name feature/renamed".to_owned(),
             "preview only".to_owned(),
             None,
@@ -1061,7 +1061,7 @@ fn bookmark_rename_confirm_duplicate_name_failure_preserves_error_output() {
     app.services.bookmark_mutation_run = mock_bookmark_mutation_duplicate_name_failure;
     app.mode = InteractionMode::BookmarkMutationPreview {
         mutation: JjBookmarkMutationPlan::rename("feature/name", "feature/renamed"),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj bookmark rename feature/name feature/renamed".to_owned(),
             "preview only".to_owned(),
             None,
@@ -1100,15 +1100,15 @@ fn file_list_x_is_not_bookmark_delete() {
 
 #[test]
 fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::BookmarkMutationPreview {
         mutation: JjBookmarkMutationPlan::create(
             "feature/name",
             JjBookmarkTarget::exact_change("change-a"),
         ),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj bookmark create --revision exactly(change_id(\"change-a\"), 1) feature/name"
                 .to_owned(),
             "preview only".to_owned(),
@@ -1138,8 +1138,8 @@ fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
         "bookmark create feature/name | jj undo"
     );
 
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.services.bookmark_mutation_run = mock_bookmark_mutation_failure;
     app.mode = InteractionMode::BookmarkMutationPreview {
@@ -1147,7 +1147,7 @@ fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
             "feature/name",
             JjBookmarkTarget::exact_change("change-a"),
         ),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj bookmark set --revision exactly(change_id(\"change-a\"), 1) feature/name"
                 .to_owned(),
             "preview only".to_owned(),
@@ -1173,15 +1173,15 @@ fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
         "jj bookmark failed: first line\nsecond line"
     );
 
-    let mut app = test_app(ViewState::Graph(crate::graph::GraphView::test_new(vec![
-        crate::graph::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
+    let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![
+        crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
     app.mode = InteractionMode::BookmarkMutationPreview {
         mutation: JjBookmarkMutationPlan::move_to(
             "feature/name",
             JjBookmarkTarget::exact_change("change-a"),
         ),
-        output: ActionOutput::pending(
+        output: ActionPane::pending(
             "jj bookmark move --to exactly(change_id(\"change-a\"), 1) exact:\"feature/name\""
                 .to_owned(),
             "preview only".to_owned(),

@@ -7,15 +7,15 @@ use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
-use crate::action_menu::ExactActionContext;
+use crate::actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
 use crate::bookmarks::BookmarksView;
 use crate::command::{Binding, CommandContext, HelpContext, ViewCommand, ViewEffect};
 use crate::diff::DiffView;
 use crate::files::list::FileListView;
 use crate::files::show::FileShowView;
-use crate::graph::GraphView;
 use crate::jj::{JjCommand, LogViewMode, ViewSpec};
-use crate::jj_actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
+use crate::log::LogView;
+use crate::menus::ExactActionContext;
 use crate::operation_log::OperationLogView;
 use crate::operation_log::detail::OperationDetailView;
 use crate::resolve::ResolveView;
@@ -28,7 +28,7 @@ use crate::workspaces::WorkspacesView;
 
 /// The currently active top-level view.
 pub enum ViewState {
-    Graph(GraphView),
+    Log(LogView),
     Show(ShowView),
     Diff(DiffView),
     Status(StatusView),
@@ -44,7 +44,7 @@ pub enum ViewState {
 impl ViewState {
     pub fn load(spec: ViewSpec) -> Result<Self> {
         match spec.command() {
-            JjCommand::Default | JjCommand::Log => Ok(Self::Graph(GraphView::load(spec)?)),
+            JjCommand::Default | JjCommand::Log => Ok(Self::Log(LogView::load(spec)?)),
             JjCommand::Show => Ok(Self::Show(ShowView::load(spec)?)),
             JjCommand::Diff => Ok(Self::Diff(DiffView::load(spec)?)),
             JjCommand::Status => Ok(Self::Status(StatusView::load(spec)?)),
@@ -62,7 +62,7 @@ impl ViewState {
 
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         match self {
-            Self::Graph(view) => view.render(frame, area, search),
+            Self::Log(view) => view.render(frame, area, search),
             Self::Show(view) => view.render(frame, area, search),
             Self::Diff(view) => view.render(frame, area, search),
             Self::Status(view) => view.render(frame, area, search),
@@ -78,7 +78,7 @@ impl ViewState {
 
     pub fn bindings(&self) -> &'static [Binding] {
         match self {
-            Self::Graph(view) => view.bindings(),
+            Self::Log(view) => view.bindings(),
             Self::Show(view) => view.bindings(),
             Self::Diff(view) => view.bindings(),
             Self::Status(view) => view.bindings(),
@@ -94,7 +94,7 @@ impl ViewState {
 
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match self {
-            Self::Graph(view) => view.execute(command, context),
+            Self::Log(view) => view.execute(command, context),
             Self::Show(view) => view.execute(command, context),
             Self::Diff(view) => view.execute(command, context),
             Self::Status(view) => view.execute(command, context),
@@ -110,7 +110,7 @@ impl ViewState {
 
     pub fn refresh(&mut self) -> Result<()> {
         match self {
-            Self::Graph(view) => view.refresh(),
+            Self::Log(view) => view.refresh(),
             Self::Show(view) => view.refresh(),
             Self::Diff(view) => view.refresh(),
             Self::Status(view) => view.refresh(),
@@ -126,7 +126,7 @@ impl ViewState {
 
     pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
         match self {
-            Self::Graph(view) => view.clamp(),
+            Self::Log(view) => view.clamp(),
             Self::Show(view) => view.clamp(viewport_height, viewport_width),
             Self::Diff(view) => view.clamp(viewport_height, viewport_width),
             Self::Status(view) => view.clamp(viewport_height),
@@ -142,7 +142,7 @@ impl ViewState {
 
     pub fn spec(&self) -> &ViewSpec {
         match self {
-            Self::Graph(view) => view.spec(),
+            Self::Log(view) => view.spec(),
             Self::Show(view) => view.spec(),
             Self::Diff(view) => view.spec(),
             Self::Status(view) => view.spec(),
@@ -158,7 +158,7 @@ impl ViewState {
 
     pub fn status_hints(&self) -> StatusHints {
         match self {
-            Self::Graph(_) => StatusHints::Graph,
+            Self::Log(_) => StatusHints::Log,
             Self::Show(_) => StatusHints::ShowDocument,
             Self::Diff(_) => StatusHints::DiffDocument,
             Self::Status(_) => StatusHints::Status,
@@ -174,7 +174,7 @@ impl ViewState {
 
     pub fn help_context(&self) -> HelpContext {
         match self {
-            Self::Graph(_) => HelpContext::Graph,
+            Self::Log(_) => HelpContext::Log,
             Self::Show(_) => HelpContext::Show,
             Self::Diff(_) => HelpContext::Diff,
             Self::Status(_) => HelpContext::Status,
@@ -194,7 +194,7 @@ impl ViewState {
 
     pub fn scroll_offset(&self) -> usize {
         match self {
-            Self::Graph(_) => 0,
+            Self::Log(_) => 0,
             Self::Show(view) => view.scroll_offset(),
             Self::Diff(view) => view.scroll_offset(),
             Self::Status(view) => view.scroll_offset(),
@@ -210,7 +210,7 @@ impl ViewState {
 
     pub fn set_scroll_offset(&mut self, viewport_height: u16, scroll_offset: usize) {
         match self {
-            Self::Graph(_) => {}
+            Self::Log(_) => {}
             Self::Show(view) => view.set_scroll_offset(viewport_height, scroll_offset),
             Self::Diff(view) => view.set_scroll_offset(viewport_height, scroll_offset),
             Self::Status(view) => view.set_scroll_offset(viewport_height, scroll_offset),
@@ -226,7 +226,7 @@ impl ViewState {
 
     pub fn item_count(&self) -> Option<usize> {
         match self {
-            Self::Graph(view) => Some(view.item_count()),
+            Self::Log(view) => Some(view.item_count()),
             Self::Resolve(view) => Some(view.item_count()),
             Self::FileList(view) => Some(view.item_count()),
             Self::Bookmarks(view) => Some(view.item_count()),
@@ -240,9 +240,9 @@ impl ViewState {
         }
     }
 
-    pub fn graph_mode_label(&self) -> Option<&str> {
+    pub fn log_mode_label(&self) -> Option<&str> {
         match self {
-            Self::Graph(view) => Some(view.mode_label()),
+            Self::Log(view) => Some(view.mode_label()),
             Self::Show(_)
             | Self::Diff(_)
             | Self::Status(_)
@@ -256,9 +256,9 @@ impl ViewState {
         }
     }
 
-    pub fn set_graph_mode(&mut self, mode: LogViewMode) -> Result<()> {
+    pub fn set_log_mode(&mut self, mode: LogViewMode) -> Result<()> {
         match self {
-            Self::Graph(view) => view.set_mode(mode),
+            Self::Log(view) => view.set_mode(mode),
             Self::Show(_)
             | Self::Diff(_)
             | Self::Status(_)
@@ -272,13 +272,13 @@ impl ViewState {
         }
     }
 
-    pub fn reveal_graph_change(
+    pub fn reveal_log_change(
         &mut self,
         change_id: &str,
         fallback_mode: LogViewMode,
     ) -> Result<bool> {
         match self {
-            Self::Graph(view) => view.reveal_change_id(change_id, fallback_mode),
+            Self::Log(view) => view.reveal_change_id(change_id, fallback_mode),
             Self::Show(_)
             | Self::Diff(_)
             | Self::Status(_)
@@ -294,7 +294,7 @@ impl ViewState {
 
     pub fn document_line_count(&self) -> usize {
         match self {
-            Self::Graph(view) => view.line_count(),
+            Self::Log(view) => view.line_count(),
             Self::Show(view) => view.line_count(),
             Self::Diff(view) => view.line_count(),
             Self::Status(view) => view.line_count(),

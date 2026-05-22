@@ -8,13 +8,13 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use ratatui::DefaultTerminal;
 
-use crate::jj::{LogViewMode, ViewSpec, git_remotes, new_trunk, resolve_exact_change_id};
-use crate::jj_actions::{
+use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
     JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan,
     JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan,
     JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
+use crate::jj::{LogViewMode, ViewSpec, git_remotes, new_trunk, resolve_exact_change_id};
 use crate::view_state::ViewState;
 
 use super::App;
@@ -46,7 +46,7 @@ pub(in crate::app) type GitRemotesLoad = fn() -> Result<Vec<String>>;
 pub(in crate::app) type PushPreviewRun = fn(&JjGitPush) -> Result<String>;
 pub(in crate::app) type PushRun = fn(&JjGitPush) -> Result<String>;
 pub(in crate::app) type RefreshView = fn(&mut ViewState) -> Result<()>;
-pub(in crate::app) type RevealGraphChange = fn(&mut ViewState, &str, LogViewMode) -> Result<bool>;
+pub(in crate::app) type RevealLogChange = fn(&mut ViewState, &str, LogViewMode) -> Result<bool>;
 pub(in crate::app) type LoadView = fn(ViewSpec) -> Result<ViewState>;
 
 /// Injectable app-side effect boundary used by dispatch and tests.
@@ -81,7 +81,7 @@ pub(in crate::app) struct AppServices {
     pub(in crate::app) push_preview_run: PushPreviewRun,
     pub(in crate::app) push_run: PushRun,
     pub(in crate::app) refresh_view: RefreshView,
-    pub(in crate::app) reveal_graph_change: RevealGraphChange,
+    pub(in crate::app) reveal_log_change: RevealLogChange,
     pub(in crate::app) load_view: LoadView,
 }
 
@@ -212,13 +212,13 @@ impl AppServices {
         (self.refresh_view)(view)
     }
 
-    pub(in crate::app) fn reveal_graph_change(
+    pub(in crate::app) fn reveal_log_change(
         &self,
         view: &mut ViewState,
         change_id: &str,
         fallback_mode: LogViewMode,
     ) -> Result<bool> {
-        (self.reveal_graph_change)(view, change_id, fallback_mode)
+        (self.reveal_log_change)(view, change_id, fallback_mode)
     }
 
     pub(in crate::app) fn load_view(&self, spec: ViewSpec) -> Result<ViewState> {
@@ -337,13 +337,13 @@ impl App {
         self.services.refresh_view(&mut self.view)
     }
 
-    pub(in crate::app) fn reveal_graph_change(
+    pub(in crate::app) fn reveal_log_change(
         &mut self,
         change_id: &str,
         fallback_mode: LogViewMode,
     ) -> Result<bool> {
         self.services
-            .reveal_graph_change(&mut self.view, change_id, fallback_mode)
+            .reveal_log_change(&mut self.view, change_id, fallback_mode)
     }
 
     pub(in crate::app) fn load_view_state(&self, spec: ViewSpec) -> Result<ViewState> {
@@ -392,7 +392,7 @@ impl Default for AppServices {
             push_preview_run: default_push_preview_run,
             push_run: default_push_run,
             refresh_view: default_refresh_view,
-            reveal_graph_change: default_reveal_graph_change,
+            reveal_log_change: default_reveal_log_change,
             load_view: default_load_view,
         }
     }
@@ -518,12 +518,12 @@ fn default_refresh_view(view: &mut ViewState) -> Result<()> {
     view.refresh()
 }
 
-fn default_reveal_graph_change(
+fn default_reveal_log_change(
     view: &mut ViewState,
     change_id: &str,
     fallback_mode: LogViewMode,
 ) -> Result<bool> {
-    view.reveal_graph_change(change_id, fallback_mode)
+    view.reveal_log_change(change_id, fallback_mode)
 }
 
 fn default_load_view(spec: ViewSpec) -> Result<ViewState> {

@@ -2,7 +2,7 @@
 //!
 //! This module owns the read-only `jj root` / `jj workspace list` loading path and the
 //! machine-oriented metadata template used to attach workspace names and target ids to rendered
-//! rows. Shared rendered-row helpers stay in `jj_rows`; workspace-specific row/context policy lives
+//! rows. Shared rendered-row helpers stay in `rows`; workspace-specific row/context policy lives
 //! under this feature root.
 
 use ansi_to_tui::IntoText as _;
@@ -11,7 +11,7 @@ use ratatui::text::Line;
 use serde_json::Value;
 
 use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
-use crate::jj_rows::{line_text, non_empty_string_field, string_field};
+use crate::rendered_rows::{line_text, non_empty_string_field, string_field};
 
 pub(crate) const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
     r#""{\"name\":" ++ json(name)"#,

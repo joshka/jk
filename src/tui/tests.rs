@@ -1,10 +1,14 @@
 use insta::assert_snapshot;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier};
 
-use crate::action_output::ActionOutput;
-use crate::app_status::{StatusKind, StatusLine};
-use crate::command::{HelpRow, HelpSectionKind};
+use crate::action_pane::ActionPane;
+use crate::command::{HelpRow, HelpSection, HelpSectionKind};
+use crate::menus::RolePrompt;
+use crate::status_line::{StatusKind, StatusLine};
+use crate::theme;
 
 use super::*;
 
@@ -109,7 +113,7 @@ fn status_chrome_renders_compact_hints_on_narrow_width() {
         "jk log",
         "push cancelled",
         StatusKind::Error,
-        StatusHints::Graph,
+        StatusHints::Log,
     );
 
     assert_snapshot!(render_chrome_snapshot(&status, 48), @r"
@@ -180,9 +184,9 @@ fn resolve_status_hints_advertise_inspect_without_external_resolve() {
 
 #[test]
 fn action_menu_renders_shortcuts_and_preview_policy() {
-    let menu = crate::action_menu::build_action_menu(
-        &crate::action_menu::ExactActionContext::with_current("change-a"),
-    );
+    let menu = crate::menus::build_action_menu(&crate::menus::ExactActionContext::with_current(
+        "change-a",
+    ));
 
     let rendered = render_widget_rows(48, 9, |frame| {
         frame.render_widget(action_menu(&menu, 1), frame.area());
@@ -203,9 +207,9 @@ fn action_menu_renders_shortcuts_and_preview_policy() {
 
 #[test]
 fn action_menu_selected_row_has_visible_fallback_style() {
-    let menu = crate::action_menu::build_action_menu(
-        &crate::action_menu::ExactActionContext::with_current("change-a"),
-    );
+    let menu = crate::menus::build_action_menu(&crate::menus::ExactActionContext::with_current(
+        "change-a",
+    ));
     let mut terminal = Terminal::new(TestBackend::new(48, 8)).unwrap();
     terminal
         .draw(|frame| {
@@ -222,9 +226,9 @@ fn action_menu_selected_row_has_visible_fallback_style() {
 
 #[test]
 fn action_menu_keeps_shortcuts_visible_on_narrow_terminals() {
-    let menu = crate::action_menu::build_action_menu(
-        &crate::action_menu::ExactActionContext::with_current("change-a"),
-    );
+    let menu = crate::menus::build_action_menu(&crate::menus::ExactActionContext::with_current(
+        "change-a",
+    ));
 
     let rendered = render_widget_rows(28, 5, |frame| {
         frame.render_widget(action_menu(&menu, 0), frame.area());
@@ -244,8 +248,8 @@ fn role_prompt_uses_shared_popover_presentation() {
     let prompt = RolePrompt::new(
         "confirm role assignment",
         vec![
-            crate::action_menu::RolePromptOption::new("source", "source-a"),
-            crate::action_menu::RolePromptOption::new("destination", "dest-a"),
+            crate::menus::RolePromptOption::new("source", "source-a"),
+            crate::menus::RolePromptOption::new("destination", "dest-a"),
         ],
         "Preview required before execution.",
     );
@@ -265,8 +269,8 @@ fn role_prompt_uses_shared_popover_presentation() {
 }
 
 #[test]
-fn action_output_render_keeps_footer_visible_while_body_scrolls() {
-    let mut output = ActionOutput::pending(
+fn action_pane_render_keeps_footer_visible_while_body_scrolls() {
+    let mut output = ActionPane::pending(
         "jj action --preview".to_owned(),
         (0..8)
             .map(|line| format!("line {line}"))
@@ -280,7 +284,7 @@ fn action_output_render_keeps_footer_visible_while_body_scrolls() {
     let mut terminal = Terminal::new(TestBackend::new(36, 8)).unwrap();
     terminal
         .draw(|frame| {
-            render_action_output(
+            render_action_pane(
                 frame,
                 Rect {
                     x: 0,
@@ -316,19 +320,19 @@ fn action_output_render_keeps_footer_visible_while_body_scrolls() {
 }
 
 #[test]
-fn action_output_overlay_renders_common_preview_title_and_footer() {
-    let output = ActionOutput::pending(
+fn action_pane_overlay_renders_common_preview_title_and_footer() {
+    let output = ActionPane::pending(
         "jj git fetch --remote exact:\"origin\"".to_owned(),
         "fetch preview".to_owned(),
         None,
     );
-    let status = StatusLine::test("jk log", "ready", StatusKind::Ready, StatusHints::Graph);
+    let status = StatusLine::test("jk log", "ready", StatusKind::Ready, StatusHints::Log);
 
     let rendered = render_widget_rows(80, 8, |frame| {
         render_overlay(
             frame,
             &status,
-            Overlay::ActionOutput {
+            Overlay::ActionPane {
                 title: "Fetch",
                 output: &output,
             },
@@ -342,19 +346,19 @@ fn action_output_overlay_renders_common_preview_title_and_footer() {
 }
 
 #[test]
-fn action_output_overlay_renders_common_result_title_and_footer() {
-    let output = ActionOutput::finished(
+fn action_pane_overlay_renders_common_result_title_and_footer() {
+    let output = ActionPane::finished(
         "jj git fetch".to_owned(),
         "fetched".to_owned(),
         Some("default fetch uses jj git fetch remote resolution".to_owned()),
     );
-    let status = StatusLine::test("jk log", "ready", StatusKind::Ready, StatusHints::Graph);
+    let status = StatusLine::test("jk log", "ready", StatusKind::Ready, StatusHints::Log);
 
     let rendered = render_widget_rows(80, 8, |frame| {
         render_overlay(
             frame,
             &status,
-            Overlay::ActionOutput {
+            Overlay::ActionPane {
                 title: "Fetch",
                 output: &output,
             },
@@ -370,7 +374,7 @@ fn action_output_overlay_renders_common_result_title_and_footer() {
 
 #[test]
 fn abandon_confirm_render_shows_typed_exact_id_footer() {
-    let output = ActionOutput::pending(
+    let output = ActionPane::pending(
         "jj abandon change-a".to_owned(),
         "change: change-a\ntitle: Edit change\ndiff summary:\nM src/main.rs\n\nundo path: jj undo"
             .to_owned(),

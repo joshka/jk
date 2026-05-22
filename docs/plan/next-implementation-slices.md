@@ -641,8 +641,8 @@ screen, status, and action-output split.
   current line count and mixes command construction, rendered-output loading, metadata contracts,
   and parsing-adjacent helpers. Inspect `src/tui.rs`, `src/graph.rs`, `src/command.rs`,
   `src/action_menu.rs`, and `src/view_state.rs` next as secondary candidates. Treat
-  `src/rendered_jj.rs`, `src/operation_log.rs`, and `src/bookmarks.rs` as optional context only if
-  the primary candidates expose ownership dependencies on them.
+  `src/rendered.rs`, `src/operation_log.rs`, and `src/bookmarks.rs` as optional context only if the
+  primary candidates expose ownership dependencies on them.
 - Non-goals: no immediate broad refactor, no behavior change, no Packet 34 Split Guided Flow, no
   warning-cleanup sweep, no line-count target, no moving code only because a file is large, and no
   blocking acceptance of the first Packet A extraction.
@@ -700,9 +700,9 @@ Audit result from 2026-05-20:
 - Owner concept: `jj` command-plan contracts for preview-first actions, including argv shape,
   labels, preview summaries, direct execution, exact change-id revsets, exact bookmark patterns, and
   fallback result wording.
-- Expected write set: `src/jj.rs`, one new focused module such as `src/jj_actions.rs` or an
-  equivalent owner-named file, `src/main.rs` for the module declaration, focused moved tests from
-  the current `src/jj.rs` test module, `docs/agent/architecture.md`, `docs/plan/progress.md`, and
+- Expected write set: `src/jj.rs`, one new focused module such as `src/actions.rs` or an equivalent
+  owner-named file, `src/main.rs` for the module declaration, focused moved tests from the current
+  `src/jj.rs` test module, `docs/agent/architecture.md`, `docs/plan/progress.md`, and
   `docs/process-observations.md`.
 - Non-goals: no command semantic changes, no output/parser extraction, no `ViewSpec` redesign, no
   broad call-site churn, no new user-visible commands, no Packet 34 Split Guided Flow, and no
@@ -733,11 +733,11 @@ Audit result from 2026-05-20:
   and parsers from remaining `ViewSpec` and process-boundary code.
 - Owner concept: conversion from rendered `jj` output plus narrow metadata-template streams into the
   selectable rows used by graph, bookmark, file-list, resolve, and operation-log views.
-- Expected write set: `src/jj.rs`, one new focused module such as `src/jj_rows.rs`, `src/main.rs`
-  for the module declaration, moved parser/row tests from `src/jj.rs`, `docs/agent/architecture.md`,
+- Expected write set: `src/jj.rs`, one new focused module such as `src/rows.rs`, `src/main.rs` for
+  the module declaration, moved parser/row tests from `src/jj.rs`, `docs/agent/architecture.md`,
   `docs/plan/progress.md`, `docs/plan/fragility-register.md` only for newly clarified or changed
   soft contracts, and `docs/process-observations.md`.
-- Non-goals: no command-plan changes, no `rendered_jj.rs` sticky-file extraction, no lower-level
+- Non-goals: no command-plan changes, no `rendered.rs` sticky-file extraction, no lower-level
   `jj_lib` integration, no new parser assumptions, no behavior changes to row grouping or metadata
   pairing, and no Packet 34 Split Guided Flow.
 - Acceptance criteria: `LogItem`, `BookmarkItem`, `FileListItem`, `ResolveEntry`, and
@@ -887,8 +887,8 @@ Audit result from 2026-05-20:
 
 - Goal: improve file viewing with formatting-preserving display and an explicit no-wrap mode.
 - Owner concept: file show/document view rendering, wrap policy, and per-view display mode state.
-- Expected write set: `src/file_show.rs`, `src/sticky_file_view.rs`, `src/rendered_jj.rs` only if
-  formatting preservation needs parser support, focused tests, `docs/plan/progress.md`, and
+- Expected write set: `src/file_show.rs`, `src/document.rs`, `src/rendered.rs` only if formatting
+  preservation needs parser support, focused tests, `docs/plan/progress.md`, and
   `docs/plan/fragility-register.md` if rendered-output assumptions change.
 - Non-goals: no editor, no syntax-highlighting engine unless separately justified, no mutation, and
   no global terminal reflow redesign.

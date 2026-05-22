@@ -1,7 +1,7 @@
 use ratatui::text::Line;
 
 use super::*;
-use crate::sticky_file_view::lines_text;
+use crate::documents::lines_text;
 
 fn operation_detail_view(
     command: JjCommand,
