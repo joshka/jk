@@ -15,7 +15,8 @@ use ratatui::text::Line;
 use crate::jj::{ColorMode, ViewSpec, run_jj};
 use crate::rendered_rows::line_text;
 
-pub(crate) use self::metadata::WORKSPACE_METADATA_TEMPLATE;
+#[cfg(test)]
+pub use self::metadata::WORKSPACE_METADATA_TEMPLATE;
 use self::metadata::{pair_workspace_lines, run_workspace_metadata};
 
 /// Read-only workspace/root context loaded from separate `jj` commands.

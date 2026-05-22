@@ -35,7 +35,7 @@ impl SearchQuery {
     }
 
     /// Return every non-overlapping match range in the provided text.
-    pub(super) fn match_ranges(&self, text: &str) -> Vec<Range<usize>> {
+    pub fn match_ranges(&self, text: &str) -> Vec<Range<usize>> {
         let mut ranges = Vec::new();
         let mut search_start = 0;
 

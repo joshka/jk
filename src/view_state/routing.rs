@@ -44,7 +44,7 @@ impl ViewState {
     }
 
     /// Render the active view slice into the shared app layout.
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         match self {
             Self::Log(view) => view.render(frame, area, search),
             Self::Show(view) => view.render(frame, area, search),

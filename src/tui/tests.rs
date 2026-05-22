@@ -35,11 +35,7 @@ fn row_text(buffer: &ratatui::buffer::Buffer, row: u16, width: u16) -> String {
         .to_owned()
 }
 
-fn render_widget_rows(
-    width: u16,
-    height: u16,
-    render: impl FnOnce(&mut ratatui::Frame<'_>),
-) -> String {
+fn render_widget_rows(width: u16, height: u16, render: impl FnOnce(&mut ratatui::Frame)) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal.draw(render).unwrap();
 

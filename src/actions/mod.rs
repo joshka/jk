@@ -65,7 +65,7 @@ pub struct CommandOutput {
 
 impl CommandOutput {
     /// Wrap presentation-ready output from a preview or confirmed execution path.
-    pub(crate) fn new(message: String) -> Self {
+    pub fn new(message: String) -> Self {
         Self { message }
     }
 

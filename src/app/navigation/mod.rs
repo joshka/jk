@@ -10,5 +10,5 @@
 //! - `view_menu`: top-level view menu selection plus show/diff format toggles
 
 mod stack;
-pub(super) mod startup;
+pub mod startup;
 mod view_menu;

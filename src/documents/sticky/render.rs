@@ -18,7 +18,7 @@ pub fn load_document(spec: &ViewSpec) -> Result<DocumentLines> {
 }
 
 pub fn render_document(
-    frame: &mut Frame<'_>,
+    frame: &mut Frame,
     area: Rect,
     document: PinnedDocument,
     search: Option<&SearchQuery>,
@@ -27,7 +27,7 @@ pub fn render_document(
 }
 
 pub fn render_document_with_viewport(
-    frame: &mut Frame<'_>,
+    frame: &mut Frame,
     area: Rect,
     document: PinnedDocument,
     mut viewport: DocumentViewport,
@@ -83,7 +83,7 @@ pub fn lines_text(lines: &[Line<'static>]) -> String {
     lines.iter().map(line_text).collect::<Vec<_>>().join("\n")
 }
 
-pub(super) fn max_line_width(lines: &[Line<'_>]) -> usize {
+pub fn max_line_width(lines: &[Line<'_>]) -> usize {
     lines
         .iter()
         .map(|line| line.width())
@@ -91,7 +91,7 @@ pub(super) fn max_line_width(lines: &[Line<'_>]) -> usize {
         .unwrap_or_default()
 }
 
-pub(super) fn line_text(line: &Line<'_>) -> String {
+pub fn line_text(line: &Line<'_>) -> String {
     line.spans
         .iter()
         .map(|span| span.content.as_ref())

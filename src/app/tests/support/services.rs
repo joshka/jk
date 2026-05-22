@@ -434,33 +434,34 @@ pub fn mock_reveal_current_working_copy_in_recent(
 }
 
 pub fn test_services() -> AppServices {
-    let mut services = AppServices::default();
-    services.new_run = mock_new_success;
-    services.duplicate_run = mock_duplicate_success;
-    services.rebase_run = mock_rebase_success;
-    services.split_run = mock_split_success_service;
-    services.squash_run = mock_squash_success;
-    services.absorb_run = mock_absorb_success;
-    services.restore_run = mock_restore_success;
-    services.revert_run = mock_revert_success;
-    services.restore_preview_load = mock_restore_preview_success;
-    services.revert_preview_load = mock_revert_preview_success;
-    services.describe_run = mock_describe_success;
-    services.commit_run = mock_commit_success;
-    services.bookmark_mutation_run = mock_bookmark_mutation_success;
-    services.file_mutation_run = mock_file_mutation_success;
-    services.abandon_preview_load = mock_empty_abandon_preview;
-    services.abandon_run = mock_abandon_success;
-    services.operation_recovery_run = mock_operation_recovery_success;
-    services.operation_target_run = mock_operation_target_success;
-    services.working_copy_navigation_run = mock_working_copy_navigation_success;
-    services.resolve_revision = mock_resolve_current_change_id;
-    services.new_trunk_run = mock_new_trunk_success;
-    services.git_fetch_run = mock_fetch_success;
-    services.git_remotes_load = mock_multiple_remotes;
-    services.push_preview_run = mock_push_preview_success;
-    services.push_run = mock_push_success;
-    services.refresh_view = mock_refresh_ok;
-    services.reveal_log_change = super::fixtures::default_reveal_log_change;
-    services
+    AppServices {
+        new_run: mock_new_success,
+        duplicate_run: mock_duplicate_success,
+        rebase_run: mock_rebase_success,
+        split_run: mock_split_success_service,
+        squash_run: mock_squash_success,
+        absorb_run: mock_absorb_success,
+        restore_run: mock_restore_success,
+        revert_run: mock_revert_success,
+        restore_preview_load: mock_restore_preview_success,
+        revert_preview_load: mock_revert_preview_success,
+        describe_run: mock_describe_success,
+        commit_run: mock_commit_success,
+        bookmark_mutation_run: mock_bookmark_mutation_success,
+        file_mutation_run: mock_file_mutation_success,
+        abandon_preview_load: mock_empty_abandon_preview,
+        abandon_run: mock_abandon_success,
+        operation_recovery_run: mock_operation_recovery_success,
+        operation_target_run: mock_operation_target_success,
+        working_copy_navigation_run: mock_working_copy_navigation_success,
+        resolve_revision: mock_resolve_current_change_id,
+        new_trunk_run: mock_new_trunk_success,
+        git_fetch_run: mock_fetch_success,
+        git_remotes_load: mock_multiple_remotes,
+        push_preview_run: mock_push_preview_success,
+        push_run: mock_push_success,
+        refresh_view: mock_refresh_ok,
+        reveal_log_change: super::fixtures::default_reveal_log_change,
+        ..Default::default()
+    }
 }

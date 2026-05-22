@@ -38,7 +38,7 @@ pub fn active_file(anchors: &[FileAnchor], scroll_offset: usize) -> Option<&File
         .last()
 }
 
-pub(super) fn line_text(line: &Line<'_>) -> String {
+pub fn line_text(line: &Line<'_>) -> String {
     line.spans
         .iter()
         .map(|span| span.content.as_ref())

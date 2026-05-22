@@ -42,7 +42,7 @@ impl StatusView {
     }
 
     /// Reload rows with a caller-supplied loader while restoring the best previous selection.
-    pub(super) fn refresh_with_loader(
+    pub fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<StatusRow>>,
     ) -> Result<()> {
@@ -95,7 +95,7 @@ fn restore_selection(
 
 #[cfg(test)]
 impl StatusView {
-    pub(crate) fn test_new(lines: &[&str]) -> Self {
+    pub fn test_new(lines: &[&str]) -> Self {
         Self {
             spec: ViewSpec::new(JjCommand::Status, Vec::new()),
             rows: lines

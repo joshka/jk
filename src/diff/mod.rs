@@ -96,7 +96,7 @@ pub struct DiffView {
 
 impl DiffView {
     #[cfg(test)]
-    pub(crate) fn test_new(spec: ViewSpec) -> Self {
+    pub fn test_new(spec: ViewSpec) -> Self {
         Self {
             spec,
             document: StickyFileDocument::new(crate::documents::DocumentLines::new(Vec::new())),

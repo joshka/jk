@@ -17,11 +17,7 @@ impl App {
     ///
     /// View code reports intent here; this dispatcher owns the resulting mode
     /// changes, status text, and follow-up navigation.
-    pub(super) fn apply_view_effect(
-        &mut self,
-        effect: ViewEffect,
-        viewport_height: u16,
-    ) -> Result<bool> {
+    pub fn apply_view_effect(&mut self, effect: ViewEffect, viewport_height: u16) -> Result<bool> {
         match effect {
             ViewEffect::Ignored | ViewEffect::Handled => Ok(true),
             ViewEffect::StatusMessage(message) => {

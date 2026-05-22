@@ -11,7 +11,7 @@ use super::super::reducers::{
 use super::App;
 
 impl App {
-    pub(super) fn handle_copy_menu_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_copy_menu_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::CopyMenu { options, selected } = &mut self.mode else {
             unreachable!("copy menu key handler requires copy menu mode");
         };
@@ -39,11 +39,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_view_menu_key(
-        &mut self,
-        code: KeyCode,
-        viewport_height: u16,
-    ) -> Result<bool> {
+    pub fn handle_view_menu_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
         let InteractionMode::ViewMenu { selected } = &mut self.mode else {
             unreachable!("view menu key handler requires view menu mode");
         };
@@ -60,7 +56,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_action_menu_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_action_menu_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::ActionMenu { menu, selected } = &mut self.mode else {
             unreachable!("action menu key handler requires action menu mode");
         };
@@ -84,7 +80,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_role_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_role_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::RolePrompt {
             action,
             prompt,
@@ -116,7 +112,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_push_remote_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_push_remote_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::PushRemotePrompt {
             target,
             remotes,
@@ -145,7 +141,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_fetch_remote_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_fetch_remote_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::FetchRemotePrompt { remotes, selected } = &mut self.mode else {
             unreachable!("fetch remote prompt key handler requires fetch remote prompt mode");
         };

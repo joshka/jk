@@ -13,7 +13,7 @@ use crate::view_state::ViewState;
 
 use super::AppServices;
 
-pub(super) fn build_default_services() -> AppServices {
+pub fn build_default_services() -> AppServices {
     AppServices {
         new_run: default_new_run,
         duplicate_run: default_duplicate_run,

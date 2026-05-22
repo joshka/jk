@@ -123,7 +123,7 @@ impl StatusView {
     }
 
     /// Return copy options for the whole rendered status document.
-    pub(super) fn copy_options(&self) -> Vec<CopyOption> {
+    pub fn copy_options(&self) -> Vec<CopyOption> {
         let lines = self
             .rows
             .iter()

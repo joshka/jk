@@ -14,7 +14,7 @@ use crate::jj::ViewSpec;
 use super::actions::StatusFileAction;
 
 #[derive(Clone, Debug)]
-pub(in crate::status) struct StatusRow {
+pub struct StatusRow {
     /// Rendered status line preserved for display, search, and copy.
     line: Line<'static>,
     /// Exact-path action contract, disabled reason, or absence for this row.
@@ -28,12 +28,12 @@ impl StatusRow {
     }
 
     /// Return the rendered line shown in the status view.
-    pub(in crate::status) fn line(&self) -> &Line<'static> {
+    pub fn line(&self) -> &Line<'static> {
         &self.line
     }
 
     #[cfg(test)]
-    pub(in crate::status) fn exact_path(&self) -> std::result::Result<&str, String> {
+    pub fn exact_path(&self) -> std::result::Result<&str, String> {
         match &self.path {
             StatusPathContract::Action(action) if action.restore_allowed() => Ok(action.path()),
             StatusPathContract::Action(_) => Err(
@@ -47,7 +47,7 @@ impl StatusRow {
         }
     }
 
-    pub(in crate::status) fn exact_path_option(&self) -> Option<&str> {
+    pub fn exact_path_option(&self) -> Option<&str> {
         match &self.path {
             StatusPathContract::Action(action) => Some(action.path()),
             StatusPathContract::Disabled(_) | StatusPathContract::None => None,
@@ -55,7 +55,7 @@ impl StatusRow {
     }
 
     /// Return the file-action target for this row, or the disabled reason when unavailable.
-    pub(in crate::status) fn file_action(&self) -> std::result::Result<StatusFileAction, String> {
+    pub fn file_action(&self) -> std::result::Result<StatusFileAction, String> {
         match &self.path {
             StatusPathContract::Action(action) => Ok(action.clone()),
             StatusPathContract::Disabled(message) => Err((*message).to_owned()),
@@ -66,7 +66,7 @@ impl StatusRow {
     }
 
     /// Return the rendered row text for selection-restore fallback.
-    pub(in crate::status) fn row_text(&self) -> String {
+    pub fn row_text(&self) -> String {
         line_text(&self.line)
     }
 }
@@ -83,7 +83,7 @@ enum StatusPathContract {
 }
 
 /// Load rendered status rows and their file-action contracts for one `ViewSpec`.
-pub(in crate::status) fn load_status_rows(spec: &ViewSpec) -> Result<Vec<StatusRow>> {
+pub fn load_status_rows(spec: &ViewSpec) -> Result<Vec<StatusRow>> {
     Ok(status_rows_from_document(load_document(spec)?))
 }
 
@@ -98,7 +98,7 @@ fn status_rows_from_document(document: DocumentLines) -> Vec<StatusRow> {
 }
 
 /// Parse one rendered line into a status row plus file-action contract.
-pub(in crate::status) fn parse_status_row(line: Line<'static>) -> StatusRow {
+pub fn parse_status_row(line: Line<'static>) -> StatusRow {
     let text = line_text(&line);
     let path = parse_status_path_contract(&text);
     StatusRow::new(line, path)

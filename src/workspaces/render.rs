@@ -10,7 +10,7 @@ use super::{WorkspaceContext, WorkspacesView};
 
 impl WorkspacesView {
     /// Renders the root header plus the selectable workspace list.
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         let header_lines = self.header_lines();
         let header_height = u16::try_from(header_lines.len())
             .unwrap_or(u16::MAX)
@@ -28,7 +28,7 @@ impl WorkspacesView {
     }
 
     /// Returns the rendered root and degraded-load diagnostics shown above the list.
-    pub(super) fn header_lines(&self) -> Vec<Line<'static>> {
+    pub fn header_lines(&self) -> Vec<Line<'static>> {
         workspace_header_lines(&self.context)
     }
 }

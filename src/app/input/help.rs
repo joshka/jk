@@ -15,7 +15,7 @@ use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand};
 
 impl App {
     /// Handle keys while the help overlay is active, including help-specific prefix matching.
-    pub(super) fn handle_help_key(&mut self, key: KeyEvent, viewport_height: u16) -> Result<bool> {
+    pub fn handle_help_key(&mut self, key: KeyEvent, viewport_height: u16) -> Result<bool> {
         if is_help_close_key(key) {
             self.pending_command = None;
             self.mode = InteractionMode::Normal;
@@ -128,11 +128,7 @@ impl App {
     }
 
     /// Leave help mode and execute the chosen binding through the normal app root path.
-    pub(in crate::app) fn execute_help_binding(
-        &mut self,
-        binding: Binding,
-        viewport_height: u16,
-    ) -> Result<()> {
+    pub fn execute_help_binding(&mut self, binding: Binding, viewport_height: u16) -> Result<()> {
         self.pending_command = None;
         self.mode = InteractionMode::Normal;
         self.run_binding_with_status_refresh(binding, viewport_height)

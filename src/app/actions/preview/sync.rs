@@ -8,7 +8,7 @@ use super::super::shared::{fetch_status_context, fetch_status_message, push_stat
 
 impl App {
     /// Open the fetch preview for one chosen remote.
-    pub(in crate::app) fn open_fetch_preview(&mut self, remote: String) {
+    pub fn open_fetch_preview(&mut self, remote: String) {
         let fetch = JjGitFetch::for_remote(remote);
         let status_context = Some(fetch_status_context(&fetch));
 
@@ -23,7 +23,7 @@ impl App {
     }
 
     /// Run default fetch immediately and keep its output on the shared fetch-preview surface.
-    pub(in crate::app) fn fetch(&mut self, viewport_height: u16) {
+    pub fn fetch(&mut self, viewport_height: u16) {
         let fetch = JjGitFetch::default_remotes();
         let command_label = fetch.command_label();
         let status_context = Some(fetch_status_context(&fetch));
@@ -57,7 +57,7 @@ impl App {
     }
 
     /// Open the push preview for one chosen target/remote pair.
-    pub(in crate::app) fn open_push_preview(&mut self, target: JjGitPushTarget, remote: String) {
+    pub fn open_push_preview(&mut self, target: JjGitPushTarget, remote: String) {
         let status_context = Some(push_status_context(&target, remote.as_str()));
         let push = match target {
             JjGitPushTarget::Bookmark(name) => JjGitPush::for_bookmark(name).with_remote(remote),

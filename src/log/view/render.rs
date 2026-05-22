@@ -9,7 +9,7 @@ use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
 
 impl LogView {
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(
             entry_list(&self.entries, search, &self.selected_change_ids),
@@ -65,7 +65,7 @@ fn entry_lines(
 }
 
 #[cfg(test)]
-pub(super) fn test_entry_lines(
+pub fn test_entry_lines(
     entry: &LogItem,
     search: Option<&SearchQuery>,
     is_selected: bool,

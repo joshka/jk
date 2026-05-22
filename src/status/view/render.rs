@@ -8,7 +8,7 @@ use crate::tui::theme;
 
 impl StatusView {
     /// Render the current status rows with search highlighting and active-row styling.
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(row_list(&self.rows, search), area, &mut state);
     }

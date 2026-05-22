@@ -10,4 +10,4 @@ mod helpers;
 mod peers;
 mod resolver;
 
-pub(super) use resolver::BookmarkActionTargetResolver;
+pub use resolver::BookmarkActionTargetResolver;

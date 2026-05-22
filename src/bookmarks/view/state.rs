@@ -17,7 +17,7 @@ impl BookmarksView {
     }
 
     /// Reloads rows and restores selection by bookmark name before falling back to index.
-    pub(crate) fn refresh_with_loader(
+    pub fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<BookmarkItem>>,
     ) -> Result<()> {

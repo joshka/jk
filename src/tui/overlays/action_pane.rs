@@ -9,7 +9,7 @@ use super::menus::centered_area;
 use super::menus::overlay_block;
 
 /// Choose the preview versus result title suffix for an action pane.
-pub(super) fn action_pane_title(action: &str, output: &ActionPane) -> String {
+pub fn action_pane_title(action: &str, output: &ActionPane) -> String {
     if output.completed() {
         format!("{action} result")
     } else {
@@ -18,7 +18,7 @@ pub(super) fn action_pane_title(action: &str, output: &ActionPane) -> String {
 }
 
 /// Render the shared preview/result pane body plus footer into the given modal area.
-pub fn render_action_pane(frame: &mut Frame<'_>, area: Rect, title: &str, output: &ActionPane) {
+pub fn render_action_pane(frame: &mut Frame, area: Rect, title: &str, output: &ActionPane) {
     let block = overlay_block(title.to_owned());
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -55,7 +55,7 @@ pub fn render_action_pane(frame: &mut Frame<'_>, area: Rect, title: &str, output
 
 /// Render the abandon confirmation overlay, reusing the action-pane body above a typed footer.
 pub fn render_abandon_confirm(
-    frame: &mut Frame<'_>,
+    frame: &mut Frame,
     area: Rect,
     title: &str,
     input: &str,
@@ -95,12 +95,12 @@ pub fn render_abandon_confirm(
     }
 }
 
-pub(super) fn action_pane_area(area: Rect, title: &str, output: &ActionPane) -> Rect {
+pub fn action_pane_area(area: Rect, title: &str, output: &ActionPane) -> Rect {
     let footer = action_pane_footer_text(output.completed());
     action_pane_area_with_footer(area, title, output, &footer)
 }
 
-pub(super) fn action_pane_area_with_footer(
+pub fn action_pane_area_with_footer(
     area: Rect,
     title: &str,
     output: &ActionPane,
@@ -121,7 +121,7 @@ pub(super) fn action_pane_area_with_footer(
     centered_area(area, width, height)
 }
 
-pub(super) fn abandon_confirm_footer_text(input: &str) -> String {
+pub fn abandon_confirm_footer_text(input: &str) -> String {
     format!("type exact id: {input}  Enter confirm  Esc cancel  arrows/page scroll")
 }
 

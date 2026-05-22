@@ -2,7 +2,7 @@ use ratatui::text::{Line, Span};
 
 use crate::documents::FileAnchor;
 
-pub(super) fn file_anchor(line_index: usize, line: &Line<'static>) -> Option<FileAnchor> {
+pub fn file_anchor(line_index: usize, line: &Line<'static>) -> Option<FileAnchor> {
     let heading = file_heading(line)?;
     Some(FileAnchor {
         line_index,
@@ -30,7 +30,7 @@ fn default_file_heading(line: &Line<'static>, text: &str) -> Option<FileHeading>
     })
 }
 
-pub(super) fn default_file_label(heading: &str) -> Option<String> {
+pub fn default_file_label(heading: &str) -> Option<String> {
     let body = heading.strip_suffix(':')?;
     let file = [
         "Added ",

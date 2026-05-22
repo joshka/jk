@@ -10,7 +10,7 @@ mod copy;
 mod menu;
 mod prompt;
 
-pub(in crate::menus) use action::PREVIEW_REQUIRED_MARKER;
+pub use action::PREVIEW_REQUIRED_MARKER;
 pub use action::{ActionKind, SafetyTier};
 pub use copy::CopyOption;
 pub use menu::{ActionMenu, ActionMenuItem, FollowUp};

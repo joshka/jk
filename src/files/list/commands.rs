@@ -69,7 +69,7 @@ impl FileListView {
     }
 
     /// Count search matches across rendered file-list entries.
-    pub(crate) fn search_matches(&self, query: &SearchQuery) -> usize {
+    pub fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
             .filter(|entry| entry_matches(&entry.lines(), query))
@@ -77,7 +77,7 @@ impl FileListView {
     }
 
     /// Move to the next matching file entry, wrapping once without reselecting the current row.
-    pub(crate) fn next_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
             .find(|index| entry_matches(&self.entries[*index].lines(), query))
@@ -89,7 +89,7 @@ impl FileListView {
     }
 
     /// Move to the previous matching file entry, wrapping once without reselecting the current row.
-    pub(crate) fn previous_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
             .chain(((self.selection.index() + 1)..self.entries.len()).rev())
@@ -102,7 +102,7 @@ impl FileListView {
     }
 
     /// Return copy options for the currently selected exact file path.
-    pub(crate) fn copy_options(&self) -> Vec<CopyOption> {
+    pub fn copy_options(&self) -> Vec<CopyOption> {
         self.selected_path()
             .map(|path| vec![CopyOption::new("file path", path)])
             .unwrap_or_default()

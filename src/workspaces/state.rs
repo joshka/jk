@@ -16,7 +16,7 @@ impl WorkspacesView {
     }
 
     /// Reloads the context and restores selection by workspace name before falling back to index.
-    pub(super) fn refresh_with_loader(
+    pub fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<WorkspaceContext>,
     ) -> Result<()> {

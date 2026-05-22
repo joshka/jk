@@ -17,10 +17,7 @@ mod working_copy;
 
 impl App {
     /// Refresh any repo-backed views stored on the app stack after an operation-level mutation.
-    pub(in crate::app) fn refresh_stacked_repo_views(
-        &mut self,
-        viewport_height: u16,
-    ) -> Result<()> {
+    pub fn refresh_stacked_repo_views(&mut self, viewport_height: u16) -> Result<()> {
         for view in &mut self.stack {
             match view.command() {
                 JjCommand::Default

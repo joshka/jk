@@ -13,7 +13,7 @@ use crate::rendered_rows::{non_empty_string_field, string_field};
 
 use super::WorkspaceItem;
 
-pub(crate) const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
+pub const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
     r#""{\"name\":" ++ json(name)"#,
     r#" ++ ",\"target_change_id\":" ++ json(target.change_id())"#,
     r#" ++ ",\"target_commit_id\":" ++ json(target.commit_id())"#,
@@ -21,7 +21,7 @@ pub(crate) const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
 );
 
 /// Loads workspace metadata rows through the workspace-specific template side channel.
-pub(super) fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMetadata>> {
+pub fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMetadata>> {
     parse_workspace_metadata_lines(run_jj_template_lines(
         spec,
         WORKSPACE_METADATA_TEMPLATE,
@@ -30,7 +30,7 @@ pub(super) fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMet
 }
 
 /// Pairs rendered workspace rows with metadata and degrades safely when parsing drifts.
-pub(super) fn pair_workspace_lines(
+pub fn pair_workspace_lines(
     lines: Vec<Line<'static>>,
     metadata: Result<Vec<WorkspaceMetadata>, String>,
 ) -> (Vec<WorkspaceItem>, Option<String>) {
@@ -76,7 +76,7 @@ pub(super) fn pair_workspace_lines(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct WorkspaceMetadata {
+pub struct WorkspaceMetadata {
     /// Exact workspace name from metadata.
     name: String,
     /// Exact target change id when present.

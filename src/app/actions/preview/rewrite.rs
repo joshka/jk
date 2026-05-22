@@ -11,7 +11,7 @@ use super::super::shared::short_id;
 
 impl App {
     /// Open the rebase preview for one prepared multi-source rewrite plan.
-    pub(in crate::app) fn open_rebase_preview(&mut self, rebase: JjRebasePlan) {
+    pub fn open_rebase_preview(&mut self, rebase: JjRebasePlan) {
         let status_context = Some(format!(
             "rebase from {} source(s) into {} from {}",
             rebase.sources().len(),
@@ -31,7 +31,7 @@ impl App {
     }
 
     /// Open the restore preview for one revision or path restore plan.
-    pub(in crate::app) fn open_restore_preview(&mut self, restore: JjRestorePlan) {
+    pub fn open_restore_preview(&mut self, restore: JjRestorePlan) {
         let target = restore
             .path()
             .map(|path| format!("path {path} from {}", restore.revision()))
@@ -52,7 +52,7 @@ impl App {
     }
 
     /// Open the revert preview for one exact revision revert plan.
-    pub(in crate::app) fn open_revert_preview(&mut self, revert: JjRevertPlan) {
+    pub fn open_revert_preview(&mut self, revert: JjRevertPlan) {
         let status_context = Some(format!(
             "revert revision {} into @ from {}",
             revert.revision(),
@@ -70,7 +70,7 @@ impl App {
     }
 
     /// Open the squash preview for one prepared multi-source squash plan.
-    pub(in crate::app) fn open_squash_preview(&mut self, squash: JjSquashPlan) {
+    pub fn open_squash_preview(&mut self, squash: JjSquashPlan) {
         let status_context = Some(format!(
             "squash from {} source(s) into {} from {}",
             squash.sources().len(),
@@ -90,7 +90,7 @@ impl App {
     }
 
     /// Open the absorb preview for one prepared absorb plan, or reject empty destinations.
-    pub(in crate::app) fn open_absorb_preview(&mut self, absorb: JjAbsorbPlan) {
+    pub fn open_absorb_preview(&mut self, absorb: JjAbsorbPlan) {
         if absorb.destinations().is_empty() {
             self.status = StatusLine::error(
                 &self.view,
@@ -124,7 +124,7 @@ impl App {
     }
 
     /// Open the abandon preview and preserve any preview-load failure on the same pane surface.
-    pub(in crate::app) fn open_abandon_preview(&mut self, abandon: JjAbandonPlan) {
+    pub fn open_abandon_preview(&mut self, abandon: JjAbandonPlan) {
         let status_context = Some(format!(
             "abandon exact revision {} from {}",
             abandon.revision(),

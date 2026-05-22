@@ -3,25 +3,25 @@ use crate::documents::PinnedDocument;
 use super::render::line_text;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(super) struct StickyScroll {
+pub struct StickyScroll {
     /// Current vertical offset into the rendered document.
     offset: usize,
 }
 
 impl StickyScroll {
-    pub(super) fn offset(self) -> usize {
+    pub fn offset(self) -> usize {
         self.offset
     }
 
-    pub(super) fn set(&mut self, offset: usize, max_offset: usize) {
+    pub fn set(&mut self, offset: usize, max_offset: usize) {
         self.offset = offset.min(max_offset);
     }
 
-    pub(super) fn move_to_top(&mut self) {
+    pub fn move_to_top(&mut self) {
         self.offset = 0;
     }
 
-    pub(super) fn move_to_bottom(
+    pub fn move_to_bottom(
         &mut self,
         max_offset: usize,
         viewport_height: u16,
@@ -30,7 +30,7 @@ impl StickyScroll {
         self.offset = previous_meaningful_offset(max_offset, viewport_height, project);
     }
 
-    pub(super) fn down(
+    pub fn down(
         &mut self,
         amount: usize,
         max_offset: usize,
@@ -44,7 +44,7 @@ impl StickyScroll {
         self.clamp(max_offset);
     }
 
-    pub(super) fn up(
+    pub fn up(
         &mut self,
         amount: usize,
         viewport_height: u16,
@@ -55,12 +55,12 @@ impl StickyScroll {
         }
     }
 
-    pub(super) fn clamp(&mut self, max_offset: usize) {
+    pub fn clamp(&mut self, max_offset: usize) {
         self.offset = self.offset.min(max_offset);
     }
 }
 
-pub(super) fn next_meaningful_offset(
+pub fn next_meaningful_offset(
     current_offset: usize,
     max_offset: usize,
     viewport_height: u16,
@@ -74,7 +74,7 @@ pub(super) fn next_meaningful_offset(
         .unwrap_or(max_offset)
 }
 
-pub(super) fn previous_meaningful_offset(
+pub fn previous_meaningful_offset(
     current_offset: usize,
     viewport_height: u16,
     project: impl Fn(usize) -> PinnedDocument,

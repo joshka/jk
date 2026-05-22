@@ -77,7 +77,7 @@ impl DocumentViewport {
     }
 }
 
-pub(super) fn max_projected_line_width(fixed_lines: &[Line<'_>], body_lines: &[Line<'_>]) -> usize {
+pub fn max_projected_line_width(fixed_lines: &[Line<'_>], body_lines: &[Line<'_>]) -> usize {
     fixed_lines
         .iter()
         .chain(body_lines)

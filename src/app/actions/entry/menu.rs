@@ -15,7 +15,7 @@ use super::super::super::App;
 
 impl App {
     /// Open the action menu for the current selection or exact restore/revert context.
-    pub(in crate::app) fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
+    pub fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
         if matches!(
             self.view.command(),
             JjCommand::Default | JjCommand::Log | JjCommand::OperationLog
@@ -54,7 +54,7 @@ impl App {
     }
 
     /// Consume one accepted menu item and route it into prompt, preview, or status flow.
-    pub(in crate::app) fn apply_action_menu_item(&mut self, item: ActionMenuItem) {
+    pub fn apply_action_menu_item(&mut self, item: ActionMenuItem) {
         match item.follow_up() {
             FollowUp::StatusMessage(message) => {
                 self.status = StatusLine::with_message(&self.view, message.as_str());
@@ -175,7 +175,7 @@ impl App {
     }
 
     /// Return the selected graph revision when the current surface is a log-like graph view.
-    pub(in crate::app) fn graph_selected_revision(&self) -> Option<String> {
+    pub fn graph_selected_revision(&self) -> Option<String> {
         match &self.view {
             ViewState::Log(view) => view.selected_revision().map(str::to_owned),
             ViewState::Show(_)

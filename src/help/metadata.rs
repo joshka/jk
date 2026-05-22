@@ -3,7 +3,7 @@ use crate::command::{Command, ViewCommand};
 use super::{HelpContext, HelpSectionKind};
 
 /// Maps one app-level command to a help section and action string for the given context.
-pub(super) fn help_metadata(
+pub fn help_metadata(
     command: Command,
     context: HelpContext,
 ) -> Option<(HelpSectionKind, &'static str)> {

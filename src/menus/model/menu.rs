@@ -97,15 +97,15 @@ pub enum FollowUp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionMenuItem {
     /// Stable action vocabulary entry represented by this row.
-    pub(in crate::menus) action: ActionKind,
+    pub action: ActionKind,
     /// Single-key accelerator accepted while the menu is open.
-    pub(in crate::menus) shortcut: char,
+    pub shortcut: char,
     /// User-facing row text shown in the menu.
-    pub(in crate::menus) label: String,
+    pub label: String,
     /// Safety requirement that the renderer surfaces for this row.
-    pub(in crate::menus) safety_tier: SafetyTier,
+    pub safety_tier: SafetyTier,
     /// Deferred payload handed back when the row is accepted.
-    pub(in crate::menus) follow_up: FollowUp,
+    pub follow_up: FollowUp,
 }
 
 impl ActionMenuItem {

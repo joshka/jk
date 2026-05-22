@@ -6,47 +6,47 @@
 mod fixtures;
 mod services;
 
-pub(super) use super::super::{APP_BINDINGS, App};
+pub use super::super::{APP_BINDINGS, App};
 #[allow(unused_imports)]
-pub(super) use crate::actions::{
+pub use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationKind, JjBookmarkMutationPlan,
     JjBookmarkTarget, JjCommitPlan, JjDescribePlan, JjDescribeTarget, JjDuplicatePlan,
     JjFileMutationPlan, JjGitFetch, JjGitPush, JjGitPushTarget, JjNewPlan, JjOperationRecovery,
     JjOperationRecoveryKind, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
 };
-pub(super) use crate::app::actions::{ActionPane, action_pane_visible_lines};
-pub(super) use crate::app::input::{rebase_plan_from_prompt, squash_plan_from_prompt};
-pub(super) use crate::app::navigation::startup::initial_view;
-pub(super) use crate::app::services::AppServices;
-pub(super) use crate::app::status_line::{StatusKind, StatusLine};
+pub use crate::app::actions::{ActionPane, action_pane_visible_lines};
+pub use crate::app::input::{rebase_plan_from_prompt, squash_plan_from_prompt};
+pub use crate::app::navigation::startup::initial_view;
+pub use crate::app::services::AppServices;
+pub use crate::app::status_line::{StatusKind, StatusLine};
 #[allow(unused_imports)]
-pub(super) use crate::bookmarks::{
+pub use crate::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState, load_bookmark_entries,
 };
-pub(super) use crate::command::{CommandContext, ViewCommand};
+pub use crate::command::{CommandContext, ViewCommand};
 #[allow(unused_imports)]
-pub(super) use crate::files::list::{FileListItem, load_file_list_entries};
+pub use crate::files::list::{FileListItem, load_file_list_entries};
 #[allow(unused_imports)]
-pub(super) use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
+pub use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
 #[allow(unused_imports)]
-pub(super) use crate::log::{LogItem, load_compact_log_context, load_entries};
-pub(super) use crate::menus::{ActionKind, FollowUp, RolePrompt, RolePromptOption};
-pub(super) use crate::modes::{InteractionMode, ViewMenuAction};
+pub use crate::log::{LogItem, load_compact_log_context, load_entries};
+pub use crate::menus::{ActionKind, FollowUp, RolePrompt, RolePromptOption};
+pub use crate::modes::{InteractionMode, ViewMenuAction};
 #[allow(unused_imports)]
-pub(super) use crate::rendered_rows::document_plain_text;
+pub use crate::rendered_rows::document_plain_text;
 #[allow(unused_imports)]
-pub(super) use crate::resolve::{ResolveEntry, load_resolve_entries};
-pub(super) use crate::tui::Overlay;
-pub(super) use crate::view_state::ViewState;
+pub use crate::resolve::{ResolveEntry, load_resolve_entries};
+pub use crate::tui::Overlay;
+pub use crate::view_state::ViewState;
 #[allow(unused_imports)]
-pub(super) use crate::workspaces::{WorkspaceContext, WorkspaceItem, load_workspace_context};
-pub(super) use color_eyre::Result;
-pub(super) use color_eyre::eyre::eyre;
-pub(super) use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
-pub(super) use fixtures::{key, log_item, mock_load_view, test_app};
-pub(super) use ratatui::DefaultTerminal;
-pub(super) use services::*;
-pub(super) use std::sync::atomic::{AtomicUsize, Ordering};
-pub(super) use std::time::{Duration, Instant};
+pub use crate::workspaces::{WorkspaceContext, WorkspaceItem, load_workspace_context};
+pub use color_eyre::Result;
+pub use color_eyre::eyre::eyre;
+pub use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+pub use fixtures::{key, log_item, mock_load_view, test_app};
+pub use ratatui::DefaultTerminal;
+pub use services::*;
+pub use std::sync::atomic::{AtomicUsize, Ordering};
+pub use std::time::{Duration, Instant};

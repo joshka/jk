@@ -11,10 +11,7 @@ use super::super::shared::short_id;
 
 impl App {
     /// Translate a log-local edit/next/prev command into a working-copy navigation preview.
-    pub(in crate::app) fn open_log_working_copy_navigation_preview(
-        &mut self,
-        kind: JjWorkingCopyNavigationKind,
-    ) {
+    pub fn open_log_working_copy_navigation_preview(&mut self, kind: JjWorkingCopyNavigationKind) {
         let navigation = match kind {
             JjWorkingCopyNavigationKind::Edit => {
                 let Some(revision) = self.graph_selected_revision() else {
@@ -34,7 +31,7 @@ impl App {
     }
 
     /// Open the preview for one working-copy navigation plan.
-    pub(in crate::app) fn open_working_copy_navigation_preview(
+    pub fn open_working_copy_navigation_preview(
         &mut self,
         navigation: JjWorkingCopyNavigationPlan,
     ) {
@@ -67,7 +64,7 @@ impl App {
     }
 
     /// Open the new-change preview for one prepared parent list.
-    pub(in crate::app) fn open_new_preview(&mut self, new_change: JjNewPlan) {
+    pub fn open_new_preview(&mut self, new_change: JjNewPlan) {
         let parent_labels = new_change
             .parents()
             .iter()
@@ -92,7 +89,7 @@ impl App {
     }
 
     /// Open the duplicate preview for one exact source revision.
-    pub(in crate::app) fn open_duplicate_preview(&mut self, duplicate: JjDuplicatePlan) {
+    pub fn open_duplicate_preview(&mut self, duplicate: JjDuplicatePlan) {
         let status_context = Some(format!(
             "duplicate exact source {} from {}",
             duplicate.source(),
@@ -110,7 +107,7 @@ impl App {
     }
 
     /// Run `jj new` from trunk and update the active app view to reveal the new working copy.
-    pub(in crate::app) fn run_new_trunk(&mut self, viewport_height: u16) {
+    pub fn run_new_trunk(&mut self, viewport_height: u16) {
         if let Err(error) = self.services.resolve_revision("trunk()") {
             self.status = StatusLine::error(&self.view, error.to_string());
             return;
@@ -159,7 +156,7 @@ impl App {
     }
 
     /// Open the split preview for one exact or working-copy split plan.
-    pub(in crate::app) fn open_split_preview(&mut self, split: JjSplitPlan) {
+    pub fn open_split_preview(&mut self, split: JjSplitPlan) {
         let status_context = Some(format!(
             "{} from {}",
             split.status_context(),

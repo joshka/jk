@@ -70,11 +70,11 @@ pub const BINDINGS: &[Binding] = &[
 /// Selectable rendered operation-log output.
 pub struct OperationLogView {
     /// View identity used to reload the operation log.
-    pub(super) spec: ViewSpec,
+    pub spec: ViewSpec,
     /// Rendered operation-log items paired with exact operation ids when metadata matches.
-    pub(super) entries: Vec<OperationLogItem>,
+    pub entries: Vec<OperationLogItem>,
     /// Current selected row within the operation-log item list.
-    pub(super) selection: Selection,
+    pub selection: Selection,
 }
 
 impl OperationLogView {
@@ -105,22 +105,22 @@ impl OperationLogView {
 }
 #[cfg(test)]
 impl OperationLogView {
-    pub(crate) fn test_copy_options(&self) -> Vec<crate::menus::CopyOption> {
+    pub fn test_copy_options(&self) -> Vec<crate::menus::CopyOption> {
         self.copy_options()
     }
 
-    pub(crate) fn test_refresh_with_loader(
+    pub fn test_refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> color_eyre::Result<Vec<OperationLogItem>>,
     ) -> color_eyre::Result<()> {
         self.refresh_with_loader(load)
     }
 
-    pub(crate) fn test_search_matches(&self, query: &crate::search::SearchQuery) -> usize {
+    pub fn test_search_matches(&self, query: &crate::search::SearchQuery) -> usize {
         self.search_matches(query)
     }
 
-    pub(crate) fn test_next_match(&mut self, query: &crate::search::SearchQuery) -> bool {
+    pub fn test_next_match(&mut self, query: &crate::search::SearchQuery) -> bool {
         self.next_match(query)
     }
 }

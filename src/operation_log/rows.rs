@@ -13,7 +13,7 @@ use ratatui::text::Line;
 use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
 use crate::rendered_rows::{RowMetadata, first_content_char, is_standalone_graph_line, line_text};
 
-pub(crate) const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
+pub const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
 
 /// One selectable operation item parsed from rendered operation-log output.
 #[derive(Clone, Debug)]

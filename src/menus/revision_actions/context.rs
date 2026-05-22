@@ -4,17 +4,17 @@ use super::super::path_actions::FileActionContext;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExactActionContext {
     /// Exact current revision selected on the log/detail surface, if any.
-    pub(super) current_revision: Option<String>,
+    pub current_revision: Option<String>,
     /// Additional exact selected revisions used for multi-source rewrite menus.
-    pub(super) source_revisions: Vec<String>,
+    pub source_revisions: Vec<String>,
     /// Optional selected path carried from detail, file, or status surfaces.
-    pub(super) selected_path: Option<String>,
+    pub selected_path: Option<String>,
     /// Path-scoped action policy derived from the current surface and selection.
-    pub(super) file_action: Option<FileActionContext>,
+    pub file_action: Option<FileActionContext>,
     /// Whether the selected current revision is the visible working-copy change.
-    pub(super) current_is_visible_working_copy: bool,
+    pub current_is_visible_working_copy: bool,
     /// Surface whose action vocabulary and ordering should be built.
-    pub(super) surface: ActionSurface,
+    pub surface: ActionSurface,
 }
 
 impl ExactActionContext {
@@ -153,22 +153,22 @@ impl ExactActionContext {
         self.selected_path.as_deref()
     }
 
-    pub(super) fn current_is_visible_working_copy(&self) -> bool {
+    pub fn current_is_visible_working_copy(&self) -> bool {
         self.current_is_visible_working_copy
     }
 
-    pub(super) fn is_detail_surface(&self) -> bool {
+    pub fn is_detail_surface(&self) -> bool {
         matches!(self.surface, ActionSurface::Detail)
     }
 
-    pub(super) fn is_status_surface(&self) -> bool {
+    pub fn is_status_surface(&self) -> bool {
         matches!(self.surface, ActionSurface::Status)
     }
 }
 
 /// Internal classification of which surface owns the current selection semantics.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum ActionSurface {
+pub enum ActionSurface {
     /// Graph/log row with a current revision and optional multiselect sources.
     Log,
     /// Detail/document surface rooted at one exact revision.

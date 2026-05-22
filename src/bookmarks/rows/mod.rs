@@ -79,7 +79,7 @@ impl BookmarkItem {
     }
 
     #[cfg(test)]
-    pub(crate) fn is_local(&self) -> bool {
+    pub fn is_local(&self) -> bool {
         matches!(self.state, BookmarkRowState::Local { .. })
     }
 
@@ -89,7 +89,7 @@ impl BookmarkItem {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_local(mut self, local: bool) -> Self {
+    pub fn with_local(mut self, local: bool) -> Self {
         self.state = if local {
             BookmarkRowState::Local {
                 tracking: LocalBookmarkRemoteState::Ambiguous,
@@ -101,7 +101,7 @@ impl BookmarkItem {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_state(mut self, state: BookmarkRowState) -> Self {
+    pub fn with_state(mut self, state: BookmarkRowState) -> Self {
         self.state = state;
         self
     }
@@ -137,11 +137,11 @@ pub enum BookmarkRowState {
 }
 
 impl BookmarkRowState {
-    pub(super) fn local(tracking: LocalBookmarkRemoteState) -> Self {
+    pub fn local(tracking: LocalBookmarkRemoteState) -> Self {
         Self::Local { tracking }
     }
 
-    pub(super) fn remote(
+    pub fn remote(
         remote: String,
         tracking: RemoteBookmarkTrackingState,
         local_peer: BookmarkLocalPeerState,

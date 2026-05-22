@@ -16,7 +16,7 @@ use super::helpers::{
 };
 use super::peers::VisibleBookmarkPeers;
 
-pub(in crate::bookmarks) struct BookmarkActionTargetResolver<'a> {
+pub struct BookmarkActionTargetResolver<'a> {
     /// Currently selected bookmark row, if any.
     selected: Option<&'a BookmarkItem>,
     /// Visible bookmark peers and metadata coverage used for exact action targeting.
@@ -25,7 +25,7 @@ pub(in crate::bookmarks) struct BookmarkActionTargetResolver<'a> {
 
 impl<'a> BookmarkActionTargetResolver<'a> {
     /// Builds the resolver from the selected row, visible rows, and view args.
-    pub(in crate::bookmarks) fn new(
+    pub fn new(
         selected: Option<&'a BookmarkItem>,
         entries: &'a [BookmarkItem],
         spec_args: &'a [String],
@@ -37,14 +37,14 @@ impl<'a> BookmarkActionTargetResolver<'a> {
     }
 
     /// Returns the selected bookmark name only when the row is a trusted local bookmark.
-    pub(in crate::bookmarks) fn selected_local_bookmark_name(&self) -> Option<&'a str> {
+    pub fn selected_local_bookmark_name(&self) -> Option<&'a str> {
         self.selected
             .filter(|entry| matches!(entry.state(), BookmarkRowState::Local { .. }))
             .map(BookmarkItem::bookmark_name)
     }
 
     /// Resolves the exact forget target for the selected row or reports why it is unsafe.
-    pub(in crate::bookmarks) fn selected_bookmark_forget_target(
+    pub fn selected_bookmark_forget_target(
         &self,
     ) -> Result<Option<(&'a str, JjBookmarkForgetTarget)>> {
         let Some(entry) = self.selected else {
@@ -72,7 +72,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
     }
 
     /// Resolves the exact track or untrack target for the selected row or reports why it is unsafe.
-    pub(in crate::bookmarks) fn selected_bookmark_tracking_target(
+    pub fn selected_bookmark_tracking_target(
         &self,
         kind: JjBookmarkMutationKind,
     ) -> Result<Option<(&'a str, JjBookmarkTrackingTarget)>> {
@@ -93,7 +93,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
-    pub(in crate::bookmarks) fn visible_local_peer_target(
+    pub fn visible_local_peer_target(
         &self,
         action: &str,
         name: &str,

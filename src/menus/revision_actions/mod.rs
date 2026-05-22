@@ -9,7 +9,7 @@ mod context;
 mod menu;
 
 pub use context::ExactActionContext;
-pub(super) use menu::build_action_menu;
+pub use menu::build_action_menu;
 
 #[cfg(test)]
 mod tests;

@@ -9,7 +9,7 @@ use super::{BookmarkItem, BookmarksView};
 
 impl BookmarksView {
     /// Renders the bookmark list with the active selection and search highlights.
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
     }

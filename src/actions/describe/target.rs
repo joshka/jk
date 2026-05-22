@@ -40,7 +40,7 @@ impl JjDescribeTarget {
     }
 
     /// Returns the revset argv fragment for this target.
-    pub(super) fn command_arg(&self) -> String {
+    pub fn command_arg(&self) -> String {
         match self {
             Self::ExactChange(change_id) => exact_change_id_revset(change_id),
             Self::CurrentWorkingCopy => "@".to_owned(),
@@ -48,7 +48,7 @@ impl JjDescribeTarget {
     }
 
     /// Returns user-facing preview wording for this target.
-    pub(super) fn preview_target(&self) -> String {
+    pub fn preview_target(&self) -> String {
         match self {
             Self::ExactChange(change_id) => format!("exact selected revision {change_id}"),
             Self::CurrentWorkingCopy => "current working-copy change (@)".to_owned(),

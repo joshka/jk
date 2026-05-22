@@ -15,7 +15,7 @@ impl App {
     ///
     /// Startup chooses the first `ViewSpec`, wires the production service seam,
     /// and records any log argv that `switch_to_log` should later restore.
-    pub(in crate::app) fn load(args: Vec<OsString>) -> Result<Self> {
+    pub fn load(args: Vec<OsString>) -> Result<Self> {
         let initial_spec = initial_view(args)?;
         let startup_log_args =
             (initial_spec.command() == JjCommand::Log).then(|| initial_spec.args().to_vec());
@@ -43,7 +43,7 @@ impl App {
 ///
 /// Startup accepts only top-level shipped views here. Deeper drill-down views
 /// are reached from in-app navigation once the first surface is loaded.
-pub(in crate::app) fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
+pub fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
     let args = args
         .into_iter()
         .map(|arg| {

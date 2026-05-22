@@ -1,6 +1,6 @@
 use crate::documents::{DocumentLines, FileAnchor};
 
-pub(super) fn next_file_offset(
+pub fn next_file_offset(
     document: &DocumentLines,
     anchors: &[FileAnchor],
     scroll_offset: usize,
@@ -12,7 +12,7 @@ pub(super) fn next_file_offset(
         .map(|anchor| file_activation_offset(document, anchor))
 }
 
-pub(super) fn previous_file_offset(
+pub fn previous_file_offset(
     document: &DocumentLines,
     anchors: &[FileAnchor],
     scroll_offset: usize,
@@ -24,7 +24,7 @@ pub(super) fn previous_file_offset(
         .map(|anchor| file_activation_offset(document, anchor))
 }
 
-pub(super) fn current_file_label<'a>(
+pub fn current_file_label<'a>(
     document: &DocumentLines,
     anchors: &'a [FileAnchor],
     scroll_offset: usize,

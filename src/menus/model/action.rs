@@ -1,4 +1,4 @@
-pub(in crate::menus) const PREVIEW_REQUIRED_MARKER: &str = "Preview required before execution.";
+pub const PREVIEW_REQUIRED_MARKER: &str = "Preview required before execution.";
 
 /// Safety policy shown before a menu action can mutate repository state.
 ///
@@ -60,7 +60,7 @@ pub enum ActionKind {
 }
 
 impl ActionKind {
-    pub(in crate::menus) fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::Edit => "edit",
             Self::New => "new",
@@ -79,7 +79,7 @@ impl ActionKind {
         }
     }
 
-    pub(in crate::menus) fn shortcut(self) -> char {
+    pub fn shortcut(self) -> char {
         match self {
             Self::Edit => 'e',
             Self::New => 'n',

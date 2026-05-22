@@ -9,7 +9,7 @@ use crate::app::App;
 
 impl App {
     /// Route one key through the common preview/result-pane reducer shared by action overlays.
-    pub(in crate::app) fn handle_common_action_preview_key(
+    pub fn handle_common_action_preview_key(
         &mut self,
         code: KeyCode,
         viewport_height: u16,

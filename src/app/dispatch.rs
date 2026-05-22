@@ -22,7 +22,7 @@ use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand};
 
 impl App {
     /// Continue or complete a multi-key prefix that was already in progress.
-    pub(super) fn handle_pending_command_key(
+    pub fn handle_pending_command_key(
         &mut self,
         key: crossterm::event::KeyEvent,
         viewport_height: u16,
@@ -82,7 +82,7 @@ impl App {
     }
 
     /// Execute any prefix fallback whose timeout expired without another key.
-    pub(super) fn flush_expired_pending_command(&mut self, viewport_height: u16) -> Result<()> {
+    pub fn flush_expired_pending_command(&mut self, viewport_height: u16) -> Result<()> {
         let Some(pending) = self.pending_command.as_ref() else {
             return Ok(());
         };
@@ -96,7 +96,7 @@ impl App {
 
     /// Run the exact binding that a prefix should fall back to when the longer
     /// match fails.
-    pub(super) fn run_pending_fallback(&mut self, viewport_height: u16) -> Result<()> {
+    pub fn run_pending_fallback(&mut self, viewport_height: u16) -> Result<()> {
         let fallback = self
             .pending_command
             .take()
@@ -117,7 +117,7 @@ impl App {
 
     /// Execute one binding and refresh ready status text if the binding says
     /// status is stale.
-    pub(super) fn run_binding_with_status_refresh(
+    pub fn run_binding_with_status_refresh(
         &mut self,
         binding: Binding,
         viewport_height: u16,
@@ -133,7 +133,7 @@ impl App {
     ///
     /// This preserves the user expectation that the suffix key is still
     /// interpreted after the shorter binding consumed the prefix.
-    pub(super) fn handle_key_after_prefix_fallback(
+    pub fn handle_key_after_prefix_fallback(
         &mut self,
         key: crossterm::event::KeyEvent,
         viewport_height: u16,
@@ -151,11 +151,7 @@ impl App {
     /// This is the boundary where global commands, app-owned previews/prompts,
     /// and view-reported commands converge before any view effect is
     /// interpreted.
-    pub(super) fn execute_binding(
-        &mut self,
-        binding: Binding,
-        viewport_height: u16,
-    ) -> Result<bool> {
+    pub fn execute_binding(&mut self, binding: Binding, viewport_height: u16) -> Result<bool> {
         match binding.command() {
             Command::Quit => {
                 self.should_quit = true;
@@ -306,7 +302,7 @@ fn binding_key_label(keys: &[crossterm::event::KeyEvent]) -> String {
 }
 
 /// Build the status-line message shown while a multi-key prefix is still pending.
-pub(super) fn prefix_status_message(
+pub fn prefix_status_message(
     prefix: &str,
     keys: &[crossterm::event::KeyEvent],
     next: &[String],

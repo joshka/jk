@@ -25,7 +25,7 @@ use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use ratatui::DefaultTerminal;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct InteractiveCommand {
+pub struct InteractiveCommand {
     /// Executable to run with inherited stdio.
     program: OsString,
     /// Positional and option arguments passed to the child process.
@@ -38,7 +38,7 @@ pub(crate) struct InteractiveCommand {
 
 impl InteractiveCommand {
     /// Build a new inherited-stdio command with a user-facing label.
-    pub(crate) fn new(program: impl Into<OsString>, label: impl Into<String>) -> Self {
+    pub fn new(program: impl Into<OsString>, label: impl Into<String>) -> Self {
         Self {
             program: program.into(),
             args: Vec::new(),
@@ -48,13 +48,13 @@ impl InteractiveCommand {
     }
 
     /// Append one argument to the child process argv.
-    pub(crate) fn arg(&mut self, arg: impl Into<OsString>) -> &mut Self {
+    pub fn arg(&mut self, arg: impl Into<OsString>) -> &mut Self {
         self.args.push(arg.into());
         self
     }
 
     /// Extend the child process argv from an iterator of arguments.
-    pub(crate) fn args<I, S>(&mut self, args: I) -> &mut Self
+    pub fn args<I, S>(&mut self, args: I) -> &mut Self
     where
         I: IntoIterator<Item = S>,
         S: Into<OsString>,
@@ -65,33 +65,33 @@ impl InteractiveCommand {
 
     /// Set the working directory the child process should inherit.
     #[allow(dead_code)]
-    pub(crate) fn current_dir(&mut self, current_dir: impl Into<PathBuf>) -> &mut Self {
+    pub fn current_dir(&mut self, current_dir: impl Into<PathBuf>) -> &mut Self {
         self.current_dir = Some(current_dir.into());
         self
     }
 
     /// Return the user-facing label for this interactive command.
-    pub(crate) fn label(&self) -> &str {
+    pub fn label(&self) -> &str {
         &self.label
     }
 
     #[cfg(test)]
-    pub(crate) fn program(&self) -> &OsStr {
+    pub fn program(&self) -> &OsStr {
         &self.program
     }
 
     #[cfg(test)]
-    pub(crate) fn argv(&self) -> Vec<&OsStr> {
+    pub fn argv(&self) -> Vec<&OsStr> {
         self.args.iter().map(OsString::as_os_str).collect()
     }
 
     #[cfg(test)]
-    pub(crate) fn current_dir_path(&self) -> Option<&Path> {
+    pub fn current_dir_path(&self) -> Option<&Path> {
         self.current_dir.as_deref()
     }
 
     #[cfg(test)]
-    pub(crate) fn stdio_intent(&self) -> StdioIntent {
+    pub fn stdio_intent(&self) -> StdioIntent {
         StdioIntent::Inherit
     }
 
@@ -112,12 +112,12 @@ impl InteractiveCommand {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg(test)]
-pub(crate) enum StdioIntent {
+pub enum StdioIntent {
     Inherit,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct InteractiveExitStatus {
+pub struct InteractiveExitStatus {
     /// Whether the child process exited successfully.
     success: bool,
     /// Human-readable exit status description.
@@ -126,7 +126,7 @@ pub(crate) struct InteractiveExitStatus {
 
 impl InteractiveExitStatus {
     #[cfg(test)]
-    pub(crate) fn success(description: impl Into<String>) -> Self {
+    pub fn success(description: impl Into<String>) -> Self {
         Self {
             success: true,
             description: description.into(),
@@ -134,7 +134,7 @@ impl InteractiveExitStatus {
     }
 
     #[cfg(test)]
-    pub(crate) fn failure(description: impl Into<String>) -> Self {
+    pub fn failure(description: impl Into<String>) -> Self {
         Self {
             success: false,
             description: description.into(),
@@ -149,18 +149,18 @@ impl InteractiveExitStatus {
     }
 
     /// Return whether the child process exited successfully.
-    pub(crate) fn is_success(&self) -> bool {
+    pub fn is_success(&self) -> bool {
         self.success
     }
 
     /// Return the human-readable exit status description.
-    pub(crate) fn description(&self) -> &str {
+    pub fn description(&self) -> &str {
         &self.description
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct InteractiveCommandResult {
+pub struct InteractiveCommandResult {
     /// User-facing label for the completed command.
     label: String,
     /// Exit status returned by the child process.
@@ -169,19 +169,19 @@ pub(crate) struct InteractiveCommandResult {
 
 impl InteractiveCommandResult {
     #[allow(dead_code)]
-    pub(crate) fn message(&self) -> String {
+    pub fn message(&self) -> String {
         format!("{} completed", self.label)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn status(&self) -> &InteractiveExitStatus {
+    pub fn status(&self) -> &InteractiveExitStatus {
         &self.status
     }
 }
 
 /// Run one interactive command using the live Ratatui terminal lifecycle.
 #[allow(dead_code)]
-pub(crate) fn run_with_ratatui_terminal(
+pub fn run_with_ratatui_terminal(
     terminal: &mut DefaultTerminal,
     command: &InteractiveCommand,
 ) -> Result<InteractiveCommandResult> {
@@ -191,7 +191,7 @@ pub(crate) fn run_with_ratatui_terminal(
 }
 
 /// Suspend the terminal, run one inherited-stdio command, and restore the terminal afterward.
-pub(crate) fn run_interactive_command<L, S>(
+pub fn run_interactive_command<L, S>(
     lifecycle: &mut L,
     spawner: &mut S,
     command: &InteractiveCommand,
@@ -251,14 +251,14 @@ where
 }
 
 /// Terminal lifecycle boundary needed around inherited-stdio commands.
-pub(crate) trait TerminalLifecycle {
+pub trait TerminalLifecycle {
     fn suspend(&mut self) -> Result<()>;
 
     fn restore(&mut self) -> Result<()>;
 }
 
 /// Child-process boundary used by the interactive runner.
-pub(crate) trait InteractiveCommandSpawner {
+pub trait InteractiveCommandSpawner {
     fn spawn_and_wait(&mut self, command: &InteractiveCommand) -> Result<InteractiveExitStatus>;
 }
 

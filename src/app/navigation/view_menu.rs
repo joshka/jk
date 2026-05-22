@@ -9,7 +9,7 @@ use super::super::App;
 impl App {
     /// Open the top-level view menu with the current surface preselected when
     /// possible.
-    pub(in crate::app) fn open_view_menu(&mut self) {
+    pub fn open_view_menu(&mut self) {
         let selected = view_menu_options()
             .iter()
             .position(|option| self.view_menu_option_is_current(option.action()))
@@ -28,7 +28,7 @@ impl App {
     }
 
     /// Apply one top-level view-menu choice.
-    pub(in crate::app) fn apply_view_menu_action(
+    pub fn apply_view_menu_action(
         &mut self,
         action: ViewMenuAction,
         viewport_height: u16,

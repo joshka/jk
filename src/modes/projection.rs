@@ -12,7 +12,7 @@ impl InteractionMode {
     /// `status_line`, and accepting, cancelling, or mutating prompt input belongs to app dispatch.
     /// This method should stay side-effect free so lifecycle code can ask what the screen would
     /// show without changing the active mode.
-    pub(crate) fn status_line(&self, view: &ViewState, stored_status: &StatusLine) -> StatusLine {
+    pub fn status_line(&self, view: &ViewState, stored_status: &StatusLine) -> StatusLine {
         match self {
             Self::SearchPrompt(input) => StatusLine::with_message(view, format!("/{input}")),
             Self::LogRevsetPrompt(input) => {
@@ -49,7 +49,7 @@ impl InteractionMode {
     /// and action output owned by `InteractionMode` or static tables. Overlay chrome and layout
     /// belong to `tui`, while key handling, command execution, and mode transitions stay in app
     /// dispatch.
-    pub(crate) fn overlay<'a>(
+    pub fn overlay<'a>(
         &'a self,
         view: &'a ViewState,
         app_bindings: &'static [Binding],

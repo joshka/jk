@@ -33,7 +33,7 @@ pub fn help_overlay_text(sections: &[HelpSection]) -> Text<'static> {
 }
 
 /// Build the copy-menu list for the current copyable options.
-pub(super) fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
+pub fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
     let items = options
         .iter()
         .enumerate()
@@ -50,7 +50,7 @@ pub(super) fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static
 }
 
 /// Build the top-level view-switching menu.
-pub(super) fn view_menu(options: &[ViewMenuOption], selected: usize) -> List<'static> {
+pub fn view_menu(options: &[ViewMenuOption], selected: usize) -> List<'static> {
     let items = options
         .iter()
         .enumerate()
@@ -99,11 +99,7 @@ pub fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
 }
 
 /// Build a remote-selection prompt for push or fetch.
-pub(super) fn remote_prompt(
-    title: &'static str,
-    remotes: &[String],
-    selected: usize,
-) -> List<'static> {
+pub fn remote_prompt(title: &'static str, remotes: &[String], selected: usize) -> List<'static> {
     let items = remotes
         .iter()
         .enumerate()
@@ -148,7 +144,7 @@ pub fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
 }
 
 /// Center a modal rectangle inside the available frame, clamping to the frame bounds.
-pub(super) fn centered_area(area: Rect, width: u16, height: u16) -> Rect {
+pub fn centered_area(area: Rect, width: u16, height: u16) -> Rect {
     let width = width.min(area.width);
     let height = height.min(area.height);
     let x = area.x + area.width.saturating_sub(width) / 2;
@@ -162,7 +158,7 @@ pub(super) fn centered_area(area: Rect, width: u16, height: u16) -> Rect {
     }
 }
 
-pub(super) fn overlay_block(title: impl Into<String>) -> Block<'static> {
+pub fn overlay_block(title: impl Into<String>) -> Block<'static> {
     Block::bordered()
         .style(theme::overlay_background_style())
         .border_style(theme::overlay_border_style())

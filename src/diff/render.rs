@@ -9,7 +9,7 @@ use super::DiffView;
 
 impl DiffView {
     /// Renders the current sticky document projection into the active viewport.
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         documents::render_document_with_viewport(
             frame,
             area,

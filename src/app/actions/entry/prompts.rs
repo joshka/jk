@@ -8,7 +8,7 @@ use super::super::super::App;
 
 impl App {
     /// Open the describe prompt for the current exact change or selected graph revision.
-    pub(in crate::app) fn open_describe_prompt(&mut self) {
+    pub fn open_describe_prompt(&mut self) {
         let target = match self.view.command() {
             JjCommand::Default | JjCommand::Log => match self.view.push_target() {
                 Ok(Some(crate::actions::JjGitPushTarget::Revision(revision))) => {
@@ -49,7 +49,7 @@ impl App {
     }
 
     /// Open the commit prompt when the current surface can commit the working copy.
-    pub(in crate::app) fn open_commit_prompt(&mut self) {
+    pub fn open_commit_prompt(&mut self) {
         if matches!(
             self.view.command(),
             JjCommand::Default | JjCommand::Log | JjCommand::Status
@@ -65,7 +65,7 @@ impl App {
     }
 
     /// Open the bookmark-name prompt for create, set, or move flows on the current target.
-    pub(in crate::app) fn open_bookmark_name_prompt(&mut self, kind: JjBookmarkMutationKind) {
+    pub fn open_bookmark_name_prompt(&mut self, kind: JjBookmarkMutationKind) {
         let target = match self.view.bookmark_target() {
             Ok(Some(target)) => target,
             Ok(None) => {
@@ -92,7 +92,7 @@ impl App {
     }
 
     /// Open the delete preview for the selected bookmark.
-    pub(in crate::app) fn open_bookmark_delete_preview(&mut self) {
+    pub fn open_bookmark_delete_preview(&mut self) {
         let name = match self.view.selected_local_bookmark_name() {
             Ok(Some(name)) => name.to_owned(),
             Ok(None) => {
@@ -112,7 +112,7 @@ impl App {
     }
 
     /// Open the forget preview for the selected bookmark and its current target.
-    pub(in crate::app) fn open_bookmark_forget_preview(&mut self) {
+    pub fn open_bookmark_forget_preview(&mut self) {
         let (name, target) = match self.view.bookmark_forget_target() {
             Ok(Some(target)) => target,
             Ok(None) => {
@@ -132,7 +132,7 @@ impl App {
     }
 
     /// Open the track or untrack preview for the selected bookmark.
-    pub(in crate::app) fn open_bookmark_tracking_preview(&mut self, kind: JjBookmarkMutationKind) {
+    pub fn open_bookmark_tracking_preview(&mut self, kind: JjBookmarkMutationKind) {
         let (name, target) = match &self.view {
             ViewState::Bookmarks(view) => match view.selected_bookmark_tracking_target(kind) {
                 Ok(Some((name, target))) => (name.to_owned(), target),
@@ -192,7 +192,7 @@ impl App {
     }
 
     /// Open the bookmark-rename prompt for the selected bookmark.
-    pub(in crate::app) fn open_bookmark_rename_prompt(&mut self) {
+    pub fn open_bookmark_rename_prompt(&mut self) {
         let old_name = match self.view.selected_local_bookmark_name_for("rename") {
             Ok(Some(name)) => name.to_owned(),
             Ok(None) => {

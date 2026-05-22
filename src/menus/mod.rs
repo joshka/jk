@@ -10,7 +10,7 @@ mod model;
 mod path_actions;
 mod revision_actions;
 
-pub(in crate::menus) use model::PREVIEW_REQUIRED_MARKER;
+pub use model::PREVIEW_REQUIRED_MARKER;
 pub use model::{
     ActionKind, ActionMenu, ActionMenuItem, CopyOption, FollowUp, RolePrompt, RolePromptOption,
     SafetyTier,

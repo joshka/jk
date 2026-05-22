@@ -6,7 +6,7 @@ use super::super::shared::bookmark_status_context;
 
 impl App {
     /// Open the describe preview for one prepared describe plan.
-    pub(in crate::app) fn open_describe_preview(&mut self, describe: JjDescribePlan) {
+    pub fn open_describe_preview(&mut self, describe: JjDescribePlan) {
         let status_context = Some(format!(
             "describe {} from {}",
             describe.target().label(),
@@ -24,7 +24,7 @@ impl App {
     }
 
     /// Open the commit preview for the current working-copy commit plan.
-    pub(in crate::app) fn open_commit_preview(&mut self, commit: JjCommitPlan) {
+    pub fn open_commit_preview(&mut self, commit: JjCommitPlan) {
         let status_context = Some(format!(
             "commit current working-copy change (@) from {}",
             self.view.spec().app_label()
@@ -41,10 +41,7 @@ impl App {
     }
 
     /// Open the bookmark mutation preview for one prepared bookmark plan.
-    pub(in crate::app) fn open_bookmark_mutation_preview(
-        &mut self,
-        mutation: JjBookmarkMutationPlan,
-    ) {
+    pub fn open_bookmark_mutation_preview(&mut self, mutation: JjBookmarkMutationPlan) {
         let status_context = Some(bookmark_status_context(
             &mutation,
             self.view.spec().app_label().as_str(),
@@ -61,7 +58,7 @@ impl App {
     }
 
     /// Open the file mutation preview for one prepared file plan.
-    pub(in crate::app) fn open_file_mutation_preview(&mut self, mutation: JjFileMutationPlan) {
+    pub fn open_file_mutation_preview(&mut self, mutation: JjFileMutationPlan) {
         let target = mutation
             .revision()
             .map(|revision| format!("{} at {}", mutation.path(), revision))

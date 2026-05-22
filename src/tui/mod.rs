@@ -12,9 +12,9 @@
 mod chrome;
 mod overlays;
 mod status_hints;
-pub(crate) mod theme;
+pub mod theme;
 
-pub use chrome::{Areas, areas, render_chrome};
+pub use chrome::{areas, render_chrome};
 pub use overlays::{Overlay, render_overlay};
 pub use status_hints::StatusHints;
 

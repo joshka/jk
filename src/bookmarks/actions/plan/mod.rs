@@ -61,7 +61,7 @@ impl JjBookmarkMutationKind {
         }
     }
 
-    pub(super) fn success_fallback(self) -> &'static str {
+    pub fn success_fallback(self) -> &'static str {
         match self {
             Self::Create => "created bookmark",
             Self::Set => "set bookmark",
@@ -200,25 +200,25 @@ impl JjBookmarkMutationPlan {
         )
     }
 
-    pub(super) fn required_target(&self) -> &JjBookmarkTarget {
+    pub fn required_target(&self) -> &JjBookmarkTarget {
         self.target
             .as_ref()
             .expect("bookmark mutation kind requires target")
     }
 
-    pub(super) fn required_new_name(&self) -> &str {
+    pub fn required_new_name(&self) -> &str {
         self.new_name
             .as_deref()
             .expect("bookmark rename requires new name")
     }
 
-    pub(super) fn required_forget_target(&self) -> &JjBookmarkForgetTarget {
+    pub fn required_forget_target(&self) -> &JjBookmarkForgetTarget {
         self.forget_target
             .as_ref()
             .expect("bookmark forget requires a forget target")
     }
 
-    pub(super) fn required_tracking_target(&self) -> &JjBookmarkTrackingTarget {
+    pub fn required_tracking_target(&self) -> &JjBookmarkTrackingTarget {
         self.tracking_target
             .as_deref()
             .expect("bookmark track/untrack requires a tracking target")

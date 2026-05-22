@@ -6,7 +6,7 @@ use super::LogItem;
 use super::metadata::RevisionMetadata;
 
 /// Group rendered terminal lines into selectable log items and pair optional metadata by row.
-pub(super) fn group_lines(
+pub fn group_lines(
     lines: Vec<Line<'static>>,
     metadata: RowMetadata<RevisionMetadata>,
 ) -> Vec<LogItem> {
@@ -60,7 +60,7 @@ fn starts_log_item(line: &Line<'_>) -> bool {
     starts_log_item_text(&line_text(line))
 }
 
-pub(super) fn starts_log_item_text(text: &str) -> bool {
+pub fn starts_log_item_text(text: &str) -> bool {
     crate::rendered_rows::first_content_char(text)
         .is_some_and(|character| matches!(character, '@' | '○' | '◆'))
 }

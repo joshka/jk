@@ -15,8 +15,8 @@ use crate::jj::ViewSpec;
 use crate::selection::Selection;
 
 #[cfg(test)]
-pub(crate) use rows::WORKSPACE_METADATA_TEMPLATE;
-pub(crate) use rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
+pub use rows::WORKSPACE_METADATA_TEMPLATE;
+pub use rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
@@ -70,7 +70,7 @@ impl WorkspacesView {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_new(context: WorkspaceContext) -> Self {
+    pub fn test_new(context: WorkspaceContext) -> Self {
         Self {
             spec: ViewSpec::workspaces(Vec::new()),
             context,

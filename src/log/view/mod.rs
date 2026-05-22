@@ -154,7 +154,7 @@ impl LogView {
 }
 
 #[cfg(test)]
-pub(super) fn test_entry_lines(
+pub fn test_entry_lines(
     entry: &LogItem,
     search: Option<&crate::search::SearchQuery>,
     is_selected: bool,
@@ -163,7 +163,7 @@ pub(super) fn test_entry_lines(
 }
 
 #[cfg(test)]
-pub(super) fn test_restore_selection(
+pub fn test_restore_selection(
     selection: &mut crate::selection::Selection,
     entries: &[LogItem],
     previous_index: usize,

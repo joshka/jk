@@ -7,7 +7,7 @@
 use crossterm::event::KeyCode;
 
 #[derive(Clone, Debug)]
-pub(crate) struct ActionPane {
+pub struct ActionPane {
     /// User-facing label for the command whose preview or result is shown.
     command_label: String,
     /// Raw command output rendered in the overlay body.
@@ -22,11 +22,7 @@ pub(crate) struct ActionPane {
 
 impl ActionPane {
     /// Build a preview/result pane whose command is still running or awaiting confirmation.
-    pub(crate) fn pending(
-        command_label: String,
-        output: String,
-        status_context: Option<String>,
-    ) -> Self {
+    pub fn pending(command_label: String, output: String, status_context: Option<String>) -> Self {
         Self {
             command_label,
             output,
@@ -37,11 +33,7 @@ impl ActionPane {
     }
 
     /// Build a preview/result pane for a completed command.
-    pub(crate) fn finished(
-        command_label: String,
-        output: String,
-        status_context: Option<String>,
-    ) -> Self {
+    pub fn finished(command_label: String, output: String, status_context: Option<String>) -> Self {
         Self {
             command_label,
             output,
@@ -52,27 +44,27 @@ impl ActionPane {
     }
 
     #[cfg(test)]
-    pub(crate) fn command_label(&self) -> &str {
+    pub fn command_label(&self) -> &str {
         &self.command_label
     }
 
     /// Return the optional context line shown above the output body.
-    pub(crate) fn status_context(&self) -> Option<&String> {
+    pub fn status_context(&self) -> Option<&String> {
         self.status_context.as_ref()
     }
 
     /// Return whether the represented command has completed.
-    pub(crate) fn completed(&self) -> bool {
+    pub fn completed(&self) -> bool {
         self.completed
     }
 
     /// Return the current vertical scroll offset.
-    pub(crate) fn scroll(&self) -> usize {
+    pub fn scroll(&self) -> usize {
         self.scroll
     }
 
     /// Render the current pane content into the body lines shown by the overlay.
-    pub(crate) fn body_lines(&self) -> Vec<String> {
+    pub fn body_lines(&self) -> Vec<String> {
         let mut lines = vec![format!("command: {}", self.command_label)];
         if let Some(context) = &self.status_context {
             lines.push(format!("context: {context}"));
@@ -89,41 +81,41 @@ impl ActionPane {
     }
 
     /// Scroll down by one line without moving past the last visible body line.
-    pub(crate) fn scroll_down(&mut self, visible_lines: u16) {
+    pub fn scroll_down(&mut self, visible_lines: u16) {
         let max_scroll = self.max_scroll(visible_lines);
         self.scroll = (self.scroll + 1).min(max_scroll);
     }
 
     /// Scroll up by one line without moving above the first body line.
-    pub(crate) fn scroll_up(&mut self) {
+    pub fn scroll_up(&mut self) {
         self.scroll = self.scroll.saturating_sub(1);
     }
 
     /// Scroll down by one page using the current visible line count.
-    pub(crate) fn page_down(&mut self, visible_lines: u16) {
+    pub fn page_down(&mut self, visible_lines: u16) {
         let max_scroll = self.max_scroll(visible_lines);
         self.scroll = (self.scroll + usize::from(visible_lines).max(1)).min(max_scroll);
     }
 
     /// Scroll up by one page using the current visible line count.
-    pub(crate) fn page_up(&mut self, visible_lines: u16) {
+    pub fn page_up(&mut self, visible_lines: u16) {
         self.scroll = self
             .scroll
             .saturating_sub(usize::from(visible_lines).max(1));
     }
 
     /// Jump to the first body line.
-    pub(crate) fn scroll_to_top(&mut self) {
+    pub fn scroll_to_top(&mut self) {
         self.scroll = 0;
     }
 
     /// Jump to the last scroll position that still fills the viewport.
-    pub(crate) fn scroll_to_bottom(&mut self, visible_lines: u16) {
+    pub fn scroll_to_bottom(&mut self, visible_lines: u16) {
         self.scroll = self.max_scroll(visible_lines);
     }
 
     /// Return the maximum vertical scroll offset for the current body and viewport size.
-    pub(crate) fn max_scroll(&self, visible_lines: u16) -> usize {
+    pub fn max_scroll(&self, visible_lines: u16) -> usize {
         self.body_lines()
             .len()
             .saturating_sub(usize::from(visible_lines))
@@ -131,13 +123,13 @@ impl ActionPane {
 }
 
 /// Return the number of body lines available beneath the pane header/status row.
-pub(crate) fn action_pane_visible_lines(viewport_height: u16) -> u16 {
+pub fn action_pane_visible_lines(viewport_height: u16) -> u16 {
     viewport_height.saturating_sub(1).max(1)
 }
 
 /// Reduced key outcome for an action preview or result overlay.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ActionPaneKey {
+pub enum ActionPaneKey {
     /// The primary accept key was pressed.
     Primary,
     /// The cancel/close key was pressed.
@@ -149,7 +141,7 @@ pub(crate) enum ActionPaneKey {
 }
 
 /// Route one key through action-pane scrolling and accept/cancel handling.
-pub(crate) fn handle_action_pane_key(
+pub fn handle_action_pane_key(
     code: KeyCode,
     output: &mut ActionPane,
     visible_lines: u16,

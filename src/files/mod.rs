@@ -6,5 +6,5 @@
 //! table of contents: `list` owns selectable file rows and drill-down into one file, while `show`
 //! owns the single-file document surface once a path has been chosen.
 
-pub(crate) mod list;
-pub(crate) mod show;
+pub mod list;
+pub mod show;

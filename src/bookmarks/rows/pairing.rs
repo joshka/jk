@@ -8,7 +8,7 @@ use super::metadata::{BookmarkMetadata, BookmarkMetadataCoverage};
 use super::{BookmarkItem, BookmarkRowState};
 
 /// Pairs rendered bookmark rows with metadata and degrades safely when counts drift.
-pub(super) fn pair_bookmark_lines(
+pub fn pair_bookmark_lines(
     lines: Vec<Line<'static>>,
     metadata: Vec<BookmarkMetadata>,
     coverage: BookmarkMetadataCoverage,
@@ -81,7 +81,7 @@ pub(super) fn pair_bookmark_lines(
     items
 }
 
-pub(super) fn bookmark_name_from_rendered_row(text: &str) -> String {
+pub fn bookmark_name_from_rendered_row(text: &str) -> String {
     text.split_once(':')
         .map(|(name, _)| name.trim())
         .filter(|name| !name.is_empty())

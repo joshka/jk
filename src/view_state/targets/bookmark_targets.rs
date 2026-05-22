@@ -4,7 +4,7 @@ use crate::actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
 
 use super::super::ViewState;
 
-pub(super) fn push_target(view: &ViewState) -> Result<Option<JjGitPushTarget>> {
+pub fn push_target(view: &ViewState) -> Result<Option<JjGitPushTarget>> {
     match view {
         ViewState::Log(view) => view
             .selected_revision()
@@ -40,7 +40,7 @@ pub(super) fn push_target(view: &ViewState) -> Result<Option<JjGitPushTarget>> {
     }
 }
 
-pub(super) fn bookmark_target(view: &ViewState) -> Result<Option<JjBookmarkTarget>> {
+pub fn bookmark_target(view: &ViewState) -> Result<Option<JjBookmarkTarget>> {
     match view {
         ViewState::Log(view) => view
             .selected_revision()
@@ -66,7 +66,7 @@ pub(super) fn bookmark_target(view: &ViewState) -> Result<Option<JjBookmarkTarge
     }
 }
 
-pub(super) fn selected_local_bookmark_name_for<'a>(
+pub fn selected_local_bookmark_name_for<'a>(
     view: &'a ViewState,
     action: &str,
 ) -> Result<Option<&'a str>> {
@@ -93,7 +93,7 @@ pub(super) fn selected_local_bookmark_name_for<'a>(
     }
 }
 
-pub(super) fn bookmark_forget_target(
+pub fn bookmark_forget_target(
     view: &ViewState,
 ) -> Result<Option<(String, JjBookmarkForgetTarget)>> {
     match view {

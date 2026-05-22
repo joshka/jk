@@ -7,7 +7,7 @@ use super::super::ActionPane;
 
 impl App {
     /// Run the undo/redo operation and leave its finished output on the recovery pane.
-    pub(in crate::app) fn confirm_operation_recovery(
+    pub fn confirm_operation_recovery(
         &mut self,
         recovery: JjOperationRecovery,
         status_context: Option<String>,
@@ -30,7 +30,7 @@ impl App {
     }
 
     /// Run the operation restore/revert command and refresh current plus stacked repo views.
-    pub(in crate::app) fn confirm_operation_target(
+    pub fn confirm_operation_target(
         &mut self,
         target: JjOperationTarget,
         status_context: Option<String>,

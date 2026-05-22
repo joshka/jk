@@ -57,7 +57,7 @@ impl FileShowView {
             .scroll_right(viewport_width, amount, self.max_line_width());
     }
 
-    pub(crate) fn refresh_with_loader(
+    pub fn refresh_with_loader(
         &mut self,
         load: impl Fn(&crate::jj::ViewSpec) -> Result<DocumentLines>,
     ) -> Result<()> {

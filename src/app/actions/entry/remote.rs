@@ -15,7 +15,7 @@ const FETCH_NO_REMOTES_CONTEXT: &str = "fetch remote selection found no remotes"
 const FETCH_REMOTE_LIST_ERROR_CONTEXT: &str = "fetch remote selection failed to list remotes";
 
 #[derive(Debug, Eq, PartialEq)]
-pub(super) enum PushRemotePromptDecision {
+pub enum PushRemotePromptDecision {
     MissingRemotes {
         /// Status text shown when no remote can be chosen.
         message: String,
@@ -35,7 +35,7 @@ pub(super) enum PushRemotePromptDecision {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub(super) enum FetchRemotePromptDecision {
+pub enum FetchRemotePromptDecision {
     MissingRemotes {
         /// Status text shown when no remote can be chosen.
         message: String,
@@ -60,7 +60,7 @@ pub(super) enum FetchRemotePromptDecision {
 
 impl App {
     /// Open push preview immediately, or prompt for a remote when multiple choices exist.
-    pub(in crate::app) fn open_push_prompt(&mut self) -> Result<bool> {
+    pub fn open_push_prompt(&mut self) -> Result<bool> {
         let target = match self.view.push_target() {
             Ok(Some(target)) => target,
             Ok(None) => {
@@ -101,7 +101,7 @@ impl App {
     }
 
     /// Open fetch preview immediately, or prompt for a remote when multiple choices exist.
-    pub(in crate::app) fn open_fetch_remote_prompt(&mut self) {
+    pub fn open_fetch_remote_prompt(&mut self) {
         let decision = decide_fetch_remote_prompt(
             self.services
                 .load_git_remotes()
@@ -140,7 +140,7 @@ impl App {
 }
 
 /// Decide whether push should fail, prompt, or preview based on discovered remotes.
-pub(super) fn decide_push_remote_prompt(
+pub fn decide_push_remote_prompt(
     remotes: std::result::Result<Vec<String>, String>,
 ) -> PushRemotePromptDecision {
     match remotes {
@@ -158,7 +158,7 @@ pub(super) fn decide_push_remote_prompt(
 }
 
 /// Decide whether fetch should fail, prompt, or preview based on discovered remotes.
-pub(super) fn decide_fetch_remote_prompt(
+pub fn decide_fetch_remote_prompt(
     remotes: std::result::Result<Vec<String>, String>,
 ) -> FetchRemotePromptDecision {
     match remotes {

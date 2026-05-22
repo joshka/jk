@@ -17,7 +17,7 @@ use crate::jj::JjCommand;
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
 
-pub(crate) use rows::{FileListItem, load_file_list_entries};
+pub use rows::{FileListItem, load_file_list_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
@@ -75,7 +75,7 @@ pub struct FileListView {
 
 impl FileListView {
     #[cfg(test)]
-    pub(crate) fn test_new(entries: Vec<FileListItem>) -> Self {
+    pub fn test_new(entries: Vec<FileListItem>) -> Self {
         Self {
             entries,
             spec: ViewSpec::file_list(None, None),
@@ -84,7 +84,7 @@ impl FileListView {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_with_spec(spec: ViewSpec, entries: Vec<FileListItem>) -> Self {
+    pub fn test_with_spec(spec: ViewSpec, entries: Vec<FileListItem>) -> Self {
         Self {
             entries,
             spec,

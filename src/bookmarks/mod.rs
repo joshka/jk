@@ -8,12 +8,12 @@
 //! selectable bookmark list surface, `targets` owns action-target safety
 //! checks, and `actions` owns the exact bookmark mutation plans.
 
-pub(crate) mod actions;
+pub mod actions;
 mod rows;
 mod targets;
 mod view;
 
-pub(crate) use self::rows::{
+pub use self::rows::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState, load_bookmark_entries,
 };

@@ -6,7 +6,7 @@ use super::super::ActionPane;
 
 impl App {
     /// Run the describe command and leave its finished output on the describe pane.
-    pub(in crate::app) fn confirm_describe(
+    pub fn confirm_describe(
         &mut self,
         describe: JjDescribePlan,
         status_context: Option<String>,
@@ -31,7 +31,7 @@ impl App {
     }
 
     /// Run the commit command and leave its finished output on the commit pane.
-    pub(in crate::app) fn confirm_commit(
+    pub fn confirm_commit(
         &mut self,
         commit: JjCommitPlan,
         status_context: Option<String>,
@@ -54,7 +54,7 @@ impl App {
     }
 
     /// Run the bookmark mutation and leave its finished output on the bookmark pane.
-    pub(in crate::app) fn confirm_bookmark_mutation(
+    pub fn confirm_bookmark_mutation(
         &mut self,
         mutation: JjBookmarkMutationPlan,
         status_context: Option<String>,
@@ -73,7 +73,7 @@ impl App {
     }
 
     /// Run the file mutation and leave its finished output on the file-mutation pane.
-    pub(in crate::app) fn confirm_file_mutation(
+    pub fn confirm_file_mutation(
         &mut self,
         mutation: JjFileMutationPlan,
         status_context: Option<String>,

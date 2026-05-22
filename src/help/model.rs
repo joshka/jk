@@ -84,7 +84,7 @@ impl HelpRow {
         self.action
     }
 
-    pub(super) fn push_key_label(&mut self, key: &str) {
+    pub fn push_key_label(&mut self, key: &str) {
         self.keys.push_str(", ");
         self.keys.push_str(key);
     }

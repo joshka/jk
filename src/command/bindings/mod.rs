@@ -45,7 +45,7 @@ impl KeyPattern {
         Self::new(code, KeyModifiers::NONE)
     }
 
-    pub(in crate::command) fn matches(self, key: KeyEvent) -> bool {
+    pub fn matches(self, key: KeyEvent) -> bool {
         key.code == self.code
             && (key.modifiers == self.modifiers
                 || (self.modifiers.is_empty()
@@ -79,11 +79,11 @@ impl KeyPattern {
         }
     }
 
-    pub(in crate::command) fn is_plain_char(self) -> bool {
+    pub fn is_plain_char(self) -> bool {
         matches!(self.code, KeyCode::Char(_)) && self.modifiers.is_empty()
     }
 
-    pub(in crate::command) fn plain_char(self) -> Option<char> {
+    pub fn plain_char(self) -> Option<char> {
         match self.code {
             KeyCode::Char(character) if self.modifiers.is_empty() => Some(character),
             _ => None,
@@ -100,6 +100,24 @@ pub struct Binding {
 }
 
 impl Binding {
+    /// Bind one printable character to a command identity.
+    pub const fn char(character: char, command: Command) -> Self {
+        Self::new(KeyPattern::char(character), command)
+    }
+
+    /// Bind one non-character key code to a command identity.
+    pub const fn code(code: KeyCode, command: Command) -> Self {
+        Self::new(KeyPattern::code(code), command)
+    }
+
+    /// Bind a two-key printable-character chord to a command identity.
+    pub const fn chord(prefix: char, suffix: char, command: Command) -> Self {
+        Self {
+            key: KeySequence::Chord(KeyPattern::char(prefix), KeyPattern::char(suffix)),
+            command,
+        }
+    }
+
     /// Bind one key pattern to a command identity.
     ///
     /// Bindings are metadata only. They do not execute commands, mutate pending
@@ -140,15 +158,15 @@ impl Binding {
         self.key.label()
     }
 
-    pub(in crate::command) fn matches_prefix(self, keys: &[KeyEvent]) -> bool {
+    pub fn matches_prefix(self, keys: &[KeyEvent]) -> bool {
         self.key.matches_prefix(keys)
     }
 
-    pub(in crate::command) fn sequence_len(self) -> usize {
+    pub fn sequence_len(self) -> usize {
         self.key.len()
     }
 
-    pub(in crate::command) fn next_pattern(self, key_count: usize) -> Option<KeyPattern> {
+    pub fn next_pattern(self, key_count: usize) -> Option<KeyPattern> {
         self.key.next_pattern(key_count)
     }
 }
@@ -161,6 +179,8 @@ impl Binding {
 enum KeySequence {
     /// A one-key binding that can complete immediately.
     Single(KeyPattern),
+    /// A fixed two-key chord stored directly in binding metadata.
+    Chord(KeyPattern, KeyPattern),
     /// A fixed sequence whose full label and prefix behavior are user-visible.
     Multi(&'static [KeyPattern]),
 }
@@ -170,6 +190,7 @@ impl KeySequence {
     fn matches(self, key: KeyEvent) -> bool {
         match self {
             Self::Single(pattern) => pattern.matches(key),
+            Self::Chord(pattern, _) => pattern.matches(key),
             Self::Multi([pattern]) => pattern.matches(key),
             Self::Multi(_) => false,
         }
@@ -178,6 +199,13 @@ impl KeySequence {
     fn label(self) -> String {
         match self {
             Self::Single(pattern) => pattern.label(),
+            Self::Chord(first, second) if first.is_plain_char() && second.is_plain_char() => {
+                [first, second]
+                    .into_iter()
+                    .filter_map(KeyPattern::plain_char)
+                    .collect()
+            }
+            Self::Chord(first, second) => format!("{} {}", first.label(), second.label()),
             // Plain character chords render compactly for help and prefix
             // fallback labels, while modified/non-character chords keep spaces
             // between physical key labels.
@@ -198,6 +226,7 @@ impl KeySequence {
     fn len(self) -> usize {
         match self {
             Self::Single(_) => 1,
+            Self::Chord(_, _) => 2,
             Self::Multi(patterns) => patterns.len(),
         }
     }
@@ -211,6 +240,12 @@ impl KeySequence {
             Self::Single(pattern) => keys
                 .first()
                 .is_some_and(|key| keys.len() == 1 && pattern.matches(*key)),
+            Self::Chord(first, second) => {
+                let patterns = [first, second];
+                keys.iter()
+                    .zip(patterns)
+                    .all(|(key, pattern)| pattern.matches(*key))
+            }
             Self::Multi(patterns) => keys
                 .iter()
                 .zip(patterns)
@@ -221,6 +256,7 @@ impl KeySequence {
     fn next_pattern(self, key_count: usize) -> Option<KeyPattern> {
         match self {
             Self::Single(_) => None,
+            Self::Chord(first, second) => [first, second].get(key_count).copied(),
             Self::Multi(patterns) => patterns.get(key_count).copied(),
         }
     }

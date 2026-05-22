@@ -88,7 +88,7 @@ impl OperationLogView {
     }
 
     /// Counts rows whose rendered text matches the current search query.
-    pub(super) fn search_matches(&self, query: &SearchQuery) -> usize {
+    pub fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
             .filter(|entry| entry_matches(&entry.lines(), query))
@@ -96,7 +96,7 @@ impl OperationLogView {
     }
 
     /// Advances selection to the next matching row if one exists.
-    pub(super) fn next_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
             .find(|index| entry_matches(&self.entries[*index].lines(), query))
@@ -108,7 +108,7 @@ impl OperationLogView {
     }
 
     /// Moves selection to the previous matching row if one exists.
-    pub(super) fn previous_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
             .chain(((self.selection.index() + 1)..self.entries.len()).rev())
@@ -121,7 +121,7 @@ impl OperationLogView {
     }
 
     /// Returns copyable identifiers and the selected rendered row text.
-    pub(super) fn copy_options(&self) -> Vec<CopyOption> {
+    pub fn copy_options(&self) -> Vec<CopyOption> {
         let Some(entry) = self.entries.get(self.selection.index()) else {
             return Vec::new();
         };

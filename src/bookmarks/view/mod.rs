@@ -63,16 +63,16 @@ pub const BINDINGS: &[Binding] = &[
 /// Selectable bookmark output from `jj bookmark list`.
 pub struct BookmarksView {
     /// View identity used to reload the bookmark list.
-    pub(super) spec: ViewSpec,
+    pub spec: ViewSpec,
     /// Rendered bookmark rows paired with trusted names, targets, and row state.
-    pub(super) entries: Vec<BookmarkItem>,
+    pub entries: Vec<BookmarkItem>,
     /// Current selected row within the bookmark list.
-    pub(super) selection: Selection,
+    pub selection: Selection,
 }
 
 impl BookmarksView {
     #[cfg(test)]
-    pub(crate) fn test_new(entries: Vec<BookmarkItem>) -> Self {
+    pub fn test_new(entries: Vec<BookmarkItem>) -> Self {
         Self {
             entries,
             spec: ViewSpec::new(JjCommand::Bookmarks, Vec::new()),
@@ -81,7 +81,7 @@ impl BookmarksView {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_new_with_args(entries: Vec<BookmarkItem>, args: Vec<String>) -> Self {
+    pub fn test_new_with_args(entries: Vec<BookmarkItem>, args: Vec<String>) -> Self {
         Self {
             entries,
             spec: ViewSpec::new(JjCommand::Bookmarks, args),

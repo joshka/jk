@@ -73,7 +73,7 @@ impl BookmarksView {
     }
 
     /// Counts rows whose rendered text matches the current search query.
-    pub(crate) fn search_matches(&self, query: &SearchQuery) -> usize {
+    pub fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
             .filter(|entry| entry_matches(&entry.lines(), query))
@@ -81,7 +81,7 @@ impl BookmarksView {
     }
 
     /// Advances selection to the next matching row if one exists.
-    pub(crate) fn next_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
             .find(|index| entry_matches(&self.entries[*index].lines(), query))
@@ -93,7 +93,7 @@ impl BookmarksView {
     }
 
     /// Moves selection to the previous matching row if one exists.
-    pub(crate) fn previous_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
             .chain(((self.selection.index() + 1)..self.entries.len()).rev())
@@ -106,7 +106,7 @@ impl BookmarksView {
     }
 
     /// Returns copyable identifiers and rendered row text for the selected bookmark.
-    pub(crate) fn copy_options(&self) -> Vec<CopyOption> {
+    pub fn copy_options(&self) -> Vec<CopyOption> {
         let Some(entry) = self.selected_entry() else {
             return Vec::new();
         };

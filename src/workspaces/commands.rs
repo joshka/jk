@@ -64,7 +64,7 @@ impl WorkspacesView {
     }
 
     /// Counts rows whose rendered text matches the current search query.
-    pub(super) fn search_matches(&self, query: &SearchQuery) -> usize {
+    pub fn search_matches(&self, query: &SearchQuery) -> usize {
         self.context
             .entries()
             .iter()
@@ -73,7 +73,7 @@ impl WorkspacesView {
     }
 
     /// Advances selection to the next matching row if one exists.
-    pub(super) fn next_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.context.entries().len())
             .chain(0..self.selection.index().min(self.context.entries().len()))
             .find(|index| entry_matches(&self.context.entries()[*index].lines(), query))
@@ -85,7 +85,7 @@ impl WorkspacesView {
     }
 
     /// Moves selection to the previous matching row if one exists.
-    pub(super) fn previous_match(&mut self, query: &SearchQuery) -> bool {
+    pub fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
             .chain(((self.selection.index() + 1)..self.context.entries().len()).rev())
@@ -98,7 +98,7 @@ impl WorkspacesView {
     }
 
     /// Returns copyable root context and selected-row identifiers for the workspace surface.
-    pub(super) fn copy_options(&self) -> Vec<CopyOption> {
+    pub fn copy_options(&self) -> Vec<CopyOption> {
         let mut options = Vec::new();
         if let Some(root) = self.context.root() {
             options.push(CopyOption::new("current root", root));

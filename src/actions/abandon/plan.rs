@@ -14,7 +14,7 @@ use super::JjAbandonPreview;
 /// The abandon flow uses `jj log` to surface a title without inventing its own
 /// parser or changing the selected change.
 #[cfg(test)]
-pub(super) const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
+pub const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 #[cfg(not(test))]
 const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n\"";
 
@@ -103,7 +103,7 @@ impl JjAbandonPlan {
 
     /// Returns argv for the first-line title preflight probe.
     #[cfg(test)]
-    pub(super) fn title_argv(&self) -> Vec<String> {
+    pub fn title_argv(&self) -> Vec<String> {
         vec![
             "log".to_owned(),
             "-r".to_owned(),

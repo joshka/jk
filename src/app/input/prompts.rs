@@ -13,7 +13,7 @@ use super::super::reducers::{
 use super::App;
 
 impl App {
-    pub(super) fn handle_search_prompt_key(
+    pub fn handle_search_prompt_key(
         &mut self,
         code: KeyCode,
         viewport_height: u16,
@@ -45,7 +45,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_log_revset_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_log_revset_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::LogRevsetPrompt(input) = &mut self.mode else {
             unreachable!("log revset prompt key handler requires log revset prompt mode");
         };
@@ -62,7 +62,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_describe_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_describe_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::DescribePrompt { target, input } = &mut self.mode else {
             unreachable!("describe prompt key handler requires describe prompt mode");
         };
@@ -81,7 +81,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_commit_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_commit_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::CommitPrompt(input) = &mut self.mode else {
             unreachable!("commit prompt key handler requires commit prompt mode");
         };
@@ -100,7 +100,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_bookmark_name_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_bookmark_name_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::BookmarkNamePrompt {
             kind,
             target,
@@ -131,7 +131,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_bookmark_rename_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
+    pub fn handle_bookmark_rename_prompt_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::BookmarkRenamePrompt { old_name, input } = &mut self.mode else {
             unreachable!("bookmark rename prompt key handler requires bookmark rename prompt mode");
         };

@@ -37,7 +37,7 @@ pub fn areas(area: Rect) -> Areas {
 }
 
 /// Draw shared title and status chrome without touching the view's main content area.
-pub fn render_chrome(frame: &mut Frame<'_>, areas: Areas, status: &StatusLine) {
+pub fn render_chrome(frame: &mut Frame, areas: Areas, status: &StatusLine) {
     frame.render_widget(title_bar(status), areas.title);
     frame.render_widget(status_line(status, areas.status.width), areas.status);
 }

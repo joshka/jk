@@ -15,6 +15,4 @@ mod pane;
 mod preview;
 mod shared;
 
-pub(crate) use pane::{
-    ActionPane, ActionPaneKey, action_pane_visible_lines, handle_action_pane_key,
-};
+pub use pane::{ActionPane, ActionPaneKey, action_pane_visible_lines, handle_action_pane_key};

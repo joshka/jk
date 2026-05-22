@@ -17,8 +17,8 @@ mod state;
 mod tests;
 
 #[cfg(test)]
-pub(crate) use rows::RESOLVE_CONFLICT_TEMPLATE;
-pub(crate) use rows::{ResolveEntry, load_resolve_entries};
+pub use rows::RESOLVE_CONFLICT_TEMPLATE;
+pub use rows::{ResolveEntry, load_resolve_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),
@@ -72,7 +72,7 @@ pub struct ResolveView {
 
 impl ResolveView {
     #[cfg(test)]
-    pub(crate) fn test_new(entries: Vec<ResolveEntry>) -> Self {
+    pub fn test_new(entries: Vec<ResolveEntry>) -> Self {
         Self {
             spec: ViewSpec::resolve(None),
             entries,
@@ -81,7 +81,7 @@ impl ResolveView {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_with_spec(spec: ViewSpec, entries: Vec<ResolveEntry>) -> Self {
+    pub fn test_with_spec(spec: ViewSpec, entries: Vec<ResolveEntry>) -> Self {
         Self {
             spec,
             entries,

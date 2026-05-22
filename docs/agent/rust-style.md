@@ -57,11 +57,11 @@ understand the behavior.
 
 ## Visibility
 
-Keep visibility narrow. Prefer private items until another module has a concrete need.
+Prefer private items until another module has a concrete need.
 
-Use `pub` for crate-root or public library API only if the item is intentionally part of the
-external surface. Use narrower visibility only when it simplifies a real module boundary; avoid
-`pub(crate)`, `pub(super)`, and `pub(in ...)` as default tools.
+When an item needs to be visible outside its module in this repo, prefer plain `pub` over
+`pub(crate)`, `pub(super)`, or `pub(in ...)`. Use narrower non-private visibility only when a real
+boundary needs to be preserved and that narrower form makes the code easier to understand.
 
 When an item becomes visible outside its module, its name and docs should make the ownership
 boundary obvious.

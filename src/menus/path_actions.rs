@@ -9,7 +9,7 @@ use crate::actions::JjFileChmodMode;
 use super::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier, short_id};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct FileActionContext {
+pub struct FileActionContext {
     /// Selected path whose menu entries are being built.
     path: String,
     /// Revision or working-copy scope that owns the selected path.
@@ -35,7 +35,7 @@ enum FileActionScope {
 
 impl FileActionContext {
     /// Build a working-copy path context for an untracked status row.
-    pub(super) fn working_copy_untracked(path: String) -> Self {
+    pub fn working_copy_untracked(path: String) -> Self {
         Self {
             path,
             scope: FileActionScope::WorkingCopy,
@@ -47,11 +47,7 @@ impl FileActionContext {
     }
 
     /// Build a working-copy path context for a tracked status or file row.
-    pub(super) fn working_copy_tracked(
-        path: String,
-        restore_allowed: bool,
-        chmod_allowed: bool,
-    ) -> Self {
+    pub fn working_copy_tracked(path: String, restore_allowed: bool, chmod_allowed: bool) -> Self {
         Self {
             path,
             scope: FileActionScope::WorkingCopy,
@@ -63,11 +59,7 @@ impl FileActionContext {
     }
 
     /// Build an exact-revision path context for detail-surface file actions.
-    pub(super) fn exact_revision_tracked(
-        revision: String,
-        path: String,
-        chmod_allowed: bool,
-    ) -> Self {
+    pub fn exact_revision_tracked(revision: String, path: String, chmod_allowed: bool) -> Self {
         Self {
             path,
             scope: FileActionScope::ExactRevision(revision),
@@ -93,7 +85,7 @@ impl FileActionContext {
 }
 
 /// Build the status-surface path menu, including restore when the status row allows it.
-pub(super) fn status_path_action_menu(file_action: &FileActionContext) -> ActionMenu {
+pub fn status_path_action_menu(file_action: &FileActionContext) -> ActionMenu {
     let mut items = Vec::new();
     if file_action.restore_allowed {
         let path = file_action.path();
@@ -112,12 +104,12 @@ pub(super) fn status_path_action_menu(file_action: &FileActionContext) -> Action
 }
 
 /// Build the non-status path menu for detail or file surfaces.
-pub(super) fn file_action_menu(file_action: &FileActionContext) -> ActionMenu {
+pub fn file_action_menu(file_action: &FileActionContext) -> ActionMenu {
     ActionMenu::new(file_action_menu_items(file_action))
 }
 
 /// Build the ordered path-specific mutation rows for the selected path context.
-pub(super) fn file_action_menu_items(file_action: &FileActionContext) -> Vec<ActionMenuItem> {
+pub fn file_action_menu_items(file_action: &FileActionContext) -> Vec<ActionMenuItem> {
     let mut items = Vec::new();
     let path = file_action.path();
     if file_action.track_allowed {

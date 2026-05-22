@@ -12,7 +12,7 @@ use super::{
     BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState, RemoteBookmarkTrackingState,
 };
 
-pub(crate) const BOOKMARK_METADATA_TEMPLATE: &str = concat!(
+pub const BOOKMARK_METADATA_TEMPLATE: &str = concat!(
     r#""{\"name\":" ++ json(name)"#,
     r#" ++ ",\"remote\":" ++ json(remote)"#,
     r#" ++ ",\"tracked\":" ++ json(tracked)"#,
@@ -24,13 +24,13 @@ pub(crate) const BOOKMARK_METADATA_TEMPLATE: &str = concat!(
 );
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum BookmarkMetadataCoverage {
+pub enum BookmarkMetadataCoverage {
     VisibleRowsOnly,
     UnfilteredAllRemotes,
 }
 
 /// Returns whether bookmark metadata covers only visible rows or all remotes without filtering.
-pub(super) fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCoverage {
+pub fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCoverage {
     if !spec.args().is_empty()
         && spec
             .args()
@@ -44,26 +44,26 @@ pub(super) fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCov
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct BookmarkMetadata {
+pub struct BookmarkMetadata {
     /// Exact bookmark name from metadata.
-    pub(super) name: String,
+    pub name: String,
     /// Remote name for remote rows, or `None` for local rows.
-    pub(super) remote: Option<String>,
+    pub remote: Option<String>,
     /// Whether the row is tracked according to `jj` metadata.
-    pub(super) tracked: bool,
+    pub tracked: bool,
     /// Whether tracking metadata was present for this row.
-    pub(super) tracking_present: bool,
+    pub tracking_present: bool,
     /// Whether the local and remote targets are already synced.
-    pub(super) synced: bool,
+    pub synced: bool,
     /// Exact target change id when available.
-    pub(super) target_change_id: Option<String>,
+    pub target_change_id: Option<String>,
     /// Exact target commit id when available.
-    pub(super) target_commit_id: Option<String>,
+    pub target_commit_id: Option<String>,
 }
 
 impl BookmarkMetadata {
     /// Classifies one metadata row into the user-visible bookmark row state.
-    pub(super) fn row_state(
+    pub fn row_state(
         &self,
         coverage: BookmarkMetadataCoverage,
         local_names: &HashSet<String>,
@@ -86,12 +86,7 @@ impl BookmarkMetadata {
     }
 
     #[cfg(test)]
-    pub(super) fn with_tracking(
-        mut self,
-        tracked: bool,
-        tracking_present: bool,
-        synced: bool,
-    ) -> Self {
+    pub fn with_tracking(mut self, tracked: bool, tracking_present: bool, synced: bool) -> Self {
         self.tracked = tracked;
         self.tracking_present = tracking_present;
         self.synced = synced;
@@ -100,7 +95,7 @@ impl BookmarkMetadata {
 }
 
 /// Loads bookmark metadata rows through the bookmark-specific template side channel.
-pub(super) fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
+pub fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
     Ok(
         run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE, false)?
             .into_iter()
@@ -110,7 +105,7 @@ pub(super) fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMe
 }
 
 /// Parses one metadata line and rejects rows that do not match the exact schema.
-pub(super) fn parse_bookmark_metadata_line(line: &str) -> Option<BookmarkMetadata> {
+pub fn parse_bookmark_metadata_line(line: &str) -> Option<BookmarkMetadata> {
     if line.is_empty() {
         return None;
     }

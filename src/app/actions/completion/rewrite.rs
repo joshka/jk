@@ -10,7 +10,7 @@ use super::super::ActionPane;
 
 impl App {
     /// Run the working-copy navigation command and reveal the resulting active change.
-    pub(in crate::app) fn confirm_working_copy_navigation(
+    pub fn confirm_working_copy_navigation(
         &mut self,
         navigation: JjWorkingCopyNavigationPlan,
         status_context: Option<String>,
@@ -64,7 +64,7 @@ impl App {
     }
 
     /// Run abandon and leave its finished output on the abandon pane.
-    pub(in crate::app) fn confirm_abandon(
+    pub fn confirm_abandon(
         &mut self,
         abandon: JjAbandonPlan,
         status_context: Option<String>,
@@ -84,7 +84,7 @@ impl App {
     }
 
     /// Re-check emptiness before abandoning so the fast path only applies to still-empty changes.
-    pub(in crate::app) fn confirm_empty_abandon_after_recheck(
+    pub fn confirm_empty_abandon_after_recheck(
         &mut self,
         abandon: JjAbandonPlan,
         status_context: Option<String>,
@@ -119,7 +119,7 @@ impl App {
     }
 
     /// Run restore and leave its finished output on the restore pane.
-    pub(in crate::app) fn confirm_restore(
+    pub fn confirm_restore(
         &mut self,
         restore: JjRestorePlan,
         status_context: Option<String>,
@@ -138,7 +138,7 @@ impl App {
     }
 
     /// Run revert and leave its finished output on the revert pane.
-    pub(in crate::app) fn confirm_revert(
+    pub fn confirm_revert(
         &mut self,
         revert: JjRevertPlan,
         status_context: Option<String>,
@@ -157,7 +157,7 @@ impl App {
     }
 
     /// Run rebase and reveal the first source change after refresh when possible.
-    pub(in crate::app) fn confirm_rebase(
+    pub fn confirm_rebase(
         &mut self,
         rebase: JjRebasePlan,
         status_context: Option<String>,
@@ -182,7 +182,7 @@ impl App {
     }
 
     /// Run squash and reveal the destination change after refresh when possible.
-    pub(in crate::app) fn confirm_squash(
+    pub fn confirm_squash(
         &mut self,
         squash: JjSquashPlan,
         status_context: Option<String>,
@@ -207,7 +207,7 @@ impl App {
     }
 
     /// Run absorb and leave its finished output on the absorb pane.
-    pub(in crate::app) fn confirm_absorb(
+    pub fn confirm_absorb(
         &mut self,
         absorb: JjAbsorbPlan,
         status_context: Option<String>,

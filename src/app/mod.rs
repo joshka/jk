@@ -10,12 +10,13 @@ use std::env;
 use std::time::{Duration, Instant};
 
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyEventKind};
 use ratatui::DefaultTerminal;
+use ratatui::Frame;
 
 use crate::command::{
-    Binding, BindingMatch, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect,
-    binding_prefix_next_labels, match_binding_sequence,
+    Binding, BindingMatch, CommandContext, ViewCommand, ViewEffect, binding_prefix_next_labels,
+    match_binding_sequence,
 };
 use crate::jj::DiffFormat;
 use crate::modes::InteractionMode;
@@ -23,18 +24,21 @@ use crate::search::SearchQuery;
 use crate::tui;
 use crate::view_state::ViewState;
 
-pub(crate) mod actions;
+pub mod actions;
+mod bindings;
 mod dispatch;
 mod effects;
 mod input;
 mod navigation;
 mod reducers;
 mod services;
-pub(crate) mod status_line;
+pub mod status_line;
 
 use self::dispatch::prefix_status_message;
 use self::services::AppServices;
 use self::status_line::{StatusKind, StatusLine};
+
+pub use self::bindings::APP_BINDINGS;
 
 /// Start the terminal application from process arguments.
 ///
@@ -53,7 +57,7 @@ pub fn run() -> Result<()> {
 /// cross-view stack, pending prefix state, search scope, and the single injected service seam
 /// together so dispatch does not have to reconstruct cross-view state or effects from rendered
 /// output.
-struct App {
+pub struct App {
     /// Currently active feature view.
     view: ViewState,
     /// Back-stack of previously active views for app-level history navigation.
@@ -76,59 +80,8 @@ struct App {
     services: AppServices,
 }
 
-/// Global bindings that resolve before view-local bindings.
-///
-/// Feature views add their own commands on top; these entries stay focused on app-level dispatch
-/// and shared mode changes.
-const APP_BINDINGS: &[Binding] = &[
-    Binding::new(KeyPattern::char('q'), Command::Quit),
-    Binding::new(KeyPattern::code(KeyCode::Esc), Command::Quit),
-    Binding::new(KeyPattern::char('?'), Command::Help),
-    Binding::new(KeyPattern::char('/'), Command::SearchPrompt),
-    Binding::new(KeyPattern::char('W'), Command::PromptLogRevset),
-    Binding::new(KeyPattern::char('S'), Command::OpenStatus),
-    Binding::new(KeyPattern::char('R'), Command::OpenResolve),
-    Binding::new(KeyPattern::char('B'), Command::OpenBookmarks),
-    Binding::new(KeyPattern::char('X'), Command::OpenWorkspaces),
-    Binding::new(KeyPattern::char('O'), Command::OpenOperationLog),
-    Binding::new(KeyPattern::char('D'), Command::Describe),
-    Binding::new(KeyPattern::char('C'), Command::Commit),
-    Binding::new(KeyPattern::char('b'), Command::BookmarkCreate),
-    Binding::sequence(BOOKMARK_CREATE_KEYS, Command::BookmarkCreate),
-    Binding::sequence(BOOKMARK_RENAME_KEYS, Command::BookmarkRename),
-    Binding::sequence(BOOKMARK_FORGET_KEYS, Command::BookmarkForget),
-    Binding::sequence(BOOKMARK_TRACK_KEYS, Command::BookmarkTrack),
-    Binding::sequence(BOOKMARK_UNTRACK_KEYS, Command::BookmarkUntrack),
-    Binding::new(KeyPattern::char('='), Command::BookmarkSet),
-    Binding::new(KeyPattern::char('m'), Command::BookmarkMove),
-    Binding::new(KeyPattern::char('f'), Command::Fetch),
-    Binding::new(KeyPattern::char('F'), Command::FetchRemote),
-    Binding::new(KeyPattern::char('y'), Command::Copy),
-    Binding::new(KeyPattern::char('p'), Command::Push),
-    Binding::new(KeyPattern::char('v'), Command::ViewFormat),
-    Binding::new(KeyPattern::char('r'), Command::Refresh),
-    Binding::new(KeyPattern::char('h'), Command::Back),
-    Binding::new(KeyPattern::code(KeyCode::Left), Command::Back),
-    Binding::new(KeyPattern::char('L'), Command::SwitchLog),
-    Binding::new(KeyPattern::char('J'), Command::SwitchDefault),
-];
-
-const BOOKMARK_CREATE_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('c')];
-const BOOKMARK_RENAME_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('r')];
-const BOOKMARK_FORGET_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('f')];
-const BOOKMARK_TRACK_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('t')];
-const BOOKMARK_UNTRACK_KEYS: &[KeyPattern] = &[KeyPattern::char('b'), KeyPattern::char('u')];
+/// Keep multi-key prefixes responsive without making fallback bindings feel hair-trigger.
 const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
-
-/// Read the current terminal width at dispatch time.
-///
-/// View clamping uses live terminal size instead of cached geometry so resize handling stays local
-/// to the next refresh or view effect.
-fn current_viewport_width() -> u16 {
-    crossterm::terminal::size()
-        .map(|(width, _)| width)
-        .unwrap_or(u16::MAX)
-}
 
 /// Pending multi-key input tracked until the prefix resolves or expires.
 ///
@@ -151,15 +104,9 @@ impl App {
     /// either dispatch the next terminal event or expire any pending multi-key prefix.
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.should_quit {
-            terminal.draw(|frame| {
-                let status = self.mode.status_line(&self.view, &self.status);
-                let areas: tui::Areas = tui::areas(frame.area());
-                tui::render_chrome(frame, areas, &status);
-                self.view.render(frame, areas.main, self.search.as_ref());
-                tui::render_overlay(frame, &status, self.mode.overlay(&self.view, APP_BINDINGS));
-            })?;
+            let completed_frame = terminal.draw(|frame| self.render(frame))?;
+            let viewport_height = tui::areas(completed_frame.area).main.height;
 
-            let viewport_height = terminal.size()?.height.saturating_sub(2);
             if event::poll(Duration::from_millis(200))? {
                 self.handle_event(terminal, event::read()?, viewport_height)?;
             } else {
@@ -168,6 +115,15 @@ impl App {
         }
 
         Ok(())
+    }
+
+    /// Render the current app frame, including shared chrome and any active overlay.
+    fn render(&self, frame: &mut Frame) {
+        let status = self.mode.status_line(&self.view, &self.status);
+        let areas = tui::areas(frame.area());
+        tui::render_chrome(frame, areas, &status);
+        self.view.render(frame, areas.main, self.search.as_ref());
+        tui::render_overlay(frame, &status, self.mode.overlay(&self.view, APP_BINDINGS));
     }
 
     /// Route one terminal event into resize handling, modal dispatch, or normal dispatch.
@@ -285,6 +241,16 @@ impl App {
             },
         )
     }
+}
+
+/// Read the current terminal width at dispatch time.
+///
+/// View clamping uses live terminal size instead of cached geometry so resize handling stays local
+/// to the next refresh or view effect.
+fn current_viewport_width() -> u16 {
+    crossterm::terminal::size()
+        .map(|(width, _)| width)
+        .unwrap_or(u16::MAX)
 }
 
 #[cfg(test)]

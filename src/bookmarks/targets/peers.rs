@@ -8,17 +8,17 @@ use crate::bookmarks::{BookmarkItem, BookmarkRowState};
 /// This owner answers the shared question "what can the currently visible
 /// bookmark rows prove safely?" after the bookmarks feature has already decided
 /// that an action needs exact local or remote peer state.
-pub(super) struct VisibleBookmarkPeers<'a> {
+pub struct VisibleBookmarkPeers<'a> {
     entries: &'a [BookmarkItem],
     spec_args: &'a [String],
 }
 
 impl<'a> VisibleBookmarkPeers<'a> {
-    pub(super) fn new(entries: &'a [BookmarkItem], spec_args: &'a [String]) -> Self {
+    pub fn new(entries: &'a [BookmarkItem], spec_args: &'a [String]) -> Self {
         Self { entries, spec_args }
     }
 
-    pub(super) fn visible_local_peer_target(
+    pub fn visible_local_peer_target(
         &self,
         action: &str,
         name: &str,
@@ -42,13 +42,13 @@ impl<'a> VisibleBookmarkPeers<'a> {
         }
     }
 
-    pub(super) fn has_local_bookmark_peer(&self, name: &str) -> bool {
+    pub fn has_local_bookmark_peer(&self, name: &str) -> bool {
         self.entries.iter().any(|entry| {
             entry.bookmark_name() == name && matches!(entry.state(), BookmarkRowState::Local { .. })
         })
     }
 
-    pub(super) fn remote_bookmark_peer_count(&self, name: &str) -> usize {
+    pub fn remote_bookmark_peer_count(&self, name: &str) -> usize {
         self.entries
             .iter()
             .filter(|entry| {
@@ -58,11 +58,7 @@ impl<'a> VisibleBookmarkPeers<'a> {
             .count()
     }
 
-    pub(super) fn require_safe_local_tracking_context(
-        &self,
-        action: &str,
-        name: &str,
-    ) -> Result<()> {
+    pub fn require_safe_local_tracking_context(&self, action: &str, name: &str) -> Result<()> {
         if !self.has_unfiltered_all_remotes_metadata() {
             return Err(eyre!(
                 "bookmark {action} disabled: selected local bookmark requires unfiltered all-remotes metadata"
@@ -79,7 +75,7 @@ impl<'a> VisibleBookmarkPeers<'a> {
         Ok(())
     }
 
-    pub(super) fn exactly_one_remote_peer(
+    pub fn exactly_one_remote_peer(
         &self,
         name: &str,
         action: &str,

@@ -18,14 +18,14 @@ use super::super::{App, current_viewport_width};
 
 impl App {
     /// Finish a failed action by surfacing the error on the app status line and result pane.
-    pub(in crate::app::actions) fn finish_failed_action(&mut self, error: impl Display) -> String {
+    pub fn finish_failed_action(&mut self, error: impl Display) -> String {
         let message = error.to_string();
         self.status = StatusLine::error(&self.view, message.clone());
         message
     }
 
     /// Refresh the active view after a successful action and return the result-pane message.
-    pub(in crate::app::actions) fn finish_successful_action(
+    pub fn finish_successful_action(
         &mut self,
         output: String,
         viewport_height: u16,
@@ -49,7 +49,7 @@ impl App {
     }
 
     /// Refresh and reveal a change after success when the action has an exact reveal target.
-    pub(in crate::app::actions) fn finish_successful_action_revealing_change(
+    pub fn finish_successful_action_revealing_change(
         &mut self,
         output: String,
         reveal_change_id: Option<&str>,
@@ -98,7 +98,7 @@ impl App {
     }
 
     /// Finish sync commands that preserve raw command output as the result-pane body.
-    pub(in crate::app::actions) fn finish_successful_sync_action(
+    pub fn finish_successful_sync_action(
         &mut self,
         output: String,
         viewport_height: u16,
@@ -123,15 +123,12 @@ impl App {
 }
 
 /// Return the short display id used in action status context wording.
-pub(in crate::app::actions) fn short_id(id: &str) -> &str {
+pub fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }
 
 /// Build the push preview status context for the selected push target and remote.
-pub(in crate::app::actions) fn push_status_context(
-    target: &JjGitPushTarget,
-    remote: &str,
-) -> String {
+pub fn push_status_context(target: &JjGitPushTarget, remote: &str) -> String {
     match target {
         JjGitPushTarget::Bookmark(name) => {
             format!("bookmark push targets exact bookmark '{name}' on remote {remote}")
@@ -146,7 +143,7 @@ pub(in crate::app::actions) fn push_status_context(
 }
 
 /// Build the fetch preview status context for the current fetch configuration.
-pub(in crate::app::actions) fn fetch_status_context(fetch: &JjGitFetch) -> String {
+pub fn fetch_status_context(fetch: &JjGitFetch) -> String {
     match fetch.remote() {
         Some(remote) => {
             let pattern = fetch
@@ -159,7 +156,7 @@ pub(in crate::app::actions) fn fetch_status_context(fetch: &JjGitFetch) -> Strin
 }
 
 /// Build the short status-line message shown after a successful fetch.
-pub(in crate::app::actions) fn fetch_status_message(fetch: &JjGitFetch, output: &str) -> String {
+pub fn fetch_status_message(fetch: &JjGitFetch, output: &str) -> String {
     match fetch.remote() {
         Some(remote) => format!("fetch {remote}: {output}"),
         None => format!("fetch: {output}"),
@@ -167,10 +164,7 @@ pub(in crate::app::actions) fn fetch_status_message(fetch: &JjGitFetch, output: 
 }
 
 /// Build bookmark preview status context from the selected mutation and current view label.
-pub(in crate::app::actions) fn bookmark_status_context(
-    mutation: &JjBookmarkMutationPlan,
-    view_label: &str,
-) -> String {
+pub fn bookmark_status_context(mutation: &JjBookmarkMutationPlan, view_label: &str) -> String {
     if let Some(new_name) = mutation.new_name() {
         return format!(
             "bookmark rename '{}' to '{}' from {}",

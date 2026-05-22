@@ -11,7 +11,7 @@ use super::super::ActionPane;
 
 impl App {
     /// Run the new-change command, resolve the new working copy, and leave the result on the pane.
-    pub(in crate::app) fn confirm_new_change(
+    pub fn confirm_new_change(
         &mut self,
         new_change: JjNewPlan,
         status_context: Option<String>,
@@ -51,7 +51,7 @@ impl App {
     }
 
     /// Run the duplicate command and leave the refresh/reveal result on the duplicate pane.
-    pub(in crate::app) fn confirm_duplicate(
+    pub fn confirm_duplicate(
         &mut self,
         duplicate: JjDuplicatePlan,
         status_context: Option<String>,
@@ -129,7 +129,7 @@ impl App {
     }
 
     /// Run the split command, including inherited-stdio interactive mode when needed.
-    pub(in crate::app) fn confirm_split(
+    pub fn confirm_split(
         &mut self,
         split: JjSplitPlan,
         status_context: Option<String>,

@@ -3,7 +3,7 @@ use crossterm::event::KeyCode;
 use crate::app::actions::ActionPane;
 
 /// Outcome of one confirmation-pane key in a pure reducer context.
-pub(in crate::app) enum ConfirmationKey {
+pub enum ConfirmationKey {
     Cancel,
     Accept,
     Handled,
@@ -11,7 +11,7 @@ pub(in crate::app) enum ConfirmationKey {
 }
 
 /// Reduce a confirmation-pane key, updating typed text and pane scrolling in place.
-pub(in crate::app) fn reduce_confirmation_key(
+pub fn reduce_confirmation_key(
     input: &mut String,
     output: &mut ActionPane,
     visible_lines: u16,

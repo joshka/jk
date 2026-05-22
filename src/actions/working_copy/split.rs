@@ -124,7 +124,7 @@ impl JjSplitPlan {
     }
 
     /// Builds the inherited-stdio interactive command used by the terminal runner.
-    pub(crate) fn interactive_command(&self) -> InteractiveCommand {
+    pub fn interactive_command(&self) -> InteractiveCommand {
         interactive_jj_command(self.command_argv(), &self.command_label())
     }
 

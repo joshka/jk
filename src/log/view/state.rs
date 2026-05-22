@@ -81,7 +81,7 @@ impl LogView {
         self.switch_mode_with_loader(mode, super::super::load_entries)
     }
 
-    pub(super) fn cycle_mode(&mut self) -> Result<LogViewMode> {
+    pub fn cycle_mode(&mut self) -> Result<LogViewMode> {
         let next_mode = self.mode.next();
         self.set_mode(next_mode.clone())?;
         Ok(next_mode)
@@ -187,7 +187,7 @@ fn restore_selection(
 }
 
 #[cfg(test)]
-pub(super) fn test_restore_selection(
+pub fn test_restore_selection(
     selection: &mut crate::selection::Selection,
     entries: &[LogItem],
     previous_index: usize,

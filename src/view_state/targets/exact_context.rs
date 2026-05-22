@@ -5,7 +5,7 @@ use crate::status::StatusFileAction;
 
 use super::super::ViewState;
 
-pub(super) fn exact_restore_revert_context(view: &ViewState) -> Result<Option<ExactActionContext>> {
+pub fn exact_restore_revert_context(view: &ViewState) -> Result<Option<ExactActionContext>> {
     match view {
         ViewState::Log(_) => Ok(None),
         ViewState::Show(view) => view

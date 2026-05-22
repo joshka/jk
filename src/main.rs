@@ -1,3 +1,5 @@
+#![warn(clippy::redundant_pub_crate)]
+
 //! Binary entry point for `jk`.
 
 mod actions;

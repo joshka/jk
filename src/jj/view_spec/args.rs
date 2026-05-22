@@ -2,7 +2,7 @@ use super::super::command::option_value;
 use super::DiffFormat;
 
 /// Infer the app-level diff-format modal state from direct startup args.
-pub(super) fn parse_diff_format(args: &[String]) -> DiffFormat {
+pub fn parse_diff_format(args: &[String]) -> DiffFormat {
     if args.iter().any(|arg| arg == "--git") {
         DiffFormat::Git
     } else {
@@ -11,7 +11,7 @@ pub(super) fn parse_diff_format(args: &[String]) -> DiffFormat {
 }
 
 /// Prepend the app-level diff-format flag when this spec should render with `jj --git`.
-pub(super) fn diff_format_args(
+pub fn diff_format_args(
     diff_format: DiffFormat,
     args: impl IntoIterator<Item = String>,
 ) -> Vec<String> {
@@ -24,7 +24,7 @@ pub(super) fn diff_format_args(
 }
 
 /// Parse the positional revset used by `jj show` while skipping option values safely.
-pub(super) fn show_revset_arg(args: &[String]) -> Option<&str> {
+pub fn show_revset_arg(args: &[String]) -> Option<&str> {
     let mut skip_next = false;
 
     for arg in args {
@@ -72,12 +72,12 @@ fn show_option_takes_value(arg: &str) -> bool {
 }
 
 /// Parse the revision context for `jj diff` startup args.
-pub(super) fn diff_revset_arg(args: &[String]) -> Option<&str> {
+pub fn diff_revset_arg(args: &[String]) -> Option<&str> {
     option_value(args, &["-r", "--revisions"], &["--revisions="])
         .or_else(|| option_value(args, &["-t", "--to"], &["--to="]))
 }
 
 /// Parse a single `-r` / `--revision` value from startup args.
-pub(super) fn revision_arg(args: &[String]) -> Option<&str> {
+pub fn revision_arg(args: &[String]) -> Option<&str> {
     option_value(args, &["-r", "--revision"], &["--revision="])
 }

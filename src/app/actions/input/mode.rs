@@ -7,7 +7,7 @@ use super::{ActionPreviewConfirmation, ActionPreviewEvent, action_preview_event}
 
 impl InteractionMode {
     /// Reduce one key for any preview/result mode that shares the common action-pane behavior.
-    pub(in crate::app) fn common_action_preview_event(
+    pub fn common_action_preview_event(
         &mut self,
         code: KeyCode,
         viewport_height: u16,

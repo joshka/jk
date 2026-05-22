@@ -9,7 +9,7 @@ mod projection;
 mod state;
 mod view_menu;
 
-pub(crate) use self::state::InteractionMode;
+pub use self::state::InteractionMode;
 pub use self::view_menu::{ViewMenuAction, ViewMenuOption, view_menu_options};
 
 #[cfg(test)]

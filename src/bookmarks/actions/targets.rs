@@ -50,14 +50,14 @@ impl JjBookmarkTarget {
         }
     }
 
-    pub(super) fn command_arg(&self) -> String {
+    pub fn command_arg(&self) -> String {
         match self {
             Self::ExactChange(change_id) => exact_change_id_revset(change_id),
             Self::CurrentWorkingCopy => "@".to_owned(),
         }
     }
 
-    pub(super) fn preview_target(&self) -> String {
+    pub fn preview_target(&self) -> String {
         match self {
             Self::ExactChange(change_id) => format!("exact selected revision {change_id}"),
             Self::CurrentWorkingCopy => "current working-copy change (@)".to_owned(),
@@ -79,11 +79,11 @@ impl JjBookmarkForgetTarget {
         }
     }
 
-    pub(super) fn include_remotes(&self) -> bool {
+    pub fn include_remotes(&self) -> bool {
         matches!(self, Self::RemoteOnly { .. })
     }
 
-    pub(super) fn visible_state(&self) -> String {
+    pub fn visible_state(&self) -> String {
         match self {
             Self::Local { tracking } => format!("local bookmark; {tracking}"),
             Self::RemoteOnly { remote, tracking } => {
@@ -92,7 +92,7 @@ impl JjBookmarkForgetTarget {
         }
     }
 
-    pub(super) fn scope_summary(&self) -> &'static str {
+    pub fn scope_summary(&self) -> &'static str {
         match self {
             Self::Local { .. } => "local tracked bookmark or local bookmark with remote peer",
             Self::RemoteOnly { .. } => "one remote peer and no local peer; includes remotes",
@@ -149,15 +149,15 @@ impl JjBookmarkTrackingTarget {
         &self.visible_state
     }
 
-    pub(super) fn local_bookmark_label(&self) -> &str {
+    pub fn local_bookmark_label(&self) -> &str {
         self.local_bookmark.as_deref().unwrap_or("absent")
     }
 
-    pub(super) fn remote_pattern(&self) -> String {
+    pub fn remote_pattern(&self) -> String {
         exact_string_pattern(self.remote())
     }
 
-    pub(super) fn bookmark_pattern(&self) -> String {
+    pub fn bookmark_pattern(&self) -> String {
         exact_string_pattern(self.remote_bookmark())
     }
 }

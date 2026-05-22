@@ -17,7 +17,7 @@ use crate::actions::{
 use crate::app::actions::{ActionPane, ActionPaneKey, handle_action_pane_key};
 
 /// Reduced preview-pane event returned after applying one key to a shared action pane.
-pub(in crate::app) enum ActionPreviewEvent {
+pub enum ActionPreviewEvent {
     /// The pane remains open after a scroll or ignored key.
     StayOpen,
     /// A completed result pane should close and return to normal mode.
@@ -29,7 +29,7 @@ pub(in crate::app) enum ActionPreviewEvent {
 }
 
 /// Deferred confirmation payload that preserves the plan and status context for one action pane.
-pub(in crate::app) enum ActionPreviewConfirmation {
+pub enum ActionPreviewConfirmation {
     Describe {
         /// Prepared describe plan that should now run.
         describe: JjDescribePlan,

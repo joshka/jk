@@ -242,9 +242,10 @@ should hold the titular concept or only re-export named child modules based on r
 Avoid `#[path]`, broad umbrella folders, and `mod.rs` layers that only reshuffle names.
 
 Write Rustdoc/module comments for durable intent: jj CLI compatibility, navigation policy, sticky
-scroll behavior, and other non-obvious constraints. Avoid comments that restate simple code. Keep
-visibility narrow. Do not introduce `pub(crate)`, `pub(super)`, or `pub(in ...)` unless there is a
-concrete need and no cleaner local structure.
+scroll behavior, and other non-obvious constraints. Avoid comments that restate simple code. In this
+repo, prefer plain `pub` or private visibility over `pub(crate)`, `pub(super)`, or `pub(in ...)`. Do
+not introduce narrower non-private visibility unless there is a concrete reason to preserve that
+boundary.
 
 When writing Rust, prefer idiomatic readability:
 

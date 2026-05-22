@@ -16,7 +16,7 @@ impl FileListView {
     }
 
     /// Reload entries with a caller-supplied loader while restoring selection by exact path first.
-    pub(crate) fn refresh_with_loader(
+    pub fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<FileListItem>>,
     ) -> Result<()> {

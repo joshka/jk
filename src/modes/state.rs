@@ -13,7 +13,7 @@ use crate::menus::{ActionKind, ActionMenu, CopyOption, RolePrompt};
 /// `App` owns the active mode and projects it into status-line and overlay
 /// output on each draw; prompt data stays here until the dispatcher consumes
 /// it.
-pub(crate) enum InteractionMode {
+pub enum InteractionMode {
     /// No modal overlay or prompt is active.
     Normal,
     /// Help overlay showing available bindings for the current view.

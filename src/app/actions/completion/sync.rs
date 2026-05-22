@@ -7,7 +7,7 @@ use super::super::shared::fetch_status_message;
 
 impl App {
     /// Run the push command and leave its finished output on the push pane.
-    pub(in crate::app) fn confirm_push(
+    pub fn confirm_push(
         &mut self,
         push: JjGitPush,
         status_context: Option<String>,
@@ -28,7 +28,7 @@ impl App {
     }
 
     /// Run the fetch command and leave its finished output on the fetch pane.
-    pub(in crate::app) fn confirm_fetch(
+    pub fn confirm_fetch(
         &mut self,
         fetch: JjGitFetch,
         status_context: Option<String>,

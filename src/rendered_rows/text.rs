@@ -9,7 +9,7 @@ pub fn document_plain_text(lines: &[Line<'static>]) -> String {
 }
 
 /// Concatenate rendered spans into plain text when callers intentionally discard style.
-pub(crate) fn line_text(line: &Line<'_>) -> String {
+pub fn line_text(line: &Line<'_>) -> String {
     line.spans
         .iter()
         .map(|span| span.content.as_ref())

@@ -21,7 +21,7 @@ pub struct StatusLine {
 
 impl StatusLine {
     /// Build the normal status line for the current view position or item count.
-    pub(crate) fn ready(view: &ViewState) -> Self {
+    pub fn ready(view: &ViewState) -> Self {
         let message = if let Some(item_count) = view.item_count() {
             item_count_message(view, item_count)
         } else {
@@ -42,7 +42,7 @@ impl StatusLine {
     }
 
     /// Build an error status line for the current view.
-    pub(crate) fn error(view: &ViewState, message: String) -> Self {
+    pub fn error(view: &ViewState, message: String) -> Self {
         Self {
             title: view.spec().app_label(),
             message,
@@ -52,7 +52,7 @@ impl StatusLine {
     }
 
     /// Build a normal status line with an explicit message for the current view.
-    pub(crate) fn with_message(view: &ViewState, message: impl Into<String>) -> Self {
+    pub fn with_message(view: &ViewState, message: impl Into<String>) -> Self {
         Self {
             title: view.spec().app_label(),
             message: message.into(),
@@ -62,7 +62,7 @@ impl StatusLine {
     }
 
     #[cfg(test)]
-    pub(crate) fn test(
+    pub fn test(
         title: impl Into<String>,
         message: impl Into<String>,
         kind: StatusKind,

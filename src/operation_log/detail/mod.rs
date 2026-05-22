@@ -12,7 +12,9 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
-use crate::documents::{DocumentLines, PinnedDocument};
+#[cfg(test)]
+use crate::documents::DocumentLines;
+use crate::documents::PinnedDocument;
 use crate::jj::{JjCommand, ViewSpec};
 use crate::menus::CopyOption;
 use crate::rendered_rows::document_plain_text;
@@ -90,7 +92,7 @@ impl OperationDetailView {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_new(spec: ViewSpec, lines: DocumentLines) -> Self {
+    pub fn test_new(spec: ViewSpec, lines: DocumentLines) -> Self {
         Self {
             spec,
             document: PlainDocument::new(lines),
@@ -98,7 +100,7 @@ impl OperationDetailView {
     }
 
     /// Renders the current plain-document projection into the active viewport.
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         crate::documents::render_document(frame, area, self.projection(), search);
     }
 

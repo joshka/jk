@@ -7,7 +7,7 @@ use crate::actions::{
 use crate::menus::RolePrompt;
 
 /// Outcome of one text-prompt key in a pure reducer context.
-pub(in crate::app) enum TextPromptKey {
+pub enum TextPromptKey {
     Cancel,
     Accept,
     Edited,
@@ -16,13 +16,13 @@ pub(in crate::app) enum TextPromptKey {
 
 /// Pure outcome produced when a text prompt is accepted.
 #[derive(Debug, Eq, PartialEq)]
-pub(in crate::app) enum PromptAcceptDecision<T> {
+pub enum PromptAcceptDecision<T> {
     Preview(T),
     StatusMessage(String),
 }
 
 /// Reduce a text-entry prompt key without performing any app-side effects.
-pub(in crate::app) fn reduce_text_prompt_key(input: &mut String, code: KeyCode) -> TextPromptKey {
+pub fn reduce_text_prompt_key(input: &mut String, code: KeyCode) -> TextPromptKey {
     match code {
         KeyCode::Esc => TextPromptKey::Cancel,
         KeyCode::Enter => TextPromptKey::Accept,
@@ -39,7 +39,7 @@ pub(in crate::app) fn reduce_text_prompt_key(input: &mut String, code: KeyCode) 
 }
 
 /// Decide whether a describe prompt should open preview or stop with a status message.
-pub(in crate::app) fn reduce_describe_prompt_accept(
+pub fn reduce_describe_prompt_accept(
     target: &JjDescribeTarget,
     input: &str,
 ) -> PromptAcceptDecision<JjDescribePlan> {
@@ -53,9 +53,7 @@ pub(in crate::app) fn reduce_describe_prompt_accept(
 }
 
 /// Decide whether a commit prompt should open preview or stop with a status message.
-pub(in crate::app) fn reduce_commit_prompt_accept(
-    input: &str,
-) -> PromptAcceptDecision<JjCommitPlan> {
+pub fn reduce_commit_prompt_accept(input: &str) -> PromptAcceptDecision<JjCommitPlan> {
     let message = input.trim().to_owned();
 
     if message.is_empty() {
@@ -66,7 +64,7 @@ pub(in crate::app) fn reduce_commit_prompt_accept(
 }
 
 /// Decide whether a bookmark-name prompt should open preview or stop with a status message.
-pub(in crate::app) fn reduce_bookmark_name_prompt_accept(
+pub fn reduce_bookmark_name_prompt_accept(
     kind: JjBookmarkMutationKind,
     target: &JjBookmarkTarget,
     input: &str,
@@ -84,7 +82,7 @@ pub(in crate::app) fn reduce_bookmark_name_prompt_accept(
 }
 
 /// Decide whether a bookmark-rename prompt should open preview or stop with a status message.
-pub(in crate::app) fn reduce_bookmark_rename_prompt_accept(
+pub fn reduce_bookmark_rename_prompt_accept(
     old_name: &str,
     input: &str,
 ) -> PromptAcceptDecision<JjBookmarkMutationPlan> {
@@ -102,7 +100,7 @@ pub(in crate::app) fn reduce_bookmark_rename_prompt_accept(
 }
 
 /// Build a rebase plan from the explicit source/destination roles selected in a role prompt.
-pub(in crate::app) fn rebase_plan_from_prompt(prompt: &RolePrompt) -> Option<JjRebasePlan> {
+pub fn rebase_plan_from_prompt(prompt: &RolePrompt) -> Option<JjRebasePlan> {
     let destination = prompt.destination_revision()?;
     let sources = prompt
         .source_revisions()
@@ -114,7 +112,7 @@ pub(in crate::app) fn rebase_plan_from_prompt(prompt: &RolePrompt) -> Option<JjR
 }
 
 /// Build a squash plan from the explicit source/destination roles selected in a role prompt.
-pub(in crate::app) fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjSquashPlan> {
+pub fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjSquashPlan> {
     let destination = prompt.destination_revision()?;
     let sources = prompt
         .source_revisions()
@@ -126,7 +124,7 @@ pub(in crate::app) fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjS
 }
 
 /// Build the bookmark mutation plan implied by a prompt-confirmed bookmark name.
-pub(super) fn bookmark_mutation_plan(
+pub fn bookmark_mutation_plan(
     kind: JjBookmarkMutationKind,
     name: String,
     target: JjBookmarkTarget,

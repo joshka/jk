@@ -6,10 +6,7 @@ use super::super::ActionPane;
 
 impl App {
     /// Open the global undo/redo preview that does not depend on a selected operation id.
-    pub(in crate::app) fn open_operation_recovery_preview(
-        &mut self,
-        kind: JjOperationRecoveryKind,
-    ) {
+    pub fn open_operation_recovery_preview(&mut self, kind: JjOperationRecoveryKind) {
         let recovery = JjOperationRecovery::new(kind);
         let status_context = Some(format!(
             "global current-repo {} from {}",
@@ -27,7 +24,7 @@ impl App {
     }
 
     /// Open the restore/revert preview for one exact operation id.
-    pub(in crate::app) fn open_operation_target_preview(&mut self, target: JjOperationTarget) {
+    pub fn open_operation_target_preview(&mut self, target: JjOperationTarget) {
         let status_context = Some(format!(
             "operation {} exact id {} from {}",
             target.status_action(),

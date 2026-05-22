@@ -12,7 +12,7 @@ use super::context::ExactActionContext;
 /// This boundary owns only action availability, menu row ordering, and the
 /// follow-up payload attached to each row. Preview construction, command
 /// execution, and refresh behavior stay in app dispatch and `actions`.
-pub(in crate::menus) fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
+pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     if context.is_status_surface() {
         return context
             .file_action

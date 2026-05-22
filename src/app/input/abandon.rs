@@ -9,7 +9,7 @@ use super::super::reducers::{ConfirmationKey, reduce_confirmation_key};
 use super::App;
 
 impl App {
-    pub(super) fn handle_abandon_preview_key(
+    pub fn handle_abandon_preview_key(
         &mut self,
         code: KeyCode,
         viewport_height: u16,
@@ -65,7 +65,7 @@ impl App {
         Ok(true)
     }
 
-    pub(super) fn handle_abandon_confirm_key(
+    pub fn handle_abandon_confirm_key(
         &mut self,
         code: KeyCode,
         viewport_height: u16,

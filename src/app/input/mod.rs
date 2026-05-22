@@ -20,11 +20,11 @@ mod menus;
 mod prompts;
 
 #[cfg(test)]
-pub(in crate::app) use super::reducers::{rebase_plan_from_prompt, squash_plan_from_prompt};
+pub use super::reducers::{rebase_plan_from_prompt, squash_plan_from_prompt};
 
 impl App {
     /// Open the copy menu by asking the active view for copyable options.
-    pub(super) fn open_copy_menu(&mut self, viewport_height: u16) {
+    pub fn open_copy_menu(&mut self, viewport_height: u16) {
         let options = match self.execute_view(crate::command::ViewCommand::Copy, viewport_height) {
             ViewEffect::CopyOptions(options) => options,
             _ => Vec::new(),
@@ -40,7 +40,7 @@ impl App {
     }
 
     #[cfg(test)]
-    pub(super) fn handle_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
+    pub fn handle_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
         self.handle_mode_key_event_with_terminal(
             KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
             viewport_height,
@@ -48,17 +48,13 @@ impl App {
         )
     }
 
-    pub(super) fn handle_mode_key_event(
-        &mut self,
-        key: KeyEvent,
-        viewport_height: u16,
-    ) -> Result<bool> {
+    pub fn handle_mode_key_event(&mut self, key: KeyEvent, viewport_height: u16) -> Result<bool> {
         self.handle_mode_key_event_with_terminal(key, viewport_height, None)
     }
 
     /// Route one key through modal dispatch, including action previews that may need terminal
     /// handoff.
-    pub(super) fn handle_mode_key_event_with_terminal(
+    pub fn handle_mode_key_event_with_terminal(
         &mut self,
         key: KeyEvent,
         viewport_height: u16,

@@ -81,7 +81,7 @@ pub enum Overlay<'a> {
 ///
 /// Overlays are presentation-only. Selection indexes and output scroll offsets are owned by
 /// `InteractionMode` or `ActionPane`; this function only sizes, clears, and renders the modal.
-pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Overlay<'_>) {
+pub fn render_overlay(frame: &mut Frame, _status: &StatusLine, overlay: Overlay<'_>) {
     match overlay {
         Overlay::None => {}
         Overlay::Help { sections } => {

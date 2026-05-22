@@ -10,7 +10,7 @@ use super::{ResolveEntry, ResolveView};
 
 impl ResolveView {
     /// Renders the resolve list with the active selection and search highlights.
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
     }
@@ -45,7 +45,7 @@ fn entry_line_count(entry: &ResolveEntry) -> usize {
 
 impl ResolveEntry {
     /// Projects one resolve entry into visible lines for the list surface.
-    pub(super) fn lines(&self) -> Vec<Line<'static>> {
+    pub fn lines(&self) -> Vec<Line<'static>> {
         if let Some(raw_line) = self.raw_line() {
             return vec![
                 Line::from("unparsed conflict metadata"),
@@ -64,7 +64,7 @@ impl ResolveEntry {
     }
 
     /// Returns plain rendered row text for copy surfaces.
-    pub(super) fn row_text(&self) -> String {
+    pub fn row_text(&self) -> String {
         self.lines()
             .into_iter()
             .map(|line| {

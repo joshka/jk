@@ -9,7 +9,7 @@ use crate::bookmarks::{
 
 use super::resolver::BookmarkActionTargetResolver;
 
-pub(super) fn remote_bookmark_track_target(
+pub fn remote_bookmark_track_target(
     name: &str,
     remote: &str,
     tracking: &RemoteBookmarkTrackingState,
@@ -33,7 +33,7 @@ pub(super) fn remote_bookmark_track_target(
     }
 }
 
-pub(super) fn remote_bookmark_untrack_target(
+pub fn remote_bookmark_untrack_target(
     name: &str,
     remote: &str,
     tracking: &RemoteBookmarkTrackingState,
@@ -57,7 +57,7 @@ pub(super) fn remote_bookmark_untrack_target(
     }
 }
 
-pub(super) fn remote_peer_is_tracked(entry: &BookmarkItem) -> bool {
+pub fn remote_peer_is_tracked(entry: &BookmarkItem) -> bool {
     matches!(
         entry.state(),
         BookmarkRowState::Remote {
@@ -67,7 +67,7 @@ pub(super) fn remote_peer_is_tracked(entry: &BookmarkItem) -> bool {
     )
 }
 
-pub(super) fn remote_peer_is_untracked(entry: &BookmarkItem) -> bool {
+pub fn remote_peer_is_untracked(entry: &BookmarkItem) -> bool {
     matches!(
         entry.state(),
         BookmarkRowState::Remote {
@@ -77,21 +77,21 @@ pub(super) fn remote_peer_is_untracked(entry: &BookmarkItem) -> bool {
     )
 }
 
-pub(super) fn remote_name(entry: &BookmarkItem) -> Option<&str> {
+pub fn remote_name(entry: &BookmarkItem) -> Option<&str> {
     match entry.state() {
         BookmarkRowState::Remote { remote, .. } => Some(remote),
         BookmarkRowState::Local { .. } | BookmarkRowState::Unknown => None,
     }
 }
 
-pub(super) fn remote_tracking(entry: &BookmarkItem) -> Option<&RemoteBookmarkTrackingState> {
+pub fn remote_tracking(entry: &BookmarkItem) -> Option<&RemoteBookmarkTrackingState> {
     match entry.state() {
         BookmarkRowState::Remote { tracking, .. } => Some(tracking),
         BookmarkRowState::Local { .. } | BookmarkRowState::Unknown => None,
     }
 }
 
-pub(super) fn require_selected_target(action: &str, entry: &BookmarkItem) -> Result<()> {
+pub fn require_selected_target(action: &str, entry: &BookmarkItem) -> Result<()> {
     if entry.target_change_id().is_none() {
         return Err(eyre!(
             "bookmark {action} disabled: selected bookmark row has no exact target metadata"
@@ -100,7 +100,7 @@ pub(super) fn require_selected_target(action: &str, entry: &BookmarkItem) -> Res
     Ok(())
 }
 
-pub(super) fn require_matching_peer_targets(
+pub fn require_matching_peer_targets(
     action: &str,
     local: &BookmarkItem,
     remote: &BookmarkItem,
@@ -123,9 +123,7 @@ pub(super) fn require_matching_peer_targets(
     Ok(())
 }
 
-pub(super) fn local_forget_target(
-    tracking: &LocalBookmarkRemoteState,
-) -> Result<JjBookmarkForgetTarget> {
+pub fn local_forget_target(tracking: &LocalBookmarkRemoteState) -> Result<JjBookmarkForgetTarget> {
     match tracking {
         LocalBookmarkRemoteState::LocalOnly => Err(eyre!(
             "bookmark forget disabled: selected local bookmark is local-only"
@@ -148,7 +146,7 @@ pub(super) fn local_forget_target(
     }
 }
 
-pub(super) fn remote_tracking_summary(tracking: &RemoteBookmarkTrackingState) -> String {
+pub fn remote_tracking_summary(tracking: &RemoteBookmarkTrackingState) -> String {
     match tracking {
         RemoteBookmarkTrackingState::Tracked {
             local_present,

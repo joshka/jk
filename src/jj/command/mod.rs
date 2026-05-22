@@ -89,7 +89,7 @@ impl JjCommand {
         }
     }
 
-    pub(super) fn prefix_args(self) -> &'static [&'static str] {
+    pub fn prefix_args(self) -> &'static [&'static str] {
         match self {
             Self::OperationLog => &["--at-op=@", "--limit", OPERATION_LOG_LIMIT],
             Self::Default

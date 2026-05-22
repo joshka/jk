@@ -8,7 +8,7 @@ use crate::modes::view_menu_options;
 use super::prompts::{rebase_plan_from_prompt, squash_plan_from_prompt};
 
 /// Outcome of one menu key in a pure reducer context.
-pub(in crate::app) enum MenuKey {
+pub enum MenuKey {
     Cancel,
     Accept,
     Shortcut(char),
@@ -17,7 +17,7 @@ pub(in crate::app) enum MenuKey {
 
 /// Pure decision produced when a role-prompt selection is accepted.
 #[derive(Debug, Eq, PartialEq)]
-pub(in crate::app) enum RolePromptDecision {
+pub enum RolePromptDecision {
     Rebase(JjRebasePlan),
     Squash(JjSquashPlan),
     StatusMessage(String),
@@ -25,11 +25,7 @@ pub(in crate::app) enum RolePromptDecision {
 }
 
 /// Reduce a menu-navigation key, updating the selected index in place when needed.
-pub(in crate::app) fn reduce_menu_key(
-    selected: &mut usize,
-    item_count: usize,
-    code: KeyCode,
-) -> MenuKey {
+pub fn reduce_menu_key(selected: &mut usize, item_count: usize, code: KeyCode) -> MenuKey {
     match code {
         KeyCode::Esc | KeyCode::Char('q') => MenuKey::Cancel,
         KeyCode::Char('j') | KeyCode::Down if *selected + 1 < item_count => {
@@ -47,7 +43,7 @@ pub(in crate::app) fn reduce_menu_key(
 }
 
 /// Reduce the view-menu key set, including `v` as an explicit close key.
-pub(in crate::app) fn reduce_view_menu_key(selected: &mut usize, code: KeyCode) -> MenuKey {
+pub fn reduce_view_menu_key(selected: &mut usize, code: KeyCode) -> MenuKey {
     match code {
         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('v') => MenuKey::Cancel,
         KeyCode::Char('j') | KeyCode::Down => {
@@ -64,10 +60,7 @@ pub(in crate::app) fn reduce_view_menu_key(selected: &mut usize, code: KeyCode) 
 }
 
 /// Turn an accepted role prompt into either a rewrite plan or a status result.
-pub(in crate::app) fn reduce_role_prompt_accept(
-    action: ActionKind,
-    prompt: &RolePrompt,
-) -> RolePromptDecision {
+pub fn reduce_role_prompt_accept(action: ActionKind, prompt: &RolePrompt) -> RolePromptDecision {
     match action {
         ActionKind::Rebase => match rebase_plan_from_prompt(prompt) {
             Some(rebase) => RolePromptDecision::Rebase(rebase),
@@ -93,7 +86,7 @@ pub(in crate::app) fn reduce_role_prompt_accept(
 }
 
 /// Report whether a key closes the help overlay without executing a command.
-pub(in crate::app) fn is_help_close_key(key: KeyEvent) -> bool {
+pub fn is_help_close_key(key: KeyEvent) -> bool {
     match key.code {
         KeyCode::Esc | KeyCode::Char('q') => key.modifiers.is_empty(),
         KeyCode::Char('?') => key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT,
@@ -102,6 +95,6 @@ pub(in crate::app) fn is_help_close_key(key: KeyEvent) -> bool {
 }
 
 /// Report whether a key should be treated as local help-menu scrolling only.
-pub(in crate::app) fn is_help_scroll_key(key: KeyEvent) -> bool {
+pub fn is_help_scroll_key(key: KeyEvent) -> bool {
     key.modifiers.is_empty() && matches!(key.code, KeyCode::Down | KeyCode::Up)
 }

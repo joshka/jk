@@ -16,7 +16,7 @@ use crate::rendered_rows::line_text;
 /// The rendered line is kept as the presentation source, and `path` is only the exact file-list
 /// text used by follow-up navigation or file actions.
 #[derive(Clone, Debug)]
-pub(crate) struct FileListItem {
+pub struct FileListItem {
     /// Rendered row lines preserved for display and search.
     lines: Vec<Line<'static>>,
     /// Exact file path text selected from `jj file list`.
@@ -25,27 +25,27 @@ pub(crate) struct FileListItem {
 
 impl FileListItem {
     /// Build one rendered file-list item with its exact path identity.
-    pub(crate) fn new(lines: Vec<Line<'static>>, path: String) -> Self {
+    pub fn new(lines: Vec<Line<'static>>, path: String) -> Self {
         Self { lines, path }
     }
 
     /// Return the rendered lines shown for this item.
-    pub(crate) fn lines(&self) -> Vec<Line<'static>> {
+    pub fn lines(&self) -> Vec<Line<'static>> {
         self.lines.clone()
     }
 
     /// Return the number of rendered lines owned by this item.
-    pub(crate) fn line_count(&self) -> usize {
+    pub fn line_count(&self) -> usize {
         self.lines.len()
     }
 
     /// Return the exact file path selected from the rendered row text.
-    pub(crate) fn path(&self) -> &str {
+    pub fn path(&self) -> &str {
         &self.path
     }
 
     #[cfg(test)]
-    pub(crate) fn row_text(&self) -> String {
+    pub fn row_text(&self) -> String {
         self.lines
             .iter()
             .map(line_text)
@@ -58,7 +58,7 @@ impl FileListItem {
 ///
 /// This preserves jj's colorized output and filters only empty rows. The loader does not infer file
 /// status or ownership beyond the rendered path string.
-pub(crate) fn load_file_list_entries(spec: &ViewSpec) -> Result<Vec<FileListItem>> {
+pub fn load_file_list_entries(spec: &ViewSpec) -> Result<Vec<FileListItem>> {
     let output = run_jj(spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
 

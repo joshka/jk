@@ -15,7 +15,7 @@ impl OperationLogView {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_new(entries: Vec<OperationLogItem>) -> Self {
+    pub fn test_new(entries: Vec<OperationLogItem>) -> Self {
         Self {
             spec: ViewSpec::new(crate::jj::JjCommand::OperationLog, Vec::new()),
             entries,
@@ -29,7 +29,7 @@ impl OperationLogView {
     }
 
     /// Reloads rows and restores selection by exact operation id before falling back to index.
-    pub(super) fn refresh_with_loader(
+    pub fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<OperationLogItem>>,
     ) -> Result<()> {

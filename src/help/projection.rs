@@ -35,7 +35,7 @@ pub fn project_help(
 }
 
 /// Returns whether a command should appear in help for the given context.
-pub(crate) fn command_is_visible_in_help(command: Command, context: HelpContext) -> bool {
+pub fn command_is_visible_in_help(command: Command, context: HelpContext) -> bool {
     help_metadata(command, context).is_some()
 }
 
