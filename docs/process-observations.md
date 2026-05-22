@@ -7635,3 +7635,42 @@ belong here.
   - Files: `src/operation_log/mod.rs`, `src/operation_log/view.rs`, `src/operation_log/tests.rs`,
     `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
+
+### 2026-05-21 (Action-menu root split)
+
+- Slice / task: apply the epage module-layout rule to the existing action-menu split module while
+  preserving shared menu contracts and keeping the hierarchy flat.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: `gpt-5.5` medium worker handled the bounded Rust split. The main thread owned jj
+  change creation, review, validation reruns, and documentation updates.
+- Changed files: `src/action_menu/mod.rs`, `src/action_menu/model.rs`,
+  `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: `src/action_menu/mod.rs` is now a table-of-contents root for shared menu
+  contracts. Shared presentation models moved to `src/action_menu/model.rs`; path and revision
+  action builders remain single-level siblings. Public imports such as `ActionKind`, `ActionMenu`,
+  `ActionMenuItem`, `FollowUp`, `RolePrompt`, `RolePromptOption`, `SafetyTier`, and
+  `ExactActionContext` remain available from `crate::action_menu`.
+- Behavior-preservation evidence: the packet did not intentionally change menu labels, shortcuts,
+  preview-required wording, role prompt text, follow-up payloads, selection lookup behavior,
+  path/revision action policy, or public imports.
+- Rework / surprise: `cargo test app::tests::revision_actions -- --test-threads=1` matched zero
+  tests in the worker run. Main review used `cargo test action_menu -- --test-threads=1`, which
+  covered action-menu unit tests plus related graph/app/TUI action-menu behavior.
+- Process observation: the user clarified that the `name.rs` preference was about keeping the tree
+  generally flat. The ledger now records a one-level default such as `name/mod.rs` plus
+  `name/tests.rs`, and treats deeper `name/tests/mod.rs` structures as something to justify rather
+  than a default.
+- Naming observation: the user called out `jj_actions`, `rendered_jj`, `sticky_file_view`, and
+  `interactive_process` as verbose. The ledger records these as dedicated naming-cleanup candidates
+  to evaluate after structural ownership is stable, not as incidental edits inside layout packets.
+- Validation trail: worker validation passed and main-thread review reran
+  `cargo test action_menu -- --test-threads=1` with 40 tests,
+  `cargo test app::tests::bookmark_actions -- --test-threads=1` with 27 tests, `cargo check`, and
+  `rustup run nightly cargo fmt --check` with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 17:15:27 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/action_menu/mod.rs`, `src/action_menu/model.rs`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.

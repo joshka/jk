@@ -46,6 +46,8 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - `operation_log` now has the same feature-root shape: the root is a table of contents, operation
   view behavior lives in `operation_log/view.rs`, and rows, operation detail, and recovery actions
   stay under the operation-log feature.
+- `action_menu` now has a table-of-contents root too: shared menu models live in
+  `action_menu/model.rs`, while path and revision action builders stay as single-level siblings.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -89,8 +91,8 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 
 ## Current State
 
-- The current top of stack splits the bookmark feature root after the root `jj_actions` action-plan
-  split, then applies the same feature-root shape to `operation_log`.
+- The current top of stack splits the bookmark and operation-log feature roots after the root
+  `jj_actions` action-plan split, then applies the same table-of-contents shape to `action_menu`.
 - Recent behavior-preserving packets have focused on locality, feature ownership, and making the
   automatic session easier to audit from files rather than chat history.
 - The broad goal is still active. The completed packets do not prove the whole cleanup queue is
@@ -99,11 +101,16 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 ## Likely Next Work
 
 - Module layout cleanup: continue applying the epage Rust style rule to existing split modules.
-  Larger roots such as `app`, `graph`, `action_menu`, `jj`, and `tui` should move toward
-  table-of-contents `mod.rs` files through topical splits, not blind path moves.
+  Larger roots such as `app`, `graph`, `jj`, and `tui` should move toward table-of-contents `mod.rs`
+  files through topical splits, not blind path moves.
 - Remaining `foo.rs` plus `foo/` pairs after the first conversion are mostly larger roots or nested
-  roots with feature/action policy: `action_menu`, `app`, `app/action_lifecycle`, `app/mode_input`,
-  `graph`, `jj`, and `tui`.
+  roots with feature/action policy: `app`, `app/action_lifecycle`, `app/mode_input`, `graph`, `jj`,
+  and `tui`.
+- Keep new structure generally flat where it still reads well. Prefer `name/mod.rs` plus
+  `name/tests.rs` over deeper `name/tests/mod.rs` trees unless the extra level has a clear owner.
+- Possible naming cleanup remains separate from module-layout cleanup. Verbose names such as
+  `jj_actions`, `rendered_jj`, `sticky_file_view`, and `interactive_process` should be evaluated in
+  dedicated rename packets rather than mixed into behavior-preserving moves.
 - App modal dispatch readability: `src/app/mode_input.rs` now mostly reads as a dispatch table plus
   named modal handlers. The next app-dispatch work should be based on measured remaining complexity,
   not another automatic extraction.

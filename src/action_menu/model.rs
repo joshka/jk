@@ -1,20 +1,14 @@
-//! Action-menu presentation models for graph, status, file, bookmark, sync,
-//! and operation surfaces.
+//! Shared action-menu presentation models.
 //!
-//! This module owns only shared menu contracts: the stable action vocabulary,
-//! safety marker text, role-prompt presentation state, and follow-up payloads
-//! handed back after a selection. Feature roots and their builders decide which
-//! actions are available for the current row or path context. The app action
-//! lifecycle and `jj_actions` own preview construction, process execution, and
-//! any refresh or reveal behavior after a command completes.
-
-mod path_actions;
-mod revision_actions;
+//! This module owns the stable action vocabulary, safety marker text,
+//! role-prompt presentation state, and follow-up payloads handed back after a
+//! selection. Feature roots and their builders decide which actions are
+//! available for the current row or path context.
 
 use crate::jj_actions::JjFileChmodMode;
-pub use revision_actions::ExactActionContext;
 
-const PREVIEW_REQUIRED_MARKER: &str = "Preview required before execution.";
+pub(in crate::action_menu) const PREVIEW_REQUIRED_MARKER: &str =
+    "Preview required before execution.";
 
 /// Safety policy shown before a menu action can mutate repository state.
 ///
@@ -61,7 +55,7 @@ pub enum ActionKind {
 }
 
 impl ActionKind {
-    fn label(self) -> &'static str {
+    pub(super) fn label(self) -> &'static str {
         match self {
             Self::Edit => "edit",
             Self::New => "new",
@@ -80,7 +74,7 @@ impl ActionKind {
         }
     }
 
-    fn shortcut(self) -> char {
+    pub(super) fn shortcut(self) -> char {
         match self {
             Self::Edit => 'e',
             Self::New => 'n',
@@ -272,11 +266,11 @@ pub enum FollowUp {
 /// state happens when the app constructs or executes the preview plan.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionMenuItem {
-    action: ActionKind,
-    shortcut: char,
-    label: String,
-    safety_tier: SafetyTier,
-    follow_up: FollowUp,
+    pub(in crate::action_menu) action: ActionKind,
+    pub(in crate::action_menu) shortcut: char,
+    pub(in crate::action_menu) label: String,
+    pub(in crate::action_menu) safety_tier: SafetyTier,
+    pub(in crate::action_menu) follow_up: FollowUp,
 }
 
 impl ActionMenuItem {
@@ -342,17 +336,4 @@ impl ActionMenu {
     pub fn item_for_shortcut(&self, shortcut: char) -> Option<&ActionMenuItem> {
         self.items.iter().find(|item| item.shortcut() == shortcut)
     }
-}
-
-/// Build the shared revision action menu for an exact graph/detail context.
-///
-/// This facade exists so callers do not depend on the current staging module. New
-/// feature-specific action policy should move toward that feature owner instead of growing this
-/// shared wrapper.
-pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
-    revision_actions::build_action_menu(context)
-}
-
-fn short_id(id: &str) -> &str {
-    id.get(..8).unwrap_or(id)
 }

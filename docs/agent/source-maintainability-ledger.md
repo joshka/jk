@@ -53,6 +53,16 @@ when a module has multiple topical parts. For small or titular modules, keeping 
 function in `mod.rs` is acceptable when splitting it into another file would add more indirection
 than clarity. Avoid `#[path]`.
 
+Prefer a generally flat module hierarchy. A good default shape is one directory level per concept,
+for example `name/mod.rs` plus `name/tests.rs`, rather than `name/tests/mod.rs` or deeper trees. Add
+a second level only when the child concept has enough internal structure to repay the extra
+navigation.
+
+Treat long module names as naming pressure after structural ownership is stable. Names such as
+`jj_actions`, `rendered_jj`, `sticky_file_view`, and `interactive_process` may be accurate but
+verbose; evaluate shorter names in dedicated rename packets so import churn, docs, and tests stay
+reviewable.
+
 Do not create a `slices/` folder or another implementation-phase bucket. The destination should look
 like feature roots with optional submodules for local concerns, plus shared infrastructure for
 boring cross-cutting mechanics:
@@ -119,6 +129,25 @@ Examples for future packets:
   document feature owner when that lowers reader burden more than today's separate helper modules.
 
 ### Recent Packet Evidence
+
+2026-05-21 action-menu root split:
+
+- `src/action_menu/mod.rs` is now the action-menu root and table of contents. It declares `model`,
+  `path_actions`, and `revision_actions`, preserves the shared ownership contract, and keeps
+  `build_action_menu` as the stable facade for exact graph/detail action menus.
+- Shared presentation models moved to `src/action_menu/model.rs`: action vocabulary, safety marker
+  text, role prompts, follow-up payloads, menu items, and menu shortcut lookup now live in a named
+  child module instead of the directory root.
+- The packet removes the old `src/action_menu.rs` plus `src/action_menu/` pair and applies the epage
+  module-layout rule through a single-level split rather than adding deeper hierarchy.
+- The packet intentionally preserved menu labels, shortcuts, preview-required wording, role prompt
+  text, follow-up payloads, selection lookup behavior, path/revision action policy, and public
+  imports from `crate::action_menu`.
+- Validation passed: `cargo test action_menu -- --test-threads=1`;
+  `cargo test app::tests::bookmark_actions -- --test-threads=1`; `cargo check`; and
+  `rustup run nightly cargo fmt --check`.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `app`, `app/action_lifecycle`,
+  `app/mode_input`, `graph`, `jj`, and `tui`.
 
 2026-05-21 operation-log feature-root split:
 
