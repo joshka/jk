@@ -134,6 +134,31 @@ Examples for future packets:
 
 ### Recent Packet Evidence
 
+2026-05-21 graph feature-root split:
+
+- `src/graph/mod.rs` is now the graph feature root and table of contents. It declares `rows`,
+  `view`, and tests while preserving stable imports from `crate::graph`.
+- `src/graph/view.rs` owns graph rendering, bindings, movement and page movement, search, copy,
+  selection toggling, multi-selection ordering, mode switching, open show/diff, new-trunk effect,
+  fetch/push key sequences, and action-menu construction.
+- `src/graph/rows.rs` remains the rendered row and metadata-pairing owner. Tests remain in
+  `src/graph/tests.rs`, keeping the feature at a single directory level.
+- The final reviewed packet contains no custom visibility inside `src/graph`. Tests use
+  `#[cfg(test)] pub` helpers where deterministic loader injection or private rendering helpers are
+  still useful.
+- The packet removes the old `src/graph.rs` plus `src/graph/` pair and applies the epage
+  module-layout rule through a feature split rather than a blind root rename.
+- The packet intentionally preserved graph row rendering, key bindings, movement, page movement,
+  search, copy options, current revision selection, explicit multi-selection behavior, mode
+  switching, refresh/reveal behavior, open show/diff routing, action-menu labels and payloads, and
+  public imports.
+- Validation passed: `cargo test graph -- --test-threads=1`;
+  `cargo test app::tests::working_copy_actions -- --test-threads=1`;
+  `cargo test app::tests::rewrite_actions -- --test-threads=1`; `cargo check`; and
+  `rustup run nightly cargo fmt --check`.
+- Remaining `foo.rs` plus `foo/` pairs after this packet are `app`, `app/action_lifecycle`,
+  `app/mode_input`, and `tui`.
+
 2026-05-21 jj command-boundary root split:
 
 - `src/jj/mod.rs` is now the `jj` command-boundary root and table of contents. It declares

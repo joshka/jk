@@ -1,4 +1,4 @@
-//! The default/log graph view.
+//! Graph view state, rendering, and item-based navigation.
 //!
 //! Rows are grouped from `jj`'s rendered graph output. Detail navigation uses
 //! the change id for the selected row because jj workflows and revsets are
@@ -11,6 +11,7 @@ use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState};
 
+use super::{LogItem, load_entries};
 use crate::action_menu::{ExactActionContext, build_action_menu};
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 use crate::copy::CopyOption;
@@ -18,10 +19,6 @@ use crate::jj::{JjCommand, LogViewMode, ViewSpec};
 use crate::search::{SearchQuery, entry_matches, highlight_line};
 use crate::selection::Selection;
 use crate::theme;
-
-mod rows;
-
-pub use rows::{LogItem, load_compact_log_context, load_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('w'), Command::View(ViewCommand::CycleMode)),
@@ -93,6 +90,11 @@ fn explicit_selection_style() -> Style {
     theme::marked_row_style()
 }
 
+#[cfg(test)]
+pub fn test_explicit_selection_style() -> Style {
+    explicit_selection_style()
+}
+
 /// Selectable graph output from `jj` or `jj log`.
 pub struct GraphView {
     home_command: JjCommand,
@@ -105,7 +107,7 @@ pub struct GraphView {
 
 impl GraphView {
     #[cfg(test)]
-    pub(crate) fn test_new(entries: Vec<LogItem>) -> Self {
+    pub fn test_new(entries: Vec<LogItem>) -> Self {
         Self {
             home_command: JjCommand::Default,
             mode: LogViewMode::Default,
@@ -117,7 +119,7 @@ impl GraphView {
     }
 
     #[cfg(test)]
-    pub(crate) fn test_with_spec(spec: ViewSpec, entries: Vec<LogItem>) -> Self {
+    pub fn test_with_spec(spec: ViewSpec, entries: Vec<LogItem>) -> Self {
         Self {
             home_command: spec.command(),
             mode: LogViewMode::from_spec(&spec),
@@ -152,7 +154,7 @@ impl GraphView {
     }
 
     pub fn bindings(&self) -> &'static [Binding] {
-        BINDINGS
+        super::BINDINGS
     }
 
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
@@ -251,6 +253,14 @@ impl GraphView {
             previous_change_id,
         );
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn test_refresh_with_loader(
+        &mut self,
+        load: impl Fn(&ViewSpec) -> Result<Vec<LogItem>>,
+    ) -> Result<()> {
+        self.refresh_with_loader(load)
     }
 
     pub fn clamp(&mut self) {
@@ -471,6 +481,16 @@ impl GraphView {
         }
     }
 
+    #[cfg(test)]
+    pub fn test_reveal_change_id_with_loader(
+        &mut self,
+        change_id: &str,
+        fallback_mode: LogViewMode,
+        load: impl Fn(&ViewSpec) -> Result<Vec<LogItem>>,
+    ) -> Result<bool> {
+        self.reveal_change_id_with_loader(change_id, fallback_mode, load)
+    }
+
     fn switch_mode_with_loader(
         &mut self,
         mode: LogViewMode,
@@ -505,6 +525,20 @@ impl GraphView {
             previous_change_id,
         );
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn test_switch_mode_with_loader(
+        &mut self,
+        mode: LogViewMode,
+        load: impl Fn(&ViewSpec) -> Result<Vec<LogItem>>,
+    ) -> Result<()> {
+        self.switch_mode_with_loader(mode, load)
+    }
+
+    #[cfg(test)]
+    pub fn test_selected_change_ids(&self) -> &[String] {
+        &self.selected_change_ids
     }
 }
 
@@ -553,6 +587,15 @@ fn entry_lines(
     }
 }
 
+#[cfg(test)]
+pub fn test_entry_lines(
+    entry: &LogItem,
+    search: Option<&SearchQuery>,
+    is_selected: bool,
+) -> Vec<Line<'static>> {
+    entry_lines(entry, search, is_selected)
+}
+
 fn next_matching_entry(entries: &[LogItem], selected: usize, query: &SearchQuery) -> Option<usize> {
     ((selected + 1)..entries.len())
         .chain(0..selected.min(entries.len()))
@@ -588,6 +631,16 @@ fn restore_selection(
     selection.set(previous_index, entries.len());
 }
 
+#[cfg(test)]
+pub fn test_restore_selection(
+    selection: &mut Selection,
+    entries: &[LogItem],
+    previous_index: usize,
+    previous_change_id: Option<String>,
+) {
+    restore_selection(selection, entries, previous_index, previous_change_id);
+}
+
 fn retain_selected_change_ids(selected_change_ids: &mut Vec<String>, entries: &[LogItem]) {
     let retained = selected_change_ids
         .iter()
@@ -600,6 +653,3 @@ fn retain_selected_change_ids(selected_change_ids: &mut Vec<String>, entries: &[
         .collect();
     *selected_change_ids = retained;
 }
-
-#[cfg(test)]
-mod tests;

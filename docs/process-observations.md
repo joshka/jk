@@ -7709,3 +7709,36 @@ belong here.
   - Files: `src/jj/mod.rs`, `src/jj/command.rs`, `src/jj/process.rs`, `src/jj/view_spec/mod.rs`,
     `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
     `docs/process-observations.md`.
+
+### 2026-05-21 (Graph feature-root split)
+
+- Slice / task: apply the epage module-layout rule to the existing graph split module while
+  preserving graph view behavior and caller-facing imports.
+- Thread id: `019e42d3-ba3c-78a1-9623-d684a45bcc39` from `CODEX_THREAD_ID`.
+- Model / routing: `gpt-5.5` medium worker handled the bounded Rust split. The main thread owned jj
+  change creation, review, validation reruns, and documentation updates.
+- Changed files: `src/graph/mod.rs`, `src/graph/view.rs`, `src/graph/tests.rs`,
+  `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+  `docs/process-observations.md`.
+- Implementation outcome: `src/graph/mod.rs` is now a feature-root table of contents. Graph view
+  behavior moved to `src/graph/view.rs`; rendered row loading and metadata pairing stay in
+  `src/graph/rows.rs`; tests stay in `src/graph/tests.rs`.
+- Behavior-preservation evidence: the packet did not intentionally change graph rendering, key
+  bindings, movement, page movement, search, copy options, current revision selection, explicit
+  multi-selection, mode switching, refresh/reveal behavior, open show/diff routing, fetch/push key
+  sequences, action-menu labels or payloads, or public imports from `crate::graph`.
+- Rework / surprise: the worker avoided custom visibility by adding `#[cfg(test)] pub` helpers for
+  deterministic loader-injected tests and private rendering helpers. Main review accepted this
+  because production fields stayed private and tests remained in the one-level `graph/tests.rs`
+  shape requested by the user.
+- Validation trail: worker validation passed and main-thread review reran
+  `cargo test graph -- --test-threads=1` with 62 tests,
+  `cargo test app::tests::working_copy_actions -- --test-threads=1` with 27 tests,
+  `cargo test app::tests::rewrite_actions -- --test-threads=1` with 16 tests, `cargo check`, and
+  `rustup run nightly cargo fmt --check` with the existing rustfmt unstable-option warnings.
+- Evidence basis:
+  - Date: `2026-05-21 17:29:19 PDT` from local `date`.
+  - Thread id from `CODEX_THREAD_ID`.
+  - Files: `src/graph/mod.rs`, `src/graph/view.rs`, `src/graph/tests.rs`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-maintainability-ledger.md`, and
+    `docs/process-observations.md`.

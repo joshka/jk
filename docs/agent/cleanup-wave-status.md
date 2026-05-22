@@ -51,6 +51,9 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 - `jj` now has a command-boundary root: command vocabulary and argv construction live in
   `jj/command.rs`, process execution and output loading live in `jj/process.rs`, and `ViewSpec`
   remains under `jj/view_spec`.
+- `graph` now has a feature root: the root declares rows, view, and tests, while graph view
+  selection, search, multi-select, mode switching, paging, and action-menu behavior live in
+  `graph/view.rs`.
 - Action plan ownership improved: file action plans, operation recovery plans, and bookmark action
   plans have moved toward their owning concepts. This reduces the role of root action modules as
   mixed-purpose buckets.
@@ -96,7 +99,7 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 
 - The current top of stack splits the bookmark and operation-log feature roots after the root
   `jj_actions` action-plan split, then applies the same table-of-contents shape to `action_menu` and
-  `jj`.
+  `jj`, then splits graph view behavior under the graph feature root.
 - Recent behavior-preserving packets have focused on locality, feature ownership, and making the
   automatic session easier to audit from files rather than chat history.
 - The broad goal is still active. The completed packets do not prove the whole cleanup queue is
@@ -105,11 +108,10 @@ snapshot for humans and future agents; detailed per-packet evidence stays in
 ## Likely Next Work
 
 - Module layout cleanup: continue applying the epage Rust style rule to existing split modules.
-  Larger roots such as `app`, `graph`, and `tui` should move toward table-of-contents `mod.rs` files
-  through topical splits, not blind path moves.
+  Larger roots such as `app` and `tui` should move toward table-of-contents `mod.rs` files through
+  topical splits, not blind path moves.
 - Remaining `foo.rs` plus `foo/` pairs after the first conversion are mostly larger roots or nested
-  roots with feature/action policy: `app`, `app/action_lifecycle`, `app/mode_input`, `graph`, and
-  `tui`.
+  roots with feature/action policy: `app`, `app/action_lifecycle`, `app/mode_input`, and `tui`.
 - Keep new structure generally flat where it still reads well. Prefer `name/mod.rs` plus
   `name/tests.rs` over deeper `name/tests/mod.rs` trees unless the extra level has a clear owner.
 - Prefer private items or plain `pub` items. Avoid custom visibility such as `pub(crate)`,
