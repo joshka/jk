@@ -3,6 +3,10 @@
 This document explains the shape of `jk` for agentic tooling. Load it when a change touches command
 execution, view behavior, rendering, navigation, search, copying, or terminal lifecycle.
 
+This is the canonical active guidance for current structure and ownership. Use
+[`workflow.md`](workflow.md) for packet shape and completion criteria, and use
+[`cleanup-wave-status.md`](cleanup-wave-status.md) for the current queue and completion framing.
+
 ## Product Boundary
 
 `jk` is a Ratatui TUI over the `jj` command-line interface. It should feel like an interactive
@@ -83,12 +87,12 @@ without understanding each other's domain:
   services;
 - `jj`: process execution, syntax quoting, command construction, and view specs;
 - `actions`: command plans and execution contracts after a feature has chosen an action;
-- `ui`: shared chrome, modal rendering, menus, status hints, and theme primitives;
+- `tui`: shared chrome, modal rendering, menus, status hints, and theme primitives;
 - `selection`, `search`, `clipboard`, and similar helpers when the rule is domain-neutral.
 
-Avoid letting `ui`, `jj`, `actions`, `rows`, `menus`, `tui`, or `view_state` become dumping grounds
-for feature policy. A shared module is the right home only when two feature owners would use the
-code without learning each other's product rules.
+Avoid letting `jj`, `actions`, `rendered_rows`, `menus`, `tui`, or `view_state` become dumping
+grounds for feature policy. A shared module is the right home only when two feature owners would use
+the code without learning each other's product rules.
 
 That gives a practical split between feature policy and shared mechanics. Feature roots answer
 questions such as "what does this surface show, select, copy, or recover from?" and "when is this
@@ -98,7 +102,7 @@ executed?" If a rule changes because `operation_log`, `bookmarks`, `status`, `fi
 changes as a product surface, prefer the feature owner even when the code shape resembles an
 existing shared helper.
 
-A plausible destination shape is:
+A plausible current shape is:
 
 - `log` owns the default graph/log view, log rows, log selection, and log-local action availability.
 - `operation_log` owns operation rows, undo/redo/restore/revert target policy, operation detail
@@ -126,17 +130,25 @@ plus shared infrastructure:
 src/
   app/
     mod.rs
-    input.rs
-    reducers.rs
-    navigation.rs
-    services.rs
+    dispatch.rs
+    effects.rs
+    input/
+    navigation/
+    reducers/
+    services/
+    status_line.rs
     actions/
-      mod.rs
-      input.rs
+      entry/
+      preview/
+      completion/
+      input/
+      pane.rs
+      shared.rs
 
   log/
     mod.rs
-    rows.rs
+    rows/
+    view/
     tests.rs
 
   operation_log/
@@ -144,54 +156,54 @@ src/
     rows.rs
     actions.rs
     detail.rs
+    view/
     tests.rs
 
   bookmarks/
     mod.rs
-    rows.rs
-    actions.rs
-    targets.rs
+    rows/
+    actions/
+    targets/
+    view/
     tests.rs
 
   status/
     mod.rs
-    view.rs
+    view/
     rows.rs
     actions.rs
     tests.rs
 
   files/
     mod.rs
-    list.rs
-    show.rs
+    list/
+    show/
 
   documents/
     mod.rs
-    rendered.rs
-    sticky.rs
+    rendered/
+    sticky/
 
-  actions.rs
   actions/
-    rewrite.rs
-    working_copy.rs
-    files.rs
-    sync.rs
-    describe.rs
-    abandon.rs
+    rewrite/
+    working_copy/
+    files/
+    git_sync/
+    describe/
+    abandon/
 
-  jj.rs
   jj/
-    command.rs
-    process.rs
+    command/
+    process/
     syntax.rs
-    view_spec.rs
+    view_spec/
 
-  menus.rs
-
-  ui.rs
-  ui/
+  menus/
+    model/
+    revision_actions/
+  tui/
     chrome.rs
-    overlays.rs
+    overlays/
     status_hints.rs
     theme.rs
 ```
@@ -202,77 +214,85 @@ eventually be the starting point for operation row interpretation, operation sel
 undo/redo/restore/revert target policy. `bookmarks` should be the starting point for bookmark row
 state, local/remote pairing, mutation target resolution, and bookmark-specific action availability.
 
-Shared action modules should begin after a feature has chosen a target. `actions/rewrite.rs` can own
-argv, preview, and run contracts for rebase, squash, and absorb. The log, status, or bookmark
+Shared action modules should begin after a feature has chosen a target. `actions/rewrite/mod.rs` can
+own argv, preview, and run contracts for rebase, squash, and absorb. The log, status, or bookmark
 feature still owns whether that action is offered from its selected rows. Apply the same split to
 working-copy, file, sync, describe, and abandon flows.
 
 Current ownership:
 
 - `app/mod.rs` owns terminal event loop, app-level key dispatch, pending key-prefix state, refresh,
-  and `ViewEffect` routing. It should read as the app orchestration table of contents and route
-  screen, action, service, and view-selection details to their owner modules.
-- `app/navigation.rs` owns startup argument parsing, view-stack transitions, top-level view-menu
-  actions, diff-format application, and custom log revset mode changes.
-- `app/input.rs` owns active modal and prompt key reducers, including copy-menu opening and prompt
-  acceptance/cancellation behavior.
+  and the normal-key entry point. It should read as the app orchestration table of contents and
+  route screen, action, service, and view-selection details to their owner modules.
+- `app/dispatch.rs` owns prefix dispatch and binding execution flow after the event loop has chosen
+  a key path.
+- `app/effects.rs` owns `ViewEffect` interpretation.
+- `app/navigation/mod.rs` owns startup parsing, view-stack transitions, top-level view-menu actions,
+  diff-format application, and custom log revset mode changes through `startup`, `stack`, and
+  `view_menu`.
+- `app/input/mod.rs` owns active modal and prompt key reducers, including copy-menu opening and
+  prompt acceptance/cancellation behavior.
 - `app/actions/mod.rs` owns action-menu opening, prompt-to-preview setup, immediate action execution
   such as default fetch and new-from-trunk, and confirmed action result handling.
-- `app/actions/input.rs` owns common action-preview key flow between pending result panes and action
-  confirmation.
-- `app/services.rs` owns the app side-effect seam for tests. App submodules call that narrow service
-  surface directly for jj/view effects, and `App` keeps only the small wrappers that must couple
-  those effects to current app-owned state such as the active `ViewState`.
+- `app/actions/input/mod.rs` owns common action-preview key flow between pending result panes and
+  action confirmation.
+- `app/actions/shared.rs` owns only the shared status/result/reveal helpers used by preview and
+  completion families. It is intentionally shared because it centralizes identical lifecycle wording
+  and refresh policy, not because it is a generic action bucket.
+- `app/services/mod.rs` owns the app side-effect seam for tests. App submodules call that narrow
+  service surface directly for jj/view effects, and `App` keeps only the small wrappers that must
+  couple those effects to current app-owned state such as the active `ViewState`.
 - `modes/mod.rs` owns app-level modal and prompt state, including help, copy, view-format,
   action-menu, role-prompt, text-prompt, action-preview/result, push-remote, operation-action, and
   working-copy navigation screens. It projects the current `InteractionMode` into status-line text
-  and `tui::Overlay` values.
-- `status_line.rs` owns status-line construction, status kind, title/message/hint storage, and
+  and `tui::Overlay` values through `projection.rs`.
+- `app/status_line.rs` owns status-line construction, status kind, title/message/hint storage, and
   per-view item-count wording.
-- `action_pane/mod.rs` owns action preview/result body projection, scroll state, visible-line
-  calculation, and preview/result key handling. `app.rs` decides what an accepted or cancelled
-  action means; `action_pane.rs` decides how output panes move.
-- `command.rs` owns binding metadata and the command/effect vocabulary shared between app-level
+- `app/actions/pane.rs` owns action preview/result body projection, scroll state, visible-line
+  calculation, and preview/result key handling. `app/mod.rs` decides what an accepted or cancelled
+  action means; `app/actions/pane.rs` decides how output panes move.
+- `command/mod.rs` owns binding metadata and the command/effect vocabulary shared between app-level
   dispatch and individual views.
 - `menus/mod.rs` owns shared menu vocabulary, safety markers, role prompts, action-menu items, and
   follow-up payload models. Feature roots own whether a selected row offers an action and which
   target values it carries.
-- `actions.rs` owns preview-first `jj` action and mutation plans that have not moved to narrower
-  feature owners. It keeps the top-level re-export boundary consumed by app and menu code.
-- `jj.rs` owns view-spec command construction, direct process helpers, diff-format arguments, and
-  command/navigation target provenance.
-- `syntax.rs` owns exact revset/fileset/string quoting helpers and argv label helpers shared by
-  `actions.rs` and related command builders.
-- `rows.rs` owns shared row-helper mechanics that have not yet moved to narrower owners. It should
-  keep shrinking as feature roots own their row models and should not own command identity,
+- `actions/mod.rs` owns preview-first `jj` action and mutation plans after target selection. It is
+  intentionally left as a top-level vocabulary and re-export boundary for action families rather
+  than as a place for feature-owned availability rules.
+- `jj/mod.rs` owns view-spec command construction, direct process helpers, diff-format arguments,
+  and command/navigation target provenance.
+- `jj/syntax.rs` owns exact revset/fileset/string quoting helpers and argv label helpers shared by
+  `actions` and related command builders.
+- `rendered_rows/mod.rs` owns only shared row-helper mechanics. It should not own command identity,
   navigation provenance, document loading, or feature-specific row policy.
-- `operation_log.rs` owns the operation-log feature view, operation selection/copy/search, operation
-  recovery availability, operation detail navigation, and operation recovery action plans.
-  `operation_log/rows.rs` owns rendered operation-log row grouping, operation-id metadata parsing
-  and pairing, and metadata drift tests. `operation_log/actions.rs` owns undo/redo and exact
-  operation restore/revert argv construction, preview wording, and run contracts, while `actions.rs`
-  re-exports the app-facing names.
-- `bookmarks.rs` owns the bookmarks feature view, bookmark selection/copy/search, and bookmark
-  action availability. `bookmarks/rows.rs` owns bookmark row metadata and local/remote state
-  classification; `bookmarks/targets.rs` owns safe bookmark mutation target resolution;
-  `bookmarks/actions.rs` owns bookmark mutation argv construction, preview summaries, exact-name
-  quoting, and rename validation.
+- `operation_log/mod.rs` owns the operation-log feature root. `operation_log/view/mod.rs` owns the
+  operation-log surface, selection/copy/search, and recovery availability. `operation_log/rows.rs`
+  owns rendered operation-log row grouping, operation-id metadata parsing and pairing, and metadata
+  drift tests. `operation_log/actions.rs` owns undo/redo and exact operation restore/revert argv
+  construction, preview wording, and run contracts, while `actions/mod.rs` re-exports the app-facing
+  names. `operation_log/detail.rs` owns the detail document surface.
+- `bookmarks/mod.rs` owns the bookmarks feature root. `bookmarks/view/mod.rs` owns bookmark
+  selection/copy/search and action availability; `bookmarks/rows/mod.rs` owns bookmark row metadata
+  and local/remote state classification; `bookmarks/targets/mod.rs` owns safe bookmark mutation
+  target resolution; `bookmarks/actions/mod.rs` owns bookmark mutation argv construction, preview
+  summaries, exact-name quoting, and rename validation.
 - `log/mod.rs` owns the default/log view, log row loading, log-row selection, log search, and
-  log-to-detail navigation. `log/rows.rs` owns rendered `jj log` row grouping, revision metadata
-  pairing, compact log context, and the `LogItem` row contract.
-- `status/mod.rs` owns the status feature root. `status/view.rs` owns status
+  log-to-detail navigation. `log/view/mod.rs` owns the log surface; `log/rows/mod.rs` owns rendered
+  `jj log` row grouping, revision metadata pairing, compact log context, and the `LogItem` row
+  contract.
+- `status/mod.rs` owns the status feature root. `status/view/mod.rs` owns status
   selection/search/copy/refresh, `status/rows.rs` owns rendered status rows and exact path policy,
   and `status/actions.rs` owns status-file action target contracts.
-- `show.rs` and `diff.rs` own their view behavior and should stay distinct even when they share
-  document mechanics.
-- `document.rs` owns shared rendered-file document mechanics for show, diff, status, file-show, and
-  operation-detail surfaces: loading rendered document lines, sticky heading projection, file
+- `show/mod.rs` and `diff/mod.rs` own their view behavior and should stay distinct even when they
+  share document mechanics.
+- `documents/mod.rs` owns shared rendered-file document mechanics for show, diff, status, file-show,
+  and operation-detail surfaces: loading rendered document lines, sticky heading projection, file
   jumping, scroll state, search, and render helpers.
-- `rendered.rs` owns lightweight structure over rendered jj lines, including file heading detection
-  and sticky projection inputs.
-- `search.rs`, `selection.rs`, `copy.rs`, and `clipboard.rs` own narrow support concepts and should
-  not accumulate view policy.
-- `tui.rs` owns shared chrome only: layout, status/header rendering, overlays, and modal
+- `documents/rendered/mod.rs` owns lightweight structure over rendered jj lines, including file
+  heading detection and sticky projection inputs.
+- `search/mod.rs`, `selection.rs`, and `clipboard.rs` own narrow support concepts and should not
+  accumulate view policy. `menus/model/copy.rs` owns copy-menu payload vocabulary.
+- `tui/mod.rs` owns shared chrome only: layout, status/header rendering, overlays, and modal
   presentation.
 
 Add a module only when it gives a real concept a local home. Do not split code just to make files
@@ -282,27 +302,29 @@ smaller if the resulting reader path becomes less direct.
 
 Every active app screen should have one explicit owner for each part of its contract:
 
-- Keys: `app.rs` owns global dispatch and mode transitions; view modules own view-local bindings;
-  `action_pane.rs` owns scrolling keys inside action preview/result output.
-- Screen state: `modes.rs` owns modal and prompt variants. New prompt or overlay state should start
-  there unless it is view-local state that belongs in a view module.
-- Overlay projection: `modes.rs` converts screen state to `tui::Overlay`; `tui.rs` renders the
-  overlay chrome without deciding app behavior.
-- Status projection: `status_line.rs` constructs durable ready/error status lines from the active
-  view; `modes.rs` supplies transient prompt status text while a mode is active.
-- Command execution: `actions.rs` owns or re-exports action-plan command contracts for confirmed
+- Keys: `app/mod.rs` owns event-loop entry and normal-mode routing; `app/dispatch.rs` owns prefix
+  dispatch; view modules own view-local bindings; `app/actions/pane.rs` owns scrolling keys inside
+  action preview/result output.
+- Screen state: `modes/mod.rs` owns modal and prompt variants. New prompt or overlay state should
+  start there unless it is view-local state that belongs in a view module.
+- Overlay projection: `modes/mod.rs` converts screen state to `tui::Overlay`; `tui/mod.rs` renders
+  the overlay chrome without deciding app behavior.
+- Status projection: `app/status_line.rs` constructs durable ready/error status lines from the
+  active view; `modes/mod.rs` supplies transient prompt status text while a mode is active.
+- Command execution: `actions/mod.rs` owns or re-exports action-plan command contracts for confirmed
   mutation flows; feature-owned action modules such as `operation_log/actions.rs` and
-  `bookmarks/actions.rs` own their local argv, preview, and run contracts. `jj.rs` owns the shared
-  `jj` process helpers and view-spec command construction. `app/actions.rs` owns when action
-  commands are run, how results refresh or reveal views, and what status/result screen follows.
-- View behavior: view modules execute `ViewCommand` into `ViewEffect`; `app.rs` routes global
+  `bookmarks/actions/mod.rs` own their local argv, preview, and run contracts. `jj/mod.rs` owns the
+  shared `jj` process helpers and view-spec command construction. `app/actions/mod.rs` owns when
+  action commands are run, how results refresh or reveal views, and what status/result screen
+  follows.
+- View behavior: view modules execute `ViewCommand` into `ViewEffect`; `app/mod.rs` routes global
   effects such as opening screens, copying, pushing views, refreshing, or changing search state to
   the app submodule that owns the detailed policy.
 
 Future UI packets should name the smallest owner that matches the contract. For example, a new
-action-result scroll key belongs in `action_pane.rs`; a new modal projection belongs in `modes.rs`
-plus `tui.rs`; a new log navigation behavior belongs in `log.rs` or `view_state.rs`; and only the
-orchestration glue should land in `app.rs`.
+action-result scroll key belongs in `app/actions/pane.rs`; a new modal projection belongs in
+`modes/mod.rs` plus `tui/mod.rs`; a new log navigation behavior belongs in `log/view/mod.rs` or
+`view_state/mod.rs`; and only the orchestration glue should land in `app/mod.rs`.
 
 ## View Architecture
 
@@ -316,8 +338,8 @@ Feature views should expose a small, boring surface:
 - `clamp` keeps selection or scroll state valid for the current content.
 
 The app owns global mode. Views should not know about help, copy menus, view menus, the stack, or
-terminal polling. A view may request an effect; `app.rs` decides how that effect changes global
-state.
+terminal polling. A view may request an effect; `app/mod.rs` and `app/effects.rs` decide how that
+effect changes global state.
 
 Prefer explicit effect values over callbacks or shared mutable app context. The current `ViewEffect`
 shape is intentionally small because it keeps command flow auditable.
@@ -350,14 +372,14 @@ For rendered file-oriented documents:
 - Search highlights should layer on top of displayed lines without changing the underlying document.
 - Scroll math should be saturating and clamp against document length.
 
-Keep shared chrome in `tui.rs`. Do not let each view invent its own title bar, status line, overlay
-style, or modal layout unless the app design genuinely changes.
+Keep shared chrome in `tui/mod.rs`. Do not let each view invent its own title bar, status line,
+overlay style, or modal layout unless the app design genuinely changes.
 
 ## Terminal And Process Boundaries
 
-Terminal lifecycle belongs in `app.rs` and Ratatui setup. View and process command execution helpers
-belong in `jj.rs`; preview-first mutation command plans belong in `actions.rs` until a narrower
-feature owner is the better reader path. Clipboard integration belongs in `clipboard.rs`.
+Terminal lifecycle belongs in `app/mod.rs` and Ratatui setup. View and process command execution
+helpers belong in `jj/mod.rs`; preview-first mutation command plans belong in `actions/mod.rs` until
+a narrower feature owner is the better reader path. Clipboard integration belongs in `clipboard.rs`.
 
 Make side effects visible:
 

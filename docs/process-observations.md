@@ -9998,3 +9998,84 @@ belong here.
   - Files: `src/bookmarks/rows/mod.rs`, `src/bookmarks/rows/metadata.rs`,
     `src/bookmarks/rows/pairing.rs`, `src/bookmarks/rows/tests.rs`,
     `src/bookmarks/view/commands.rs`, and this process note.
+
+### 2026-05-22 (post-review cleanup doctrine consolidation)
+
+- Slice / task: convert the completed structural cleanup into durable repository memory by fixing
+  stale active guidance, sharpening completion framing, recording the post-traversal dense-owner
+  queue, and adding source-local anti-drift ownership notes for intact shared roots.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread guidance and source-note consolidation. No worker was used.
+- Changed source shape: no runtime behavior moved. The source edits were ownership docs on
+  `src/actions/mod.rs` and `src/app/actions/shared.rs`; the rest of the packet updated active
+  guidance in `AGENTS.md`, `docs/agent/architecture.md`, `docs/agent/rust-style.md`,
+  `docs/agent/workflow.md`, `docs/agent/call-tree-cleanup-map.md`,
+  `docs/agent/cleanup-wave-status.md`, and `docs/agent/source-cleanup-audit.md`.
+- Implementation outcome:
+  - active guidance now points to the current split module roots instead of the old single-file
+    owners;
+  - maintainability doctrine now explicitly distinguishes active guidance from historical ledgers,
+    runtime-path completion from post-traversal reader-pain work, and green builds from durable
+    ownership memory;
+  - the post-traversal queue now names the remaining dense production owners to re-read before
+    future broad changes;
+  - `src/actions/mod.rs` and `src/app/actions/shared.rs` now explain locally why they remain shared
+    and what policy should not land there.
+- Behavior preserved: this packet intentionally changed guidance truthfulness and source-local
+  ownership notes only. No user-visible jj/TUI behavior, command argv, action flow, or view logic
+  was changed.
+- Validation trail: `cargo check`; `cargo clippy -- -D warnings`; `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-22` from local validation commands in this turn.
+  - Files: `AGENTS.md`, `docs/agent/architecture.md`, `docs/agent/rust-style.md`,
+    `docs/agent/workflow.md`, `docs/agent/call-tree-cleanup-map.md`,
+    `docs/agent/cleanup-wave-status.md`, `docs/agent/source-cleanup-audit.md`, `src/actions/mod.rs`,
+    `src/app/actions/shared.rs`, and this process note.
+
+### 2026-05-22 (active-guidance follow-up audit)
+
+- Slice / task: continue the post-review consolidation by sweeping the remaining `docs/agent`
+  guidance set for stale active references and missing doctrine hooks after the first repair pass.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread documentation follow-up. No worker was used.
+- Changed source shape: no runtime behavior moved and no Rust source changed in this follow-up. The
+  packet updated `docs/agent/testing.md`, `docs/agent/documentation.md`, and
+  `docs/agent/source-maintainability-ledger.md`.
+- Implementation outcome:
+  - `testing.md` now points command-construction guidance at `jj/mod.rs` and `jj/view_spec` instead
+    of the removed `jj.rs` root;
+  - `documentation.md` now teaches the active-guidance versus historical-ledger distinction
+    explicitly;
+  - `source-maintainability-ledger.md` now states near the top that older entries intentionally
+    preserve historical paths and should not override the current ownership map in the active
+    guidance docs.
+- Behavior preserved: this follow-up changed documentation only. No user-visible jj/TUI behavior,
+  command argv, action flow, or ownership in code changed.
+- Validation trail: `just md-check`; targeted `rg` scan over `docs/agent/*.md` for known stale path
+  patterns.
+- Evidence basis:
+  - Date: `2026-05-22` from local validation commands in this turn.
+  - Files: `docs/agent/testing.md`, `docs/agent/documentation.md`,
+    `docs/agent/source-maintainability-ledger.md`, and this process note.
+
+### 2026-05-22 (canonical doctrine shaping pass)
+
+- Slice / task: finish the guidance consolidation by concentrating the repo-specific maintainability
+  doctrine into one small canonical active surface and making the guidance hierarchy explicit from
+  the entry point.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Model / routing: main-thread documentation consolidation. No worker was used.
+- Changed source shape: no runtime behavior moved and no Rust source changed in this pass. The
+  packet updated `AGENTS.md` and `docs/agent/workflow.md`.
+- Implementation outcome:
+  - `workflow.md` now contains a short “Current Maintainability Doctrine” section that future `jk`
+    work can follow by default without reconstructing the lessons from several docs;
+  - `AGENTS.md` now points to that doctrine section as part of the canonical guidance order, so the
+    entry-point doc, ownership map, style guidance, queue docs, and historical records have a
+    clearer hierarchy.
+- Behavior preserved: this pass changed documentation only. No user-visible jj/TUI behavior, command
+  argv, action flow, or source ownership changed.
+- Validation trail: `just md-check`.
+- Evidence basis:
+  - Date: `2026-05-22` from local validation commands in this turn.
+  - Files: `AGENTS.md`, `docs/agent/workflow.md`, and this process note.

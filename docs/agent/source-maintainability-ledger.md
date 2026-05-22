@@ -4,6 +4,11 @@ This ledger records the active maintainability objective for `jk` and the curren
 guide bounded follow-up packets. It is not a standing "split the biggest files" queue. Measurements
 nominate places to read first; they do not mandate refactors.
 
+This file is also a historical ledger. Older entries intentionally preserve the paths and owner
+names that were current when those packets landed. Use [`architecture.md`](architecture.md),
+[`workflow.md`](workflow.md), and [`cleanup-wave-status.md`](cleanup-wave-status.md) for the current
+active guidance surface; do not treat old path references in this ledger as the current module map.
+
 For a concise human-readable map of recent work, current focus, likely next work, and process
 observations, see [`cleanup-wave-status.md`](cleanup-wave-status.md).
 

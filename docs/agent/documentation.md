@@ -71,6 +71,10 @@ unless they are clearly marked as illustrative.
 Do not document planned behavior as if it exists. If a feature is partial, experimental,
 platform-specific, or dependent on jj output shape, say so plainly.
 
+Keep the distinction between active guidance and history explicit. Architecture, workflow, style,
+and current-status docs should describe the current tree and current ownership. Historical ledgers
+and process logs may preserve old paths when they are recording how the code changed over time.
+
 When docs describe compatibility, be specific about what is preserved:
 
 - user jj config;

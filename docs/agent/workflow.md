@@ -3,6 +3,38 @@
 Load this document when planning non-trivial changes, reviewing code, preparing handoff notes, or
 deciding how much validation is needed.
 
+This is the canonical active guidance for implementation workflow, maintainability packet shape, and
+completion criteria. Use [`architecture.md`](architecture.md) for the ownership map, and use
+[`cleanup-wave-status.md`](cleanup-wave-status.md) for the current post-traversal queue.
+
+## Current Maintainability Doctrine
+
+Future `jk` work should follow these rules by default:
+
+- prefer feature roots over kind-of-code buckets;
+- treat shared modules as boring mechanics after the feature has made the product decision;
+- keep shared action families after target selection, and keep availability with the feature;
+- move active guidance with structure, while letting historical ledgers preserve old paths;
+- record coherent no-move decisions when a shared root could otherwise look unreviewed;
+- treat the runtime-path cleanup as done, and use the post-traversal reader-pain queue for the next
+  maintainability packets;
+- require both behavior-preservation proof and durable ownership memory before claiming a
+  maintainability wave is complete.
+
+## Guidance Hierarchy
+
+For future `jk` work, use the active guidance in this order:
+
+1. `AGENTS.md` for repo entry rules and load order.
+1. `architecture.md` for current structure and ownership.
+1. `rust-style.md` for Rust/module-shape decisions once the owner is known.
+1. `workflow.md` for packet shape, validation posture, and completion criteria.
+1. `cleanup-wave-status.md` and `source-cleanup-audit.md` for the current queue and supporting
+   evidence.
+
+Treat `source-maintainability-ledger.md` and `docs/process-observations.md` as historical records,
+not as the current ownership map.
+
 ## Start With The Existing Shape
 
 Read the owning module before editing. Identify the concept that owns the change, the adjacent
@@ -24,6 +56,21 @@ Keep changes atomic:
 
 If a change reveals a separate cleanup, note it or make a separate `jj` change rather than folding
 it into unrelated work.
+
+## Maintainability Packets
+
+For maintainability work, optimize for correct future change rather than for superficial tidiness.
+
+- Start with the runtime path when the reader pain is in startup, dispatch, modal flow, action flow,
+  or view routing.
+- After the runtime path is healthy, switch to a measured reader-pain queue for dense feature or
+  boundary owners instead of continuing to split by habit.
+- Stop splitting when a module reads as one coherent owner. Record the no-move decision when the
+  module could otherwise look like an unreviewed dumping ground.
+- When structure moves, update active guidance in the same wave. Historical ledgers may preserve old
+  paths; active guidance may not.
+- Treat maintainability completion as two claims: changed surfaces still behave correctly, and the
+  repo now has durable ownership memory for what changed, what stayed, and what remains.
 
 ## Review Posture
 

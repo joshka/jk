@@ -12,6 +12,26 @@ navigation model, command coverage, or visual direction. Load
 [`docs/agent/architecture.md`](docs/agent/architecture.md) when work touches command execution, view
 behavior, rendering, navigation, search, copying, or terminal lifecycle.
 
+## Canonical Maintainability Guidance
+
+Use the repo guidance in this order when maintainability, ownership, or structure matters:
+
+- [`AGENTS.md`](AGENTS.md): entry-point rules, repo workflow, and which deeper docs to load.
+- [`docs/agent/architecture.md`](docs/agent/architecture.md): canonical source of truth for current
+  structure, ownership, feature roots, and shared-mechanics boundaries.
+- [`docs/agent/rust-style.md`](docs/agent/rust-style.md): canonical Rust/module-shape guidance once
+  the owner is known.
+- [`docs/agent/workflow.md`](docs/agent/workflow.md): canonical implementation workflow,
+  maintainability packet shape, completion bar, and the small current maintainability doctrine that
+  future work should follow by default.
+- [`docs/agent/cleanup-wave-status.md`](docs/agent/cleanup-wave-status.md): current cleanup status,
+  what completion means, and the active post-traversal queue summary.
+- [`docs/agent/source-cleanup-audit.md`](docs/agent/source-cleanup-audit.md): supporting evidence
+  and measurements for the queue, not the ownership source of truth.
+- [`docs/agent/source-maintainability-ledger.md`](docs/agent/source-maintainability-ledger.md) and
+  [`docs/process-observations.md`](docs/process-observations.md): historical records and packet
+  evidence, not active structure guidance.
+
 Rendered `jj` output is the default presentation source. Preserve user templates, colors, graph
 symbols, diff style, wording, and command behavior wherever practical. Parse the minimum structure
 needed for presentation-adjacent navigation, sticky file context, search, and copy actions, and keep
@@ -53,9 +73,15 @@ sibling checkout or generated scripts.
 - Properly document and test implementation work. Record the behavior, constraints, and maintenance
   context needed to understand the change, and leave focused proof in the owning tests or docs
   instead of relying on chat context.
+- Treat active guidance docs as part of the product boundary. When structure moves, update
+  `AGENTS.md` and the relevant `docs/agent/*.md` files in the same change; historical ledgers may
+  preserve old paths, but active guidance may not.
 - Choose validation by risk. Match proof to the changed surface: parser samples for parsers,
   navigation boundaries for TUI movement, rendered output checks for presentation, and docs checks
   for documentation.
+- Treat maintainability completion claims as a higher bar than green builds. Preserve both
+  behavior-level proof for changed surfaces and durable ownership memory for what was intentionally
+  left alone.
 - Report proof in handoffs instead of confidence language. State what was run, what passed, what was
   not run, and any residual risk.
 - Review output as a future maintainer. Check correctness, edge cases, API clarity, documentation
@@ -146,7 +172,7 @@ the user-visible concept changes: feature roots own view state, bindings, row in
 selection/search/copy behavior, action availability, target resolution, and tests; shared modules
 own only cross-cutting mechanics that two feature owners can use without understanding each other's
 domain. Treat this as a feature-policy versus shared-mechanics split: feature roots answer what the
-surface shows, selects, copies, recovers from, and offers; `ui`, `jj`, `actions`, `app`, and small
+surface shows, selects, copies, recovers from, and offers; `tui`, `jj`, `actions`, `app`, and small
 helpers answer boring cross-cutting questions after a feature has already chosen its policy.
 
 Apply the project-structure rule from Ed Page's Rust style guidance when a module is split across
@@ -163,7 +189,8 @@ The code is organized by vertical slices where practical:
 
 - `app/mod.rs` owns the terminal event loop, key dispatch, modal state, view stack, refresh, and
   cross-view transitions.
-- `view_state/mod.rs` routes app-level view operations to log, show, and diff view implementations.
+- `view_state/mod.rs` routes app-level view operations across the concrete feature views and keeps
+  action-target delegation separate from feature-local policy.
 - `command/mod.rs` owns key binding metadata and the command/effect vocabulary shared between app
   dispatch and individual views.
 - `menus/mod.rs` owns shared menu vocabulary and prompt models. Feature roots own action
@@ -176,18 +203,22 @@ The code is organized by vertical slices where practical:
   share document mechanics.
 - `documents/mod.rs` owns shared rendered document structure, show/diff/status/operation-detail
   document scrolling, file jumping, sticky heading projection, and document search.
-- `rendered_rows.rs` owns only shared rendered-row helpers; feature-specific row policy belongs in
-  feature roots such as `log/rows.rs`, `bookmarks/rows/mod.rs`, and `operation_log/rows.rs`.
-- `search.rs`, `selection.rs`, `copy.rs`, and `clipboard.rs` own narrow support concepts and should
-  not accumulate view policy.
+- `rendered_rows/mod.rs` owns only shared rendered-row helpers; feature-specific row policy belongs
+  in feature roots such as `log/rows.rs`, `bookmarks/rows/mod.rs`, and `operation_log/rows.rs`.
+- `search/mod.rs`, `selection.rs`, and `clipboard.rs` own narrow support concepts and should not
+  accumulate view policy. Copy-menu payload vocabulary now lives under `menus/model/copy.rs`.
 - `terminal_process/mod.rs` owns inherited-stdio terminal suspension and restoration for interactive
   commands.
 - `tui/mod.rs` owns shared chrome only: layout, status/header rendering, overlays, and modal
   presentation.
 
-Avoid letting `ui`, `jj`, `actions`, `rendered_rows`, `menus`, `tui`, or `view_state` become dumping
+Avoid letting `jj`, `actions`, `rendered_rows`, `menus`, `tui`, or `view_state` become dumping
 grounds for feature policy. Add a module only when it gives a real concept a local home. Avoid broad
 reorganization unless it improves the reader path for a concrete change.
+
+If a shared root still looks suspicious after review, do not split it by default. Record the no-move
+decision near the source or in active guidance so future maintainers know why it stayed shared and
+what policy does not belong there.
 
 ## Build, Test, And Development Commands
 

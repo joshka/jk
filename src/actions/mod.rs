@@ -16,6 +16,9 @@
 //! lifecycle owns prompt flow, confirmation strength, refresh/reveal policy, and result-screen
 //! transitions after a plan runs. Syntax quoting helpers stay in [`crate::jj`]; rendered row
 //! loading stays in [`crate::rendered_rows`] and view-spec command construction stays in [`crate::jj`].
+//! This root is intentionally shared as a vocabulary and re-export boundary after target selection.
+//! Do not move feature-owned availability rules, row eligibility checks, or prompt routing here;
+//! those stay with the feature or app action lifecycle that chose the target.
 
 mod abandon;
 mod describe;

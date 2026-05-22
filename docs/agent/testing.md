@@ -67,7 +67,8 @@ Use saturating expectations. Terminal UIs frequently run in small panes.
 
 ## Command Tests
 
-Tests for `jj.rs` should prove command construction and display behavior:
+Tests for `jj/mod.rs` and the `jj/view_spec` subtree should prove command construction and display
+behavior:
 
 - direct startup args are preserved;
 - app labels use `jk` wording while command labels use `jj` wording;

@@ -3,6 +3,10 @@
 This audit records mechanical measurements for the maintainability cleanup wave. Measurements are
 evidence for choosing what to read next; they are not a refactoring order by themselves.
 
+This is supporting queue evidence, not the canonical active ownership guide. Use
+[`architecture.md`](architecture.md) for current structure and
+[`cleanup-wave-status.md`](cleanup-wave-status.md) for the queue summary and completion framing.
+
 Captured: `2026-05-22 11:11:16 PDT`.
 
 ## Current Measurements
@@ -51,11 +55,16 @@ automatic split queue.
 
 ## Candidate Future Reads
 
-- `src/bookmarks/actions/plan.rs`: still the largest production action-plan file.
+- `src/bookmarks/actions/plan.rs`: still the largest production action-plan file. Re-read before
+  broad bookmark mutation or rename-flow changes.
 - `src/jj/view_spec/mod.rs`: still a central shared boundary with startup and navigation policy.
-- `src/bookmarks/targets/resolver.rs`: still a dense feature-owned target policy file.
-- `src/operation_log/detail.rs`: still a larger rendered-document feature surface.
+  Re-read before widening startup argv parsing or detail-target provenance behavior.
+- `src/bookmarks/targets/resolver.rs`: still a dense feature-owned target policy file. Re-read
+  before changing bookmark eligibility, ambiguity, or remote-peer safety rules.
+- `src/operation_log/detail.rs`: still a larger rendered-document feature surface. Re-read before
+  mixing more document mechanics or operation-specific behavior into one packet.
 - `src/workspaces/rows.rs`: still a non-trivial feature-owned row and metadata pairing surface.
+  Re-read before changing workspace metadata loading or view-facing row contracts.
 - `src/terminal_process/mod.rs`: still a shared effect boundary worth re-reading before future
   process-handling changes.
 
@@ -65,3 +74,5 @@ automatic split queue.
 - Prefer a no-move decision when a large file is coherent and well owned.
 - Use focused validation for the surface being changed, then rerun the broader gate when deciding
   whether the cleanup objective is actually complete.
+- Treat this audit as a reader-pain queue after the completed runtime traversal, not as proof that
+  every large file still needs structural work.

@@ -3,6 +3,10 @@
 //! These helpers are kept separate because preview and completion code both need identical status
 //! context language, and confirmed actions share the same refresh/reveal/status outcome policy
 //! without owning command construction.
+//!
+//! Keep this module limited to lifecycle-completion wording and refresh/reveal helpers. It is not a
+//! generic action-policy bucket: action availability, target selection, preview planning, and jj
+//! argv construction belong in feature owners, action families, or the app action entry flow.
 
 use std::fmt::Display;
 

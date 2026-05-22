@@ -3,6 +3,10 @@
 Load this document when a change touches Rust implementation structure, public or crate-local APIs,
 naming, visibility, or refactoring.
 
+This document is the canonical Rust/module-style companion to [`architecture.md`](architecture.md).
+Use `architecture.md` to decide the owner first; then use this file to shape the Rust implementation
+inside that owner.
+
 ## Maintenance Goal
 
 Write `jk` code so a future maintainer can read a module from top to bottom and understand the local
@@ -32,6 +36,10 @@ naturally needs it:
 
 Caller-before-callee ordering is preferred when it makes the workflow clear. It is acceptable to put
 small low-level helpers earlier when that improves local reading.
+
+When a module still looks large after cleanup, do not keep splitting it unless the next move lowers
+reader burden. A coherent owner is a valid stopping point; record the no-move decision in module
+docs when the file could plausibly attract unrelated future code.
 
 ## Abstraction Standard
 
@@ -93,8 +101,8 @@ the edge cases easier to audit.
 
 ## Ratatui Code
 
-Keep layout and chrome centralized in `tui.rs`. View modules should build the widgets that represent
-their content and let shared chrome handle the app frame.
+Keep layout and chrome centralized in `tui/mod.rs`. View modules should build the widgets that
+represent their content and let shared chrome handle the app frame.
 
 Prefer stable dimensions and saturating arithmetic for scrollable UI. Any calculation involving
 terminal height, line count, selected row, or scroll offset should handle empty content and very
