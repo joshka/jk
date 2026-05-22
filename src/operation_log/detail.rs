@@ -10,10 +10,10 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
-use crate::copy::CopyOption;
 use crate::documents;
 use crate::documents::{DocumentLines, FileAnchor, PinnedDocument, project_with_active_file};
 use crate::jj::{JjCommand, ViewSpec};
+use crate::menus::CopyOption;
 use crate::rendered_rows::document_plain_text;
 use crate::search::SearchQuery;
 

@@ -7,7 +7,7 @@ use super::*;
 use crate::command::{Binding, Command, CommandContext, ViewCommand, ViewEffect, find_binding};
 use crate::jj::LogViewMode;
 use crate::selection::Selection;
-use crate::theme;
+use crate::tui::theme;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
 fn log_item(text: &str, change_id: Option<&str>, commit_id: Option<&str>) -> LogItem {

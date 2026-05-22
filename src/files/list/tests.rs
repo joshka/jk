@@ -1,6 +1,9 @@
 use ratatui::text::Line;
 
 use super::*;
+use crate::command::{CommandContext, ViewEffect};
+use crate::menus::CopyOption;
+use crate::search::SearchQuery;
 
 fn file_item(path: &str) -> FileListItem {
     FileListItem::new(vec![Line::from(path.to_owned())], path.to_owned())

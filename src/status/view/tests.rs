@@ -1,6 +1,11 @@
 use insta::assert_snapshot;
+use ratatui::text::Line;
 
 use super::*;
+use crate::command::{CommandContext, ViewEffect};
+use crate::search::SearchQuery;
+use crate::status::StatusFileAction;
+use crate::status::rows::parse_status_row;
 
 fn status_view(lines: &[&str]) -> StatusView {
     StatusView::test_new(lines)

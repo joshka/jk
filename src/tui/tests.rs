@@ -4,11 +4,11 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 
-use crate::action_pane::ActionPane;
+use crate::app::actions::ActionPane;
+use crate::app::status_line::{StatusKind, StatusLine};
 use crate::command::{HelpRow, HelpSection, HelpSectionKind};
 use crate::menus::RolePrompt;
-use crate::status_line::{StatusKind, StatusLine};
-use crate::theme;
+use crate::tui::theme;
 
 use super::*;
 

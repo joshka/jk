@@ -1,8 +1,20 @@
 use super::*;
-use crate::actions::JjOperationRecoveryKind;
+use crate::actions::{
+    JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjCommitPlan, JjDescribePlan, JjDescribeTarget,
+    JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan, JjOperationRecoveryKind,
+    JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan, JjSquashPlan,
+    JjWorkingCopyNavigationPlan,
+};
+use crate::app::actions::ActionPane;
+use crate::app::status_line::StatusKind;
+use crate::app::status_line::StatusLine;
+use crate::bookmarks::actions::{JjBookmarkMutationPlan, JjBookmarkTarget};
+use crate::jj::{DiffFormat, JjCommand};
 use crate::log::LogView;
-use crate::status_line::StatusKind;
+use crate::operation_log::actions::{JjOperationRecovery, JjOperationTarget};
+use crate::tui::Overlay;
 use crate::tui::StatusHints;
+use crate::view_state::ViewState;
 
 #[test]
 fn prompt_status_overrides_stored_status() {

@@ -1,7 +1,10 @@
 use ratatui::text::Line;
 
 use super::*;
+use crate::command::{CommandContext, ViewEffect};
 use crate::jj::JjCommand;
+use crate::menus::CopyOption;
+use crate::search::SearchQuery;
 
 fn file_show_view(path: &str, lines: &[&str]) -> FileShowView {
     FileShowView::new(

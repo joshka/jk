@@ -1,6 +1,9 @@
 use ratatui::text::Line;
 
 use super::*;
+use crate::command::CommandContext;
+use crate::menus::CopyOption;
+use crate::search::SearchQuery;
 
 fn workspace_item(label: &str, name: Option<&str>) -> WorkspaceItem {
     WorkspaceItem::new(

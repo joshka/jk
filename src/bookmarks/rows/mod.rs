@@ -6,28 +6,18 @@
 //! the metadata drifts or row counts do not match the rendered rows, items keep
 //! their rendered text but degrade to unknown bookmark state and empty targets.
 
-use std::collections::HashSet;
+mod metadata;
+mod pairing;
 
 use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
 use ratatui::text::Line;
-use serde_json::Value;
 
-use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
-use crate::rendered_rows::{
-    boolean_field, line_text, non_empty_string_field, optional_string_field, string_field,
-};
+use crate::jj::{ColorMode, ViewSpec, run_jj};
+use crate::rendered_rows::line_text;
 
-pub(crate) const BOOKMARK_METADATA_TEMPLATE: &str = concat!(
-    r#""{\"name\":" ++ json(name)"#,
-    r#" ++ ",\"remote\":" ++ json(remote)"#,
-    r#" ++ ",\"tracked\":" ++ json(tracked)"#,
-    r#" ++ ",\"tracking_present\":" ++ json(tracking_present)"#,
-    r#" ++ ",\"synced\":" ++ json(synced)"#,
-    r#" ++ ",\"target_change_id\":" ++ json(if(normal_target, normal_target.change_id(), ""))"#,
-    r#" ++ ",\"target_commit_id\":" ++ json(if(normal_target, normal_target.commit_id(), ""))"#,
-    r#" ++ "}\n""#,
-);
+use metadata::{bookmark_metadata_coverage, run_jj_bookmark_metadata};
+use pairing::pair_bookmark_lines;
 
 /// One selectable bookmark item parsed from rendered bookmark output.
 #[derive(Clone, Debug)]
@@ -147,11 +137,11 @@ pub enum BookmarkRowState {
 }
 
 impl BookmarkRowState {
-    fn local(tracking: LocalBookmarkRemoteState) -> Self {
+    pub(super) fn local(tracking: LocalBookmarkRemoteState) -> Self {
         Self::Local { tracking }
     }
 
-    fn remote(
+    pub(super) fn remote(
         remote: String,
         tracking: RemoteBookmarkTrackingState,
         local_peer: BookmarkLocalPeerState,
@@ -204,236 +194,6 @@ pub fn load_bookmark_entries(spec: &ViewSpec) -> Result<Vec<BookmarkItem>> {
         metadata,
         bookmark_metadata_coverage(spec),
     ))
-}
-
-/// Loads bookmark metadata rows through the bookmark-specific template side channel.
-fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
-    Ok(
-        run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE, false)?
-            .into_iter()
-            .filter_map(|line| parse_bookmark_metadata_line(&line))
-            .collect(),
-    )
-}
-
-/// Pairs rendered bookmark rows with metadata and degrades safely when counts drift.
-fn pair_bookmark_lines(
-    lines: Vec<Line<'static>>,
-    metadata: Vec<BookmarkMetadata>,
-    coverage: BookmarkMetadataCoverage,
-) -> Vec<BookmarkItem> {
-    if lines.len() != metadata.len() {
-        return lines
-            .into_iter()
-            .map(|line| {
-                let text = line_text(&line);
-                BookmarkItem {
-                    lines: vec![line],
-                    name: bookmark_name_from_rendered_row(&text),
-                    target_change_id: None,
-                    target_commit_id: None,
-                    state: BookmarkRowState::Unknown,
-                }
-            })
-            .collect();
-    }
-
-    let local_names = metadata
-        .iter()
-        .filter(|metadata| metadata.remote.is_none())
-        .map(|metadata| metadata.name.clone())
-        .collect::<HashSet<_>>();
-    let tracked_remote_names = metadata
-        .iter()
-        .filter(|metadata| metadata.remote.is_some() && metadata.tracked)
-        .map(|metadata| metadata.name.clone())
-        .collect::<HashSet<_>>();
-    let untracked_remote_names = metadata
-        .iter()
-        .filter(|metadata| metadata.remote.is_some() && !metadata.tracked)
-        .map(|metadata| metadata.name.clone())
-        .collect::<HashSet<_>>();
-
-    let mut items = Vec::new();
-    let mut metadata = metadata.into_iter();
-
-    for line in lines {
-        let text = line_text(&line);
-        let metadata = metadata.next();
-        let bookmark_name = metadata
-            .as_ref()
-            .map(|metadata| metadata.name.clone())
-            .unwrap_or_else(|| bookmark_name_from_rendered_row(&text));
-        let mut item = BookmarkItem::new(
-            vec![line],
-            bookmark_name,
-            metadata
-                .as_ref()
-                .and_then(|metadata| metadata.target_change_id.clone()),
-            metadata
-                .as_ref()
-                .and_then(|metadata| metadata.target_commit_id.clone()),
-        );
-        item.state = metadata
-            .as_ref()
-            .map_or(BookmarkRowState::Unknown, |metadata| {
-                metadata.row_state(
-                    coverage,
-                    &local_names,
-                    &tracked_remote_names,
-                    &untracked_remote_names,
-                )
-            });
-        items.push(item);
-    }
-
-    items
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BookmarkMetadataCoverage {
-    VisibleRowsOnly,
-    UnfilteredAllRemotes,
-}
-
-/// Returns whether bookmark metadata covers only visible rows or all remotes without filtering.
-fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCoverage {
-    if !spec.args().is_empty()
-        && spec
-            .args()
-            .iter()
-            .all(|arg| matches!(arg.as_str(), "--all-remotes" | "-a"))
-    {
-        BookmarkMetadataCoverage::UnfilteredAllRemotes
-    } else {
-        BookmarkMetadataCoverage::VisibleRowsOnly
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct BookmarkMetadata {
-    /// Exact bookmark name from metadata.
-    name: String,
-    /// Remote name for remote rows, or `None` for local rows.
-    remote: Option<String>,
-    /// Whether the row is tracked according to `jj` metadata.
-    tracked: bool,
-    /// Whether tracking metadata was present for this row.
-    tracking_present: bool,
-    /// Whether the local and remote targets are already synced.
-    synced: bool,
-    /// Exact target change id when available.
-    target_change_id: Option<String>,
-    /// Exact target commit id when available.
-    target_commit_id: Option<String>,
-}
-
-impl BookmarkMetadata {
-    /// Classifies one metadata row into the user-visible bookmark row state.
-    fn row_state(
-        &self,
-        coverage: BookmarkMetadataCoverage,
-        local_names: &HashSet<String>,
-        tracked_remote_names: &HashSet<String>,
-        untracked_remote_names: &HashSet<String>,
-    ) -> BookmarkRowState {
-        match &self.remote {
-            None => BookmarkRowState::local(local_bookmark_remote_state(
-                self,
-                coverage,
-                tracked_remote_names,
-                untracked_remote_names,
-            )),
-            Some(remote) => BookmarkRowState::remote(
-                remote.clone(),
-                remote_bookmark_tracking_state(self),
-                local_peer_state(self, coverage, local_names),
-            ),
-        }
-    }
-}
-
-/// Parses one metadata line and rejects rows that do not match the exact schema.
-fn parse_bookmark_metadata_line(line: &str) -> Option<BookmarkMetadata> {
-    if line.is_empty() {
-        return None;
-    }
-
-    let Value::Object(fields) = serde_json::from_str::<Value>(line).ok()? else {
-        return None;
-    };
-
-    let name = string_field(&fields, "name")?;
-    if name.is_empty() {
-        return None;
-    }
-
-    Some(BookmarkMetadata {
-        name,
-        remote: optional_string_field(&fields, "remote")?,
-        tracked: boolean_field(&fields, "tracked")?,
-        tracking_present: boolean_field(&fields, "tracking_present")?,
-        synced: boolean_field(&fields, "synced")?,
-        target_change_id: non_empty_string_field(&fields, "target_change_id"),
-        target_commit_id: non_empty_string_field(&fields, "target_commit_id"),
-    })
-}
-
-fn local_bookmark_remote_state(
-    metadata: &BookmarkMetadata,
-    coverage: BookmarkMetadataCoverage,
-    tracked_remote_names: &HashSet<String>,
-    untracked_remote_names: &HashSet<String>,
-) -> LocalBookmarkRemoteState {
-    let tracked_remote_present = tracked_remote_names.contains(metadata.name.as_str());
-    let untracked_remote_present = untracked_remote_names.contains(metadata.name.as_str());
-
-    if tracked_remote_present {
-        LocalBookmarkRemoteState::Tracked {
-            untracked_remote_present,
-        }
-    } else if untracked_remote_present {
-        LocalBookmarkRemoteState::UntrackedRemotePresent
-    } else if coverage == BookmarkMetadataCoverage::UnfilteredAllRemotes {
-        LocalBookmarkRemoteState::LocalOnly
-    } else {
-        LocalBookmarkRemoteState::Ambiguous
-    }
-}
-
-fn remote_bookmark_tracking_state(metadata: &BookmarkMetadata) -> RemoteBookmarkTrackingState {
-    if metadata.tracked {
-        RemoteBookmarkTrackingState::Tracked {
-            local_present: metadata.tracking_present,
-            synced: metadata.synced,
-        }
-    } else {
-        RemoteBookmarkTrackingState::Untracked {
-            synced: metadata.synced,
-        }
-    }
-}
-
-fn local_peer_state(
-    metadata: &BookmarkMetadata,
-    coverage: BookmarkMetadataCoverage,
-    local_names: &HashSet<String>,
-) -> BookmarkLocalPeerState {
-    if local_names.contains(metadata.name.as_str()) {
-        BookmarkLocalPeerState::Present
-    } else if coverage == BookmarkMetadataCoverage::UnfilteredAllRemotes {
-        BookmarkLocalPeerState::Absent
-    } else {
-        BookmarkLocalPeerState::Unknown
-    }
-}
-
-fn bookmark_name_from_rendered_row(text: &str) -> String {
-    text.split_once(':')
-        .map(|(name, _)| name.trim())
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| text.trim())
-        .to_owned()
 }
 
 #[cfg(test)]

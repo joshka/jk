@@ -1,4 +1,8 @@
 use super::*;
+use crate::command::{CommandContext, ViewCommand, ViewEffect};
+use crate::jj::JjCommand;
+use crate::menus::CopyOption;
+use crate::search::SearchQuery;
 
 fn parsed_entry(path: &str, file_type: &str, side_count: usize) -> ResolveEntry {
     ResolveEntry::parsed(

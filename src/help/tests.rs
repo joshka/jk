@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 
 use super::*;
-use crate::command::KeyPattern;
+use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 
 #[test]
 fn project_help_groups_bindings_by_command() {

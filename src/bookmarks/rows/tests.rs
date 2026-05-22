@@ -1,3 +1,5 @@
+use super::metadata::{BookmarkMetadata, BookmarkMetadataCoverage, parse_bookmark_metadata_line};
+use super::pairing::pair_bookmark_lines;
 use super::*;
 use crate::jj::ViewSpec;
 
@@ -459,18 +461,5 @@ fn bookmark_metadata_with_remote(
         synced: remote.is_some(),
         target_change_id: target_change_id.map(str::to_owned),
         target_commit_id: target_commit_id.map(str::to_owned),
-    }
-}
-
-trait BookmarkMetadataTestExt {
-    fn with_tracking(self, tracked: bool, tracking_present: bool, synced: bool) -> Self;
-}
-
-impl BookmarkMetadataTestExt for BookmarkMetadata {
-    fn with_tracking(mut self, tracked: bool, tracking_present: bool, synced: bool) -> Self {
-        self.tracked = tracked;
-        self.tracking_present = tracking_present;
-        self.synced = synced;
-        self
     }
 }

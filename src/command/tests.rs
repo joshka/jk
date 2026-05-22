@@ -1,4 +1,4 @@
-use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
 use super::*;
 

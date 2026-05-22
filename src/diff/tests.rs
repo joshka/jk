@@ -2,8 +2,10 @@ use ratatui::text::Line;
 use ratatui_macros::line;
 
 use super::*;
+use crate::command::{CommandContext, ViewEffect};
 use crate::documents::DocumentLines;
 use crate::jj::{JjCommand, ViewSpec};
+use crate::search::SearchQuery;
 
 #[test]
 fn diff_view_pins_first_file_immediately() {

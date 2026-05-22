@@ -3,7 +3,7 @@
 use ratatui::text::{Line, Span};
 use ratatui_macros::span;
 
-use crate::theme;
+use crate::tui::theme;
 
 #[derive(Clone, Copy, Debug)]
 pub enum StatusHints {

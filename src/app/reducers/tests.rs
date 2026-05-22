@@ -1,5 +1,6 @@
 use super::*;
-use crate::menus::RolePromptOption;
+use crate::actions::{JjBookmarkMutationKind, JjBookmarkTarget, JjDescribeTarget};
+use crate::menus::{ActionKind, RolePrompt, RolePromptOption};
 
 fn role_prompt(options: Vec<RolePromptOption>) -> RolePrompt {
     RolePrompt::new("confirm role assignment", options, "Preview required.")

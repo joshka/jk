@@ -12,7 +12,8 @@ mod revision_actions;
 
 pub(in crate::menus) use model::PREVIEW_REQUIRED_MARKER;
 pub use model::{
-    ActionKind, ActionMenu, ActionMenuItem, FollowUp, RolePrompt, RolePromptOption, SafetyTier,
+    ActionKind, ActionMenu, ActionMenuItem, CopyOption, FollowUp, RolePrompt, RolePromptOption,
+    SafetyTier,
 };
 pub use revision_actions::ExactActionContext;
 

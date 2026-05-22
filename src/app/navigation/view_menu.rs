@@ -1,0 +1,83 @@
+use color_eyre::Result;
+
+use crate::app::status_line::StatusLine;
+use crate::jj::{DiffFormat, JjCommand};
+use crate::modes::{InteractionMode, ViewMenuAction, view_menu_options};
+
+use super::super::App;
+
+impl App {
+    /// Open the top-level view menu with the current surface preselected when
+    /// possible.
+    pub(in crate::app) fn open_view_menu(&mut self) {
+        let selected = view_menu_options()
+            .iter()
+            .position(|option| self.view_menu_option_is_current(option.action()))
+            .unwrap_or(0);
+        self.mode = InteractionMode::ViewMenu { selected };
+    }
+
+    fn view_menu_option_is_current(&self, action: ViewMenuAction) -> bool {
+        match action {
+            ViewMenuAction::Open(command) => self.view.command() == command,
+            ViewMenuAction::DiffFormat(format) => {
+                matches!(self.view.command(), JjCommand::Show | JjCommand::Diff)
+                    && self.diff_format == format
+            }
+        }
+    }
+
+    /// Apply one top-level view-menu choice.
+    pub(in crate::app) fn apply_view_menu_action(
+        &mut self,
+        action: ViewMenuAction,
+        viewport_height: u16,
+    ) -> Result<()> {
+        match action {
+            ViewMenuAction::Open(JjCommand::Log) => self.switch_to_log(),
+            ViewMenuAction::Open(JjCommand::Default) => self.switch_to_default(),
+            ViewMenuAction::Open(JjCommand::Status) => self.open_status(),
+            ViewMenuAction::Open(JjCommand::Resolve) => self.open_resolve(),
+            ViewMenuAction::Open(JjCommand::Bookmarks) => self.open_bookmarks(),
+            ViewMenuAction::Open(JjCommand::Workspaces) => self.open_workspaces(),
+            ViewMenuAction::Open(JjCommand::OperationLog) => self.open_operation_log(),
+            ViewMenuAction::DiffFormat(diff_format) => {
+                self.apply_diff_format(diff_format, viewport_height)
+            }
+            ViewMenuAction::Open(
+                JjCommand::Show
+                | JjCommand::Diff
+                | JjCommand::FileList
+                | JjCommand::FileShow
+                | JjCommand::OperationShow
+                | JjCommand::OperationDiff,
+            ) => {
+                self.status = StatusLine::with_message(
+                    &self.view,
+                    "view menu only opens top-level shipped views",
+                );
+                Ok(())
+            }
+        }
+    }
+
+    /// Apply the app-level show/diff format toggle and reload the current
+    /// detail view if needed.
+    fn apply_diff_format(&mut self, diff_format: DiffFormat, viewport_height: u16) -> Result<()> {
+        self.diff_format = diff_format;
+        if !matches!(self.view.command(), JjCommand::Show | JjCommand::Diff) {
+            self.status = StatusLine::with_message(
+                &self.view,
+                format!("show/diff format: {}", diff_format.label()),
+            );
+            return Ok(());
+        }
+
+        let scroll_offset = self.view.scroll_offset();
+        let spec = self.view.spec().with_diff_format(diff_format);
+        self.view = self.services.load_view(spec)?;
+        self.view.set_scroll_offset(viewport_height, scroll_offset);
+        self.status = StatusLine::ready(&self.view);
+        Ok(())
+    }
+}

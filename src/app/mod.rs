@@ -1,10 +1,10 @@
 //! Terminal event loop and app-level orchestration.
 //!
-//! Feature slices own their view behavior. The app owns cross-cutting concerns:
-//! key dispatch, pending key-prefix state, mode handoff, refresh, search state,
-//! and routing view effects to the app submodule that owns the detailed policy. `services`
-//! provides the single injected side-effect seam; child app modules call it directly unless the
-//! operation must couple that effect to current app-owned state.
+//! Feature slices own their view behavior. The app owns cross-cutting concerns: key dispatch,
+//! pending key-prefix state, mode handoff, refresh, search state, and routing view effects to the
+//! app submodule that owns the detailed policy. `services` provides the single injected side-effect
+//! seam; child app modules call it directly unless the operation must couple that effect to current
+//! app-owned state.
 
 use std::env;
 use std::time::{Duration, Instant};
@@ -13,7 +13,6 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::DefaultTerminal;
 
-use crate::actions::{JjBookmarkMutationKind, JjWorkingCopyNavigationKind};
 use crate::command::{
     Binding, BindingMatch, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect,
     binding_prefix_next_labels, match_binding_sequence,
@@ -21,17 +20,21 @@ use crate::command::{
 use crate::jj::DiffFormat;
 use crate::modes::InteractionMode;
 use crate::search::SearchQuery;
-use crate::status_line::{StatusKind, StatusLine};
 use crate::tui;
 use crate::view_state::ViewState;
 
-mod actions;
+pub(crate) mod actions;
+mod dispatch;
+mod effects;
 mod input;
 mod navigation;
 mod reducers;
 mod services;
+pub(crate) mod status_line;
 
+use self::dispatch::prefix_status_message;
 use self::services::AppServices;
+use self::status_line::{StatusKind, StatusLine};
 
 /// Start the terminal application from process arguments.
 ///
@@ -46,10 +49,10 @@ pub fn run() -> Result<()> {
 
 /// App-owned runtime state for dispatch, view history, and prompt handoff.
 ///
-/// View modules own the rendered content and local navigation policy. This
-/// struct keeps the cross-view stack, pending prefix state, search scope, and
-/// the single injected service seam together so dispatch does not have to
-/// reconstruct cross-view state or effects from rendered output.
+/// View modules own the rendered content and local navigation policy. This struct keeps the
+/// cross-view stack, pending prefix state, search scope, and the single injected service seam
+/// together so dispatch does not have to reconstruct cross-view state or effects from rendered
+/// output.
 struct App {
     /// Currently active feature view.
     view: ViewState,
@@ -75,8 +78,8 @@ struct App {
 
 /// Global bindings that resolve before view-local bindings.
 ///
-/// Feature views add their own commands on top; these entries stay focused on
-/// app-level dispatch and shared mode changes.
+/// Feature views add their own commands on top; these entries stay focused on app-level dispatch
+/// and shared mode changes.
 const APP_BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('q'), Command::Quit),
     Binding::new(KeyPattern::code(KeyCode::Esc), Command::Quit),
@@ -119,8 +122,8 @@ const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
 
 /// Read the current terminal width at dispatch time.
 ///
-/// View clamping uses live terminal size instead of cached geometry so resize
-/// handling stays local to the next refresh or view effect.
+/// View clamping uses live terminal size instead of cached geometry so resize handling stays local
+/// to the next refresh or view effect.
 fn current_viewport_width() -> u16 {
     crossterm::terminal::size()
         .map(|(width, _)| width)
@@ -129,9 +132,8 @@ fn current_viewport_width() -> u16 {
 
 /// Pending multi-key input tracked until the prefix resolves or expires.
 ///
-/// `App` keeps the original keys, any exact fallback binding, and the timeout
-/// together so prefix dispatch can finish, cancel, or replay without rebuilding
-/// state from the current view.
+/// `App` keeps the original keys, any exact fallback binding, and the timeout together so prefix
+/// dispatch can finish, cancel, or replay without rebuilding state from the current view.
 #[derive(Clone)]
 struct PendingCommand {
     /// Keys already typed for the prefix currently being resolved.
@@ -145,8 +147,8 @@ struct PendingCommand {
 impl App {
     /// Drive the terminal redraw and input loop until the app requests exit.
     ///
-    /// The runtime path is deliberate: draw the current view, derive the live viewport height,
-    /// then either dispatch the next terminal event or expire any pending multi-key prefix.
+    /// The runtime path is deliberate: draw the current view, derive the live viewport height, then
+    /// either dispatch the next terminal event or expire any pending multi-key prefix.
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.should_quit {
             terminal.draw(|frame| {
@@ -170,9 +172,9 @@ impl App {
 
     /// Route one terminal event into resize handling, modal dispatch, or normal dispatch.
     ///
-    /// Resize is handled here because it updates app-owned presentation state immediately.
-    /// Key events first go through the active mode, then fall through to normal bindings only
-    /// when the mode does not consume them.
+    /// Resize is handled here because it updates app-owned presentation state immediately. Key
+    /// events first go through the active mode, then fall through to normal bindings only when the
+    /// mode does not consume them.
     fn handle_event(
         &mut self,
         terminal: &mut DefaultTerminal,
@@ -258,274 +260,10 @@ impl App {
         }
     }
 
-    /// Continue or complete a multi-key prefix that was already in progress.
-    fn handle_pending_command_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        viewport_height: u16,
-        now: Instant,
-    ) -> Result<bool> {
-        if self
-            .pending_command
-            .as_ref()
-            .is_some_and(|pending| now >= pending.deadline)
-        {
-            self.run_pending_fallback(viewport_height)?;
-            return self.handle_key_after_prefix_fallback(key, viewport_height, now);
-        }
-
-        if key.code == KeyCode::Esc {
-            self.pending_command = None;
-            self.status = StatusLine::with_message(&self.view, "prefix cancelled");
-            return Ok(false);
-        }
-
-        let Some(mut pending) = self.pending_command.take() else {
-            return Ok(true);
-        };
-        pending.keys.push(key);
-
-        match match_binding_sequence(&[APP_BINDINGS, self.view.bindings()], &pending.keys) {
-            Some(BindingMatch::Exact(binding)) => self.execute_binding(binding, viewport_height),
-            Some(BindingMatch::Prefix { fallback }) => {
-                self.status = StatusLine::with_message(
-                    &self.view,
-                    prefix_status_message(
-                        "prefix",
-                        &pending.keys,
-                        &binding_prefix_next_labels(
-                            &[APP_BINDINGS, self.view.bindings()],
-                            &pending.keys,
-                        ),
-                    ),
-                );
-                self.pending_command = Some(PendingCommand {
-                    keys: pending.keys,
-                    fallback,
-                    deadline: now + COMMAND_PREFIX_TIMEOUT,
-                });
-                Ok(false)
-            }
-            None => {
-                if let Some(fallback) = pending.fallback {
-                    self.run_binding_with_status_refresh(fallback, viewport_height)?;
-                    self.handle_key_after_prefix_fallback(key, viewport_height, now)
-                } else {
-                    self.status = StatusLine::with_message(&self.view, "unknown command prefix");
-                    Ok(false)
-                }
-            }
-        }
-    }
-
-    /// Execute any prefix fallback whose timeout expired without another key.
-    fn flush_expired_pending_command(&mut self, viewport_height: u16) -> Result<()> {
-        let Some(pending) = self.pending_command.as_ref() else {
-            return Ok(());
-        };
-        if Instant::now() < pending.deadline {
-            return Ok(());
-        }
-
-        self.run_pending_fallback(viewport_height)?;
-        Ok(())
-    }
-
-    /// Run the exact binding that a prefix should fall back to when the longer match fails.
-    fn run_pending_fallback(&mut self, viewport_height: u16) -> Result<()> {
-        let fallback = self
-            .pending_command
-            .take()
-            .and_then(|pending| pending.fallback);
-        if matches!(self.mode, InteractionMode::Help) {
-            if let Some(binding) = fallback {
-                self.execute_help_binding(binding, viewport_height)?;
-            } else {
-                self.status = StatusLine::with_message(&self.view, "unknown help command prefix");
-            }
-        } else if let Some(binding) = fallback {
-            self.run_binding_with_status_refresh(binding, viewport_height)?;
-        } else {
-            self.status = StatusLine::ready(&self.view);
-        }
-        Ok(())
-    }
-
-    /// Execute one binding and refresh ready status text if the binding says status is stale.
-    fn run_binding_with_status_refresh(
-        &mut self,
-        binding: Binding,
-        viewport_height: u16,
-    ) -> Result<()> {
-        let refresh_status = self.execute_binding(binding, viewport_height)?;
-        if refresh_status && matches!(self.status.kind(), StatusKind::Ready) {
-            self.status = StatusLine::ready(&self.view);
-        }
-        Ok(())
-    }
-
-    /// Replay the current key after a prefix fallback has already run.
-    ///
-    /// This preserves the user expectation that the suffix key is still interpreted after the
-    /// shorter binding consumed the prefix.
-    fn handle_key_after_prefix_fallback(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        viewport_height: u16,
-        now: Instant,
-    ) -> Result<bool> {
-        if matches!(self.mode, InteractionMode::Normal) {
-            self.handle_normal_key_at(key, viewport_height, now)
-        } else {
-            self.handle_mode_key_event(key, viewport_height)
-        }
-    }
-
-    /// Execute one app-level or view-level binding at the app root.
-    ///
-    /// This is the boundary where global commands, app-owned previews/prompts, and view-reported
-    /// commands converge before any view effect is interpreted.
-    fn execute_binding(&mut self, binding: Binding, viewport_height: u16) -> Result<bool> {
-        match binding.command() {
-            Command::Quit => {
-                self.should_quit = true;
-                Ok(false)
-            }
-            Command::Help => {
-                self.mode = InteractionMode::Help;
-                Ok(true)
-            }
-            Command::SearchPrompt => {
-                self.mode = InteractionMode::SearchPrompt(String::new());
-                Ok(true)
-            }
-            Command::PromptLogRevset => {
-                self.open_log_revset_prompt();
-                Ok(true)
-            }
-            Command::OpenStatus => {
-                self.open_status()?;
-                Ok(true)
-            }
-            Command::OpenResolve => {
-                self.open_resolve()?;
-                Ok(true)
-            }
-            Command::OpenBookmarks => {
-                self.open_bookmarks()?;
-                Ok(true)
-            }
-            Command::OpenWorkspaces => {
-                self.open_workspaces()?;
-                Ok(true)
-            }
-            Command::OpenOperationLog => {
-                self.open_operation_log()?;
-                Ok(true)
-            }
-            Command::OperationUndo | Command::OperationRedo => {
-                if let Some(kind) = binding.command().operation_recovery() {
-                    self.open_operation_recovery_preview(kind);
-                }
-                Ok(false)
-            }
-            Command::Edit => {
-                self.open_log_working_copy_navigation_preview(JjWorkingCopyNavigationKind::Edit);
-                Ok(false)
-            }
-            Command::NextEdit => {
-                self.open_log_working_copy_navigation_preview(JjWorkingCopyNavigationKind::Next);
-                Ok(false)
-            }
-            Command::PrevEdit => {
-                self.open_log_working_copy_navigation_preview(JjWorkingCopyNavigationKind::Prev);
-                Ok(false)
-            }
-            Command::Describe => {
-                self.open_describe_prompt();
-                Ok(false)
-            }
-            Command::Commit => {
-                self.open_commit_prompt();
-                Ok(false)
-            }
-            Command::BookmarkCreate => {
-                self.open_bookmark_name_prompt(JjBookmarkMutationKind::Create);
-                Ok(false)
-            }
-            Command::BookmarkSet => {
-                self.open_bookmark_name_prompt(JjBookmarkMutationKind::Set);
-                Ok(false)
-            }
-            Command::BookmarkMove => {
-                self.open_bookmark_name_prompt(JjBookmarkMutationKind::Move);
-                Ok(false)
-            }
-            Command::BookmarkRename => {
-                self.open_bookmark_rename_prompt();
-                Ok(false)
-            }
-            Command::BookmarkDelete => {
-                self.open_bookmark_delete_preview();
-                Ok(false)
-            }
-            Command::BookmarkForget => {
-                self.open_bookmark_forget_preview();
-                Ok(false)
-            }
-            Command::BookmarkTrack => {
-                self.open_bookmark_tracking_preview(JjBookmarkMutationKind::Track);
-                Ok(false)
-            }
-            Command::BookmarkUntrack => {
-                self.open_bookmark_tracking_preview(JjBookmarkMutationKind::Untrack);
-                Ok(false)
-            }
-            Command::Fetch => {
-                self.fetch(viewport_height);
-                Ok(false)
-            }
-            Command::FetchRemote => {
-                self.open_fetch_remote_prompt();
-                Ok(false)
-            }
-            Command::Push => self.open_push_prompt(),
-            Command::Copy => {
-                self.open_copy_menu(viewport_height);
-                Ok(true)
-            }
-            Command::ViewFormat => {
-                self.open_view_menu();
-                Ok(true)
-            }
-            Command::Refresh => {
-                self.refresh(viewport_height);
-                Ok(false)
-            }
-            Command::Back => {
-                self.pop_view();
-                Ok(true)
-            }
-            Command::SwitchLog => {
-                self.switch_to_log()?;
-                Ok(true)
-            }
-            Command::SwitchDefault => {
-                self.switch_to_default()?;
-                Ok(true)
-            }
-            Command::View(ViewCommand::OpenActionMenu) => self.open_action_menu(viewport_height),
-            Command::View(command) => {
-                let effect = self.execute_view(command, viewport_height);
-                self.apply_view_effect(effect, viewport_height)
-            }
-        }
-    }
-
     /// Rebuild the active view and convert refresh failure into status.
     ///
-    /// ViewState owns the actual reload and clamp policy; this method only
-    /// keeps the app status in sync with the result.
+    /// ViewState owns the actual reload and clamp policy; this method only keeps the app status in
+    /// sync with the result.
     fn refresh(&mut self, viewport_height: u16) {
         match self.refresh_view_state() {
             Ok(()) => {
@@ -546,88 +284,6 @@ impl App {
                 search: self.search.as_ref(),
             },
         )
-    }
-
-    /// Interpret a view effect and move the app-owned state it refers to.
-    ///
-    /// View code reports intent here; this dispatcher owns the resulting mode
-    /// changes, status text, and follow-up navigation.
-    fn apply_view_effect(&mut self, effect: ViewEffect, viewport_height: u16) -> Result<bool> {
-        match effect {
-            ViewEffect::Ignored | ViewEffect::Handled => Ok(true),
-            ViewEffect::StatusMessage(message) => {
-                self.status = StatusLine::with_message(&self.view, message);
-                Ok(false)
-            }
-            ViewEffect::StatusError(message) => {
-                self.status = StatusLine::error(&self.view, message);
-                Ok(false)
-            }
-            ViewEffect::RunNewTrunk => {
-                self.run_new_trunk(viewport_height);
-                Ok(false)
-            }
-            ViewEffect::OpenDetail(command, revset) => {
-                self.push_detail(command, revset)?;
-                Ok(true)
-            }
-            ViewEffect::OpenView(spec) => {
-                self.push_view(spec)?;
-                Ok(true)
-            }
-            ViewEffect::SearchMoved => {
-                if let Some(query) = &self.search {
-                    self.status =
-                        StatusLine::with_message(&self.view, format!("search: {}", query.text()));
-                }
-                Ok(false)
-            }
-            ViewEffect::SearchStarted { matches } => {
-                self.status = StatusLine::with_message(&self.view, format!("{matches} matches"));
-                Ok(false)
-            }
-            ViewEffect::OpenActionMenu(menu) => {
-                self.mode = InteractionMode::ActionMenu { menu, selected: 0 };
-                Ok(false)
-            }
-            ViewEffect::CopyOptions(options) => {
-                if options.is_empty() {
-                    self.status = StatusLine::with_message(&self.view, "nothing to copy");
-                } else {
-                    self.mode = InteractionMode::CopyMenu {
-                        options,
-                        selected: 0,
-                    };
-                }
-                Ok(false)
-            }
-        }
-    }
-}
-
-/// Format a pressed key sequence the same way prefix status text presents it.
-fn binding_key_label(keys: &[crossterm::event::KeyEvent]) -> String {
-    keys.iter()
-        .map(|key| match key.code {
-            KeyCode::Char(character) if key.modifiers.is_empty() => character.to_string(),
-            KeyCode::Char(character) => format!("{:?}-{character}", key.modifiers),
-            _ => format!("{:?}", key.code),
-        })
-        .collect::<Vec<_>>()
-        .join("")
-}
-
-/// Build the status-line message shown while a multi-key prefix is still pending.
-fn prefix_status_message(
-    prefix: &str,
-    keys: &[crossterm::event::KeyEvent],
-    next: &[String],
-) -> String {
-    let keys = binding_key_label(keys);
-    if next.is_empty() {
-        format!("{prefix}: {keys}")
-    } else {
-        format!("{prefix}: {keys} -> {}", next.join("/"))
     }
 }
 

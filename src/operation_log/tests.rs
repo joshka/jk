@@ -29,7 +29,7 @@ fn copy_options_include_exact_operation_id_when_known() {
         ),
     )]);
 
-    let options = view.copy_options();
+    let options = view.test_copy_options();
 
     assert_eq!(options.len(), 2);
     assert_eq!(options[0].label(), "operation id");
@@ -73,7 +73,7 @@ fn refresh_preserves_selected_operation_id() {
     ]);
     view.selection.set(1, view.entries.len());
 
-    view.refresh_with_loader(|_| {
+    view.test_refresh_with_loader(|_| {
         Ok(vec![
             operation_item(&["@  second"], Some("second")),
             operation_item(&["○  third"], Some("third")),
@@ -93,7 +93,7 @@ fn refresh_clamps_when_selected_operation_disappears() {
     ]);
     view.selection.set(1, view.entries.len());
 
-    view.refresh_with_loader(|_| Ok(vec![operation_item(&["@  current"], Some("first"))]))
+    view.test_refresh_with_loader(|_| Ok(vec![operation_item(&["@  current"], Some("first"))]))
         .unwrap();
 
     assert_eq!(view.selection.index(), 0);
@@ -109,10 +109,10 @@ fn search_wraps_by_operation_item() {
     view.selection.set(1, view.entries.len());
     let query = SearchQuery::new("describe".to_owned()).unwrap();
 
-    assert_eq!(view.search_matches(&query), 2);
-    assert!(view.next_match(&query));
+    assert_eq!(view.test_search_matches(&query), 2);
+    assert!(view.test_next_match(&query));
     assert_eq!(view.selection.index(), 2);
-    assert!(view.next_match(&query));
+    assert!(view.test_next_match(&query));
     assert_eq!(view.selection.index(), 0);
 }
 
