@@ -5,6 +5,72 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-22 (Rewrite action family split pass)
+
+- Slice / task: continue down the app action path by splitting the shared
+  rewrite plan owner into concrete rebase, squash, and absorb plan modules.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/rewrite/mod.rs`,
+  `src/actions/rewrite/rebase.rs`, `src/actions/rewrite/squash.rs`,
+  `src/actions/rewrite/absorb.rs`, `src/actions/rewrite/tests.rs`,
+  `docs/agent/call-tree-cleanup-map.md`, and this process note.
+- Implementation outcome:
+  - `src/actions/rewrite.rs` became a real `src/actions/rewrite/` root that
+    now serves as the family boundary and re-export surface.
+  - `src/actions/rewrite/rebase.rs` now owns `JjRebasePlan` argv,
+    normalization, direct-run behavior, and preview wording.
+  - `src/actions/rewrite/squash.rs` now owns `JjSquashPlan` argv,
+    normalization, direct-run behavior, and preview wording.
+  - `src/actions/rewrite/absorb.rs` now owns `JjAbsorbPlan` exact-revset argv,
+    destination filtering, direct-run behavior, and preview wording.
+  - `src/actions/rewrite/tests.rs` keeps the family characterization focused on
+    argv shape and preview wording instead of leaving tests embedded in one
+    broad file.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the subtree conversion.
+  - `cargo test rewrite_actions -- --test-threads=1` passed with 16 app-level
+    rewrite preview/result tests.
+  - `cargo test working_copy_actions -- --test-threads=1` passed with 27
+    working-copy and rewrite-plan prompt tests.
+  - `cargo test actions::rewrite -- --test-threads=1` passed with 8 rewrite
+    plan unit tests.
+- Evidence basis:
+  - Date: `2026-05-22 11:04:24 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Git sync action family split pass)
+
+- Slice / task: continue down the app action path by splitting the shared git
+  sync owner into fetch and push plan modules.
+- Thread id: `019e4ee1-3027-7392-993f-2d340e877e8c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/git_sync/mod.rs`,
+  `src/actions/git_sync/fetch.rs`, `src/actions/git_sync/push.rs`,
+  `src/actions/git_sync/tests.rs`, `docs/agent/call-tree-cleanup-map.md`, and
+  this process note.
+- Implementation outcome:
+  - `src/actions/git_sync.rs` became a real `src/actions/git_sync/` root that
+    now serves as the family boundary and re-export surface.
+  - `src/actions/git_sync/fetch.rs` now owns `JjGitFetch` remote override
+    handling, exact-pattern construction, preview wording, and direct-run
+    behavior.
+  - `src/actions/git_sync/push.rs` now owns `JjGitPushTarget`, `JjGitPush`
+    dry-run argv construction, remote override handling, and direct-run
+    behavior.
+  - `src/actions/git_sync/tests.rs` keeps the sync family characterization
+    focused on argv shape and preview-facing target behavior instead of leaving
+    tests embedded in one broad file.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the subtree conversion.
+  - `cargo test sync_actions -- --test-threads=1` passed with 20 app-level
+    fetch/push preview and result tests.
+  - `cargo test actions::git_sync -- --test-threads=1` passed with 9 git sync
+    plan unit tests.
+  - `cargo test bookmark_actions -- --test-threads=1` passed with 27
+    bookmark-to-push prompt and preview tests.
+- Evidence basis:
+  - Date: `2026-05-22 11:04:24 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
 ### 2026-05-22 (Copy menu model ownership pass)
 
 - Slice / task: audit the remaining small root helpers and move only the one

@@ -85,11 +85,11 @@ where future structural cleanup should land. The current pass counts 98 nodes.
 - `61: src/app/actions/pane.rs`
 - `62: src/actions/mod.rs`
 - `63: src/actions/working_copy/mod.rs`
-- `64: src/actions/rewrite.rs`
+- `64: src/actions/rewrite/mod.rs`
 - `65: src/actions/describe/mod.rs`
 - `66: src/actions/abandon/mod.rs`
 - `67: src/actions/files/mod.rs`
-- `68: src/actions/git_sync.rs`
+- `68: src/actions/git_sync/mod.rs`
 
 ## View Dispatch And Per-View Surfaces
 
