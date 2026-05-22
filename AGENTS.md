@@ -231,7 +231,8 @@ Use the repository `just` commands:
 - `just run`: run the TUI with `cargo run`.
 
 Use `rustup run nightly cargo fmt` before finishing Rust changes. Markdown is formatted with
-Panache, configured in [`panache.toml`](panache.toml) for GFM, 100-column reflow.
+Panache, configured in [`panache.toml`](panache.toml) for GFM, 100-column reflow. In this repo, use
+Panache for Markdown formatting and linting instead of running `markdownlint-cli2` directly.
 
 ## Coding Style & Naming Conventions
 
@@ -286,7 +287,8 @@ ANSI-sensitive tests if it reaches `jj` calls. When a test depends on styled out
 expectation explicit, verify both content and presentation at the appropriate level, and investigate
 or correct color-handling leaks when snapshots stop exercising ANSI output.
 
-For Markdown-only changes, run `just md-check`. For Rust formatting-only validation, run `just fmt`.
+For Markdown-only changes, run `just md-check`. Do not substitute `markdownlint-cli2` for repo
+Markdown checks here. For Rust formatting-only validation, run `just fmt`.
 
 ## Commit, Branch, And Pull Request Guidelines
 

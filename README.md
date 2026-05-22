@@ -1,33 +1,47 @@
 # jk
 
-`jk` is a log-first Rust TUI for [Jujutsu](https://github.com/jj-vcs/jj). It shells out to `jj`, so
-the app keeps the user's templates, colors, graph symbols, diff formatting, and CLI wording instead
-of recreating a separate repository model. The current focus is the everyday loop of scanning
-history, drilling into `show`/`diff`, checking status, and returning without leaving the terminal.
+`jk` is a terminal UI for [Jujutsu](https://github.com/jj-vcs/jj) that keeps your day-to-day `jj`
+flow in one place.
 
-## What Ships Today
+It shells out to `jj` instead of rebuilding a separate repository model, so your templates, colors,
+graph symbols, diff formatting, and wording stay intact. The goal is simple: stay in the terminal,
+move through history quickly, inspect changes, run a few high-value actions, and get back to work.
 
-`jk` currently ships these surfaces:
+## Why This Exists
 
-- a default graph view and explicit `log`, `show`, `diff`, `status`, `resolve`, `bookmarks`,
-  `workspaces`, and `operation-log` startup views;
-- one-active-view navigation with `show`/`diff` drill-down, back, refresh, and search;
-- focused utility views for files, bookmarks, status, resolve, workspaces, and operation history;
-- copy menus for selected revisions, files, bookmarks, and operation-log rows;
-- direct `jj` actions for fetch (`f`, plus `gf` from graph) and graph `c` / `jj new trunk`;
-- guided mutation flows for describe, commit, push, bookmark mutation, operation undo/redo, graph
-  action-menu `new`, abandon, rebase, squash, absorb, restore, and related action-menu flows where
-  exact targets are available.
+If you already use `jj`, you know the rhythm: run a command, inspect output, run another command,
+repeat. That works, but it also means a lot of shell ping-pong.
 
-This README only describes shipped behavior. The current product surface is mapped in
-[`docs/reference/`](docs/reference/README.md), and the implementation guidance for contributors
-lives under [`docs/agent/`](docs/agent/workflow.md).
+`jk` keeps that rhythm while making the common loop faster:
 
-Short walkthroughs for the supported daily loops live in
-[`docs/tutorials/`](docs/tutorials/README.md). The tracked demo setup used by some of those examples
-is documented in [`docs/demo/`](docs/demo/README.md).
+- start in a log-first home view;
+- move by revision item instead of line noise;
+- open `show` and `diff` without leaving the app;
+- check status, bookmarks, workspaces, conflicts, or operation history in focused views;
+- run selected `jj` actions when the target is exact and the flow is clear.
 
-## Install And Run
+## What You Get
+
+`jk` is a good fit if you want:
+
+- a log-first interface that still feels like `jj`;
+- one active view at a time instead of a dashboard full of panes;
+- fast keyboard navigation for inspecting history and patches;
+- search, copy, and drill-down flows around rendered `jj` output;
+- safety-first mutation flows that prefer exact targets, previews, or staying disabled over
+  guessing.
+
+Today that includes:
+
+- graph, `log`, `show`, `diff`, `status`, `resolve`, `bookmarks`, `workspaces`, and `operation-log`
+  views;
+- back, refresh, search, and view switching;
+- copy menus for revisions, files, bookmarks, and operation-log rows;
+- focused `jj` actions including fetch, push, describe, commit, bookmark mutation, undo and redo,
+  and selected graph actions such as `new`, rebase, squash, absorb, abandon, and restore when `jk`
+  has an exact target.
+
+## Quick Start
 
 Prerequisites:
 
@@ -35,115 +49,58 @@ Prerequisites:
 - `jj` on `PATH`;
 - `just` if you want the helper commands.
 
-Run `jk` from a `jj` repository:
+Run `jk` inside a `jj` repository:
 
 ```sh
 just run
 ```
 
-The helper runs `cargo run` from the repository root. You can also invoke Cargo directly:
+You can also invoke Cargo directly:
 
 ```sh
 cargo run
 cargo run -- log
-cargo run -- log -r 'mine() & mutable()'
 cargo run -- show @
 cargo run -- diff -r @
 cargo run -- status
-cargo run -- resolve
 cargo run -- bookmarks
 cargo run -- workspaces
 cargo run -- operation-log
 ```
 
-## Help And Keys
+## Your First Few Minutes
 
-Press `?` for the generated in-app command menu. It reflects the current bindings for the active
-view, and pressing a listed key runs that command. Use `Esc`, `q`, or `?` to close the menu without
-running a command.
+If you want to know whether `jk` is useful for your workflow, try this:
 
-Global keys outside menus:
+1. Start in the graph and move with `j` and `k`.
+1. Press `s`, `l`, or `Right` to open `show` for the selected change.
+1. Press `d` to switch to `diff`.
+1. Press `h` or `Left` to go back.
+1. Press `S` for status or `B` for bookmarks.
+1. Press `?` anywhere to see the commands for the current view.
 
-- `q` or `Esc` quits;
-- `/` starts search;
-- `n` and `N` move between search matches;
-- `r` refreshes the current view;
-- `h` or `Left` goes back;
-- `L` switches to `jk log`;
-- `J` switches back to the default `jk` view;
-- `S` opens status;
-- `B` opens bookmarks;
-- `R` opens resolve;
-- `X` opens workspaces;
-- `O` opens operation log;
-- `f` fetches;
-- `p` opens push;
-- `y` opens the copy menu;
-- `v` opens the view menu;
-- `W` prompts for a custom graph revset.
+If that loop feels faster and calmer than bouncing between `jj log`, `jj show`, `jj diff`, and
+`jj status`, `jk` is probably pulling its weight.
 
-Graph view:
+## Safety And Limits
 
-- `j` and `k` move;
-- `g` and `G` jump to the first or last item;
-- `s`, `l`, or `Right` open `show`;
-- `d` opens `diff`;
-- `Space` toggles exact revision selection for preview-first actions;
-- `a` opens the action menu;
-- `bc` creates a bookmark at the selected change, with bare `b` kept as a timed fallback;
-- `gf` fetches from the graph view; other views keep `g` as immediate top navigation;
-- `c` creates a new working-copy change from trunk;
-- `w` cycles the graph log mode.
+`jk` is strongest as a navigation and inspection tool with a focused set of high-value actions
+around it.
 
-Show and diff views:
+- Direct low-friction actions such as `f`, graph `gf`, and `c` execute immediately and show the
+  resulting `jj` output.
+- Riskier or more stateful flows prefer preview, confirmation, or an exact metadata-backed target.
+- Bookmark mutation, restore, revert, and similar actions stay disabled when `jk` cannot identify
+  the exact target it would pass to `jj`.
+- Some `jj` workflows still belong in the CLI first. `jk` does not try to replace the full command
+  line.
 
-- `j` and `k` scroll;
-- `Space`, `PageDown`, and `Ctrl-f` page down;
-- `Shift-Space`, `PageUp`, and `Ctrl-b` page up;
-- `[` and `]` jump between files;
-- `l` or `Right` opens the file list;
-- `s` switches from diff to show;
-- `d` switches from show to diff.
+## Learn More
 
-Bookmarks, resolve, workspaces, and operation log are item-based utility views. Bookmarks open the
-selected change with `s`, `l`, `Right`, or `Enter` when a target change id is present, and bookmark
-mutation flows such as rename/delete/forget/track/untrack are available from the shipped bookmark
-bindings when row metadata makes them exact. Resolve opens file inspection with `Enter`, `l`, or
-`Right` when the selected conflict row has an exact path. Workspaces expose search and copy over
-rendered rows plus exact workspace metadata when it is available. Operation log opens operation
-`show` with `s`, `l`, `Right`, or `Enter`, operation `diff` with `d`, and global repo recovery with
-`u` for undo and `Ctrl-r` for redo.
-
-## Safety Notes
-
-- Direct low-friction mutation actions (`f`, graph `gf`, and `c`) execute immediately and show the
-  resulting status/output from `jj`; where recovery is available, `jj`-level undo is still the
-  intended fallback.
-- Guided flows (for example push, operation undo/redo, graph action-menu `new`, abandon, and rebase)
-  show preview or result text before execution.
-- Bookmark track/untrack, rename/delete/forget, and revision-targeted restore/revert stay disabled
-  unless `jk` has exact row metadata for the target it would pass to `jj`.
-- Where `jj` exposes an exact target, `jk` keeps that target exact instead of guessing from a label.
-- Successful mutations keep the undo path visible when `jj` supports one.
-- Operation-log undo and redo act on the repo cursor, not on the selected row.
-- Push is previewed and does not ship a force-push shortcut.
-- If `jj` rejects an action or a target is unavailable, `jk` shows a readable result or status error
-  instead of pretending success.
-
-## Media And Captures
-
-- Generated screenshots, GIFs, and demo repos are not committed.
-- The tracked capture specs and setup notes live in [`docs/demo/`](docs/demo/README.md).
-- Tutorial walkthroughs live in [`docs/tutorials/`](docs/tutorials/README.md).
-- If capture artifacts are added later, keep the generated output under ignored `target/vhs` or host
-  it externally.
-
-## Contributor References
-
-- [`docs/product-direction.md`](docs/product-direction.md) for the product shape.
-- [`docs/reference/README.md`](docs/reference/README.md) for the current screens, workflows, and
-  view model.
-- [`docs/agent/architecture.md`](docs/agent/architecture.md) for the implementation ownership map.
-- [`docs/agent/workflow.md`](docs/agent/workflow.md) for maintainability packet shape and completion
-  criteria.
-- [`docs/agent/documentation.md`](docs/agent/documentation.md) for doc style and truthfulness.
+- [`docs/reference/README.md`](docs/reference/README.md) describes the current screens, workflows,
+  and view model.
+- [`docs/tutorials/README.md`](docs/tutorials/README.md) has short walkthroughs for common loops.
+- [`docs/demo/README.md`](docs/demo/README.md) documents the tracked demo setup used by some
+  examples.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) covers contributor workflow, repo references, and development
+  commands.
