@@ -9,13 +9,18 @@ use crate::view_state::ViewState;
 
 #[derive(Clone, Debug)]
 pub struct StatusLine {
+    /// App/view label shown at the start of the status line.
     title: String,
+    /// User-facing status text for the current screen or recent action.
     message: String,
+    /// Presentation kind used to choose normal versus error styling.
     kind: StatusKind,
+    /// Key-hint projection copied from the active view at status construction time.
     hints: StatusHints,
 }
 
 impl StatusLine {
+    /// Build the normal status line for the current view position or item count.
     pub(crate) fn ready(view: &ViewState) -> Self {
         let message = if let Some(item_count) = view.item_count() {
             item_count_message(view, item_count)
@@ -36,6 +41,7 @@ impl StatusLine {
         }
     }
 
+    /// Build an error status line for the current view.
     pub(crate) fn error(view: &ViewState, message: String) -> Self {
         Self {
             title: view.spec().app_label(),
@@ -45,6 +51,7 @@ impl StatusLine {
         }
     }
 
+    /// Build a normal status line with an explicit message for the current view.
     pub(crate) fn with_message(view: &ViewState, message: impl Into<String>) -> Self {
         Self {
             title: view.spec().app_label(),
@@ -73,19 +80,23 @@ impl StatusLine {
         &self.title
     }
 
+    /// Return the user-facing status text.
     pub fn message(&self) -> &str {
         &self.message
     }
 
+    /// Return the presentation kind used by the renderer.
     pub fn kind(&self) -> &StatusKind {
         &self.kind
     }
 
+    /// Return the key-hint projection copied from the active view.
     pub fn hints(&self) -> StatusHints {
         self.hints
     }
 }
 
+/// Format the graph/log item-count message, optionally including the current log mode label.
 fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
     let base = format!("{item_count} items");
     match mode_label {
@@ -94,6 +105,7 @@ fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
     }
 }
 
+/// Format the ready-status count line for the active view command.
 fn item_count_message(view: &ViewState, item_count: usize) -> String {
     match view.command() {
         JjCommand::Resolve => format!("{item_count} conflicts"),
@@ -115,7 +127,9 @@ fn item_count_message(view: &ViewState, item_count: usize) -> String {
 
 #[derive(Clone, Debug)]
 pub enum StatusKind {
+    /// Normal informational status.
     Ready,
+    /// Error status that should render with error emphasis.
     Error,
 }
 

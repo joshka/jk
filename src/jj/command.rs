@@ -1,28 +1,53 @@
+//! `jj` command vocabulary and argv construction for `ViewSpec`.
+//!
+//! Higher layers choose a `ViewSpec`; this module decides which `jj` subcommand words, revset
+//! presets, and command-shape quirks that spec implies.
+
 use crate::jj::ViewSpec;
 
+/// The shipped `jj` command families that can back a `jk` view.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjCommand {
+    /// Default log surface using jk's home revset behavior.
     Default,
+    /// Explicit `jj log` startup or navigation surface.
     Log,
+    /// `jj show` detail view.
     Show,
+    /// `jj diff` detail view.
     Diff,
+    /// `jj status` working-copy summary.
     Status,
+    /// `jj resolve` conflict surface.
     Resolve,
+    /// `jj file list` file-oriented listing surface.
     FileList,
+    /// `jj file show` file detail surface.
     FileShow,
+    /// `jj bookmark list` bookmark management surface.
     Bookmarks,
+    /// `jj workspace list` workspace management surface.
     Workspaces,
+    /// `jj operation log` history surface.
     OperationLog,
+    /// `jj operation show` detail surface for one operation.
     OperationShow,
+    /// `jj operation diff` detail surface for one operation diff.
     OperationDiff,
 }
 
+/// Named log revset modes that cycle within the default/log surface.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LogViewMode {
+    /// Home log mode used by the default startup surface.
     Default,
+    /// Work relative to `trunk()`.
     Trunk,
+    /// Recent mutable work plus the working copy and trunk.
     Recent,
+    /// Repository-wide overview.
     All,
+    /// User-provided explicit revset carried through the log view state.
     CustomRevset(String),
 }
 
@@ -165,6 +190,7 @@ pub fn resolve_exact_change_id_command_argv(revset: &str) -> Vec<String> {
     ]
 }
 
+/// Build the `jj` argv for one `ViewSpec`, optionally overriding the template or graph mode.
 pub fn jj_command_args(spec: &ViewSpec, template: Option<&str>, no_graph: bool) -> Vec<String> {
     let mut args = command_words(spec)
         .iter()
@@ -191,6 +217,7 @@ fn command_words(spec: &ViewSpec) -> &'static [&'static str] {
     spec.command().command_words()
 }
 
+/// Find the value associated with a flag that may use either `--flag value` or `--flag=value`.
 pub fn option_value<'a>(
     args: &'a [String],
     value_options: &[&str],

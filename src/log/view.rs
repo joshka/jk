@@ -97,11 +97,17 @@ pub fn test_explicit_selection_style() -> Style {
 
 /// Selectable graph output from `jj` or `jj log`.
 pub struct LogView {
+    /// Top-level command that established this log surface, used when cycling modes back home.
     home_command: JjCommand,
+    /// Current log presentation mode derived from the active `ViewSpec`.
     mode: LogViewMode,
+    /// Original spec used to load and later refresh this view.
     spec: ViewSpec,
+    /// Selectable rendered log items loaded from jj output.
     entries: Vec<LogItem>,
+    /// Current cursor position within `entries`.
     selection: Selection,
+    /// Explicitly marked change ids that stay highlighted independently of the cursor.
     selected_change_ids: Vec<String>,
 }
 
@@ -130,6 +136,11 @@ impl LogView {
         }
     }
 
+    /// Load the default/log view from a parsed `ViewSpec`.
+    ///
+    /// Startup and log-mode switches both come through here. The loader keeps the `ViewSpec`,
+    /// derives the current log mode from it, and fetches the rendered log rows before any
+    /// navigation state is applied.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         let home_command = spec.command();
         let mode = LogViewMode::from_spec(&spec);

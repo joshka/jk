@@ -90,12 +90,16 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Rendered `jj status` output plus exact row action contracts.
 pub struct StatusView {
+    /// View specification used to reload the current status screen.
     spec: ViewSpec,
+    /// Rendered status rows plus exact-path action contracts.
     rows: Vec<StatusRow>,
+    /// Current selected row in the rendered status output.
     selection: Selection,
 }
 
 impl StatusView {
+    /// Load the status view and derive exact-path action contracts from rendered output.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         Ok(Self {
             rows: load_status_rows(&spec)?,
@@ -104,15 +108,18 @@ impl StatusView {
         })
     }
 
+    /// Render the current status rows with search highlighting and active-row styling.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(row_list(&self.rows, search), area, &mut state);
     }
 
+    /// Return the status-specific binding table.
     pub fn bindings(&self) -> &'static [Binding] {
         BINDINGS
     }
 
+    /// Execute one view-local command against the status screen.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::CycleMode
@@ -178,23 +185,28 @@ impl StatusView {
         }
     }
 
+    /// Reload rendered status rows while preserving selection when possible.
     pub fn refresh(&mut self) -> Result<()> {
         self.refresh_with_loader(load_status_rows)?;
         Ok(())
     }
 
+    /// Return the `ViewSpec` that owns this status screen.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Return the total rendered row count.
     pub fn line_count(&self) -> usize {
         self.rows.len()
     }
 
+    /// Return the selected row index used as the scroll offset.
     pub fn scroll_offset(&self) -> usize {
         self.selection.index()
     }
 
+    /// Set the selected row index, clamped to the current row count.
     pub fn set_scroll_offset(&mut self, _viewport_height: u16, scroll_offset: usize) {
         self.selection.set(scroll_offset, self.rows.len());
     }
@@ -213,6 +225,7 @@ impl StatusView {
         self.selection.clamp(self.rows.len());
     }
 
+    /// Count search matches across rendered status rows.
     pub fn search_matches(&self, query: &SearchQuery) -> usize {
         self.rows
             .iter()
@@ -220,6 +233,7 @@ impl StatusView {
             .count()
     }
 
+    /// Move to the next matching status row, wrapping once without reselecting the current row.
     pub fn next_match(&mut self, _viewport_height: u16, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.rows.len())
             .chain(0..self.selection.index().min(self.rows.len()))
@@ -231,6 +245,7 @@ impl StatusView {
         true
     }
 
+    /// Move to the previous matching status row, wrapping once without reselecting the current row.
     pub fn previous_match(&mut self, _viewport_height: u16, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
@@ -258,6 +273,7 @@ impl StatusView {
         row.file_action()
     }
 
+    /// Return copy options for the whole rendered status document.
     fn copy_options(&self) -> Vec<CopyOption> {
         let lines = self
             .rows
@@ -272,18 +288,21 @@ impl StatusView {
         }
     }
 
+    /// Move selection down by a fixed number of rows.
     fn move_down(&mut self, amount: usize) {
         for _ in 0..amount {
             self.selection.next(self.rows.len());
         }
     }
 
+    /// Move selection up by a fixed number of rows.
     fn move_up(&mut self, amount: usize) {
         for _ in 0..amount {
             self.selection.previous();
         }
     }
 
+    /// Reload rows with a caller-supplied loader while restoring the best previous selection.
     fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<StatusRow>>,
@@ -308,6 +327,7 @@ impl StatusView {
     }
 }
 
+/// Build the rendered row list with active-row styling and optional search highlighting.
 fn row_list(rows: &[StatusRow], search: Option<&SearchQuery>) -> List<'static> {
     let items = rows
         .iter()
@@ -317,6 +337,7 @@ fn row_list(rows: &[StatusRow], search: Option<&SearchQuery>) -> List<'static> {
     List::new(items).highlight_style(theme::active_row_style())
 }
 
+/// Restore selection after refresh by exact path first, then row text, then prior index.
 fn restore_selection(
     selection: &mut Selection,
     rows: &[StatusRow],

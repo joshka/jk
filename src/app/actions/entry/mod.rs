@@ -5,7 +5,8 @@
 //! views and action menus own whether an action is available and the exact target values they
 //! carry. [`super::preview`] owns preview pane construction and preview status contexts.
 //! [`super::completion`] and [`super::shared`] own confirmed command result handling.
-//! [`crate::actions`] owns command-plan argv, preview, and run contracts.
+//! [`crate::actions`] owns command-plan argv, preview, and run contracts. When entry setup needs
+//! jj/view side effects such as remote loading, it calls `AppServices` directly.
 
 use color_eyre::Result;
 
@@ -33,31 +34,50 @@ const FETCH_REMOTE_LIST_ERROR_CONTEXT: &str = "fetch remote selection failed to 
 
 #[derive(Debug, Eq, PartialEq)]
 enum PushRemotePromptDecision {
-    MissingRemotes { message: String },
-    OpenPreview { remote: String },
-    Prompt { remotes: Vec<String> },
-    RemoteListError { message: String },
+    MissingRemotes {
+        /// Status text shown when no remote can be chosen.
+        message: String,
+    },
+    OpenPreview {
+        /// Sole remote that can be used immediately without prompting.
+        remote: String,
+    },
+    Prompt {
+        /// Ordered remotes offered in the selection prompt.
+        remotes: Vec<String>,
+    },
+    RemoteListError {
+        /// Status text shown when remote discovery fails.
+        message: String,
+    },
 }
 
 #[derive(Debug, Eq, PartialEq)]
 enum FetchRemotePromptDecision {
     MissingRemotes {
+        /// Status text shown when no remote can be chosen.
         message: String,
+        /// Command/output context captured for the action pane.
         status_context: String,
     },
     OpenPreview {
+        /// Sole remote that can be used immediately without prompting.
         remote: String,
     },
     Prompt {
+        /// Ordered remotes offered in the selection prompt.
         remotes: Vec<String>,
     },
     RemoteListError {
+        /// Status text shown when remote discovery fails.
         message: String,
+        /// Command/output context captured for the action pane.
         status_context: String,
     },
 }
 
 impl App {
+    /// Open the action menu for the current selection or exact restore/revert context.
     pub(in crate::app) fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
         if matches!(
             self.view.command(),
@@ -96,6 +116,7 @@ impl App {
         Ok(false)
     }
 
+    /// Consume one accepted menu item and route it into prompt, preview, or status flow.
     pub(in crate::app) fn apply_action_menu_item(&mut self, item: ActionMenuItem) {
         // Accepted menu items leave modal input here because the app lifecycle owns the
         // mode transition and any immediate preview/status side effects.
@@ -235,6 +256,7 @@ impl App {
         }
     }
 
+    /// Return the selected graph revision when the current surface is a log-like graph view.
     pub(in crate::app) fn graph_selected_revision(&self) -> Option<String> {
         match &self.view {
             ViewState::Log(view) => view.selected_revision().map(str::to_owned),
@@ -251,6 +273,7 @@ impl App {
         }
     }
 
+    /// Open the describe prompt for the current exact change or selected graph revision.
     pub(in crate::app) fn open_describe_prompt(&mut self) {
         let target = match self.view.command() {
             JjCommand::Default | JjCommand::Log => match self.view.push_target() {
@@ -291,6 +314,7 @@ impl App {
         };
     }
 
+    /// Open the commit prompt when the current surface can commit the working copy.
     pub(in crate::app) fn open_commit_prompt(&mut self) {
         if matches!(
             self.view.command(),
@@ -306,6 +330,7 @@ impl App {
         }
     }
 
+    /// Open the bookmark-name prompt for create, set, or move flows on the current target.
     pub(in crate::app) fn open_bookmark_name_prompt(&mut self, kind: JjBookmarkMutationKind) {
         let target = match self.view.bookmark_target() {
             Ok(Some(target)) => target,
@@ -332,6 +357,7 @@ impl App {
         };
     }
 
+    /// Open the delete preview for the selected bookmark.
     pub(in crate::app) fn open_bookmark_delete_preview(&mut self) {
         let name = match self.view.selected_local_bookmark_name() {
             Ok(Some(name)) => name.to_owned(),
@@ -351,6 +377,7 @@ impl App {
         self.open_bookmark_mutation_preview(JjBookmarkMutationPlan::delete(name));
     }
 
+    /// Open the forget preview for the selected bookmark and its current target.
     pub(in crate::app) fn open_bookmark_forget_preview(&mut self) {
         let (name, target) = match self.view.bookmark_forget_target() {
             Ok(Some(target)) => target,
@@ -370,6 +397,7 @@ impl App {
         self.open_bookmark_mutation_preview(JjBookmarkMutationPlan::forget(name, target));
     }
 
+    /// Open the track or untrack preview for the selected bookmark.
     pub(in crate::app) fn open_bookmark_tracking_preview(&mut self, kind: JjBookmarkMutationKind) {
         let (name, target) = match &self.view {
             ViewState::Bookmarks(view) => match view.selected_bookmark_tracking_target(kind) {
@@ -429,6 +457,7 @@ impl App {
         self.open_bookmark_mutation_preview(mutation);
     }
 
+    /// Open the bookmark-rename prompt for the selected bookmark.
     pub(in crate::app) fn open_bookmark_rename_prompt(&mut self) {
         let old_name = match self.view.selected_local_bookmark_name_for("rename") {
             Ok(Some(name)) => name.to_owned(),
@@ -451,6 +480,7 @@ impl App {
         };
     }
 
+    /// Open push preview immediately, or prompt for a remote when multiple choices exist.
     pub(in crate::app) fn open_push_prompt(&mut self) -> Result<bool> {
         let target = match self.view.push_target() {
             Ok(Some(target)) => target,
@@ -467,8 +497,11 @@ impl App {
             }
         };
 
-        let decision =
-            decide_push_remote_prompt(self.load_git_remotes().map_err(|error| error.to_string()));
+        let decision = decide_push_remote_prompt(
+            self.services
+                .load_git_remotes()
+                .map_err(|error| error.to_string()),
+        );
         // The reducer classifies loaded remotes; this entry point applies the resulting app
         // side effect after preserving the feature-selected push target.
         match decision {
@@ -490,9 +523,13 @@ impl App {
         Ok(false)
     }
 
+    /// Open fetch preview immediately, or prompt for a remote when multiple choices exist.
     pub(in crate::app) fn open_fetch_remote_prompt(&mut self) {
-        let decision =
-            decide_fetch_remote_prompt(self.load_git_remotes().map_err(|error| error.to_string()));
+        let decision = decide_fetch_remote_prompt(
+            self.services
+                .load_git_remotes()
+                .map_err(|error| error.to_string()),
+        );
         // Fetch without an explicit remote still opens a preview pane so the failed remote-list
         // command has the same status/output surface as other action previews.
         match decision {
@@ -527,6 +564,7 @@ impl App {
     }
 }
 
+/// Decide whether push should fail, prompt, or preview based on discovered remotes.
 fn decide_push_remote_prompt(
     remotes: std::result::Result<Vec<String>, String>,
 ) -> PushRemotePromptDecision {
@@ -545,6 +583,7 @@ fn decide_push_remote_prompt(
     }
 }
 
+/// Decide whether fetch should fail, prompt, or preview based on discovered remotes.
 fn decide_fetch_remote_prompt(
     remotes: std::result::Result<Vec<String>, String>,
 ) -> FetchRemotePromptDecision {

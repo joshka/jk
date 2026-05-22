@@ -1,7 +1,8 @@
 //! Rewrite action completion and result-pane handling.
 //!
 //! This module owns post-command refresh, reveal, and result wording for commands that move or
-//! rewrite changes after preview confirmation.
+//! rewrite changes after preview confirmation. It calls `AppServices` directly for the confirmed
+//! command effects and keeps rewrite-specific follow-up policy local to this file.
 
 use crate::action_pane::ActionPane;
 use crate::actions::{
@@ -14,6 +15,7 @@ use crate::status_line::StatusLine;
 use super::super::App;
 
 impl App {
+    /// Run the working-copy navigation command and reveal the resulting active change.
     pub(in crate::app) fn confirm_working_copy_navigation(
         &mut self,
         navigation: JjWorkingCopyNavigationPlan,
@@ -21,7 +23,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = navigation.command_label();
-        let result_message = match self.run_working_copy_navigation(&navigation) {
+        let result_message = match self.services.run_working_copy_navigation(&navigation) {
             Ok(output) => {
                 let reveal_change_id = match navigation.kind() {
                     JjWorkingCopyNavigationKind::Edit => navigation
@@ -29,7 +31,7 @@ impl App {
                         .expect("edit navigation requires exact target change id")
                         .to_owned(),
                     JjWorkingCopyNavigationKind::Next | JjWorkingCopyNavigationKind::Prev => {
-                        match self.resolve_revision("@") {
+                        match self.services.resolve_revision("@") {
                             Ok(change_id) => change_id,
                             Err(error) => {
                                 let message = format!(
@@ -67,6 +69,7 @@ impl App {
         };
     }
 
+    /// Run abandon and leave its finished output on the abandon pane.
     pub(in crate::app) fn confirm_abandon(
         &mut self,
         abandon: JjAbandonPlan,
@@ -74,7 +77,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = abandon.command_label();
-        let result_message = match self.run_abandon(&abandon) {
+        let result_message = match self.services.run_abandon(&abandon) {
             Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
@@ -86,13 +89,14 @@ impl App {
         };
     }
 
+    /// Re-check emptiness before abandoning so the fast path only applies to still-empty changes.
     pub(in crate::app) fn confirm_empty_abandon_after_recheck(
         &mut self,
         abandon: JjAbandonPlan,
         status_context: Option<String>,
         viewport_height: u16,
     ) {
-        match self.load_abandon_preview(&abandon) {
+        match self.services.load_abandon_preview(&abandon) {
             Ok(preview) if preview.is_empty_change() => {
                 self.confirm_abandon(abandon, status_context, viewport_height);
             }
@@ -120,6 +124,7 @@ impl App {
         }
     }
 
+    /// Run restore and leave its finished output on the restore pane.
     pub(in crate::app) fn confirm_restore(
         &mut self,
         restore: JjRestorePlan,
@@ -127,7 +132,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = restore.command_label();
-        let result_message = match self.run_restore(&restore) {
+        let result_message = match self.services.run_restore(&restore) {
             Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
@@ -138,6 +143,7 @@ impl App {
         };
     }
 
+    /// Run revert and leave its finished output on the revert pane.
     pub(in crate::app) fn confirm_revert(
         &mut self,
         revert: JjRevertPlan,
@@ -145,7 +151,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = revert.command_label();
-        let result_message = match self.run_revert(&revert) {
+        let result_message = match self.services.run_revert(&revert) {
             Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
@@ -156,6 +162,7 @@ impl App {
         };
     }
 
+    /// Run rebase and reveal the first source change after refresh when possible.
     pub(in crate::app) fn confirm_rebase(
         &mut self,
         rebase: JjRebasePlan,
@@ -164,7 +171,7 @@ impl App {
     ) {
         let command_label = rebase.command_label(false);
         let primary_source = rebase.sources().first().cloned();
-        let result_message = match self.run_rebase(&rebase) {
+        let result_message = match self.services.run_rebase(&rebase) {
             Ok(output) => self.finish_successful_action_revealing_change(
                 output,
                 primary_source.as_deref(),
@@ -180,6 +187,7 @@ impl App {
         };
     }
 
+    /// Run squash and reveal the destination change after refresh when possible.
     pub(in crate::app) fn confirm_squash(
         &mut self,
         squash: JjSquashPlan,
@@ -188,7 +196,7 @@ impl App {
     ) {
         let command_label = squash.command_label(false);
         let destination = squash.destination().to_owned();
-        let result_message = match self.run_squash(&squash) {
+        let result_message = match self.services.run_squash(&squash) {
             Ok(output) => self.finish_successful_action_revealing_change(
                 output,
                 Some(destination.as_str()),
@@ -204,6 +212,7 @@ impl App {
         };
     }
 
+    /// Run absorb and leave its finished output on the absorb pane.
     pub(in crate::app) fn confirm_absorb(
         &mut self,
         absorb: JjAbsorbPlan,
@@ -211,7 +220,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = absorb.command_label();
-        let result_message = match self.run_absorb(&absorb) {
+        let result_message = match self.services.run_absorb(&absorb) {
             Ok(output) => {
                 self.finish_successful_action(output, viewport_height, " | jj undo | jj op show -p")
             }

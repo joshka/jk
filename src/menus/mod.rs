@@ -25,6 +25,7 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     revision_actions::build_action_menu(context)
 }
 
+/// Truncates an exact id for compact menu labels.
 fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }

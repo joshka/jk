@@ -15,22 +15,29 @@ use color_eyre::Result;
 /// or file content.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRestorePlan {
+    /// Restore target revision policy for this plan.
     target: JjRestoreTarget,
+    /// Optional exact repository-root path restricted by this restore plan.
     path: Option<String>,
 }
 
 /// File mutation subcommand represented by a preview-first plan.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjFileMutationKind {
+    /// Track an exact repository-root path.
     Track,
+    /// Untrack an exact repository-root path.
     Untrack,
+    /// Change executable mode for an exact repository-root path.
     Chmod(JjFileChmodMode),
 }
 
 /// File executable-bit mode accepted by `jj file chmod`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjFileChmodMode {
+    /// Mark the file executable.
     Executable,
+    /// Mark the file non-executable / normal.
     Normal,
 }
 
@@ -40,7 +47,9 @@ pub enum JjFileChmodMode {
 /// argv construction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjFileMutationTarget {
+    /// Mutate a path in the current working-copy change.
     WorkingCopy { path: String },
+    /// Mutate a path in one exact selected revision.
     ExactRevision { revision: String, path: String },
 }
 
@@ -50,13 +59,17 @@ pub enum JjFileMutationTarget {
 /// available; that policy belongs to the selected view/action-menu owner.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjFileMutationPlan {
+    /// File mutation subcommand owned by this plan.
     kind: JjFileMutationKind,
+    /// Exact target scope for the mutation.
     target: JjFileMutationTarget,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum JjRestoreTarget {
+    /// Restore content from one exact selected revision.
     ExactChange(String),
+    /// Restore content from the current working-copy change.
     CurrentWorkingCopy,
 }
 
@@ -66,6 +79,7 @@ enum JjRestoreTarget {
 /// reverse-apply.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRevertPlan {
+    /// Exact selected revision reverse-applied into `@`.
     revision: String,
 }
 
@@ -94,19 +108,23 @@ impl JjRestorePlan {
         }
     }
 
+    /// Returns the revision label targeted by this restore plan.
     pub fn revision(&self) -> &str {
         self.target.label()
     }
 
+    /// Returns the exact repository-root path restriction, if present.
     pub fn path(&self) -> Option<&str> {
         self.path.as_deref()
     }
 
+    /// Returns the user-facing `jj` command label for this restore plan.
     pub fn command_label(&self) -> String {
         let label_args = self.command_argv().join(" ");
         format!("jj {label_args}")
     }
 
+    /// Returns argv for `jj restore`.
     pub fn command_argv(&self) -> Vec<String> {
         let mut argv = match &self.target {
             JjRestoreTarget::ExactChange(revision) => vec![
@@ -122,11 +140,13 @@ impl JjRestorePlan {
         argv
     }
 
+    /// Returns the user-facing label for the forward-diff preview probe.
     pub fn preview_diff_label(&self) -> String {
         let label_args = self.preview_diff_argv().join(" ");
         format!("jj {label_args}")
     }
 
+    /// Returns argv for the forward-diff preview probe.
     pub fn preview_diff_argv(&self) -> Vec<String> {
         let mut argv = match &self.target {
             JjRestoreTarget::ExactChange(revision) => vec![
@@ -188,6 +208,7 @@ impl JjRestorePlan {
 }
 
 impl JjRestoreTarget {
+    /// Returns the user-facing revision label for this restore target.
     fn label(&self) -> &str {
         match self {
             Self::ExactChange(revision) => revision,
@@ -195,6 +216,7 @@ impl JjRestoreTarget {
         }
     }
 
+    /// Returns user-facing effect wording for path-scoped restore previews.
     fn path_restore_effect(&self) -> String {
         match self {
             Self::ExactChange(_) => {
@@ -209,6 +231,7 @@ impl JjRestoreTarget {
 }
 
 impl JjFileChmodMode {
+    /// Returns the argv token used by `jj file chmod`.
     pub fn command_arg(self) -> &'static str {
         match self {
             Self::Executable => "x",
@@ -216,6 +239,7 @@ impl JjFileChmodMode {
         }
     }
 
+    /// Returns the user-facing mode label for preview text.
     pub fn label(self) -> &'static str {
         match self {
             Self::Executable => "executable",
@@ -225,6 +249,7 @@ impl JjFileChmodMode {
 }
 
 impl JjFileMutationKind {
+    /// Returns the user-facing action label for this mutation kind.
     pub fn label(self) -> &'static str {
         match self {
             Self::Track => "track",
@@ -234,6 +259,7 @@ impl JjFileMutationKind {
         }
     }
 
+    /// Returns fallback success wording when `jj` does not provide one.
     fn success_fallback(self) -> &'static str {
         match self {
             Self::Track => "tracked file",
@@ -245,12 +271,14 @@ impl JjFileMutationKind {
 }
 
 impl JjFileMutationTarget {
+    /// Returns the exact repository-root path for this target.
     fn path(&self) -> &str {
         match self {
             Self::WorkingCopy { path } | Self::ExactRevision { path, .. } => path,
         }
     }
 
+    /// Returns the exact selected revision for this target, if any.
     fn revision(&self) -> Option<&str> {
         match self {
             Self::WorkingCopy { .. } => None,
@@ -258,6 +286,7 @@ impl JjFileMutationTarget {
         }
     }
 
+    /// Returns the user-facing scope label for preview text.
     fn scope_label(&self) -> String {
         match self {
             Self::WorkingCopy { .. } => "working-copy change (@)".to_owned(),
@@ -308,23 +337,28 @@ impl JjFileMutationPlan {
         }
     }
 
+    /// Returns the mutation kind owned by this plan.
     pub fn kind(&self) -> JjFileMutationKind {
         self.kind
     }
 
+    /// Returns the exact repository-root path targeted by this mutation.
     pub fn path(&self) -> &str {
         self.target.path()
     }
 
+    /// Returns the exact selected revision targeted by this mutation, if any.
     pub fn revision(&self) -> Option<&str> {
         self.target.revision()
     }
 
+    /// Returns the user-facing `jj` command label for this mutation plan.
     pub fn command_label(&self) -> String {
         let label_args = self.command_argv().join(" ");
         format!("jj {label_args}")
     }
 
+    /// Returns argv for the underlying `jj file` mutation.
     pub fn command_argv(&self) -> Vec<String> {
         let fileset = root_file_fileset(self.path());
         match self.kind {

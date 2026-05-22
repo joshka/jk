@@ -10,11 +10,14 @@ use ratatui::text::{Line, Span};
 /// letters become case-sensitive, following the common Vim-style convention.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchQuery {
+    /// Original user-entered query text.
     text: String,
+    /// Whether matching should preserve case based on the smart-case rule.
     case_sensitive: bool,
 }
 
 impl SearchQuery {
+    /// Build a smart-case query, returning `None` for an empty prompt submission.
     pub fn new(text: String) -> Option<Self> {
         (!text.is_empty()).then(|| {
             let case_sensitive = text.chars().any(char::is_uppercase);
@@ -25,14 +28,17 @@ impl SearchQuery {
         })
     }
 
+    /// Return the original query text.
     pub fn text(&self) -> &str {
         &self.text
     }
 
+    /// Return whether any match exists in the provided text.
     pub fn matches(&self, text: &str) -> bool {
         self.find_in(text).is_some()
     }
 
+    /// Return every non-overlapping match range in the provided text.
     fn match_ranges(&self, text: &str) -> Vec<Range<usize>> {
         let mut ranges = Vec::new();
         let mut search_start = 0;
@@ -50,6 +56,7 @@ impl SearchQuery {
         ranges
     }
 
+    /// Return the first match range in the provided text, respecting smart-case behavior.
     fn find_in(&self, text: &str) -> Option<Range<usize>> {
         if self.case_sensitive {
             text.find(&self.text)
@@ -60,6 +67,7 @@ impl SearchQuery {
     }
 }
 
+/// Flatten a styled line into plain text for search matching.
 pub fn line_text(line: &Line<'_>) -> String {
     line.spans
         .iter()
@@ -67,14 +75,17 @@ pub fn line_text(line: &Line<'_>) -> String {
         .collect()
 }
 
+/// Return whether any part of the line matches the query.
 pub fn line_matches(line: &Line<'_>, query: &SearchQuery) -> bool {
     query.matches(&line_text(line))
 }
 
+/// Return whether any rendered line in an entry matches the query.
 pub fn entry_matches(lines: &[Line<'static>], query: &SearchQuery) -> bool {
     lines.iter().any(|line| line_matches(line, query))
 }
 
+/// Highlight every match in the provided rendered line.
 pub fn highlight_line(line: Line<'static>, query: Option<&SearchQuery>) -> Line<'static> {
     let Some(query) = query else {
         return line;
@@ -87,6 +98,7 @@ pub fn highlight_line(line: Line<'static>, query: Option<&SearchQuery>) -> Line<
     Line::from(highlight_spans(line.spans, &ranges))
 }
 
+/// Rebuild a rendered line with reversed style applied to all matching ranges.
 fn highlight_spans(spans: Vec<Span<'static>>, ranges: &[Range<usize>]) -> Vec<Span<'static>> {
     let mut highlighted = Vec::new();
     let mut line_offset = 0;
@@ -102,6 +114,7 @@ fn highlight_spans(spans: Vec<Span<'static>>, ranges: &[Range<usize>]) -> Vec<Sp
     highlighted
 }
 
+/// Split one styled span into matched and unmatched segments for highlighting.
 fn highlight_span_parts(
     content: String,
     style: ratatui::style::Style,
@@ -137,6 +150,7 @@ fn highlight_span_parts(
     spans
 }
 
+/// Find the first case-insensitive match range using character boundaries.
 fn find_case_insensitive(text: &str, needle: &str) -> Option<Range<usize>> {
     let needle_len = needle.chars().count();
     let needle = needle.to_lowercase();

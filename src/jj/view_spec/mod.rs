@@ -45,15 +45,26 @@ impl DiffFormat {
 /// from parsing a direct startup revset such as `main` or `@`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ViewSpec {
+    /// `jj` command family that owns this view.
     command: JjCommand,
+    /// Raw argv passed through to `jj` after command words are chosen.
     args: Vec<String>,
+    /// Navigation target associated with the surface when jk knows one explicitly.
     target: Option<String>,
+    /// Whether `target` came from an exact graph-derived change id rather than startup argv.
     target_is_exact_change: bool,
+    /// File path context carried by file-oriented views.
     path: Option<String>,
+    /// App-level diff presentation state for show/diff surfaces.
     diff_format: DiffFormat,
 }
 
 impl ViewSpec {
+    /// Build a direct `ViewSpec` from a top-level command and raw argv.
+    ///
+    /// This is the startup path constructor: it preserves argv as entered, derives the diff-format
+    /// toggle from those args, and leaves target provenance unset until in-app navigation provides
+    /// something stronger.
     pub fn new(command: JjCommand, args: Vec<String>) -> Self {
         let diff_format = parse_diff_format(&args);
         Self {
@@ -88,6 +99,7 @@ impl ViewSpec {
         }
     }
 
+    /// Build a show detail view targeted at an exact change id.
     pub fn show(revset: String, diff_format: DiffFormat) -> Self {
         Self {
             command: JjCommand::Show,
@@ -99,6 +111,7 @@ impl ViewSpec {
         }
     }
 
+    /// Build a diff detail view targeted at an exact change id.
     pub fn diff(revset: String, diff_format: DiffFormat) -> Self {
         Self {
             command: JjCommand::Diff,
@@ -110,6 +123,7 @@ impl ViewSpec {
         }
     }
 
+    /// Build a resolve view, defaulting to the current working copy when startup omits `-r`.
     pub fn resolve(revset: Option<String>) -> Self {
         let revset = revset.unwrap_or_else(|| "@".to_owned());
         let args = vec!["-r".to_owned(), revset.clone()];
@@ -124,6 +138,7 @@ impl ViewSpec {
         }
     }
 
+    /// Build a file-list view with optional revision and carried selected-path context.
     pub fn file_list(revset: Option<String>, selected_path: Option<String>) -> Self {
         let args = revset
             .as_ref()
@@ -140,6 +155,7 @@ impl ViewSpec {
         }
     }
 
+    /// Build a file-show view while keeping the file path outside navigation revset parsing.
     pub fn file_show(revset: Option<String>, path: String) -> Self {
         let args = revset
             .as_ref()
@@ -178,6 +194,7 @@ impl ViewSpec {
         }
     }
 
+    /// Build the log-like view for one named log mode.
     pub fn for_log_mode(home_command: JjCommand, mode: &LogViewMode) -> Self {
         match mode {
             LogViewMode::Default => Self::new(home_command, Vec::new()),
@@ -193,6 +210,7 @@ impl ViewSpec {
         &self.args
     }
 
+    /// Label the concrete `jj` command line that this spec will execute.
     pub fn label(&self) -> String {
         let command = self.label_prefix();
         if self.args.is_empty() {
@@ -202,6 +220,7 @@ impl ViewSpec {
         }
     }
 
+    /// Label the surface in `jk` terms, shortening exact targets for status text and menus.
     pub fn app_label(&self) -> String {
         let command = self.app_label_prefix();
 
@@ -297,6 +316,7 @@ impl ViewSpec {
         self.diff_format
     }
 
+    /// Replace the app-level diff format without changing the rest of the view provenance.
     pub fn with_diff_format(&self, diff_format: DiffFormat) -> Self {
         if !matches!(self.command, JjCommand::Show | JjCommand::Diff) {
             return self.clone();
@@ -314,6 +334,7 @@ impl ViewSpec {
         spec
     }
 
+    /// Recover the revset to use when opening a show-style detail from this surface.
     pub fn show_context_revset(&self) -> String {
         self.target
             .clone()
@@ -377,6 +398,7 @@ impl ViewSpec {
     }
 }
 
+/// Infer the app-level diff-format modal state from direct startup args.
 fn parse_diff_format(args: &[String]) -> DiffFormat {
     if args.iter().any(|arg| arg == "--git") {
         DiffFormat::Git
@@ -385,6 +407,7 @@ fn parse_diff_format(args: &[String]) -> DiffFormat {
     }
 }
 
+/// Prepend the app-level diff-format flag when this spec should render with `jj --git`.
 fn diff_format_args(
     diff_format: DiffFormat,
     args: impl IntoIterator<Item = String>,
@@ -397,6 +420,7 @@ fn diff_format_args(
         .collect()
 }
 
+/// Parse the positional revset used by `jj show` while skipping option values safely.
 fn show_revset_arg(args: &[String]) -> Option<&str> {
     let mut skip_next = false;
 
@@ -444,11 +468,13 @@ fn show_option_takes_value(arg: &str) -> bool {
     .any(|prefix| arg.starts_with(prefix))
 }
 
+/// Parse the revision context for `jj diff` startup args.
 fn diff_revset_arg(args: &[String]) -> Option<&str> {
     option_value(args, &["-r", "--revisions"], &["--revisions="])
         .or_else(|| option_value(args, &["-t", "--to"], &["--to="]))
 }
 
+/// Parse a single `-r` / `--revision` value from startup args.
 fn revision_arg(args: &[String]) -> Option<&str> {
     option_value(args, &["-r", "--revision"], &["--revision="])
 }

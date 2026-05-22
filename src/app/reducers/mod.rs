@@ -14,6 +14,7 @@ use crate::actions::{
 use crate::menus::{ActionKind, RolePrompt};
 use crate::modes::view_menu_options;
 
+/// Outcome of one text-prompt key in a pure reducer context.
 pub(super) enum TextPromptKey {
     Cancel,
     Accept,
@@ -21,6 +22,7 @@ pub(super) enum TextPromptKey {
     Ignored,
 }
 
+/// Reduce a text-entry prompt key without performing any app-side effects.
 pub(super) fn reduce_text_prompt_key(input: &mut String, code: KeyCode) -> TextPromptKey {
     match code {
         KeyCode::Esc => TextPromptKey::Cancel,
@@ -37,6 +39,7 @@ pub(super) fn reduce_text_prompt_key(input: &mut String, code: KeyCode) -> TextP
     }
 }
 
+/// Outcome of one menu key in a pure reducer context.
 pub(super) enum MenuKey {
     Cancel,
     Accept,
@@ -44,6 +47,7 @@ pub(super) enum MenuKey {
     Other,
 }
 
+/// Reduce a menu-navigation key, updating the selected index in place when needed.
 pub(super) fn reduce_menu_key(selected: &mut usize, item_count: usize, code: KeyCode) -> MenuKey {
     match code {
         KeyCode::Esc | KeyCode::Char('q') => MenuKey::Cancel,
@@ -61,6 +65,7 @@ pub(super) fn reduce_menu_key(selected: &mut usize, item_count: usize, code: Key
     }
 }
 
+/// Reduce the view-menu key set, including `v` as an explicit close key.
 pub(super) fn reduce_view_menu_key(selected: &mut usize, code: KeyCode) -> MenuKey {
     match code {
         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('v') => MenuKey::Cancel,
@@ -77,6 +82,7 @@ pub(super) fn reduce_view_menu_key(selected: &mut usize, code: KeyCode) -> MenuK
     }
 }
 
+/// Pure decision produced when a role-prompt selection is accepted.
 #[derive(Debug, Eq, PartialEq)]
 pub(super) enum RolePromptDecision {
     Rebase(JjRebasePlan),
@@ -85,6 +91,7 @@ pub(super) enum RolePromptDecision {
     StatusError(String),
 }
 
+/// Turn an accepted role prompt into either a rewrite plan or a status result.
 pub(super) fn reduce_role_prompt_accept(
     action: ActionKind,
     prompt: &RolePrompt,
@@ -113,12 +120,14 @@ pub(super) fn reduce_role_prompt_accept(
     }
 }
 
+/// Pure outcome produced when a text prompt is accepted.
 #[derive(Debug, Eq, PartialEq)]
 pub(super) enum PromptAcceptDecision<T> {
     Preview(T),
     StatusMessage(String),
 }
 
+/// Decide whether a describe prompt should open preview or stop with a status message.
 pub(super) fn reduce_describe_prompt_accept(
     target: &JjDescribeTarget,
     input: &str,
@@ -132,6 +141,7 @@ pub(super) fn reduce_describe_prompt_accept(
     }
 }
 
+/// Decide whether a commit prompt should open preview or stop with a status message.
 pub(super) fn reduce_commit_prompt_accept(input: &str) -> PromptAcceptDecision<JjCommitPlan> {
     let message = input.trim().to_owned();
 
@@ -142,6 +152,7 @@ pub(super) fn reduce_commit_prompt_accept(input: &str) -> PromptAcceptDecision<J
     }
 }
 
+/// Decide whether a bookmark-name prompt should open preview or stop with a status message.
 pub(super) fn reduce_bookmark_name_prompt_accept(
     kind: JjBookmarkMutationKind,
     target: &JjBookmarkTarget,
@@ -159,6 +170,7 @@ pub(super) fn reduce_bookmark_name_prompt_accept(
     }
 }
 
+/// Decide whether a bookmark-rename prompt should open preview or stop with a status message.
 pub(super) fn reduce_bookmark_rename_prompt_accept(
     old_name: &str,
     input: &str,
@@ -176,6 +188,7 @@ pub(super) fn reduce_bookmark_rename_prompt_accept(
     }
 }
 
+/// Outcome of one confirmation-pane key in a pure reducer context.
 pub(super) enum ConfirmationKey {
     Cancel,
     Accept,
@@ -186,6 +199,7 @@ pub(super) enum ConfirmationKey {
 #[cfg(test)]
 mod tests;
 
+/// Reduce a confirmation-pane key, updating typed text and pane scrolling in place.
 pub(super) fn reduce_confirmation_key(
     input: &mut String,
     output: &mut ActionPane,
@@ -231,6 +245,7 @@ pub(super) fn reduce_confirmation_key(
     }
 }
 
+/// Build a rebase plan from the explicit source/destination roles selected in a role prompt.
 pub(in crate::app) fn rebase_plan_from_prompt(prompt: &RolePrompt) -> Option<JjRebasePlan> {
     let destination = prompt.destination_revision()?;
     let sources = prompt
@@ -242,6 +257,7 @@ pub(in crate::app) fn rebase_plan_from_prompt(prompt: &RolePrompt) -> Option<JjR
     (!sources.is_empty()).then(|| JjRebasePlan::new(sources, destination.to_owned()))
 }
 
+/// Build a squash plan from the explicit source/destination roles selected in a role prompt.
 pub(in crate::app) fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjSquashPlan> {
     let destination = prompt.destination_revision()?;
     let sources = prompt
@@ -253,6 +269,7 @@ pub(in crate::app) fn squash_plan_from_prompt(prompt: &RolePrompt) -> Option<JjS
     (!sources.is_empty()).then(|| JjSquashPlan::new(sources, destination.to_owned()))
 }
 
+/// Report whether a key closes the help overlay without executing a command.
 pub(super) fn is_help_close_key(key: KeyEvent) -> bool {
     match key.code {
         KeyCode::Esc | KeyCode::Char('q') => key.modifiers.is_empty(),
@@ -261,10 +278,12 @@ pub(super) fn is_help_close_key(key: KeyEvent) -> bool {
     }
 }
 
+/// Report whether a key should be treated as local help-menu scrolling only.
 pub(super) fn is_help_scroll_key(key: KeyEvent) -> bool {
     key.modifiers.is_empty() && matches!(key.code, KeyCode::Down | KeyCode::Up)
 }
 
+/// Build the bookmark mutation plan implied by a prompt-confirmed bookmark name.
 pub(super) fn bookmark_mutation_plan(
     kind: JjBookmarkMutationKind,
     name: String,

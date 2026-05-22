@@ -28,20 +28,35 @@ use crate::workspaces::WorkspacesView;
 
 /// The currently active top-level view.
 pub enum ViewState {
+    /// Default/log graph surface.
     Log(LogView),
+    /// Show detail document.
     Show(ShowView),
+    /// Diff detail document.
     Diff(DiffView),
+    /// Working-copy status surface.
     Status(StatusView),
+    /// Conflict-resolution surface.
     Resolve(ResolveView),
+    /// File-list surface for one revision context.
     FileList(FileListView),
+    /// File-show document surface.
     FileShow(FileShowView),
+    /// Bookmark management surface.
     Bookmarks(BookmarksView),
+    /// Workspace management surface.
     Workspaces(WorkspacesView),
+    /// Operation-log surface.
     OperationLog(OperationLogView),
+    /// Operation detail document, either show or diff flavored.
     OperationDetail(OperationDetailView),
 }
 
 impl ViewState {
+    /// Materialize the concrete feature view for a previously parsed `ViewSpec`.
+    ///
+    /// Startup and app-level navigation both pass through here so the app can stay generic over
+    /// the active slice until a specific `JjCommand` selects the owning view type.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         match spec.command() {
             JjCommand::Default | JjCommand::Log => Ok(Self::Log(LogView::load(spec)?)),
@@ -60,6 +75,7 @@ impl ViewState {
         }
     }
 
+    /// Render the active view slice into the shared app layout.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         match self {
             Self::Log(view) => view.render(frame, area, search),
@@ -76,6 +92,7 @@ impl ViewState {
         }
     }
 
+    /// Expose the bindings owned by the active view slice.
     pub fn bindings(&self) -> &'static [Binding] {
         match self {
             Self::Log(view) => view.bindings(),
@@ -92,6 +109,7 @@ impl ViewState {
         }
     }
 
+    /// Route one view-local command into the active feature slice.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match self {
             Self::Log(view) => view.execute(command, context),
@@ -108,6 +126,7 @@ impl ViewState {
         }
     }
 
+    /// Refresh the active view slice from its owning data source.
     pub fn refresh(&mut self) -> Result<()> {
         match self {
             Self::Log(view) => view.refresh(),
@@ -124,6 +143,7 @@ impl ViewState {
         }
     }
 
+    /// Clamp active-view scroll or selection state to the current viewport.
     pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
         match self {
             Self::Log(view) => view.clamp(),
@@ -140,6 +160,7 @@ impl ViewState {
         }
     }
 
+    /// Borrow the original `ViewSpec` carried by the active slice.
     pub fn spec(&self) -> &ViewSpec {
         match self {
             Self::Log(view) => view.spec(),
@@ -156,6 +177,7 @@ impl ViewState {
         }
     }
 
+    /// Report the shared status-hint flavor for the active slice.
     pub fn status_hints(&self) -> StatusHints {
         match self {
             Self::Log(_) => StatusHints::Log,
@@ -172,6 +194,7 @@ impl ViewState {
         }
     }
 
+    /// Report the help-surface grouping for the active slice.
     pub fn help_context(&self) -> HelpContext {
         match self {
             Self::Log(_) => HelpContext::Log,

@@ -4,8 +4,10 @@
 //! policy. `modes.rs` projects app interaction state into borrowed [`Overlay`] values; this
 //! module sizes, clears, styles, and renders those values as shared chrome around the active view.
 //! Future behavior belongs in the view, app screen, action lifecycle, or action output owner that
-//! holds the state being changed, not in this presentation layer. This module should only adjust
-//! presentation geometry and styling.
+//! holds the state being changed, not in this presentation layer. Treat this root as a table of
+//! contents: `chrome` owns frame layout and status/title rows, `status_hints` owns width-fit hint
+//! projection, and `overlays` owns shared modal rendering for help, menus, prompts, and action
+//! panes.
 
 mod chrome;
 mod overlays;

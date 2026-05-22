@@ -15,49 +15,72 @@ use crate::jj::{exact_change_id_revset, exact_string_pattern};
 // and forget/delete semantics in one exact-pattern command family.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjBookmarkMutationKind {
+    /// Create one local bookmark at the target revision.
     Create,
+    /// Set one local bookmark to the target revision.
     Set,
+    /// Move one exactly named local bookmark to the target revision.
     Move,
+    /// Rename one local bookmark.
     Rename,
+    /// Delete one exactly named local bookmark.
     Delete,
+    /// Forget one bookmark, optionally including the exact remote peer.
     Forget,
+    /// Track one exact remote bookmark.
     Track,
+    /// Untrack one exact remote bookmark.
     Untrack,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjBookmarkTarget {
+    /// One exact selected revision from rendered metadata.
     ExactChange(String),
+    /// The current working-copy change (`@`).
     CurrentWorkingCopy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjBookmarkForgetTarget {
+    /// Forget the local bookmark and include its tracked remote peer.
     Local { tracking: String },
+    /// Forget one exact remote-only bookmark with no local peer.
     RemoteOnly { remote: String, tracking: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjBookmarkTrackingTarget {
+    /// Matching local bookmark name when the action originates from a local row.
     local_bookmark: Option<String>,
+    /// Exact remote bookmark name to track or untrack.
     remote_bookmark: String,
+    /// Exact remote name that owns the remote bookmark.
     remote: String,
+    /// User-facing description of the visible trusted metadata state.
     visible_state: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjBookmarkMutationPlan {
+    /// Bookmark mutation subcommand owned by this plan.
     kind: JjBookmarkMutationKind,
+    /// Primary bookmark name supplied by the caller.
     name: String,
+    /// New bookmark name for rename plans.
     new_name: Option<String>,
+    /// Revision target for create, set, and move plans.
     target: Option<JjBookmarkTarget>,
+    /// Forget-target policy for forget plans.
     forget_target: Option<JjBookmarkForgetTarget>,
+    /// Exact remote tracking target for track and untrack plans.
     tracking_target: Option<Box<JjBookmarkTrackingTarget>>,
 }
 
 // Bookmark mutation owns all bookmark subcommand argv so exact-name matching,
 // tracking metadata, and preview wording stay consistent.
 impl JjBookmarkMutationKind {
+    /// Returns the user-facing action label for this mutation kind.
     pub fn label(self) -> &'static str {
         match self {
             Self::Create => "create",
@@ -71,6 +94,7 @@ impl JjBookmarkMutationKind {
         }
     }
 
+    /// Returns fallback success wording when `jj` does not provide one.
     fn success_fallback(self) -> &'static str {
         match self {
             Self::Create => "created bookmark",
@@ -86,14 +110,17 @@ impl JjBookmarkMutationKind {
 }
 
 impl JjBookmarkTarget {
+    /// Builds a bookmark target for one exact selected revision.
     pub fn exact_change(change_id: impl Into<String>) -> Self {
         Self::ExactChange(change_id.into())
     }
 
+    /// Builds a bookmark target for the current working-copy change.
     pub fn current_working_copy() -> Self {
         Self::CurrentWorkingCopy
     }
 
+    /// Returns the user-facing revision label for this target.
     pub fn label(&self) -> &str {
         match self {
             Self::ExactChange(change_id) => change_id,
@@ -101,6 +128,7 @@ impl JjBookmarkTarget {
         }
     }
 
+    /// Returns the revset argv fragment for this target.
     fn command_arg(&self) -> String {
         match self {
             Self::ExactChange(change_id) => exact_change_id_revset(change_id),
@@ -108,6 +136,7 @@ impl JjBookmarkTarget {
         }
     }
 
+    /// Returns user-facing preview wording for this target.
     fn preview_target(&self) -> String {
         match self {
             Self::ExactChange(change_id) => format!("exact selected revision {change_id}"),
@@ -117,6 +146,7 @@ impl JjBookmarkTarget {
 }
 
 impl JjBookmarkMutationPlan {
+    /// Builds a create plan for one bookmark name and revision target.
     pub fn create(name: impl Into<String>, target: JjBookmarkTarget) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Create,
@@ -128,6 +158,7 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Builds a set plan for one bookmark name and revision target.
     pub fn set(name: impl Into<String>, target: JjBookmarkTarget) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Set,
@@ -139,6 +170,7 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Builds a move plan for one bookmark name and revision target.
     pub fn move_to(name: impl Into<String>, target: JjBookmarkTarget) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Move,
@@ -150,6 +182,7 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Builds a rename plan for one local bookmark.
     pub fn rename(old_name: impl Into<String>, new_name: impl Into<String>) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Rename,
@@ -161,6 +194,7 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Builds a delete plan for one exactly named local bookmark.
     pub fn delete(name: impl Into<String>) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Delete,
@@ -172,6 +206,7 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Builds a forget plan from a selected bookmark row and resolved forget target.
     pub fn forget(name: impl Into<String>, target: JjBookmarkForgetTarget) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Forget,
@@ -183,6 +218,7 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Builds a track plan from a resolved remote bookmark target.
     pub fn track(name: impl Into<String>, target: JjBookmarkTrackingTarget) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Track,
@@ -194,6 +230,7 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Builds an untrack plan from a resolved remote bookmark target.
     pub fn untrack(name: impl Into<String>, target: JjBookmarkTrackingTarget) -> Self {
         Self {
             kind: JjBookmarkMutationKind::Untrack,
@@ -205,22 +242,27 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Returns the mutation kind owned by this plan.
     pub fn kind(&self) -> JjBookmarkMutationKind {
         self.kind
     }
 
+    /// Returns the primary bookmark name for this plan.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the new bookmark name for rename plans.
     pub fn new_name(&self) -> Option<&str> {
         self.new_name.as_deref()
     }
 
+    /// Returns the revision target for create, set, and move plans.
     pub fn target(&self) -> Option<&JjBookmarkTarget> {
         self.target.as_ref()
     }
 
+    /// Returns the user-facing `jj` command label for this mutation plan.
     pub fn command_label(&self) -> String {
         let label_args = self
             .command_argv()
@@ -231,6 +273,7 @@ impl JjBookmarkMutationPlan {
         format!("jj {label_args}")
     }
 
+    /// Returns argv for the underlying bookmark mutation command.
     pub fn command_argv(&self) -> Vec<String> {
         match self.kind {
             JjBookmarkMutationKind::Create => vec![
@@ -286,10 +329,12 @@ impl JjBookmarkMutationPlan {
         }
     }
 
+    /// Returns preview text without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Runs the bookmark mutation through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(),
@@ -298,6 +343,7 @@ impl JjBookmarkMutationPlan {
         )
     }
 
+    /// Returns the preview summary shown before confirming the bookmark mutation.
     pub fn preview_summary(&self) -> String {
         let mut lines = vec![
             format!("command: {}", self.command_label()),

@@ -15,23 +15,30 @@ use crate::jj::run_direct_args;
 // predicting jj's final graph shape.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjRebasePlan {
+    /// Source revisions selected for rebase.
     sources: Vec<String>,
+    /// Destination revision the sources will be rebased onto.
     destination: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjSquashPlan {
+    /// Source revisions selected to squash into the destination.
     sources: Vec<String>,
+    /// Destination revision that receives the squashed content.
     destination: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjAbsorbPlan {
+    /// Source revision whose changes may be absorbed.
     source: String,
+    /// Candidate destination revisions selected by the caller.
     destinations: Vec<String>,
 }
 
 impl JjRebasePlan {
+    /// Builds a rebase plan from explicit source and destination roles.
     pub fn new(sources: Vec<String>, destination: impl Into<String>) -> Self {
         Self {
             sources,
@@ -40,14 +47,17 @@ impl JjRebasePlan {
         .normalize()
     }
 
+    /// Returns the source revisions owned by this rebase plan.
     pub fn sources(&self) -> &[String] {
         &self.sources
     }
 
+    /// Returns the destination revision for this rebase plan.
     pub fn destination(&self) -> &str {
         &self.destination
     }
 
+    /// Returns the user-facing `jj` command label for this rebase plan.
     pub fn command_label(&self, _dry_run: bool) -> String {
         let label_args = self
             .command_argv(false)
@@ -58,6 +68,7 @@ impl JjRebasePlan {
         format!("jj {label_args}")
     }
 
+    /// Returns argv for `jj rebase`.
     pub fn command_argv(&self, _dry_run: bool) -> Vec<String> {
         let mut argv = vec!["rebase".to_owned()];
         for source in &self.sources {
@@ -69,10 +80,12 @@ impl JjRebasePlan {
         argv
     }
 
+    /// Returns preview text without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Runs `jj rebase` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(false),
@@ -81,6 +94,7 @@ impl JjRebasePlan {
         )
     }
 
+    /// Returns the preview summary shown before confirming `jj rebase`.
     pub fn preview_summary(&self) -> String {
         let sources = self
             .sources
@@ -97,6 +111,7 @@ impl JjRebasePlan {
         )
     }
 
+    /// Drops blank source inputs before argv construction.
     fn normalize(mut self) -> Self {
         self.sources.retain(|source| !source.trim().is_empty());
         self
@@ -104,6 +119,7 @@ impl JjRebasePlan {
 }
 
 impl JjSquashPlan {
+    /// Builds a squash plan from explicit source and destination roles.
     pub fn new(sources: Vec<String>, destination: impl Into<String>) -> Self {
         Self {
             sources,
@@ -112,14 +128,17 @@ impl JjSquashPlan {
         .normalize()
     }
 
+    /// Returns the source revisions owned by this squash plan.
     pub fn sources(&self) -> &[String] {
         &self.sources
     }
 
+    /// Returns the destination revision for this squash plan.
     pub fn destination(&self) -> &str {
         &self.destination
     }
 
+    /// Returns the user-facing `jj` command label for this squash plan.
     pub fn command_label(&self, _dry_run: bool) -> String {
         let label_args = self
             .command_argv(false)
@@ -130,6 +149,7 @@ impl JjSquashPlan {
         format!("jj {label_args}")
     }
 
+    /// Returns argv for `jj squash`.
     pub fn command_argv(&self, _dry_run: bool) -> Vec<String> {
         let mut argv = vec!["squash".to_owned()];
         for source in &self.sources {
@@ -142,10 +162,12 @@ impl JjSquashPlan {
         argv
     }
 
+    /// Returns preview text without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Runs `jj squash` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(false),
@@ -154,6 +176,7 @@ impl JjSquashPlan {
         )
     }
 
+    /// Returns the preview summary shown before confirming `jj squash`.
     pub fn preview_summary(&self) -> String {
         let sources = self
             .sources
@@ -170,6 +193,7 @@ impl JjSquashPlan {
         )
     }
 
+    /// Drops blank source inputs before argv construction.
     fn normalize(mut self) -> Self {
         self.sources.retain(|source| !source.trim().is_empty());
         self
@@ -177,6 +201,7 @@ impl JjSquashPlan {
 }
 
 impl JjAbsorbPlan {
+    /// Builds an absorb plan from one source revision and candidate destinations.
     pub fn new(source: impl Into<String>, destinations: Vec<String>) -> Self {
         Self {
             source: source.into(),
@@ -185,14 +210,17 @@ impl JjAbsorbPlan {
         .normalize()
     }
 
+    /// Returns the source revision for this absorb plan.
     pub fn source(&self) -> &str {
         &self.source
     }
 
+    /// Returns the candidate destination revisions for this absorb plan.
     pub fn destinations(&self) -> &[String] {
         &self.destinations
     }
 
+    /// Returns the user-facing `jj` command label for this absorb plan.
     pub fn command_label(&self) -> String {
         let label_args = self
             .command_argv()
@@ -203,6 +231,7 @@ impl JjAbsorbPlan {
         format!("jj {label_args}")
     }
 
+    /// Returns argv for `jj absorb`.
     pub fn command_argv(&self) -> Vec<String> {
         let mut argv = vec![
             "absorb".to_owned(),
@@ -216,14 +245,17 @@ impl JjAbsorbPlan {
         argv
     }
 
+    /// Returns preview text without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Runs `jj absorb` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(self.command_argv(), &self.command_label(), "absorbed")
     }
 
+    /// Returns the preview summary shown before confirming `jj absorb`.
     pub fn preview_summary(&self) -> String {
         let destinations = self
             .destinations
@@ -255,6 +287,7 @@ impl JjAbsorbPlan {
         )
     }
 
+    /// Drops blank or self-target destinations before argv construction.
     fn normalize(mut self) -> Self {
         self.destinations
             .retain(|destination| !destination.trim().is_empty() && destination != &self.source);

@@ -2,7 +2,8 @@
 //!
 //! This module owns post-command refresh, reveal, and result wording for non-rewrite-specific
 //! mutation flows such as describe, commit, bookmarks, sync, duplicate, split, and operation
-//! recovery.
+//! recovery. It calls `AppServices` directly for the completed command output and keeps the
+//! app-owned refresh/reveal/status policy local to this file.
 
 use color_eyre::Result;
 use ratatui::DefaultTerminal;
@@ -22,6 +23,7 @@ use super::super::{App, current_viewport_width};
 use super::shared::fetch_status_message;
 
 impl App {
+    /// Run the describe command and leave its finished output on the describe pane.
     pub(in crate::app) fn confirm_describe(
         &mut self,
         describe: JjDescribePlan,
@@ -30,7 +32,7 @@ impl App {
     ) {
         let command_label = describe.command_label();
         let reveal_change_id = describe.target().exact_change_id().map(str::to_owned);
-        let result_message = match self.run_describe(&describe) {
+        let result_message = match self.services.run_describe(&describe) {
             Ok(output) => self.finish_successful_action_revealing_change(
                 output,
                 reveal_change_id.as_deref(),
@@ -46,6 +48,7 @@ impl App {
         };
     }
 
+    /// Run the commit command and leave its finished output on the commit pane.
     pub(in crate::app) fn confirm_commit(
         &mut self,
         commit: JjCommitPlan,
@@ -53,7 +56,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = commit.command_label();
-        let result_message = match self.run_commit(&commit) {
+        let result_message = match self.services.run_commit(&commit) {
             Ok(output) => self.finish_successful_action(
                 output,
                 viewport_height,
@@ -68,6 +71,7 @@ impl App {
         };
     }
 
+    /// Run the bookmark mutation and leave its finished output on the bookmark pane.
     pub(in crate::app) fn confirm_bookmark_mutation(
         &mut self,
         mutation: JjBookmarkMutationPlan,
@@ -75,7 +79,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = mutation.command_label();
-        let result_message = match self.run_bookmark_mutation(&mutation) {
+        let result_message = match self.services.run_bookmark_mutation(&mutation) {
             Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
@@ -86,6 +90,7 @@ impl App {
         };
     }
 
+    /// Run the file mutation and leave its finished output on the file-mutation pane.
     pub(in crate::app) fn confirm_file_mutation(
         &mut self,
         mutation: JjFileMutationPlan,
@@ -93,7 +98,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = mutation.command_label();
-        let result_message = match self.run_file_mutation(&mutation) {
+        let result_message = match self.services.run_file_mutation(&mutation) {
             Ok(output) => {
                 self.finish_successful_action(output, viewport_height, " | jj undo | jj op show -p")
             }
@@ -106,6 +111,7 @@ impl App {
         };
     }
 
+    /// Run the new-change command, resolve the new working copy, and leave the result on the pane.
     pub(in crate::app) fn confirm_new_change(
         &mut self,
         new_change: JjNewPlan,
@@ -113,9 +119,9 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = new_change.command_label();
-        let result_message = match self.run_new_change(&new_change) {
+        let result_message = match self.services.run_new_change(&new_change) {
             Ok(output) => {
-                let new_change_id = match self.resolve_revision("@") {
+                let new_change_id = match self.services.resolve_revision("@") {
                     Ok(change_id) => change_id,
                     Err(error) => {
                         let message =
@@ -145,6 +151,7 @@ impl App {
         };
     }
 
+    /// Run the duplicate command and leave the refresh/reveal result on the duplicate pane.
     pub(in crate::app) fn confirm_duplicate(
         &mut self,
         duplicate: JjDuplicatePlan,
@@ -152,7 +159,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = duplicate.command_label();
-        let result_message = match self.run_duplicate(&duplicate) {
+        let result_message = match self.services.run_duplicate(&duplicate) {
             Ok(output) => self.finish_successful_duplicate(&duplicate, output, viewport_height),
             Err(error) => self.finish_failed_action(error),
         };
@@ -163,6 +170,7 @@ impl App {
         };
     }
 
+    /// Refresh after duplicate and fall back to revealing the original source change when possible.
     fn finish_successful_duplicate(
         &mut self,
         duplicate: &JjDuplicatePlan,
@@ -221,6 +229,7 @@ impl App {
         }
     }
 
+    /// Run the push command and leave its finished output on the push pane.
     pub(in crate::app) fn confirm_push(
         &mut self,
         push: JjGitPush,
@@ -228,7 +237,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = push.command_label(false);
-        let result_message = match self.run_push(&push) {
+        let result_message = match self.services.run_push(&push) {
             Ok(output) => {
                 self.finish_successful_sync_action(output, viewport_height, str::to_owned)
             }
@@ -241,6 +250,7 @@ impl App {
         }
     }
 
+    /// Run the fetch command and leave its finished output on the fetch pane.
     pub(in crate::app) fn confirm_fetch(
         &mut self,
         fetch: JjGitFetch,
@@ -248,7 +258,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = fetch.command_label();
-        let result_message = match self.run_git_fetch(&fetch) {
+        let result_message = match self.services.run_git_fetch(&fetch) {
             Ok(output) => self.finish_successful_sync_action(output, viewport_height, |output| {
                 fetch_status_message(&fetch, output)
             }),
@@ -261,6 +271,7 @@ impl App {
         }
     }
 
+    /// Run the undo/redo operation and leave its finished output on the recovery pane.
     pub(in crate::app) fn confirm_operation_recovery(
         &mut self,
         recovery: JjOperationRecovery,
@@ -268,7 +279,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = recovery.command_label().to_owned();
-        let result_message = match self.run_operation_recovery(&recovery) {
+        let result_message = match self.services.run_operation_recovery(&recovery) {
             Ok(output) => self.finish_successful_action(
                 output,
                 viewport_height,
@@ -283,6 +294,7 @@ impl App {
         };
     }
 
+    /// Run the split command, including inherited-stdio interactive mode when needed.
     pub(in crate::app) fn confirm_split(
         &mut self,
         split: JjSplitPlan,
@@ -291,7 +303,7 @@ impl App {
         terminal: Option<&mut DefaultTerminal>,
     ) {
         let command_label = split.command_label();
-        let result_message = match self.run_split(terminal, &split) {
+        let result_message = match self.services.run_split(terminal, &split) {
             Ok(output) => self.finish_successful_split(&split, output, viewport_height),
             Err(error) => {
                 let message = split.failure_result_message(&error.to_string());
@@ -306,6 +318,7 @@ impl App {
         };
     }
 
+    /// Refresh after split and reveal the exact or current working-copy target when possible.
     fn finish_successful_split(
         &mut self,
         split: &JjSplitPlan,
@@ -314,7 +327,7 @@ impl App {
     ) -> String {
         let reveal_change_id = match split.target() {
             JjSplitTarget::ExactChange(change_id) => Some(change_id.clone()),
-            JjSplitTarget::CurrentWorkingCopy => match self.resolve_revision("@") {
+            JjSplitTarget::CurrentWorkingCopy => match self.services.resolve_revision("@") {
                 Ok(change_id) => Some(change_id),
                 Err(error) => {
                     self.status = StatusLine::error(&self.view, error.to_string());
@@ -368,6 +381,7 @@ impl App {
         }
     }
 
+    /// Run the operation restore/revert command and refresh current plus stacked repo views.
     pub(in crate::app) fn confirm_operation_target(
         &mut self,
         target: JjOperationTarget,
@@ -375,7 +389,7 @@ impl App {
         viewport_height: u16,
     ) {
         let command_label = target.command_label();
-        let result_message = match self.run_operation_target(&target) {
+        let result_message = match self.services.run_operation_target(&target) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
                     self.view.clamp(viewport_height, current_viewport_width());
@@ -408,6 +422,7 @@ impl App {
         };
     }
 
+    /// Refresh any repo-backed views stored on the app stack after an operation-level mutation.
     pub(in crate::app) fn refresh_stacked_repo_views(
         &mut self,
         viewport_height: u16,

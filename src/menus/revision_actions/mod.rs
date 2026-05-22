@@ -15,15 +15,22 @@ use super::{
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExactActionContext {
+    /// Exact current revision selected on the log/detail surface, if any.
     current_revision: Option<String>,
+    /// Additional exact selected revisions used for multi-source rewrite menus.
     source_revisions: Vec<String>,
+    /// Optional selected path carried from detail, file, or status surfaces.
     selected_path: Option<String>,
+    /// Path-scoped action policy derived from the current surface and selection.
     file_action: Option<FileActionContext>,
+    /// Whether the selected current revision is the visible working-copy change.
     current_is_visible_working_copy: bool,
+    /// Surface whose action vocabulary and ordering should be built.
     surface: ActionSurface,
 }
 
 impl ExactActionContext {
+    /// Build a log-surface context with one exact current revision selected.
     pub fn with_current(current_revision: impl Into<String>) -> Self {
         Self {
             current_revision: Some(current_revision.into()),
@@ -35,6 +42,7 @@ impl ExactActionContext {
         }
     }
 
+    /// Build a detail-surface context with one exact current revision selected.
     pub fn detail(current_revision: impl Into<String>) -> Self {
         Self {
             current_revision: Some(current_revision.into()),
@@ -46,6 +54,7 @@ impl ExactActionContext {
         }
     }
 
+    /// Build a status-surface context for a tracked working-copy path.
     pub fn status_tracked_path(
         path: impl Into<String>,
         restore_allowed: bool,
@@ -71,6 +80,7 @@ impl ExactActionContext {
         Self::status_tracked_path(path, true, true)
     }
 
+    /// Build a status-surface context for an untracked working-copy path.
     pub fn status_untracked_path(path: impl Into<String>) -> Self {
         let path = path.into();
         Self {
@@ -83,6 +93,7 @@ impl ExactActionContext {
         }
     }
 
+    /// Build a file-surface context for the working-copy path view.
     pub fn working_copy_file_path(path: impl Into<String>) -> Self {
         let path = path.into();
         Self {
@@ -107,6 +118,7 @@ impl ExactActionContext {
         }
     }
 
+    /// Add the exact source revisions selected alongside the current destination.
     pub fn with_sources<I, S>(mut self, sources: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -116,6 +128,7 @@ impl ExactActionContext {
         self
     }
 
+    /// Add the currently selected path and derive detail-surface file actions when needed.
     pub fn with_selected_path(mut self, path: impl Into<String>) -> Self {
         let path = path.into();
         if self.is_detail_surface()
@@ -131,19 +144,23 @@ impl ExactActionContext {
         self
     }
 
+    /// Mark that the selected current revision is the visible working-copy change.
     pub fn with_visible_working_copy(mut self) -> Self {
         self.current_is_visible_working_copy = true;
         self
     }
 
+    /// Return the exact current revision selected on the surface, if any.
     pub fn current_revision(&self) -> Option<&str> {
         self.current_revision.as_deref()
     }
 
+    /// Return the additional selected source revisions used for rewrite menus.
     pub fn source_revisions(&self) -> &[String] {
         &self.source_revisions
     }
 
+    /// Return the optional selected path carried with this context.
     pub fn selected_path(&self) -> Option<&str> {
         self.selected_path.as_deref()
     }
@@ -161,6 +178,11 @@ impl ExactActionContext {
     }
 }
 
+/// Build the revision-scoped action menu for one exact selection context.
+///
+/// This boundary owns only action availability, menu row ordering, and the
+/// follow-up payload attached to each row. Preview construction, command
+/// execution, and refresh behavior stay in app dispatch and `actions`.
 pub(super) fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     if context.is_status_surface() {
         return context
@@ -435,11 +457,16 @@ fn mutation_menu_items(
     items
 }
 
+/// Internal classification of which surface owns the current selection semantics.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ActionSurface {
+    /// Graph/log row with a current revision and optional multiselect sources.
     Log,
+    /// Detail/document surface rooted at one exact revision.
     Detail,
+    /// Working-copy status row for a selected path.
     Status,
+    /// File-list surface rooted in the working copy.
     File,
 }
 

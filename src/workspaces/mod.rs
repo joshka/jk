@@ -56,12 +56,16 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Read-only workspace/root context from `jj root` and `jj workspace list`.
 pub struct WorkspacesView {
+    /// View identity used to reload the workspace surface.
     spec: ViewSpec,
+    /// Loaded root context, workspace rows, and any degraded-load diagnostics.
     context: WorkspaceContext,
+    /// Current selected row within the workspace list.
     selection: Selection,
 }
 
 impl WorkspacesView {
+    /// Loads root context and rendered workspace rows for the current view spec.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         Ok(Self {
             context: load_workspace_context(&spec)?,
@@ -79,6 +83,7 @@ impl WorkspacesView {
         }
     }
 
+    /// Renders the root header plus the selectable workspace list.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let header_lines = self.header_lines();
         let header_height = u16::try_from(header_lines.len())
@@ -96,10 +101,12 @@ impl WorkspacesView {
         frame.render_stateful_widget(workspace_list(&self.context, search), rows, &mut state);
     }
 
+    /// Returns the key bindings owned by the workspaces view.
     pub fn bindings(&self) -> &'static [Binding] {
         BINDINGS
     }
 
+    /// Applies selection, search, and copy commands to the read-only workspace view.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::MoveDown => {
@@ -157,22 +164,27 @@ impl WorkspacesView {
         }
     }
 
+    /// Reloads the workspace context while preserving the selected workspace name when possible.
     pub fn refresh(&mut self) -> Result<()> {
         self.refresh_with_loader(load_workspace_context)
     }
 
+    /// Clamps the current selection to the available rows.
     pub fn clamp(&mut self) {
         self.selection.clamp(self.context.entries().len());
     }
 
+    /// Returns the view spec that identifies this workspaces surface.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Returns the number of selectable workspace rows.
     pub fn item_count(&self) -> usize {
         self.context.entries().len()
     }
 
+    /// Returns the rendered line count of the header plus all workspace rows.
     pub fn line_count(&self) -> usize {
         self.header_lines().len()
             + self
@@ -183,10 +195,12 @@ impl WorkspacesView {
                 .sum::<usize>()
     }
 
+    /// Returns the currently selected workspace row, if any.
     fn selected_entry(&self) -> Option<&WorkspaceItem> {
         self.context.entries().get(self.selection.index())
     }
 
+    /// Counts rows whose rendered text matches the current search query.
     fn search_matches(&self, query: &SearchQuery) -> usize {
         self.context
             .entries()
@@ -195,6 +209,7 @@ impl WorkspacesView {
             .count()
     }
 
+    /// Advances selection to the next matching row if one exists.
     fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.context.entries().len())
             .chain(0..self.selection.index().min(self.context.entries().len()))
@@ -206,6 +221,7 @@ impl WorkspacesView {
         true
     }
 
+    /// Moves selection to the previous matching row if one exists.
     fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
@@ -218,6 +234,7 @@ impl WorkspacesView {
         true
     }
 
+    /// Returns copyable root context and selected-row identifiers for the workspace surface.
     fn copy_options(&self) -> Vec<CopyOption> {
         let mut options = Vec::new();
         if let Some(root) = self.context.root() {
@@ -240,6 +257,7 @@ impl WorkspacesView {
         options
     }
 
+    /// Reloads the context and restores selection by workspace name before falling back to index.
     fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<WorkspaceContext>,
@@ -260,11 +278,13 @@ impl WorkspacesView {
         Ok(())
     }
 
+    /// Returns the rendered root and degraded-load diagnostics shown above the list.
     fn header_lines(&self) -> Vec<Line<'static>> {
         workspace_header_lines(&self.context)
     }
 }
 
+/// Builds the rendered header for the workspace root surface and any degraded-load diagnostics.
 fn workspace_header_lines(context: &WorkspaceContext) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     match context.root() {
@@ -283,6 +303,7 @@ fn workspace_header_lines(context: &WorkspaceContext) -> Vec<Line<'static>> {
     lines
 }
 
+/// Projects workspace rows into the selectable list widget.
 fn workspace_list(context: &WorkspaceContext, search: Option<&SearchQuery>) -> List<'static> {
     let items = if context.entries().is_empty() {
         vec![ListItem::new("no workspaces listed")]
@@ -304,6 +325,7 @@ fn workspace_list(context: &WorkspaceContext, search: Option<&SearchQuery>) -> L
     List::new(items).highlight_style(theme::active_row_style())
 }
 
+/// Restores selection by exact workspace name before falling back to the previous index.
 fn restore_selection(
     selection: &mut Selection,
     entries: &[WorkspaceItem],

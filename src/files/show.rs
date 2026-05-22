@@ -85,14 +85,20 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Rendered `jj file show` output plus scroll state for one exact path.
 pub struct FileShowView {
+    /// View specification used to reload the current file show surface.
     spec: ViewSpec,
+    /// Exact file path selected for this file show document.
     path: String,
+    /// Rendered document lines for the selected file.
     document: DocumentLines,
+    /// Current vertical scroll offset into the projected document.
     scroll_offset: usize,
+    /// Current wrapping and horizontal-scroll viewport state.
     viewport: DocumentViewport,
 }
 
 impl FileShowView {
+    /// Load the file-show document for the exact path owned by the `ViewSpec`.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         let path = file_show_path(&spec);
         Ok(Self {
@@ -115,6 +121,7 @@ impl FileShowView {
         }
     }
 
+    /// Render the current file document with the active viewport projection.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         documents::render_document_with_viewport(
             frame,
@@ -125,10 +132,12 @@ impl FileShowView {
         );
     }
 
+    /// Return the file-show-specific binding table.
     pub fn bindings(&self) -> &'static [Binding] {
         BINDINGS
     }
 
+    /// Execute one view-local command against the file show document.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::CycleMode
@@ -200,26 +209,32 @@ impl FileShowView {
         }
     }
 
+    /// Reload the document while preserving path identity and viewport state.
     pub fn refresh(&mut self) -> Result<()> {
         self.refresh_with_loader(load_document)
     }
 
+    /// Project the rendered document with the active file pinned for sticky context.
     pub fn projection(&self) -> crate::documents::PinnedDocument {
         project_with_active_file(&self.document, &[], self.scroll_offset, std::iter::empty())
     }
 
+    /// Return the `ViewSpec` that owns this file show surface.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Return the exact file path shown in this document.
     pub fn path(&self) -> &str {
         &self.path
     }
 
+    /// Return the rendered document line count.
     pub fn line_count(&self) -> usize {
         self.document.line_count()
     }
 
+    /// Return the current vertical scroll offset.
     pub fn scroll_offset(&self) -> usize {
         self.scroll_offset
     }
@@ -238,14 +253,17 @@ impl FileShowView {
         self.scroll_offset = scroll_offset.min(self.max_scroll_offset());
     }
 
+    /// Jump to the first document line.
     pub fn scroll_to_top(&mut self) {
         self.scroll_offset = 0;
     }
 
+    /// Jump to the last visible document position.
     pub fn scroll_to_bottom(&mut self, _viewport_height: u16) {
         self.scroll_offset = self.max_scroll_offset();
     }
 
+    /// Scroll down by a fixed number of lines.
     pub fn scroll_down(&mut self, _viewport_height: u16, amount: usize) {
         self.scroll_offset = self
             .scroll_offset
@@ -253,10 +271,12 @@ impl FileShowView {
             .min(self.max_scroll_offset());
     }
 
+    /// Scroll up by a fixed number of lines.
     pub fn scroll_up(&mut self, _viewport_height: u16, amount: usize) {
         self.scroll_offset = self.scroll_offset.saturating_sub(amount);
     }
 
+    /// Clamp vertical and horizontal viewport state to current document and width bounds.
     pub fn clamp(&mut self, _viewport_height: u16, viewport_width: u16) {
         self.scroll_offset = self.scroll_offset.min(self.max_scroll_offset());
         self.viewport.clamp(viewport_width, self.max_line_width());

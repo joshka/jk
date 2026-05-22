@@ -1,3 +1,9 @@
+//! Process execution helpers for the `jj` CLI boundary.
+//!
+//! Higher layers decide which `ViewSpec` or direct argv to run. This module owns how those
+//! commands inherit pager/color settings, execute `jj`, and turn exit status plus stdio into
+//! app-usable errors or output values.
+
 use std::process::Command;
 
 use color_eyre::Result;
@@ -82,16 +88,13 @@ pub fn resolve_exact_change_id(revset: &str) -> Result<String> {
         .map_err(|error| eyre!("{} {}", revset, error))
 }
 
+/// Run one rendered `jj` view command and return the raw process output.
+///
+/// Callers use this when the rendered stdout is itself the product surface, such as startup log
+/// rows or detail-document loading.
 pub fn run_jj(spec: &ViewSpec, color: ColorMode) -> Result<std::process::Output> {
-    let mut jj = base_command(color);
-    jj.args(jj_command_args(spec, None, false));
-
-    let output = jj.output()?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(eyre!("{} failed: {}", spec.label(), stderr.trim()));
-    }
-    Ok(output)
+    let label = spec.label();
+    run_view_command(spec, &label, color, None, false)
 }
 
 fn run_direct_command(args: &[&str], label: &str, success_fallback: &str) -> Result<CommandOutput> {
@@ -167,27 +170,46 @@ pub fn run_jj_template_lines(
     template: &str,
     no_graph: bool,
 ) -> Result<Vec<String>> {
-    let mut jj = base_command(ColorMode::Never);
-    jj.args(jj_command_args(spec, Some(template), no_graph));
+    let output = run_view_command(
+        spec,
+        &format!("{} metadata", metadata_label(spec)),
+        ColorMode::Never,
+        Some(template),
+        no_graph,
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    Ok(stdout.lines().map(str::to_owned).collect())
+}
+
+/// Run one `ViewSpec` through `jj` with optional template customization.
+///
+/// This keeps the `ViewSpec`-to-process boundary in one place so callers differ only in how they
+/// interpret successful stdout.
+fn run_view_command(
+    spec: &ViewSpec,
+    label: &str,
+    color: ColorMode,
+    template: Option<&str>,
+    no_graph: bool,
+) -> Result<std::process::Output> {
+    let mut jj = base_command(color);
+    jj.args(jj_command_args(spec, template, no_graph));
 
     let output = jj.output()?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        let metadata_label = if matches!(spec.command(), JjCommand::Resolve) {
-            "jj log resolve metadata".to_owned()
-        } else {
-            spec.label().to_owned()
-        };
-
-        return Err(eyre!(
-            "{} metadata failed: {}",
-            metadata_label,
-            stderr.trim()
-        ));
+        return Err(eyre!("{label} failed: {}", stderr.trim()));
     }
+    Ok(output)
+}
 
-    let stdout = String::from_utf8(output.stdout)?;
-    Ok(stdout.lines().map(str::to_owned).collect())
+/// Label metadata-only loads that reuse the rendered-view command shape.
+fn metadata_label(spec: &ViewSpec) -> String {
+    if matches!(spec.command(), JjCommand::Resolve) {
+        "jj log resolve metadata".to_owned()
+    } else {
+        spec.label().to_owned()
+    }
 }
 
 pub fn base_command(color: ColorMode) -> Command {
@@ -240,7 +262,9 @@ pub fn parse_exact_change_id(output: &str) -> Result<String> {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ColorMode {
+    /// Preserve jj color escapes so the TUI can render the same styled output.
     Always,
+    /// Disable color when jk is parsing semantic helper output rather than rendering it directly.
     Never,
 }
 

@@ -3,6 +3,7 @@
 //! Action builders use these helpers to keep revset/fileset quoting and
 //! command-label formatting in one place without pulling in execution logic.
 
+/// Build the user-facing command label shown for a `jj` argv vector.
 pub fn command_label_from_argv(command_argv: &[String]) -> String {
     if command_argv.is_empty() {
         "jj".to_owned()
@@ -11,6 +12,7 @@ pub fn command_label_from_argv(command_argv: &[String]) -> String {
     }
 }
 
+/// Build an exact-change-id revset that resolves to at most one change.
 pub fn exact_change_id_revset(change_id: &str) -> String {
     format!(
         "exactly(change_id({}), 1)",
@@ -18,14 +20,17 @@ pub fn exact_change_id_revset(change_id: &str) -> String {
     )
 }
 
+/// Build a root-file fileset literal for one exact repository path.
 pub fn root_file_fileset(path: &str) -> String {
     format!("root-file:{}", revset_string_literal(path))
 }
 
+/// Build an `exact:` pattern literal for names such as remotes or bookmarks.
 pub fn exact_string_pattern(value: &str) -> String {
     format!("exact:{}", revset_string_literal(value))
 }
 
+/// Quote one string as a `jj` revset/fileset string literal.
 fn revset_string_literal(value: &str) -> String {
     let mut quoted = String::with_capacity(value.len() + 2);
     quoted.push('"');

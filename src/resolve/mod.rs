@@ -69,8 +69,11 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Selectable conflict list output from the resolve template contract.
 pub struct ResolveView {
+    /// View identity used to reload the resolve list.
     spec: ViewSpec,
+    /// Conflicted-path rows loaded from the resolve template contract.
     entries: Vec<ResolveEntry>,
+    /// Current selected row within the resolve list.
     selection: Selection,
 }
 
@@ -93,6 +96,7 @@ impl ResolveView {
         }
     }
 
+    /// Loads resolve rows and initializes selection at the first row.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         Ok(Self {
             entries: load_resolve_entries(&spec)?,
@@ -101,15 +105,18 @@ impl ResolveView {
         })
     }
 
+    /// Renders the resolve list with the active selection and search highlights.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
     }
 
+    /// Returns the key bindings owned by the resolve view.
     pub fn bindings(&self) -> &'static [Binding] {
         BINDINGS
     }
 
+    /// Applies selection, search, copy, and file-inspection commands to the resolve list.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::MoveDown => {
@@ -178,32 +185,39 @@ impl ResolveView {
         }
     }
 
+    /// Reloads resolve rows while preserving the selected exact path when possible.
     pub fn refresh(&mut self) -> Result<()> {
         self.refresh_with_loader(load_resolve_entries)
     }
 
+    /// Clamps the current selection to the available rows.
     pub fn clamp(&mut self) {
         self.selection.clamp(self.entries.len());
     }
 
+    /// Returns the view spec that identifies this resolve surface.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Returns the number of selectable resolve rows.
     pub fn item_count(&self) -> usize {
         self.entries.len()
     }
 
+    /// Returns the total rendered line count across all resolve rows.
     pub fn line_count(&self) -> usize {
         self.entries.iter().map(entry_line_count).sum()
     }
 
+    /// Returns the exact conflicted path for the selected row, if available.
     pub fn selected_path(&self) -> Option<&str> {
         self.entries
             .get(self.selection.index())
             .and_then(ResolveEntry::path)
     }
 
+    /// Counts rows whose rendered text matches the current search query.
     fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
@@ -211,6 +225,7 @@ impl ResolveView {
             .count()
     }
 
+    /// Advances selection to the next matching row if one exists.
     fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
@@ -222,6 +237,7 @@ impl ResolveView {
         true
     }
 
+    /// Moves selection to the previous matching row if one exists.
     fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
@@ -234,6 +250,7 @@ impl ResolveView {
         true
     }
 
+    /// Returns copyable exact paths and rendered row text for the selected conflict.
     fn copy_options(&self) -> Vec<CopyOption> {
         let Some(entry) = self.entries.get(self.selection.index()) else {
             return Vec::new();
@@ -247,6 +264,7 @@ impl ResolveView {
         options
     }
 
+    /// Reloads rows and restores selection by exact path before falling back to index.
     fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<ResolveEntry>>,
@@ -266,6 +284,7 @@ impl ResolveView {
     }
 }
 
+/// Projects resolve rows into the selectable list widget.
 fn entry_list(entries: &[ResolveEntry], search: Option<&SearchQuery>) -> List<'static> {
     let items = entries
         .iter()
@@ -282,14 +301,17 @@ fn entry_list(entries: &[ResolveEntry], search: Option<&SearchQuery>) -> List<'s
     List::new(items).highlight_style(theme::active_row_style())
 }
 
+/// Returns the rendered lines for one resolve row.
 fn entry_lines(entry: &ResolveEntry) -> Vec<Line<'static>> {
     entry.lines()
 }
 
+/// Returns the rendered line count for one resolve row.
 fn entry_line_count(entry: &ResolveEntry) -> usize {
     entry_lines(entry).len()
 }
 
+/// Returns plain rendered row text for copy surfaces.
 fn entry_row_text(entry: &ResolveEntry) -> String {
     entry_lines(entry)
         .into_iter()
@@ -304,6 +326,7 @@ fn entry_row_text(entry: &ResolveEntry) -> String {
 }
 
 impl ResolveEntry {
+    /// Projects one resolve entry into visible lines for the list surface.
     fn lines(&self) -> Vec<Line<'static>> {
         if let Some(raw_line) = self.raw_line() {
             return vec![
@@ -323,6 +346,7 @@ impl ResolveEntry {
     }
 }
 
+/// Formats the conflict side count for the degraded second line of a parsed row.
 fn side_count_label(side_count: Option<usize>) -> String {
     match side_count {
         Some(1) => "1".to_owned(),

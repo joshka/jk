@@ -19,6 +19,10 @@ use super::App;
 use super::services::AppServices;
 
 impl App {
+    /// Build the initial app state from process arguments.
+    ///
+    /// Startup chooses the first `ViewSpec`, wires the production service seam, and records any
+    /// log argv that `switch_to_log` should later restore.
     pub(in crate::app) fn load(args: Vec<OsString>) -> Result<Self> {
         let initial_spec = initial_view(args)?;
         let startup_log_args =
@@ -42,6 +46,7 @@ impl App {
         })
     }
 
+    /// Open a detail surface only when the requested command has a valid detail `ViewSpec`.
     pub(in crate::app) fn push_detail(&mut self, command: JjCommand, revset: String) -> Result<()> {
         let Some(spec) = self.detail_spec(command, revset) else {
             return Ok(());
@@ -49,6 +54,10 @@ impl App {
         self.push_view(spec)
     }
 
+    /// Build the detail `ViewSpec` implied by the current surface and requested detail command.
+    ///
+    /// Exact-change provenance is preserved only when the source surface actually knows an exact
+    /// change target. Direct startup revsets such as `jk show main` intentionally stay inexact.
     pub(in crate::app) fn detail_spec(
         &self,
         command: JjCommand,
@@ -94,11 +103,13 @@ impl App {
         Some(spec)
     }
 
+    /// Report whether the current surface can vouch for an exact change-id detail target.
     fn view_has_exact_detail_target(&self) -> bool {
         matches!(self.view.command(), JjCommand::Default | JjCommand::Log)
             || self.view.spec().has_exact_change_target()
     }
 
+    /// Push the shipped status surface unless it is already active.
     pub(in crate::app) fn open_status(&mut self) -> Result<()> {
         if matches!(self.view.command(), JjCommand::Status) {
             return Ok(());
@@ -107,6 +118,7 @@ impl App {
         self.push_view(ViewSpec::new(JjCommand::Status, Vec::new()))
     }
 
+    /// Push the shipped resolve surface unless it is already active.
     pub(in crate::app) fn open_resolve(&mut self) -> Result<()> {
         if matches!(self.view.command(), JjCommand::Resolve) {
             return Ok(());
@@ -115,6 +127,7 @@ impl App {
         self.push_view(ViewSpec::resolve(None))
     }
 
+    /// Push the shipped operation-log surface unless it is already active.
     pub(in crate::app) fn open_operation_log(&mut self) -> Result<()> {
         if matches!(self.view.command(), JjCommand::OperationLog) {
             return Ok(());
@@ -123,6 +136,7 @@ impl App {
         self.push_view(ViewSpec::new(JjCommand::OperationLog, Vec::new()))
     }
 
+    /// Push the shipped bookmarks surface unless it is already active.
     pub(in crate::app) fn open_bookmarks(&mut self) -> Result<()> {
         if matches!(self.view.command(), JjCommand::Bookmarks) {
             return Ok(());
@@ -131,6 +145,7 @@ impl App {
         self.push_view(ViewSpec::new(JjCommand::Bookmarks, Vec::new()))
     }
 
+    /// Push the shipped workspaces surface unless it is already active.
     pub(in crate::app) fn open_workspaces(&mut self) -> Result<()> {
         if matches!(self.view.command(), JjCommand::Workspaces) {
             return Ok(());
@@ -139,8 +154,9 @@ impl App {
         self.push_view(ViewSpec::workspaces(Vec::new()))
     }
 
+    /// Push a newly loaded view and keep the previous view on the app-owned back stack.
     pub(in crate::app) fn push_view(&mut self, spec: ViewSpec) -> Result<()> {
-        let next = self.load_view_state(spec)?;
+        let next = self.services.load_view(spec)?;
         let previous = std::mem::replace(&mut self.view, next);
         self.stack.push(previous);
         self.status = StatusLine::ready(&self.view);
@@ -154,27 +170,35 @@ impl App {
         }
     }
 
+    /// Replace the current stack with the startup log view.
     pub(in crate::app) fn switch_to_log(&mut self) -> Result<()> {
         let args = self.startup_log_args.clone().unwrap_or_default();
         self.stack.clear();
-        self.view = self.load_view_state(ViewSpec::new(JjCommand::Log, args))?;
+        self.view = self
+            .services
+            .load_view(ViewSpec::new(JjCommand::Log, args))?;
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }
 
+    /// Replace the current stack with the default view.
     pub(in crate::app) fn switch_to_default(&mut self) -> Result<()> {
         self.stack.clear();
-        self.view = self.load_view_state(ViewSpec::new(JjCommand::Default, Vec::new()))?;
+        self.view = self
+            .services
+            .load_view(ViewSpec::new(JjCommand::Default, Vec::new()))?;
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }
 
+    /// Enter the custom-revset prompt only from the log-oriented home surfaces.
     pub(in crate::app) fn open_log_revset_prompt(&mut self) {
         if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
             self.mode = InteractionMode::LogRevsetPrompt(String::new());
         }
     }
 
+    /// Apply a user-provided log revset to the current log surface.
     pub(in crate::app) fn apply_custom_log_revset(&mut self, revset: String) {
         if revset.trim().is_empty() {
             self.status = StatusLine::ready(&self.view);
@@ -187,6 +211,7 @@ impl App {
         }
     }
 
+    /// Open the top-level view menu with the current surface preselected when possible.
     pub(in crate::app) fn open_view_menu(&mut self) {
         let selected = view_menu_options()
             .iter()
@@ -205,6 +230,7 @@ impl App {
         }
     }
 
+    /// Apply one top-level view-menu choice.
     pub(in crate::app) fn apply_view_menu_action(
         &mut self,
         action: ViewMenuAction,
@@ -238,6 +264,7 @@ impl App {
         }
     }
 
+    /// Apply the app-level show/diff format toggle and reload the current detail view if needed.
     fn apply_diff_format(&mut self, diff_format: DiffFormat, viewport_height: u16) -> Result<()> {
         self.diff_format = diff_format;
         if !matches!(self.view.command(), JjCommand::Show | JjCommand::Diff) {
@@ -250,13 +277,17 @@ impl App {
 
         let scroll_offset = self.view.scroll_offset();
         let spec = self.view.spec().with_diff_format(diff_format);
-        self.view = self.load_view_state(spec)?;
+        self.view = self.services.load_view(spec)?;
         self.view.set_scroll_offset(viewport_height, scroll_offset);
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }
 }
 
+/// Parse process arguments into the first `ViewSpec` the app should load.
+///
+/// Startup accepts only top-level shipped views here. Deeper drill-down views are reached from
+/// in-app navigation once the first surface is loaded.
 pub(in crate::app) fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
     let args = args
         .into_iter()

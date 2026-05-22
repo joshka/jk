@@ -13,47 +13,59 @@ use crate::jj::{command_label_from_argv, exact_string_pattern};
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjGitPushTarget {
+    /// Push one exact bookmark by name.
     Bookmark(String),
+    /// Push one exact revision revset.
     Revision(String),
+    /// Push the status/default target without an explicit bookmark or revision argument.
     Status,
 }
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjGitPush {
+    /// Push target policy selected by the caller.
     target: JjGitPushTarget,
+    /// Optional remote override; `None` uses jj's default remote resolution.
     remote: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjGitFetch {
+    /// Optional remote override; `None` uses jj's default remote resolution.
     remote: Option<String>,
 }
 
 impl JjGitFetch {
+    /// Builds a fetch plan that relies on jj's default remote resolution.
     pub fn default_remotes() -> Self {
         Self { remote: None }
     }
 
+    /// Builds a fetch plan for one explicitly selected remote.
     pub fn for_remote(remote: impl Into<String>) -> Self {
         Self {
             remote: Some(remote.into()),
         }
     }
 
+    /// Returns the selected remote override, if any.
     pub fn remote(&self) -> Option<&str> {
         self.remote.as_deref()
     }
 
+    /// Returns the exact remote pattern passed to jj when a remote override is present.
     pub fn exact_remote_pattern(&self) -> Option<String> {
         self.remote.as_deref().map(exact_string_pattern)
     }
 
+    /// Returns the user-facing `jj` command label for this fetch plan.
     pub fn command_label(&self) -> String {
         let command_argv = self.command_argv();
         command_label_from_argv(&command_argv)
     }
 
+    /// Returns argv for `jj git fetch`.
     pub fn command_argv(&self) -> Vec<String> {
         let mut argv = vec!["git".to_owned(), "fetch".to_owned()];
         if let Some(pattern) = self.exact_remote_pattern() {
@@ -63,6 +75,7 @@ impl JjGitFetch {
         argv
     }
 
+    /// Returns the preview summary shown before confirming `jj git fetch`.
     pub fn preview_summary(&self) -> String {
         match self.remote() {
             Some(remote) => {
@@ -86,10 +99,12 @@ impl JjGitFetch {
         }
     }
 
+    /// Returns preview text without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Runs `jj git fetch` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(self.command_argv(), &self.command_label(), "fetched")
     }
@@ -97,6 +112,7 @@ impl JjGitFetch {
 
 #[allow(dead_code)]
 impl JjGitPush {
+    /// Builds a push plan for one exact bookmark name.
     pub fn for_bookmark(name: String) -> Self {
         Self {
             target: JjGitPushTarget::Bookmark(name),
@@ -104,6 +120,7 @@ impl JjGitPush {
         }
     }
 
+    /// Builds a push plan for one revision revset.
     pub fn for_revision(revset: String) -> Self {
         Self {
             target: JjGitPushTarget::Revision(revset),
@@ -111,6 +128,7 @@ impl JjGitPush {
         }
     }
 
+    /// Builds a push plan that relies on jj's default status target.
     pub fn for_status() -> Self {
         Self {
             target: JjGitPushTarget::Status,
@@ -118,15 +136,18 @@ impl JjGitPush {
         }
     }
 
+    /// Adds an explicit remote override to the push plan.
     pub fn with_remote(mut self, remote: impl Into<String>) -> Self {
         self.remote = Some(remote.into());
         self
     }
 
+    /// Returns the selected remote override, if any.
     pub fn remote(&self) -> Option<&str> {
         self.remote.as_deref()
     }
 
+    /// Returns the user-facing `jj` command label for this push plan.
     pub fn command_label(&self, dry_run: bool) -> String {
         let label_args = self
             .command_argv(dry_run)
@@ -137,6 +158,7 @@ impl JjGitPush {
         format!("jj {label_args}")
     }
 
+    /// Returns argv for `jj git push`, optionally in dry-run mode.
     pub fn command_argv(&self, dry_run: bool) -> Vec<String> {
         let mut argv = vec!["git".to_owned(), "push".to_owned()];
 
@@ -163,6 +185,7 @@ impl JjGitPush {
         argv
     }
 
+    /// Runs the jj dry-run preview and returns its preserved output.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(true),
@@ -171,6 +194,7 @@ impl JjGitPush {
         )
     }
 
+    /// Runs `jj git push` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(false),

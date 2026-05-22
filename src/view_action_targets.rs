@@ -12,14 +12,17 @@ use crate::status::StatusFileAction;
 use crate::view_state::ViewState;
 
 pub(crate) struct ViewActionTargets<'a> {
+    /// Active view whose selection is being projected into action targets.
     view: &'a ViewState,
 }
 
 impl<'a> ViewActionTargets<'a> {
+    /// Builds the action-target projector for the current active view.
     pub(crate) fn new(view: &'a ViewState) -> Self {
         Self { view }
     }
 
+    /// Projects the active view into a push target or reports why the current selection is unsafe.
     pub(crate) fn push_target(&self) -> Result<Option<JjGitPushTarget>> {
         match self.view {
             ViewState::Log(view) => view
@@ -56,6 +59,7 @@ impl<'a> ViewActionTargets<'a> {
         }
     }
 
+    /// Projects the active view into a bookmark target or reports why the current selection is unsafe.
     pub(crate) fn bookmark_target(&self) -> Result<Option<JjBookmarkTarget>> {
         match self.view {
             ViewState::Log(view) => view
@@ -82,10 +86,12 @@ impl<'a> ViewActionTargets<'a> {
         }
     }
 
+    /// Returns the selected exact local bookmark name for delete-like actions.
     pub(crate) fn selected_local_bookmark_name(&self) -> Result<Option<&'a str>> {
         self.selected_local_bookmark_name_for("delete")
     }
 
+    /// Returns the selected exact local bookmark name for one named action or reports why it is unsafe.
     pub(crate) fn selected_local_bookmark_name_for(&self, action: &str) -> Result<Option<&'a str>> {
         match self.view {
             ViewState::Bookmarks(view) => view.selected_local_bookmark_name().map_or_else(
@@ -110,6 +116,7 @@ impl<'a> ViewActionTargets<'a> {
         }
     }
 
+    /// Projects the selected bookmarks row into a forget target or reports why it is unsafe.
     pub(crate) fn bookmark_forget_target(
         &self,
     ) -> Result<Option<(String, JjBookmarkForgetTarget)>> {
@@ -130,6 +137,7 @@ impl<'a> ViewActionTargets<'a> {
         }
     }
 
+    /// Projects the active detail, file, or status view into an exact restore/revert action context.
     pub(crate) fn exact_restore_revert_context(&self) -> Result<Option<ExactActionContext>> {
         match self.view {
             ViewState::Log(_) => Ok(None),
@@ -211,6 +219,7 @@ impl<'a> ViewActionTargets<'a> {
     }
 }
 
+/// Converts a status-file action into the exact action context used by shared file action menus.
 fn status_file_action_context(action: StatusFileAction) -> ExactActionContext {
     match action {
         StatusFileAction::Track { path } => ExactActionContext::status_untracked_path(path),

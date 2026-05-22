@@ -101,7 +101,9 @@ pub enum ViewCommand {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Binding {
+    /// Physical key pattern or sequence accepted by this binding.
     key: KeySequence,
+    /// Stable command identity routed by the app or active view.
     command: Command,
 }
 
@@ -200,7 +202,9 @@ impl Command {
 /// the key code and as a `SHIFT` modifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct KeyPattern {
+    /// Terminal key code that must match.
     code: KeyCode,
+    /// Terminal modifiers that must match, subject to shifted-character normalization.
     modifiers: KeyModifiers,
 }
 
@@ -367,7 +371,10 @@ pub enum BindingMatch {
     ///
     /// The fallback is not executed by this module. `App` owns the prefix timer
     /// and decides whether to keep collecting keys or apply the exact command.
-    Prefix { fallback: Option<Binding> },
+    Prefix {
+        /// Exact binding that may run if the app's prefix timeout expires.
+        fallback: Option<Binding>,
+    },
 }
 
 /// Snapshot of the live viewport and search state for one view dispatch.
@@ -400,16 +407,29 @@ impl CommandContext<'_> {
 /// Views do not mutate app-owned state directly or run `jj` mutation flows.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ViewEffect {
+    /// The view does not support the command in the current state.
     Ignored,
+    /// The view handled the command without further app work.
     Handled,
+    /// Normal status text that app dispatch should surface.
     StatusMessage(String),
+    /// Error status text that app dispatch should surface with error styling.
     StatusError(String),
+    /// Request that the app open a new child change at trunk.
     RunNewTrunk,
+    /// Request that the app open a detail view rooted at the selected target.
     OpenDetail(JjCommand, String),
+    /// Request that the app open an already constructed top-level view spec.
     OpenView(crate::jj::ViewSpec),
+    /// Search moved to the next or previous match.
     SearchMoved,
-    SearchStarted { matches: usize },
+    SearchStarted {
+        /// Number of matches found when search was first started.
+        matches: usize,
+    },
+    /// Copyable options for the app-owned copy menu.
     CopyOptions(Vec<CopyOption>),
+    /// Action menu for the currently selected row or path.
     OpenActionMenu(ActionMenu),
 }
 
@@ -472,6 +492,11 @@ pub fn help_binding_prefix_next_labels(
     })
 }
 
+/// Match pending keys against binding groups after applying an availability filter.
+///
+/// This is the core prefix-matching routine used by both normal dispatch and
+/// help-mode dispatch. It preserves binding-table order for exact matches while
+/// still surfacing a pending prefix whenever any longer sequence remains viable.
 fn match_binding_sequence_by(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],
@@ -511,6 +536,10 @@ fn match_binding_sequence_by(
     }
 }
 
+/// Return unique next-key labels for every binding that still matches the prefix.
+///
+/// This helper stays pure and ordered so app status text and help prefix hints
+/// can stay aligned without sharing mutable dispatch state.
 fn binding_prefix_next_labels_by(
     binding_groups: &[&[Binding]],
     keys: &[KeyEvent],

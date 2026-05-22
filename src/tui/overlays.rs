@@ -19,40 +19,58 @@ use crate::theme;
 /// only shared modal presentation here; feature-specific availability and command policy belong in
 /// the view, action menu, or action plan that produced the state.
 pub enum Overlay<'a> {
+    /// No modal overlay is active.
     None,
     Help {
+        /// Help sections already projected from the command vocabulary.
         sections: Vec<HelpSection>,
     },
     CopyMenu {
+        /// Copy options offered by the active view.
         options: &'a [CopyOption],
+        /// Highlighted option index.
         selected: usize,
     },
     ViewMenu {
+        /// Top-level view entries offered by the app.
         options: &'a [ViewMenuOption],
+        /// Highlighted option index.
         selected: usize,
     },
     ActionMenu {
+        /// Action rows offered for the current exact selection.
         menu: &'a ActionMenu,
+        /// Highlighted action row index.
         selected: usize,
     },
     PushRemotePrompt {
+        /// Remote names offered for push.
         remotes: &'a [String],
+        /// Highlighted remote index.
         selected: usize,
     },
     FetchRemotePrompt {
+        /// Remote names offered for fetch.
         remotes: &'a [String],
+        /// Highlighted remote index.
         selected: usize,
     },
     ActionPane {
+        /// Shared overlay title stem such as "Split" or "Fetch".
         title: &'static str,
+        /// Scrollable preview/result output owned by action state.
         output: &'a ActionPane,
     },
     AbandonConfirm {
+        /// User-typed exact revision confirmation text.
         input: &'a str,
+        /// Existing preview output shown above the confirmation footer.
         output: &'a ActionPane,
     },
     RolePrompt {
+        /// Immutable role prompt model for rewrite assignment.
         prompt: &'a RolePrompt,
+        /// Highlighted role row index.
         selected: usize,
     },
 }
@@ -120,12 +138,14 @@ pub fn render_overlay(frame: &mut Frame<'_>, _status: &StatusLine, overlay: Over
     }
 }
 
+/// Wrap help text in the shared overlay block and background styling.
 pub fn help_overlay(content: Text<'static>) -> Paragraph<'static> {
     Paragraph::new(content)
         .style(theme::overlay_background_style())
         .block(overlay_block("Command menu"))
 }
 
+/// Project help sections into the two-column text shown in the help overlay.
 pub fn help_overlay_text(sections: &[HelpSection]) -> Text<'static> {
     let split = sections.len().div_ceil(2);
     let mut left = menu_help_lines();
@@ -213,6 +233,7 @@ fn line_display_width(line: &Line<'_>) -> usize {
         .sum()
 }
 
+/// Build the copy-menu list for the current copyable options.
 fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
     let items = options
         .iter()
@@ -229,6 +250,7 @@ fn copy_menu(options: &[CopyOption], selected: usize) -> List<'static> {
     List::new(items).block(overlay_block("Copy"))
 }
 
+/// Build the top-level view-switching menu.
 fn view_menu(options: &[ViewMenuOption], selected: usize) -> List<'static> {
     let items = options
         .iter()
@@ -245,6 +267,7 @@ fn view_menu(options: &[ViewMenuOption], selected: usize) -> List<'static> {
     List::new(items).block(overlay_block("View"))
 }
 
+/// Build the action menu, surfacing preview policy in the title when needed.
 pub fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
     let items = menu
         .items()
@@ -276,6 +299,7 @@ pub fn action_menu(menu: &ActionMenu, selected: usize) -> List<'static> {
     List::new(items).block(overlay_block(title))
 }
 
+/// Build a remote-selection prompt for push or fetch.
 fn remote_prompt(title: &'static str, remotes: &[String], selected: usize) -> List<'static> {
     let items = remotes
         .iter()
@@ -293,6 +317,7 @@ fn remote_prompt(title: &'static str, remotes: &[String], selected: usize) -> Li
     List::new(items).block(overlay_block(title))
 }
 
+/// Choose the preview versus result title suffix for an action pane.
 fn action_pane_title(action: &str, output: &ActionPane) -> String {
     if output.completed() {
         format!("{action} result")
@@ -301,6 +326,7 @@ fn action_pane_title(action: &str, output: &ActionPane) -> String {
     }
 }
 
+/// Render the shared preview/result pane body plus footer into the given modal area.
 pub fn render_action_pane(frame: &mut Frame<'_>, area: Rect, title: &str, output: &ActionPane) {
     let block = overlay_block(title.to_owned());
     let inner = block.inner(area);
@@ -338,6 +364,7 @@ pub fn render_action_pane(frame: &mut Frame<'_>, area: Rect, title: &str, output
     }
 }
 
+/// Render the abandon confirmation overlay, reusing the action-pane body above a typed footer.
 pub fn render_abandon_confirm(
     frame: &mut Frame<'_>,
     area: Rect,
@@ -381,6 +408,7 @@ pub fn render_abandon_confirm(
     }
 }
 
+/// Build the footer for a preview/result pane based on whether the command has completed.
 fn action_pane_footer(completed: bool) -> Paragraph<'static> {
     let primary = if completed {
         line![key("Enter"), " close  "]
@@ -400,15 +428,18 @@ fn action_pane_footer(completed: bool) -> Paragraph<'static> {
     Paragraph::new(Line::from(spans)).style(theme::muted_style())
 }
 
+/// Build the footer that shows the typed abandon confirmation text and instructions.
 fn abandon_confirm_footer(input: &str) -> Paragraph<'static> {
     Paragraph::new(Line::from(abandon_confirm_footer_text(input))).style(theme::muted_style())
 }
 
+/// Choose a centered modal area sized for the current action pane body and footer.
 fn action_pane_area(area: Rect, title: &str, output: &ActionPane) -> Rect {
     let footer = action_pane_footer_text(output.completed());
     action_pane_area_with_footer(area, title, output, &footer)
 }
 
+/// Choose a centered modal area sized for the action pane body plus an explicit footer block.
 fn action_pane_area_with_footer(
     area: Rect,
     title: &str,
@@ -432,6 +463,7 @@ fn action_pane_area_with_footer(
     centered_area(area, width, height)
 }
 
+/// Return the shared footer instruction line for preview/result panes.
 fn action_pane_footer_text(completed: bool) -> String {
     if completed {
         "Enter close  Esc/q close  j/k scroll  PgUp/PgDn page  g/G ends".to_owned()
@@ -440,6 +472,7 @@ fn action_pane_footer_text(completed: bool) -> String {
     }
 }
 
+/// Return the footer instruction line for abandon confirmation.
 fn abandon_confirm_footer_text(input: &str) -> String {
     format!("type exact id: {input}  Enter confirm  Esc cancel  arrows/page scroll")
 }
@@ -448,6 +481,7 @@ fn line_width(line: &str) -> usize {
     line.chars().count()
 }
 
+/// Build the shared role-assignment prompt for rewrite previews.
 pub fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
     let mut items: Vec<ListItem<'static>> = prompt
         .options()
@@ -474,6 +508,7 @@ pub fn role_prompt(prompt: &RolePrompt, selected: usize) -> List<'static> {
     )))
 }
 
+/// Build the shared bordered block styling for modal overlays.
 fn overlay_block(title: impl Into<String>) -> Block<'static> {
     // All overlays share one fallback-friendly style contract: bordered, cleared, high-contrast
     // presentation with theme-owned colors. Variant-specific behavior and state stay upstream.
@@ -484,6 +519,7 @@ fn overlay_block(title: impl Into<String>) -> Block<'static> {
         .title(title.into())
 }
 
+/// Center a modal rectangle inside the available frame, clamping to the frame bounds.
 fn centered_area(area: Rect, width: u16, height: u16) -> Rect {
     // Modal geometry is clipped to the current terminal instead of assuming a minimum size. The
     // caller decides desired content dimensions; this helper only keeps the rectangle drawable.

@@ -10,21 +10,31 @@ use super::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier, short_
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct FileActionContext {
+    /// Selected path whose menu entries are being built.
     path: String,
+    /// Revision or working-copy scope that owns the selected path.
     scope: FileActionScope,
+    /// Whether the surface may offer restore for this path.
     restore_allowed: bool,
+    /// Whether the surface may offer tracking the selected path.
     track_allowed: bool,
+    /// Whether the surface may offer untracking the selected path.
     untrack_allowed: bool,
+    /// Whether the surface may offer chmod mutations for the selected path.
     chmod_allowed: bool,
 }
 
+/// Internal classification of where the selected path lives.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum FileActionScope {
+    /// Path comes from the working copy, so no exact revision is attached.
     WorkingCopy,
+    /// Path is rooted in one exact revision on a detail surface.
     ExactRevision(String),
 }
 
 impl FileActionContext {
+    /// Build a working-copy path context for an untracked status row.
     pub(super) fn working_copy_untracked(path: String) -> Self {
         Self {
             path,
@@ -36,6 +46,7 @@ impl FileActionContext {
         }
     }
 
+    /// Build a working-copy path context for a tracked status or file row.
     pub(super) fn working_copy_tracked(
         path: String,
         restore_allowed: bool,
@@ -51,6 +62,7 @@ impl FileActionContext {
         }
     }
 
+    /// Build an exact-revision path context for detail-surface file actions.
     pub(super) fn exact_revision_tracked(
         revision: String,
         path: String,
@@ -66,10 +78,12 @@ impl FileActionContext {
         }
     }
 
+    /// Return the selected path string.
     fn path(&self) -> &str {
         &self.path
     }
 
+    /// Return the owning exact revision, or `None` for working-copy paths.
     fn revision(&self) -> Option<&str> {
         match &self.scope {
             FileActionScope::WorkingCopy => None,
@@ -78,6 +92,7 @@ impl FileActionContext {
     }
 }
 
+/// Build the status-surface path menu, including restore when the status row allows it.
 pub(super) fn status_path_action_menu(file_action: &FileActionContext) -> ActionMenu {
     let mut items = Vec::new();
     if file_action.restore_allowed {
@@ -96,10 +111,12 @@ pub(super) fn status_path_action_menu(file_action: &FileActionContext) -> Action
     ActionMenu::new(items)
 }
 
+/// Build the non-status path menu for detail or file surfaces.
 pub(super) fn file_action_menu(file_action: &FileActionContext) -> ActionMenu {
     ActionMenu::new(file_action_menu_items(file_action))
 }
 
+/// Build the ordered path-specific mutation rows for the selected path context.
 pub(super) fn file_action_menu_items(file_action: &FileActionContext) -> Vec<ActionMenuItem> {
     let mut items = Vec::new();
     let path = file_action.path();
@@ -142,6 +159,7 @@ pub(super) fn file_action_menu_items(file_action: &FileActionContext) -> Vec<Act
     items
 }
 
+/// Build one chmod row for the selected path and revision scope.
 fn file_chmod_item(
     action: ActionKind,
     path: &str,

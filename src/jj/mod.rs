@@ -4,19 +4,29 @@
 //! contract. Shelling out keeps user config, templates, graph symbols, colors,
 //! and future jj formatting behavior aligned with the CLI instead of rebuilding
 //! a parallel view from repository data.
+//!
+//! The root module intentionally re-exports four kinds of boundary surface:
+//! command vocabulary (`JjCommand`, `LogViewMode`), `ViewSpec` state that
+//! shapes one CLI invocation, syntax helpers for quoting and labels, and
+//! process helpers that actually run `jj`.
 
 mod command;
 mod process;
 mod syntax;
 mod view_spec;
 
+/// `jj` command families and named log-mode presets used across app and view code.
 pub use command::{JjCommand, LogViewMode};
+/// Read-only helpers for direct repository queries that are not tied to one `ViewSpec`.
 pub use process::{git_remotes, new_trunk, resolve_exact_change_id};
+/// String-shaping helpers for revsets, filesets, and human-readable command labels.
 pub use syntax::{
     command_label_from_argv, exact_change_id_revset, exact_string_pattern, root_file_fileset,
 };
+/// Stateful description of one rendered `jj` surface.
 pub use view_spec::{DiffFormat, ViewSpec};
 
+/// Process-level helpers used by higher layers once they have already chosen a `ViewSpec` or argv.
 pub use process::{
     ColorMode, base_command, interactive_jj_command, load_workspace_root, run_direct_args,
     run_direct_args_stdout, run_jj, run_jj_template_lines, summarize_output,

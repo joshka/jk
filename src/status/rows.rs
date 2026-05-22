@@ -15,15 +15,19 @@ use super::actions::StatusFileAction;
 
 #[derive(Clone, Debug)]
 pub(in crate::status) struct StatusRow {
+    /// Rendered status line preserved for display, search, and copy.
     line: Line<'static>,
+    /// Exact-path action contract, disabled reason, or absence for this row.
     path: StatusPathContract,
 }
 
 impl StatusRow {
+    /// Build one rendered status row plus its selected-path contract.
     fn new(line: Line<'static>, path: StatusPathContract) -> Self {
         Self { line, path }
     }
 
+    /// Return the rendered line shown in the status view.
     pub(in crate::status) fn line(&self) -> &Line<'static> {
         &self.line
     }
@@ -50,6 +54,7 @@ impl StatusRow {
         }
     }
 
+    /// Return the file-action target for this row, or the disabled reason when unavailable.
     pub(in crate::status) fn file_action(&self) -> std::result::Result<StatusFileAction, String> {
         match &self.path {
             StatusPathContract::Action(action) => Ok(action.clone()),
@@ -60,22 +65,29 @@ impl StatusRow {
         }
     }
 
+    /// Return the rendered row text for selection-restore fallback.
     pub(in crate::status) fn row_text(&self) -> String {
         line_text(&self.line)
     }
 }
 
+/// Exact-path contract derived from one rendered status row.
 #[derive(Clone, Debug)]
 enum StatusPathContract {
+    /// Row safely identifies one file-action target.
     Action(StatusFileAction),
+    /// Row looks path-like but must fail closed with a specific reason.
     Disabled(&'static str),
+    /// Row does not represent a file path target.
     None,
 }
 
+/// Load rendered status rows and their file-action contracts for one `ViewSpec`.
 pub(in crate::status) fn load_status_rows(spec: &ViewSpec) -> Result<Vec<StatusRow>> {
     Ok(status_rows_from_document(load_document(spec)?))
 }
 
+/// Convert a rendered document into feature-owned status rows.
 fn status_rows_from_document(document: DocumentLines) -> Vec<StatusRow> {
     document
         .lines()
@@ -85,12 +97,14 @@ fn status_rows_from_document(document: DocumentLines) -> Vec<StatusRow> {
         .collect()
 }
 
+/// Parse one rendered line into a status row plus file-action contract.
 pub(in crate::status) fn parse_status_row(line: Line<'static>) -> StatusRow {
     let text = line_text(&line);
     let path = parse_status_path_contract(&text);
     StatusRow::new(line, path)
 }
 
+/// Classify one rendered status line as an actionable path, disabled path, or non-path row.
 fn parse_status_path_contract(text: &str) -> StatusPathContract {
     let Some(separator_index) = text.find(char::is_whitespace) else {
         return StatusPathContract::None;
@@ -153,10 +167,12 @@ fn parse_status_path_contract(text: &str) -> StatusPathContract {
     }
 }
 
+/// Return whether a character may appear in the short `jj status` kind prefix.
 fn is_status_code(character: char) -> bool {
     character.is_ascii_alphabetic() || matches!(character, '?' | '!')
 }
 
+/// Validate that a rendered path is an exact, clean repo-relative path target.
 fn validate_repo_relative_path(path: &str) -> std::result::Result<(), &'static str> {
     if path.trim() != path {
         return Err(
@@ -185,6 +201,7 @@ fn validate_repo_relative_path(path: &str) -> std::result::Result<(), &'static s
     Ok(())
 }
 
+/// Flatten a rendered line into plain text for parsing and selection restore.
 fn line_text(line: &Line<'_>) -> String {
     line.spans
         .iter()

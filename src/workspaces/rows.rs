@@ -23,14 +23,20 @@ pub(crate) const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
 /// Read-only workspace/root context loaded from separate `jj` commands.
 #[derive(Clone, Debug, Default)]
 pub struct WorkspaceContext {
+    /// Current repository root reported by `jj root`, when available.
     root: Option<String>,
+    /// Error text from loading the current root, if `jj root` failed.
     root_error: Option<String>,
+    /// Rendered workspace rows paired with trusted metadata when available.
     entries: Vec<WorkspaceItem>,
+    /// Error text from `jj workspace list`, if the rendered list failed to load.
     list_error: Option<String>,
+    /// Warning or error text from workspace metadata pairing or parsing.
     metadata_error: Option<String>,
 }
 
 impl WorkspaceContext {
+    /// Builds the full read-only workspace/root context from its loaded parts.
     pub fn new(
         root: Option<String>,
         root_error: Option<String>,
@@ -47,22 +53,27 @@ impl WorkspaceContext {
         }
     }
 
+    /// Returns the current repository root, if `jj root` succeeded.
     pub fn root(&self) -> Option<&str> {
         self.root.as_deref()
     }
 
+    /// Returns the `jj root` error message, if root loading failed.
     pub fn root_error(&self) -> Option<&str> {
         self.root_error.as_deref()
     }
 
+    /// Returns the rendered workspace rows for the current context.
     pub fn entries(&self) -> &[WorkspaceItem] {
         &self.entries
     }
 
+    /// Returns the rendered workspace-list error, if the list failed to load.
     pub fn list_error(&self) -> Option<&str> {
         self.list_error.as_deref()
     }
 
+    /// Returns the metadata parse or pairing warning, if metadata degraded.
     pub fn metadata_error(&self) -> Option<&str> {
         self.metadata_error.as_deref()
     }
@@ -71,13 +82,18 @@ impl WorkspaceContext {
 /// One selectable row from rendered `jj workspace list` output.
 #[derive(Clone, Debug)]
 pub struct WorkspaceItem {
+    /// Preserved rendered lines for one workspace row.
     lines: Vec<Line<'static>>,
+    /// Exact workspace name when metadata still proves it.
     name: Option<String>,
+    /// Exact target change id when metadata still proves it.
     target_change_id: Option<String>,
+    /// Exact target commit id when metadata still proves it.
     target_commit_id: Option<String>,
 }
 
 impl WorkspaceItem {
+    /// Builds one rendered workspace row and its trusted metadata fields.
     pub fn new(
         lines: Vec<Line<'static>>,
         name: Option<String>,
@@ -92,26 +108,32 @@ impl WorkspaceItem {
         }
     }
 
+    /// Returns the preserved rendered lines for this workspace row.
     pub fn lines(&self) -> Vec<Line<'static>> {
         self.lines.clone()
     }
 
+    /// Returns the number of rendered lines in this workspace row.
     pub fn line_count(&self) -> usize {
         self.lines.len()
     }
 
+    /// Returns the exact workspace name when metadata still proves it.
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
+    /// Returns the exact target change id when metadata still proves it.
     pub fn target_change_id(&self) -> Option<&str> {
         self.target_change_id.as_deref()
     }
 
+    /// Returns the exact target commit id when metadata still proves it.
     pub fn target_commit_id(&self) -> Option<&str> {
         self.target_commit_id.as_deref()
     }
 
+    /// Returns plain rendered row text for copy and search surfaces.
     pub fn row_text(&self) -> String {
         self.lines
             .iter()
@@ -121,6 +143,7 @@ impl WorkspaceItem {
     }
 }
 
+/// Loads the current root, rendered workspace rows, and metadata side channel together.
 pub fn load_workspace_context(spec: &ViewSpec) -> Result<WorkspaceContext> {
     let (root, root_error) = match crate::jj::load_workspace_root() {
         Ok(root) => (Some(root), None),
@@ -150,6 +173,7 @@ pub fn load_workspace_context(spec: &ViewSpec) -> Result<WorkspaceContext> {
     ))
 }
 
+/// Loads workspace metadata rows through the workspace-specific template side channel.
 fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMetadata>> {
     parse_workspace_metadata_lines(run_jj_template_lines(
         spec,
@@ -158,6 +182,7 @@ fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMetadata>> {
     )?)
 }
 
+/// Pairs rendered workspace rows with metadata and degrades safely when parsing drifts.
 fn pair_workspace_lines(
     lines: Vec<Line<'static>>,
     metadata: Result<Vec<WorkspaceMetadata>, String>,
@@ -205,11 +230,15 @@ fn pair_workspace_lines(
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct WorkspaceMetadata {
+    /// Exact workspace name from metadata.
     name: String,
+    /// Exact target change id when present.
     target_change_id: Option<String>,
+    /// Exact target commit id when present.
     target_commit_id: Option<String>,
 }
 
+/// Parses metadata lines and reports the first malformed row as an error.
 fn parse_workspace_metadata_lines(lines: Vec<String>) -> Result<Vec<WorkspaceMetadata>> {
     let mut metadata = Vec::new();
     for line in lines {
@@ -226,6 +255,7 @@ fn parse_workspace_metadata_lines(lines: Vec<String>) -> Result<Vec<WorkspaceMet
     Ok(metadata)
 }
 
+/// Parses one metadata line only when it matches the exact workspace schema.
 fn parse_workspace_metadata_line(line: &str) -> Option<WorkspaceMetadata> {
     let Value::Object(fields) = serde_json::from_str::<Value>(line).ok()? else {
         return None;

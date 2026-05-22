@@ -9,22 +9,27 @@ use ratatui::text::{Line, Span};
 /// Lines emitted by `jj`, with their terminal styling preserved.
 #[derive(Clone, Debug)]
 pub struct DocumentLines {
+    /// Rendered lines loaded from `jj`, preserving styles and wording.
     lines: Vec<Line<'static>>,
 }
 
 impl DocumentLines {
+    /// Build a rendered document from already-styled `jj` lines.
     pub fn new(lines: Vec<Line<'static>>) -> Self {
         Self { lines }
     }
 
+    /// Return the rendered lines as loaded from `jj`.
     pub fn lines(&self) -> &[Line<'static>] {
         &self.lines
     }
 
+    /// Return the total number of rendered lines.
     pub fn line_count(&self) -> usize {
         self.lines.len()
     }
 
+    /// Detect file anchors from rendered lines using lightweight heading recognition.
     pub fn file_anchors(&self) -> Vec<FileAnchor> {
         self.lines
             .iter()
@@ -33,6 +38,7 @@ impl DocumentLines {
             .collect()
     }
 
+    /// Return whether the indexed rendered line is blank after trimming.
     pub fn line_is_blank(&self, line_index: usize) -> bool {
         self.lines
             .get(line_index)
@@ -46,20 +52,26 @@ impl DocumentLines {
 /// file name used for copy actions and file navigation state.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileAnchor {
+    /// Line index where the file heading appears in the rendered document.
     line_index: usize,
+    /// Styled heading text reused by sticky headers.
     heading: Line<'static>,
+    /// Plain file label used for navigation and copy surfaces.
     label: String,
 }
 
 impl FileAnchor {
+    /// Return the rendered line index of this file heading.
     pub fn line_index(&self) -> usize {
         self.line_index
     }
 
+    /// Return the styled heading reused in sticky headers.
     pub fn heading(&self) -> Line<'static> {
         self.heading.clone()
     }
 
+    /// Return the plain file label for navigation and copy flows.
     pub fn label(&self) -> &str {
         &self.label
     }
@@ -71,29 +83,37 @@ impl FileAnchor {
 /// so colors and wording stay aligned with user config and jj defaults.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PinnedDocument {
+    /// Fixed sticky lines shown above the scrollable body.
     fixed_lines: Vec<Line<'static>>,
+    /// Scrollable body lines beneath the sticky header.
     body_lines: Vec<Line<'static>>,
+    /// Scroll offset into the scrollable body after removing pinned lines.
     body_scroll_offset: usize,
 }
 
 impl PinnedDocument {
+    /// Return the sticky fixed lines shown above the body.
     pub fn fixed_lines(&self) -> &[Line<'static>] {
         &self.fixed_lines
     }
 
+    /// Return the scrollable body lines beneath the sticky header.
     pub fn body_lines(&self) -> &[Line<'static>] {
         &self.body_lines
     }
 
+    /// Return the body-local scroll offset after sticky projection.
     pub fn body_scroll_offset(&self) -> usize {
         self.body_scroll_offset
     }
 
+    /// Return the height consumed by the sticky header in terminal rows.
     pub fn sticky_height(&self) -> u16 {
         self.fixed_lines.len().min(u16::MAX as usize) as u16
     }
 }
 
+/// Project a rendered document into sticky fixed lines plus a scrollable active-file body.
 pub fn project_with_active_file(
     document: &DocumentLines,
     anchors: &[FileAnchor],
@@ -121,6 +141,7 @@ pub fn project_with_active_file(
     }
 }
 
+/// Build sticky fixed lines from an optional prefix and the active file heading.
 fn fixed_lines(
     prefix: impl IntoIterator<Item = Line<'static>>,
     anchor: &FileAnchor,
@@ -133,6 +154,7 @@ fn fixed_lines(
     lines
 }
 
+/// Return the last file anchor at or above the current scroll offset.
 pub fn active_file(anchors: &[FileAnchor], scroll_offset: usize) -> Option<&FileAnchor> {
     anchors
         .iter()
@@ -140,6 +162,7 @@ pub fn active_file(anchors: &[FileAnchor], scroll_offset: usize) -> Option<&File
         .last()
 }
 
+/// Activate the first file after a separating blank line to avoid dead scroll presses.
 fn file_after_separator<'a>(
     document: &DocumentLines,
     anchors: &'a [FileAnchor],
@@ -157,6 +180,7 @@ fn file_after_separator<'a>(
     })
 }
 
+/// Return all lines after the active file heading as the scrollable body.
 fn lines_from_active_file(
     document: &DocumentLines,
     file_heading_index: usize,

@@ -23,7 +23,9 @@ pub fn document_plain_text(lines: &[Line<'static>]) -> String {
 /// means the caller should discard the metadata instead of guessing alignment.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum RowMetadata<T> {
+    /// Metadata rows still match the rendered row count and may be paired safely.
     Valid(Vec<T>),
+    /// Metadata drifted from the rendered rows and must be ignored by the caller.
     Drifted,
 }
 
@@ -38,6 +40,9 @@ impl<T> RowMetadata<T> {
 }
 
 /// Extract a required string field from feature-owned metadata templates.
+///
+/// Callers own field names and schema meaning; this helper only reads one
+/// string-valued field without inventing fallbacks.
 pub(crate) fn string_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<String> {
     fields.get(name).and_then(Value::as_str).map(str::to_owned)
 }
@@ -64,6 +69,9 @@ pub(crate) fn optional_string_field(
 }
 
 /// Extract a required boolean field from feature-owned metadata templates.
+///
+/// Callers own the policy for missing or malformed fields; this helper only
+/// reports whether the JSON value was a boolean.
 pub(crate) fn boolean_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<bool> {
     fields.get(name).and_then(Value::as_bool)
 }
@@ -78,6 +86,9 @@ pub(crate) fn is_standalone_graph_line(line: &Line<'_>) -> bool {
 }
 
 /// Return the first non-graph character in a rendered line.
+///
+/// Shared row parsers use this to distinguish graph-only prefixes from the
+/// first content glyph without committing to feature-specific row formats.
 pub(crate) fn first_content_char(text: &str) -> Option<char> {
     text.chars()
         .find(|character| !matches!(character, ' ' | '│' | '├' | '─' | '╯' | '╰' | '╭' | '╮'))

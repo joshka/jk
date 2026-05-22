@@ -66,8 +66,11 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Selectable file list output from `jj file list`.
 pub struct FileListView {
+    /// View specification used to reload the current file list.
     spec: ViewSpec,
+    /// Rendered file rows plus exact path identity.
     entries: Vec<FileListItem>,
+    /// Current selected file entry.
     selection: Selection,
 }
 
@@ -104,15 +107,18 @@ impl FileListView {
         Ok(view)
     }
 
+    /// Render the current file list with active-row styling and optional search highlighting.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
     }
 
+    /// Return the file-list-specific binding table.
     pub fn bindings(&self) -> &'static [Binding] {
         BINDINGS
     }
 
+    /// Execute one view-local command against the file list.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::MoveDown => {
@@ -174,32 +180,39 @@ impl FileListView {
         }
     }
 
+    /// Reload the file list while preserving the selected path when possible.
     pub fn refresh(&mut self) -> Result<()> {
         self.refresh_with_loader(load_file_list_entries)
     }
 
+    /// Clamp the current selection to the current entry count.
     pub fn clamp(&mut self) {
         self.selection.clamp(self.entries.len());
     }
 
+    /// Return the `ViewSpec` that owns this file list.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Return the number of selectable file entries.
     pub fn item_count(&self) -> usize {
         self.entries.len()
     }
 
+    /// Return the total rendered line count across all file entries.
     pub fn line_count(&self) -> usize {
         self.entries.iter().map(FileListItem::line_count).sum()
     }
 
+    /// Return the exact path of the currently selected entry, if any.
     pub fn selected_path(&self) -> Option<&str> {
         self.entries
             .get(self.selection.index())
             .map(FileListItem::path)
     }
 
+    /// Count search matches across rendered file-list entries.
     fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
@@ -207,6 +220,7 @@ impl FileListView {
             .count()
     }
 
+    /// Move to the next matching file entry, wrapping once without reselecting the current row.
     fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
@@ -218,6 +232,7 @@ impl FileListView {
         true
     }
 
+    /// Move to the previous matching file entry, wrapping once without reselecting the current row.
     fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
@@ -230,12 +245,14 @@ impl FileListView {
         true
     }
 
+    /// Return copy options for the currently selected exact file path.
     fn copy_options(&self) -> Vec<CopyOption> {
         self.selected_path()
             .map(|path| vec![CopyOption::new("file path", path)])
             .unwrap_or_default()
     }
 
+    /// Reload entries with a caller-supplied loader while restoring selection by exact path first.
     fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<FileListItem>>,
@@ -255,6 +272,7 @@ impl FileListView {
     }
 }
 
+/// Build the rendered file-entry list with active-row styling and search highlighting.
 fn entry_list(entries: &[FileListItem], search: Option<&SearchQuery>) -> List<'static> {
     let items = entries
         .iter()

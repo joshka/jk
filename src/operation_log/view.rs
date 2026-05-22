@@ -73,12 +73,16 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Selectable rendered operation-log output.
 pub struct OperationLogView {
+    /// View identity used to reload the operation log.
     pub(super) spec: ViewSpec,
+    /// Rendered operation-log items paired with exact operation ids when metadata matches.
     pub(super) entries: Vec<OperationLogItem>,
+    /// Current selected row within the operation-log item list.
     pub(super) selection: Selection,
 }
 
 impl OperationLogView {
+    /// Loads rendered operation-log rows and initializes selection at the first row.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         Ok(Self {
             entries: load_operation_log_entries(&spec)?,
@@ -96,15 +100,18 @@ impl OperationLogView {
         }
     }
 
+    /// Renders the operation-log list with the active selection and search highlights.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
     }
 
+    /// Returns the key bindings owned by the operation-log view.
     pub fn bindings(&self) -> &'static [Binding] {
         super::BINDINGS
     }
 
+    /// Applies selection, navigation, search, copy, and recovery-menu commands.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::MoveDown => {
@@ -185,26 +192,32 @@ impl OperationLogView {
         }
     }
 
+    /// Reloads rendered rows while preserving the selected exact operation id when possible.
     pub fn refresh(&mut self) -> Result<()> {
         self.refresh_with_loader(load_operation_log_entries)
     }
 
+    /// Clamps the current selection to the available rows.
     pub fn clamp(&mut self) {
         self.selection.clamp(self.entries.len());
     }
 
+    /// Returns the view spec that identifies this operation-log surface.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Returns the number of selectable operation-log rows.
     pub fn item_count(&self) -> usize {
         self.entries.len()
     }
 
+    /// Returns the total rendered line count across all operation-log rows.
     pub fn line_count(&self) -> usize {
         self.entries.iter().map(OperationLogItem::line_count).sum()
     }
 
+    /// Counts rows whose rendered text matches the current search query.
     pub(super) fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
@@ -212,6 +225,7 @@ impl OperationLogView {
             .count()
     }
 
+    /// Advances selection to the next matching row if one exists.
     pub(super) fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
@@ -223,6 +237,7 @@ impl OperationLogView {
         true
     }
 
+    /// Moves selection to the previous matching row if one exists.
     pub(super) fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
@@ -235,6 +250,7 @@ impl OperationLogView {
         true
     }
 
+    /// Returns copyable identifiers and the selected rendered row text.
     pub(super) fn copy_options(&self) -> Vec<CopyOption> {
         let Some(entry) = self.entries.get(self.selection.index()) else {
             return Vec::new();
@@ -248,6 +264,7 @@ impl OperationLogView {
         options
     }
 
+    /// Returns the exact operation id for the selected row, if metadata is present.
     fn selected_operation_id(&self) -> Option<String> {
         self.entries
             .get(self.selection.index())
@@ -255,6 +272,7 @@ impl OperationLogView {
             .map(str::to_owned)
     }
 
+    /// Reloads rows and restores selection by exact operation id before falling back to index.
     pub(super) fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<OperationLogItem>>,
@@ -277,6 +295,7 @@ impl OperationLogView {
     }
 }
 
+/// Builds the recovery-action menu for one exact selected operation id.
 fn operation_action_menu(operation_id: String) -> ActionMenu {
     let short_operation_id = short_id(&operation_id).to_owned();
     ActionMenu::new(vec![
@@ -297,6 +316,7 @@ fn operation_action_menu(operation_id: String) -> ActionMenu {
     ])
 }
 
+/// Projects rendered operation-log items into the selectable list widget.
 fn entry_list(entries: &[OperationLogItem], search: Option<&SearchQuery>) -> List<'static> {
     let items = entries
         .iter()
@@ -313,6 +333,7 @@ fn entry_list(entries: &[OperationLogItem], search: Option<&SearchQuery>) -> Lis
     List::new(items).highlight_style(theme::active_row_style())
 }
 
+/// Truncates a full operation id for compact action-menu labels.
 fn short_id(id: &str) -> &str {
     id.get(..8).unwrap_or(id)
 }

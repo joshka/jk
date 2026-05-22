@@ -1,7 +1,9 @@
 //! Preview opening and immediate action execution for app-owned action flows.
 //!
 //! This module builds the preview/result panes before a command is confirmed. It owns preview
-//! status context wording, while `actions` remains the owner of argv construction.
+//! status context wording, while `actions` remains the owner of argv construction. When a preview
+//! or immediate action needs jj/view side effects, it calls `AppServices` directly and leaves
+//! current-view coupling to the small `App` wrappers in `services.rs`.
 
 use color_eyre::Result;
 
@@ -24,6 +26,7 @@ use super::shared::{
 };
 
 impl App {
+    /// Open the fetch preview for one chosen remote.
     pub(in crate::app) fn open_fetch_preview(&mut self, remote: String) {
         let fetch = JjGitFetch::for_remote(remote);
         let status_context = Some(fetch_status_context(&fetch));
@@ -38,11 +41,12 @@ impl App {
         self.mode = InteractionMode::FetchPreview { fetch, output };
     }
 
+    /// Run default fetch immediately and keep its output on the shared fetch-preview surface.
     pub(in crate::app) fn fetch(&mut self, viewport_height: u16) {
         let fetch = JjGitFetch::default_remotes();
         let command_label = fetch.command_label();
         let status_context = Some(fetch_status_context(&fetch));
-        let result_message = match self.run_git_fetch(&fetch) {
+        let result_message = match self.services.run_git_fetch(&fetch) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
                     self.view.clamp(viewport_height, current_viewport_width());
@@ -71,6 +75,7 @@ impl App {
         };
     }
 
+    /// Open the push preview for one chosen target/remote pair.
     pub(in crate::app) fn open_push_preview(&mut self, target: JjGitPushTarget, remote: String) {
         let status_context = Some(push_status_context(&target, remote.as_str()));
         let push = match target {
@@ -82,13 +87,14 @@ impl App {
         let command_label = push.command_label(true);
         let output = self.preview_output_with_error_status(
             command_label,
-            self.load_push_preview(&push),
+            self.services.load_push_preview(&push),
             std::convert::identity,
             status_context,
         );
         self.mode = InteractionMode::PushPreview { push, output };
     }
 
+    /// Open the global undo/redo preview that does not depend on a selected operation id.
     pub(in crate::app) fn open_operation_recovery_preview(
         &mut self,
         kind: JjOperationRecoveryKind,
@@ -109,6 +115,7 @@ impl App {
         };
     }
 
+    /// Open the restore/revert preview for one exact operation id.
     pub(in crate::app) fn open_operation_target_preview(&mut self, target: JjOperationTarget) {
         let status_context = Some(format!(
             "operation {} exact id {} from {}",
@@ -127,6 +134,7 @@ impl App {
         self.mode = InteractionMode::OperationTargetPreview { target, output };
     }
 
+    /// Translate a log-local edit/next/prev command into a working-copy navigation preview.
     pub(in crate::app) fn open_log_working_copy_navigation_preview(
         &mut self,
         kind: JjWorkingCopyNavigationKind,
@@ -149,6 +157,7 @@ impl App {
         self.open_working_copy_navigation_preview(navigation);
     }
 
+    /// Open the preview for one working-copy navigation plan.
     pub(in crate::app) fn open_working_copy_navigation_preview(
         &mut self,
         navigation: JjWorkingCopyNavigationPlan,
@@ -181,6 +190,7 @@ impl App {
         self.mode = InteractionMode::WorkingCopyNavigationPreview { navigation, output };
     }
 
+    /// Open the describe preview for one prepared describe plan.
     pub(in crate::app) fn open_describe_preview(&mut self, describe: JjDescribePlan) {
         let status_context = Some(format!(
             "describe {} from {}",
@@ -198,6 +208,7 @@ impl App {
         self.mode = InteractionMode::DescribePreview { describe, output };
     }
 
+    /// Open the commit preview for the current working-copy commit plan.
     pub(in crate::app) fn open_commit_preview(&mut self, commit: JjCommitPlan) {
         let status_context = Some(format!(
             "commit current working-copy change (@) from {}",
@@ -214,6 +225,7 @@ impl App {
         self.mode = InteractionMode::CommitPreview { commit, output };
     }
 
+    /// Open the bookmark mutation preview for one prepared bookmark plan.
     pub(in crate::app) fn open_bookmark_mutation_preview(
         &mut self,
         mutation: JjBookmarkMutationPlan,
@@ -233,6 +245,7 @@ impl App {
         self.mode = InteractionMode::BookmarkMutationPreview { mutation, output };
     }
 
+    /// Open the file mutation preview for one prepared file plan.
     pub(in crate::app) fn open_file_mutation_preview(&mut self, mutation: JjFileMutationPlan) {
         let target = mutation
             .revision()
@@ -255,6 +268,7 @@ impl App {
         self.mode = InteractionMode::FileMutationPreview { mutation, output };
     }
 
+    /// Open the new-change preview for one prepared parent list.
     pub(in crate::app) fn open_new_preview(&mut self, new_change: JjNewPlan) {
         let parent_labels = new_change
             .parents()
@@ -279,6 +293,7 @@ impl App {
         self.mode = InteractionMode::NewPreview { new_change, output };
     }
 
+    /// Open the duplicate preview for one exact source revision.
     pub(in crate::app) fn open_duplicate_preview(&mut self, duplicate: JjDuplicatePlan) {
         let status_context = Some(format!(
             "duplicate exact source {} from {}",
@@ -296,15 +311,16 @@ impl App {
         self.mode = InteractionMode::DuplicatePreview { duplicate, output };
     }
 
+    /// Run `jj new` from trunk and update the active app view to reveal the new working copy.
     pub(in crate::app) fn run_new_trunk(&mut self, viewport_height: u16) {
-        if let Err(error) = self.resolve_revision("trunk()") {
+        if let Err(error) = self.services.resolve_revision("trunk()") {
             self.status = StatusLine::error(&self.view, error.to_string());
             return;
         }
 
         match self.services.run_new_trunk() {
             Ok(_) => {
-                let new_change_id = match self.resolve_revision("@") {
+                let new_change_id = match self.services.resolve_revision("@") {
                     Ok(change_id) => change_id,
                     Err(error) => {
                         self.status = StatusLine::error(&self.view, error.to_string());
@@ -317,6 +333,7 @@ impl App {
         }
     }
 
+    /// Refresh and reveal the new trunk child in the current log-oriented view.
     fn finish_new_trunk_success(&mut self, new_change_id: &str, viewport_height: u16) {
         match self.refresh_view_state() {
             Ok(()) => {
@@ -343,6 +360,7 @@ impl App {
         }
     }
 
+    /// Open the rebase preview for one prepared multi-source rewrite plan.
     pub(in crate::app) fn open_rebase_preview(&mut self, rebase: JjRebasePlan) {
         let status_context = Some(format!(
             "rebase from {} source(s) into {} from {}",
@@ -362,6 +380,7 @@ impl App {
         self.mode = InteractionMode::RebasePreview { rebase, output };
     }
 
+    /// Open the split preview for one exact or working-copy split plan.
     pub(in crate::app) fn open_split_preview(&mut self, split: JjSplitPlan) {
         let status_context = Some(format!(
             "{} from {}",
@@ -379,6 +398,7 @@ impl App {
         self.mode = InteractionMode::SplitPreview { split, output };
     }
 
+    /// Open the restore preview for one revision or path restore plan.
     pub(in crate::app) fn open_restore_preview(&mut self, restore: JjRestorePlan) {
         let target = restore
             .path()
@@ -392,13 +412,14 @@ impl App {
         let command_label = restore.command_label();
         let output = self.preview_output_with_error_status(
             command_label,
-            self.load_restore_preview(&restore),
+            self.services.load_restore_preview(&restore),
             std::convert::identity,
             status_context,
         );
         self.mode = InteractionMode::RestorePreview { restore, output };
     }
 
+    /// Open the revert preview for one exact revision revert plan.
     pub(in crate::app) fn open_revert_preview(&mut self, revert: JjRevertPlan) {
         let status_context = Some(format!(
             "revert revision {} into @ from {}",
@@ -409,13 +430,14 @@ impl App {
         let command_label = revert.command_label();
         let output = self.preview_output_with_error_status(
             command_label,
-            self.load_revert_preview(&revert),
+            self.services.load_revert_preview(&revert),
             std::convert::identity,
             status_context,
         );
         self.mode = InteractionMode::RevertPreview { revert, output };
     }
 
+    /// Open the squash preview for one prepared multi-source squash plan.
     pub(in crate::app) fn open_squash_preview(&mut self, squash: JjSquashPlan) {
         let status_context = Some(format!(
             "squash from {} source(s) into {} from {}",
@@ -435,6 +457,7 @@ impl App {
         self.mode = InteractionMode::SquashPreview { squash, output };
     }
 
+    /// Open the absorb preview for one prepared absorb plan, or reject empty destinations.
     pub(in crate::app) fn open_absorb_preview(&mut self, absorb: JjAbsorbPlan) {
         if absorb.destinations().is_empty() {
             self.status = StatusLine::error(
@@ -468,6 +491,7 @@ impl App {
         self.mode = InteractionMode::AbsorbPreview { absorb, output };
     }
 
+    /// Open the abandon preview and preserve any preview-load failure on the same pane surface.
     pub(in crate::app) fn open_abandon_preview(&mut self, abandon: JjAbandonPlan) {
         let status_context = Some(format!(
             "abandon exact revision {} from {}",
@@ -475,7 +499,7 @@ impl App {
             self.view.spec().app_label()
         ));
 
-        match self.load_abandon_preview(&abandon) {
+        match self.services.load_abandon_preview(&abandon) {
             Ok(preview) => {
                 let command_label = abandon.command_label();
                 self.mode = InteractionMode::AbandonPreview {
@@ -520,6 +544,7 @@ impl App {
     }
 }
 
+/// Append abbreviated rewrite sources to a status context when any exist.
 fn with_rewrite_source_context(
     status_context: Option<String>,
     sources: &[String],

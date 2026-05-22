@@ -15,8 +15,11 @@ use super::status_hints::status_hint_spans;
 /// instead of leaking frame geometry into feature views.
 #[derive(Clone, Copy, Debug)]
 pub struct Areas {
+    /// One-row title bar shown above the active view.
     pub title: Rect,
+    /// Main content area reserved for the active view renderer.
     pub main: Rect,
+    /// One-row status bar shown below the active view.
     pub status: Rect,
 }
 
@@ -45,10 +48,12 @@ fn title_bar(status: &StatusLine) -> Paragraph<'_> {
     ])
 }
 
+/// Wrap the status-line projection in a paragraph for the bottom chrome row.
 fn status_line(status: &StatusLine, width: u16) -> Paragraph<'_> {
     Paragraph::new(status_line_text(status, width))
 }
 
+/// Build the status-row text, appending hints only when they fit after the primary message.
 fn status_line_text(status: &StatusLine, width: u16) -> Line<'_> {
     let mut spans = line![span!(
         status_style(status);
@@ -73,10 +78,12 @@ fn status_line_text(status: &StatusLine, width: u16) -> Line<'_> {
     Line::from(spans)
 }
 
+/// Count display width in monospace terminal cells for narrow status-line fitting.
 fn line_width(line: &str) -> usize {
     line.chars().count()
 }
 
+/// Choose the shared chrome style for ready versus error status text.
 fn status_style(status: &StatusLine) -> Style {
     match status.kind() {
         StatusKind::Ready => Style::default().fg(Color::DarkGray),

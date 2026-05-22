@@ -36,6 +36,7 @@ mod workspaces;
 
 use color_eyre::Result;
 
+/// Install process-wide error reporting and transfer control to the app boundary.
 fn main() -> Result<()> {
     color_eyre::install()?;
     app::run()

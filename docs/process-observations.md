@@ -5,6 +5,885 @@ be supported by the work log, repo state, or direct transcript evidence.
 
 ## Observations
 
+### 2026-05-22 (Final leaf module pass)
+
+- Slice / task: finish the remaining uncovered non-test `src/` leaves by documenting the shared
+  menus root, terminal theme helpers, and active-view action-target projection surface.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/menus/mod.rs`, `src/theme.rs`, `src/view_action_targets.rs`, and this
+  process note.
+- Implementation outcome: the final leaf slice now documents the shared menu facade helper, the
+  app-owned fallback styles, and the active-view target projector that turns current view state
+  into push/bookmark/restore/revert action targets.
+- Behavior-preservation evidence:
+  - `cargo test menus -- --test-threads=1` passed with 10 menu-focused tests.
+  - `cargo test tui -- --test-threads=1` passed with 17 TUI tests and 1 ignored manual
+    terminal-proof test.
+  - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 command
+    navigation tests.
+  - `cargo test sync_actions -- --test-threads=1` passed with 20 sync-focused and dependent
+    tests.
+  - `cargo test bookmark_actions -- --test-threads=1` passed with 27 bookmark-action-focused app
+    tests.
+  - `cargo check` passed after the documentation update.
+- Completion evidence:
+  - The audited non-test `src/` tree has no remaining uncovered files in this pass: `COUNT=0` from
+    the local tree-audit script run against `src/**/*.rs` excluding `tests.rs` and `tests/`
+    paths.
+- Evidence basis:
+  - Date: `2026-05-22 01:49:53 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Sync and bookmark-target leaf pass)
+
+- Slice / task: continue through the remaining action-target leaves by documenting the git
+  fetch/push plans, bookmark mutation plans, and bookmark action-target resolver that connect
+  selected rows to exact mutation inputs.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/git_sync.rs`, `src/bookmarks/actions.rs`,
+  `src/bookmarks/targets.rs`, and this process note.
+- Implementation outcome: the sync slice now documents push and fetch targets, remote overrides,
+  and command/preview helpers; the bookmark slices now document mutation payload fields, target
+  enums, and the resolver state and checks that gate forget/track/untrack on trusted metadata.
+- Behavior-preservation evidence:
+  - `cargo test sync_actions -- --test-threads=1` passed with 20 sync-focused and dependent
+    tests.
+  - `cargo test bookmark_actions -- --test-threads=1` passed with 27 bookmark-action-focused app
+    tests.
+  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent
+    tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:48:18 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Rewrite and file-mutation plan pass)
+
+- Slice / task: continue through the remaining shared `actions` family by documenting the rewrite
+  plans for rebase, squash, and absorb plus the file restore/revert/mutation plans that app action
+  previews consume directly.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/rewrite.rs`, `src/actions/files/mod.rs`, and this process note.
+- Implementation outcome: the rewrite slice now documents explicit role fields plus command and
+  preview helpers for rebase, squash, and absorb, and the file-mutation slice now documents target
+  enums, path/revision ownership, command builders, preview probes, and user-facing wording hooks
+  for restore, revert, and `jj file` mutations.
+- Behavior-preservation evidence:
+  - `cargo test rewrite -- --test-threads=1` passed with 25 rewrite-focused and dependent tests.
+  - `cargo test file_actions -- --test-threads=1` passed with 7 file-action-focused and dependent
+    tests.
+  - `cargo test app::tests::rewrite_actions -- --test-threads=1` passed with 16 focused app
+    rewrite tests.
+  - `cargo test app::tests::file_actions -- --test-threads=1` passed with 6 focused app file
+    action tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:46:05 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Describe and abandon plan pass)
+
+- Slice / task: continue through the remaining shared `actions` family by documenting the
+  describe/commit plans and the abandon preflight/confirmation plans that the app preview flow
+  consumes directly.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/describe/mod.rs`, `src/actions/abandon/mod.rs`, and this process
+  note.
+- Implementation outcome: the describe/commit slice now documents target and message ownership plus
+  command and preview helpers, and the abandon slice now documents exact revision targeting,
+  preflight probe helpers, preview payload fields, and empty versus non-empty confirmation state.
+- Behavior-preservation evidence:
+  - `cargo test describe -- --test-threads=1` passed with 16 describe-focused and dependent tests.
+  - `cargo test abandon -- --test-threads=1` passed with 15 abandon-focused and dependent tests.
+  - `cargo test app::tests::describe_commit_actions -- --test-threads=1` passed with 10 focused
+    app describe/commit tests.
+  - `cargo test app::tests::abandon_actions -- --test-threads=1` passed with 7 focused app
+    abandon tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:43:42 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Action root and working-copy plan pass)
+
+- Slice / task: continue from the covered app action flow into the shared `actions` plan layer by
+  documenting the top-level `CommandOutput` envelope and the working-copy action family for new,
+  duplicate, split, and navigation plans.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/actions/mod.rs`, `src/actions/working_copy/mod.rs`, and this process note.
+- Implementation outcome: the action root now documents the result envelope field, and the
+- working-copy family now documents plan fields, target enums, command builders, preview/result
+  surfaces, and the app-owned wording hooks around interactive split and working-copy navigation.
+- Behavior-preservation evidence:
+  - `cargo test working_copy -- --test-threads=1` passed with 50 working-copy-focused and
+    dependent tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
+    app-working-copy tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:42:15 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Help projection contract pass)
+
+- Slice / task: unwind from the covered input/help path into the shared `help` projection surface
+  that maps commands and view commands into grouped overlay rows for each view context.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/help/mod.rs` and this process note.
+- Implementation outcome: the help surface now documents each help context and section kind, the
+  projected row and section payloads, and the helper functions that decide visibility and group
+  bindings into overlay sections.
+- Behavior-preservation evidence:
+  - `cargo test help -- --test-threads=1` passed with 23 help-focused and dependent tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:40:25 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Resolve feature contract pass)
+
+- Slice / task: continue from the shared rendered-row and selection helpers into the `resolve`
+  feature by documenting conflict-row parsing and the read-only resolve list view.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/resolve/rows.rs`, `src/resolve/mod.rs`, and this process note.
+- Implementation outcome: the resolve slice now documents exact-path versus degraded raw-row
+  state, the conflict-row template parsing contract, and the view's selection/search/copy/open and
+  refresh ownership around those rows.
+- Behavior-preservation evidence:
+  - `cargo test resolve -- --test-threads=1` passed with 24 resolve-focused and dependent tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:39:30 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Workspaces feature contract pass)
+
+- Slice / task: continue from the shared rendered-row helpers into the `workspaces` feature by
+  documenting workspace metadata pairing, the loaded root/list context, and the read-only
+  workspaces view surface.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/workspaces/rows.rs`, `src/workspaces/mod.rs`, and this process note.
+- Implementation outcome: the workspaces slice now documents the loaded root/list context fields,
+  trusted workspace identifiers on each rendered row, degraded metadata behavior, and the view's
+  selection/search/copy/refresh ownership around that context.
+- Behavior-preservation evidence:
+  - `cargo test workspaces -- --test-threads=1` passed with 11 workspaces-focused and dependent
+    tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:38:25 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Bookmarks feature contract pass)
+
+- Slice / task: continue from the shared rendered-row helpers into the `bookmarks` feature by
+  documenting bookmark row metadata pairing and classification, the selectable bookmark list view,
+  and the feature-root ownership split.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/bookmarks/rows/mod.rs`, `src/bookmarks/view.rs`, `src/bookmarks/mod.rs`,
+  and this process note.
+- Implementation outcome: the bookmarks slice now documents preserved rendered row lines, trusted
+  bookmark ids and targets, local/remote/tracking row state, bookmark-list selection and refresh
+  behavior, and the root split between rows, view, targets, and actions.
+- Behavior-preservation evidence:
+  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent
+    tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:37:08 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Rendered-row helper contract pass)
+
+- Slice / task: continue unwinding from `operation_log` into `rendered_rows.rs`, the shared helper
+  module that owns plain-text flattening, metadata drift handling, graph-line detection, and JSON
+  metadata field extraction used by multiple feature row parsers.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/rendered_rows.rs` and this process note.
+- Implementation outcome: `rendered_rows.rs` now documents the `RowMetadata` states and the helper
+  contracts for plain-text flattening, string and boolean field extraction, graph-prefix stripping,
+  and rendered span flattening that downstream row owners rely on.
+- Behavior-preservation evidence:
+  - `cargo test log -- --test-threads=1` passed with 92 log-focused and dependent tests.
+  - `cargo test operation_log -- --test-threads=1` passed with 29 operation-log-focused and
+    dependent tests.
+  - `cargo test bookmarks -- --test-threads=1` passed with 40 bookmarks-focused and dependent
+    tests.
+  - `cargo test workspaces -- --test-threads=1` passed with 11 workspaces-focused and dependent
+    tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:35:38 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Selection support contract pass)
+
+- Slice / task: unwind from the `operation_log` list view into `selection.rs`, the shared support
+  type that owns row-index movement and key-or-index restoration across refreshed collections.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/selection.rs` and this process note.
+- Implementation outcome: `selection.rs` now documents the owned selection index plus the
+  movement, clamping, and restore semantics that feature views rely on when row sets change.
+- Behavior-preservation evidence:
+  - `cargo test selection -- --test-threads=1` passed with 28 selection-focused and dependent
+    tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:33:41 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Operation-log feature contract pass)
+
+- Slice / task: continue the shared-document runtime path into the `operation_log` feature by
+  documenting the detail document view, the selectable list view, rendered-row grouping, recovery
+  action plans, and the feature root ownership story.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/operation_log/detail.rs`, `src/operation_log/view.rs`,
+  `src/operation_log/rows.rs`, `src/operation_log/actions.rs`, `src/operation_log/mod.rs`, and
+  this process note.
+- Implementation outcome: the operation-log slice now documents plain rendered operation detail
+  state, list selection and refresh behavior, fail-closed operation-id pairing, repository-wide
+  versus exact-operation recovery plans, and the feature-root split between rows, list view,
+  detail view, and actions.
+- Behavior-preservation evidence:
+  - `cargo test operation_log -- --test-threads=1` passed with 29 operation-log-focused and
+    dependent tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:32:57 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Copy boundary contract pass)
+
+- Slice / task: unwind from the `show` and `diff` views into the shared copy path by documenting
+  the modal payload in `copy.rs` and the clipboard side-effect boundary in `clipboard.rs`.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/copy.rs`, `src/clipboard.rs`, and this process note.
+- Implementation outcome: the copy path now documents which fields control the modal label versus
+  the copied value, how copy options are constructed, and where the actual clipboard write side
+  effect happens.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:30:56 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Show and diff detail-view contract pass)
+
+- Slice / task: continue the shared-document runtime path into the `show` and `diff` feature
+  roots by documenting the two detail views that consume `StickyFileDocument` directly.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/show/mod.rs`, `src/diff/mod.rs`, and this process note.
+- Implementation outcome: the detail-view slice now documents the durable state in `ShowView`
+  and `DiffView`, the view-owned render/refresh/search/scroll/file-navigation methods, and the
+  difference between show's pinned compact log context and diff's file-only sticky projection.
+- Behavior-preservation evidence:
+  - `cargo test show -- --test-threads=1` passed with 47 show-focused and dependent tests.
+  - `cargo test diff -- --test-threads=1` passed with 32 diff-focused and dependent tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:30:19 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Shared document contract pass)
+
+- Slice / task: continue the file-show runtime path into the shared `documents` layer by
+  documenting the rendered document model, sticky-file viewport behavior, and the documents module
+  root.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/documents/rendered.rs`, `src/documents/sticky.rs`, `src/documents/mod.rs`,
+  and this process note.
+- Implementation outcome: the shared document layer now documents preserved rendered lines,
+  detected file anchors, pinned sticky projection, sticky scroll and viewport state, and the root
+  ownership story connecting rendered structure to shared document navigation/rendering.
+- Behavior-preservation evidence:
+  - `cargo test documents -- --test-threads=1` passed with 14 documents-focused tests.
+  - `cargo test files -- --test-threads=1` passed with 27 files-focused and dependent tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:27:26 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Files feature contract pass)
+
+- Slice / task: continue the audited feature-tree pass along the status -> file list -> file show
+  runtime path by documenting the files feature root, file-list row contract, file-list view, and
+  file-show view.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/files/mod.rs`, `src/files/list/rows.rs`, `src/files/list.rs`,
+  `src/files/show.rs`, and this process note.
+- Implementation outcome: the files slice now documents exact path identity in file-list rows, the
+  file-list view state and selection/refresh behavior, the file-show document state and viewport
+  behavior, and the feature-root ownership story connecting list and show surfaces.
+- Behavior-preservation evidence:
+  - `cargo test files -- --test-threads=1` passed with 27 files-focused and dependent tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:25:35 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Status feature contract pass)
+
+- Slice / task: continue the audited feature-tree pass on the `status` branch by documenting the
+  status-owned action target, rendered-row contract, view state, and feature root in caller-callee
+  order.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/status/actions.rs`, `src/status/rows.rs`, `src/status/view.rs`,
+  `src/status/mod.rs`, and this process note.
+- Implementation outcome: the status slice now documents the `StatusFileAction` payload fields, the
+  exact-path row contract and disabled-path reasons, the status view state and command behavior,
+  and the feature-root ownership story that ties actions, rows, and view state together.
+- Behavior-preservation evidence:
+  - `cargo test status -- --test-threads=1` passed with 45 status-focused and dependent tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:23:58 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Runtime root unwind pass)
+
+- Slice / task: finish unwinding the completed `app/actions` and `tui` subtrees by updating their
+  module-root ownership docs to match the more detailed boundaries now described in child files.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/actions/mod.rs`, `src/tui/mod.rs`, and this process note.
+- Implementation outcome: the `app/actions` root now explicitly acts as a table of contents for
+  entry, preview, input, completion, rewrite completion, and shared helpers; the `tui` root now
+  explicitly acts as a table of contents for chrome, status hints, and overlays.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the module-doc updates.
+- Evidence basis:
+  - Date: `2026-05-22 01:20:47 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (jj syntax helper contract pass)
+
+- Slice / task: finish the remaining uncovered live helper under the `jj` boundary by documenting
+  `src/jj/syntax.rs`, which owns quoting and display-label helpers used by command builders and
+  process execution.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/jj/syntax.rs` and this process note.
+- Implementation outcome: `jj/syntax.rs` now documents the helper functions that build user-facing
+  command labels, exact-change-id revsets, root-file filesets, exact string patterns, and the
+  shared literal-quoting routine behind those surfaces.
+- Behavior-preservation evidence:
+  - `cargo test jj -- --test-threads=1` passed with 60 `jj` tests and 2 ignored manual terminal
+    proof tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:19:53 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Interactive terminal runner contract pass)
+
+- Slice / task: unwind out of the action subtree into `src/terminal_process/mod.rs` and document
+  the inherited-stdio terminal lifecycle boundary used by interactive commands.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/terminal_process/mod.rs` and this process note.
+- Implementation outcome: `terminal_process/mod.rs` now documents the `InteractiveCommand`,
+  `InteractiveExitStatus`, and `InteractiveCommandResult` fields plus the suspend/spawn/restore
+  runner, lifecycle traits, and restore guard that own Ratatui terminal handoff for interactive
+  commands.
+- Behavior-preservation evidence:
+  - `cargo test terminal_process -- --test-threads=1` passed with 7 terminal-process tests and 2
+    ignored manual proof tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:19:05 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Action support leaf contract pass)
+
+- Slice / task: finish the remaining local leaves under `src/app/actions/` by documenting the
+  shared refresh/wording helpers in `shared.rs` and the common preview-key reducer in `input.rs`
+  before unwinding out of the action subtree.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/actions/shared.rs`, `src/app/actions/input.rs`, and this process note.
+- Implementation outcome: `shared.rs` now documents the shared success/failure/reveal helpers and
+  action status-context builders; `input.rs` now documents the common preview key flow, its reduced
+  event/confirmation enums, and the boundary that turns accepted preview panes into completion
+  calls.
+- Behavior-preservation evidence:
+  - `cargo test app::tests::bookmark_actions -- --test-threads=1` passed with 27 focused tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
+    tests.
+  - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:17:51 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (TUI overlay contract pass)
+
+- Slice / task: continue the `App::run()` TUI branch into `src/tui/overlays.rs` and document the
+  borrowed overlay projection plus the shared modal rendering helpers for help, menus, prompts, and
+  action panes.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/tui/overlays.rs` and this process note.
+- Implementation outcome: `overlays.rs` now documents the payload fields on each `Overlay`
+  variant and the helper methods that render help, menus, remote prompts, action panes, abandon
+  confirm, role prompts, and centered overlay geometry.
+- Behavior-preservation evidence:
+  - `cargo test tui -- --test-threads=1` passed with 17 TUI tests and 1 ignored manual
+    terminal-proof test.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:15:34 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Status-hint projection contract pass)
+
+- Slice / task: continue the `App::run()` TUI branch into `src/tui/status_hints.rs` and document
+  the shared status-hint vocabulary plus the width-fit projection used by chrome rendering.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/tui/status_hints.rs` and this process note.
+- Implementation outcome: `status_hints.rs` now documents the meaning of each `StatusHints`
+  variant, the per-view hint projection contract, and the local width/count helpers that keep hint
+  items complete on narrow terminals.
+- Behavior-preservation evidence:
+  - `cargo test tui -- --test-threads=1` passed with 17 TUI tests and 1 ignored manual
+    terminal-proof test.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:14:42 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (TUI chrome contract pass)
+
+- Slice / task: unwind from `App::run()` into `src/tui/chrome.rs` and document the shared frame
+  layout and status-chrome rendering path that wraps every active view.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/tui/chrome.rs` and this process note.
+- Implementation outcome: `chrome.rs` now documents the `Areas` fields and the local helpers that
+  fit status text plus hints into the shared title/status rows without leaking frame geometry into
+  feature views.
+- Behavior-preservation evidence:
+  - `cargo test tui -- --test-threads=1` passed with 17 TUI tests and 1 ignored manual
+    terminal-proof test.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:14:05 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Rewrite completion contract pass)
+
+- Slice / task: continue the action-branch descent into `src/app/actions/rewrite_completion.rs`
+  and document the rewrite-specific confirmation layer that runs commands, refreshes views, and
+  reveals rewritten targets after preview acceptance.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/actions/rewrite_completion.rs` and this process note.
+- Implementation outcome: `rewrite_completion.rs` now documents the confirm methods for
+  working-copy navigation, abandon, restore, revert, rebase, squash, and absorb, including the
+  re-check path for empty abandon and the reveal policy for edit/next/prev, rebase, and squash.
+- Behavior-preservation evidence:
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
+    tests.
+  - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:12:36 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (General action completion contract pass)
+
+- Slice / task: continue the action-branch descent into `src/app/actions/completion.rs` and
+  document the confirmation layer that runs commands, refreshes views, reveals targets, and leaves
+  finished output on result panes.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/actions/completion.rs` and this process note.
+- Implementation outcome: `completion.rs` now documents the confirm methods for describe, commit,
+  bookmark/file mutations, new, duplicate, fetch/push, split, and operation actions, plus the
+  helper methods that own duplicate reveal fallback, split reveal behavior, and stacked repo-view
+  refresh after operation mutations.
+- Behavior-preservation evidence:
+  - `cargo test app::tests::bookmark_actions -- --test-threads=1` passed with 27 focused tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
+    tests.
+  - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:11:51 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Action preview contract pass)
+
+- Slice / task: continue the action-branch descent into `src/app/actions/preview.rs` and document
+  the methods that turn accepted actions into preview panes or immediate execution surfaces.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/actions/preview.rs` and this process note.
+- Implementation outcome: `preview.rs` now documents the preview-opening methods for fetch, push,
+  operation actions, working-copy navigation, mutation previews, and rewrite previews, plus the
+  local helpers that normalize preview-pane error handling and rewrite-source status context.
+- Behavior-preservation evidence:
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
+    tests.
+  - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:10:28 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Action entry routing contract pass)
+
+- Slice / task: unwind from `src/app/mod.rs` into `src/app/actions/entry/mod.rs` and document the
+  branch point where accepted commands and action-menu items become prompts, previews, or immediate
+  status.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/actions/entry/mod.rs` and this process note.
+- Implementation outcome: `entry/mod.rs` now documents the remote-prompt decision payloads and the
+  routing methods that open action menus, consume accepted menu items, open prompts, and classify
+  push/fetch remote selection before handing off to previews.
+- Behavior-preservation evidence:
+  - `cargo test app::tests::bookmark_actions -- --test-threads=1` passed with 27 focused tests.
+  - `cargo test app::tests::working_copy_actions -- --test-threads=1` passed with 27 focused
+    tests.
+  - `cargo test app::tests::operation_actions -- --test-threads=1` passed with 10 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:09:18 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Command prefix-matching contract pass)
+
+- Slice / task: continue unwinding from `src/app/input.rs` into `src/command/mod.rs` and document
+  the binding, prefix-match, and view-effect contracts that help-mode and modal dispatch depend on.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/command/mod.rs` and this process note.
+- Implementation outcome: `command/mod.rs` now documents the field-level contracts on `Binding` and
+  `KeyPattern`, the fallback payload on `BindingMatch::Prefix`, the meaning of the `ViewEffect`
+  payload variants, and the core prefix-matching helpers that keep app dispatch and help-mode
+  matching aligned.
+- Behavior-preservation evidence:
+  - `cargo test command -- --test-threads=1` passed with 86 focused and dependent command tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:07:11 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Search query contract pass)
+
+- Slice / task: unwind from `src/app/input.rs` into `src/search.rs` and document the query object
+  and matching/highlighting boundary that modal search prompt acceptance creates.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/search.rs` and this process note.
+- Implementation outcome: `search.rs` now documents the `SearchQuery` fields, smart-case
+  constructor semantics, line/entry match helpers, and the rendered-line highlighting pipeline that
+  active views use after the app sets a query.
+- Behavior-preservation evidence:
+  - `cargo test search -- --test-threads=1` passed with 15 focused and dependent search tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:06:09 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Status line contract pass)
+
+- Slice / task: unwind from `src/app/input.rs` into `src/status_line.rs` and document the status
+  object that modal prompt handlers construct on accept, cancel, and error paths.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/status_line.rs` and this process note.
+- Implementation outcome: `status_line.rs` now documents the `StatusLine` fields, ready/error
+  constructors, accessor intent, and the count-formatting helpers that turn active-view state into
+  user-facing status text.
+- Behavior-preservation evidence:
+  - `cargo test status_line -- --test-threads=1` passed with 1 focused status-line test.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:05:28 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Action pane overlay contract pass)
+
+- Slice / task: continue the modal-branch descent into `src/action_pane/mod.rs` and document the
+  preview/result overlay state, scrolling helpers, and key-reduction contract that `app/input.rs`
+  mutates directly.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/action_pane/mod.rs` and this process note.
+- Implementation outcome: `action_pane/mod.rs` now documents the pane fields, pending/finished
+  constructors, scroll methods, visible-line helper, and `ActionPaneKey` reduction contract that
+  drives action preview and result overlays.
+- Behavior-preservation evidence:
+  - `cargo test action_pane -- --test-threads=1` passed with 10 focused overlay and integration
+    tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:04:08 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Path action policy contract pass)
+
+- Slice / task: continue the shared-menu depth-first descent into `src/menus/path_actions.rs` and
+  document the path-scoped context and menu-building contracts used by status, detail-path, and
+  working-copy file surfaces.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/menus/path_actions.rs` and this process note.
+- Implementation outcome: `path_actions.rs` now documents the `FileActionContext` fields, the
+  working-copy versus exact-revision scope classification, and the menu-building boundaries that
+  produce restore, track, untrack, and chmod rows for path selections.
+- Behavior-preservation evidence:
+  - `cargo test menus -- --test-threads=1` passed with 10 focused menu tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:03:07 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Revision action context contract pass)
+
+- Slice / task: continue the modal/menu descent into `src/menus/revision_actions/mod.rs` and
+  document the `ExactActionContext` payload plus the revision-scoped menu-construction boundary.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/menus/revision_actions/mod.rs` and this process note.
+- Implementation outcome: `revision_actions/mod.rs` now documents the fields and constructors on
+  `ExactActionContext`, the meaning of the internal action-surface classification, and the boundary
+  that maps one exact selection context into ordered menu rows and follow-up payloads.
+- Behavior-preservation evidence:
+  - `cargo test menus -- --test-threads=1` passed with 10 focused menu tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:02:17 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Menu model payload contract pass)
+
+- Slice / task: continue the modal-branch descent into `src/menus/model.rs` because
+  `InteractionMode` carries `ActionMenu` and `RolePrompt` by value, and document the field and API
+  contracts on those shared modal payloads.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/menus/model.rs` and this process note.
+- Implementation outcome: `menus/model.rs` now documents the action-kind variants, role-prompt
+  fields, follow-up payload fields, menu-item fields, and the immutable-menu accessors that modal
+  dispatch relies on after `InteractionMode` opens a menu or prompt.
+- Behavior-preservation evidence:
+  - `cargo test menus -- --test-threads=1` passed with 10 focused menu tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 01:00:57 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (InteractionMode contract pass)
+
+- Slice / task: descend from `app/input.rs` into `src/modes/mod.rs` and document the modal-state
+  enum variants, payload fields, and shared view-menu contracts that app dispatch carries across
+  prompt and preview lifecycles.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/modes/mod.rs` and this process note.
+- Implementation outcome: `modes/mod.rs` now documents the `InteractionMode` variant payloads plus
+  the `ViewMenuOption` and `ViewMenuAction` fields that define app-owned modal screen state and the
+  shared top-level view-switching menu.
+- Behavior-preservation evidence:
+  - `cargo test modes -- --test-threads=1` passed with 9 focused mode tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:59:21 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Modal reducer contract pass)
+
+- Slice / task: descend one level deeper on the modal-dispatch branch into `src/app/reducers/mod.rs`
+  and document the pure reducer contracts that shape prompt, menu, confirmation, and help-key
+  outcomes.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/reducers/mod.rs` and this process note.
+- Implementation outcome: `app/reducers/mod.rs` now documents the meaning of each reducer outcome
+  enum and the pure decision boundary between key reduction and side-effectful preview/status
+  handling in `app/input.rs`.
+- Behavior-preservation evidence:
+  - `cargo test reducers -- --test-threads=1` passed with 12 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:56:34 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Modal dispatch contract pass)
+
+- Slice / task: descend from `App::handle_event()` into `src/app/input.rs` and document the modal
+  dispatch contract for copy menus, prompt handling, help routing, and action-preview key flow.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/input.rs` and this process note.
+- Implementation outcome: `app/input.rs` now states where modal dispatch begins, how help-mode
+  prefix handling differs from normal mode, and where prompt accept decisions cross into preview
+  opening.
+- Behavior-preservation evidence:
+  - `cargo test app::tests -- --test-threads=1` passed with 177 focused app tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:55:27 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (log root export contract pass)
+
+- Slice / task: continue unwinding into `src/log/mod.rs` and document the root-module export
+  contract for the default/log feature.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/log/mod.rs` and this process note.
+- Implementation outcome: `log/mod.rs` now explains that its root re-exports the rendered row
+  contract used by startup loading and the `LogView` state machine used by app/view dispatch.
+- Behavior-preservation evidence:
+  - `cargo test log -- --test-threads=1` passed with 92 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:54:09 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (jj root export contract pass)
+
+- Slice / task: continue unwinding into `src/jj/mod.rs` and document the root-module export
+  contract that higher layers import from the `jj` boundary.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/jj/mod.rs` and this process note.
+- Implementation outcome: `jj/mod.rs` now explains the kinds of boundary surface it re-exports and
+  documents the intended role of the command, syntax, `ViewSpec`, and process helpers exposed at
+  the module root.
+- Behavior-preservation evidence:
+  - `cargo test jj -- --test-threads=1` passed with 60 tests and 2 ignored manual terminal proofs.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:53:17 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (App root dispatch contract pass)
+
+- Slice / task: continue unwinding into `src/app/mod.rs` and document the remaining app-root
+  contracts for binding execution, view-command dispatch, and multi-key prefix status wording.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/mod.rs` and this process note.
+- Implementation outcome: `app/mod.rs` now states where app-level bindings converge with
+  view-level commands, where shared view execution is delegated, and how pending prefix keys are
+  surfaced in status text.
+- Behavior-preservation evidence:
+  - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:52:14 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Navigation contract pass)
+
+- Slice / task: continue unwinding into `src/app/navigation.rs` and document the app-owned
+  contracts for startup parsing, detail-spec construction, top-level shipped-view opening,
+  log-revset prompting, and diff-format application.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/navigation.rs` and this process note.
+- Implementation outcome: `navigation.rs` now states which helpers preserve exact-change
+  provenance, which open only shipped top-level views, and when the app replaces versus extends the
+  back stack.
+- Behavior-preservation evidence:
+  - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:51:18 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (ViewState dispatch contract pass)
+
+- Slice / task: continue unwinding the startup path into `src/view_state/mod.rs` and document the
+  app-facing dispatch contract carried by the `ViewState` enum and its core routing methods.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/view_state/mod.rs` and this process note.
+- Implementation outcome: `ViewState` now documents the meaning of each active-view variant and
+  the shared routing responsibilities for render, bindings, command execution, refresh, clamp,
+  `ViewSpec` access, status hints, and help context.
+- Behavior-preservation evidence:
+  - `cargo test view_state -- --test-threads=1` passed with 11 focused tests.
+  - `cargo check` passed after the documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:50:10 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (AppServices field contract pass)
+
+- Slice / task: unwind from the `jj`/`ViewSpec` startup leaf back to `src/app/services.rs` and
+  document the field-level contracts on the app side-effect seam.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/services.rs` and this process note.
+- Implementation outcome: `AppServices` now documents what each injected runner/load hook owns, so
+  tests and runtime wiring can treat the seam as an explicit set of app-side effect contracts.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the field documentation update.
+- Evidence basis:
+  - Date: `2026-05-22 00:49:00 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (ViewSpec contract documentation pass)
+
+- Slice / task: continue the caller-callee descent from `jj_command_args` into
+  `src/jj/view_spec/mod.rs`, documenting the `ViewSpec` data contract and the startup-path
+  constructors/accessors that shape navigation provenance, diff-format state, and argv recovery.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/jj/view_spec/mod.rs` and this process note.
+- Implementation outcome: `ViewSpec` now documents field ownership and the role of the startup-path
+  constructors and accessors that feed both app startup loading and `jj` argv construction.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the `ViewSpec` documentation updates.
+  - `cargo test jj::view_spec -- --test-threads=1` passed with 31 tests, covering startup revset
+    parsing, exact-target provenance, diff-format behavior, and display labels.
+- Evidence basis:
+  - Date: `2026-05-22 00:47:52 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (jj startup-boundary consolidation)
+
+- Slice / task: continue the caller-callee descent from `log::rows` into the `jj` boundary,
+  document the startup-path data carriers, and consolidate the shared `ViewSpec` execution path in
+  `src/jj/process.rs` before descending into argv construction in `src/jj/command.rs`.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/jj/process.rs`, `src/jj/command.rs`, `src/log/rows.rs`,
+  `src/log/view.rs`, `src/app/mod.rs`, and this process note.
+- Implementation outcome: `run_jj` and `run_jj_template_lines` now share one local
+  `run_view_command` boundary for `ViewSpec`-driven process execution; startup-path structs on the
+  app/log side now document field ownership; and the `jj` command vocabulary plus argv builder are
+  documented in place.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the `jj` boundary refactor.
+  - `cargo test jj -- --test-threads=1` passed with 60 tests and 2 ignored manual terminal proofs.
+  - `cargo test log -- --test-threads=1` passed with 92 tests, covering log row grouping, view
+    behavior, and adjacent startup/navigation contracts.
+- Evidence basis:
+  - Date: `2026-05-22 00:46:28 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (Caller-callee startup-path documentation pass)
+
+- Slice / task: continue the maintainability pass in strict caller-callee order from `main()` down
+  through `app::run()`, `App::run()`, `App::load()`, `AppServices::load_view()`,
+  `ViewState::load()`, `LogView::load()`, and `load_entries()`, updating ownership docs at each
+  step without jumping sideways to unrelated siblings.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/app/mod.rs`, `src/app/navigation.rs`, `src/app/services.rs`,
+  `src/view_state/mod.rs`, `src/log/view.rs`, `src/log/rows.rs`, and this process note.
+- Implementation outcome: the startup/runtime call chain now documents its execution order and
+  ownership boundaries in place, from process handoff through the app event loop, startup parsing,
+  service seam, view dispatch, and initial rendered log row loading.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the documentation updates.
+  - `cargo test app::tests::command_navigation -- --test-threads=1` passed with 35 tests,
+    covering startup command parsing, top-level view loading, and navigation/prefix behavior.
+- Evidence basis:
+  - Date: `2026-05-22 00:43:17 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
+### 2026-05-22 (App service seam simplification)
+
+- Slice / task: restart the maintainability pass at `src/main.rs`, descend through `src/app`, and
+  remove the duplicate `App` passthrough layer above `AppServices` while documenting the surviving
+  ownership boundary in each touched file.
+- Thread id: `019e4d8d-0e0e-7df2-859c-8daa03de767c` from `CODEX_THREAD_ID`.
+- Changed files: `src/main.rs`, `src/app/mod.rs`, `src/app/navigation.rs`,
+  `src/app/services.rs`, `src/app/actions/mod.rs`, `src/app/actions/preview.rs`,
+  `src/app/actions/completion.rs`, `src/app/actions/rewrite_completion.rs`,
+  `src/app/actions/entry/mod.rs`, `docs/agent/architecture.md`, and this process note.
+- Implementation outcome: `AppServices` remains the single injectable jj/view effect seam;
+  `app` submodules now call that seam directly for pure side-effect dispatch; `App` keeps only
+  `refresh_view_state` and `reveal_log_change`, the two wrappers that must couple the seam to the
+  current app-owned `ViewState`.
+- Behavior-preservation evidence:
+  - `cargo check` passed after the call-site rewiring.
+  - `rustup run nightly cargo fmt` completed after the source and doc updates.
+  - `jj --no-pager diff --stat` for this working copy showed nine source files touched for the code
+    cut before the two documentation updates were added.
+- Evidence basis:
+  - Date: `2026-05-22 00:39:54 PDT` from local `date`.
+  - Files: the changed files listed above and this process note.
+
 ### 2026-05-21 (Planning and history surface audit)
 
 - Slice / task: audit the current planning and history documentation surface to decide whether to

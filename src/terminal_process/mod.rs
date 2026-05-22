@@ -20,13 +20,18 @@ use ratatui::DefaultTerminal;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct InteractiveCommand {
+    /// Executable to run with inherited stdio.
     program: OsString,
+    /// Positional and option arguments passed to the child process.
     args: Vec<OsString>,
+    /// Optional working directory for the child process.
     current_dir: Option<PathBuf>,
+    /// User-facing label used in errors and result reporting.
     label: String,
 }
 
 impl InteractiveCommand {
+    /// Build a new inherited-stdio command with a user-facing label.
     pub(crate) fn new(program: impl Into<OsString>, label: impl Into<String>) -> Self {
         Self {
             program: program.into(),
@@ -36,11 +41,13 @@ impl InteractiveCommand {
         }
     }
 
+    /// Append one argument to the child process argv.
     pub(crate) fn arg(&mut self, arg: impl Into<OsString>) -> &mut Self {
         self.args.push(arg.into());
         self
     }
 
+    /// Extend the child process argv from an iterator of arguments.
     pub(crate) fn args<I, S>(&mut self, args: I) -> &mut Self
     where
         I: IntoIterator<Item = S>,
@@ -50,12 +57,14 @@ impl InteractiveCommand {
         self
     }
 
+    /// Set the working directory the child process should inherit.
     #[allow(dead_code)]
     pub(crate) fn current_dir(&mut self, current_dir: impl Into<PathBuf>) -> &mut Self {
         self.current_dir = Some(current_dir.into());
         self
     }
 
+    /// Return the user-facing label for this interactive command.
     pub(crate) fn label(&self) -> &str {
         &self.label
     }
@@ -80,6 +89,7 @@ impl InteractiveCommand {
         StdioIntent::Inherit
     }
 
+    /// Build the `std::process::Command` configured for inherited stdio execution.
     fn process_command(&self) -> Command {
         let mut command = Command::new(&self.program);
         command
@@ -102,7 +112,9 @@ pub(crate) enum StdioIntent {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct InteractiveExitStatus {
+    /// Whether the child process exited successfully.
     success: bool,
+    /// Human-readable exit status description.
     description: String,
 }
 
@@ -130,10 +142,12 @@ impl InteractiveExitStatus {
         }
     }
 
+    /// Return whether the child process exited successfully.
     pub(crate) fn is_success(&self) -> bool {
         self.success
     }
 
+    /// Return the human-readable exit status description.
     pub(crate) fn description(&self) -> &str {
         &self.description
     }
@@ -141,7 +155,9 @@ impl InteractiveExitStatus {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct InteractiveCommandResult {
+    /// User-facing label for the completed command.
     label: String,
+    /// Exit status returned by the child process.
     status: InteractiveExitStatus,
 }
 
@@ -157,6 +173,7 @@ impl InteractiveCommandResult {
     }
 }
 
+/// Run one interactive command using the live Ratatui terminal lifecycle.
 #[allow(dead_code)]
 pub(crate) fn run_with_ratatui_terminal(
     terminal: &mut DefaultTerminal,
@@ -167,6 +184,7 @@ pub(crate) fn run_with_ratatui_terminal(
     run_interactive_command(&mut lifecycle, &mut spawner, command)
 }
 
+/// Suspend the terminal, run one inherited-stdio command, and restore the terminal afterward.
 pub(crate) fn run_interactive_command<L, S>(
     lifecycle: &mut L,
     spawner: &mut S,
@@ -226,17 +244,21 @@ where
     }
 }
 
+/// Terminal lifecycle boundary needed around inherited-stdio commands.
 pub(crate) trait TerminalLifecycle {
     fn suspend(&mut self) -> Result<()>;
 
     fn restore(&mut self) -> Result<()>;
 }
 
+/// Child-process boundary used by the interactive runner.
 pub(crate) trait InteractiveCommandSpawner {
     fn spawn_and_wait(&mut self, command: &InteractiveCommand) -> Result<InteractiveExitStatus>;
 }
 
+/// Real Ratatui terminal lifecycle that leaves and re-enters the alternate-screen UI.
 struct RatatuiTerminalLifecycle<'a> {
+    /// Live Ratatui terminal that must be suspended and restored.
     terminal: &'a mut DefaultTerminal,
 }
 
@@ -272,16 +294,19 @@ impl InteractiveCommandSpawner for ProcessSpawner {
 }
 
 struct TerminalRestoreGuard<'a, L: TerminalLifecycle> {
+    /// Lifecycle to restore exactly once, either explicitly or on drop.
     lifecycle: Option<&'a mut L>,
 }
 
 impl<'a, L: TerminalLifecycle> TerminalRestoreGuard<'a, L> {
+    /// Create a restore guard immediately after terminal suspension succeeds.
     fn new(lifecycle: &'a mut L) -> Self {
         Self {
             lifecycle: Some(lifecycle),
         }
     }
 
+    /// Restore the terminal once and consume the stored lifecycle reference.
     fn restore(&mut self) -> Result<()> {
         self.lifecycle
             .take()

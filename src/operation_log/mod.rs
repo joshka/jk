@@ -4,6 +4,10 @@
 //! search, refresh, operation detail navigation, and recovery action targets can
 //! preserve user-visible `jj` presentation while using exact operation ids only
 //! where needed.
+//!
+//! `rows` owns rendered-row grouping and metadata pairing, `view` owns the
+//! selectable list surface, `detail` owns rendered operation show/diff documents,
+//! and `actions` owns repository-wide and exact-operation recovery plans.
 
 pub(crate) mod actions;
 pub(crate) mod detail;

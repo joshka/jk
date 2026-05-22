@@ -33,6 +33,7 @@ use super::reducers::{
 pub(in crate::app) use super::reducers::{rebase_plan_from_prompt, squash_plan_from_prompt};
 
 impl App {
+    /// Open the copy menu by asking the active view for copyable options.
     pub(super) fn open_copy_menu(&mut self, viewport_height: u16) {
         let options = match self.execute_view(ViewCommand::Copy, viewport_height) {
             ViewEffect::CopyOptions(options) => options,
@@ -65,6 +66,8 @@ impl App {
         self.handle_mode_key_event_with_terminal(key, viewport_height, None)
     }
 
+    /// Route one key through modal dispatch, including action previews that may need terminal
+    /// handoff.
     pub(super) fn handle_mode_key_event_with_terminal(
         &mut self,
         key: KeyEvent,
@@ -83,6 +86,7 @@ impl App {
         self.handle_active_mode_key(code, viewport_height)
     }
 
+    /// Dispatch a key to the currently active non-preview interaction mode.
     fn handle_active_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
         match &mut self.mode {
             InteractionMode::Normal => Ok(false),
@@ -521,6 +525,7 @@ impl App {
         }
     }
 
+    /// Handle keys while the help overlay is active, including help-specific prefix matching.
     fn handle_help_key(&mut self, key: KeyEvent, viewport_height: u16) -> Result<bool> {
         if is_help_close_key(key) {
             self.pending_command = None;
@@ -572,6 +577,7 @@ impl App {
         }
     }
 
+    /// Continue a multi-key help binding after the help overlay has already claimed the first key.
     fn handle_pending_help_key(
         &mut self,
         key: KeyEvent,
@@ -632,6 +638,7 @@ impl App {
         Ok(true)
     }
 
+    /// Leave help mode and execute the chosen binding through the normal app root path.
     pub(super) fn execute_help_binding(
         &mut self,
         binding: Binding,

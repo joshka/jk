@@ -32,14 +32,20 @@ pub(crate) const BOOKMARK_METADATA_TEMPLATE: &str = concat!(
 /// One selectable bookmark item parsed from rendered bookmark output.
 #[derive(Clone, Debug)]
 pub struct BookmarkItem {
+    /// Preserved rendered lines for one selectable bookmark row.
     lines: Vec<Line<'static>>,
+    /// Exact bookmark name paired from metadata or degraded from rendered text.
     name: String,
+    /// Exact target change id when trusted metadata still provides it.
     target_change_id: Option<String>,
+    /// Exact target commit id when trusted metadata still provides it.
     target_commit_id: Option<String>,
+    /// Local/remote/tracking classification derived from trusted metadata coverage.
     state: BookmarkRowState,
 }
 
 impl BookmarkItem {
+    /// Builds one bookmark row from rendered lines and trusted target ids.
     pub fn new(
         lines: Vec<Line<'static>>,
         name: String,
@@ -57,22 +63,27 @@ impl BookmarkItem {
         }
     }
 
+    /// Returns the preserved rendered lines for this bookmark row.
     pub fn lines(&self) -> Vec<Line<'static>> {
         self.lines.clone()
     }
 
+    /// Returns the number of rendered lines in this bookmark row.
     pub fn line_count(&self) -> usize {
         self.lines.len()
     }
 
+    /// Returns the exact bookmark name for this row.
     pub fn bookmark_name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the exact target change id when metadata still proves it.
     pub fn target_change_id(&self) -> Option<&str> {
         self.target_change_id.as_deref()
     }
 
+    /// Returns the exact target commit id when metadata still proves it.
     pub fn target_commit_id(&self) -> Option<&str> {
         self.target_commit_id.as_deref()
     }
@@ -82,6 +93,7 @@ impl BookmarkItem {
         matches!(self.state, BookmarkRowState::Local { .. })
     }
 
+    /// Returns the local/remote/tracking classification for this row.
     pub fn state(&self) -> &BookmarkRowState {
         &self.state
     }
@@ -104,6 +116,7 @@ impl BookmarkItem {
         self
     }
 
+    /// Returns plain rendered row text for copy and search surfaces.
     pub fn row_text(&self) -> String {
         self.lines
             .iter()
@@ -115,14 +128,21 @@ impl BookmarkItem {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BookmarkRowState {
+    /// A local bookmark row plus its relationship to remote peers.
     Local {
+        /// Remote-peer state derived from the trusted metadata coverage.
         tracking: LocalBookmarkRemoteState,
     },
+    /// A remote bookmark row plus its tracking and local-peer status.
     Remote {
+        /// Remote name shown for the remote bookmark row.
         remote: String,
+        /// Tracking state for this exact remote bookmark.
         tracking: RemoteBookmarkTrackingState,
+        /// Whether a local peer is known for the same bookmark name.
         local_peer: BookmarkLocalPeerState,
     },
+    /// Metadata drifted or was incomplete, so only rendered text remains trusted.
     Unknown,
 }
 
@@ -146,25 +166,35 @@ impl BookmarkRowState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LocalBookmarkRemoteState {
+    /// No remote peer is known for this local bookmark.
     LocalOnly,
+    /// A tracked remote peer exists, and another untracked peer may also be visible.
     Tracked { untracked_remote_present: bool },
+    /// Only untracked remote peers are known for this local bookmark.
     UntrackedRemotePresent,
+    /// Metadata coverage is not strong enough to classify the local bookmark safely.
     Ambiguous,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RemoteBookmarkTrackingState {
+    /// The remote bookmark is tracked locally, with local presence and sync state.
     Tracked { local_present: bool, synced: bool },
+    /// The remote bookmark is visible but not tracked locally.
     Untracked { synced: bool },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BookmarkLocalPeerState {
+    /// A local bookmark with the same exact name is known to exist.
     Present,
+    /// No local bookmark with the same exact name is known to exist.
     Absent,
+    /// Metadata coverage cannot prove whether a local peer exists.
     Unknown,
 }
 
+/// Loads rendered bookmark rows and pairs them with trusted metadata when coverage permits.
 pub fn load_bookmark_entries(spec: &ViewSpec) -> Result<Vec<BookmarkItem>> {
     let output = run_jj(spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
@@ -176,6 +206,7 @@ pub fn load_bookmark_entries(spec: &ViewSpec) -> Result<Vec<BookmarkItem>> {
     ))
 }
 
+/// Loads bookmark metadata rows through the bookmark-specific template side channel.
 fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
     Ok(
         run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE, false)?
@@ -185,6 +216,7 @@ fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
     )
 }
 
+/// Pairs rendered bookmark rows with metadata and degrades safely when counts drift.
 fn pair_bookmark_lines(
     lines: Vec<Line<'static>>,
     metadata: Vec<BookmarkMetadata>,
@@ -264,6 +296,7 @@ enum BookmarkMetadataCoverage {
     UnfilteredAllRemotes,
 }
 
+/// Returns whether bookmark metadata covers only visible rows or all remotes without filtering.
 fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCoverage {
     if !spec.args().is_empty()
         && spec
@@ -279,16 +312,24 @@ fn bookmark_metadata_coverage(spec: &ViewSpec) -> BookmarkMetadataCoverage {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct BookmarkMetadata {
+    /// Exact bookmark name from metadata.
     name: String,
+    /// Remote name for remote rows, or `None` for local rows.
     remote: Option<String>,
+    /// Whether the row is tracked according to `jj` metadata.
     tracked: bool,
+    /// Whether tracking metadata was present for this row.
     tracking_present: bool,
+    /// Whether the local and remote targets are already synced.
     synced: bool,
+    /// Exact target change id when available.
     target_change_id: Option<String>,
+    /// Exact target commit id when available.
     target_commit_id: Option<String>,
 }
 
 impl BookmarkMetadata {
+    /// Classifies one metadata row into the user-visible bookmark row state.
     fn row_state(
         &self,
         coverage: BookmarkMetadataCoverage,
@@ -312,6 +353,7 @@ impl BookmarkMetadata {
     }
 }
 
+/// Parses one metadata line and rejects rows that do not match the exact schema.
 fn parse_bookmark_metadata_line(line: &str) -> Option<BookmarkMetadata> {
     if line.is_empty() {
         return None;

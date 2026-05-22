@@ -3,6 +3,10 @@
 //! Bookmark views keep rendered `jj` output close to row metadata so copy,
 //! search, refresh, and action targeting can preserve user-visible `jj`
 //! presentation while using trusted parsed fields only where needed.
+//!
+//! `rows` owns metadata pairing and row classification, `view` owns the
+//! selectable bookmark list surface, `targets` owns action-target safety
+//! checks, and `actions` owns the exact bookmark mutation plans.
 
 pub(crate) mod actions;
 mod rows;

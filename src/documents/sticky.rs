@@ -21,18 +21,24 @@ use crate::search::{SearchQuery, highlight_line, line_matches};
 /// reloads from `jj` through `load_document`, then keeps scroll offsets clamped
 /// to the rendered lines rather than to a reconstructed repository model.
 pub struct StickyFileDocument {
+    /// Rendered document lines loaded from `jj`.
     lines: DocumentLines,
+    /// Detected file anchors reused for sticky headers and file navigation.
     anchors: Vec<FileAnchor>,
+    /// Current vertical sticky-scroll state.
     scroll: StickyScroll,
+    /// Current wrapping and horizontal-scroll viewport state.
     viewport: DocumentViewport,
 }
 
 impl StickyFileDocument {
+    /// Load a rendered document plus sticky-file anchors for one `ViewSpec`.
     pub fn load(spec: &ViewSpec) -> Result<Self> {
         let lines = load_document(spec)?;
         Ok(Self::new(lines))
     }
 
+    /// Build a sticky document from already-rendered lines.
     pub fn new(lines: DocumentLines) -> Self {
         let anchors = lines.file_anchors();
         Self {
@@ -43,19 +49,23 @@ impl StickyFileDocument {
         }
     }
 
+    /// Reload the rendered document while recomputing file anchors.
     pub fn refresh(&mut self, spec: &ViewSpec) -> Result<()> {
         self.replace_lines(load_document(spec)?);
         Ok(())
     }
 
+    /// Project the current scroll position into sticky fixed lines plus body.
     pub fn projection(&self, prefix: impl IntoIterator<Item = Line<'static>>) -> PinnedDocument {
         self.projection_at(self.scroll.offset(), prefix)
     }
 
+    /// Return the total rendered line count.
     pub fn line_count(&self) -> usize {
         self.lines.line_count()
     }
 
+    /// Return the current vertical scroll offset.
     pub fn scroll_offset(&self) -> usize {
         self.scroll.offset()
     }
@@ -69,15 +79,18 @@ impl StickyFileDocument {
         self.viewport
     }
 
+    /// Set the vertical scroll offset and clamp it against current bounds.
     pub fn set_scroll_offset(&mut self, viewport_height: u16, scroll_offset: usize) {
         self.scroll.set(scroll_offset, self.max_scroll_offset());
         self.clamp(viewport_height, u16::MAX);
     }
 
+    /// Jump to the top of the rendered document.
     pub fn scroll_to_top(&mut self) {
         self.scroll.move_to_top();
     }
 
+    /// Jump to the lowest meaningful scroll offset for the current viewport.
     pub fn scroll_to_bottom(
         &mut self,
         viewport_height: u16,
@@ -92,6 +105,7 @@ impl StickyFileDocument {
             });
     }
 
+    /// Scroll down by a number of meaningful document offsets.
     pub fn scroll_down(
         &mut self,
         viewport_height: u16,
@@ -107,6 +121,7 @@ impl StickyFileDocument {
             });
     }
 
+    /// Scroll up by a number of meaningful document offsets.
     pub fn scroll_up(
         &mut self,
         viewport_height: u16,
@@ -120,29 +135,35 @@ impl StickyFileDocument {
         });
     }
 
+    /// Clamp vertical and horizontal viewport state to current content and width.
     pub fn clamp(&mut self, _viewport_height: u16, viewport_width: u16) {
         self.scroll.clamp(self.max_scroll_offset());
         self.viewport.clamp(viewport_width, self.max_line_width());
     }
 
+    /// Toggle wrapped versus horizontal-scroll document presentation.
     pub fn toggle_wrap(&mut self, viewport_width: u16) {
         self.viewport.toggle_wrap();
         self.viewport.clamp(viewport_width, self.max_line_width());
     }
 
+    /// Scroll horizontally left when no-wrap mode is active.
     pub fn scroll_left(&mut self, amount: usize) {
         self.viewport.scroll_left(amount);
     }
 
+    /// Scroll horizontally right when no-wrap mode is active.
     pub fn scroll_right(&mut self, viewport_width: u16, amount: usize) {
         self.viewport
             .scroll_right(viewport_width, amount, self.max_line_width());
     }
 
+    /// Count search matches across the rendered document.
     pub fn search_matches(&self, query: &SearchQuery) -> usize {
         search_matches(&self.lines, query)
     }
 
+    /// Move to the next matching document line, if any.
     pub fn next_match(&mut self, _viewport_height: u16, query: &SearchQuery) -> bool {
         let Some(offset) = next_matching_line(&self.lines, self.scroll.offset(), query) else {
             return false;
@@ -152,6 +173,7 @@ impl StickyFileDocument {
         true
     }
 
+    /// Move to the previous matching document line, if any.
     pub fn previous_match(&mut self, _viewport_height: u16, query: &SearchQuery) -> bool {
         let Some(offset) = previous_matching_line(&self.lines, self.scroll.offset(), query) else {
             return false;
@@ -161,6 +183,7 @@ impl StickyFileDocument {
         true
     }
 
+    /// Jump to the next file heading in the rendered document.
     pub fn next_file(&mut self) {
         if let Some(line_index) = next_file_offset(&self.lines, &self.anchors, self.scroll.offset())
         {
@@ -168,6 +191,7 @@ impl StickyFileDocument {
         }
     }
 
+    /// Jump to the previous file heading in the rendered document.
     pub fn previous_file(&mut self) {
         if let Some(line_index) =
             previous_file_offset(&self.lines, &self.anchors, self.scroll.offset())
@@ -176,6 +200,7 @@ impl StickyFileDocument {
         }
     }
 
+    /// Return the current active file label, if any.
     pub fn current_file_label(&self) -> Option<&str> {
         current_file_label(&self.lines, &self.anchors, self.scroll.offset())
     }
@@ -193,6 +218,7 @@ impl StickyFileDocument {
         self.anchors = self.lines.file_anchors();
     }
 
+    /// Project an arbitrary scroll offset into sticky fixed lines plus body.
     fn projection_at(
         &self,
         scroll_offset: usize,
@@ -218,15 +244,19 @@ pub enum DocumentDisplayMode {
 /// Viewport state for rendered document text.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct DocumentViewport {
+    /// Current wrap-versus-no-wrap display policy.
     display_mode: DocumentDisplayMode,
+    /// Current horizontal offset used only in no-wrap mode.
     horizontal_offset: usize,
 }
 
 impl DocumentViewport {
+    /// Return the current display mode.
     pub fn display_mode(self) -> DocumentDisplayMode {
         self.display_mode
     }
 
+    /// Return the current horizontal offset, or zero in wrapped mode.
     pub fn horizontal_offset(self) -> usize {
         match self.display_mode {
             DocumentDisplayMode::Wrap => 0,
@@ -234,6 +264,7 @@ impl DocumentViewport {
         }
     }
 
+    /// Toggle wrapped versus no-wrap mode, resetting horizontal scroll when wrapping.
     pub fn toggle_wrap(&mut self) {
         self.display_mode = match self.display_mode {
             DocumentDisplayMode::Wrap => DocumentDisplayMode::NoWrap,
@@ -244,12 +275,14 @@ impl DocumentViewport {
         };
     }
 
+    /// Scroll horizontally left in no-wrap mode.
     pub fn scroll_left(&mut self, amount: usize) {
         if self.display_mode == DocumentDisplayMode::NoWrap {
             self.horizontal_offset = self.horizontal_offset.saturating_sub(amount);
         }
     }
 
+    /// Scroll horizontally right in no-wrap mode within content bounds.
     pub fn scroll_right(&mut self, viewport_width: u16, amount: usize, max_line_width: usize) {
         if self.display_mode == DocumentDisplayMode::NoWrap {
             self.horizontal_offset = self
@@ -259,6 +292,7 @@ impl DocumentViewport {
         }
     }
 
+    /// Clamp horizontal offset to the current viewport and content width.
     pub fn clamp(&mut self, viewport_width: u16, max_line_width: usize) {
         match self.display_mode {
             DocumentDisplayMode::Wrap => self.horizontal_offset = 0,
@@ -273,6 +307,7 @@ impl DocumentViewport {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct StickyScroll {
+    /// Current vertical offset into the rendered document.
     offset: usize,
 }
 

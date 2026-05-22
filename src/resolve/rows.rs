@@ -17,13 +17,18 @@ pub(crate) const RESOLVE_CONFLICT_TEMPLATE: &str = r#"self.conflicted_files().ma
 /// row instead of silently dropping a conflicted file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolveEntry {
+    /// Exact conflicted path when the template row parsed successfully.
     path: Option<String>,
+    /// File-type label from the conflict template when parsing succeeded.
     file_type: Option<String>,
+    /// Conflict side count from the template when parsing succeeded.
     side_count: Option<usize>,
+    /// Raw template line preserved when parsing drifted or returned invalid JSON.
     raw_line: Option<String>,
 }
 
 impl ResolveEntry {
+    /// Builds one parsed resolve entry from template fields.
     pub fn parsed(
         path: Option<String>,
         file_type: Option<String>,
@@ -37,6 +42,7 @@ impl ResolveEntry {
         }
     }
 
+    /// Builds one degraded resolve entry that preserves the raw unparsed template row.
     pub fn unparsed(raw_line: String) -> Self {
         Self {
             path: None,
@@ -46,18 +52,22 @@ impl ResolveEntry {
         }
     }
 
+    /// Returns the exact conflicted path when the template still proves it.
     pub fn path(&self) -> Option<&str> {
         self.path.as_deref()
     }
 
+    /// Returns the file-type label from the parsed template row.
     pub fn file_type(&self) -> Option<&str> {
         self.file_type.as_deref()
     }
 
+    /// Returns the parsed conflict side count.
     pub fn side_count(&self) -> Option<usize> {
         self.side_count
     }
 
+    /// Returns the preserved raw line when parsing degraded.
     pub fn raw_line(&self) -> Option<&str> {
         self.raw_line.as_deref()
     }
@@ -76,6 +86,7 @@ pub fn load_resolve_entries(spec: &ViewSpec) -> Result<Vec<ResolveEntry>> {
     )
 }
 
+/// Parses one resolve template line and degrades malformed JSON into a visible raw row.
 fn parse_resolve_entry_line(line: &str) -> ResolveEntry {
     let raw_line = line.to_owned();
     let Ok(Value::Object(fields)) = serde_json::from_str::<Value>(line) else {
@@ -89,6 +100,7 @@ fn parse_resolve_entry_line(line: &str) -> ResolveEntry {
     )
 }
 
+/// Extracts one unsigned integer field and converts it to the platform `usize`.
 fn integer_field(fields: &serde_json::Map<String, Value>, name: &str) -> Option<usize> {
     fields
         .get(name)

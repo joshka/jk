@@ -19,8 +19,11 @@ use crate::rendered_rows::{RowMetadata, first_content_char, is_standalone_graph_
 /// navigation and copying.
 #[derive(Clone, Debug)]
 pub struct LogItem {
+    /// Rendered terminal lines that make up one selectable graph item.
     lines: Vec<Line<'static>>,
+    /// Exact change id paired back from metadata when this item represents a revision row.
     change_id: Option<String>,
+    /// Exact commit id paired back from metadata for copy actions that need commit identity.
     commit_id: Option<String>,
 }
 
@@ -72,6 +75,11 @@ impl LogItem {
     }
 }
 
+/// Load selectable log items from the rendered `jj` output for one `ViewSpec`.
+///
+/// The rendered rows remain the presentation source of truth. When the command groups log items,
+/// this loader also fetches narrow metadata so each visible item can still carry exact change and
+/// commit ids for navigation and copy behavior.
 pub fn load_entries(spec: &ViewSpec) -> Result<Vec<LogItem>> {
     let output = run_jj(spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
@@ -99,12 +107,14 @@ pub fn load_compact_log_context(revset: &str) -> Result<Vec<Line<'static>>> {
         .unwrap_or_default())
 }
 
+/// Load row metadata using a narrow template that can be paired back to rendered rows.
 fn run_jj_with_template(spec: &ViewSpec, template: &str) -> Result<RowMetadata<RevisionMetadata>> {
     Ok(parse_revision_metadata_lines(run_jj_template_lines(
         spec, template, false,
     )?))
 }
 
+/// Group rendered terminal lines into selectable log items and pair optional metadata by row.
 fn group_lines(lines: Vec<Line<'static>>, metadata: RowMetadata<RevisionMetadata>) -> Vec<LogItem> {
     let revision_row_count = lines.iter().filter(|line| starts_log_item(line)).count();
     let mut metadata = metadata
@@ -154,7 +164,9 @@ fn group_lines(lines: Vec<Line<'static>>, metadata: RowMetadata<RevisionMetadata
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct RevisionMetadata {
+    /// Full change id emitted by the metadata template for one rendered revision row.
     change_id: String,
+    /// Full commit id emitted alongside the change id when metadata pairing remains aligned.
     commit_id: Option<String>,
 }
 

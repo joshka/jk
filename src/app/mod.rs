@@ -2,7 +2,9 @@
 //!
 //! Feature slices own their view behavior. The app owns cross-cutting concerns:
 //! key dispatch, pending key-prefix state, mode handoff, refresh, search state,
-//! and routing view effects to the app submodule that owns the detailed policy.
+//! and routing view effects to the app submodule that owns the detailed policy. `services`
+//! provides the single injected side-effect seam; child app modules call it directly unless the
+//! operation must couple that effect to current app-owned state.
 
 use std::env;
 use std::time::{Duration, Instant};
@@ -46,18 +48,28 @@ pub fn run() -> Result<()> {
 ///
 /// View modules own the rendered content and local navigation policy. This
 /// struct keeps the cross-view stack, pending prefix state, search scope, and
-/// terminal-facing services together so dispatch does not have to reconstruct
-/// them from rendered output.
+/// the single injected service seam together so dispatch does not have to
+/// reconstruct cross-view state or effects from rendered output.
 struct App {
+    /// Currently active feature view.
     view: ViewState,
+    /// Back-stack of previously active views for app-level history navigation.
     stack: Vec<ViewState>,
+    /// Startup `jj log` argv restored by direct log switching.
     startup_log_args: Option<Vec<String>>,
+    /// Active show/diff presentation format chosen at the app level.
     diff_format: DiffFormat,
+    /// Current status-line state shown in shared chrome.
     status: StatusLine,
+    /// Active modal or prompt state layered over the current view.
     mode: InteractionMode,
+    /// In-progress multi-key command prefix waiting for resolution or timeout.
     pending_command: Option<PendingCommand>,
+    /// Active search query shared with the current view.
     search: Option<SearchQuery>,
+    /// Exit flag set by app-level quit handling.
     should_quit: bool,
+    /// Injected seam for jj, refresh, and alternate-view side effects.
     services: AppServices,
 }
 
@@ -122,12 +134,19 @@ fn current_viewport_width() -> u16 {
 /// state from the current view.
 #[derive(Clone)]
 struct PendingCommand {
+    /// Keys already typed for the prefix currently being resolved.
     keys: Vec<crossterm::event::KeyEvent>,
+    /// Exact binding to run if the prefix expires or no longer matches a longer sequence.
     fallback: Option<Binding>,
+    /// Instant after which the prefix should fall back automatically.
     deadline: Instant,
 }
 
 impl App {
+    /// Drive the terminal redraw and input loop until the app requests exit.
+    ///
+    /// The runtime path is deliberate: draw the current view, derive the live viewport height,
+    /// then either dispatch the next terminal event or expire any pending multi-key prefix.
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.should_quit {
             terminal.draw(|frame| {
@@ -149,6 +168,11 @@ impl App {
         Ok(())
     }
 
+    /// Route one terminal event into resize handling, modal dispatch, or normal dispatch.
+    ///
+    /// Resize is handled here because it updates app-owned presentation state immediately.
+    /// Key events first go through the active mode, then fall through to normal bindings only
+    /// when the mode does not consume them.
     fn handle_event(
         &mut self,
         terminal: &mut DefaultTerminal,
@@ -183,6 +207,7 @@ impl App {
         Ok(())
     }
 
+    /// Dispatch a normal-mode key using the current timestamp as prefix resolution time.
     fn handle_normal_key(
         &mut self,
         key: crossterm::event::KeyEvent,
@@ -191,6 +216,10 @@ impl App {
         self.handle_normal_key_at(key, viewport_height, Instant::now())
     }
 
+    /// Dispatch a normal-mode key while making prefix timeout evaluation explicit.
+    ///
+    /// Tests call this variant with a controlled timestamp so prefix fallback behavior stays
+    /// deterministic.
     fn handle_normal_key_at(
         &mut self,
         key: crossterm::event::KeyEvent,
@@ -229,6 +258,7 @@ impl App {
         }
     }
 
+    /// Continue or complete a multi-key prefix that was already in progress.
     fn handle_pending_command_key(
         &mut self,
         key: crossterm::event::KeyEvent,
@@ -288,6 +318,7 @@ impl App {
         }
     }
 
+    /// Execute any prefix fallback whose timeout expired without another key.
     fn flush_expired_pending_command(&mut self, viewport_height: u16) -> Result<()> {
         let Some(pending) = self.pending_command.as_ref() else {
             return Ok(());
@@ -300,6 +331,7 @@ impl App {
         Ok(())
     }
 
+    /// Run the exact binding that a prefix should fall back to when the longer match fails.
     fn run_pending_fallback(&mut self, viewport_height: u16) -> Result<()> {
         let fallback = self
             .pending_command
@@ -319,6 +351,7 @@ impl App {
         Ok(())
     }
 
+    /// Execute one binding and refresh ready status text if the binding says status is stale.
     fn run_binding_with_status_refresh(
         &mut self,
         binding: Binding,
@@ -331,6 +364,10 @@ impl App {
         Ok(())
     }
 
+    /// Replay the current key after a prefix fallback has already run.
+    ///
+    /// This preserves the user expectation that the suffix key is still interpreted after the
+    /// shorter binding consumed the prefix.
     fn handle_key_after_prefix_fallback(
         &mut self,
         key: crossterm::event::KeyEvent,
@@ -344,6 +381,10 @@ impl App {
         }
     }
 
+    /// Execute one app-level or view-level binding at the app root.
+    ///
+    /// This is the boundary where global commands, app-owned previews/prompts, and view-reported
+    /// commands converge before any view effect is interpreted.
     fn execute_binding(&mut self, binding: Binding, viewport_height: u16) -> Result<bool> {
         match binding.command() {
             Command::Quit => {
@@ -495,6 +536,7 @@ impl App {
         }
     }
 
+    /// Ask the active view slice to interpret one view-local command.
     fn execute_view(&mut self, command: ViewCommand, viewport_height: u16) -> ViewEffect {
         self.view.execute(
             command,
@@ -563,6 +605,7 @@ impl App {
     }
 }
 
+/// Format a pressed key sequence the same way prefix status text presents it.
 fn binding_key_label(keys: &[crossterm::event::KeyEvent]) -> String {
     keys.iter()
         .map(|key| match key.code {
@@ -574,6 +617,7 @@ fn binding_key_label(keys: &[crossterm::event::KeyEvent]) -> String {
         .join("")
 }
 
+/// Build the status-line message shown while a multi-key prefix is still pending.
 fn prefix_status_message(
     prefix: &str,
     keys: &[crossterm::event::KeyEvent],

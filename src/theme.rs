@@ -6,36 +6,43 @@
 
 use ratatui::style::{Color, Modifier, Style};
 
+/// Returns the style for the actively selected row.
 pub fn active_row_style() -> Style {
     Style::default()
         .bg(Color::Rgb(48, 52, 60))
         .add_modifier(Modifier::BOLD)
 }
 
+/// Returns the style for marked rows that are selected for preview actions.
 pub fn marked_row_style() -> Style {
     Style::default()
         .bg(Color::Rgb(32, 47, 48))
         .add_modifier(Modifier::BOLD)
 }
 
+/// Returns the background style for overlays and popovers.
 pub fn overlay_background_style() -> Style {
     Style::default().bg(Color::Rgb(18, 20, 24))
 }
 
+/// Returns the border style for overlays and popovers.
 pub fn overlay_border_style() -> Style {
     Style::default().fg(Color::DarkGray)
 }
 
+/// Returns the title style for overlays and popovers.
 pub fn overlay_title_style() -> Style {
     Style::default()
         .fg(Color::LightCyan)
         .add_modifier(Modifier::BOLD)
 }
 
+/// Returns the muted text style for secondary chrome.
 pub fn muted_style() -> Style {
     Style::default().fg(Color::Gray)
 }
 
+/// Returns the emphasized key-label style used in help and popovers.
 pub fn key_style() -> Style {
     Style::default()
         .fg(Color::Yellow)

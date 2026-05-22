@@ -92,7 +92,9 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Rendered `jj diff` output plus sticky file context and scroll state.
 pub struct DiffView {
+    /// View identity and revset navigation target for refresh and drill-down commands.
     spec: ViewSpec,
+    /// Shared sticky document state for rendered lines, viewport, and file navigation.
     document: StickyFileDocument,
 }
 
@@ -105,11 +107,13 @@ impl DiffView {
         }
     }
 
+    /// Loads rendered `jj diff` output into the shared sticky document model.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         let document = StickyFileDocument::load(&spec)?;
         Ok(Self { spec, document })
     }
 
+    /// Renders the current sticky document projection into the active viewport.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         documents::render_document_with_viewport(
             frame,
@@ -120,10 +124,12 @@ impl DiffView {
         );
     }
 
+    /// Returns the key bindings owned by the diff view.
     pub fn bindings(&self) -> &'static [Binding] {
         BINDINGS
     }
 
+    /// Applies a view command to diff-specific navigation, search, and drill-down state.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::CycleMode => ViewEffect::Ignored,
@@ -215,23 +221,28 @@ impl DiffView {
         }
     }
 
+    /// Reloads the rendered diff body while preserving the same view identity.
     pub fn refresh(&mut self) -> Result<()> {
         self.document.refresh(&self.spec)?;
         Ok(())
     }
 
+    /// Returns the rendered projection with sticky file context applied.
     pub fn projection(&self) -> PinnedDocument {
         self.document.projection([])
     }
 
+    /// Returns the view spec that identifies this diff surface.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Returns the rendered line count of the underlying diff body.
     pub fn line_count(&self) -> usize {
         self.document.line_count()
     }
 
+    /// Returns the current vertical scroll offset in rendered lines.
     pub fn scroll_offset(&self) -> usize {
         self.document.scroll_offset()
     }
@@ -241,67 +252,82 @@ impl DiffView {
         self.document.horizontal_offset()
     }
 
+    /// Restores a saved vertical scroll position, clamped to the current viewport.
     pub fn set_scroll_offset(&mut self, viewport_height: u16, scroll_offset: usize) {
         self.document
             .set_scroll_offset(viewport_height, scroll_offset);
     }
 
+    /// Moves the viewport to the first rendered line.
     pub fn scroll_to_top(&mut self) {
         self.document.scroll_to_top();
     }
 
+    /// Moves the viewport to the last reachable rendered line.
     pub fn scroll_to_bottom(&mut self, viewport_height: u16) {
         self.document.scroll_to_bottom(viewport_height, Vec::new);
     }
 
+    /// Scrolls down by `amount` rendered lines while preserving sticky projection rules.
     pub fn scroll_down(&mut self, viewport_height: u16, amount: usize) {
         for _ in 0..amount {
             self.document.scroll_down(viewport_height, 1, Vec::new);
         }
     }
 
+    /// Scrolls up by `amount` rendered lines while preserving sticky projection rules.
     pub fn scroll_up(&mut self, viewport_height: u16, amount: usize) {
         for _ in 0..amount {
             self.document.scroll_up(viewport_height, 1, Vec::new);
         }
     }
 
+    /// Clamps vertical and horizontal offsets to the current viewport dimensions.
     pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
         self.document.clamp(viewport_height, viewport_width);
     }
 
+    /// Toggles wrapped rendering for the current viewport width.
     pub fn toggle_wrap(&mut self, viewport_width: u16) {
         self.document.toggle_wrap(viewport_width);
     }
 
+    /// Moves the horizontal offset left by `amount` columns.
     pub fn scroll_left(&mut self, amount: usize) {
         self.document.scroll_left(amount);
     }
 
+    /// Moves the horizontal offset right by `amount` columns within the viewport width.
     pub fn scroll_right(&mut self, viewport_width: u16, amount: usize) {
         self.document.scroll_right(viewport_width, amount);
     }
 
+    /// Counts rendered matches for the current search query.
     pub fn search_matches(&self, query: &SearchQuery) -> usize {
         self.document.search_matches(query)
     }
 
+    /// Advances to the next rendered search match if one exists.
     pub fn next_match(&mut self, viewport_height: u16, query: &SearchQuery) -> bool {
         self.document.next_match(viewport_height, query)
     }
 
+    /// Moves to the previous rendered search match if one exists.
     pub fn previous_match(&mut self, viewport_height: u16, query: &SearchQuery) -> bool {
         self.document.previous_match(viewport_height, query)
     }
 
+    /// Selects the next detected file heading in the rendered document.
     pub fn next_file(&mut self) {
         self.document.next_file();
     }
 
+    /// Selects the previous detected file heading in the rendered document.
     pub fn previous_file(&mut self) {
         self.document.previous_file();
     }
 
+    /// Returns copyable identifiers for the current diff surface.
     pub fn copy_options(&self) -> Vec<CopyOption> {
         let mut options = Vec::new();
         if let Some(target) = self.spec.target() {

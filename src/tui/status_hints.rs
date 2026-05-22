@@ -7,19 +7,31 @@ use crate::theme;
 
 #[derive(Clone, Copy, Debug)]
 pub enum StatusHints {
+    /// Hint set for graph/log views.
     Log,
+    /// Hint set for show-like document views.
     ShowDocument,
+    /// Hint set for diff-like document views.
     DiffDocument,
+    /// Hint set for working-copy status views.
     Status,
+    /// Hint set for resolve/conflict list views.
     Resolve,
+    /// Hint set for file-list views.
     FileList,
+    /// Hint set for file-show document views.
     FileShowDocument,
+    /// Hint set for bookmark list views.
     Bookmarks,
+    /// Hint set for workspace list views.
     Workspaces,
+    /// Hint set for operation-log views.
     OperationLog,
+    /// Hint set for operation detail document views.
     OperationDetailDocument,
 }
 
+/// Project the first complete hint items that fit within the available status-line width.
 pub fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
     let mut spans = Vec::new();
     let mut used_width = 0;
@@ -45,7 +57,9 @@ pub fn status_hint_spans(hints: StatusHints, width: u16) -> Line<'static> {
 
 #[derive(Clone, Copy)]
 struct StatusHint {
+    /// Rendered key label shown in shared chrome.
     key: &'static str,
+    /// Short action label paired with the key.
     label: &'static str,
 }
 
@@ -168,10 +182,12 @@ fn status_hint_candidates(hints: StatusHints) -> &'static [StatusHint] {
     }
 }
 
+/// Count display width in terminal cells for one rendered hint fragment.
 fn text_width(text: &str) -> usize {
     text.chars().count()
 }
 
+/// Style one key label using the shared theme key treatment.
 fn key(label: &'static str) -> Span<'static> {
     span!(theme::key_style(); "{label}")
 }

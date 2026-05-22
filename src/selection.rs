@@ -2,36 +2,44 @@
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Selection {
+    /// Zero-based selected row index within the caller-owned collection.
     index: usize,
 }
 
 impl Selection {
+    /// Returns the currently selected row index.
     pub fn index(self) -> usize {
         self.index
     }
 
+    /// Moves selection to the first row.
     pub fn first(&mut self) {
         self.index = 0;
     }
 
+    /// Advances selection by one row without moving past the end.
     pub fn next(&mut self, len: usize) {
         if self.index + 1 < len {
             self.index += 1;
         }
     }
 
+    /// Moves selection up by one row without going below zero.
     pub fn previous(&mut self) {
         self.index = self.index.saturating_sub(1);
     }
 
+    /// Moves selection to the last available row.
     pub fn last(&mut self, len: usize) {
         self.index = len.saturating_sub(1);
     }
 
+    /// Sets selection to `index`, clamped to the available row count.
     pub fn set(&mut self, index: usize, len: usize) {
         self.index = index.min(len.saturating_sub(1));
     }
 
+    /// Reapplies the current index through clamping after row counts change.
     pub fn clamp(&mut self, len: usize) {
         self.set(self.index, len);
     }

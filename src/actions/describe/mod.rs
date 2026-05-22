@@ -11,14 +11,18 @@ use color_eyre::Result;
 /// working-copy target stays as jj's `@` revset.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JjDescribeTarget {
+    /// One exact selected revision from rendered metadata.
     ExactChange(String),
+    /// The current working-copy revset (`@`).
     CurrentWorkingCopy,
 }
 
 /// Preview-first plan for updating a change description without opening an editor.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjDescribePlan {
+    /// Target revision policy for the describe action.
     target: JjDescribeTarget,
+    /// Non-interactive description text passed to `jj describe --message`.
     message: String,
 }
 
@@ -28,6 +32,7 @@ pub struct JjDescribePlan {
 /// working-copy change according to jj's normal behavior.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjCommitPlan {
+    /// Non-interactive description text passed to `jj commit --message`.
     message: String,
 }
 
@@ -42,6 +47,7 @@ impl JjDescribeTarget {
         Self::CurrentWorkingCopy
     }
 
+    /// Returns the user-facing target label used in preview and command labels.
     pub fn label(&self) -> &str {
         match self {
             Self::ExactChange(change_id) => change_id,
@@ -57,6 +63,7 @@ impl JjDescribeTarget {
         }
     }
 
+    /// Returns the revset argv fragment for this target.
     fn command_arg(&self) -> String {
         match self {
             Self::ExactChange(change_id) => exact_change_id_revset(change_id),
@@ -64,6 +71,7 @@ impl JjDescribeTarget {
         }
     }
 
+    /// Returns user-facing preview wording for this target.
     fn preview_target(&self) -> String {
         match self {
             Self::ExactChange(change_id) => format!("exact selected revision {change_id}"),
@@ -81,10 +89,12 @@ impl JjDescribePlan {
         }
     }
 
+    /// Returns the target policy owned by this describe plan.
     pub fn target(&self) -> &JjDescribeTarget {
         &self.target
     }
 
+    /// Returns the user-facing `jj` command label for this describe plan.
     pub fn command_label(&self) -> String {
         format!(
             "jj describe {} --message {}",
@@ -93,6 +103,7 @@ impl JjDescribePlan {
         )
     }
 
+    /// Returns argv for `jj describe --message`.
     pub fn command_argv(&self) -> Vec<String> {
         vec![
             "describe".to_owned(),
@@ -102,6 +113,7 @@ impl JjDescribePlan {
         ]
     }
 
+    /// Returns preview text without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }
@@ -130,10 +142,12 @@ impl JjCommitPlan {
         }
     }
 
+    /// Returns the user-facing `jj` command label for this commit plan.
     pub fn command_label(&self) -> String {
         format!("jj commit --message {}", self.message)
     }
 
+    /// Returns argv for `jj commit --message`.
     pub fn command_argv(&self) -> Vec<String> {
         vec![
             "commit".to_owned(),
@@ -142,6 +156,7 @@ impl JjCommitPlan {
         ]
     }
 
+    /// Returns preview text without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }

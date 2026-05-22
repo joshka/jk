@@ -63,8 +63,11 @@ pub const BINDINGS: &[Binding] = &[
 
 /// Selectable bookmark output from `jj bookmark list`.
 pub struct BookmarksView {
+    /// View identity used to reload the bookmark list.
     pub(super) spec: ViewSpec,
+    /// Rendered bookmark rows paired with trusted names, targets, and row state.
     pub(super) entries: Vec<BookmarkItem>,
+    /// Current selected row within the bookmark list.
     pub(super) selection: Selection,
 }
 
@@ -87,6 +90,7 @@ impl BookmarksView {
         }
     }
 
+    /// Loads rendered bookmark rows and initializes selection at the first row.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         Ok(Self {
             entries: load_bookmark_entries(&spec)?,
@@ -95,15 +99,18 @@ impl BookmarksView {
         })
     }
 
+    /// Renders the bookmark list with the active selection and search highlights.
     pub fn render(&self, frame: &mut Frame<'_>, area: Rect, search: Option<&SearchQuery>) {
         let mut state = ListState::default().with_selected(Some(self.selection.index()));
         frame.render_stateful_widget(entry_list(&self.entries, search), area, &mut state);
     }
 
+    /// Returns the key bindings owned by the bookmarks view.
     pub fn bindings(&self) -> &'static [Binding] {
         super::BINDINGS
     }
 
+    /// Applies selection, navigation, search, copy, and bookmark-detail commands.
     pub fn execute(&mut self, command: ViewCommand, context: CommandContext<'_>) -> ViewEffect {
         match command {
             ViewCommand::MoveDown => {
@@ -169,44 +176,54 @@ impl BookmarksView {
         }
     }
 
+    /// Reloads rendered bookmark rows while preserving the selected bookmark name when possible.
     pub fn refresh(&mut self) -> Result<()> {
         self.refresh_with_loader(load_bookmark_entries)
     }
 
+    /// Clamps the current selection to the available rows.
     pub fn clamp(&mut self) {
         self.selection.clamp(self.entries.len());
     }
 
+    /// Returns the view spec that identifies this bookmarks surface.
     pub fn spec(&self) -> &ViewSpec {
         &self.spec
     }
 
+    /// Returns the number of selectable bookmark rows.
     pub fn item_count(&self) -> usize {
         self.entries.len()
     }
 
+    /// Returns the total rendered line count across all bookmark rows.
     pub fn line_count(&self) -> usize {
         self.entries.iter().map(BookmarkItem::line_count).sum()
     }
 
+    /// Returns the currently selected bookmark row, if any.
     fn selected_entry(&self) -> Option<&BookmarkItem> {
         self.entries.get(self.selection.index())
     }
 
+    /// Returns the exact bookmark name for the selected row.
     pub fn selected_bookmark_name(&self) -> Option<&str> {
         self.selected_entry().map(BookmarkItem::bookmark_name)
     }
 
+    /// Returns the selected local bookmark name when action policy allows it.
     pub fn selected_local_bookmark_name(&self) -> Option<&str> {
         self.action_targets().selected_local_bookmark_name()
     }
 
+    /// Resolves the exact forget target for the selected row when the row state is safe.
     pub fn selected_bookmark_forget_target(
         &self,
     ) -> Result<Option<(&str, JjBookmarkForgetTarget)>> {
         self.action_targets().selected_bookmark_forget_target()
     }
 
+    /// Resolves the exact track or untrack target for the selected row when the row state is safe.
     pub fn selected_bookmark_tracking_target(
         &self,
         kind: JjBookmarkMutationKind,
@@ -215,10 +232,12 @@ impl BookmarksView {
             .selected_bookmark_tracking_target(kind)
     }
 
+    /// Builds the bookmark action-target resolver for the current selection and visible rows.
     fn action_targets(&self) -> BookmarkActionTargetResolver<'_> {
         BookmarkActionTargetResolver::new(self.selected_entry(), &self.entries, self.spec.args())
     }
 
+    /// Counts rows whose rendered text matches the current search query.
     pub(super) fn search_matches(&self, query: &SearchQuery) -> usize {
         self.entries
             .iter()
@@ -226,6 +245,7 @@ impl BookmarksView {
             .count()
     }
 
+    /// Advances selection to the next matching row if one exists.
     pub(super) fn next_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = ((self.selection.index() + 1)..self.entries.len())
             .chain(0..self.selection.index().min(self.entries.len()))
@@ -237,6 +257,7 @@ impl BookmarksView {
         true
     }
 
+    /// Moves selection to the previous matching row if one exists.
     pub(super) fn previous_match(&mut self, query: &SearchQuery) -> bool {
         let Some(index) = (0..self.selection.index())
             .rev()
@@ -249,6 +270,7 @@ impl BookmarksView {
         true
     }
 
+    /// Returns copyable identifiers and rendered row text for the selected bookmark.
     pub(super) fn copy_options(&self) -> Vec<CopyOption> {
         let Some(entry) = self.selected_entry() else {
             return Vec::new();
@@ -266,6 +288,7 @@ impl BookmarksView {
         options
     }
 
+    /// Reloads rows and restores selection by bookmark name before falling back to index.
     pub(super) fn refresh_with_loader(
         &mut self,
         load: impl Fn(&ViewSpec) -> Result<Vec<BookmarkItem>>,
@@ -286,6 +309,7 @@ impl BookmarksView {
     }
 }
 
+/// Projects rendered bookmark rows into the selectable list widget.
 fn entry_list(entries: &[BookmarkItem], search: Option<&SearchQuery>) -> List<'static> {
     let items = entries
         .iter()
@@ -302,6 +326,7 @@ fn entry_list(entries: &[BookmarkItem], search: Option<&SearchQuery>) -> List<'s
     List::new(items).highlight_style(theme::active_row_style())
 }
 
+/// Restores selection by exact bookmark name before falling back to the previous index.
 fn restore_selection(
     selection: &mut Selection,
     entries: &[BookmarkItem],

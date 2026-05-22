@@ -16,12 +16,16 @@ use super::{
 };
 
 pub(super) struct BookmarkActionTargetResolver<'a> {
+    /// Currently selected bookmark row, if any.
     selected: Option<&'a BookmarkItem>,
+    /// All visible bookmark rows used to resolve peers and ambiguity.
     entries: &'a [BookmarkItem],
+    /// View args used to detect whether all-remotes metadata is safely unfiltered.
     spec_args: &'a [String],
 }
 
 impl<'a> BookmarkActionTargetResolver<'a> {
+    /// Builds the resolver from the selected row, visible rows, and view args.
     pub(super) fn new(
         selected: Option<&'a BookmarkItem>,
         entries: &'a [BookmarkItem],
@@ -34,12 +38,14 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Returns the selected bookmark name only when the row is a trusted local bookmark.
     pub(super) fn selected_local_bookmark_name(&self) -> Option<&'a str> {
         self.selected
             .filter(|entry| matches!(entry.state(), BookmarkRowState::Local { .. }))
             .map(BookmarkItem::bookmark_name)
     }
 
+    /// Resolves the exact forget target for the selected row or reports why it is unsafe.
     pub(super) fn selected_bookmark_forget_target(
         &self,
     ) -> Result<Option<(&'a str, JjBookmarkForgetTarget)>> {
@@ -67,6 +73,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Resolves the exact track or untrack target for the selected row or reports why it is unsafe.
     pub(super) fn selected_bookmark_tracking_target(
         &self,
         kind: JjBookmarkMutationKind,
@@ -88,6 +95,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Resolves a remote-row forget target only when local-peer and remote uniqueness checks pass.
     fn remote_forget_target(
         &self,
         name: &str,
@@ -140,6 +148,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         ))
     }
 
+    /// Resolves an exact track target for the selected bookmark row.
     fn selected_bookmark_track_target(
         &self,
         entry: &'a BookmarkItem,
@@ -163,6 +172,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Resolves an exact untrack target for the selected bookmark row.
     fn selected_bookmark_untrack_target(
         &self,
         entry: &'a BookmarkItem,
@@ -186,6 +196,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Resolves a track target from a trusted local row with one eligible remote peer.
     fn local_bookmark_track_target(
         &self,
         name: &'a str,
@@ -228,6 +239,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Resolves an untrack target from a trusted local row with one eligible remote peer.
     fn local_bookmark_untrack_target(
         &self,
         name: &'a str,
@@ -270,6 +282,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Enforces the all-remotes and uniqueness preconditions for local tracking actions.
     fn require_safe_local_tracking_context(&self, action: &str, name: &str) -> Result<()> {
         if !self.has_unfiltered_all_remotes_metadata() {
             return Err(eyre!(
@@ -287,6 +300,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         Ok(())
     }
 
+    /// Returns one eligible remote peer or reports why the remote peer set is unsafe.
     fn exactly_one_remote_peer(
         &self,
         name: &str,
@@ -311,6 +325,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Returns the one visible local peer for a bookmark name or reports ambiguity.
     fn visible_local_peer_target(&self, action: &str, name: &str) -> Result<Option<&BookmarkItem>> {
         let peers = self
             .entries
@@ -331,12 +346,14 @@ impl<'a> BookmarkActionTargetResolver<'a> {
         }
     }
 
+    /// Returns whether any visible local peer exists for the bookmark name.
     fn has_local_bookmark_peer(&self, name: &str) -> bool {
         self.entries.iter().any(|entry| {
             entry.bookmark_name() == name && matches!(entry.state(), BookmarkRowState::Local { .. })
         })
     }
 
+    /// Counts visible local peers with the same exact bookmark name.
     fn local_bookmark_peer_count(&self, name: &str) -> usize {
         self.entries
             .iter()
@@ -347,6 +364,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
             .count()
     }
 
+    /// Counts visible remote peers with the same exact bookmark name.
     fn remote_bookmark_peer_count(&self, name: &str) -> usize {
         self.entries
             .iter()
@@ -357,6 +375,7 @@ impl<'a> BookmarkActionTargetResolver<'a> {
             .count()
     }
 
+    /// Returns whether the view args prove unfiltered all-remotes metadata coverage.
     fn has_unfiltered_all_remotes_metadata(&self) -> bool {
         !self.spec_args.is_empty()
             && self

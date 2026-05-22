@@ -14,28 +14,36 @@ use crate::jj::run_direct_args;
 // operation restore/revert, which target one exact operation id.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjOperationRecoveryKind {
+    /// Globally undo the most recent repository operation.
     Undo,
+    /// Globally redo the most recently undone repository operation.
     Redo,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum JjOperationTargetKind {
+    /// Restore repository state to one selected exact operation by creating a new operation.
     Restore,
+    /// Revert one selected exact operation by applying its inverse.
     Revert,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjOperationRecovery {
+    /// Repository-wide undo/redo kind that does not take a selected operation id.
     kind: JjOperationRecoveryKind,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjOperationTarget {
+    /// Exact selected-operation action to run.
     kind: JjOperationTargetKind,
+    /// Exact operation id taken from the selected operation-log row.
     operation_id: String,
 }
 
 impl JjOperationRecovery {
+    /// Builds one repository-wide undo/redo recovery plan.
     pub fn new(kind: JjOperationRecoveryKind) -> Self {
         Self { kind }
     }
@@ -45,6 +53,7 @@ impl JjOperationRecovery {
         self.kind
     }
 
+    /// Returns the user-facing `jj` command label for this recovery action.
     pub fn command_label(&self) -> &'static str {
         match self.kind {
             JjOperationRecoveryKind::Undo => "jj undo",
@@ -52,6 +61,7 @@ impl JjOperationRecovery {
         }
     }
 
+    /// Returns argv for the repository-wide recovery command.
     pub fn command_argv(&self) -> Vec<String> {
         match self.kind {
             JjOperationRecoveryKind::Undo => vec!["undo".to_owned()],
@@ -59,6 +69,7 @@ impl JjOperationRecovery {
         }
     }
 
+    /// Returns preview text explaining what the recovery action does and does not target.
     pub fn preview_text(&self) -> &'static str {
         match self.kind {
             JjOperationRecoveryKind::Undo => concat!(
@@ -77,6 +88,7 @@ impl JjOperationRecovery {
         }
     }
 
+    /// Returns the follow-up recovery hint shown after success.
     pub fn success_hint(&self) -> &'static str {
         match self.kind {
             JjOperationRecoveryKind::Undo => "jj redo",
@@ -84,6 +96,7 @@ impl JjOperationRecovery {
         }
     }
 
+    /// Returns the status verb used in app messaging for this action.
     pub fn status_action(&self) -> &'static str {
         match self.kind {
             JjOperationRecoveryKind::Undo => "undo",
@@ -91,6 +104,7 @@ impl JjOperationRecovery {
         }
     }
 
+    /// Runs the repository-wide undo or redo command through the direct `jj` boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(),
@@ -101,6 +115,7 @@ impl JjOperationRecovery {
 }
 
 impl JjOperationTargetKind {
+    /// Returns the action verb used in menu labels and status messages.
     pub fn label(self) -> &'static str {
         match self {
             Self::Restore => "restore",
@@ -108,6 +123,7 @@ impl JjOperationTargetKind {
         }
     }
 
+    /// Returns fallback success wording when `jj` output does not provide one.
     fn success_fallback(self) -> &'static str {
         match self {
             Self::Restore => "restored operation",
@@ -117,6 +133,7 @@ impl JjOperationTargetKind {
 }
 
 impl JjOperationTarget {
+    /// Builds an exact selected-operation restore plan.
     pub fn restore(operation_id: impl Into<String>) -> Self {
         Self {
             kind: JjOperationTargetKind::Restore,
@@ -124,6 +141,7 @@ impl JjOperationTarget {
         }
     }
 
+    /// Builds an exact selected-operation revert plan.
     pub fn revert(operation_id: impl Into<String>) -> Self {
         Self {
             kind: JjOperationTargetKind::Revert,
@@ -136,19 +154,23 @@ impl JjOperationTarget {
         self.kind
     }
 
+    /// Returns the exact selected operation id owned by this plan.
     pub fn operation_id(&self) -> &str {
         &self.operation_id
     }
 
+    /// Returns the status verb used in app messaging for this action.
     pub fn status_action(&self) -> &'static str {
         self.kind.label()
     }
 
+    /// Returns the full `jj` command label for this exact operation action.
     pub fn command_label(&self) -> String {
         let label_args = self.command_argv().join(" ");
         format!("jj {label_args}")
     }
 
+    /// Returns argv for the exact operation action.
     pub fn command_argv(&self) -> Vec<String> {
         let action = match self.kind {
             JjOperationTargetKind::Restore => "restore",
@@ -161,10 +183,12 @@ impl JjOperationTarget {
         ]
     }
 
+    /// Returns preview output without mutating repository state.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         Ok(CommandOutput::new(self.preview_summary()))
     }
 
+    /// Runs the exact operation action through the direct `jj` boundary.
     pub fn run(&self) -> Result<CommandOutput> {
         run_direct_args(
             self.command_argv(),
@@ -173,6 +197,7 @@ impl JjOperationTarget {
         )
     }
 
+    /// Returns the preview summary shown before confirming the action.
     pub fn preview_summary(&self) -> String {
         let effect = match self.kind {
             JjOperationTargetKind::Restore => {

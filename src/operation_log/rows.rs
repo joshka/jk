@@ -18,11 +18,14 @@ pub(crate) const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
 /// One selectable operation item parsed from rendered operation-log output.
 #[derive(Clone, Debug)]
 pub struct OperationLogItem {
+    /// Preserved rendered lines for one selectable operation-log row.
     lines: Vec<Line<'static>>,
+    /// Exact operation id paired from metadata when row counts still match.
     operation_id: Option<String>,
 }
 
 impl OperationLogItem {
+    /// Builds one rendered operation-log item and its paired exact operation id.
     pub fn new(lines: Vec<Line<'static>>, operation_id: Option<String>) -> Self {
         Self {
             lines,
@@ -30,18 +33,22 @@ impl OperationLogItem {
         }
     }
 
+    /// Returns the preserved rendered lines for this operation row.
     pub fn lines(&self) -> Vec<Line<'static>> {
         self.lines.clone()
     }
 
+    /// Returns the number of rendered lines in this operation row.
     pub fn line_count(&self) -> usize {
         self.lines.len()
     }
 
+    /// Returns the exact operation id paired with this row, if metadata was valid.
     pub fn operation_id(&self) -> Option<&str> {
         self.operation_id.as_deref()
     }
 
+    /// Returns plain row text for copy and search surfaces.
     pub fn row_text(&self) -> String {
         self.lines
             .iter()
@@ -51,6 +58,7 @@ impl OperationLogItem {
     }
 }
 
+/// Loads rendered operation-log rows and pairs them with exact metadata ids.
 pub fn load_operation_log_entries(spec: &ViewSpec) -> Result<Vec<OperationLogItem>> {
     let output = run_jj(spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
@@ -58,6 +66,7 @@ pub fn load_operation_log_entries(spec: &ViewSpec) -> Result<Vec<OperationLogIte
     Ok(group_operation_log_lines(lines, operation_ids))
 }
 
+/// Loads exact operation ids through a narrow metadata template.
 fn run_operation_log_ids(spec: &ViewSpec) -> Result<RowMetadata<String>> {
     Ok(parse_operation_id_lines(run_jj_template_lines(
         spec,
@@ -66,6 +75,7 @@ fn run_operation_log_ids(spec: &ViewSpec) -> Result<RowMetadata<String>> {
     )?))
 }
 
+/// Groups rendered lines into selectable rows and attaches ids only when metadata still matches.
 fn group_operation_log_lines(
     lines: Vec<Line<'static>>,
     operation_ids: RowMetadata<String>,
@@ -105,6 +115,7 @@ fn group_operation_log_lines(
     items
 }
 
+/// Parses one metadata line into an exact operation id only when the shape is exact.
 fn parse_operation_id_line(line: &str) -> Option<String> {
     let mut tokens = line.split_whitespace();
     let operation_id = tokens.next()?;
@@ -116,6 +127,7 @@ fn parse_operation_id_line(line: &str) -> Option<String> {
     Some(operation_id.to_owned())
 }
 
+/// Parses metadata lines and fails closed on the first malformed row.
 fn parse_operation_id_lines(lines: Vec<String>) -> RowMetadata<String> {
     let mut operation_ids = Vec::new();
     for line in lines {
@@ -127,10 +139,12 @@ fn parse_operation_id_lines(lines: Vec<String>) -> RowMetadata<String> {
     RowMetadata::Valid(operation_ids)
 }
 
+/// Returns whether the token is one full hexadecimal operation id.
 fn is_operation_id(token: &str) -> bool {
     token.len() == 128 && token.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+/// Returns whether a rendered line starts a new operation-log item.
 fn starts_operation_log_item(line: &Line<'_>) -> bool {
     first_content_char(&line_text(line)).is_some_and(|character| matches!(character, '@' | '○'))
 }

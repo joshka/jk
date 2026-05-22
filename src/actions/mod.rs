@@ -56,6 +56,7 @@ pub use working_copy::{
 /// reparsing command output, reconstructing jj wording, or inferring follow-up state transitions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandOutput {
+    /// Presentation-ready text shown in the preview or result pane.
     message: String,
 }
 

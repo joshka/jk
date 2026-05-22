@@ -20,6 +20,7 @@ const DESCRIPTION_FIRST_LINE_TEMPLATE: &str = "description.first_line() ++ \"\\n
 /// rewrite plans because it classifies destructive risk before command execution.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjAbandonPlan {
+    /// Exact selected revision targeted by `jj abandon`.
     revision: String,
 }
 
@@ -31,22 +32,27 @@ impl JjAbandonPlan {
         }
     }
 
+    /// Returns the exact selected revision targeted by this plan.
     pub fn revision(&self) -> &str {
         &self.revision
     }
 
+    /// Returns the user-facing `jj` command label for this abandon plan.
     pub fn command_label(&self) -> String {
         format!("jj abandon {}", self.revision)
     }
 
+    /// Returns argv for `jj abandon`.
     pub fn command_argv(&self) -> Vec<String> {
         vec!["abandon".to_owned(), self.exact_change_id_revset()]
     }
 
+    /// Returns the user-facing label for the diff-summary preflight probe.
     pub fn diff_summary_label(&self) -> String {
         format!("jj diff -r {} --summary", self.revision)
     }
 
+    /// Returns argv for the diff-summary preflight probe.
     pub fn diff_summary_argv(&self) -> Vec<String> {
         vec![
             "diff".to_owned(),
@@ -90,6 +96,7 @@ impl JjAbandonPlan {
         Ok((!title.is_empty()).then_some(title))
     }
 
+    /// Returns argv for the first-line title preflight probe.
     fn title_argv(&self) -> Vec<String> {
         vec![
             "log".to_owned(),
@@ -101,6 +108,7 @@ impl JjAbandonPlan {
         ]
     }
 
+    /// Returns the quoted exact-change revset for the selected revision.
     fn exact_change_id_revset(&self) -> String {
         exact_change_id_revset(&self.revision)
     }
@@ -112,14 +120,19 @@ impl JjAbandonPlan {
 /// confirmation strength. It does not decide refresh or reveal behavior after abandon completes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjAbandonPreview {
+    /// Exact selected revision shown in the confirmation screen.
     revision: String,
+    /// First description line loaded from `jj log`, when available.
     title: Option<String>,
+    /// `jj diff --summary` output preserved for the confirmation screen.
     summary: String,
+    /// Empty versus non-empty classification derived from the summary text.
     change_state: AbandonChangeState,
 }
 
 impl JjAbandonPreview {
     /// Classify preflight output only by whether jj reported a non-empty diff summary.
+    /// Builds the confirmation preview and classifies empty versus non-empty change state.
     pub fn new(revision: String, title: Option<String>, summary: String) -> Self {
         let change_state = if summary.trim().is_empty() {
             AbandonChangeState::Empty
@@ -175,7 +188,9 @@ impl JjAbandonPreview {
 /// confirmation flow, not in this local classifier.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AbandonChangeState {
+    /// `jj diff --summary` reported no visible content changes.
     Empty,
+    /// `jj diff --summary` reported content changes.
     NonEmpty,
 }
 
