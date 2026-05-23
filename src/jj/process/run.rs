@@ -4,7 +4,10 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
 use crate::jj::ViewSpec;
-use crate::jj::command::{JjCommand, jj_command_args};
+use crate::jj::command::{
+    JjCommand, jj_command_args, jj_command_args_with_template,
+    jj_command_args_with_template_no_graph,
+};
 
 /// Preserve jj color escapes so the TUI can render the same styled output.
 #[derive(Clone, Copy, Debug)]
@@ -12,6 +15,12 @@ pub enum ColorMode {
     Always,
     /// Disable color when jk is parsing semantic helper output rather than rendering it directly.
     Never,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum TemplateGraphStyle {
+    Include,
+    Omit,
 }
 
 impl ColorMode {
@@ -29,20 +38,30 @@ impl ColorMode {
 /// rows or detail-document loading.
 pub fn run_jj(spec: &ViewSpec, color: ColorMode) -> Result<std::process::Output> {
     let label = spec.label();
-    run_view_command(spec, &label, color, None, false)
+    run_view_command(spec, &label, color, ViewCommandArgs::Default)
 }
 
-pub fn run_jj_template_lines(
+pub fn run_jj_template_lines(spec: &ViewSpec, template: &str) -> Result<Vec<String>> {
+    run_jj_template_lines_with_style(spec, template, TemplateGraphStyle::Include)
+}
+
+pub fn run_jj_template_lines_no_graph(spec: &ViewSpec, template: &str) -> Result<Vec<String>> {
+    run_jj_template_lines_with_style(spec, template, TemplateGraphStyle::Omit)
+}
+
+fn run_jj_template_lines_with_style(
     spec: &ViewSpec,
     template: &str,
-    no_graph: bool,
+    graph_style: TemplateGraphStyle,
 ) -> Result<Vec<String>> {
     let output = run_view_command(
         spec,
         &format!("{} metadata", metadata_label(spec)),
         ColorMode::Never,
-        Some(template),
-        no_graph,
+        ViewCommandArgs::Template {
+            template,
+            graph_style,
+        },
     )?;
     let stdout = String::from_utf8(output.stdout)?;
     Ok(stdout.lines().map(str::to_owned).collect())
@@ -100,15 +119,32 @@ pub fn parse_exact_change_id(output: &str) -> Result<String> {
 ///
 /// This keeps the `ViewSpec`-to-process boundary in one place so callers differ only in how they
 /// interpret successful stdout.
+enum ViewCommandArgs<'a> {
+    Default,
+    Template {
+        template: &'a str,
+        graph_style: TemplateGraphStyle,
+    },
+}
+
 fn run_view_command(
     spec: &ViewSpec,
     label: &str,
     color: ColorMode,
-    template: Option<&str>,
-    no_graph: bool,
+    args: ViewCommandArgs<'_>,
 ) -> Result<std::process::Output> {
     let mut jj = base_command(color);
-    jj.args(jj_command_args(spec, template, no_graph));
+    match args {
+        ViewCommandArgs::Default => jj.args(jj_command_args(spec)),
+        ViewCommandArgs::Template {
+            template,
+            graph_style: TemplateGraphStyle::Include,
+        } => jj.args(jj_command_args_with_template(spec, template)),
+        ViewCommandArgs::Template {
+            template,
+            graph_style: TemplateGraphStyle::Omit,
+        } => jj.args(jj_command_args_with_template_no_graph(spec, template)),
+    };
 
     let output = jj.output()?;
     if !output.status.success() {

@@ -65,7 +65,7 @@ impl App {
             JjGitPushTarget::Status => JjGitPush::for_status().with_remote(remote),
         };
 
-        let command_label = push.command_label(true);
+        let command_label = push.preview_command_label();
         let output = self.preview_output_with_error_status(
             command_label,
             self.services.load_push_preview(&push),

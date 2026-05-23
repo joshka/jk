@@ -280,11 +280,11 @@ pub fn mock_multiple_remotes() -> Result<Vec<String>> {
 }
 
 pub fn mock_push_preview_success(push: &JjGitPush) -> Result<String> {
-    Ok(format!("preview: {}", push.command_label(true)))
+    Ok(format!("preview: {}", push.preview_command_label()))
 }
 
 pub fn mock_push_success(push: &JjGitPush) -> Result<String> {
-    Ok(format!("pushed: {}", push.command_label(false)))
+    Ok(format!("pushed: {}", push.command_label()))
 }
 
 pub fn mock_resolve_current_change_id(revset: &str) -> Result<String> {

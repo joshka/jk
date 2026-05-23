@@ -34,18 +34,13 @@ impl JjSquashPlan {
     }
 
     /// Returns the user-facing `jj` command label for this squash plan.
-    pub fn command_label(&self, _dry_run: bool) -> String {
-        let label_args = self
-            .command_argv(false)
-            .iter()
-            .map(|arg| arg.as_str())
-            .collect::<Vec<_>>()
-            .join(" ");
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
         format!("jj {label_args}")
     }
 
     /// Returns argv for `jj squash`.
-    pub fn command_argv(&self, _dry_run: bool) -> Vec<String> {
+    pub fn command_argv(&self) -> Vec<String> {
         let mut argv = vec!["squash".to_owned()];
         for source in &self.sources {
             argv.push("--from".to_owned());
@@ -64,11 +59,7 @@ impl JjSquashPlan {
 
     /// Runs `jj squash` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
-        run_direct_args(
-            self.command_argv(false),
-            &self.command_label(false),
-            "squashed",
-        )
+        run_direct_args(self.command_argv(), &self.command_label(), "squashed")
     }
 
     /// Returns the preview summary shown before confirming `jj squash`.
@@ -82,7 +73,7 @@ impl JjSquashPlan {
 
         format!(
             "command: {}\n\n{}\n\ndestination: {}\n\ngraph effect: moves the selected source changes into the destination; jj may abandon emptied sources and rebase descendants\n\ndescription behavior: --use-destination-message keeps the destination description, discards source descriptions, and avoids an editor or prompt\n\nconfirmation: press Enter to run jj squash\nundo path: jj undo",
-            self.command_label(false),
+            self.command_label(),
             sources,
             self.destination,
         )

@@ -29,7 +29,11 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
             .unwrap_or_default();
     };
 
-    let mut mutation_items = mutation_menu_items(current_revision, context.selected_path(), true);
+    let mut mutation_items = mutation_menu_items(
+        current_revision,
+        context.selected_path(),
+        DuplicateMenuItemPolicy::Include,
+    );
     if context.is_detail_surface()
         && let Some(file_action) = &context.file_action
     {
@@ -59,8 +63,11 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
     {
         let edit = menu_item_for_edit(current_revision);
         let new = menu_item_for_new_parents(&new_parents);
-        let split =
-            menu_item_for_split(current_revision, context.current_is_visible_working_copy());
+        let split = if context.current_is_visible_working_copy() {
+            menu_item_for_split_current_working_copy()
+        } else {
+            menu_item_for_split_revision(current_revision)
+        };
         let abandon = menu_item_for_single_revision(ActionKind::Abandon, current_revision);
         let mut items = vec![edit, new, split, abandon];
         items.extend(mutation_items);
@@ -83,8 +90,17 @@ pub fn build_action_menu(context: &ExactActionContext) -> ActionMenu {
         menu_item_for_multirev_action(ActionKind::Squash, &selected_revisions, current_revision),
         menu_item_for_absorb(current_revision, &selected_revisions),
     ];
-    items.extend(mutation_menu_items(current_revision, None, false));
+    items.extend(mutation_menu_items(
+        current_revision,
+        None,
+        DuplicateMenuItemPolicy::Omit,
+    ));
     ActionMenu::new(items)
+}
+
+enum DuplicateMenuItemPolicy {
+    Include,
+    Omit,
 }
 
 fn menu_item_for_new_parents(parent_revisions: &[String]) -> ActionMenuItem {
@@ -140,26 +156,25 @@ fn menu_item_for_single_revision(action: ActionKind, revision: &str) -> ActionMe
     }
 }
 
-fn menu_item_for_split(revision: &str, current_is_visible_working_copy: bool) -> ActionMenuItem {
-    let label = if current_is_visible_working_copy {
-        "split current working-copy change @".to_owned()
-    } else {
-        format!("split selected revision {}", short_id(revision))
-    };
-    let follow_up = if current_is_visible_working_copy {
-        FollowUp::SplitCurrentWorkingCopy
-    } else {
-        FollowUp::SplitExactTarget {
-            revision: revision.to_owned(),
-        }
-    };
-
+fn menu_item_for_split_current_working_copy() -> ActionMenuItem {
     ActionMenuItem {
         action: ActionKind::Split,
         shortcut: ActionKind::Split.shortcut(),
-        label,
+        label: "split current working-copy change @".to_owned(),
         safety_tier: SafetyTier::PreviewFirst,
-        follow_up,
+        follow_up: FollowUp::SplitCurrentWorkingCopy,
+    }
+}
+
+fn menu_item_for_split_revision(revision: &str) -> ActionMenuItem {
+    ActionMenuItem {
+        action: ActionKind::Split,
+        shortcut: ActionKind::Split.shortcut(),
+        label: format!("split selected revision {}", short_id(revision)),
+        safety_tier: SafetyTier::PreviewFirst,
+        follow_up: FollowUp::SplitExactTarget {
+            revision: revision.to_owned(),
+        },
     }
 }
 
@@ -235,7 +250,7 @@ fn menu_item_for_absorb(source_revision: &str, destination_revisions: &[String])
 fn mutation_menu_items(
     current_revision: &str,
     selected_path: Option<&str>,
-    include_duplicate: bool,
+    duplicate_policy: DuplicateMenuItemPolicy,
 ) -> Vec<ActionMenuItem> {
     let mut items = Vec::new();
     if let Some(path) = selected_path {
@@ -250,7 +265,7 @@ fn mutation_menu_items(
             },
         });
     }
-    if include_duplicate {
+    if matches!(duplicate_policy, DuplicateMenuItemPolicy::Include) {
         items.push(ActionMenuItem {
             action: ActionKind::Duplicate,
             shortcut: ActionKind::Duplicate.shortcut(),

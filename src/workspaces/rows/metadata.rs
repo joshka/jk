@@ -22,11 +22,7 @@ pub const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
 
 /// Loads workspace metadata rows through the workspace-specific template side channel.
 pub fn run_workspace_metadata(spec: &ViewSpec) -> Result<Vec<WorkspaceMetadata>> {
-    parse_workspace_metadata_lines(run_jj_template_lines(
-        spec,
-        WORKSPACE_METADATA_TEMPLATE,
-        false,
-    )?)
+    parse_workspace_metadata_lines(run_jj_template_lines(spec, WORKSPACE_METADATA_TEMPLATE)?)
 }
 
 /// Pairs rendered workspace rows with metadata and degrades safely when parsing drifts.

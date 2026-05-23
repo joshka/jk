@@ -96,12 +96,10 @@ impl BookmarkMetadata {
 
 /// Loads bookmark metadata rows through the bookmark-specific template side channel.
 pub fn run_jj_bookmark_metadata(spec: &ViewSpec) -> Result<Vec<BookmarkMetadata>> {
-    Ok(
-        run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE, false)?
-            .into_iter()
-            .filter_map(|line| parse_bookmark_metadata_line(&line))
-            .collect(),
-    )
+    Ok(run_jj_template_lines(spec, BOOKMARK_METADATA_TEMPLATE)?
+        .into_iter()
+        .filter_map(|line| parse_bookmark_metadata_line(&line))
+        .collect())
 }
 
 /// Parses one metadata line and rejects rows that do not match the exact schema.

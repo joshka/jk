@@ -1,4 +1,4 @@
-use super::super::path_actions::FileActionContext;
+use super::super::path_actions::{FileActionContext, StatusPathActionAvailability};
 
 /// Exact selection state carried from revision-owned surfaces into action-menu policy.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,19 +45,14 @@ impl ExactActionContext {
     /// Build a status-surface context for a tracked working-copy path.
     pub fn status_tracked_path(
         path: impl Into<String>,
-        restore_allowed: bool,
-        chmod_allowed: bool,
+        availability: StatusPathActionAvailability,
     ) -> Self {
         let path = path.into();
         Self {
             current_revision: Some("@".to_owned()),
             source_revisions: Vec::new(),
             selected_path: Some(path.clone()),
-            file_action: Some(FileActionContext::working_copy_tracked(
-                path,
-                restore_allowed,
-                chmod_allowed,
-            )),
+            file_action: Some(FileActionContext::status_tracked_path(path, availability)),
             current_is_visible_working_copy: false,
             surface: ActionSurface::Status,
         }
@@ -65,7 +60,13 @@ impl ExactActionContext {
 
     #[cfg(test)]
     pub fn status_path(path: impl Into<String>) -> Self {
-        Self::status_tracked_path(path, true, true)
+        Self::status_tracked_path(
+            path,
+            StatusPathActionAvailability {
+                restore_allowed: true,
+                chmod_allowed: true,
+            },
+        )
     }
 
     /// Build a status-surface context for an untracked working-copy path.
@@ -88,7 +89,7 @@ impl ExactActionContext {
             current_revision: None,
             source_revisions: Vec::new(),
             selected_path: Some(path.clone()),
-            file_action: Some(FileActionContext::working_copy_tracked(path, false, true)),
+            file_action: Some(FileActionContext::working_copy_file_path(path)),
             current_is_visible_working_copy: false,
             surface: ActionSurface::File,
         }
@@ -125,7 +126,6 @@ impl ExactActionContext {
             self.file_action = Some(FileActionContext::exact_revision_tracked(
                 revision,
                 path.clone(),
-                true,
             ));
         }
         self.selected_path = Some(path);

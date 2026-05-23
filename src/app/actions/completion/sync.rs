@@ -13,7 +13,7 @@ impl App {
         status_context: Option<String>,
         viewport_height: u16,
     ) {
-        let command_label = push.command_label(false);
+        let command_label = push.command_label();
         let result_message = match self.services.run_push(&push) {
             Ok(output) => {
                 self.finish_successful_sync_action(output, viewport_height, str::to_owned)

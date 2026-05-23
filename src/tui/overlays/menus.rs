@@ -21,12 +21,16 @@ pub fn help_overlay_text(sections: &[HelpSection]) -> Text<'static> {
     let split = sections.len().div_ceil(2);
     let mut left = menu_help_lines();
     for section in &sections[..split] {
-        append_help_section_lines(&mut left, section, true);
+        left.push(Line::default());
+        append_help_section_lines(&mut left, section);
     }
 
     let mut right = Vec::new();
     for (index, section) in sections[split..].iter().enumerate() {
-        append_help_section_lines(&mut right, section, index > 0);
+        if index > 0 {
+            right.push(Line::default());
+        }
+        append_help_section_lines(&mut right, section);
     }
 
     Text::from(join_help_column_lines(&left, &right))
@@ -182,14 +186,7 @@ fn menu_help_lines() -> Vec<Line<'static>> {
     ]
 }
 
-fn append_help_section_lines(
-    lines: &mut Vec<Line<'static>>,
-    section: &HelpSection,
-    leading_blank: bool,
-) {
-    if leading_blank {
-        lines.push(Line::default());
-    }
+fn append_help_section_lines(lines: &mut Vec<Line<'static>>, section: &HelpSection) {
     lines.push(Line::styled(
         section.title().to_owned(),
         Style::default()

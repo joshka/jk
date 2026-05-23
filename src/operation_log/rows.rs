@@ -10,7 +10,7 @@ use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
 use ratatui::text::Line;
 
-use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines};
+use crate::jj::{ColorMode, ViewSpec, run_jj, run_jj_template_lines_no_graph};
 use crate::rendered_rows::{RowMetadata, first_content_char, is_standalone_graph_line, line_text};
 
 pub const OPERATION_ID_TEMPLATE: &str = "self.id() ++ \"\\n\"";
@@ -68,10 +68,9 @@ pub fn load_operation_log_entries(spec: &ViewSpec) -> Result<Vec<OperationLogIte
 
 /// Loads exact operation ids through a narrow metadata template.
 fn run_operation_log_ids(spec: &ViewSpec) -> Result<RowMetadata<String>> {
-    Ok(parse_operation_id_lines(run_jj_template_lines(
+    Ok(parse_operation_id_lines(run_jj_template_lines_no_graph(
         spec,
         OPERATION_ID_TEMPLATE,
-        true,
     )?))
 }
 

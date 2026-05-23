@@ -29,13 +29,15 @@ pub use view_spec::{DiffFormat, ViewSpec};
 /// Process-level helpers used by higher layers once they have already chosen a `ViewSpec` or argv.
 pub use process::{
     ColorMode, base_command, interactive_jj_command, load_workspace_root, run_direct_args,
-    run_direct_args_stdout, run_jj, run_jj_template_lines, summarize_output,
+    run_direct_args_stdout, run_jj, run_jj_template_lines, run_jj_template_lines_no_graph,
+    summarize_output,
 };
 
 #[cfg(test)]
 pub use command::{
     ALL_REPO_REVSET, CHANGE_ID_TEMPLATE, NEW_TRUNK_ARGS, OPERATION_LOG_LIMIT, RECENT_WORK_REVSET,
-    TRUNK_WORK_REVSET, jj_command_args, resolve_exact_change_id_command_argv,
+    TRUNK_WORK_REVSET, jj_command_args, jj_command_args_with_template,
+    jj_command_args_with_template_no_graph, resolve_exact_change_id_command_argv,
     workspace_root_command_args,
 };
 #[cfg(test)]

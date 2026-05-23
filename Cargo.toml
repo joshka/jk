@@ -3,6 +3,9 @@ name = "jk"
 version = "0.1.0"
 edition = "2024"
 
+[lints.clippy]
+fn_params_excessive_bools = "warn"
+
 [dependencies]
 ansi-to-tui = "8.0.1"
 arboard = "3.6.1"

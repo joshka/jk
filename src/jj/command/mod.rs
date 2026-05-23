@@ -13,7 +13,8 @@ mod log_mode;
 pub use self::argv::CHANGE_ID_TEMPLATE;
 pub use self::argv::{
     ALL_REPO_REVSET, JJ_GIT_REMOTE_ARGS, NEW_TRUNK_ARGS, OPERATION_LOG_LIMIT, RECENT_WORK_REVSET,
-    TRUNK_WORK_REVSET, jj_command_args, option_value, resolve_exact_change_id_command_argv,
+    TRUNK_WORK_REVSET, jj_command_args, jj_command_args_with_template,
+    jj_command_args_with_template_no_graph, option_value, resolve_exact_change_id_command_argv,
     workspace_root_command_args,
 };
 pub use self::log_mode::LogViewMode;

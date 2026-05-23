@@ -5,7 +5,7 @@ fn git_push_bookmark_args_include_dry_run_when_previewing() {
     let push = JjGitPush::for_bookmark("main".to_owned()).with_remote("origin".to_owned());
 
     assert_eq!(
-        push.command_argv(true),
+        push.preview_command_argv(),
         vec![
             "git",
             "push",
@@ -17,15 +17,15 @@ fn git_push_bookmark_args_include_dry_run_when_previewing() {
         ]
     );
     assert_eq!(
-        push.command_label(false),
+        push.command_label(),
         "jj git push --remote origin --bookmark main"
     );
     assert_eq!(
-        push.command_label(true),
+        push.preview_command_label(),
         "jj git push --dry-run --remote origin --bookmark main"
     );
     assert_eq!(
-        push.command_argv(false),
+        push.command_argv(),
         vec!["git", "push", "--remote", "origin", "--bookmark", "main"]
     );
 }
@@ -35,7 +35,7 @@ fn git_push_revision_args_follow_revision_target() {
     let push = JjGitPush::for_revision("main".to_owned()).with_remote("origin".to_owned());
 
     assert_eq!(
-        push.command_argv(true),
+        push.preview_command_argv(),
         vec![
             "git",
             "push",
@@ -53,11 +53,11 @@ fn git_push_revision_can_use_jj_default_remote_resolution() {
     let push = JjGitPush::for_revision("main".to_owned());
 
     assert_eq!(
-        push.command_argv(false),
+        push.command_argv(),
         vec!["git", "push", "--revision", "main"]
     );
     assert_eq!(
-        push.command_label(true),
+        push.preview_command_label(),
         "jj git push --dry-run --revision main"
     );
 }
@@ -67,11 +67,11 @@ fn git_push_status_default_uses_remote_only_target() {
     let push = JjGitPush::for_status().with_remote("origin".to_owned());
 
     assert_eq!(
-        push.command_argv(false),
+        push.command_argv(),
         vec!["git", "push", "--remote", "origin"]
     );
     assert_eq!(
-        push.command_label(true),
+        push.preview_command_label(),
         "jj git push --dry-run --remote origin"
     );
 }
@@ -81,7 +81,7 @@ fn git_push_bookmark_can_use_jj_default_remote_resolution() {
     let push = JjGitPush::for_bookmark("main".to_owned());
 
     assert_eq!(
-        push.command_argv(true),
+        push.preview_command_argv(),
         vec!["git", "push", "--dry-run", "--bookmark", "main"]
     );
 }
@@ -121,7 +121,7 @@ fn git_fetch_remote_uses_exact_remote_pattern() {
 #[test]
 fn git_push_keeps_status_target_with_no_remote_optional() {
     assert_eq!(
-        JjGitPush::for_status().command_argv(true),
+        JjGitPush::for_status().preview_command_argv(),
         vec!["git", "push", "--dry-run"]
     );
 }

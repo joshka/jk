@@ -9,7 +9,7 @@ pub fn run_jj_with_template(
     template: &str,
 ) -> Result<RowMetadata<RevisionMetadata>> {
     Ok(parse_revision_metadata_lines(run_jj_template_lines(
-        spec, template, false,
+        spec, template,
     )?))
 }
 

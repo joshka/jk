@@ -20,7 +20,7 @@ impl App {
         ));
         let status_context = with_rewrite_source_context(status_context, rebase.sources());
 
-        let command_label = rebase.command_label(true);
+        let command_label = rebase.command_label();
         let output = self.preview_output_with_error_status(
             command_label,
             rebase.run_preview(),
@@ -79,7 +79,7 @@ impl App {
         ));
         let status_context = with_rewrite_source_context(status_context, squash.sources());
 
-        let command_label = squash.command_label(true);
+        let command_label = squash.command_label();
         let output = self.preview_output_with_error_status(
             command_label,
             squash.run_preview(),

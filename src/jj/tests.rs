@@ -12,7 +12,7 @@ fn bookmark_list_command_uses_bookmark_words_and_labels() {
 
     assert_eq!(spec.command(), JjCommand::Bookmarks);
     assert_eq!(
-        jj_command_args(&spec, None, false),
+        jj_command_args(&spec),
         vec!["bookmark", "list", "--revision", "main"]
     );
     assert_eq!(spec.label(), "jj bookmark list --revision main");
@@ -25,12 +25,9 @@ fn workspace_commands_use_read_only_root_list_and_metadata_template() {
 
     assert_eq!(workspace_root_command_args(), vec!["root"]);
     assert_eq!(spec.command(), JjCommand::Workspaces);
+    assert_eq!(jj_command_args(&spec), vec!["workspace", "list"]);
     assert_eq!(
-        jj_command_args(&spec, None, false),
-        vec!["workspace", "list"]
-    );
-    assert_eq!(
-        jj_command_args(&spec, Some(WORKSPACE_METADATA_TEMPLATE), false),
+        jj_command_args_with_template(&spec, WORKSPACE_METADATA_TEMPLATE),
         vec!["workspace", "list", "-T", WORKSPACE_METADATA_TEMPLATE,]
     );
     assert!(!WORKSPACE_METADATA_TEMPLATE.contains("root"));
@@ -46,10 +43,7 @@ fn file_list_command_uses_file_words_and_keeps_selected_path_out_of_args() {
     assert_eq!(spec.args(), ["-r", "main"]);
     assert_eq!(spec.path(), Some("src/main.rs"));
     assert_eq!(spec.exact_change_target(), None);
-    assert_eq!(
-        jj_command_args(&spec, None, false),
-        vec!["file", "list", "-r", "main"]
-    );
+    assert_eq!(jj_command_args(&spec), vec!["file", "list", "-r", "main"]);
     assert_eq!(spec.label(), "jj file list -r main");
     assert_eq!(spec.app_label(), "jk file list -r main");
     assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
@@ -65,7 +59,7 @@ fn file_show_command_keeps_exact_path_identity() {
     assert_eq!(spec.path(), Some("src/main.rs"));
     assert_eq!(spec.exact_change_target(), None);
     assert_eq!(
-        jj_command_args(&spec, None, false),
+        jj_command_args(&spec),
         vec!["file", "show", "-r", "main", "src/main.rs"]
     );
     assert_eq!(spec.label(), "jj file show -r main src/main.rs");
@@ -81,7 +75,7 @@ fn resolve_command_defaults_to_current_revision() {
     assert_eq!(spec.command(), JjCommand::Resolve);
     assert_eq!(spec.args(), ["-r", "@"]);
     assert_eq!(
-        jj_command_args(&spec, Some(RESOLVE_CONFLICT_TEMPLATE), true),
+        jj_command_args_with_template_no_graph(&spec, RESOLVE_CONFLICT_TEMPLATE),
         vec![
             "log",
             "--no-graph",
@@ -105,7 +99,7 @@ fn resolve_command_uses_log_template_contract_without_graph() {
     assert_eq!(spec.args(), ["-r", "main"]);
     assert_eq!(spec.exact_change_target(), None);
     assert_eq!(
-        jj_command_args(&spec, Some(RESOLVE_CONFLICT_TEMPLATE), true),
+        jj_command_args_with_template_no_graph(&spec, RESOLVE_CONFLICT_TEMPLATE),
         vec![
             "log",
             "--no-graph",
@@ -124,11 +118,7 @@ fn resolve_command_uses_log_template_contract_without_graph() {
 #[test]
 fn operation_log_command_uses_at_op_prefix() {
     assert_eq!(
-        jj_command_args(
-            &ViewSpec::new(JjCommand::OperationLog, Vec::new()),
-            None,
-            false
-        ),
+        jj_command_args(&ViewSpec::new(JjCommand::OperationLog, Vec::new())),
         vec![
             "operation",
             "log",
@@ -142,10 +132,9 @@ fn operation_log_command_uses_at_op_prefix() {
 #[test]
 fn operation_log_id_command_disables_graph_for_template_output() {
     assert_eq!(
-        jj_command_args(
+        jj_command_args_with_template_no_graph(
             &ViewSpec::new(JjCommand::OperationLog, Vec::new()),
-            Some(OPERATION_ID_TEMPLATE),
-            true
+            OPERATION_ID_TEMPLATE,
         ),
         vec![
             "operation",
@@ -167,7 +156,7 @@ fn operation_show_command_uses_positional_operation_id() {
     assert_eq!(spec.command(), JjCommand::OperationShow);
     assert_eq!(spec.args(), [operation_id('a')]);
     assert_eq!(
-        jj_command_args(&spec, None, false),
+        jj_command_args(&spec),
         vec!["operation", "show", operation_id('a').as_str()]
     );
     assert_eq!(spec.app_label(), "jk operation show aaaaaaaa");
@@ -180,7 +169,7 @@ fn operation_diff_command_uses_operation_option() {
     assert_eq!(spec.command(), JjCommand::OperationDiff);
     assert_eq!(spec.args(), ["--operation", operation_id('b').as_str()]);
     assert_eq!(
-        jj_command_args(&spec, None, false),
+        jj_command_args(&spec),
         vec![
             "operation",
             "diff",

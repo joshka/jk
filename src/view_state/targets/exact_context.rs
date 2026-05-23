@@ -1,6 +1,6 @@
 use color_eyre::Result;
 
-use crate::menus::ExactActionContext;
+use crate::menus::{ExactActionContext, StatusPathActionAvailability};
 use crate::status::StatusFileAction;
 
 use super::super::ViewState;
@@ -93,6 +93,12 @@ fn status_file_action_context(action: StatusFileAction) -> ExactActionContext {
             path,
             restore_allowed,
             chmod_allowed,
-        } => ExactActionContext::status_tracked_path(path, restore_allowed, chmod_allowed),
+        } => ExactActionContext::status_tracked_path(
+            path,
+            StatusPathActionAvailability {
+                restore_allowed,
+                chmod_allowed,
+            },
+        ),
     }
 }

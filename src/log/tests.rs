@@ -529,9 +529,8 @@ fn graph_bindings_expose_edit_next_and_prev_keys() {
 #[test]
 fn entry_lines_apply_explicit_selection_style() {
     let selected =
-        super::view::test_entry_lines(&log_item("first", Some("change"), None), None, true);
-    let unselected =
-        super::view::test_entry_lines(&log_item("first", Some("change"), None), None, false);
+        super::view::test_selected_entry_lines(&log_item("first", Some("change"), None), None);
+    let unselected = super::view::test_entry_lines(&log_item("first", Some("change"), None), None);
 
     assert_eq!(
         selected[0].style,
@@ -570,7 +569,7 @@ fn current_row_highlight_preserves_rendered_foreground() {
 
 #[test]
 fn explicit_selection_preserves_rendered_foreground() {
-    let selected = super::view::test_entry_lines(
+    let selected = super::view::test_selected_entry_lines(
         &LogItem::new(
             vec![Line::styled(
                 "colored row",
@@ -580,7 +579,6 @@ fn explicit_selection_preserves_rendered_foreground() {
             None,
         ),
         None,
-        true,
     );
 
     assert_eq!(selected[0].style.fg, Some(Color::LightBlue));

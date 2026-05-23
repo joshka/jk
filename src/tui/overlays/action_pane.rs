@@ -8,9 +8,15 @@ use crate::tui::theme;
 use super::menus::centered_area;
 use super::menus::overlay_block;
 
+#[derive(Clone, Copy)]
+enum ActionPaneMode {
+    Preview,
+    Result,
+}
+
 /// Choose the preview versus result title suffix for an action pane.
 pub fn action_pane_title(action: &str, output: &ActionPane) -> String {
-    if output.completed() {
+    if matches!(action_pane_mode(output), ActionPaneMode::Result) {
         format!("{action} result")
     } else {
         format!("{action} preview")
@@ -49,7 +55,7 @@ pub fn render_action_pane(frame: &mut Frame, area: Rect, title: &str, output: &A
             width: inner.width,
             height: 1,
         };
-        frame.render_widget(action_pane_footer(output.completed()), footer_area);
+        frame.render_widget(action_pane_footer(action_pane_mode(output)), footer_area);
     }
 }
 
@@ -96,7 +102,7 @@ pub fn render_abandon_confirm(
 }
 
 pub fn action_pane_area(area: Rect, title: &str, output: &ActionPane) -> Rect {
-    let footer = action_pane_footer_text(output.completed());
+    let footer = action_pane_footer_text(action_pane_mode(output));
     action_pane_area_with_footer(area, title, output, &footer)
 }
 
@@ -125,14 +131,14 @@ pub fn abandon_confirm_footer_text(input: &str) -> String {
     format!("type exact id: {input}  Enter confirm  Esc cancel  arrows/page scroll")
 }
 
-fn action_pane_footer(completed: bool) -> ratatui::widgets::Paragraph<'static> {
-    let primary = if completed {
+fn action_pane_footer(mode: ActionPaneMode) -> ratatui::widgets::Paragraph<'static> {
+    let primary = if matches!(mode, ActionPaneMode::Result) {
         keyed_line("Enter", "close")
     } else {
         keyed_line("Enter", "confirm")
     };
     let mut spans = primary.spans;
-    if completed {
+    if matches!(mode, ActionPaneMode::Result) {
         spans.extend(keyed_line("Esc/q", "close").spans);
     } else {
         spans.extend(keyed_line("Esc/q", "cancel").spans);
@@ -149,11 +155,19 @@ fn abandon_confirm_footer(input: &str) -> ratatui::widgets::Paragraph<'static> {
         .style(theme::muted_style())
 }
 
-fn action_pane_footer_text(completed: bool) -> String {
-    if completed {
+fn action_pane_footer_text(mode: ActionPaneMode) -> String {
+    if matches!(mode, ActionPaneMode::Result) {
         "Enter close  Esc/q close  j/k scroll  PgUp/PgDn page  g/G ends".to_owned()
     } else {
         "Enter confirm  Esc/q cancel  j/k scroll  PgUp/PgDn page  g/G ends".to_owned()
+    }
+}
+
+fn action_pane_mode(output: &ActionPane) -> ActionPaneMode {
+    if output.completed() {
+        ActionPaneMode::Result
+    } else {
+        ActionPaneMode::Preview
     }
 }
 

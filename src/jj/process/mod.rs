@@ -15,4 +15,7 @@ pub use self::direct::{
 };
 #[cfg(test)]
 pub use self::run::parse_exact_change_id;
-pub use self::run::{ColorMode, base_command, run_jj, run_jj_template_lines, summarize_output};
+pub use self::run::{
+    ColorMode, base_command, run_jj, run_jj_template_lines, run_jj_template_lines_no_graph,
+    summarize_output,
+};

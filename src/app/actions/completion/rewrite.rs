@@ -163,7 +163,7 @@ impl App {
         status_context: Option<String>,
         viewport_height: u16,
     ) {
-        let command_label = rebase.command_label(false);
+        let command_label = rebase.command_label();
         let primary_source = rebase.sources().first().cloned();
         let result_message = match self.services.run_rebase(&rebase) {
             Ok(output) => self.finish_successful_action_revealing_change(
@@ -188,7 +188,7 @@ impl App {
         status_context: Option<String>,
         viewport_height: u16,
     ) {
-        let command_label = squash.command_label(false);
+        let command_label = squash.command_label();
         let destination = squash.destination().to_owned();
         let result_message = match self.services.run_squash(&squash) {
             Ok(output) => self.finish_successful_action_revealing_change(

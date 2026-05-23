@@ -157,9 +157,16 @@ impl LogView {
 pub fn test_entry_lines(
     entry: &LogItem,
     search: Option<&crate::search::SearchQuery>,
-    is_selected: bool,
 ) -> Vec<ratatui::text::Line<'static>> {
-    self::render::test_entry_lines(entry, search, is_selected)
+    self::render::test_entry_lines(entry, search)
+}
+
+#[cfg(test)]
+pub fn test_selected_entry_lines(
+    entry: &LogItem,
+    search: Option<&crate::search::SearchQuery>,
+) -> Vec<ratatui::text::Line<'static>> {
+    self::render::test_selected_entry_lines(entry, search)
 }
 
 #[cfg(test)]

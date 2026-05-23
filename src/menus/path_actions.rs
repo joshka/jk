@@ -8,6 +8,12 @@ use crate::actions::JjFileChmodMode;
 
 use super::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier, short_id};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StatusPathActionAvailability {
+    pub restore_allowed: bool,
+    pub chmod_allowed: bool,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileActionContext {
     /// Selected path whose menu entries are being built.
@@ -46,27 +52,39 @@ impl FileActionContext {
         }
     }
 
-    /// Build a working-copy path context for a tracked status or file row.
-    pub fn working_copy_tracked(path: String, restore_allowed: bool, chmod_allowed: bool) -> Self {
+    /// Build a working-copy path context for a tracked status row.
+    pub fn status_tracked_path(path: String, availability: StatusPathActionAvailability) -> Self {
         Self {
             path,
             scope: FileActionScope::WorkingCopy,
-            restore_allowed,
+            restore_allowed: availability.restore_allowed,
             track_allowed: false,
             untrack_allowed: true,
-            chmod_allowed,
+            chmod_allowed: availability.chmod_allowed,
+        }
+    }
+
+    /// Build a working-copy path context for the file-list/file-show surfaces.
+    pub fn working_copy_file_path(path: String) -> Self {
+        Self {
+            path,
+            scope: FileActionScope::WorkingCopy,
+            restore_allowed: false,
+            track_allowed: false,
+            untrack_allowed: true,
+            chmod_allowed: true,
         }
     }
 
     /// Build an exact-revision path context for detail-surface file actions.
-    pub fn exact_revision_tracked(revision: String, path: String, chmod_allowed: bool) -> Self {
+    pub fn exact_revision_tracked(revision: String, path: String) -> Self {
         Self {
             path,
             scope: FileActionScope::ExactRevision(revision),
             restore_allowed: true,
             track_allowed: false,
             untrack_allowed: false,
-            chmod_allowed,
+            chmod_allowed: true,
         }
     }
 

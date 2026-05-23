@@ -10,6 +10,12 @@ pub const NEW_TRUNK_ARGS: [&str; 2] = ["new", "trunk()"];
 pub const CHANGE_ID_TEMPLATE: &str = "change_id ++ \"\\n\"";
 pub const OPERATION_LOG_LIMIT: &str = "100";
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum GraphStyle {
+    Include,
+    Omit,
+}
+
 pub fn workspace_root_command_args() -> Vec<String> {
     vec!["root".to_owned()]
 }
@@ -25,8 +31,26 @@ pub fn resolve_exact_change_id_command_argv(revset: &str) -> Vec<String> {
     ]
 }
 
-/// Build the `jj` argv for one `ViewSpec`, optionally overriding the template or graph mode.
-pub fn jj_command_args(spec: &ViewSpec, template: Option<&str>, no_graph: bool) -> Vec<String> {
+/// Build the default `jj` argv for one `ViewSpec`.
+pub fn jj_command_args(spec: &ViewSpec) -> Vec<String> {
+    jj_command_args_with_graph_style(spec, None, GraphStyle::Include)
+}
+
+/// Build `jj` argv for one `ViewSpec` with an explicit template override.
+pub fn jj_command_args_with_template(spec: &ViewSpec, template: &str) -> Vec<String> {
+    jj_command_args_with_graph_style(spec, Some(template), GraphStyle::Include)
+}
+
+/// Build `jj` argv for one `ViewSpec` with an explicit template override and no graph.
+pub fn jj_command_args_with_template_no_graph(spec: &ViewSpec, template: &str) -> Vec<String> {
+    jj_command_args_with_graph_style(spec, Some(template), GraphStyle::Omit)
+}
+
+fn jj_command_args_with_graph_style(
+    spec: &ViewSpec,
+    template: Option<&str>,
+    graph_style: GraphStyle,
+) -> Vec<String> {
     let mut args = command_words(spec)
         .iter()
         .map(|arg| (*arg).to_owned())
@@ -37,7 +61,7 @@ pub fn jj_command_args(spec: &ViewSpec, template: Option<&str>, no_graph: bool) 
             .iter()
             .map(|arg| (*arg).to_owned()),
     );
-    if no_graph {
+    if matches!(graph_style, GraphStyle::Omit) {
         args.push("--no-graph".to_owned());
     }
     if let Some(template) = template {

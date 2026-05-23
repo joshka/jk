@@ -34,18 +34,13 @@ impl JjRebasePlan {
     }
 
     /// Returns the user-facing `jj` command label for this rebase plan.
-    pub fn command_label(&self, _dry_run: bool) -> String {
-        let label_args = self
-            .command_argv(false)
-            .iter()
-            .map(|arg| arg.as_str())
-            .collect::<Vec<_>>()
-            .join(" ");
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
         format!("jj {label_args}")
     }
 
     /// Returns argv for `jj rebase`.
-    pub fn command_argv(&self, _dry_run: bool) -> Vec<String> {
+    pub fn command_argv(&self) -> Vec<String> {
         let mut argv = vec!["rebase".to_owned()];
         for source in &self.sources {
             argv.push("-r".to_owned());
@@ -63,11 +58,7 @@ impl JjRebasePlan {
 
     /// Runs `jj rebase` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
-        run_direct_args(
-            self.command_argv(false),
-            &self.command_label(false),
-            "rebased",
-        )
+        run_direct_args(self.command_argv(), &self.command_label(), "rebased")
     }
 
     /// Returns the preview summary shown before confirming `jj rebase`.
@@ -81,7 +72,7 @@ impl JjRebasePlan {
 
         format!(
             "command: {}\n\nroles:\n{}\ndestination revision: {}\n\ncurrent log context:\n- source rows are selected in jk\n- destination is the current row\n\nexpected jj effect:\n- semantics: jj rebase --revision <source> --onto <destination>\n- only listed source revisions are rebased\n- dependencies among listed sources are preserved\n- descendants outside the selected set may be rebased to fill holes\n- destination descendants are not inserted or rebased by -o\n\nnot a graph preview: jk has not run jj and is not simulating the final graph\n\nreview after run: jj op show -p\nundo path: jj undo\nconfirmation: press Enter to run jj rebase",
-            self.command_label(false),
+            self.command_label(),
             sources,
             self.destination,
         )

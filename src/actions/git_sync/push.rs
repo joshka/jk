@@ -60,10 +60,10 @@ impl JjGitPush {
         self.remote.as_deref()
     }
 
-    /// Returns the user-facing `jj` command label for this push plan.
-    pub fn command_label(&self, dry_run: bool) -> String {
+    /// Returns the user-facing `jj` command label for this push plan preview.
+    pub fn preview_command_label(&self) -> String {
         let label_args = self
-            .command_argv(dry_run)
+            .preview_command_argv()
             .iter()
             .map(|arg| arg.as_str())
             .collect::<Vec<_>>()
@@ -71,18 +71,33 @@ impl JjGitPush {
         format!("jj {label_args}")
     }
 
-    /// Returns argv for `jj git push`, optionally in dry-run mode.
-    pub fn command_argv(&self, dry_run: bool) -> Vec<String> {
-        let mut argv = vec!["git".to_owned(), "push".to_owned()];
+    /// Returns the user-facing `jj` command label for this push plan.
+    pub fn command_label(&self) -> String {
+        let label_args = self.command_argv().join(" ");
+        format!("jj {label_args}")
+    }
 
-        if dry_run {
-            argv.push("--dry-run".to_owned());
-        }
+    /// Returns argv for `jj git push --dry-run`.
+    pub fn preview_command_argv(&self) -> Vec<String> {
+        let mut argv = vec!["git".to_owned(), "push".to_owned()];
+        argv.push("--dry-run".to_owned());
+        argv.extend(self.target_argv());
+        argv
+    }
+
+    /// Returns argv for `jj git push`.
+    pub fn command_argv(&self) -> Vec<String> {
+        let mut argv = vec!["git".to_owned(), "push".to_owned()];
+        argv.extend(self.target_argv());
+        argv
+    }
+
+    fn target_argv(&self) -> Vec<String> {
+        let mut argv = Vec::new();
         if let Some(remote) = &self.remote {
             argv.push("--remote".to_owned());
             argv.push(remote.clone());
         }
-
         match &self.target {
             JjGitPushTarget::Bookmark(name) => {
                 argv.push("--bookmark".to_owned());
@@ -101,18 +116,14 @@ impl JjGitPush {
     /// Runs the jj dry-run preview and returns its preserved output.
     pub fn run_preview(&self) -> Result<CommandOutput> {
         run_direct_args(
-            self.command_argv(true),
-            &self.command_label(true),
+            self.preview_command_argv(),
+            &self.preview_command_label(),
             "preview complete",
         )
     }
 
     /// Runs `jj git push` through the direct command boundary.
     pub fn run(&self) -> Result<CommandOutput> {
-        run_direct_args(
-            self.command_argv(false),
-            &self.command_label(false),
-            "pushed",
-        )
+        run_direct_args(self.command_argv(), &self.command_label(), "pushed")
     }
 }

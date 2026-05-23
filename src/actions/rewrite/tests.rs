@@ -8,11 +8,11 @@ fn rebase_command_args_use_explicit_sources_and_destination() {
     );
 
     assert_eq!(
-        rebase.command_argv(false),
+        rebase.command_argv(),
         vec!["rebase", "-r", "source-a", "-r", "source-b", "-o", "dest"]
     );
     assert_eq!(
-        rebase.command_label(false),
+        rebase.command_label(),
         "jj rebase -r source-a -r source-b -o dest"
     );
 }
@@ -48,7 +48,7 @@ fn squash_command_args_use_explicit_sources_destination_and_message_policy() {
     );
 
     assert_eq!(
-        squash.command_argv(false),
+        squash.command_argv(),
         vec![
             "squash",
             "--from",
@@ -61,7 +61,7 @@ fn squash_command_args_use_explicit_sources_destination_and_message_policy() {
         ]
     );
     assert_eq!(
-        squash.command_label(false),
+        squash.command_label(),
         "jj squash --from source-a --from source-b --into dest --use-destination-message"
     );
 }
@@ -138,7 +138,7 @@ fn rebase_plan_argv_includes_repeated_sources_and_destination() {
     );
 
     assert_eq!(
-        rebase.command_argv(false),
+        rebase.command_argv(),
         vec![
             "rebase", "-r", "source-a", "-r", "source-b", "-r", "source-c", "-o", "dest"
         ]
@@ -146,23 +146,15 @@ fn rebase_plan_argv_includes_repeated_sources_and_destination() {
 }
 
 #[test]
-fn rebase_plan_argv_and_label_do_not_change_for_preview_flag() {
+fn rebase_plan_argv_and_label_are_stable() {
     let rebase = JjRebasePlan::new(vec!["source-a".to_owned(), "source-b".to_owned()], "dest");
 
     assert_eq!(
-        rebase.command_argv(true),
+        rebase.command_argv(),
         vec!["rebase", "-r", "source-a", "-r", "source-b", "-o", "dest"]
     );
     assert_eq!(
-        rebase.command_label(false),
+        rebase.command_label(),
         "jj rebase -r source-a -r source-b -o dest"
-    );
-    assert_eq!(
-        rebase.command_label(true),
-        "jj rebase -r source-a -r source-b -o dest"
-    );
-    assert_eq!(
-        rebase.command_argv(false),
-        vec!["rebase", "-r", "source-a", "-r", "source-b", "-o", "dest"]
     );
 }

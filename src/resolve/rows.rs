@@ -6,7 +6,7 @@
 use color_eyre::Result;
 use serde_json::Value;
 
-use crate::jj::{ViewSpec, run_jj_template_lines};
+use crate::jj::{ViewSpec, run_jj_template_lines_no_graph};
 use crate::rendered_rows::string_field;
 
 pub const RESOLVE_CONFLICT_TEMPLATE: &str = r#"self.conflicted_files().map(|entry| "{\"path\":" ++ json(entry.path()) ++ ",\"file_type\":" ++ json(entry.file_type()) ++ ",\"side_count\":" ++ json(entry.conflict_side_count()) ++ "}\n").join("")"#;
@@ -79,7 +79,7 @@ impl ResolveEntry {
 /// `ResolveEntry::unparsed` so the view can degrade row-by-row.
 pub fn load_resolve_entries(spec: &ViewSpec) -> Result<Vec<ResolveEntry>> {
     Ok(
-        run_jj_template_lines(spec, RESOLVE_CONFLICT_TEMPLATE, true)?
+        run_jj_template_lines_no_graph(spec, RESOLVE_CONFLICT_TEMPLATE)?
             .into_iter()
             .map(|line| parse_resolve_entry_line(&line))
             .collect(),

@@ -15,6 +15,7 @@ pub use model::{
     ActionKind, ActionMenu, ActionMenuItem, CopyOption, FollowUp, RolePrompt, RolePromptOption,
     SafetyTier,
 };
+pub use path_actions::StatusPathActionAvailability;
 pub use revision_actions::ExactActionContext;
 
 /// Build the shared revision action menu for an exact log/detail context.

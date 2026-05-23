@@ -32,7 +32,11 @@ fn entry_list(
                     .iter()
                     .any(|selected| selected == action_id)
             });
-            let lines = entry_lines(entry, search, is_selected);
+            let lines = if is_selected {
+                selected_entry_lines(entry, search)
+            } else {
+                entry_lines(entry, search)
+            };
             ListItem::new(lines).style(if is_selected {
                 explicit_selection_style()
             } else {
@@ -44,31 +48,30 @@ fn entry_list(
     List::new(items).highlight_style(theme::active_row_style())
 }
 
-fn entry_lines(
-    entry: &LogItem,
-    search: Option<&SearchQuery>,
-    is_selected: bool,
-) -> Vec<Line<'static>> {
-    let lines = entry
+fn entry_lines(entry: &LogItem, search: Option<&SearchQuery>) -> Vec<Line<'static>> {
+    entry
         .lines()
         .into_iter()
         .map(|line| highlight_line(line, search))
-        .collect::<Vec<_>>();
-    if is_selected {
-        lines
-            .into_iter()
-            .map(|line| line.patch_style(explicit_selection_style()))
-            .collect()
-    } else {
-        lines
-    }
+        .collect()
+}
+
+fn selected_entry_lines(entry: &LogItem, search: Option<&SearchQuery>) -> Vec<Line<'static>> {
+    entry_lines(entry, search)
+        .into_iter()
+        .map(|line| line.patch_style(explicit_selection_style()))
+        .collect()
 }
 
 #[cfg(test)]
-pub fn test_entry_lines(
+pub fn test_entry_lines(entry: &LogItem, search: Option<&SearchQuery>) -> Vec<Line<'static>> {
+    entry_lines(entry, search)
+}
+
+#[cfg(test)]
+pub fn test_selected_entry_lines(
     entry: &LogItem,
     search: Option<&SearchQuery>,
-    is_selected: bool,
 ) -> Vec<Line<'static>> {
-    entry_lines(entry, search, is_selected)
+    selected_entry_lines(entry, search)
 }
