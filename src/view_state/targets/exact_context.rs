@@ -1,9 +1,8 @@
 use color_eyre::Result;
 
+use super::super::ViewState;
 use crate::menus::{ExactActionContext, StatusPathActionAvailability};
 use crate::status::StatusFileAction;
-
-use super::super::ViewState;
 
 pub fn exact_restore_revert_context(view: &ViewState) -> Result<Option<ExactActionContext>> {
     match view {

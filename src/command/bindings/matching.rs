@@ -1,9 +1,8 @@
 use crossterm::event::KeyEvent;
 
+use super::Binding;
 use crate::command::HelpContext;
 use crate::help::command_is_visible_in_help;
-
-use super::Binding;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BindingMatch {

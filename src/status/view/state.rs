@@ -2,13 +2,12 @@ use color_eyre::Result;
 #[cfg(test)]
 use ratatui::text::Line;
 
-use crate::jj::ViewSpec;
-#[cfg(test)]
-use crate::selection::Selection;
-
 use super::StatusView;
 #[cfg(test)]
 use crate::jj::JjCommand;
+use crate::jj::ViewSpec;
+#[cfg(test)]
+use crate::selection::Selection;
 #[cfg(test)]
 use crate::status::rows::parse_status_row;
 use crate::status::rows::{StatusRow, load_status_rows};

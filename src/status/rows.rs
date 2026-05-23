@@ -7,11 +7,9 @@
 use color_eyre::Result;
 use ratatui::text::Line;
 
-use crate::documents::DocumentLines;
-use crate::documents::load_document;
-use crate::jj::ViewSpec;
-
 use super::actions::StatusFileAction;
+use crate::documents::{DocumentLines, load_document};
+use crate::jj::ViewSpec;
 
 #[derive(Clone, Debug)]
 pub struct StatusRow {

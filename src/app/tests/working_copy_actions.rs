@@ -327,8 +327,10 @@ fn duplicate_preview_cancel_preserves_log_selection() {
     graph.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 12,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 12,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -494,8 +496,10 @@ fn split_preview_cancel_preserves_log_selection() {
     graph.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 12,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 12,
+                width: 80,
+            },
             search: None,
         },
     );

@@ -1,11 +1,10 @@
 use ratatui::text::Line;
 
+use super::*;
 use crate::command::{Command, CommandContext, ViewCommand, ViewEffect};
 use crate::jj::ViewSpec;
 use crate::menus::{ActionKind, FollowUp};
 use crate::search::SearchQuery;
-
-use super::*;
 
 fn operation_item(text: &[&str], operation_id: Option<&str>) -> OperationLogItem {
     OperationLogItem::new(
@@ -47,8 +46,10 @@ fn movement_is_operation_item_based() {
     view.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 10,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 10,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -57,8 +58,10 @@ fn movement_is_operation_item_based() {
     view.execute(
         ViewCommand::MoveUp,
         CommandContext {
-            viewport_height: 10,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 10,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -124,8 +127,10 @@ fn operation_show_and_diff_open_selected_operation_detail() {
         view.execute(
             ViewCommand::OpenShow,
             CommandContext {
-                viewport_height: 10,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 10,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -135,8 +140,10 @@ fn operation_show_and_diff_open_selected_operation_detail() {
         view.execute(
             ViewCommand::OpenDiff,
             CommandContext {
-                viewport_height: 10,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 10,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -152,8 +159,10 @@ fn operation_detail_actions_are_disabled_without_operation_id() {
         view.execute(
             ViewCommand::OpenShow,
             CommandContext {
-                viewport_height: 10,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 10,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -165,8 +174,10 @@ fn operation_detail_actions_are_disabled_without_operation_id() {
         view.execute(
             ViewCommand::OpenDiff,
             CommandContext {
-                viewport_height: 10,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 10,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -184,8 +195,10 @@ fn operation_recovery_action_menu_requires_exact_operation_id() {
         view.execute(
             ViewCommand::OpenActionMenu,
             CommandContext {
-                viewport_height: 10,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 10,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -203,8 +216,10 @@ fn operation_recovery_action_menu_uses_selected_operation_id() {
     let effect = view.execute(
         ViewCommand::OpenActionMenu,
         CommandContext {
-            viewport_height: 10,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 10,
+                width: 80,
+            },
             search: None,
         },
     );

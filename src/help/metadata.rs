@@ -1,6 +1,5 @@
-use crate::command::{Command, ViewCommand};
-
 use super::{HelpContext, HelpSectionKind};
+use crate::command::{Command, ViewCommand};
 
 /// Maps one app-level command to a help section and action string for the given context.
 pub fn help_metadata(

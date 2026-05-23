@@ -3,10 +3,9 @@ use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState};
 
+use super::{ResolveEntry, ResolveView};
 use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
-
-use super::{ResolveEntry, ResolveView};
 
 impl ResolveView {
     /// Renders the resolve list with the active selection and search highlights.

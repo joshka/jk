@@ -2,10 +2,9 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
+use super::{BookmarkItem, BookmarksView};
 use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
-
-use super::{BookmarkItem, BookmarksView};
 
 impl BookmarksView {
     /// Renders the bookmark list with the active selection and search highlights.

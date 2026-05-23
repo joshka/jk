@@ -37,8 +37,10 @@ fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
     operation_log.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 12,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 12,
+                width: 80,
+            },
             search: None,
         },
     );

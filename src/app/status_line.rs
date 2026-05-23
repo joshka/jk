@@ -90,6 +90,11 @@ impl StatusLine {
         &self.kind
     }
 
+    /// Return whether the status uses the normal ready presentation.
+    pub fn is_ready(&self) -> bool {
+        matches!(self.kind, StatusKind::Ready)
+    }
+
     /// Return the key-hint projection copied from the active view.
     pub fn hints(&self) -> StatusHints {
         self.hints

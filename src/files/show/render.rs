@@ -1,11 +1,10 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
+use super::FileShowView;
 use crate::documents;
 use crate::documents::{PinnedDocument, project_with_active_file};
 use crate::search::SearchQuery;
-
-use super::FileShowView;
 
 impl FileShowView {
     /// Render the current file document with the active viewport projection.

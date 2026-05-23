@@ -1,3 +1,5 @@
+use super::super::super::{App, clamp_view_to_current_viewport};
+use super::super::shared::short_id;
 use crate::actions::{
     JjDuplicatePlan, JjNewPlan, JjSplitPlan, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan,
@@ -5,9 +7,6 @@ use crate::actions::{
 use crate::app::status_line::StatusLine;
 use crate::jj::LogViewMode;
 use crate::modes::InteractionMode;
-
-use super::super::super::{App, current_viewport_width};
-use super::super::shared::short_id;
 
 impl App {
     /// Translate a log-local edit/next/prev command into a working-copy navigation preview.
@@ -107,7 +106,7 @@ impl App {
     }
 
     /// Run `jj new` from trunk and update the active app view to reveal the new working copy.
-    pub fn run_new_trunk(&mut self, viewport_height: u16) {
+    pub fn run_new_trunk(&mut self, _viewport_height: u16) {
         if let Err(error) = self.services.resolve_revision("trunk()") {
             self.status = StatusLine::error(&self.view, error.to_string());
             return;
@@ -122,21 +121,21 @@ impl App {
                         return;
                     }
                 };
-                self.finish_new_trunk_success(&new_change_id, viewport_height);
+                self.finish_new_trunk_success(&new_change_id);
             }
             Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
         }
     }
 
     /// Refresh and reveal the new trunk child in the current log-oriented view.
-    fn finish_new_trunk_success(&mut self, new_change_id: &str, viewport_height: u16) {
+    fn finish_new_trunk_success(&mut self, new_change_id: &str) {
         match self.refresh_view_state() {
             Ok(()) => {
-                self.view.clamp(viewport_height, current_viewport_width());
+                clamp_view_to_current_viewport(&mut self.view);
                 let revealed_in_recent =
                     match self.reveal_log_change(new_change_id, LogViewMode::Recent) {
                         Ok(switched_modes) => {
-                            self.view.clamp(viewport_height, current_viewport_width());
+                            clamp_view_to_current_viewport(&mut self.view);
                             switched_modes
                         }
                         Err(error) => {

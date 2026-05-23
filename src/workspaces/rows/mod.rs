@@ -12,12 +12,11 @@ use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
 use ratatui::text::Line;
 
-use crate::jj::{ColorMode, ViewSpec, run_jj};
-use crate::rendered_rows::line_text;
-
 #[cfg(test)]
 pub use self::metadata::WORKSPACE_METADATA_TEMPLATE;
 use self::metadata::{pair_workspace_lines, run_workspace_metadata};
+use crate::jj::{ColorMode, ViewSpec, run_jj};
+use crate::rendered_rows::line_text;
 
 /// Read-only workspace/root context loaded from separate `jj` commands.
 #[derive(Clone, Debug, Default)]

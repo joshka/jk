@@ -1,11 +1,10 @@
 use color_eyre::Result;
 
+use super::super::super::App;
 use crate::actions::JjGitFetch;
 use crate::app::actions::ActionPane;
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
-
-use super::super::super::App;
 
 const PUSH_NO_REMOTES_MESSAGE: &str = "no git remotes found; add a remote before pushing";
 const FETCH_NO_REMOTES_MESSAGE: &str =

@@ -1,10 +1,10 @@
 use color_eyre::Result;
+use ratatui::layout::Size;
 
+use super::ShowView;
 use crate::documents::StickyFileDocument;
 use crate::jj::ViewSpec;
 use crate::log::load_compact_log_context;
-
-use super::ShowView;
 
 impl ShowView {
     /// Loads rendered `jj show` output and the compact log context pinned above file content.
@@ -52,9 +52,9 @@ impl ShowView {
         }
     }
 
-    /// Clamps vertical and horizontal offsets to the current viewport dimensions.
-    pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
-        self.document.clamp(viewport_height, viewport_width);
+    /// Clamp vertical and horizontal offsets to the current viewport size.
+    pub fn clamp(&mut self, viewport: Size) {
+        self.document.clamp(viewport.height, viewport.width);
     }
 
     /// Toggles wrapped rendering for the current viewport width.

@@ -3,13 +3,12 @@ use std::collections::HashSet;
 use color_eyre::Result;
 use serde_json::Value;
 
+use super::{
+    BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState, RemoteBookmarkTrackingState,
+};
 use crate::jj::{ViewSpec, run_jj_template_lines};
 use crate::rendered_rows::{
     boolean_field, non_empty_string_field, optional_string_field, string_field,
-};
-
-use super::{
-    BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState, RemoteBookmarkTrackingState,
 };
 
 pub const BOOKMARK_METADATA_TEMPLATE: &str = concat!(

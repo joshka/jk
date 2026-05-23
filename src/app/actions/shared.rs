@@ -10,11 +10,10 @@
 
 use std::fmt::Display;
 
+use super::super::{App, clamp_view_to_current_viewport};
 use crate::actions::{JjBookmarkMutationPlan, JjGitFetch, JjGitPushTarget};
 use crate::app::status_line::StatusLine;
 use crate::jj::LogViewMode;
-
-use super::super::{App, current_viewport_width};
 
 impl App {
     /// Finish a failed action by surfacing the error on the app status line and result pane.
@@ -25,15 +24,13 @@ impl App {
     }
 
     /// Refresh the active view after a successful action and return the result-pane message.
-    pub fn finish_successful_action(
-        &mut self,
-        output: String,
-        viewport_height: u16,
-        success_suffix: &str,
-    ) -> String {
+    ///
+    /// The post-action clamp uses the live terminal size because command execution can outlive the
+    /// frame whose geometry started the action.
+    pub fn finish_successful_action(&mut self, output: String, success_suffix: &str) -> String {
         match self.refresh_view_state() {
             Ok(()) => {
-                self.view.clamp(viewport_height, current_viewport_width());
+                clamp_view_to_current_viewport(&mut self.view);
                 let message = format!("{}{}", output.trim(), success_suffix);
                 self.status = StatusLine::with_message(&self.view, message.as_str());
                 message
@@ -53,17 +50,16 @@ impl App {
         &mut self,
         output: String,
         reveal_change_id: Option<&str>,
-        viewport_height: u16,
         success_suffix: &str,
     ) -> String {
         match self.refresh_view_state() {
             Ok(()) => {
-                self.view.clamp(viewport_height, current_viewport_width());
+                clamp_view_to_current_viewport(&mut self.view);
                 let revealed_in_recent = match reveal_change_id {
                     Some(change_id) => {
                         match self.reveal_log_change(change_id, LogViewMode::Recent) {
                             Ok(switched_modes) => {
-                                self.view.clamp(viewport_height, current_viewport_width());
+                                clamp_view_to_current_viewport(&mut self.view);
                                 Some(switched_modes)
                             }
                             Err(error) => {
@@ -101,12 +97,11 @@ impl App {
     pub fn finish_successful_sync_action(
         &mut self,
         output: String,
-        viewport_height: u16,
         status_message: impl FnOnce(&str) -> String,
     ) -> String {
         match self.refresh_view_state() {
             Ok(()) => {
-                self.view.clamp(viewport_height, current_viewport_width());
+                clamp_view_to_current_viewport(&mut self.view);
                 self.status = StatusLine::with_message(&self.view, status_message(output.as_str()));
                 output
             }

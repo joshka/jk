@@ -1,8 +1,7 @@
 use color_eyre::Result;
 
-use crate::jj::LogViewMode;
-
 use super::ViewState;
+use crate::jj::LogViewMode;
 
 impl ViewState {
     pub fn scroll_offset(&self) -> usize {

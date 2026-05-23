@@ -1,13 +1,12 @@
 use color_eyre::Result;
 use ratatui::Frame;
-use ratatui::layout::Rect;
+use ratatui::layout::{Rect, Size};
 
+use super::ViewState;
 use crate::command::{Binding, CommandContext, HelpContext, ViewCommand, ViewEffect};
 use crate::jj::{JjCommand, ViewSpec};
 use crate::search::SearchQuery;
 use crate::tui::StatusHints;
-
-use super::ViewState;
 
 impl ViewState {
     /// Materialize the concrete feature view for a previously parsed `ViewSpec`.
@@ -111,20 +110,20 @@ impl ViewState {
         }
     }
 
-    /// Clamp active-view scroll or selection state to the current viewport.
-    pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
+    /// Clamp active-view scroll or selection state to the current viewport size.
+    pub fn clamp(&mut self, viewport: Size) {
         match self {
             Self::Log(view) => view.clamp(),
-            Self::Show(view) => view.clamp(viewport_height, viewport_width),
-            Self::Diff(view) => view.clamp(viewport_height, viewport_width),
-            Self::Status(view) => view.clamp(viewport_height),
+            Self::Show(view) => view.clamp(viewport),
+            Self::Diff(view) => view.clamp(viewport),
+            Self::Status(view) => view.clamp(viewport.height),
             Self::Resolve(view) => view.clamp(),
             Self::FileList(view) => view.clamp(),
-            Self::FileShow(view) => view.clamp(viewport_height, viewport_width),
+            Self::FileShow(view) => view.clamp(viewport),
             Self::Bookmarks(view) => view.clamp(),
             Self::Workspaces(view) => view.clamp(),
             Self::OperationLog(view) => view.clamp(),
-            Self::OperationDetail(view) => view.clamp(viewport_height),
+            Self::OperationDetail(view) => view.clamp(viewport.height),
         }
     }
 

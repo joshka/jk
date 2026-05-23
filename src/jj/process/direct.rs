@@ -1,14 +1,13 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
+use super::run::{ColorMode, base_command, summarize_output};
 use crate::actions::CommandOutput;
 use crate::jj::command::{
     JJ_GIT_REMOTE_ARGS, NEW_TRUNK_ARGS, resolve_exact_change_id_command_argv,
     workspace_root_command_args,
 };
 use crate::terminal_process::InteractiveCommand;
-
-use super::run::{ColorMode, base_command, summarize_output};
 
 #[allow(dead_code)]
 pub fn git_remotes() -> Result<Vec<String>> {

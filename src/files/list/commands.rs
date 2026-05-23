@@ -1,9 +1,8 @@
+use super::FileListView;
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::jj::JjCommand;
 use crate::menus::CopyOption;
 use crate::search::{SearchQuery, entry_matches};
-
-use super::FileListView;
 
 impl FileListView {
     /// Execute one view-local command against the file list.

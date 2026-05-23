@@ -1,8 +1,7 @@
 use color_eyre::Result;
 
-use crate::selection::restore_by_key_or_index;
-
 use super::{FileListItem, FileListView, ViewSpec, load_file_list_entries};
+use crate::selection::restore_by_key_or_index;
 
 impl FileListView {
     /// Reload the file list while preserving the selected path when possible.

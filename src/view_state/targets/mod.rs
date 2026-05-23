@@ -1,9 +1,8 @@
 use color_eyre::Result;
 
+use super::ViewState;
 use crate::actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
 use crate::menus::ExactActionContext;
-
-use super::ViewState;
 
 mod bookmark_targets;
 mod exact_context;
@@ -24,7 +23,8 @@ impl<'a> ViewActionTargets<'a> {
         bookmark_targets::push_target(self.view)
     }
 
-    /// Projects the active view into a bookmark target or reports why the current selection is unsafe.
+    /// Projects the active view into a bookmark target or reports why the current selection is
+    /// unsafe.
     fn bookmark_target(&self) -> Result<Option<JjBookmarkTarget>> {
         bookmark_targets::bookmark_target(self.view)
     }
@@ -34,7 +34,8 @@ impl<'a> ViewActionTargets<'a> {
         self.selected_local_bookmark_name_for("delete")
     }
 
-    /// Returns the selected exact local bookmark name for one named action or reports why it is unsafe.
+    /// Returns the selected exact local bookmark name for one named action or reports why it is
+    /// unsafe.
     fn selected_local_bookmark_name_for(&self, action: &str) -> Result<Option<&'a str>> {
         bookmark_targets::selected_local_bookmark_name_for(self.view, action)
     }
@@ -44,7 +45,8 @@ impl<'a> ViewActionTargets<'a> {
         bookmark_targets::bookmark_forget_target(self.view)
     }
 
-    /// Projects the active detail, file, or status view into an exact restore/revert action context.
+    /// Projects the active detail, file, or status view into an exact restore/revert action
+    /// context.
     fn exact_restore_revert_context(&self) -> Result<Option<ExactActionContext>> {
         exact_context::exact_restore_revert_context(self.view)
     }

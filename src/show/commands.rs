@@ -1,10 +1,9 @@
+use super::{HORIZONTAL_SCROLL_AMOUNT, ShowView};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::documents;
 use crate::jj::{JjCommand, ViewSpec};
 use crate::menus::CopyOption;
 use crate::search::SearchQuery;
-
-use super::{HORIZONTAL_SCROLL_AMOUNT, ShowView};
 
 impl ShowView {
     /// Applies a view command to show-specific navigation, search, and drill-down state.
@@ -13,7 +12,7 @@ impl ShowView {
             ViewCommand::CycleMode => ViewEffect::Ignored,
             ViewCommand::NewTrunk => ViewEffect::Ignored,
             ViewCommand::ToggleWrap => {
-                self.toggle_wrap(context.viewport_width);
+                self.toggle_wrap(context.size.width);
                 ViewEffect::Handled
             }
             ViewCommand::ScrollLeft => {
@@ -21,23 +20,23 @@ impl ShowView {
                 ViewEffect::Handled
             }
             ViewCommand::ScrollRight => {
-                self.scroll_right(context.viewport_width, HORIZONTAL_SCROLL_AMOUNT);
+                self.scroll_right(context.size.width, HORIZONTAL_SCROLL_AMOUNT);
                 ViewEffect::Handled
             }
             ViewCommand::MoveDown => {
-                self.scroll_down(context.viewport_height, 1);
+                self.scroll_down(context.size.height, 1);
                 ViewEffect::Handled
             }
             ViewCommand::MoveUp => {
-                self.scroll_up(context.viewport_height, 1);
+                self.scroll_up(context.size.height, 1);
                 ViewEffect::Handled
             }
             ViewCommand::PageDown => {
-                self.scroll_down(context.viewport_height, context.page_size());
+                self.scroll_down(context.size.height, context.page_size());
                 ViewEffect::Handled
             }
             ViewCommand::PageUp => {
-                self.scroll_up(context.viewport_height, context.page_size());
+                self.scroll_up(context.size.height, context.page_size());
                 ViewEffect::Handled
             }
             ViewCommand::MoveFirst => {
@@ -45,7 +44,7 @@ impl ShowView {
                 ViewEffect::Handled
             }
             ViewCommand::MoveLast => {
-                self.scroll_to_bottom(context.viewport_height);
+                self.scroll_to_bottom(context.size.height);
                 ViewEffect::Handled
             }
             ViewCommand::NextFile => {
@@ -79,18 +78,18 @@ impl ShowView {
                 };
                 let matches = self.search_matches(query);
                 if matches > 0 {
-                    let _ = self.next_match(context.viewport_height, query);
+                    let _ = self.next_match(context.size.height, query);
                 }
                 ViewEffect::SearchStarted { matches }
             }
             ViewCommand::NextSearchMatch => context
                 .search
-                .filter(|query| self.next_match(context.viewport_height, query))
+                .filter(|query| self.next_match(context.size.height, query))
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::PreviousSearchMatch => context
                 .search
-                .filter(|query| self.previous_match(context.viewport_height, query))
+                .filter(|query| self.previous_match(context.size.height, query))
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),

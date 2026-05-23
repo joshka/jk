@@ -1,8 +1,7 @@
 use color_eyre::Result;
 
-use crate::actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
-
 use super::super::ViewState;
+use crate::actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
 
 pub fn push_target(view: &ViewState) -> Result<Option<JjGitPushTarget>> {
     match view {

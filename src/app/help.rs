@@ -3,15 +3,14 @@ use std::time::Instant;
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 
+use super::keyboard::{COMMAND_PREFIX_TIMEOUT, prefix_status_message};
+use super::reducers::{is_help_close_key, is_help_scroll_key};
+use super::{APP_BINDINGS, App, PendingCommand};
 use crate::app::status_line::StatusLine;
 use crate::command::{
     Binding, BindingMatch, help_binding_prefix_next_labels, match_help_binding_sequence,
 };
 use crate::modes::InteractionMode;
-
-use super::super::dispatch::prefix_status_message;
-use super::super::reducers::{is_help_close_key, is_help_scroll_key};
-use super::{APP_BINDINGS, App, COMMAND_PREFIX_TIMEOUT, PendingCommand};
 
 impl App {
     /// Handle keys while the help overlay is active, including help-specific prefix matching.
@@ -115,12 +114,14 @@ impl App {
                 });
             }
             None => {
-                if let Some(fallback) = pending.fallback {
-                    self.execute_help_binding(fallback, viewport_height)?;
-                    return self.handle_key_after_prefix_fallback(key, viewport_height, now);
-                }
+                let Some(fallback) = pending.fallback else {
+                    self.status =
+                        StatusLine::with_message(&self.view, "unknown help command prefix");
+                    return Ok(true);
+                };
 
-                self.status = StatusLine::with_message(&self.view, "unknown help command prefix");
+                self.execute_help_binding(fallback, viewport_height)?;
+                return self.handle_key_after_prefix_fallback(key, viewport_height, now);
             }
         }
 

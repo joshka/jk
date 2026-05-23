@@ -1,9 +1,9 @@
 use color_eyre::Result;
-
-use crate::documents::StickyFileDocument;
-use crate::jj::ViewSpec;
+use ratatui::layout::Size;
 
 use super::DiffView;
+use crate::documents::StickyFileDocument;
+use crate::jj::ViewSpec;
 
 impl DiffView {
     /// Loads rendered `jj diff` output into the shared sticky document model.
@@ -42,9 +42,9 @@ impl DiffView {
         }
     }
 
-    /// Clamps vertical and horizontal offsets to the current viewport dimensions.
-    pub fn clamp(&mut self, viewport_height: u16, viewport_width: u16) {
-        self.document.clamp(viewport_height, viewport_width);
+    /// Clamp vertical and horizontal offsets to the current viewport size.
+    pub fn clamp(&mut self, viewport: Size) {
+        self.document.clamp(viewport.height, viewport.width);
     }
 
     /// Toggles wrapped rendering for the current viewport width.

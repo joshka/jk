@@ -9,8 +9,7 @@ mod model;
 mod projection;
 
 pub use model::{HelpContext, HelpRow, HelpSection, HelpSectionKind};
-pub use projection::command_is_visible_in_help;
-pub use projection::project_help;
+pub use projection::{command_is_visible_in_help, project_help};
 
 #[cfg(test)]
 mod tests;

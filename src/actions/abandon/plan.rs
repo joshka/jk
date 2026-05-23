@@ -1,13 +1,12 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use crate::actions::CommandOutput;
-use crate::jj::exact_change_id_revset;
-use crate::jj::{
-    ColorMode, base_command, run_direct_args, run_direct_args_stdout, summarize_output,
-};
-
 use super::JjAbandonPreview;
+use crate::actions::CommandOutput;
+use crate::jj::{
+    ColorMode, base_command, exact_change_id_revset, run_direct_args, run_direct_args_stdout,
+    summarize_output,
+};
 
 /// Template used to read the first description line for abandon preflight text.
 ///

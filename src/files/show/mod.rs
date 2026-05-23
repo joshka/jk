@@ -13,8 +13,7 @@ use color_eyre::Result;
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 #[cfg(test)]
 use crate::documents::DocumentDisplayMode;
-use crate::documents::DocumentViewport;
-use crate::documents::{DocumentLines, load_document};
+use crate::documents::{DocumentLines, DocumentViewport, load_document};
 use crate::jj::ViewSpec;
 
 const TOGGLE_WRAP_KEYS: &[KeyPattern] = &[KeyPattern::char('z'), KeyPattern::char('w')];

@@ -1,10 +1,9 @@
+use super::super::super::App;
 use crate::actions::{JjBookmarkMutationKind, JjBookmarkMutationPlan, JjDescribeTarget};
 use crate::app::status_line::StatusLine;
 use crate::jj::JjCommand;
 use crate::modes::InteractionMode;
 use crate::view_state::ViewState;
-
-use super::super::super::App;
 
 impl App {
     /// Open the describe prompt for the current exact change or selected graph revision.

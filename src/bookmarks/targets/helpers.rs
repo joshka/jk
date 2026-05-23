@@ -1,13 +1,12 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
+use super::resolver::BookmarkActionTargetResolver;
 use crate::bookmarks::actions::{JjBookmarkForgetTarget, JjBookmarkTrackingTarget};
 use crate::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState,
 };
-
-use super::resolver::BookmarkActionTargetResolver;
 
 pub fn remote_bookmark_track_target(
     name: &str,

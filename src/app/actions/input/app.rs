@@ -1,10 +1,9 @@
 use crossterm::event::KeyCode;
 
-use crate::app::status_line::StatusLine;
-use crate::modes::InteractionMode;
-
 use super::{ActionPreviewConfirmation, ActionPreviewEvent};
 use crate::app::App;
+use crate::app::status_line::StatusLine;
+use crate::modes::InteractionMode;
 
 impl App {
     /// Route one key through the common preview/result-pane reducer shared by action overlays.

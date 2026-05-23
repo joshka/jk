@@ -77,7 +77,10 @@ fn file_show_clamps_horizontal_offset_after_refresh_shrinks_content() {
 
     view.refresh_with_loader(|_| Ok(DocumentLines::new(vec![Line::from("short")])))
         .unwrap();
-    view.clamp(3, 10);
+    view.clamp(ratatui::layout::Size {
+        height: 3,
+        width: 10,
+    });
 
     assert_eq!(view.horizontal_offset(), 0);
 }
@@ -138,8 +141,10 @@ fn file_show_search_still_moves_by_source_line_in_no_wrap() {
 
 fn context(viewport_width: u16, search: Option<&SearchQuery>) -> CommandContext<'_> {
     CommandContext {
-        viewport_height: 3,
-        viewport_width,
+        size: ratatui::layout::Size {
+            height: 3,
+            width: viewport_width,
+        },
         search,
     }
 }

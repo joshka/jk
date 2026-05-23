@@ -3,10 +3,9 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState, Paragraph};
 
+use super::{WorkspaceContext, WorkspacesView};
 use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
-
-use super::{WorkspaceContext, WorkspacesView};
 
 impl WorkspacesView {
     /// Renders the root header plus the selectable workspace list.

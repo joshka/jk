@@ -2,6 +2,7 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use ratatui::DefaultTerminal;
 
+use super::AppServices;
 use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
     JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan,
@@ -10,8 +11,6 @@ use crate::actions::{
 };
 use crate::jj::{LogViewMode, ViewSpec, git_remotes, new_trunk, resolve_exact_change_id};
 use crate::view_state::ViewState;
-
-use super::AppServices;
 
 pub fn build_default_services() -> AppServices {
     AppServices {

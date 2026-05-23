@@ -137,11 +137,15 @@ plus shared infrastructure:
 ```text
 src/
   app/
+    abandon.rs
     mod.rs
     dispatch.rs
     effects.rs
-    input/
+    help.rs
+    keyboard.rs
+    menus.rs
     navigation/
+    prompts.rs
     reducers/
     services/
     status_line.rs
@@ -229,17 +233,22 @@ working-copy, file, sync, describe, and abandon flows.
 
 Current ownership:
 
-- `app/mod.rs` owns terminal event loop, app-level key dispatch, pending key-prefix state, refresh,
-  and the normal-key entry point. It should read as the app orchestration table of contents and
-  route screen, action, service, and view-selection details to their owner modules.
-- `app/dispatch.rs` owns prefix dispatch and binding execution flow after the event loop has chosen
-  a key path.
+- `app/mod.rs` owns the terminal event loop, shared app state, render entry point, refresh, and
+  view-execution helpers. It should read as the app orchestration table of contents and route
+  screen, action, service, and view-selection details to their owner modules.
+- `app/keyboard.rs` owns first-hop key routing, modal-first dispatch, normal binding dispatch, and
+  prefix replay. It is the main maintainer entry point for keyboard behavior.
+- `app/dispatch.rs` owns binding execution flow after keyboard dispatch has already chosen a
+  concrete binding.
 - `app/effects.rs` owns `ViewEffect` interpretation.
+- `app/help.rs` owns help-overlay key handling, including help-specific prefix matching.
+- `app/menus.rs` owns shared copy-menu, view-menu, action-menu, role-prompt, and remote-prompt key
+  reducers.
 - `app/navigation/mod.rs` owns startup parsing, view-stack transitions, top-level view-menu actions,
   diff-format application, and custom log revset mode changes through `startup`, `stack`, and
   `view_menu`.
-- `app/input/mod.rs` owns active modal and prompt key reducers, including copy-menu opening and
-  prompt acceptance/cancellation behavior.
+- `app/prompts.rs` owns text-prompt acceptance and cancellation behavior.
+- `app/abandon.rs` owns abandon preview and confirmation key handling.
 - `app/actions/mod.rs` owns action-menu opening, prompt-to-preview setup, immediate action execution
   such as default fetch and new-from-trunk, and confirmed action result handling.
 - `app/actions/input/mod.rs` owns common action-preview key flow between pending result panes and

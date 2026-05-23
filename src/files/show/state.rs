@@ -1,8 +1,8 @@
 use color_eyre::Result;
-
-use crate::documents::{DocumentLines, load_document};
+use ratatui::layout::Size;
 
 use super::FileShowView;
+use crate::documents::{DocumentLines, load_document};
 
 impl FileShowView {
     /// Reload the document while preserving path identity and viewport state.
@@ -37,10 +37,10 @@ impl FileShowView {
         self.scroll_offset = self.scroll_offset.saturating_sub(amount);
     }
 
-    /// Clamp vertical and horizontal viewport state to current document and width bounds.
-    pub fn clamp(&mut self, _viewport_height: u16, viewport_width: u16) {
+    /// Clamp vertical and horizontal viewport state to current document bounds.
+    pub fn clamp(&mut self, viewport: Size) {
         self.scroll_offset = self.scroll_offset.min(self.max_scroll_offset());
-        self.viewport.clamp(viewport_width, self.max_line_width());
+        self.viewport.clamp(viewport.width, self.max_line_width());
     }
 
     pub fn toggle_wrap(&mut self, viewport_width: u16) {

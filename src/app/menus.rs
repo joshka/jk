@@ -1,16 +1,32 @@
 use color_eyre::Result;
 use crossterm::event::KeyCode;
 
-use crate::app::status_line::StatusLine;
-use crate::clipboard;
-use crate::modes::{InteractionMode, view_menu_options};
-
-use super::super::reducers::{
+use super::App;
+use super::reducers::{
     MenuKey, RolePromptDecision, reduce_menu_key, reduce_role_prompt_accept, reduce_view_menu_key,
 };
-use super::App;
+use crate::app::status_line::StatusLine;
+use crate::clipboard;
+use crate::command::ViewEffect;
+use crate::modes::{InteractionMode, view_menu_options};
 
 impl App {
+    /// Open the copy menu by asking the active view for copyable options.
+    pub fn open_copy_menu(&mut self) {
+        let options = match self.execute_view(crate::command::ViewCommand::Copy) {
+            ViewEffect::CopyOptions(options) => options,
+            _ => Vec::new(),
+        };
+        if options.is_empty() {
+            self.status = StatusLine::with_message(&self.view, "nothing to copy");
+        } else {
+            self.mode = InteractionMode::CopyMenu {
+                options,
+                selected: 0,
+            };
+        }
+    }
+
     pub fn handle_copy_menu_key(&mut self, code: KeyCode) -> Result<bool> {
         let InteractionMode::CopyMenu { options, selected } = &mut self.mode else {
             unreachable!("copy menu key handler requires copy menu mode");

@@ -2,13 +2,13 @@ use std::ffi::OsString;
 
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-
-use crate::app::status_line::StatusLine;
-use crate::jj::{JjCommand, ViewSpec};
-use crate::modes::InteractionMode;
+use ratatui::layout::Rect;
 
 use super::super::App;
 use super::super::services::AppServices;
+use crate::app::status_line::StatusLine;
+use crate::jj::{JjCommand, ViewSpec};
+use crate::modes::InteractionMode;
 
 impl App {
     /// Build the initial app state from process arguments.
@@ -27,6 +27,12 @@ impl App {
         Ok(Self {
             view,
             stack: Vec::new(),
+            viewport: Rect {
+                x: 0,
+                y: 0,
+                height: u16::MAX,
+                width: u16::MAX,
+            },
             startup_log_args,
             diff_format,
             status,

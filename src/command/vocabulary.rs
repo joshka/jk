@@ -1,3 +1,5 @@
+use ratatui::layout::Size;
+
 use crate::actions::JjOperationRecoveryKind;
 use crate::jj::JjCommand;
 use crate::menus::{ActionMenu, CopyOption};
@@ -126,15 +128,15 @@ impl Command {
     }
 }
 
-/// Snapshot of the live viewport and search state for one view dispatch.
+/// Snapshot of the active viewport and search state for one view dispatch.
 ///
-/// `App` rebuilds this for each key event, so view code must treat it as
-/// read-only input for the current dispatch instead of retained state.
+/// Immediate key dispatch reuses the main viewport from the last completed
+/// frame so height and width stay consistent for one event-loop turn. View
+/// code must treat this as read-only input for the current dispatch instead of
+/// retained state.
 pub struct CommandContext<'a> {
-    /// Current content viewport height in terminal rows.
-    pub viewport_height: u16,
-    /// Current content viewport width in terminal columns.
-    pub viewport_width: u16,
+    /// Current content viewport size in terminal cells.
+    pub size: Size,
     /// Active search query, if search is currently scoped to the view.
     pub search: Option<&'a SearchQuery>,
 }
@@ -145,7 +147,7 @@ impl CommandContext<'_> {
     /// Page movement keeps one row of overlap and never returns zero, even for
     /// very small terminal viewports.
     pub fn page_size(&self) -> usize {
-        usize::from(self.viewport_height.saturating_sub(1).max(1))
+        usize::from(self.size.height.saturating_sub(1).max(1))
     }
 }
 

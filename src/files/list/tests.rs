@@ -24,8 +24,10 @@ fn file_list_moves_by_path_item() {
     view.execute(
         ViewCommand::MoveLast,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -34,8 +36,10 @@ fn file_list_moves_by_path_item() {
     view.execute(
         ViewCommand::MoveUp,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -44,8 +48,10 @@ fn file_list_moves_by_path_item() {
     view.execute(
         ViewCommand::MoveFirst,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -115,8 +121,10 @@ fn file_list_open_selected_file_uses_exact_path() {
     let effect = view.execute(
         ViewCommand::OpenItem,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );

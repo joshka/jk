@@ -10,36 +10,39 @@ use std::env;
 use std::time::{Duration, Instant};
 
 use color_eyre::Result;
-use crossterm::event::{self, Event, KeyEventKind};
-use ratatui::DefaultTerminal;
-use ratatui::Frame;
+use crossterm::event;
+use ratatui::layout::{Rect, Size};
+use ratatui::{DefaultTerminal, Frame};
 
 use crate::actions::JjSplitPlan;
-use crate::command::{
-    Binding, BindingMatch, CommandContext, ViewCommand, ViewEffect, binding_prefix_next_labels,
-    match_binding_sequence,
-};
+use crate::command::{Binding, CommandContext, ViewCommand, ViewEffect};
 use crate::jj::DiffFormat;
 use crate::modes::InteractionMode;
 use crate::search::SearchQuery;
 use crate::tui;
 use crate::view_state::ViewState;
 
+mod abandon;
 pub mod actions;
 mod bindings;
 mod dispatch;
 mod effects;
-mod input;
+mod help;
+mod keyboard;
+mod menus;
 mod navigation;
+mod prompts;
 mod reducers;
 mod services;
 pub mod status_line;
-
-use self::dispatch::prefix_status_message;
-use self::services::AppServices;
-use self::status_line::{StatusKind, StatusLine};
+#[cfg(test)]
+mod tests;
 
 pub use self::bindings::APP_BINDINGS;
+#[cfg(test)]
+pub use self::reducers::{rebase_plan_from_prompt, squash_plan_from_prompt};
+use self::services::AppServices;
+use self::status_line::StatusLine;
 
 /// Start the terminal application from process arguments.
 ///
@@ -47,7 +50,8 @@ pub use self::bindings::APP_BINDINGS;
 /// loop, and lets app-owned dispatch surface terminal, clipboard, and jj errors through
 /// `color_eyre`.
 pub fn run() -> Result<()> {
-    let mut app = App::load(env::args_os().skip(1).collect())?;
+    let startup_args = env::args_os().skip(1).collect();
+    let mut app = App::load(startup_args)?;
 
     ratatui::run(|terminal| app.run(terminal))
 }
@@ -63,6 +67,8 @@ pub struct App {
     view: ViewState,
     /// Back-stack of previously active views for app-level history navigation.
     stack: Vec<ViewState>,
+    /// Main viewport from the last completed frame, reused for immediate dispatch.
+    viewport: Rect,
     /// Startup `jj log` argv restored by direct log switching.
     startup_log_args: Option<Vec<String>>,
     /// Active show/diff presentation format chosen at the app level.
@@ -82,9 +88,6 @@ pub struct App {
     /// Injected seam for jj, refresh, and alternate-view side effects.
     services: AppServices,
 }
-
-/// Keep multi-key prefixes responsive without making fallback bindings feel hair-trigger.
-const COMMAND_PREFIX_TIMEOUT: Duration = Duration::from_millis(700);
 
 /// Pending multi-key input tracked until the prefix resolves or expires.
 ///
@@ -112,17 +115,18 @@ enum PendingInteractiveAction {
 impl App {
     /// Drive the terminal redraw and input loop until the app requests exit.
     ///
-    /// The runtime path is deliberate: draw the current view, derive the live viewport height, then
+    /// The runtime path is deliberate: draw the current view, snapshot the main viewport, then
     /// either dispatch the next terminal event or expire any pending multi-key prefix.
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.should_quit {
             let completed_frame = terminal.draw(|frame| self.render(frame))?;
-            let viewport_height = tui::areas(completed_frame.area).main.height;
+            let completed_viewport = viewport_from_completed_frame(completed_frame.area);
+            self.viewport = completed_viewport;
 
             if event::poll(Duration::from_millis(200))? {
-                self.handle_event(event::read()?, viewport_height)?;
+                self.handle_event(event::read()?)?;
             } else {
-                self.flush_expired_pending_command(viewport_height)?;
+                self.flush_expired_pending_command(completed_viewport.height)?;
             }
             self.run_pending_interactive_action(Some(terminal))?;
         }
@@ -139,127 +143,101 @@ impl App {
         tui::render_overlay(frame, &status, self.mode.overlay(&self.view, APP_BINDINGS));
     }
 
-    /// Route one terminal event into resize handling, modal dispatch, or normal dispatch.
+    /// Route one terminal event into resize handling or pressed-key dispatch.
     ///
-    /// Resize is handled here because it updates app-owned presentation state immediately. Key
-    /// events first go through the active mode, then fall through to normal bindings only when the
-    /// mode does not consume them.
-    fn handle_event(&mut self, event: Event, viewport_height: u16) -> Result<()> {
-        let key = match event {
-            Event::Key(key) => key,
-            Event::Resize(width, height) => {
-                self.view.clamp(height.saturating_sub(2), width);
-                if matches!(self.status.kind(), StatusKind::Ready) {
-                    self.status = StatusLine::ready(&self.view);
-                }
-                return Ok(());
+    /// Non-press key events and unrelated terminal events are ignored here.
+    fn handle_event(&mut self, event: event::Event) -> Result<()> {
+        match event {
+            event::Event::Resize(width, height) => {
+                self.handle_resize(width, height);
+                Ok(())
             }
-            _ => return Ok(()),
-        };
-
-        if key.kind != KeyEventKind::Press {
-            return Ok(());
+            event::Event::Key(key) if key.is_press() => {
+                self.handle_key_press(key, self.viewport.height)
+            }
+            _ => Ok(()),
         }
+    }
 
-        if self.handle_mode_key_event_inner(key, viewport_height)? {
-            return Ok(());
-        }
-
-        let refresh_status = self.handle_normal_key(key, viewport_height)?;
-        if refresh_status && matches!(self.status.kind(), StatusKind::Ready) {
+    /// Clamp the active view to the new terminal size and refresh ready status text.
+    fn handle_resize(&mut self, width: u16, height: u16) {
+        self.viewport = viewport_from_terminal_size(width, height);
+        self.view.clamp(viewport_size(self.viewport));
+        if self.status.is_ready() {
             self.status = StatusLine::ready(&self.view);
-        }
-
-        Ok(())
-    }
-
-    /// Dispatch a normal-mode key using the current timestamp as prefix resolution time.
-    fn handle_normal_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        viewport_height: u16,
-    ) -> Result<bool> {
-        self.handle_normal_key_at(key, viewport_height, Instant::now())
-    }
-
-    /// Dispatch a normal-mode key while making prefix timeout evaluation explicit.
-    ///
-    /// Tests call this variant with a controlled timestamp so prefix fallback behavior stays
-    /// deterministic.
-    fn handle_normal_key_at(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        viewport_height: u16,
-        now: Instant,
-    ) -> Result<bool> {
-        if self.pending_command.is_some() {
-            return self.handle_pending_command_key(key, viewport_height, now);
-        }
-
-        let keys = [key];
-        let Some(binding_match) =
-            match_binding_sequence(&[APP_BINDINGS, self.view.bindings()], &keys)
-        else {
-            return Ok(true);
-        };
-
-        match binding_match {
-            BindingMatch::Exact(binding) => self.execute_binding(binding, viewport_height),
-            BindingMatch::Prefix { fallback } => {
-                self.pending_command = Some(PendingCommand {
-                    keys: keys.to_vec(),
-                    fallback,
-                    deadline: now + COMMAND_PREFIX_TIMEOUT,
-                });
-                self.status = StatusLine::with_message(
-                    &self.view,
-                    prefix_status_message(
-                        "prefix",
-                        &keys,
-                        &binding_prefix_next_labels(&[APP_BINDINGS, self.view.bindings()], &keys),
-                    ),
-                );
-                Ok(false)
-            }
         }
     }
 
     /// Rebuild the active view and convert refresh failure into status.
     ///
-    /// ViewState owns the actual reload and clamp policy; this method only keeps the app status in
-    /// sync with the result.
-    fn refresh(&mut self, viewport_height: u16) {
-        match self.refresh_view_state() {
-            Ok(()) => {
-                self.view.clamp(viewport_height, current_viewport_width());
-                self.status = StatusLine::ready(&self.view);
-            }
-            Err(error) => self.status = StatusLine::error(&self.view, error.to_string()),
+    /// Refresh can run after external side effects, so the follow-up clamp uses a fresh terminal
+    /// size snapshot instead of reusing geometry from the initiating frame.
+    fn refresh(&mut self) {
+        if let Err(error) = self.refresh_view_state() {
+            self.status = StatusLine::error(&self.view, error.to_string());
+            return;
         }
+
+        clamp_view_to_current_viewport(&mut self.view);
+        self.status = StatusLine::ready(&self.view);
     }
 
     /// Ask the active view slice to interpret one view-local command.
-    fn execute_view(&mut self, command: ViewCommand, viewport_height: u16) -> ViewEffect {
+    ///
+    /// Immediate dispatch reuses the main viewport from the last completed frame so height and
+    /// width stay consistent for one event-loop turn.
+    fn execute_view(&mut self, command: ViewCommand) -> ViewEffect {
         self.view.execute(
             command,
             CommandContext {
-                viewport_height,
-                viewport_width: current_viewport_width(),
+                size: viewport_size(self.viewport),
                 search: self.search.as_ref(),
             },
         )
     }
 }
 
-/// Read the current terminal width at dispatch time.
-///
-/// View clamping uses live terminal size instead of cached geometry so resize handling stays local
-/// to the next refresh or view effect.
-fn current_viewport_width() -> u16 {
-    crossterm::terminal::size()
-        .map(|(width, _)| width)
-        .unwrap_or(u16::MAX)
+/// Build the app's main viewport area from the last completed frame.
+fn viewport_from_completed_frame(area: Rect) -> Rect {
+    tui::areas(area).main
 }
 
-#[cfg(test)]
-mod tests;
+/// Clamp one view to the live main viewport using a single size snapshot.
+///
+/// Post-refresh and post-action clamp paths use this helper because the terminal may have changed
+/// while an external command, reveal step, or terminal handoff was in flight. Sampling height and
+/// width together keeps the clamp inputs consistent with each other.
+fn clamp_view_to_current_viewport(view: &mut ViewState) {
+    let viewport = current_viewport_rect();
+    view.clamp(viewport_size(viewport));
+}
+
+/// Read the current main viewport area from one terminal-size snapshot.
+fn current_viewport_rect() -> Rect {
+    crossterm::terminal::size()
+        .map(|(width, height)| viewport_from_terminal_size(width, height))
+        .unwrap_or(Rect {
+            x: 0,
+            y: 0,
+            height: u16::MAX,
+            width: u16::MAX,
+        })
+}
+
+/// Build the app's main viewport area from the raw terminal size.
+fn viewport_from_terminal_size(width: u16, height: u16) -> Rect {
+    Rect {
+        x: 0,
+        y: 0,
+        height: height.saturating_sub(2),
+        width,
+    }
+}
+
+/// Convert one viewport area into the dimensions view dispatch and clamping need.
+fn viewport_size(viewport: Rect) -> Size {
+    Size {
+        height: viewport.height,
+        width: viewport.width,
+    }
+}

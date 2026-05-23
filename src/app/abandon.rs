@@ -1,12 +1,11 @@
 use color_eyre::Result;
 use crossterm::event::KeyCode;
 
+use super::App;
+use super::reducers::{ConfirmationKey, reduce_confirmation_key};
 use crate::app::actions::{ActionPaneKey, action_pane_visible_lines, handle_action_pane_key};
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
-
-use super::super::reducers::{ConfirmationKey, reduce_confirmation_key};
-use super::App;
 
 impl App {
     pub fn handle_abandon_preview_key(

@@ -1,9 +1,8 @@
 use color_eyre::Result;
 
+use super::JjDescribeTarget;
 use crate::actions::CommandOutput;
 use crate::jj::run_direct_args;
-
-use super::JjDescribeTarget;
 
 /// Preview-first plan for updating a change description without opening an editor.
 #[derive(Clone, Debug, Eq, PartialEq)]

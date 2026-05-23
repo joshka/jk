@@ -1,6 +1,5 @@
-use crate::jj::exact_string_pattern;
-
 use super::{JjBookmarkMutationKind, JjBookmarkMutationPlan};
+use crate::jj::exact_string_pattern;
 
 impl JjBookmarkMutationPlan {
     pub fn command_label(&self) -> String {

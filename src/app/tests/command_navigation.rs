@@ -507,8 +507,10 @@ fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
     graph.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 12,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 12,
+                width: 80,
+            },
             search: None,
         },
     );

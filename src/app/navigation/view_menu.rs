@@ -1,10 +1,9 @@
 use color_eyre::Result;
 
+use super::super::App;
 use crate::app::status_line::StatusLine;
 use crate::jj::{DiffFormat, JjCommand};
 use crate::modes::{InteractionMode, ViewMenuAction, view_menu_options};
-
-use super::super::App;
 
 impl App {
     /// Open the top-level view menu with the current surface preselected when

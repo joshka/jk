@@ -9,8 +9,9 @@
 mod args;
 mod context;
 
-use super::{JjCommand, LogViewMode};
 use args::{diff_format_args, parse_diff_format};
+
+use super::{JjCommand, LogViewMode};
 
 /// The diff presentation selected by `jk`'s view-format modal.
 ///

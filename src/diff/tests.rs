@@ -262,7 +262,10 @@ fn diff_clamp_revalidates_horizontal_offset_for_current_width() {
     }
     assert!(view.horizontal_offset() > 0);
 
-    view.clamp(4, 80);
+    view.clamp(ratatui::layout::Size {
+        height: 4,
+        width: 80,
+    });
 
     assert_eq!(view.horizontal_offset(), 0);
 }
@@ -283,8 +286,10 @@ fn context(search: Option<&SearchQuery>) -> CommandContext<'_> {
 
 fn context_width(viewport_width: u16, search: Option<&SearchQuery>) -> CommandContext<'_> {
     CommandContext {
-        viewport_height: 4,
-        viewport_width,
+        size: ratatui::layout::Size {
+            height: 4,
+            width: viewport_width,
+        },
         search,
     }
 }

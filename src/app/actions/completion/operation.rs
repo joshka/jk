@@ -1,9 +1,8 @@
+use super::super::super::{App, clamp_view_to_current_viewport};
+use super::super::ActionPane;
 use crate::actions::{JjOperationRecovery, JjOperationTarget};
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
-
-use super::super::super::{App, current_viewport_width};
-use super::super::ActionPane;
 
 impl App {
     /// Run the undo/redo operation and leave its finished output on the recovery pane.
@@ -11,15 +10,13 @@ impl App {
         &mut self,
         recovery: JjOperationRecovery,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = recovery.command_label().to_owned();
         let result_message = match self.services.run_operation_recovery(&recovery) {
-            Ok(output) => self.finish_successful_action(
-                output,
-                viewport_height,
-                &format!(" | {}", recovery.success_hint()),
-            ),
+            Ok(output) => {
+                self.finish_successful_action(output, &format!(" | {}", recovery.success_hint()))
+            }
             Err(error) => self.finish_failed_action(error),
         };
 
@@ -34,14 +31,14 @@ impl App {
         &mut self,
         target: JjOperationTarget,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = target.command_label();
         let result_message = match self.services.run_operation_target(&target) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
-                    match self.refresh_stacked_repo_views(viewport_height) {
+                    clamp_view_to_current_viewport(&mut self.view);
+                    match self.refresh_stacked_repo_views() {
                         Ok(()) => {
                             let message = format!("{} | jj undo", output.trim());
                             self.status = StatusLine::with_message(&self.view, message.as_str());

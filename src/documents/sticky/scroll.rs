@@ -1,6 +1,5 @@
-use crate::documents::PinnedDocument;
-
 use super::render::line_text;
+use crate::documents::PinnedDocument;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct StickyScroll {

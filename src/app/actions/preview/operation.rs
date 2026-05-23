@@ -1,8 +1,7 @@
-use crate::actions::{JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget};
-use crate::modes::InteractionMode;
-
 use super::super::super::App;
 use super::super::ActionPane;
+use crate::actions::{JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget};
+use crate::modes::InteractionMode;
 
 impl App {
     /// Open the global undo/redo preview that does not depend on a selected operation id.

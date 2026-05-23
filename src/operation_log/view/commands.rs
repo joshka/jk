@@ -1,9 +1,8 @@
+use super::{OperationLogItem, OperationLogView};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::jj::ViewSpec;
 use crate::menus::{ActionKind, ActionMenu, ActionMenuItem, CopyOption, FollowUp, SafetyTier};
 use crate::search::{SearchQuery, entry_matches};
-
-use super::{OperationLogItem, OperationLogView};
 
 impl OperationLogView {
     /// Applies selection, navigation, search, copy, and recovery-menu commands.

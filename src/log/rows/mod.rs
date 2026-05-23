@@ -9,13 +9,12 @@ mod pairing;
 
 use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
+use metadata::run_jj_with_template;
+use pairing::group_lines;
 use ratatui::text::Line;
 
 use crate::jj::{ColorMode, JjCommand, ViewSpec, run_jj};
 use crate::rendered_rows::{RowMetadata, first_content_char, line_text};
-
-use metadata::run_jj_with_template;
-use pairing::group_lines;
 
 /// One selectable item parsed from rendered graph output.
 ///

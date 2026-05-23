@@ -1,7 +1,6 @@
 use super::build_action_menu;
 use super::context::ExactActionContext;
-use crate::menus::PREVIEW_REQUIRED_MARKER;
-use crate::menus::{ActionKind, ActionMenuItem, FollowUp};
+use crate::menus::{ActionKind, ActionMenuItem, FollowUp, PREVIEW_REQUIRED_MARKER};
 
 #[test]
 fn single_exact_revision_builds_log_menu_with_duplicate_restore_and_revert() {

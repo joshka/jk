@@ -6,6 +6,16 @@
 mod fixtures;
 mod services;
 
+pub use std::sync::atomic::{AtomicUsize, Ordering};
+pub use std::time::{Duration, Instant};
+
+pub use color_eyre::Result;
+pub use color_eyre::eyre::eyre;
+pub use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+pub use fixtures::{key, log_item, mock_load_view, test_app};
+pub use ratatui::DefaultTerminal;
+pub use services::*;
+
 pub use super::super::{APP_BINDINGS, App};
 #[allow(unused_imports)]
 pub use crate::actions::{
@@ -16,10 +26,10 @@ pub use crate::actions::{
     JjSplitPlan, JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
 };
 pub use crate::app::actions::{ActionPane, action_pane_visible_lines};
-pub use crate::app::input::{rebase_plan_from_prompt, squash_plan_from_prompt};
 pub use crate::app::navigation::startup::initial_view;
 pub use crate::app::services::AppServices;
 pub use crate::app::status_line::{StatusKind, StatusLine};
+pub use crate::app::{rebase_plan_from_prompt, squash_plan_from_prompt};
 #[allow(unused_imports)]
 pub use crate::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
@@ -42,11 +52,3 @@ pub use crate::tui::Overlay;
 pub use crate::view_state::ViewState;
 #[allow(unused_imports)]
 pub use crate::workspaces::{WorkspaceContext, WorkspaceItem, load_workspace_context};
-pub use color_eyre::Result;
-pub use color_eyre::eyre::eyre;
-pub use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
-pub use fixtures::{key, log_item, mock_load_view, test_app};
-pub use ratatui::DefaultTerminal;
-pub use services::*;
-pub use std::sync::atomic::{AtomicUsize, Ordering};
-pub use std::time::{Duration, Instant};

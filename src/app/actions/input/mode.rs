@@ -1,9 +1,8 @@
 use crossterm::event::KeyCode;
 
+use super::{ActionPreviewConfirmation, ActionPreviewEvent, action_preview_event};
 use crate::app::actions::action_pane_visible_lines;
 use crate::modes::InteractionMode;
-
-use super::{ActionPreviewConfirmation, ActionPreviewEvent, action_preview_event};
 
 impl InteractionMode {
     /// Reduce one key for any preview/result mode that shares the common action-pane behavior.

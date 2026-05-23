@@ -5,9 +5,8 @@ use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use ratatui_macros::{line, span, vertical};
 
-use crate::app::status_line::{StatusKind, StatusLine};
-
 use super::status_hints::status_hint_spans;
+use crate::app::status_line::{StatusKind, StatusLine};
 
 /// Fixed chrome layout for one terminal frame.
 ///

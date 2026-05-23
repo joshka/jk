@@ -69,8 +69,10 @@ fn movement_is_bookmark_item_based() {
     view.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 10,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 10,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -79,8 +81,10 @@ fn movement_is_bookmark_item_based() {
     view.execute(
         ViewCommand::MoveUp,
         CommandContext {
-            viewport_height: 10,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 10,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -88,8 +92,10 @@ fn movement_is_bookmark_item_based() {
     view.execute(
         ViewCommand::MoveLast,
         CommandContext {
-            viewport_height: 10,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 10,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -651,8 +657,10 @@ fn open_show_uses_target_change_id_and_reports_missing_targets() {
         view.execute(
             ViewCommand::OpenShow,
             CommandContext {
-                viewport_height: 10,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 10,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -667,8 +675,10 @@ fn open_show_uses_target_change_id_and_reports_missing_targets() {
         view.execute(
             ViewCommand::OpenShow,
             CommandContext {
-                viewport_height: 10,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 10,
+                    width: 80
+                },
                 search: None,
             },
         ),

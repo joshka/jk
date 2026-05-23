@@ -25,8 +25,8 @@ impl SafetyTier {
 /// Stable action vocabulary shared by menus, prompts, and follow-up dispatch.
 ///
 /// This enum names user-visible verbs only. Feature-specific availability rules belong in the
-/// feature or action-menu builder that knows the selected row context. Labels and shortcuts are part
-/// of the shared presentation contract, but they are not command construction policy.
+/// feature or action-menu builder that knows the selected row context. Labels and shortcuts are
+/// part of the shared presentation contract, but they are not command construction policy.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionKind {
     /// Edit the selected revision into the working copy.

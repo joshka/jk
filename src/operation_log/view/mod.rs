@@ -6,11 +6,10 @@
 //! cursor and selected-row `jj operation restore`/`jj operation revert` flows
 //! using exact operation ids.
 
+use super::OperationLogItem;
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
-
-use super::OperationLogItem;
 
 mod commands;
 mod render;

@@ -39,8 +39,10 @@ fn operation_detail_scrolls_searches_and_copies_plain_document() {
     view.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -87,8 +89,10 @@ fn operation_detail_switches_between_show_and_diff_for_same_operation() {
         show.execute(
             ViewCommand::OpenDiff,
             CommandContext {
-                viewport_height: 3,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 3,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -98,8 +102,10 @@ fn operation_detail_switches_between_show_and_diff_for_same_operation() {
         diff.execute(
             ViewCommand::OpenShow,
             CommandContext {
-                viewport_height: 3,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 3,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -109,8 +115,10 @@ fn operation_detail_switches_between_show_and_diff_for_same_operation() {
         show.execute(
             ViewCommand::OpenShow,
             CommandContext {
-                viewport_height: 3,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 3,
+                    width: 80
+                },
                 search: None,
             },
         ),
@@ -120,8 +128,10 @@ fn operation_detail_switches_between_show_and_diff_for_same_operation() {
         diff.execute(
             ViewCommand::OpenDiff,
             CommandContext {
-                viewport_height: 3,
-                viewport_width: 80,
+                size: ratatui::layout::Size {
+                    height: 3,
+                    width: 80
+                },
                 search: None,
             },
         ),

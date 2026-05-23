@@ -2,10 +2,9 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
+use super::{FileListItem, FileListView};
 use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
-
-use super::{FileListItem, FileListView};
 
 impl FileListView {
     /// Render the current file list with active-row styling and optional search highlighting.

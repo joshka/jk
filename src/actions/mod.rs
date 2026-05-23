@@ -15,10 +15,10 @@
 //! Feature views and action menus own availability decisions and target selection. The app
 //! lifecycle owns prompt flow, confirmation strength, refresh/reveal policy, and result-screen
 //! transitions after a plan runs. Syntax quoting helpers stay in [`crate::jj`]; rendered row
-//! loading stays in [`crate::rendered_rows`] and view-spec command construction stays in [`crate::jj`].
-//! This root is intentionally shared as a vocabulary and re-export boundary after target selection.
-//! Do not move feature-owned availability rules, row eligibility checks, or prompt routing here;
-//! those stay with the feature or app action lifecycle that chose the target.
+//! loading stays in [`crate::rendered_rows`] and view-spec command construction stays in
+//! [`crate::jj`]. This root is intentionally shared as a vocabulary and re-export boundary after
+//! target selection. Do not move feature-owned availability rules, row eligibility checks, or
+//! prompt routing here; those stay with the feature or app action lifecycle that chose the target.
 
 mod abandon;
 mod describe;
@@ -30,13 +30,6 @@ mod working_copy;
 // Re-export plan types as the boundary consumed by views, menus, and the app lifecycle. The
 // owning modules keep family-specific policy local while this root module keeps the top-level
 // action vocabulary discoverable from one import path.
-pub use crate::bookmarks::actions::{
-    JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget,
-    validate_bookmark_rename_new_name,
-};
-pub use crate::operation_log::actions::{
-    JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget,
-};
 pub use abandon::{JjAbandonPlan, JjAbandonPreview};
 pub use describe::{JjCommitPlan, JjDescribePlan, JjDescribeTarget};
 #[allow(unused_imports)]
@@ -49,6 +42,14 @@ pub use rewrite::{JjAbsorbPlan, JjRebasePlan, JjSquashPlan};
 pub use working_copy::{
     JjDuplicatePlan, JjNewPlan, JjSplitPlan, JjSplitTarget, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan,
+};
+
+pub use crate::bookmarks::actions::{
+    JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkMutationPlan, JjBookmarkTarget,
+    validate_bookmark_rename_new_name,
+};
+pub use crate::operation_log::actions::{
+    JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget,
 };
 
 /// Shared result envelope for preview and confirmed command output.

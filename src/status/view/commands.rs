@@ -1,10 +1,9 @@
+use super::StatusView;
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::jj::ViewSpec;
 use crate::menus::CopyOption;
 use crate::rendered_rows::document_plain_text;
 use crate::search::{SearchQuery, line_matches};
-
-use super::StatusView;
 use crate::status::actions::StatusFileAction;
 
 impl StatusView {
@@ -51,18 +50,18 @@ impl StatusView {
                 };
                 let matches = self.search_matches(query);
                 if matches > 0 {
-                    let _ = self.next_match(context.viewport_height, query);
+                    let _ = self.next_match(context.size.height, query);
                 }
                 ViewEffect::SearchStarted { matches }
             }
             ViewCommand::NextSearchMatch => context
                 .search
-                .filter(|query| self.next_match(context.viewport_height, query))
+                .filter(|query| self.next_match(context.size.height, query))
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::PreviousSearchMatch => context
                 .search
-                .filter(|query| self.previous_match(context.viewport_height, query))
+                .filter(|query| self.previous_match(context.size.height, query))
                 .map(|_| ViewEffect::SearchMoved)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::Copy => ViewEffect::CopyOptions(self.copy_options()),

@@ -1,9 +1,8 @@
 use color_eyre::Result;
 
+use super::{BookmarkItem, BookmarksView, load_bookmark_entries};
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
-
-use super::{BookmarkItem, BookmarksView, load_bookmark_entries};
 
 impl BookmarksView {
     /// Reloads rendered bookmark rows while preserving the selected bookmark name when possible.

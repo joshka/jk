@@ -1,22 +1,21 @@
 use color_eyre::Result;
 use crossterm::event::KeyCode;
 
-use crate::app::status_line::StatusLine;
-use crate::modes::InteractionMode;
-use crate::search::SearchQuery;
-
-use super::super::reducers::{
+use super::App;
+use super::reducers::{
     PromptAcceptDecision, TextPromptKey, reduce_bookmark_name_prompt_accept,
     reduce_bookmark_rename_prompt_accept, reduce_commit_prompt_accept,
     reduce_describe_prompt_accept, reduce_text_prompt_key,
 };
-use super::App;
+use crate::app::status_line::StatusLine;
+use crate::modes::InteractionMode;
+use crate::search::SearchQuery;
 
 impl App {
     pub fn handle_search_prompt_key(
         &mut self,
         code: KeyCode,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) -> Result<bool> {
         let InteractionMode::SearchPrompt(input) = &mut self.mode else {
             unreachable!("search prompt key handler requires search prompt mode");
@@ -28,9 +27,7 @@ impl App {
                 self.search = SearchQuery::new(input.clone());
                 self.mode = InteractionMode::Normal;
                 self.status = if self.search.is_some() {
-                    match self
-                        .execute_view(crate::command::ViewCommand::StartSearch, viewport_height)
-                    {
+                    match self.execute_view(crate::command::ViewCommand::StartSearch) {
                         crate::command::ViewEffect::SearchStarted { matches } => {
                             StatusLine::with_message(&self.view, format!("{matches} matches"))
                         }

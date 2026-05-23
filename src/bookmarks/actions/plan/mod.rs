@@ -1,9 +1,8 @@
 use color_eyre::Result;
 
+use super::targets::{JjBookmarkForgetTarget, JjBookmarkTarget, JjBookmarkTrackingTarget};
 use crate::actions::CommandOutput;
 use crate::jj::run_direct_args;
-
-use super::targets::{JjBookmarkForgetTarget, JjBookmarkTarget, JjBookmarkTrackingTarget};
 
 mod argv;
 mod preview;

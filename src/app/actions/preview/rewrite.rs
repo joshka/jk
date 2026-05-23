@@ -1,13 +1,12 @@
+use super::super::super::App;
+use super::super::ActionPane;
+use super::super::shared::short_id;
 use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSquashPlan,
 };
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
-
-use super::super::super::App;
-use super::super::ActionPane;
-use super::super::shared::short_id;
 
 impl App {
     /// Open the rebase preview for one prepared multi-source rewrite plan.

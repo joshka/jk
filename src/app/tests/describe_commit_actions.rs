@@ -218,8 +218,10 @@ fn commit_prompt_is_honest_about_current_working_copy_target() {
     graph.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 12,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 12,
+                width: 80,
+            },
             search: None,
         },
     );

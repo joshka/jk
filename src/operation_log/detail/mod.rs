@@ -11,6 +11,7 @@ use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
+use self::document::PlainDocument;
 use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, ViewEffect};
 #[cfg(test)]
 use crate::documents::DocumentLines;
@@ -19,8 +20,6 @@ use crate::jj::{JjCommand, ViewSpec};
 use crate::menus::CopyOption;
 use crate::rendered_rows::document_plain_text;
 use crate::search::SearchQuery;
-
-use self::document::PlainDocument;
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),

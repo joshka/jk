@@ -1,9 +1,8 @@
+use super::{InteractionMode, view_menu_options};
 use crate::app::status_line::StatusLine;
 use crate::command::{Binding, project_help};
 use crate::tui::Overlay;
 use crate::view_state::ViewState;
-
-use super::{InteractionMode, view_menu_options};
 
 impl InteractionMode {
     /// Projects transient prompt state into the status line for the current draw.

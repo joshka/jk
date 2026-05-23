@@ -10,14 +10,13 @@ mod rows;
 mod state;
 
 use color_eyre::Result;
+pub use rows::{FileListItem, load_file_list_entries};
 
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 #[cfg(test)]
 use crate::jj::JjCommand;
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
-
-pub use rows::{FileListItem, load_file_list_entries};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),

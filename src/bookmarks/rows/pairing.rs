@@ -2,10 +2,9 @@ use std::collections::HashSet;
 
 use ratatui::text::Line;
 
-use crate::rendered_rows::line_text;
-
 use super::metadata::{BookmarkMetadata, BookmarkMetadataCoverage};
 use super::{BookmarkItem, BookmarkRowState};
+use crate::rendered_rows::line_text;
 
 /// Pairs rendered bookmark rows with metadata and degrades safely when counts drift.
 pub fn pair_bookmark_lines(

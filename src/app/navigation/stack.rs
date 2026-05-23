@@ -1,10 +1,9 @@
 use color_eyre::Result;
 
+use super::super::App;
 use crate::app::status_line::StatusLine;
 use crate::jj::{JjCommand, LogViewMode, ViewSpec};
 use crate::modes::InteractionMode;
-
-use super::super::App;
 
 impl App {
     /// Open a detail surface only when the requested command has a valid detail

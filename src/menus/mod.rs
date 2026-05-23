@@ -10,10 +10,9 @@ mod model;
 mod path_actions;
 mod revision_actions;
 
-pub use model::PREVIEW_REQUIRED_MARKER;
 pub use model::{
-    ActionKind, ActionMenu, ActionMenuItem, CopyOption, FollowUp, RolePrompt, RolePromptOption,
-    SafetyTier,
+    ActionKind, ActionMenu, ActionMenuItem, CopyOption, FollowUp, PREVIEW_REQUIRED_MARKER,
+    RolePrompt, RolePromptOption, SafetyTier,
 };
 pub use path_actions::StatusPathActionAvailability;
 pub use revision_actions::ExactActionContext;

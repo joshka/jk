@@ -1,6 +1,5 @@
-use crate::actions::JjFileChmodMode;
-
 use super::{ActionKind, RolePrompt, SafetyTier};
+use crate::actions::JjFileChmodMode;
 
 /// Deferred action payload produced by a selected menu item.
 ///
@@ -8,8 +7,8 @@ use super::{ActionKind, RolePrompt, SafetyTier};
 /// app turns them into preview-first `actions` plans before any process side effects occur. Keep
 /// payloads to the metadata needed to construct that plan: exact revision strings, operation ids,
 /// selected paths, role prompts, candidate lists, and chmod modes. UI selection state, command
-/// preview text, post-command status, refresh policy, and reveal targets belong in the app lifecycle
-/// or `actions`.
+/// preview text, post-command status, refresh policy, and reveal targets belong in the app
+/// lifecycle or `actions`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FollowUp {
     /// User-visible terminal payload when a builder cannot form a safe mutation target.

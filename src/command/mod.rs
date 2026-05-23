@@ -9,19 +9,20 @@ mod bindings;
 mod vocabulary;
 
 #[cfg(test)]
-pub use crate::help::HelpSectionKind;
-/// Help projection types re-exported from the command vocabulary surface.
-///
-/// Command tables are the source of key identity. `help.rs` decides which rows
-/// are visible for a context and how they are grouped for display.
-pub use crate::help::{HelpContext, HelpRow, HelpSection, project_help};
-#[cfg(test)]
 pub use bindings::find_binding;
 pub use bindings::{
     Binding, BindingMatch, KeyPattern, binding_prefix_next_labels, help_binding_prefix_next_labels,
     match_binding_sequence, match_help_binding_sequence,
 };
 pub use vocabulary::{Command, CommandContext, ViewCommand, ViewEffect};
+
+#[cfg(test)]
+pub use crate::help::HelpSectionKind;
+/// Help projection types re-exported from the command vocabulary surface.
+///
+/// Command tables are the source of key identity. `help.rs` decides which rows
+/// are visible for a context and how they are grouped for display.
+pub use crate::help::{HelpContext, HelpRow, HelpSection, project_help};
 
 #[cfg(test)]
 mod tests;

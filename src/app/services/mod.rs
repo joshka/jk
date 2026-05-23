@@ -9,6 +9,7 @@ mod defaults;
 use color_eyre::Result;
 use ratatui::DefaultTerminal;
 
+use super::App;
 use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
     JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan,
@@ -17,8 +18,6 @@ use crate::actions::{
 };
 use crate::jj::{LogViewMode, ViewSpec};
 use crate::view_state::ViewState;
-
-use super::App;
 
 pub type NewRun = fn(&JjNewPlan) -> Result<String>;
 pub type DuplicateRun = fn(&JjDuplicatePlan) -> Result<String>;

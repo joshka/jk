@@ -9,14 +9,13 @@ mod rows;
 mod state;
 
 use color_eyre::Result;
+#[cfg(test)]
+pub use rows::WORKSPACE_METADATA_TEMPLATE;
+pub use rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
-
-#[cfg(test)]
-pub use rows::WORKSPACE_METADATA_TEMPLATE;
-pub use rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 
 pub const BINDINGS: &[Binding] = &[
     Binding::new(KeyPattern::char('j'), Command::View(ViewCommand::MoveDown)),

@@ -2,11 +2,9 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
 
+use super::menus::{centered_area, overlay_block};
 use crate::app::actions::ActionPane;
 use crate::tui::theme;
-
-use super::menus::centered_area;
-use super::menus::overlay_block;
 
 #[derive(Clone, Copy)]
 enum ActionPaneMode {

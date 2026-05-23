@@ -16,13 +16,12 @@ pub mod theme;
 
 pub use chrome::{areas, render_chrome};
 pub use overlays::{Overlay, render_overlay};
-pub use status_hints::StatusHints;
-
 #[cfg(test)]
 use overlays::{
     action_menu, help_overlay, help_overlay_text, render_abandon_confirm, render_action_pane,
     role_prompt,
 };
+pub use status_hints::StatusHints;
 
 #[cfg(test)]
 mod tests;

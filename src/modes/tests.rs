@@ -6,14 +6,12 @@ use crate::actions::{
     JjWorkingCopyNavigationPlan,
 };
 use crate::app::actions::ActionPane;
-use crate::app::status_line::StatusKind;
-use crate::app::status_line::StatusLine;
+use crate::app::status_line::{StatusKind, StatusLine};
 use crate::bookmarks::actions::{JjBookmarkMutationPlan, JjBookmarkTarget};
 use crate::jj::{DiffFormat, JjCommand};
 use crate::log::LogView;
 use crate::operation_log::actions::{JjOperationRecovery, JjOperationTarget};
-use crate::tui::Overlay;
-use crate::tui::StatusHints;
+use crate::tui::{Overlay, StatusHints};
 use crate::view_state::ViewState;
 
 #[test]

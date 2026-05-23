@@ -1,7 +1,6 @@
 use crossterm::event::KeyCode;
 
-use crate::command::Binding;
-use crate::command::Command;
+use crate::command::{Binding, Command};
 
 /// Global bindings that resolve before view-local bindings.
 ///

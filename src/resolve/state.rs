@@ -1,12 +1,11 @@
 use color_eyre::Result;
 
+use super::{ResolveEntry, ResolveView, load_resolve_entries};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::jj::{JjCommand, ViewSpec};
 use crate::menus::CopyOption;
 use crate::search::{SearchQuery, entry_matches};
 use crate::selection::restore_by_key_or_index;
-
-use super::{ResolveEntry, ResolveView, load_resolve_entries};
 
 impl ResolveView {
     /// Loads resolve rows and initializes selection at the first row.

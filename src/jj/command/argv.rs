@@ -1,6 +1,5 @@
-use crate::jj::ViewSpec;
-
 use super::command_words;
+use crate::jj::ViewSpec;
 
 pub const TRUNK_WORK_REVSET: &str = "trunk().. | trunk()";
 pub const RECENT_WORK_REVSET: &str = "latest(mutable(), 20) | @ | trunk()";

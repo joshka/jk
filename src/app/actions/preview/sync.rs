@@ -1,10 +1,9 @@
+use super::super::super::{App, clamp_view_to_current_viewport};
+use super::super::ActionPane;
+use super::super::shared::{fetch_status_context, fetch_status_message, push_status_context};
 use crate::actions::{JjGitFetch, JjGitPush, JjGitPushTarget};
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
-
-use super::super::super::{App, current_viewport_width};
-use super::super::ActionPane;
-use super::super::shared::{fetch_status_context, fetch_status_message, push_status_context};
 
 impl App {
     /// Open the fetch preview for one chosen remote.
@@ -23,14 +22,14 @@ impl App {
     }
 
     /// Run default fetch immediately and keep its output on the shared fetch-preview surface.
-    pub fn fetch(&mut self, viewport_height: u16) {
+    pub fn fetch(&mut self, _viewport_height: u16) {
         let fetch = JjGitFetch::default_remotes();
         let command_label = fetch.command_label();
         let status_context = Some(fetch_status_context(&fetch));
         let result_message = match self.services.run_git_fetch(&fetch) {
             Ok(output) => match self.refresh_view_state() {
                 Ok(()) => {
-                    self.view.clamp(viewport_height, current_viewport_width());
+                    clamp_view_to_current_viewport(&mut self.view);
                     self.status =
                         StatusLine::with_message(&self.view, fetch_status_message(&fetch, &output));
                     output

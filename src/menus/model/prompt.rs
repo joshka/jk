@@ -2,8 +2,8 @@
 ///
 /// Roles are presentation labels and dispatcher cues, not parsed revsets. The follow-up action plan
 /// is responsible for quoting selected values before passing them to `jj`. Values are the exact
-/// revision strings selected by the builder, so callers should not normalize them while the prompt is
-/// open.
+/// revision strings selected by the builder, so callers should not normalize them while the prompt
+/// is open.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RolePromptOption {
     /// Presentation label naming how the selected revision will be used.

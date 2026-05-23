@@ -4,13 +4,12 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier};
 
+use super::*;
 use crate::app::actions::ActionPane;
 use crate::app::status_line::{StatusKind, StatusLine};
 use crate::command::{HelpRow, HelpSection, HelpSectionKind};
 use crate::menus::RolePrompt;
 use crate::tui::theme;
-
-use super::*;
 
 fn render_chrome_snapshot(status: &StatusLine, width: u16) -> String {
     let mut terminal = Terminal::new(TestBackend::new(width, 3)).unwrap();

@@ -1,8 +1,7 @@
-use crate::actions::{JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjFileMutationPlan};
-use crate::modes::InteractionMode;
-
 use super::super::super::App;
 use super::super::ActionPane;
+use crate::actions::{JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjFileMutationPlan};
+use crate::modes::InteractionMode;
 
 impl App {
     /// Run the describe command and leave its finished output on the describe pane.
@@ -10,7 +9,7 @@ impl App {
         &mut self,
         describe: JjDescribePlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = describe.command_label();
         let reveal_change_id = describe.target().exact_change_id().map(str::to_owned);
@@ -18,7 +17,6 @@ impl App {
             Ok(output) => self.finish_successful_action_revealing_change(
                 output,
                 reveal_change_id.as_deref(),
-                viewport_height,
                 " | jj undo",
             ),
             Err(error) => self.finish_failed_action(error),
@@ -35,13 +33,12 @@ impl App {
         &mut self,
         commit: JjCommitPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = commit.command_label();
         let result_message = match self.services.run_commit(&commit) {
             Ok(output) => self.finish_successful_action(
                 output,
-                viewport_height,
                 " | new working-copy change created on top | jj undo",
             ),
             Err(error) => self.finish_failed_action(error),
@@ -58,11 +55,11 @@ impl App {
         &mut self,
         mutation: JjBookmarkMutationPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = mutation.command_label();
         let result_message = match self.services.run_bookmark_mutation(&mutation) {
-            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Ok(output) => self.finish_successful_action(output, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
 
@@ -77,13 +74,11 @@ impl App {
         &mut self,
         mutation: JjFileMutationPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = mutation.command_label();
         let result_message = match self.services.run_file_mutation(&mutation) {
-            Ok(output) => {
-                self.finish_successful_action(output, viewport_height, " | jj undo | jj op show -p")
-            }
+            Ok(output) => self.finish_successful_action(output, " | jj undo | jj op show -p"),
             Err(error) => self.finish_failed_action(error),
         };
 

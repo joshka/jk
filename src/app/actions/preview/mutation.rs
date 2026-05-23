@@ -1,8 +1,7 @@
-use crate::actions::{JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjFileMutationPlan};
-use crate::modes::InteractionMode;
-
 use super::super::super::App;
 use super::super::shared::bookmark_status_context;
+use crate::actions::{JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjFileMutationPlan};
+use crate::modes::InteractionMode;
 
 impl App {
     /// Open the describe preview for one prepared describe plan.

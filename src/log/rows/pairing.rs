@@ -1,9 +1,8 @@
 use ratatui::text::Line;
 
-use crate::rendered_rows::{RowMetadata, is_standalone_graph_line, line_text};
-
 use super::LogItem;
 use super::metadata::RevisionMetadata;
+use crate::rendered_rows::{RowMetadata, is_standalone_graph_line, line_text};
 
 /// Group rendered terminal lines into selectable log items and pair optional metadata by row.
 pub fn group_lines(

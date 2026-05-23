@@ -11,13 +11,12 @@ mod pairing;
 
 use ansi_to_tui::IntoText as _;
 use color_eyre::Result;
+use metadata::{bookmark_metadata_coverage, run_jj_bookmark_metadata};
+use pairing::pair_bookmark_lines;
 use ratatui::text::Line;
 
 use crate::jj::{ColorMode, ViewSpec, run_jj};
 use crate::rendered_rows::line_text;
-
-use metadata::{bookmark_metadata_coverage, run_jj_bookmark_metadata};
-use pairing::pair_bookmark_lines;
 
 /// One selectable bookmark item parsed from rendered bookmark output.
 #[derive(Clone, Debug)]

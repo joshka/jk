@@ -5,8 +5,8 @@
 //! They call `AppServices` directly for jj/view effects and leave only current-view coupling on
 //! `App` itself. Treat this root as a table of contents for the action subtree: `entry` accepts
 //! chosen actions, `pane` owns preview/result overlay state, `preview` opens panes, `input`
-//! reduces shared preview keys, `completion` runs confirmed commands, and `shared` keeps only wording plus
-//! refresh/reveal helpers used by multiple lifecycle stages.
+//! reduces shared preview keys, `completion` runs confirmed commands, and `shared` keeps only
+//! wording plus refresh/reveal helpers used by multiple lifecycle stages.
 
 mod completion;
 mod entry;

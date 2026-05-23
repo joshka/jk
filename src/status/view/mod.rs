@@ -5,11 +5,10 @@
 //! name one repo-relative tracked path remain visible and selectable, but file
 //! mutation actions report why they are disabled instead of guessing.
 
+use super::rows::StatusRow;
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
-
-use super::rows::StatusRow;
 
 mod commands;
 mod render;

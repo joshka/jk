@@ -29,8 +29,10 @@ fn status_navigation_moves_through_rows() {
     view.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -39,8 +41,10 @@ fn status_navigation_moves_through_rows() {
     view.execute(
         ViewCommand::MoveLast,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -55,8 +59,10 @@ fn status_search_moves_to_next_match() {
     let effect = view.execute(
         ViewCommand::StartSearch,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: Some(&query),
         },
     );
@@ -202,8 +208,10 @@ fn status_action_path_follows_selected_exact_row() {
     view.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 4,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 4,
+                width: 80,
+            },
             search: None,
         },
     );

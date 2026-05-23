@@ -1,3 +1,5 @@
+use ratatui::layout::Rect;
+
 use super::{
     App, DiffFormat, InteractionMode, JjCommand, KeyCode, KeyEvent, KeyEventKind, KeyEventState,
     KeyModifiers, LogViewMode, Result, StatusLine, ViewSpec, ViewState,
@@ -8,6 +10,12 @@ pub fn test_app(view: ViewState) -> App {
         status: StatusLine::ready(&view),
         view,
         stack: Vec::new(),
+        viewport: Rect {
+            x: 0,
+            y: 0,
+            height: 12,
+            width: 80,
+        },
         startup_log_args: None,
         diff_format: DiffFormat::Default,
         mode: InteractionMode::Normal,

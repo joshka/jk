@@ -1,8 +1,7 @@
+use super::WorkspacesView;
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::menus::CopyOption;
 use crate::search::{SearchQuery, entry_matches};
-
-use super::WorkspacesView;
 
 impl WorkspacesView {
     /// Applies selection, search, and copy commands to the read-only workspace view.

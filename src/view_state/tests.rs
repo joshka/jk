@@ -1,10 +1,8 @@
 use super::*;
-
 use crate::actions::{JjBookmarkTarget, JjGitPushTarget};
-use crate::bookmarks;
 use crate::jj::{JjCommand, ViewSpec};
-use crate::log;
 use crate::menus::ExactActionContext;
+use crate::{bookmarks, log};
 
 #[test]
 fn push_target_from_log_uses_exact_revision() {

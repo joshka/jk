@@ -1,5 +1,6 @@
 use color_eyre::Result;
 
+use super::super::super::App;
 use crate::actions::{
     JjAbandonPlan, JjAbsorbPlan, JjDuplicatePlan, JjFileMutationPlan, JjNewPlan, JjOperationTarget,
     JjRestorePlan, JjRevertPlan, JjSplitPlan, JjWorkingCopyNavigationPlan,
@@ -11,8 +12,6 @@ use crate::menus::{ActionKind, ActionMenuItem, FollowUp, build_action_menu};
 use crate::modes::InteractionMode;
 use crate::view_state::ViewState;
 
-use super::super::super::App;
-
 impl App {
     /// Open the action menu for the current selection or exact restore/revert context.
     pub fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
@@ -20,7 +19,7 @@ impl App {
             self.view.command(),
             JjCommand::Default | JjCommand::Log | JjCommand::OperationLog
         ) {
-            let effect = self.execute_view(ViewCommand::OpenActionMenu, viewport_height);
+            let effect = self.execute_view(ViewCommand::OpenActionMenu);
             return self.apply_view_effect(effect, viewport_height);
         }
 

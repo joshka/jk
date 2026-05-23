@@ -1,13 +1,12 @@
 use ratatui::DefaultTerminal;
 
+use super::super::super::{App, PendingInteractiveAction, clamp_view_to_current_viewport};
+use super::super::ActionPane;
 use crate::actions::{JjDuplicatePlan, JjNewPlan, JjSplitPlan, JjSplitTarget};
 use crate::app::status_line::StatusLine;
 use crate::jj::LogViewMode;
 use crate::modes::InteractionMode;
 use crate::view_state::ViewState;
-
-use super::super::super::{App, PendingInteractiveAction, current_viewport_width};
-use super::super::ActionPane;
 
 impl App {
     /// Queue an interactive split to run after dispatch returns to the app boundary.
@@ -49,7 +48,7 @@ impl App {
         &mut self,
         new_change: JjNewPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = new_change.command_label();
         let result_message = match self.services.run_new_change(&new_change) {
@@ -71,7 +70,6 @@ impl App {
                 self.finish_successful_action_revealing_change(
                     output,
                     Some(new_change_id.as_str()),
-                    viewport_height,
                     " | jj undo",
                 )
             }
@@ -108,11 +106,11 @@ impl App {
         &mut self,
         duplicate: &JjDuplicatePlan,
         output: String,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) -> String {
         match self.refresh_view_state() {
             Ok(()) => {
-                self.view.clamp(viewport_height, current_viewport_width());
+                clamp_view_to_current_viewport(&mut self.view);
                 let reveal_result = match &self.view {
                     ViewState::Log(_) => {
                         Some(self.reveal_log_change(duplicate.source(), LogViewMode::Recent))
@@ -122,7 +120,7 @@ impl App {
 
                 match reveal_result {
                     Some(Ok(switched_modes)) => {
-                        self.view.clamp(viewport_height, current_viewport_width());
+                        clamp_view_to_current_viewport(&mut self.view);
                         let message = if switched_modes {
                             "duplicate completed | showing recent work fallback for source | jj undo | jj op show -p"
                         } else {
@@ -191,7 +189,7 @@ impl App {
         &mut self,
         split: &JjSplitPlan,
         output: String,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) -> String {
         let reveal_change_id = match split.target() {
             JjSplitTarget::ExactChange(change_id) => Some(change_id.clone()),
@@ -208,13 +206,13 @@ impl App {
 
         match self.refresh_view_state() {
             Ok(()) => {
-                self.view.clamp(viewport_height, current_viewport_width());
+                clamp_view_to_current_viewport(&mut self.view);
                 let mut reveal_error = None;
                 let revealed_in_recent = match reveal_change_id.as_deref() {
                     Some(change_id) => match self.reveal_log_change(change_id, LogViewMode::Recent)
                     {
                         Ok(switched_modes) => {
-                            self.view.clamp(viewport_height, current_viewport_width());
+                            clamp_view_to_current_viewport(&mut self.view);
                             Some(switched_modes)
                         }
                         Err(error) => {

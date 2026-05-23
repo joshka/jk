@@ -1,11 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::actions::{JjRebasePlan, JjSquashPlan};
-use crate::menus::ActionKind;
-use crate::menus::RolePrompt;
-use crate::modes::view_menu_options;
-
 use super::prompts::{rebase_plan_from_prompt, squash_plan_from_prompt};
+use crate::actions::{JjRebasePlan, JjSquashPlan};
+use crate::menus::{ActionKind, RolePrompt};
+use crate::modes::view_menu_options;
 
 /// Outcome of one menu key in a pure reducer context.
 pub enum MenuKey {

@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::style::{Color, Modifier, Style};
@@ -8,7 +9,6 @@ use crate::command::{Binding, Command, CommandContext, ViewCommand, ViewEffect, 
 use crate::jj::LogViewMode;
 use crate::selection::Selection;
 use crate::tui::theme;
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
 fn log_item(text: &str, change_id: Option<&str>, commit_id: Option<&str>) -> LogItem {
     LogItem::new(
@@ -24,8 +24,10 @@ fn log_view(entries: Vec<LogItem>) -> LogView {
 
 fn command_context() -> CommandContext<'static> {
     CommandContext {
-        viewport_height: 0,
-        viewport_width: 80,
+        size: ratatui::layout::Size {
+            height: 0,
+            width: 80,
+        },
         search: None,
     }
 }
@@ -177,8 +179,10 @@ fn page_keys_move_selection_by_visible_page_with_saturating_bounds() {
             .collect(),
     );
     let context = || CommandContext {
-        viewport_height: 3,
-        viewport_width: 80,
+        size: ratatui::layout::Size {
+            height: 3,
+            width: 80,
+        },
         search: None,
     };
 

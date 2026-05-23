@@ -28,8 +28,10 @@ fn movement_clamps_to_workspace_rows() {
     view.execute(
         ViewCommand::MoveLast,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -38,8 +40,10 @@ fn movement_clamps_to_workspace_rows() {
     view.execute(
         ViewCommand::MoveDown,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );
@@ -48,8 +52,10 @@ fn movement_clamps_to_workspace_rows() {
     view.execute(
         ViewCommand::MoveFirst,
         CommandContext {
-            viewport_height: 3,
-            viewport_width: 80,
+            size: ratatui::layout::Size {
+                height: 3,
+                width: 80,
+            },
             search: None,
         },
     );

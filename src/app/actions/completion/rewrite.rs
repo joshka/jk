@@ -1,3 +1,5 @@
+use super::super::super::App;
+use super::super::ActionPane;
 use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
@@ -5,16 +7,13 @@ use crate::actions::{
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
 
-use super::super::super::App;
-use super::super::ActionPane;
-
 impl App {
     /// Run the working-copy navigation command and reveal the resulting active change.
     pub fn confirm_working_copy_navigation(
         &mut self,
         navigation: JjWorkingCopyNavigationPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = navigation.command_label();
         let result_message = match self.services.run_working_copy_navigation(&navigation) {
@@ -50,7 +49,6 @@ impl App {
                 self.finish_successful_action_revealing_change(
                     output,
                     Some(reveal_change_id.as_str()),
-                    viewport_height,
                     " | jj undo",
                 )
             }
@@ -68,11 +66,11 @@ impl App {
         &mut self,
         abandon: JjAbandonPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = abandon.command_label();
         let result_message = match self.services.run_abandon(&abandon) {
-            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Ok(output) => self.finish_successful_action(output, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
 
@@ -123,11 +121,11 @@ impl App {
         &mut self,
         restore: JjRestorePlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = restore.command_label();
         let result_message = match self.services.run_restore(&restore) {
-            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Ok(output) => self.finish_successful_action(output, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
 
@@ -142,11 +140,11 @@ impl App {
         &mut self,
         revert: JjRevertPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = revert.command_label();
         let result_message = match self.services.run_revert(&revert) {
-            Ok(output) => self.finish_successful_action(output, viewport_height, " | jj undo"),
+            Ok(output) => self.finish_successful_action(output, " | jj undo"),
             Err(error) => self.finish_failed_action(error),
         };
 
@@ -161,7 +159,7 @@ impl App {
         &mut self,
         rebase: JjRebasePlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = rebase.command_label();
         let primary_source = rebase.sources().first().cloned();
@@ -169,7 +167,6 @@ impl App {
             Ok(output) => self.finish_successful_action_revealing_change(
                 output,
                 primary_source.as_deref(),
-                viewport_height,
                 " | jj undo | jj op show -p",
             ),
             Err(error) => self.finish_failed_action(error),
@@ -186,7 +183,7 @@ impl App {
         &mut self,
         squash: JjSquashPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = squash.command_label();
         let destination = squash.destination().to_owned();
@@ -194,7 +191,6 @@ impl App {
             Ok(output) => self.finish_successful_action_revealing_change(
                 output,
                 Some(destination.as_str()),
-                viewport_height,
                 " | jj undo",
             ),
             Err(error) => self.finish_failed_action(error),
@@ -211,13 +207,11 @@ impl App {
         &mut self,
         absorb: JjAbsorbPlan,
         status_context: Option<String>,
-        viewport_height: u16,
+        _viewport_height: u16,
     ) {
         let command_label = absorb.command_label();
         let result_message = match self.services.run_absorb(&absorb) {
-            Ok(output) => {
-                self.finish_successful_action(output, viewport_height, " | jj undo | jj op show -p")
-            }
+            Ok(output) => self.finish_successful_action(output, " | jj undo | jj op show -p"),
             Err(error) => self.finish_failed_action(error),
         };
 

@@ -6,11 +6,10 @@
 
 use color_eyre::Result;
 
+use super::App;
 use crate::app::status_line::StatusLine;
 use crate::command::ViewEffect;
 use crate::modes::InteractionMode;
-
-use super::App;
 
 impl App {
     /// Interpret a view effect and move the app-owned state it refers to.
