@@ -14,6 +14,7 @@ use crossterm::event::{self, Event, KeyEventKind};
 use ratatui::DefaultTerminal;
 use ratatui::Frame;
 
+use crate::actions::JjSplitPlan;
 use crate::command::{
     Binding, BindingMatch, CommandContext, ViewCommand, ViewEffect, binding_prefix_next_labels,
     match_binding_sequence,
@@ -72,6 +73,8 @@ pub struct App {
     mode: InteractionMode,
     /// In-progress multi-key command prefix waiting for resolution or timeout.
     pending_command: Option<PendingCommand>,
+    /// Interactive command waiting for a top-level terminal handoff.
+    pending_interactive_action: Option<PendingInteractiveAction>,
     /// Active search query shared with the current view.
     search: Option<SearchQuery>,
     /// Exit flag set by app-level quit handling.
@@ -97,6 +100,15 @@ struct PendingCommand {
     deadline: Instant,
 }
 
+/// Interactive app action that must run with the live terminal at the app boundary.
+enum PendingInteractiveAction {
+    Split {
+        split: JjSplitPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    },
+}
+
 impl App {
     /// Drive the terminal redraw and input loop until the app requests exit.
     ///
@@ -108,10 +120,11 @@ impl App {
             let viewport_height = tui::areas(completed_frame.area).main.height;
 
             if event::poll(Duration::from_millis(200))? {
-                self.handle_event(terminal, event::read()?, viewport_height)?;
+                self.handle_event(event::read()?, viewport_height)?;
             } else {
                 self.flush_expired_pending_command(viewport_height)?;
             }
+            self.run_pending_interactive_action(Some(terminal))?;
         }
 
         Ok(())
@@ -131,12 +144,7 @@ impl App {
     /// Resize is handled here because it updates app-owned presentation state immediately. Key
     /// events first go through the active mode, then fall through to normal bindings only when the
     /// mode does not consume them.
-    fn handle_event(
-        &mut self,
-        terminal: &mut DefaultTerminal,
-        event: Event,
-        viewport_height: u16,
-    ) -> Result<()> {
+    fn handle_event(&mut self, event: Event, viewport_height: u16) -> Result<()> {
         let key = match event {
             Event::Key(key) => key,
             Event::Resize(width, height) => {
@@ -153,7 +161,7 @@ impl App {
             return Ok(());
         }
 
-        if self.handle_mode_key_event_with_terminal(key, viewport_height, Some(terminal))? {
+        if self.handle_mode_key_event_inner(key, viewport_height)? {
             return Ok(());
         }
 

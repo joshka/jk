@@ -6,7 +6,6 @@
 
 use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::DefaultTerminal;
 
 use crate::app::status_line::StatusLine;
 use crate::command::ViewEffect;
@@ -41,31 +40,32 @@ impl App {
 
     #[cfg(test)]
     pub fn handle_mode_key(&mut self, code: KeyCode, viewport_height: u16) -> Result<bool> {
-        self.handle_mode_key_event_with_terminal(
+        let handled = self.handle_mode_key_event_inner(
             KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
             viewport_height,
-            None,
-        )
+        )?;
+        self.run_pending_interactive_action(None)?;
+        Ok(handled)
     }
 
     pub fn handle_mode_key_event(&mut self, key: KeyEvent, viewport_height: u16) -> Result<bool> {
-        self.handle_mode_key_event_with_terminal(key, viewport_height, None)
+        let handled = self.handle_mode_key_event_inner(key, viewport_height)?;
+        self.run_pending_interactive_action(None)?;
+        Ok(handled)
     }
 
-    /// Route one key through modal dispatch, including action previews that may need terminal
-    /// handoff.
-    pub fn handle_mode_key_event_with_terminal(
+    /// Route one key through modal dispatch without running any queued interactive terminal handoff.
+    pub fn handle_mode_key_event_inner(
         &mut self,
         key: KeyEvent,
         viewport_height: u16,
-        terminal: Option<&mut DefaultTerminal>,
     ) -> Result<bool> {
         if matches!(self.mode, InteractionMode::Help) {
             return self.handle_help_key(key, viewport_height);
         }
 
         let code = key.code;
-        if self.handle_common_action_preview_key(code, viewport_height, terminal) {
+        if self.handle_common_action_preview_key(code, viewport_height) {
             return Ok(true);
         }
 

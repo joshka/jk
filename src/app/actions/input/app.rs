@@ -1,5 +1,4 @@
 use crossterm::event::KeyCode;
-use ratatui::DefaultTerminal;
 
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
@@ -13,23 +12,17 @@ impl App {
         &mut self,
         code: KeyCode,
         viewport_height: u16,
-        terminal: Option<&mut DefaultTerminal>,
     ) -> bool {
         let Some(event) = self.mode.common_action_preview_event(code, viewport_height) else {
             return false;
         };
 
-        self.apply_action_preview_event(event, viewport_height, terminal);
+        self.apply_action_preview_event(event, viewport_height);
         true
     }
 
     /// Apply one reduced preview event to app-owned mode, status, or confirmation flow.
-    fn apply_action_preview_event(
-        &mut self,
-        event: ActionPreviewEvent,
-        viewport_height: u16,
-        terminal: Option<&mut DefaultTerminal>,
-    ) {
+    fn apply_action_preview_event(&mut self, event: ActionPreviewEvent, viewport_height: u16) {
         match event {
             ActionPreviewEvent::StayOpen => {}
             ActionPreviewEvent::CloseCompleted => self.mode = InteractionMode::Normal,
@@ -38,7 +31,7 @@ impl App {
                 self.status = StatusLine::with_message(&self.view, message);
             }
             ActionPreviewEvent::Confirm(confirmation) => {
-                self.confirm_action_preview(confirmation, viewport_height, terminal);
+                self.confirm_action_preview(confirmation, viewport_height);
             }
         }
     }
@@ -48,7 +41,6 @@ impl App {
         &mut self,
         confirmation: ActionPreviewConfirmation,
         viewport_height: u16,
-        terminal: Option<&mut DefaultTerminal>,
     ) {
         match confirmation {
             ActionPreviewConfirmation::Describe {
@@ -82,7 +74,7 @@ impl App {
             ActionPreviewConfirmation::Split {
                 split,
                 status_context,
-            } => self.confirm_split(split, status_context, viewport_height, terminal),
+            } => self.request_interactive_split(split, status_context, viewport_height),
             ActionPreviewConfirmation::Restore {
                 restore,
                 status_context,

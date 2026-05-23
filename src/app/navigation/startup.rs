@@ -32,6 +32,7 @@ impl App {
             status,
             mode: InteractionMode::Normal,
             pending_command: None,
+            pending_interactive_action: None,
             search: None,
             should_quit: false,
             services,

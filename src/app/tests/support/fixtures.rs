@@ -12,6 +12,7 @@ pub fn test_app(view: ViewState) -> App {
         diff_format: DiffFormat::Default,
         mode: InteractionMode::Normal,
         pending_command: None,
+        pending_interactive_action: None,
         search: None,
         should_quit: false,
         services: super::services::test_services(),

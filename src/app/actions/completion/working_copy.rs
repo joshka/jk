@@ -6,10 +6,44 @@ use crate::jj::LogViewMode;
 use crate::modes::InteractionMode;
 use crate::view_state::ViewState;
 
-use super::super::super::{App, current_viewport_width};
+use super::super::super::{App, PendingInteractiveAction, current_viewport_width};
 use super::super::ActionPane;
 
 impl App {
+    /// Queue an interactive split to run after dispatch returns to the app boundary.
+    pub fn request_interactive_split(
+        &mut self,
+        split: JjSplitPlan,
+        status_context: Option<String>,
+        viewport_height: u16,
+    ) {
+        self.pending_interactive_action = Some(PendingInteractiveAction::Split {
+            split,
+            status_context,
+            viewport_height,
+        });
+    }
+
+    /// Run any queued interactive action using the top-level terminal when available.
+    pub fn run_pending_interactive_action(
+        &mut self,
+        terminal: Option<&mut DefaultTerminal>,
+    ) -> color_eyre::Result<()> {
+        let Some(action) = self.pending_interactive_action.take() else {
+            return Ok(());
+        };
+
+        match action {
+            PendingInteractiveAction::Split {
+                split,
+                status_context,
+                viewport_height,
+            } => self.confirm_split(split, status_context, viewport_height, terminal),
+        }
+
+        Ok(())
+    }
+
     /// Run the new-change command, resolve the new working copy, and leave the result on the pane.
     pub fn confirm_new_change(
         &mut self,
