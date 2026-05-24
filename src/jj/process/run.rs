@@ -1,12 +1,11 @@
-use std::process::Command;
+use std::process::Command as ProcessCommand;
 
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
 use crate::jj::ViewSpec;
 use crate::jj::command::{
-    JjCommand, jj_command_args, jj_command_args_with_template,
-    jj_command_args_with_template_no_graph,
+    jj_command_args, jj_command_args_with_template, jj_command_args_with_template_no_graph,
 };
 
 /// Preserve jj color escapes so the TUI can render the same styled output.
@@ -67,8 +66,8 @@ fn run_jj_template_lines_with_style(
     Ok(stdout.lines().map(str::to_owned).collect())
 }
 
-pub fn base_command(color: ColorMode) -> Command {
-    let mut jj = Command::new("jj");
+pub fn base_command(color: ColorMode) -> ProcessCommand {
+    let mut jj = ProcessCommand::new("jj");
     // Codex and users may set pager/color environment differently. The TUI
     // needs raw colored jj output so ratatui can render the same colors and
     // graph symbols the CLI would have produced.
@@ -156,7 +155,7 @@ fn run_view_command(
 
 /// Label metadata-only loads that reuse the rendered-view command shape.
 fn metadata_label(spec: &ViewSpec) -> String {
-    if matches!(spec.command(), JjCommand::Resolve) {
+    if matches!(spec.command(), crate::jj::Command::Resolve) {
         "jj log resolve metadata".to_owned()
     } else {
         spec.label().to_owned()

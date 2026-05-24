@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use super::resolver::BookmarkActionTargetResolver;
 use crate::bookmarks::actions::{JjBookmarkForgetTarget, JjBookmarkTrackingTarget};
+use crate::bookmarks::targets::resolver::BookmarkActionTargetResolver;
 use crate::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState,

@@ -1,7 +1,7 @@
-use super::super::super::{App, clamp_view_to_current_viewport};
-use super::super::ActionPane;
 use crate::actions::{JjOperationRecovery, JjOperationTarget};
+use crate::app::actions::ActionPane;
 use crate::app::status_line::StatusLine;
+use crate::app::{App, clamp_view_to_current_viewport};
 use crate::modes::InteractionMode;
 
 impl App {

@@ -3,7 +3,7 @@
 //! The app mutates status after commands and view transitions, while this module owns how a
 //! status line is constructed from the active view.
 
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::tui::StatusHints;
 use crate::view_state::ViewState;
 
@@ -113,20 +113,20 @@ fn graph_status_message(item_count: usize, mode_label: Option<&str>) -> String {
 /// Format the ready-status count line for the active view command.
 fn item_count_message(view: &ViewState, item_count: usize) -> String {
     match view.command() {
-        JjCommand::Resolve => format!("{item_count} conflicts"),
-        JjCommand::FileList => format!("{item_count} files"),
-        JjCommand::Bookmarks => format!("{item_count} bookmarks"),
-        JjCommand::Workspaces => format!("{item_count} workspaces"),
-        JjCommand::OperationLog => format!("{item_count} operations"),
-        JjCommand::Default | JjCommand::Log => {
+        jj::Command::Resolve => format!("{item_count} conflicts"),
+        jj::Command::FileList => format!("{item_count} files"),
+        jj::Command::Bookmarks => format!("{item_count} bookmarks"),
+        jj::Command::Workspaces => format!("{item_count} workspaces"),
+        jj::Command::OperationLog => format!("{item_count} operations"),
+        jj::Command::Default | jj::Command::Log => {
             graph_status_message(item_count, view.log_mode_label())
         }
-        JjCommand::Show
-        | JjCommand::Diff
-        | JjCommand::Status
-        | JjCommand::FileShow
-        | JjCommand::OperationShow
-        | JjCommand::OperationDiff => format!("{item_count} items"),
+        jj::Command::Show
+        | jj::Command::Diff
+        | jj::Command::Status
+        | jj::Command::FileShow
+        | jj::Command::OperationShow
+        | jj::Command::OperationDiff => format!("{item_count} items"),
     }
 }
 

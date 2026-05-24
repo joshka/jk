@@ -1,4 +1,4 @@
-use super::super::path_actions::{FileActionContext, StatusPathActionAvailability};
+use crate::menus::path_actions::{FileActionContext, StatusPathActionAvailability};
 
 /// Exact selection state carried from revision-owned surfaces into action-menu policy.
 #[derive(Clone, Debug, Eq, PartialEq)]

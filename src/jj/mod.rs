@@ -6,7 +6,7 @@
 //! a parallel view from repository data.
 //!
 //! The root module intentionally re-exports four kinds of boundary surface:
-//! command vocabulary (`JjCommand`, `LogViewMode`), `ViewSpec` state that
+//! command vocabulary (`Command`, `LogViewMode`), `ViewSpec` state that
 //! shapes one CLI invocation, syntax helpers for quoting and labels, and
 //! process helpers that actually run `jj`.
 
@@ -23,7 +23,7 @@ pub use command::{
     workspace_root_command_args,
 };
 /// `jj` command families and named log-mode presets used across app and view code.
-pub use command::{JjCommand, LogViewMode};
+pub use command::{Command, LogViewMode};
 /// Process-level helpers used by higher layers once they have already chosen a `ViewSpec` or
 /// argv.
 pub use process::{

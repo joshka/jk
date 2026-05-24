@@ -1,6 +1,6 @@
-use super::super::super::App;
-use super::super::ActionPane;
 use crate::actions::{JjOperationRecovery, JjOperationRecoveryKind, JjOperationTarget};
+use crate::app::App;
+use crate::app::actions::ActionPane;
 use crate::modes::InteractionMode;
 
 impl App {

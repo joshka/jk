@@ -1,6 +1,7 @@
 use color_eyre::Result;
 
-use super::{FileListItem, FileListView, ViewSpec, load_file_list_entries};
+use crate::files::list::{FileListItem, FileListView, load_file_list_entries};
+use crate::jj::ViewSpec;
 use crate::selection::restore_by_key_or_index;
 
 impl FileListView {

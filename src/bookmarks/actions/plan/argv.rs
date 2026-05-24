@@ -1,4 +1,4 @@
-use super::{JjBookmarkMutationKind, JjBookmarkMutationPlan};
+use crate::bookmarks::actions::plan::{JjBookmarkMutationKind, JjBookmarkMutationPlan};
 use crate::jj::exact_string_pattern;
 
 impl JjBookmarkMutationPlan {

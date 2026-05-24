@@ -1,6 +1,6 @@
-use super::{DiffView, HORIZONTAL_SCROLL_AMOUNT};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
-use crate::jj::{JjCommand, ViewSpec};
+use crate::diff::{DiffView, HORIZONTAL_SCROLL_AMOUNT};
+use crate::jj::{self, ViewSpec};
 use crate::menus::CopyOption;
 use crate::search::SearchQuery;
 
@@ -69,7 +69,7 @@ impl DiffView {
             ViewCommand::OpenShow => self
                 .spec
                 .navigation_revset()
-                .map(|revset| ViewEffect::OpenDetail(JjCommand::Show, revset))
+                .map(|revset| ViewEffect::OpenDetail(jj::Command::Show, revset))
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::StartSearch => {
                 let Some(query) = context.search else {

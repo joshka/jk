@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use super::JjAbandonPreview;
 use crate::actions::CommandOutput;
+use crate::actions::abandon::JjAbandonPreview;
 use crate::jj::{
     ColorMode, base_command, exact_change_id_revset, run_direct_args, run_direct_args_stdout,
     summarize_output,

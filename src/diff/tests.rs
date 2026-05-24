@@ -4,7 +4,7 @@ use ratatui_macros::line;
 use super::*;
 use crate::command::{CommandContext, ViewEffect};
 use crate::documents::DocumentLines;
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::search::SearchQuery;
 
 #[test]
@@ -163,11 +163,11 @@ fn command_execution_moves_between_files() {
 #[test]
 fn command_execution_opens_show_for_same_revset() {
     let mut view = diff_view(vec![line!("Added regular file Cargo.toml:")], 0);
-    view.spec = ViewSpec::new(JjCommand::Diff, vec!["-r".to_owned(), "main".to_owned()]);
+    view.spec = ViewSpec::new(jj::Command::Diff, vec!["-r".to_owned(), "main".to_owned()]);
 
     assert_eq!(
         view.execute(ViewCommand::OpenShow, context(None)),
-        ViewEffect::OpenDetail(JjCommand::Show, "main".to_owned())
+        ViewEffect::OpenDetail(jj::Command::Show, "main".to_owned())
     );
 }
 
@@ -188,7 +188,7 @@ fn command_execution_opens_file_list_with_exact_target_provenance() {
 #[test]
 fn command_execution_opens_file_list_with_inexact_direct_revset() {
     let mut view = diff_view(vec![line!("Added regular file Cargo.toml:")], 0);
-    view.spec = ViewSpec::new(JjCommand::Diff, vec!["-r".to_owned(), "main".to_owned()]);
+    view.spec = ViewSpec::new(jj::Command::Diff, vec!["-r".to_owned(), "main".to_owned()]);
 
     assert_eq!(
         view.execute(ViewCommand::OpenFiles, context(None)),
@@ -275,7 +275,7 @@ fn diff_view(lines: Vec<Line<'static>>, scroll_offset: usize) -> DiffView {
     let mut document = StickyFileDocument::new(document);
     document.set_scroll_offset(u16::MAX, scroll_offset);
     DiffView {
-        spec: ViewSpec::new(JjCommand::Diff, Vec::new()),
+        spec: ViewSpec::new(jj::Command::Diff, Vec::new()),
         document,
     }
 }

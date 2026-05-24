@@ -1,7 +1,7 @@
 use crossterm::event::KeyCode;
 
-use super::{ActionPreviewConfirmation, ActionPreviewEvent};
 use crate::app::App;
+use crate::app::actions::input::{ActionPreviewConfirmation, ActionPreviewEvent};
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
 

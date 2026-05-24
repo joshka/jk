@@ -1,11 +1,11 @@
-use super::super::path_actions::{
+use crate::menus::path_actions::{
     file_action_menu, file_action_menu_items, status_path_action_menu,
 };
-use super::super::{
+use crate::menus::revision_actions::context::ExactActionContext;
+use crate::menus::{
     ActionKind, ActionMenu, ActionMenuItem, FollowUp, PREVIEW_REQUIRED_MARKER, RolePrompt,
     RolePromptOption, SafetyTier, short_id,
 };
-use super::context::ExactActionContext;
 
 /// Build the revision-scoped action menu for one exact selection context.
 ///

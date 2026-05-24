@@ -8,9 +8,9 @@ use color_eyre::Result;
 use ratatui::text::Line;
 use serde_json::Value;
 
-use super::WorkspaceItem;
 use crate::jj::{ViewSpec, run_jj_template_lines};
 use crate::rendered_rows::{non_empty_string_field, string_field};
+use crate::workspaces::WorkspaceItem;
 
 pub const WORKSPACE_METADATA_TEMPLATE: &str = concat!(
     r#""{\"name\":" ++ json(name)"#,

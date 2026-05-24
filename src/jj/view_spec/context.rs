@@ -5,8 +5,9 @@
 //! change-id provenance, startup argv recovery, and app-level diff-format
 //! rewrites together instead of mixing them with spec constructors.
 
-use super::args::{diff_revset_arg, revision_arg, show_revset_arg};
-use super::{DiffFormat, JjCommand, ViewSpec, diff_format_args};
+use crate::jj::Command;
+use crate::jj::view_spec::args::{diff_revset_arg, revision_arg, show_revset_arg};
+use crate::jj::view_spec::{DiffFormat, ViewSpec, diff_format_args};
 
 impl ViewSpec {
     pub fn exact_change_target(&self) -> Option<&str> {
@@ -43,23 +44,23 @@ impl ViewSpec {
     /// `jj diff` receives only paths, the revision still defaults to `@`.
     pub fn navigation_revset(&self) -> Option<String> {
         self.target.clone().or_else(|| match self.command {
-            JjCommand::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
-            JjCommand::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
-            JjCommand::Resolve => Some(revision_arg(&self.args).unwrap_or("@").to_owned()),
-            JjCommand::FileList => Some(revision_arg(&self.args).unwrap_or("@").to_owned()),
-            JjCommand::FileShow => Some(
+            Command::Show => Some(show_revset_arg(&self.args).unwrap_or("@").to_owned()),
+            Command::Diff => Some(diff_revset_arg(&self.args).unwrap_or("@").to_owned()),
+            Command::Resolve => Some(revision_arg(&self.args).unwrap_or("@").to_owned()),
+            Command::FileList => Some(revision_arg(&self.args).unwrap_or("@").to_owned()),
+            Command::FileShow => Some(
                 revision_arg(self.file_show_context_args())
                     .unwrap_or("@")
                     .to_owned(),
             ),
-            JjCommand::Default
-            | JjCommand::Log
-            | JjCommand::Status
-            | JjCommand::Bookmarks
-            | JjCommand::Workspaces
-            | JjCommand::OperationLog
-            | JjCommand::OperationShow
-            | JjCommand::OperationDiff => None,
+            Command::Default
+            | Command::Log
+            | Command::Status
+            | Command::Bookmarks
+            | Command::Workspaces
+            | Command::OperationLog
+            | Command::OperationShow
+            | Command::OperationDiff => None,
         })
     }
 
@@ -69,7 +70,7 @@ impl ViewSpec {
 
     /// Replace the app-level diff format without changing the rest of the view provenance.
     pub fn with_diff_format(&self, diff_format: DiffFormat) -> Self {
-        if !matches!(self.command, JjCommand::Show | JjCommand::Diff) {
+        if !matches!(self.command, Command::Show | Command::Diff) {
             return self.clone();
         }
 
@@ -90,21 +91,17 @@ impl ViewSpec {
         self.target
             .clone()
             .or_else(|| match self.command {
-                JjCommand::Resolve => revision_arg(&self.args).map(str::to_owned),
-                JjCommand::FileList => revision_arg(&self.args).map(str::to_owned),
-                JjCommand::FileShow => {
-                    revision_arg(self.file_show_context_args()).map(str::to_owned)
-                }
-                JjCommand::OperationShow | JjCommand::OperationDiff => None,
+                Command::Resolve => revision_arg(&self.args).map(str::to_owned),
+                Command::FileList => revision_arg(&self.args).map(str::to_owned),
+                Command::FileShow => revision_arg(self.file_show_context_args()).map(str::to_owned),
+                Command::OperationShow | Command::OperationDiff => None,
                 _ => show_revset_arg(&self.args).map(str::to_owned),
             })
             .unwrap_or_else(|| "@".to_owned())
     }
 
     fn file_show_context_args(&self) -> &[String] {
-        if matches!(self.command, JjCommand::FileShow)
-            && self.path.is_some()
-            && !self.args.is_empty()
+        if matches!(self.command, Command::FileShow) && self.path.is_some() && !self.args.is_empty()
         {
             &self.args[..self.args.len() - 1]
         } else {

@@ -14,7 +14,7 @@ pub use rows::{FileListItem, load_file_list_entries};
 
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 #[cfg(test)]
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
 

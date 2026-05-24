@@ -1,6 +1,6 @@
 use super::*;
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::menus::CopyOption;
 use crate::search::SearchQuery;
 
@@ -136,7 +136,7 @@ fn resolve_open_selected_conflict_uses_exact_path() {
 
     assert_eq!(
         effect,
-        ViewEffect::OpenDetail(JjCommand::FileShow, "src/space file.txt".to_owned())
+        ViewEffect::OpenDetail(jj::Command::FileShow, "src/space file.txt".to_owned())
     );
 }
 

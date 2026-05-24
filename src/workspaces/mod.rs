@@ -71,7 +71,7 @@ impl WorkspacesView {
     #[cfg(test)]
     pub fn test_new(context: WorkspaceContext) -> Self {
         Self {
-            spec: ViewSpec::new(JjCommand::Workspaces, Vec::new()),
+            spec: ViewSpec::new(jj::Command::Workspaces, Vec::new()),
             context,
             selection: Selection::default(),
         }

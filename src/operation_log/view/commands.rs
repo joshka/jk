@@ -1,7 +1,7 @@
-use super::{OperationLogItem, OperationLogView};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::jj::ViewSpec;
 use crate::menus::{ActionKind, ActionMenu, ActionMenuItem, CopyOption, FollowUp, SafetyTier};
+use crate::operation_log::view::{OperationLogItem, OperationLogView};
 use crate::search::{SearchQuery, entry_matches};
 
 impl OperationLogView {

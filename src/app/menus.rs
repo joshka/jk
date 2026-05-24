@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use crossterm::event::KeyCode;
 
-use super::App;
-use super::reducers::{
+use crate::app::App;
+use crate::app::reducers::{
     MenuKey, RolePromptDecision, reduce_menu_key, reduce_role_prompt_accept, reduce_view_menu_key,
 };
 use crate::app::status_line::StatusLine;

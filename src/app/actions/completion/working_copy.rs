@@ -1,9 +1,9 @@
 use ratatui::DefaultTerminal;
 
-use super::super::super::{App, PendingInteractiveAction, clamp_view_to_current_viewport};
-use super::super::ActionPane;
 use crate::actions::{JjDuplicatePlan, JjNewPlan, JjSplitPlan, JjSplitTarget};
+use crate::app::actions::ActionPane;
 use crate::app::status_line::StatusLine;
+use crate::app::{App, PendingInteractiveAction, clamp_view_to_current_viewport};
 use crate::jj::LogViewMode;
 use crate::modes::InteractionMode;
 use crate::view_state::ViewState;

@@ -9,7 +9,7 @@ use crate::bookmarks::{
     BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState, RemoteBookmarkTrackingState,
 };
 use crate::command::{Binding, Command, CommandContext, ViewCommand, ViewEffect, find_binding};
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::search::SearchQuery;
 use crate::selection::Selection;
 
@@ -31,7 +31,7 @@ fn bookmark_item(
 
 fn bookmarks_view(entries: Vec<BookmarkItem>) -> BookmarksView {
     BookmarksView {
-        spec: ViewSpec::new(JjCommand::Bookmarks, Vec::new()),
+        spec: ViewSpec::new(jj::Command::Bookmarks, Vec::new()),
         entries,
         selection: Selection::default(),
     }
@@ -39,7 +39,7 @@ fn bookmarks_view(entries: Vec<BookmarkItem>) -> BookmarksView {
 
 fn all_remotes_bookmarks_view(entries: Vec<BookmarkItem>) -> BookmarksView {
     BookmarksView {
-        spec: ViewSpec::new(JjCommand::Bookmarks, vec!["--all-remotes".to_owned()]),
+        spec: ViewSpec::new(jj::Command::Bookmarks, vec!["--all-remotes".to_owned()]),
         entries,
         selection: Selection::default(),
     }
@@ -665,7 +665,7 @@ fn open_show_uses_target_change_id_and_reports_missing_targets() {
             },
         ),
         ViewEffect::OpenDetail(
-            JjCommand::Show,
+            jj::Command::Show,
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_owned()
         )
     );

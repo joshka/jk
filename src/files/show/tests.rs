@@ -2,13 +2,13 @@ use ratatui::text::Line;
 
 use super::*;
 use crate::command::{CommandContext, ViewEffect};
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::menus::CopyOption;
 use crate::search::SearchQuery;
 
 fn file_show_view(path: &str, lines: &[&str]) -> FileShowView {
     FileShowView::new(
-        ViewSpec::new(JjCommand::FileShow, Vec::new()),
+        ViewSpec::new(jj::Command::FileShow, Vec::new()),
         path,
         DocumentLines::new(
             lines

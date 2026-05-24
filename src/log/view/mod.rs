@@ -6,9 +6,9 @@
 
 use ratatui::style::Style;
 
-use super::LogItem;
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
-use crate::jj::{JjCommand, LogViewMode, ViewSpec};
+use crate::jj::{self, LogViewMode, ViewSpec};
+use crate::log::LogItem;
 use crate::selection::Selection;
 use crate::tui::theme;
 
@@ -94,7 +94,7 @@ pub fn test_explicit_selection_style() -> Style {
 /// Selectable graph output from `jj` or `jj log`.
 pub struct LogView {
     /// Top-level command that established this log surface, used when cycling modes back home.
-    home_command: JjCommand,
+    home_command: jj::Command,
     /// Current log presentation mode derived from the active `ViewSpec`.
     mode: LogViewMode,
     /// Original spec used to load and later refresh this view.
@@ -111,7 +111,7 @@ impl LogView {
     #[cfg(test)]
     pub fn test_new(entries: Vec<LogItem>) -> Self {
         Self {
-            home_command: JjCommand::Default,
+            home_command: jj::Command::Default,
             mode: LogViewMode::Default,
             spec: ViewSpec::home(),
             entries,

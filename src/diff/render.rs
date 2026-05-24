@@ -1,7 +1,7 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
-use super::DiffView;
+use crate::diff::DiffView;
 use crate::documents;
 use crate::documents::PinnedDocument;
 use crate::search::SearchQuery;

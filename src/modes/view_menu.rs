@@ -1,4 +1,4 @@
-use crate::jj::{DiffFormat, JjCommand};
+use crate::jj::{self, DiffFormat};
 
 /// One static row in the view-switching menu.
 ///
@@ -35,7 +35,7 @@ impl ViewMenuOption {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ViewMenuAction {
     /// Open one shipped top-level view.
-    Open(JjCommand),
+    Open(jj::Command),
     /// Apply one app-level show/diff format choice.
     DiffFormat(DiffFormat),
 }
@@ -49,31 +49,31 @@ pub fn view_menu_options() -> &'static [ViewMenuOption] {
     &[
         ViewMenuOption {
             label: "log",
-            action: ViewMenuAction::Open(JjCommand::Log),
+            action: ViewMenuAction::Open(jj::Command::Log),
         },
         ViewMenuOption {
             label: "jj default",
-            action: ViewMenuAction::Open(JjCommand::Default),
+            action: ViewMenuAction::Open(jj::Command::Default),
         },
         ViewMenuOption {
             label: "status",
-            action: ViewMenuAction::Open(JjCommand::Status),
+            action: ViewMenuAction::Open(jj::Command::Status),
         },
         ViewMenuOption {
             label: "resolve",
-            action: ViewMenuAction::Open(JjCommand::Resolve),
+            action: ViewMenuAction::Open(jj::Command::Resolve),
         },
         ViewMenuOption {
             label: "bookmarks",
-            action: ViewMenuAction::Open(JjCommand::Bookmarks),
+            action: ViewMenuAction::Open(jj::Command::Bookmarks),
         },
         ViewMenuOption {
             label: "workspaces",
-            action: ViewMenuAction::Open(JjCommand::Workspaces),
+            action: ViewMenuAction::Open(jj::Command::Workspaces),
         },
         ViewMenuOption {
             label: "operation log",
-            action: ViewMenuAction::Open(JjCommand::OperationLog),
+            action: ViewMenuAction::Open(jj::Command::OperationLog),
         },
         ViewMenuOption {
             label: "show/diff format: default jj",

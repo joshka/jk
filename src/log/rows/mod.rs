@@ -13,7 +13,7 @@ use metadata::run_jj_with_template;
 use pairing::group_lines;
 use ratatui::text::Line;
 
-use crate::jj::{ColorMode, JjCommand, ViewSpec, run_jj};
+use crate::jj::{self, ColorMode, ViewSpec, run_jj};
 use crate::rendered_rows::{RowMetadata, first_content_char, line_text};
 
 /// One selectable item parsed from rendered graph output.
@@ -100,7 +100,7 @@ pub fn load_entries(spec: &ViewSpec) -> Result<Vec<LogItem>> {
 }
 
 pub fn load_compact_log_context(revset: &str) -> Result<Vec<Line<'static>>> {
-    let spec = ViewSpec::new(JjCommand::Log, vec!["-r".to_owned(), revset.to_owned()]);
+    let spec = ViewSpec::new(jj::Command::Log, vec!["-r".to_owned(), revset.to_owned()]);
     let output = run_jj(&spec, ColorMode::Always)?;
     let lines = output.stdout.into_text()?.lines;
 

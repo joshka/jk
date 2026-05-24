@@ -4,11 +4,11 @@ use super::*;
 #[test]
 fn bookmark_list_spec_uses_bookmark_labels() {
     let spec = ViewSpec::new(
-        JjCommand::Bookmarks,
+        Command::Bookmarks,
         vec!["--revision".to_owned(), "main".to_owned()],
     );
 
-    assert_eq!(spec.command(), JjCommand::Bookmarks);
+    assert_eq!(spec.command(), Command::Bookmarks);
     assert_eq!(spec.args(), ["--revision", "main"]);
     assert_eq!(spec.label(), "jj bookmark list --revision main");
     assert_eq!(spec.app_label(), "jk bookmarks --revision main");
@@ -16,9 +16,9 @@ fn bookmark_list_spec_uses_bookmark_labels() {
 
 #[test]
 fn workspace_spec_uses_workspace_labels() {
-    let spec = ViewSpec::new(JjCommand::Workspaces, Vec::new());
+    let spec = ViewSpec::new(Command::Workspaces, Vec::new());
 
-    assert_eq!(spec.command(), JjCommand::Workspaces);
+    assert_eq!(spec.command(), Command::Workspaces);
     assert!(spec.args().is_empty());
     assert_eq!(spec.label(), "jj workspace list");
     assert_eq!(spec.app_label(), "jk workspaces");
@@ -28,7 +28,7 @@ fn workspace_spec_uses_workspace_labels() {
 fn file_list_spec_keeps_selected_path_out_of_args() {
     let spec = ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned()));
 
-    assert_eq!(spec.command(), JjCommand::FileList);
+    assert_eq!(spec.command(), Command::FileList);
     assert_eq!(spec.args(), ["-r", "main"]);
     assert_eq!(spec.path(), Some("src/main.rs"));
     assert_eq!(spec.exact_change_target(), None);
@@ -42,7 +42,7 @@ fn file_list_spec_keeps_selected_path_out_of_args() {
 fn file_show_spec_keeps_exact_path_identity() {
     let spec = ViewSpec::file_show(Some("main".to_owned()), "src/main.rs".to_owned());
 
-    assert_eq!(spec.command(), JjCommand::FileShow);
+    assert_eq!(spec.command(), Command::FileShow);
     assert_eq!(spec.args(), ["-r", "main", "src/main.rs"]);
     assert_eq!(spec.path(), Some("src/main.rs"));
     assert_eq!(spec.exact_change_target(), None);
@@ -64,7 +64,7 @@ fn file_show_context_revset_defaults_to_current_revision() {
 fn resolve_spec_defaults_to_current_revision() {
     let spec = ViewSpec::resolve_current();
 
-    assert_eq!(spec.command(), JjCommand::Resolve);
+    assert_eq!(spec.command(), Command::Resolve);
     assert_eq!(spec.args(), ["-r", "@"]);
     assert_eq!(spec.label(), "jj resolve -r @");
     assert_eq!(spec.app_label(), "jk resolve -r @");
@@ -76,7 +76,7 @@ fn resolve_spec_defaults_to_current_revision() {
 fn resolve_spec_records_direct_revset_without_exact_target() {
     let spec = ViewSpec::resolve_revset("main".to_owned());
 
-    assert_eq!(spec.command(), JjCommand::Resolve);
+    assert_eq!(spec.command(), Command::Resolve);
     assert_eq!(spec.args(), ["-r", "main"]);
     assert_eq!(spec.exact_change_target(), None);
     assert_eq!(spec.label(), "jj resolve -r main");
@@ -89,7 +89,7 @@ fn resolve_spec_records_direct_revset_without_exact_target() {
 fn operation_show_spec_uses_positional_operation_id() {
     let spec = ViewSpec::operation_show(operation_id('a'));
 
-    assert_eq!(spec.command(), JjCommand::OperationShow);
+    assert_eq!(spec.command(), Command::OperationShow);
     assert_eq!(spec.args(), [operation_id('a')]);
     assert_eq!(spec.app_label(), "jk operation show aaaaaaaa");
 }
@@ -98,7 +98,7 @@ fn operation_show_spec_uses_positional_operation_id() {
 fn operation_diff_spec_uses_operation_option() {
     let spec = ViewSpec::operation_diff(operation_id('b'));
 
-    assert_eq!(spec.command(), JjCommand::OperationDiff);
+    assert_eq!(spec.command(), Command::OperationDiff);
     assert_eq!(spec.args(), ["--operation", operation_id('b').as_str()]);
     assert_eq!(spec.app_label(), "jk operation diff --operation bbbbbbbb");
 }
@@ -143,7 +143,7 @@ fn app_label_shortens_navigated_targets() {
 
 #[test]
 fn exact_change_target_provenance_is_explicit() {
-    let direct = ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]);
+    let direct = ViewSpec::new(Command::Show, vec!["main".to_owned()]);
     assert_eq!(direct.navigation_revset().as_deref(), Some("main"));
     assert_eq!(direct.exact_change_target(), None);
 
@@ -166,7 +166,7 @@ fn show_context_revset_prefers_navigation_target() {
 
 #[test]
 fn show_context_revset_uses_direct_revset() {
-    let spec = ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]);
+    let spec = ViewSpec::new(Command::Show, vec!["main".to_owned()]);
 
     assert_eq!(spec.show_context_revset(), "main");
 }
@@ -174,7 +174,7 @@ fn show_context_revset_uses_direct_revset() {
 #[test]
 fn show_context_revset_skips_option_values() {
     let spec = ViewSpec::new(
-        JjCommand::Show,
+        Command::Show,
         vec![
             "--template".to_owned(),
             "description".to_owned(),
@@ -188,7 +188,7 @@ fn show_context_revset_skips_option_values() {
 #[test]
 fn show_context_revset_finds_revset_after_options() {
     let spec = ViewSpec::new(
-        JjCommand::Show,
+        Command::Show,
         vec![
             "--template=description".to_owned(),
             "--summary".to_owned(),
@@ -201,7 +201,7 @@ fn show_context_revset_finds_revset_after_options() {
 
 #[test]
 fn show_context_revset_defaults_to_current_revision() {
-    let spec = ViewSpec::new(JjCommand::Show, Vec::new());
+    let spec = ViewSpec::new(Command::Show, Vec::new());
 
     assert_eq!(spec.show_context_revset(), "@");
 }
@@ -222,7 +222,7 @@ fn git_diff_format_adds_git_argument_to_navigated_views() {
 #[test]
 fn diff_format_can_be_replaced_without_duplicating_git_flag() {
     let spec = ViewSpec::new(
-        JjCommand::Diff,
+        Command::Diff,
         vec!["--git".to_owned(), "-r".to_owned(), "abc".to_owned()],
     );
 
@@ -239,14 +239,14 @@ fn diff_format_can_be_replaced_without_duplicating_git_flag() {
 
 #[test]
 fn navigation_revset_uses_direct_show_startup_revset() {
-    let spec = ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]);
+    let spec = ViewSpec::new(Command::Show, vec!["main".to_owned()]);
 
     assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
 }
 
 #[test]
 fn navigation_revset_defaults_direct_show_to_current_revision() {
-    let spec = ViewSpec::new(JjCommand::Show, Vec::new());
+    let spec = ViewSpec::new(Command::Show, Vec::new());
 
     assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
 }
@@ -254,7 +254,7 @@ fn navigation_revset_defaults_direct_show_to_current_revision() {
 #[test]
 fn navigation_revset_uses_direct_diff_startup_revset() {
     let spec = ViewSpec::new(
-        JjCommand::Diff,
+        Command::Diff,
         vec!["--git".to_owned(), "-r".to_owned(), "main".to_owned()],
     );
 
@@ -263,7 +263,7 @@ fn navigation_revset_uses_direct_diff_startup_revset() {
 
 #[test]
 fn navigation_revset_ignores_direct_diff_filesets() {
-    let spec = ViewSpec::new(JjCommand::Diff, vec!["src/main.rs".to_owned()]);
+    let spec = ViewSpec::new(Command::Diff, vec!["src/main.rs".to_owned()]);
 
     assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
 }
@@ -271,7 +271,7 @@ fn navigation_revset_ignores_direct_diff_filesets() {
 #[test]
 fn navigation_revset_uses_direct_diff_to_revision() {
     let spec = ViewSpec::new(
-        JjCommand::Diff,
+        Command::Diff,
         vec!["--from".to_owned(), "main".to_owned(), "--to=@".to_owned()],
     );
 
@@ -280,10 +280,7 @@ fn navigation_revset_uses_direct_diff_to_revision() {
 
 #[test]
 fn navigation_revset_defaults_direct_diff_from_revision_to_current_revision() {
-    let spec = ViewSpec::new(
-        JjCommand::Diff,
-        vec!["--from".to_owned(), "main".to_owned()],
-    );
+    let spec = ViewSpec::new(Command::Diff, vec!["--from".to_owned(), "main".to_owned()]);
 
     assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
 }
@@ -291,7 +288,7 @@ fn navigation_revset_defaults_direct_diff_from_revision_to_current_revision() {
 #[test]
 fn navigation_revset_uses_long_direct_diff_revision_option() {
     let spec = ViewSpec::new(
-        JjCommand::Diff,
+        Command::Diff,
         vec!["--revisions=main".to_owned(), "src/main.rs".to_owned()],
     );
 
@@ -300,7 +297,7 @@ fn navigation_revset_uses_long_direct_diff_revision_option() {
 
 #[test]
 fn tool_git_is_passthrough_not_view_format_state() {
-    let spec = ViewSpec::new(JjCommand::Diff, vec!["--tool=:git".to_owned()]);
+    let spec = ViewSpec::new(Command::Diff, vec!["--tool=:git".to_owned()]);
 
     assert_eq!(spec.diff_format(), DiffFormat::Default);
     assert_eq!(spec.args(), ["--tool=:git"]);
@@ -308,32 +305,32 @@ fn tool_git_is_passthrough_not_view_format_state() {
 
 #[test]
 fn log_view_mode_uses_plain_default_command() {
-    let spec = ViewSpec::for_log_mode(JjCommand::Default, &LogViewMode::Default);
+    let spec = ViewSpec::for_log_mode(Command::Default, &LogViewMode::Default);
 
-    assert_eq!(spec.command(), JjCommand::Default);
+    assert_eq!(spec.command(), Command::Default);
     assert!(spec.args().is_empty());
 }
 
 #[test]
 fn log_view_mode_uses_explicit_revset_for_named_modes() {
-    let spec = ViewSpec::for_log_mode(JjCommand::Default, &LogViewMode::Trunk);
+    let spec = ViewSpec::for_log_mode(Command::Default, &LogViewMode::Trunk);
 
-    assert_eq!(spec.command(), JjCommand::Log);
+    assert_eq!(spec.command(), Command::Log);
     assert_eq!(spec.args(), ["-r", TRUNK_WORK_REVSET]);
 }
 
 #[test]
 fn log_view_mode_uses_recent_revset_for_recent_mode() {
-    let spec = ViewSpec::for_log_mode(JjCommand::Default, &LogViewMode::Recent);
+    let spec = ViewSpec::for_log_mode(Command::Default, &LogViewMode::Recent);
 
-    assert_eq!(spec.command(), JjCommand::Log);
+    assert_eq!(spec.command(), Command::Log);
     assert_eq!(spec.args(), ["-r", RECENT_WORK_REVSET]);
 }
 
 #[test]
 fn log_view_mode_uses_all_revset_for_all_mode() {
-    let spec = ViewSpec::for_log_mode(JjCommand::Default, &LogViewMode::All);
+    let spec = ViewSpec::for_log_mode(Command::Default, &LogViewMode::All);
 
-    assert_eq!(spec.command(), JjCommand::Log);
+    assert_eq!(spec.command(), Command::Log);
     assert_eq!(spec.args(), ["-r", ALL_REPO_REVSET]);
 }

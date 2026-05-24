@@ -3,7 +3,7 @@ use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState};
 
-use super::{ResolveEntry, ResolveView};
+use crate::resolve::{ResolveEntry, ResolveView};
 use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
 

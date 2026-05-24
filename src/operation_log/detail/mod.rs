@@ -16,7 +16,7 @@ use crate::command::{Binding, Command, CommandContext, KeyPattern, ViewCommand, 
 #[cfg(test)]
 use crate::documents::DocumentLines;
 use crate::documents::PinnedDocument;
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::menus::CopyOption;
 use crate::rendered_rows::document_plain_text;
 use crate::search::SearchQuery;
@@ -146,13 +146,13 @@ impl OperationDetailView {
             }
             ViewCommand::OpenShow => self
                 .operation_id()
-                .filter(|_| self.spec.command() != JjCommand::OperationShow)
+                .filter(|_| self.spec.command() != jj::Command::OperationShow)
                 .map(ViewSpec::operation_show)
                 .map(ViewEffect::OpenView)
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::OpenDiff => self
                 .operation_id()
-                .filter(|_| self.spec.command() != JjCommand::OperationDiff)
+                .filter(|_| self.spec.command() != jj::Command::OperationDiff)
                 .map(ViewSpec::operation_diff)
                 .map(ViewEffect::OpenView)
                 .unwrap_or(ViewEffect::Ignored),

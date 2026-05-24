@@ -1,15 +1,15 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use super::helpers::{
+use crate::bookmarks::actions::{
+    JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget,
+};
+use crate::bookmarks::targets::helpers::{
     local_forget_target, remote_bookmark_track_target, remote_bookmark_untrack_target, remote_name,
     remote_peer_is_tracked, remote_peer_is_untracked, remote_tracking, remote_tracking_summary,
     require_matching_peer_targets, require_selected_target,
 };
-use super::peers::VisibleBookmarkPeers;
-use crate::bookmarks::actions::{
-    JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget,
-};
+use crate::bookmarks::targets::peers::VisibleBookmarkPeers;
 use crate::bookmarks::{
     BookmarkItem, BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState,
     RemoteBookmarkTrackingState,

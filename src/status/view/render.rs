@@ -2,8 +2,9 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
-use super::{StatusRow, StatusView};
 use crate::search::{SearchQuery, highlight_line};
+use crate::status::rows::StatusRow;
+use crate::status::view::StatusView;
 use crate::tui::theme;
 
 impl StatusView {

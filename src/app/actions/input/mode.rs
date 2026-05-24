@@ -1,7 +1,9 @@
 use crossterm::event::KeyCode;
 
-use super::{ActionPreviewConfirmation, ActionPreviewEvent, action_preview_event};
 use crate::app::actions::action_pane_visible_lines;
+use crate::app::actions::input::{
+    ActionPreviewConfirmation, ActionPreviewEvent, action_preview_event,
+};
 use crate::modes::InteractionMode;
 
 impl InteractionMode {

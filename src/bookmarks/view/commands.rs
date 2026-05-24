@@ -1,6 +1,6 @@
-use super::BookmarksView;
+use crate::bookmarks::view::BookmarksView;
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::menus::CopyOption;
 use crate::search::{SearchQuery, entry_matches};
 
@@ -27,7 +27,7 @@ impl BookmarksView {
             ViewCommand::OpenShow => self
                 .selected_entry()
                 .and_then(super::BookmarkItem::target_change_id)
-                .map(|change_id| ViewEffect::OpenDetail(JjCommand::Show, change_id.to_owned()))
+                .map(|change_id| ViewEffect::OpenDetail(jj::Command::Show, change_id.to_owned()))
                 .unwrap_or_else(|| {
                     ViewEffect::StatusMessage(
                         "selected bookmark has no target change id".to_owned(),

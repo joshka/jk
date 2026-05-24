@@ -1,6 +1,6 @@
 use ratatui::text::Line;
 
-use super::text::line_text;
+use crate::rendered_rows::text::line_text;
 
 /// Detect log rows that contain only structural glyphs or `~`.
 ///

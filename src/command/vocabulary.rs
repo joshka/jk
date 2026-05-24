@@ -1,7 +1,7 @@
 use ratatui::layout::Size;
 
 use crate::actions::JjOperationRecoveryKind;
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::menus::{ActionMenu, CopyOption};
 use crate::search::SearchQuery;
 
@@ -169,7 +169,7 @@ pub enum ViewEffect {
     /// Request that the app open a new child change at trunk.
     RunNewTrunk,
     /// Request that the app open a detail view rooted at the selected target.
-    OpenDetail(JjCommand, String),
+    OpenDetail(jj::Command, String),
     /// Request that the app open an already constructed top-level view spec.
     OpenView(crate::jj::ViewSpec),
     /// Search moved to the next or previous match.

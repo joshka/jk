@@ -1,7 +1,7 @@
 use color_eyre::Result;
 
-use super::{LogItem, LogView};
 use crate::jj::{LogViewMode, ViewSpec};
+use crate::log::view::{LogItem, LogView};
 
 impl LogView {
     /// Load the default/log view from a parsed `ViewSpec`.

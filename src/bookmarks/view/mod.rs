@@ -9,12 +9,14 @@ mod state;
 
 use color_eyre::Result;
 
-use super::actions::{JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget};
-use super::targets::BookmarkActionTargetResolver;
-use super::{BookmarkItem, load_bookmark_entries};
+use crate::bookmarks::actions::{
+    JjBookmarkForgetTarget, JjBookmarkMutationKind, JjBookmarkTrackingTarget,
+};
+use crate::bookmarks::targets::BookmarkActionTargetResolver;
+use crate::bookmarks::{BookmarkItem, load_bookmark_entries};
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
 #[cfg(test)]
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
 
@@ -75,7 +77,7 @@ impl BookmarksView {
     pub fn test_new(entries: Vec<BookmarkItem>) -> Self {
         Self {
             entries,
-            spec: ViewSpec::new(JjCommand::Bookmarks, Vec::new()),
+            spec: ViewSpec::new(jj::Command::Bookmarks, Vec::new()),
             selection: Selection::default(),
         }
     }
@@ -84,7 +86,7 @@ impl BookmarksView {
     pub fn test_new_with_args(entries: Vec<BookmarkItem>, args: Vec<String>) -> Self {
         Self {
             entries,
-            spec: ViewSpec::new(JjCommand::Bookmarks, args),
+            spec: ViewSpec::new(jj::Command::Bookmarks, args),
             selection: Selection::default(),
         }
     }

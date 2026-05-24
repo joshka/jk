@@ -1,8 +1,8 @@
 use color_eyre::Result;
 
-use super::ViewState;
 use crate::actions::{JjBookmarkForgetTarget, JjBookmarkTarget, JjGitPushTarget};
 use crate::menus::ExactActionContext;
+use crate::view_state::ViewState;
 
 mod bookmark_targets;
 mod exact_context;

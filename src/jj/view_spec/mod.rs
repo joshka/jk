@@ -11,7 +11,7 @@ mod context;
 
 use args::{diff_format_args, parse_diff_format};
 
-use super::{JjCommand, LogViewMode};
+use crate::jj::{Command, LogViewMode};
 
 /// The diff presentation selected by `jk`'s view-format modal.
 ///
@@ -50,7 +50,7 @@ impl DiffFormat {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ViewSpec {
     /// `jj` command family that owns this view.
-    command: JjCommand,
+    command: Command,
     /// Raw argv passed through to `jj` after command words are chosen.
     args: Vec<String>,
     /// Navigation target associated with the surface when jk knows one explicitly.
@@ -66,7 +66,7 @@ pub struct ViewSpec {
 impl ViewSpec {
     /// Build the app's home surface using the default `jj` command with no extra argv.
     pub fn home() -> Self {
-        Self::new(JjCommand::Default, Vec::new())
+        Self::new(Command::Default, Vec::new())
     }
 
     /// Build a direct `ViewSpec` from a top-level command and raw argv.
@@ -74,7 +74,7 @@ impl ViewSpec {
     /// This is the startup path constructor: it preserves argv as entered, derives the diff-format
     /// toggle from those args, and leaves target provenance unset until in-app navigation provides
     /// something stronger.
-    pub fn new(command: JjCommand, args: Vec<String>) -> Self {
+    pub fn new(command: Command, args: Vec<String>) -> Self {
         let diff_format = parse_diff_format(&args);
         Self {
             command,
@@ -89,7 +89,7 @@ impl ViewSpec {
     /// Build a show detail view targeted at an exact change id.
     pub fn show(revset: String, diff_format: DiffFormat) -> Self {
         Self {
-            command: JjCommand::Show,
+            command: Command::Show,
             args: diff_format_args(diff_format, [revset.clone()]),
             target: Some(revset),
             target_is_exact_change: true,
@@ -101,7 +101,7 @@ impl ViewSpec {
     /// Build a diff detail view targeted at an exact change id.
     pub fn diff(revset: String, diff_format: DiffFormat) -> Self {
         Self {
-            command: JjCommand::Diff,
+            command: Command::Diff,
             args: diff_format_args(diff_format, ["-r".to_owned(), revset.clone()]),
             target: Some(revset),
             target_is_exact_change: true,
@@ -120,7 +120,7 @@ impl ViewSpec {
         let args = vec!["-r".to_owned(), revset.clone()];
 
         Self {
-            command: JjCommand::Resolve,
+            command: Command::Resolve,
             args,
             target: Some(revset),
             target_is_exact_change: false,
@@ -137,7 +137,7 @@ impl ViewSpec {
             .unwrap_or_default();
 
         Self {
-            command: JjCommand::FileList,
+            command: Command::FileList,
             args,
             target: revset,
             target_is_exact_change: false,
@@ -154,7 +154,7 @@ impl ViewSpec {
             .unwrap_or_else(|| vec![path.clone()]);
 
         Self {
-            command: JjCommand::FileShow,
+            command: Command::FileShow,
             args,
             target: revset,
             target_is_exact_change: false,
@@ -165,7 +165,7 @@ impl ViewSpec {
 
     pub fn operation_show(operation_id: String) -> Self {
         Self {
-            command: JjCommand::OperationShow,
+            command: Command::OperationShow,
             args: vec![operation_id.clone()],
             target: Some(operation_id),
             target_is_exact_change: false,
@@ -176,7 +176,7 @@ impl ViewSpec {
 
     pub fn operation_diff(operation_id: String) -> Self {
         Self {
-            command: JjCommand::OperationDiff,
+            command: Command::OperationDiff,
             args: vec!["--operation".to_owned(), operation_id.clone()],
             target: Some(operation_id),
             target_is_exact_change: false,
@@ -186,14 +186,14 @@ impl ViewSpec {
     }
 
     /// Build the log-like view for one named log mode.
-    pub fn for_log_mode(home_command: JjCommand, mode: &LogViewMode) -> Self {
+    pub fn for_log_mode(home_command: Command, mode: &LogViewMode) -> Self {
         match mode {
             LogViewMode::Default => Self::new(home_command, Vec::new()),
-            _ => Self::new(JjCommand::Log, mode.args()),
+            _ => Self::new(Command::Log, mode.args()),
         }
     }
 
-    pub fn command(&self) -> JjCommand {
+    pub fn command(&self) -> Command {
         self.command
     }
 
@@ -233,19 +233,19 @@ impl ViewSpec {
 
     fn app_label_prefix(&self) -> &'static str {
         match self.command {
-            JjCommand::Default => "jk",
-            JjCommand::Log => "jk log",
-            JjCommand::Show => "jk show",
-            JjCommand::Diff => "jk diff",
-            JjCommand::Status => "jk status",
-            JjCommand::Resolve => "jk resolve",
-            JjCommand::FileList => "jk file list",
-            JjCommand::FileShow => "jk file show",
-            JjCommand::Bookmarks => "jk bookmarks",
-            JjCommand::Workspaces => "jk workspaces",
-            JjCommand::OperationLog => "jk operation log",
-            JjCommand::OperationShow => "jk operation show",
-            JjCommand::OperationDiff => "jk operation diff",
+            Command::Default => "jk",
+            Command::Log => "jk log",
+            Command::Show => "jk show",
+            Command::Diff => "jk diff",
+            Command::Status => "jk status",
+            Command::Resolve => "jk resolve",
+            Command::FileList => "jk file list",
+            Command::FileShow => "jk file show",
+            Command::Bookmarks => "jk bookmarks",
+            Command::Workspaces => "jk workspaces",
+            Command::OperationLog => "jk operation log",
+            Command::OperationShow => "jk operation show",
+            Command::OperationDiff => "jk operation diff",
         }
     }
 
@@ -254,9 +254,7 @@ impl ViewSpec {
             return self.args.clone();
         };
 
-        if matches!(self.command, JjCommand::FileShow)
-            && self.path.is_some()
-            && !self.args.is_empty()
+        if matches!(self.command, Command::FileShow) && self.path.is_some() && !self.args.is_empty()
         {
             let split = self.args.len() - 1;
             let mut display_args = self.args[..split]

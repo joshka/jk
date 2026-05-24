@@ -1,7 +1,7 @@
 use color_eyre::Result;
 use ratatui::layout::Size;
 
-use super::DiffView;
+use crate::diff::DiffView;
 use crate::documents::StickyFileDocument;
 use crate::jj::ViewSpec;
 

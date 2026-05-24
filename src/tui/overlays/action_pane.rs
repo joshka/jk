@@ -2,8 +2,8 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
 
-use super::menus::{centered_area, overlay_block};
 use crate::app::actions::ActionPane;
+use crate::tui::overlays::menus::{centered_area, overlay_block};
 use crate::tui::theme;
 
 #[derive(Clone, Copy)]

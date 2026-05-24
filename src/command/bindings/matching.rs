@@ -1,7 +1,6 @@
 use crossterm::event::KeyEvent;
 
-use super::Binding;
-use crate::command::HelpContext;
+use crate::command::{Binding, HelpContext};
 use crate::help::command_is_visible_in_help;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

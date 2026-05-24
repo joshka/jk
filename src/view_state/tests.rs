@@ -1,6 +1,6 @@
 use super::*;
 use crate::actions::{JjBookmarkTarget, JjGitPushTarget};
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::menus::ExactActionContext;
 use crate::{bookmarks, log};
 
@@ -155,11 +155,11 @@ fn exact_restore_revert_context_rejects_ambiguous_status_row() {
 #[test]
 fn exact_restore_revert_context_rejects_direct_startup_detail_revsets() {
     let show = ViewState::Show(crate::show::ShowView::test_new(ViewSpec::new(
-        JjCommand::Show,
+        jj::Command::Show,
         vec!["main".to_owned()],
     )));
     let diff = ViewState::Diff(crate::diff::DiffView::test_new(ViewSpec::new(
-        JjCommand::Diff,
+        jj::Command::Diff,
         vec!["-r".to_owned(), "main".to_owned()],
     )));
     let file_list = ViewState::FileList(crate::files::list::FileListView::test_with_spec(

@@ -1,6 +1,6 @@
-use super::FileListView;
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
-use crate::jj::JjCommand;
+use crate::files::list::FileListView;
+use crate::jj;
 use crate::menus::CopyOption;
 use crate::search::{SearchQuery, entry_matches};
 
@@ -26,7 +26,7 @@ impl FileListView {
             }
             ViewCommand::OpenItem => self
                 .selected_path()
-                .map(|path| ViewEffect::OpenDetail(JjCommand::FileShow, path.to_owned()))
+                .map(|path| ViewEffect::OpenDetail(jj::Command::FileShow, path.to_owned()))
                 .unwrap_or_else(|| {
                     ViewEffect::StatusMessage("selected file list is empty".to_owned())
                 }),

@@ -1,6 +1,6 @@
-use super::{LogItem, LogView};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
-use crate::jj::JjCommand;
+use crate::jj;
+use crate::log::view::{LogItem, LogView};
 use crate::menus::{CopyOption, ExactActionContext, build_action_menu};
 use crate::search::{SearchQuery, entry_matches};
 
@@ -38,11 +38,11 @@ impl LogView {
             }
             ViewCommand::OpenShow => self
                 .current_revset()
-                .map(|revset| ViewEffect::OpenDetail(JjCommand::Show, revset.to_owned()))
+                .map(|revset| ViewEffect::OpenDetail(jj::Command::Show, revset.to_owned()))
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::OpenDiff => self
                 .current_revset()
-                .map(|revset| ViewEffect::OpenDetail(JjCommand::Diff, revset.to_owned()))
+                .map(|revset| ViewEffect::OpenDetail(jj::Command::Diff, revset.to_owned()))
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::StartSearch => {
                 let Some(query) = context.search else {

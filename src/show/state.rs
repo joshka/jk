@@ -1,10 +1,10 @@
 use color_eyre::Result;
 use ratatui::layout::Size;
 
-use super::ShowView;
 use crate::documents::StickyFileDocument;
 use crate::jj::ViewSpec;
 use crate::log::load_compact_log_context;
+use crate::show::ShowView;
 
 impl ShowView {
     /// Loads rendered `jj show` output and the compact log context pinned above file content.

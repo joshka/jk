@@ -5,8 +5,8 @@
 
 use color_eyre::Result;
 
-use super::super::{App, clamp_view_to_current_viewport};
-use crate::jj::JjCommand;
+use crate::app::{App, clamp_view_to_current_viewport};
+use crate::jj;
 
 mod mutation;
 mod operation;
@@ -19,22 +19,22 @@ impl App {
     pub fn refresh_stacked_repo_views(&mut self) -> Result<()> {
         for view in &mut self.stack {
             match view.command() {
-                JjCommand::Default
-                | JjCommand::Log
-                | JjCommand::Status
-                | JjCommand::Bookmarks
-                | JjCommand::Workspaces
-                | JjCommand::OperationLog => {
+                jj::Command::Default
+                | jj::Command::Log
+                | jj::Command::Status
+                | jj::Command::Bookmarks
+                | jj::Command::Workspaces
+                | jj::Command::OperationLog => {
                     self.services.refresh_view(view)?;
                     clamp_view_to_current_viewport(view);
                 }
-                JjCommand::Show
-                | JjCommand::Diff
-                | JjCommand::Resolve
-                | JjCommand::FileList
-                | JjCommand::FileShow
-                | JjCommand::OperationShow
-                | JjCommand::OperationDiff => {}
+                jj::Command::Show
+                | jj::Command::Diff
+                | jj::Command::Resolve
+                | jj::Command::FileList
+                | jj::Command::FileShow
+                | jj::Command::OperationShow
+                | jj::Command::OperationDiff => {}
             }
         }
         Ok(())

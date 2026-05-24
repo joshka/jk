@@ -9,7 +9,7 @@ use ratatui::layout::Rect;
 use crate::app::App;
 use crate::app::services::AppServices;
 use crate::app::status_line::StatusLine;
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::modes::InteractionMode;
 
 impl App {
@@ -22,12 +22,13 @@ impl App {
         let services = AppServices::default();
         let view = services.load_view(initial_spec)?;
         let status = StatusLine::ready(&view);
+        // Before the first draw, treat the main viewport as effectively unbounded.
+        let viewport = Rect::MAX;
 
         Ok(Self {
             view,
             stack: Vec::new(),
-            // Before the first draw, treat the main viewport as effectively unbounded.
-            viewport: Rect::MAX,
+            viewport,
             diff_format,
             status,
             mode: InteractionMode::Normal,
@@ -42,8 +43,8 @@ impl App {
 
 /// Parse process arguments into the first `ViewSpec` the app should load.
 ///
-/// Startup accepts only top-level shipped views here. `StartupCommand` owns the subset of command
-/// names that make sense before the app has any active surface, while `JjCommand` continues to own
+/// Startup accepts only top-level shipped views here. `Command` owns the subset of command names
+/// that make sense before the app has any active surface, while `jj::Command` continues to own
 /// the broader rendered-view vocabulary once startup has already chosen that top-level surface.
 /// Deeper drill-down views are reached from in-app navigation once the first surface is loaded.
 /// Returns an error when a startup argument is not valid UTF-8 or when the first argument is not
@@ -59,21 +60,21 @@ pub fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
         return Ok(ViewSpec::home());
     };
 
-    let command: StartupCommand = command.parse()?;
+    let command: Command = command.parse()?;
     match command {
-        StartupCommand::Resolve if rest.is_empty() => Ok(ViewSpec::resolve_current()),
+        Command::Resolve if rest.is_empty() => Ok(ViewSpec::resolve_current()),
         _ => Ok(ViewSpec::new(command.jj_command(), rest.to_vec())),
     }
 }
 
 /// Startup-only top-level commands accepted on the `jk` CLI.
 ///
-/// This remains narrower than `JjCommand`: startup chooses one shipped home surface, then later
+/// This remains narrower than `jj::Command`: startup chooses one shipped home surface, then later
 /// in-app navigation can move into detail-oriented command families that are not valid as direct
 /// startup entry points. This enum owns the textual startup boundary only; it does not try to
 /// represent the full in-app rendered-view command vocabulary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum StartupCommand {
+enum Command {
     Log,
     Show,
     Diff,
@@ -84,23 +85,23 @@ enum StartupCommand {
     OperationLog,
 }
 
-impl StartupCommand {
+impl Command {
     /// Map one startup-only command to the rendered `jj` command family it opens.
-    fn jj_command(self) -> JjCommand {
+    fn jj_command(self) -> jj::Command {
         match self {
-            Self::Log => JjCommand::Log,
-            Self::Show => JjCommand::Show,
-            Self::Diff => JjCommand::Diff,
-            Self::Status => JjCommand::Status,
-            Self::Resolve => JjCommand::Resolve,
-            Self::Bookmarks => JjCommand::Bookmarks,
-            Self::Workspaces => JjCommand::Workspaces,
-            Self::OperationLog => JjCommand::OperationLog,
+            Self::Log => jj::Command::Log,
+            Self::Show => jj::Command::Show,
+            Self::Diff => jj::Command::Diff,
+            Self::Status => jj::Command::Status,
+            Self::Resolve => jj::Command::Resolve,
+            Self::Bookmarks => jj::Command::Bookmarks,
+            Self::Workspaces => jj::Command::Workspaces,
+            Self::OperationLog => jj::Command::OperationLog,
         }
     }
 }
 
-impl FromStr for StartupCommand {
+impl FromStr for Command {
     type Err = Report;
 
     fn from_str(command: &str) -> Result<Self, Self::Err> {

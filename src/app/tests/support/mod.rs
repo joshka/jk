@@ -39,7 +39,7 @@ pub use crate::command::{CommandContext, ViewCommand};
 #[allow(unused_imports)]
 pub use crate::files::list::{FileListItem, load_file_list_entries};
 #[allow(unused_imports)]
-pub use crate::jj::{DiffFormat, JjCommand, LogViewMode, ViewSpec};
+pub use crate::jj::{self, DiffFormat, LogViewMode, ViewSpec};
 #[allow(unused_imports)]
 pub use crate::log::{LogItem, load_compact_log_context, load_entries};
 pub use crate::menus::{ActionKind, FollowUp, RolePrompt, RolePromptOption};

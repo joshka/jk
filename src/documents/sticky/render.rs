@@ -5,7 +5,9 @@ use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Wrap};
 
-use super::viewport::{DocumentDisplayMode, DocumentViewport, max_projected_line_width};
+use crate::documents::sticky::viewport::{
+    DocumentDisplayMode, DocumentViewport, max_projected_line_width,
+};
 use crate::documents::{DocumentLines, PinnedDocument};
 use crate::jj::{ColorMode, ViewSpec, run_jj};
 use crate::search::{SearchQuery, highlight_line, line_matches};

@@ -3,10 +3,10 @@ use std::time::Instant;
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 
-use super::keyboard::{COMMAND_PREFIX_TIMEOUT, prefix_status_message};
-use super::reducers::{is_help_close_key, is_help_scroll_key};
-use super::{APP_BINDINGS, App, PendingCommand};
+use crate::app::keyboard::{COMMAND_PREFIX_TIMEOUT, prefix_status_message};
+use crate::app::reducers::{is_help_close_key, is_help_scroll_key};
 use crate::app::status_line::StatusLine;
+use crate::app::{APP_BINDINGS, App, PendingCommand};
 use crate::command::{
     Binding, BindingMatch, help_binding_prefix_next_labels, match_help_binding_sequence,
 };

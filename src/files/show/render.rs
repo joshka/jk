@@ -1,9 +1,9 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
-use super::FileShowView;
 use crate::documents;
 use crate::documents::{PinnedDocument, project_with_active_file};
+use crate::files::show::FileShowView;
 use crate::search::SearchQuery;
 
 impl FileShowView {

@@ -5,8 +5,8 @@
 
 use color_eyre::Result;
 
-use super::App;
 use crate::actions::{JjBookmarkMutationKind, JjWorkingCopyNavigationKind};
+use crate::app::App;
 use crate::command::{Binding, Command, ViewCommand};
 use crate::modes::InteractionMode;
 

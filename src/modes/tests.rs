@@ -8,7 +8,7 @@ use crate::actions::{
 use crate::app::actions::ActionPane;
 use crate::app::status_line::{StatusKind, StatusLine};
 use crate::bookmarks::actions::{JjBookmarkMutationPlan, JjBookmarkTarget};
-use crate::jj::{DiffFormat, JjCommand};
+use crate::jj::{self, DiffFormat};
 use crate::log::LogView;
 use crate::operation_log::actions::{JjOperationRecovery, JjOperationTarget};
 use crate::tui::{Overlay, StatusHints};
@@ -47,7 +47,7 @@ fn view_menu_projects_configured_view_options() {
     assert_eq!(selected, 4);
     assert_eq!(
         options[4].action(),
-        ViewMenuAction::Open(JjCommand::Bookmarks)
+        ViewMenuAction::Open(jj::Command::Bookmarks)
     );
 }
 
@@ -250,13 +250,13 @@ fn view_menu_options_include_shipped_entries_and_diff_formats() {
     assert_eq!(
         actions,
         vec![
-            ViewMenuAction::Open(JjCommand::Log),
-            ViewMenuAction::Open(JjCommand::Default),
-            ViewMenuAction::Open(JjCommand::Status),
-            ViewMenuAction::Open(JjCommand::Resolve),
-            ViewMenuAction::Open(JjCommand::Bookmarks),
-            ViewMenuAction::Open(JjCommand::Workspaces),
-            ViewMenuAction::Open(JjCommand::OperationLog),
+            ViewMenuAction::Open(jj::Command::Log),
+            ViewMenuAction::Open(jj::Command::Default),
+            ViewMenuAction::Open(jj::Command::Status),
+            ViewMenuAction::Open(jj::Command::Resolve),
+            ViewMenuAction::Open(jj::Command::Bookmarks),
+            ViewMenuAction::Open(jj::Command::Workspaces),
+            ViewMenuAction::Open(jj::Command::OperationLog),
             ViewMenuAction::DiffFormat(DiffFormat::Default),
             ViewMenuAction::DiffFormat(DiffFormat::Git),
         ]

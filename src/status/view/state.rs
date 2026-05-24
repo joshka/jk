@@ -2,15 +2,15 @@ use color_eyre::Result;
 #[cfg(test)]
 use ratatui::text::Line;
 
-use super::StatusView;
 #[cfg(test)]
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::jj::ViewSpec;
 #[cfg(test)]
 use crate::selection::Selection;
 #[cfg(test)]
 use crate::status::rows::parse_status_row;
 use crate::status::rows::{StatusRow, load_status_rows};
+use crate::status::view::StatusView;
 
 impl StatusView {
     /// Load the status view and derive exact-path action contracts from rendered output.
@@ -96,7 +96,7 @@ fn restore_selection(
 impl StatusView {
     pub fn test_new(lines: &[&str]) -> Self {
         Self {
-            spec: ViewSpec::new(JjCommand::Status, Vec::new()),
+            spec: ViewSpec::new(jj::Command::Status, Vec::new()),
             rows: lines
                 .iter()
                 .map(|line| parse_status_row(Line::from((*line).to_owned())))

@@ -5,8 +5,8 @@
 
 use color_eyre::Result;
 
-use super::super::App;
-use super::ActionPane;
+use crate::app::App;
+use crate::app::actions::ActionPane;
 
 mod mutation;
 mod operation;

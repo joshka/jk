@@ -2,13 +2,13 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use ratatui::DefaultTerminal;
 
-use super::AppServices;
 use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
     JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan,
     JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan,
     JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
+use crate::app::services::AppServices;
 use crate::jj::{LogViewMode, ViewSpec, git_remotes, new_trunk, resolve_exact_change_id};
 use crate::view_state::ViewState;
 

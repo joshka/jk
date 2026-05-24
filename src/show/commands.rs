@@ -1,9 +1,9 @@
-use super::{HORIZONTAL_SCROLL_AMOUNT, ShowView};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::documents;
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::menus::CopyOption;
 use crate::search::SearchQuery;
+use crate::show::{HORIZONTAL_SCROLL_AMOUNT, ShowView};
 
 impl ShowView {
     /// Applies a view command to show-specific navigation, search, and drill-down state.
@@ -70,7 +70,7 @@ impl ShowView {
             ViewCommand::OpenDiff => self
                 .spec
                 .navigation_revset()
-                .map(|revset| ViewEffect::OpenDetail(JjCommand::Diff, revset))
+                .map(|revset| ViewEffect::OpenDetail(jj::Command::Diff, revset))
                 .unwrap_or(ViewEffect::Ignored),
             ViewCommand::StartSearch => {
                 let Some(query) = context.search else {

@@ -1,6 +1,6 @@
-use super::super::super::App;
-use super::super::shared::bookmark_status_context;
 use crate::actions::{JjBookmarkMutationPlan, JjCommitPlan, JjDescribePlan, JjFileMutationPlan};
+use crate::app::App;
+use crate::app::actions::shared::bookmark_status_context;
 use crate::modes::InteractionMode;
 
 impl App {

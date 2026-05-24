@@ -9,13 +9,13 @@ mod defaults;
 use color_eyre::Result;
 use ratatui::DefaultTerminal;
 
-use super::App;
 use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjBookmarkMutationPlan, JjCommitPlan,
     JjDescribePlan, JjDuplicatePlan, JjFileMutationPlan, JjGitFetch, JjGitPush, JjNewPlan,
     JjOperationRecovery, JjOperationTarget, JjRebasePlan, JjRestorePlan, JjRevertPlan, JjSplitPlan,
     JjSquashPlan, JjWorkingCopyNavigationPlan,
 };
+use crate::app::App;
 use crate::jj::{LogViewMode, ViewSpec};
 use crate::view_state::ViewState;
 

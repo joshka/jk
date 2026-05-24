@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use color_eyre::Result;
 use serde_json::Value;
 
-use super::{
+use crate::bookmarks::{
     BookmarkLocalPeerState, BookmarkRowState, LocalBookmarkRemoteState, RemoteBookmarkTrackingState,
 };
 use crate::jj::{ViewSpec, run_jj_template_lines};

@@ -1,9 +1,9 @@
-use super::super::super::App;
-use super::super::ActionPane;
 use crate::actions::{
     JjAbandonPlan, JjAbandonPreview, JjAbsorbPlan, JjRebasePlan, JjRestorePlan, JjRevertPlan,
     JjSquashPlan, JjWorkingCopyNavigationKind, JjWorkingCopyNavigationPlan,
 };
+use crate::app::App;
+use crate::app::actions::ActionPane;
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;
 

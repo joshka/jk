@@ -1,5 +1,5 @@
-use super::{ALL_REPO_REVSET, RECENT_WORK_REVSET, TRUNK_WORK_REVSET, option_value};
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::command::{ALL_REPO_REVSET, RECENT_WORK_REVSET, TRUNK_WORK_REVSET, option_value};
+use crate::jj::{Command, ViewSpec};
 
 /// Named log revset modes that cycle within the default/log surface.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,7 +37,7 @@ impl LogViewMode {
     }
 
     pub fn from_spec(spec: &ViewSpec) -> Self {
-        if spec.command() == JjCommand::Default {
+        if spec.command() == Command::Default {
             return Self::Default;
         }
 

@@ -131,6 +131,6 @@ fn file_list_open_selected_file_uses_exact_path() {
 
     assert_eq!(
         effect,
-        ViewEffect::OpenDetail(JjCommand::FileShow, "src/space file.txt".to_owned())
+        ViewEffect::OpenDetail(jj::Command::FileShow, "src/space file.txt".to_owned())
     );
 }

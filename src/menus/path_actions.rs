@@ -4,8 +4,8 @@
 //! owns which path actions are offered for working-copy paths versus exact
 //! revision paths, including their ordering and follow-up payloads.
 
-use super::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier, short_id};
 use crate::actions::JjFileChmodMode;
+use crate::menus::{ActionKind, ActionMenu, ActionMenuItem, FollowUp, SafetyTier, short_id};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StatusPathActionAvailability {

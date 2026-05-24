@@ -1,13 +1,13 @@
 use color_eyre::Result;
 
-use super::super::super::App;
 use crate::actions::{
     JjAbandonPlan, JjAbsorbPlan, JjDuplicatePlan, JjFileMutationPlan, JjNewPlan, JjOperationTarget,
     JjRestorePlan, JjRevertPlan, JjSplitPlan, JjWorkingCopyNavigationPlan,
 };
+use crate::app::App;
 use crate::app::status_line::StatusLine;
 use crate::command::ViewCommand;
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::menus::{ActionKind, ActionMenuItem, FollowUp, build_action_menu};
 use crate::modes::InteractionMode;
 use crate::view_state::ViewState;
@@ -17,7 +17,7 @@ impl App {
     pub fn open_action_menu(&mut self, viewport_height: u16) -> Result<bool> {
         if matches!(
             self.view.command(),
-            JjCommand::Default | JjCommand::Log | JjCommand::OperationLog
+            jj::Command::Default | jj::Command::Log | jj::Command::OperationLog
         ) {
             let effect = self.execute_view(ViewCommand::OpenActionMenu);
             return self.apply_view_effect(effect, viewport_height);

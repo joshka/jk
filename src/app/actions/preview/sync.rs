@@ -1,8 +1,10 @@
-use super::super::super::{App, clamp_view_to_current_viewport};
-use super::super::ActionPane;
-use super::super::shared::{fetch_status_context, fetch_status_message, push_status_context};
 use crate::actions::{JjGitFetch, JjGitPush, JjGitPushTarget};
+use crate::app::actions::ActionPane;
+use crate::app::actions::shared::{
+    fetch_status_context, fetch_status_message, push_status_context,
+};
 use crate::app::status_line::StatusLine;
+use crate::app::{App, clamp_view_to_current_viewport};
 use crate::modes::InteractionMode;
 
 impl App {

@@ -1,6 +1,6 @@
 use color_eyre::Result;
 
-use super::{BookmarkItem, BookmarksView, load_bookmark_entries};
+use crate::bookmarks::view::{BookmarkItem, BookmarksView, load_bookmark_entries};
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
 

@@ -1,10 +1,10 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
-use super::ShowView;
 use crate::documents;
 use crate::documents::PinnedDocument;
 use crate::search::SearchQuery;
+use crate::show::ShowView;
 
 impl ShowView {
     /// Renders the current sticky document projection into the active viewport.

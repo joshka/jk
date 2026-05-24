@@ -1,7 +1,7 @@
-use super::super::super::App;
 use crate::actions::{JjBookmarkMutationKind, JjBookmarkMutationPlan, JjDescribeTarget};
+use crate::app::App;
 use crate::app::status_line::StatusLine;
-use crate::jj::JjCommand;
+use crate::jj;
 use crate::modes::InteractionMode;
 use crate::view_state::ViewState;
 
@@ -9,7 +9,7 @@ impl App {
     /// Open the describe prompt for the current exact change or selected graph revision.
     pub fn open_describe_prompt(&mut self) {
         let target = match self.view.command() {
-            JjCommand::Default | JjCommand::Log => match self.view.push_target() {
+            jj::Command::Default | jj::Command::Log => match self.view.push_target() {
                 Ok(Some(crate::actions::JjGitPushTarget::Revision(revision))) => {
                     JjDescribeTarget::exact_change(revision)
                 }
@@ -22,17 +22,17 @@ impl App {
                     return;
                 }
             },
-            JjCommand::Status => JjDescribeTarget::current_working_copy(),
-            JjCommand::Show
-            | JjCommand::Diff
-            | JjCommand::Resolve
-            | JjCommand::FileList
-            | JjCommand::FileShow
-            | JjCommand::Bookmarks
-            | JjCommand::Workspaces
-            | JjCommand::OperationLog
-            | JjCommand::OperationShow
-            | JjCommand::OperationDiff => {
+            jj::Command::Status => JjDescribeTarget::current_working_copy(),
+            jj::Command::Show
+            | jj::Command::Diff
+            | jj::Command::Resolve
+            | jj::Command::FileList
+            | jj::Command::FileShow
+            | jj::Command::Bookmarks
+            | jj::Command::Workspaces
+            | jj::Command::OperationLog
+            | jj::Command::OperationShow
+            | jj::Command::OperationDiff => {
                 self.status = StatusLine::error(
                     &self.view,
                     "describe is only available from log or status views".to_owned(),
@@ -51,7 +51,7 @@ impl App {
     pub fn open_commit_prompt(&mut self) {
         if matches!(
             self.view.command(),
-            JjCommand::Default | JjCommand::Log | JjCommand::Status
+            jj::Command::Default | jj::Command::Log | jj::Command::Status
         ) {
             self.mode = InteractionMode::CommitPrompt(String::new());
         } else {

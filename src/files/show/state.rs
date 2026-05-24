@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use ratatui::layout::Size;
 
-use super::FileShowView;
 use crate::documents::{DocumentLines, load_document};
+use crate::files::show::FileShowView;
 
 impl FileShowView {
     /// Reload the document while preserving path identity and viewport state.

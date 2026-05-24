@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
-use super::{APP_BINDINGS, App, PendingCommand};
 use crate::app::status_line::StatusLine;
+use crate::app::{APP_BINDINGS, App, PendingCommand};
 use crate::command::{BindingMatch, binding_prefix_next_labels, match_binding_sequence};
 use crate::modes::InteractionMode;
 

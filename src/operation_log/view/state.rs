@@ -1,7 +1,7 @@
 use color_eyre::Result;
 
-use super::{OperationLogItem, OperationLogView};
 use crate::jj::ViewSpec;
+use crate::operation_log::view::{OperationLogItem, OperationLogView};
 use crate::selection::{Selection, restore_by_key_or_index};
 
 impl OperationLogView {
@@ -17,7 +17,7 @@ impl OperationLogView {
     #[cfg(test)]
     pub fn test_new(entries: Vec<OperationLogItem>) -> Self {
         Self {
-            spec: ViewSpec::new(crate::jj::JjCommand::OperationLog, Vec::new()),
+            spec: ViewSpec::new(crate::jj::Command::OperationLog, Vec::new()),
             entries,
             selection: Selection::default(),
         }

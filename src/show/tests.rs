@@ -4,7 +4,7 @@ use ratatui_macros::line;
 use super::*;
 use crate::command::{CommandContext, ViewEffect};
 use crate::documents::DocumentLines;
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::search::SearchQuery;
 
 #[test]
@@ -126,11 +126,11 @@ fn show_file_navigation_uses_sticky_activation_offsets() {
 #[test]
 fn command_execution_opens_diff_for_same_revset() {
     let mut view = show_view(vec![line!("Added regular file Cargo.toml:")], 0);
-    view.spec = ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]);
+    view.spec = ViewSpec::new(jj::Command::Show, vec!["main".to_owned()]);
 
     assert_eq!(
         view.execute(ViewCommand::OpenDiff, context(None)),
-        ViewEffect::OpenDetail(JjCommand::Diff, "main".to_owned())
+        ViewEffect::OpenDetail(jj::Command::Diff, "main".to_owned())
     );
 }
 
@@ -151,7 +151,7 @@ fn command_execution_opens_file_list_with_exact_target_provenance() {
 #[test]
 fn command_execution_opens_file_list_with_inexact_direct_revset() {
     let mut view = show_view(vec![line!("Added regular file Cargo.toml:")], 0);
-    view.spec = ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]);
+    view.spec = ViewSpec::new(jj::Command::Show, vec!["main".to_owned()]);
 
     assert_eq!(
         view.execute(ViewCommand::OpenFiles, context(None)),
@@ -234,7 +234,7 @@ fn show_view(lines: Vec<Line<'static>>, scroll_offset: usize) -> ShowView {
     let mut document = StickyFileDocument::new(document);
     document.set_scroll_offset(u16::MAX, scroll_offset);
     ShowView {
-        spec: ViewSpec::new(JjCommand::Show, Vec::new()),
+        spec: ViewSpec::new(jj::Command::Show, Vec::new()),
         document,
         compact_context: vec![line!("@  abc"), line!("│  subject")],
     }

@@ -21,7 +21,7 @@ pub use self::log_mode::LogViewMode;
 
 /// The shipped `jj` command families that can back a `jk` view.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum JjCommand {
+pub enum Command {
     /// Default log surface using jk's home revset behavior.
     Default,
     /// Explicit `jj log` startup or navigation surface.
@@ -53,7 +53,7 @@ pub enum JjCommand {
 const BOOKMARK_COMMAND_WORDS: [&str; 2] = ["bookmark", "list"];
 const WORKSPACE_LIST_COMMAND_WORDS: [&str; 2] = ["workspace", "list"];
 
-impl JjCommand {
+impl Command {
     pub fn label(self) -> &'static str {
         match self {
             Self::Default => "jj",

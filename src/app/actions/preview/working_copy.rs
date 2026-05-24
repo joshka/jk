@@ -1,10 +1,10 @@
-use super::super::super::{App, clamp_view_to_current_viewport};
-use super::super::shared::short_id;
 use crate::actions::{
     JjDuplicatePlan, JjNewPlan, JjSplitPlan, JjWorkingCopyNavigationKind,
     JjWorkingCopyNavigationPlan,
 };
+use crate::app::actions::shared::short_id;
 use crate::app::status_line::StatusLine;
+use crate::app::{App, clamp_view_to_current_viewport};
 use crate::jj::LogViewMode;
 use crate::modes::InteractionMode;
 

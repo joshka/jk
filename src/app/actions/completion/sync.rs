@@ -1,7 +1,7 @@
-use super::super::super::App;
-use super::super::ActionPane;
-use super::super::shared::fetch_status_message;
 use crate::actions::{JjGitFetch, JjGitPush};
+use crate::app::App;
+use crate::app::actions::ActionPane;
+use crate::app::actions::shared::fetch_status_message;
 use crate::modes::InteractionMode;
 
 impl App {

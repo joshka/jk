@@ -1,7 +1,7 @@
 use color_eyre::Result;
 
-use super::super::super::App;
 use crate::actions::JjGitFetch;
+use crate::app::App;
 use crate::app::actions::ActionPane;
 use crate::app::status_line::StatusLine;
 use crate::modes::InteractionMode;

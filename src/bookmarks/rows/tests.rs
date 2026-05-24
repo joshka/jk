@@ -1,7 +1,7 @@
 use super::metadata::{BookmarkMetadata, BookmarkMetadataCoverage, parse_bookmark_metadata_line};
 use super::pairing::pair_bookmark_lines;
 use super::*;
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 
 #[test]
 fn parses_bookmark_metadata_lines() {
@@ -334,13 +334,16 @@ fn tracked_local_bookmark_state_preserves_untracked_remote_peer() {
 fn bookmark_metadata_coverage_requires_unfiltered_all_remotes_args() {
     assert_eq!(
         bookmark_metadata_coverage(&ViewSpec::new(
-            JjCommand::Bookmarks,
+            jj::Command::Bookmarks,
             vec!["--all-remotes".to_owned()],
         )),
         BookmarkMetadataCoverage::UnfilteredAllRemotes
     );
     assert_eq!(
-        bookmark_metadata_coverage(&ViewSpec::new(JjCommand::Bookmarks, vec!["-a".to_owned()])),
+        bookmark_metadata_coverage(&ViewSpec::new(
+            jj::Command::Bookmarks,
+            vec!["-a".to_owned()]
+        )),
         BookmarkMetadataCoverage::UnfilteredAllRemotes
     );
 
@@ -354,7 +357,7 @@ fn bookmark_metadata_coverage_requires_unfiltered_all_remotes_args() {
     ] {
         let args = args.into_iter().map(str::to_owned).collect();
         assert_eq!(
-            bookmark_metadata_coverage(&ViewSpec::new(JjCommand::Bookmarks, args)),
+            bookmark_metadata_coverage(&ViewSpec::new(jj::Command::Bookmarks, args)),
             BookmarkMetadataCoverage::VisibleRowsOnly
         );
     }

@@ -4,7 +4,7 @@ use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem, ListState};
 
-use super::{LogItem, LogView, explicit_selection_style};
+use crate::log::view::{LogItem, LogView, explicit_selection_style};
 use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
 

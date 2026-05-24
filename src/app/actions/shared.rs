@@ -10,9 +10,9 @@
 
 use std::fmt::Display;
 
-use super::super::{App, clamp_view_to_current_viewport};
 use crate::actions::{JjBookmarkMutationPlan, JjGitFetch, JjGitPushTarget};
 use crate::app::status_line::StatusLine;
+use crate::app::{App, clamp_view_to_current_viewport};
 use crate::jj::LogViewMode;
 
 impl App {

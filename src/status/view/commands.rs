@@ -1,10 +1,10 @@
-use super::StatusView;
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::jj::ViewSpec;
 use crate::menus::CopyOption;
 use crate::rendered_rows::document_plain_text;
 use crate::search::{SearchQuery, line_matches};
 use crate::status::actions::StatusFileAction;
+use crate::status::view::StatusView;
 
 impl StatusView {
     /// Execute one view-local command against the status screen.

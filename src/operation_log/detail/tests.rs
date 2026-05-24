@@ -4,13 +4,13 @@ use super::*;
 use crate::documents::lines_text;
 
 fn operation_detail_view(
-    command: JjCommand,
+    command: jj::Command,
     operation_id: &str,
     lines: &[&str],
 ) -> OperationDetailView {
     let spec = match command {
-        JjCommand::OperationShow => ViewSpec::operation_show(operation_id.to_owned()),
-        JjCommand::OperationDiff => ViewSpec::operation_diff(operation_id.to_owned()),
+        jj::Command::OperationShow => ViewSpec::operation_show(operation_id.to_owned()),
+        jj::Command::OperationDiff => ViewSpec::operation_diff(operation_id.to_owned()),
         _ => panic!("expected operation detail command"),
     };
     OperationDetailView::test_new(
@@ -27,7 +27,7 @@ fn operation_detail_view(
 #[test]
 fn operation_detail_scrolls_searches_and_copies_plain_document() {
     let mut view = operation_detail_view(
-        JjCommand::OperationShow,
+        jj::Command::OperationShow,
         "0123456789abcdef",
         &[
             "operation abc",
@@ -66,7 +66,7 @@ fn operation_detail_scrolls_searches_and_copies_plain_document() {
 #[test]
 fn operation_detail_does_not_pin_file_like_headings() {
     let view = operation_detail_view(
-        JjCommand::OperationDiff,
+        jj::Command::OperationDiff,
         "abcdef",
         &["Modified regular file src/main.rs:", "        1: old"],
     );
@@ -82,8 +82,8 @@ fn operation_detail_does_not_pin_file_like_headings() {
 
 #[test]
 fn operation_detail_switches_between_show_and_diff_for_same_operation() {
-    let mut show = operation_detail_view(JjCommand::OperationShow, "abcdef", &["operation"]);
-    let mut diff = operation_detail_view(JjCommand::OperationDiff, "abcdef", &["operation"]);
+    let mut show = operation_detail_view(jj::Command::OperationShow, "abcdef", &["operation"]);
+    let mut diff = operation_detail_view(jj::Command::OperationDiff, "abcdef", &["operation"]);
 
     assert_eq!(
         show.execute(

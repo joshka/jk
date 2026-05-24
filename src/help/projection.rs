@@ -1,6 +1,6 @@
-use super::metadata::help_metadata;
-use super::{HelpContext, HelpRow, HelpSection, HelpSectionKind};
 use crate::command::{Binding, Command};
+use crate::help::metadata::help_metadata;
+use crate::help::{HelpContext, HelpRow, HelpSection, HelpSectionKind};
 
 /// Projects global and view-local bindings into grouped help sections for one context.
 pub fn project_help(

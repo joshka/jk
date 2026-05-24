@@ -1,5 +1,5 @@
-use super::{ActionKind, RolePrompt, SafetyTier};
 use crate::actions::JjFileChmodMode;
+use crate::menus::model::{ActionKind, RolePrompt, SafetyTier};
 
 /// Deferred action payload produced by a selected menu item.
 ///

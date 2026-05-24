@@ -9,11 +9,11 @@ use crate::workspaces::WORKSPACE_METADATA_TEMPLATE;
 #[test]
 fn bookmark_list_command_uses_bookmark_words_and_labels() {
     let spec = ViewSpec::new(
-        JjCommand::Bookmarks,
+        Command::Bookmarks,
         vec!["--revision".to_owned(), "main".to_owned()],
     );
 
-    assert_eq!(spec.command(), JjCommand::Bookmarks);
+    assert_eq!(spec.command(), Command::Bookmarks);
     assert_eq!(
         jj_command_args(&spec),
         vec!["bookmark", "list", "--revision", "main"]
@@ -24,10 +24,10 @@ fn bookmark_list_command_uses_bookmark_words_and_labels() {
 
 #[test]
 fn workspace_commands_use_read_only_root_list_and_metadata_template() {
-    let spec = ViewSpec::new(JjCommand::Workspaces, Vec::new());
+    let spec = ViewSpec::new(Command::Workspaces, Vec::new());
 
     assert_eq!(workspace_root_command_args(), vec!["root"]);
-    assert_eq!(spec.command(), JjCommand::Workspaces);
+    assert_eq!(spec.command(), Command::Workspaces);
     assert_eq!(jj_command_args(&spec), vec!["workspace", "list"]);
     assert_eq!(
         jj_command_args_with_template(&spec, WORKSPACE_METADATA_TEMPLATE),
@@ -42,7 +42,7 @@ fn workspace_commands_use_read_only_root_list_and_metadata_template() {
 fn file_list_command_uses_file_words_and_keeps_selected_path_out_of_args() {
     let spec = ViewSpec::file_list(Some("main".to_owned()), Some("src/main.rs".to_owned()));
 
-    assert_eq!(spec.command(), JjCommand::FileList);
+    assert_eq!(spec.command(), Command::FileList);
     assert_eq!(spec.args(), ["-r", "main"]);
     assert_eq!(spec.path(), Some("src/main.rs"));
     assert_eq!(spec.exact_change_target(), None);
@@ -57,7 +57,7 @@ fn file_list_command_uses_file_words_and_keeps_selected_path_out_of_args() {
 fn file_show_command_keeps_exact_path_identity() {
     let spec = ViewSpec::file_show(Some("main".to_owned()), "src/main.rs".to_owned());
 
-    assert_eq!(spec.command(), JjCommand::FileShow);
+    assert_eq!(spec.command(), Command::FileShow);
     assert_eq!(spec.args(), ["-r", "main", "src/main.rs"]);
     assert_eq!(spec.path(), Some("src/main.rs"));
     assert_eq!(spec.exact_change_target(), None);
@@ -75,7 +75,7 @@ fn file_show_command_keeps_exact_path_identity() {
 fn resolve_command_defaults_to_current_revision() {
     let spec = ViewSpec::resolve_current();
 
-    assert_eq!(spec.command(), JjCommand::Resolve);
+    assert_eq!(spec.command(), Command::Resolve);
     assert_eq!(spec.args(), ["-r", "@"]);
     assert_eq!(
         jj_command_args_with_template_no_graph(&spec, RESOLVE_CONFLICT_TEMPLATE),
@@ -98,7 +98,7 @@ fn resolve_command_defaults_to_current_revision() {
 fn resolve_command_uses_log_template_contract_without_graph() {
     let spec = ViewSpec::resolve_revset("main".to_owned());
 
-    assert_eq!(spec.command(), JjCommand::Resolve);
+    assert_eq!(spec.command(), Command::Resolve);
     assert_eq!(spec.args(), ["-r", "main"]);
     assert_eq!(spec.exact_change_target(), None);
     assert_eq!(
@@ -121,7 +121,7 @@ fn resolve_command_uses_log_template_contract_without_graph() {
 #[test]
 fn operation_log_command_uses_at_op_prefix() {
     assert_eq!(
-        jj_command_args(&ViewSpec::new(JjCommand::OperationLog, Vec::new())),
+        jj_command_args(&ViewSpec::new(Command::OperationLog, Vec::new())),
         vec![
             "operation",
             "log",
@@ -136,7 +136,7 @@ fn operation_log_command_uses_at_op_prefix() {
 fn operation_log_id_command_disables_graph_for_template_output() {
     assert_eq!(
         jj_command_args_with_template_no_graph(
-            &ViewSpec::new(JjCommand::OperationLog, Vec::new()),
+            &ViewSpec::new(Command::OperationLog, Vec::new()),
             OPERATION_ID_TEMPLATE,
         ),
         vec![
@@ -156,7 +156,7 @@ fn operation_log_id_command_disables_graph_for_template_output() {
 fn operation_show_command_uses_positional_operation_id() {
     let spec = ViewSpec::operation_show(operation_id('a'));
 
-    assert_eq!(spec.command(), JjCommand::OperationShow);
+    assert_eq!(spec.command(), Command::OperationShow);
     assert_eq!(spec.args(), [operation_id('a')]);
     assert_eq!(
         jj_command_args(&spec),
@@ -169,7 +169,7 @@ fn operation_show_command_uses_positional_operation_id() {
 fn operation_diff_command_uses_operation_option() {
     let spec = ViewSpec::operation_diff(operation_id('b'));
 
-    assert_eq!(spec.command(), JjCommand::OperationDiff);
+    assert_eq!(spec.command(), Command::OperationDiff);
     assert_eq!(spec.args(), ["--operation", operation_id('b').as_str()]);
     assert_eq!(
         jj_command_args(&spec),
@@ -189,7 +189,7 @@ fn operation_id(digit: char) -> String {
 
 #[test]
 fn log_view_mode_parses_custom_revset_from_log_spec() {
-    let spec = ViewSpec::new(JjCommand::Log, vec!["-r".to_owned(), "::".to_owned()]);
+    let spec = ViewSpec::new(Command::Log, vec!["-r".to_owned(), "::".to_owned()]);
 
     assert_eq!(
         LogViewMode::from_spec(&spec),
@@ -200,7 +200,7 @@ fn log_view_mode_parses_custom_revset_from_log_spec() {
 #[test]
 fn log_view_mode_recognizes_named_recent_revset() {
     let spec = ViewSpec::new(
-        JjCommand::Log,
+        Command::Log,
         vec!["-r".to_owned(), RECENT_WORK_REVSET.to_owned()],
     );
 

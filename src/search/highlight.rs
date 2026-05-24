@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use ratatui::text::{Line, Span};
 
-use super::SearchQuery;
+use crate::search::SearchQuery;
 
 /// Flatten a styled line into plain text for search matching.
 pub fn line_text(line: &Line<'_>) -> String {

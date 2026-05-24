@@ -2,41 +2,43 @@ use color_eyre::Result;
 use ratatui::Frame;
 use ratatui::layout::{Rect, Size};
 
-use super::ViewState;
 use crate::command::{Binding, CommandContext, HelpContext, ViewCommand, ViewEffect};
-use crate::jj::{JjCommand, ViewSpec};
+use crate::jj::{self, ViewSpec};
 use crate::search::SearchQuery;
 use crate::tui::StatusHints;
+use crate::view_state::ViewState;
 
 impl ViewState {
     /// Materialize the concrete feature view for a previously parsed `ViewSpec`.
     ///
     /// Startup and app-level navigation both pass through here so the app can
-    /// stay generic over the active slice until a specific `JjCommand`
+    /// stay generic over the active slice until a specific `jj::Command`
     /// selects the owning view type.
     pub fn load(spec: ViewSpec) -> Result<Self> {
         match spec.command() {
-            JjCommand::Default | JjCommand::Log => Ok(Self::Log(crate::log::LogView::load(spec)?)),
-            JjCommand::Show => Ok(Self::Show(crate::show::ShowView::load(spec)?)),
-            JjCommand::Diff => Ok(Self::Diff(crate::diff::DiffView::load(spec)?)),
-            JjCommand::Status => Ok(Self::Status(crate::status::StatusView::load(spec)?)),
-            JjCommand::Resolve => Ok(Self::Resolve(crate::resolve::ResolveView::load(spec)?)),
-            JjCommand::FileList => Ok(Self::FileList(crate::files::list::FileListView::load(
+            jj::Command::Default | jj::Command::Log => {
+                Ok(Self::Log(crate::log::LogView::load(spec)?))
+            }
+            jj::Command::Show => Ok(Self::Show(crate::show::ShowView::load(spec)?)),
+            jj::Command::Diff => Ok(Self::Diff(crate::diff::DiffView::load(spec)?)),
+            jj::Command::Status => Ok(Self::Status(crate::status::StatusView::load(spec)?)),
+            jj::Command::Resolve => Ok(Self::Resolve(crate::resolve::ResolveView::load(spec)?)),
+            jj::Command::FileList => Ok(Self::FileList(crate::files::list::FileListView::load(
                 spec,
             )?)),
-            JjCommand::FileShow => Ok(Self::FileShow(crate::files::show::FileShowView::load(
+            jj::Command::FileShow => Ok(Self::FileShow(crate::files::show::FileShowView::load(
                 spec,
             )?)),
-            JjCommand::Bookmarks => Ok(Self::Bookmarks(crate::bookmarks::BookmarksView::load(
+            jj::Command::Bookmarks => Ok(Self::Bookmarks(crate::bookmarks::BookmarksView::load(
                 spec,
             )?)),
-            JjCommand::Workspaces => Ok(Self::Workspaces(crate::workspaces::WorkspacesView::load(
-                spec,
-            )?)),
-            JjCommand::OperationLog => Ok(Self::OperationLog(
+            jj::Command::Workspaces => Ok(Self::Workspaces(
+                crate::workspaces::WorkspacesView::load(spec)?,
+            )),
+            jj::Command::OperationLog => Ok(Self::OperationLog(
                 crate::operation_log::OperationLogView::load(spec)?,
             )),
-            JjCommand::OperationShow | JjCommand::OperationDiff => Ok(Self::OperationDetail(
+            jj::Command::OperationShow | jj::Command::OperationDiff => Ok(Self::OperationDetail(
                 crate::operation_log::detail::OperationDetailView::load(spec)?,
             )),
         }
@@ -178,7 +180,7 @@ impl ViewState {
         }
     }
 
-    pub fn command(&self) -> JjCommand {
+    pub fn command(&self) -> jj::Command {
         self.spec().command()
     }
 }

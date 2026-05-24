@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use crossterm::event::KeyCode;
 
-use super::App;
-use super::reducers::{
+use crate::app::App;
+use crate::app::reducers::{
     PromptAcceptDecision, TextPromptKey, reduce_bookmark_name_prompt_accept,
     reduce_bookmark_rename_prompt_accept, reduce_commit_prompt_accept,
     reduce_describe_prompt_accept, reduce_text_prompt_key,

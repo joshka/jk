@@ -2,7 +2,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
 
-use super::{FileListItem, FileListView};
+use crate::files::list::{FileListItem, FileListView};
 use crate::search::{SearchQuery, highlight_line};
 use crate::tui::theme;
 

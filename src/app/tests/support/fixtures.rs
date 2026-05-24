@@ -1,8 +1,9 @@
 use ratatui::layout::Rect;
 
+use super::jj::Command;
 use super::{
-    App, DiffFormat, InteractionMode, JjCommand, KeyCode, KeyEvent, KeyEventKind, KeyEventState,
-    KeyModifiers, LogViewMode, Result, StatusLine, ViewSpec, ViewState,
+    App, DiffFormat, InteractionMode, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+    LogViewMode, Result, StatusLine, ViewSpec, ViewState,
 };
 
 pub fn test_app(view: ViewState) -> App {
@@ -45,33 +46,33 @@ pub fn log_item(change_id: &str) -> crate::log::LogItem {
 
 pub fn mock_load_view(spec: ViewSpec) -> Result<ViewState> {
     let view = match spec.command() {
-        JjCommand::Default | JjCommand::Log => {
+        jj::Command::Default | jj::Command::Log => {
             ViewState::Log(crate::log::LogView::test_with_spec(spec, vec![]))
         }
-        JjCommand::Show => ViewState::Show(crate::show::ShowView::test_new(spec)),
-        JjCommand::Diff => ViewState::Diff(crate::diff::DiffView::test_new(spec)),
-        JjCommand::Status => ViewState::Status(crate::status::StatusView::test_new(&[])),
-        JjCommand::Resolve => ViewState::Resolve(crate::resolve::ResolveView::test_new(vec![])),
-        JjCommand::FileList => {
+        jj::Command::Show => ViewState::Show(crate::show::ShowView::test_new(spec)),
+        jj::Command::Diff => ViewState::Diff(crate::diff::DiffView::test_new(spec)),
+        jj::Command::Status => ViewState::Status(crate::status::StatusView::test_new(&[])),
+        jj::Command::Resolve => ViewState::Resolve(crate::resolve::ResolveView::test_new(vec![])),
+        jj::Command::FileList => {
             ViewState::FileList(crate::files::list::FileListView::test_new(vec![]))
         }
-        JjCommand::FileShow => ViewState::FileShow(crate::files::show::FileShowView::new(
+        jj::Command::FileShow => ViewState::FileShow(crate::files::show::FileShowView::new(
             spec,
             "src/main.rs",
             crate::documents::DocumentLines::new(Vec::new()),
         )),
-        JjCommand::Bookmarks => {
+        jj::Command::Bookmarks => {
             ViewState::Bookmarks(crate::bookmarks::BookmarksView::test_new(vec![]))
         }
-        JjCommand::Workspaces => {
+        jj::Command::Workspaces => {
             ViewState::Workspaces(crate::workspaces::WorkspacesView::test_new(
                 crate::workspaces::WorkspaceContext::default(),
             ))
         }
-        JjCommand::OperationLog => {
+        jj::Command::OperationLog => {
             ViewState::OperationLog(crate::operation_log::OperationLogView::test_new(vec![]))
         }
-        JjCommand::OperationShow | JjCommand::OperationDiff => {
+        jj::Command::OperationShow | jj::Command::OperationDiff => {
             ViewState::OperationDetail(crate::operation_log::detail::OperationDetailView::test_new(
                 spec,
                 crate::documents::DocumentLines::new(Vec::new()),

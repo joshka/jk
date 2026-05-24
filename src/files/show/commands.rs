@@ -1,6 +1,6 @@
-use super::{FileShowView, HORIZONTAL_SCROLL_AMOUNT};
 use crate::command::{CommandContext, ViewCommand, ViewEffect};
 use crate::documents::{next_matching_line, previous_matching_line};
+use crate::files::show::{FileShowView, HORIZONTAL_SCROLL_AMOUNT};
 use crate::menus::CopyOption;
 use crate::search::{SearchQuery, line_matches};
 

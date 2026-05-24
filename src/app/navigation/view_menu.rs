@@ -1,8 +1,8 @@
 use color_eyre::Result;
 
-use super::super::App;
+use crate::app::App;
 use crate::app::status_line::StatusLine;
-use crate::jj::{DiffFormat, JjCommand};
+use crate::jj::{self, DiffFormat};
 use crate::modes::{InteractionMode, ViewMenuAction, view_menu_options};
 
 impl App {
@@ -20,7 +20,7 @@ impl App {
         match action {
             ViewMenuAction::Open(command) => self.view.command() == command,
             ViewMenuAction::DiffFormat(format) => {
-                matches!(self.view.command(), JjCommand::Show | JjCommand::Diff)
+                matches!(self.view.command(), jj::Command::Show | jj::Command::Diff)
                     && self.diff_format == format
             }
         }
@@ -33,23 +33,23 @@ impl App {
         viewport_height: u16,
     ) -> Result<()> {
         match action {
-            ViewMenuAction::Open(JjCommand::Log) => self.switch_to_log(),
-            ViewMenuAction::Open(JjCommand::Default) => self.switch_to_default(),
-            ViewMenuAction::Open(JjCommand::Status) => self.open_status(),
-            ViewMenuAction::Open(JjCommand::Resolve) => self.open_resolve(),
-            ViewMenuAction::Open(JjCommand::Bookmarks) => self.open_bookmarks(),
-            ViewMenuAction::Open(JjCommand::Workspaces) => self.open_workspaces(),
-            ViewMenuAction::Open(JjCommand::OperationLog) => self.open_operation_log(),
+            ViewMenuAction::Open(jj::Command::Log) => self.switch_to_log(),
+            ViewMenuAction::Open(jj::Command::Default) => self.switch_to_default(),
+            ViewMenuAction::Open(jj::Command::Status) => self.open_status(),
+            ViewMenuAction::Open(jj::Command::Resolve) => self.open_resolve(),
+            ViewMenuAction::Open(jj::Command::Bookmarks) => self.open_bookmarks(),
+            ViewMenuAction::Open(jj::Command::Workspaces) => self.open_workspaces(),
+            ViewMenuAction::Open(jj::Command::OperationLog) => self.open_operation_log(),
             ViewMenuAction::DiffFormat(diff_format) => {
                 self.apply_diff_format(diff_format, viewport_height)
             }
             ViewMenuAction::Open(
-                JjCommand::Show
-                | JjCommand::Diff
-                | JjCommand::FileList
-                | JjCommand::FileShow
-                | JjCommand::OperationShow
-                | JjCommand::OperationDiff,
+                jj::Command::Show
+                | jj::Command::Diff
+                | jj::Command::FileList
+                | jj::Command::FileShow
+                | jj::Command::OperationShow
+                | jj::Command::OperationDiff,
             ) => {
                 self.status = StatusLine::with_message(
                     &self.view,
@@ -64,7 +64,7 @@ impl App {
     /// detail view if needed.
     fn apply_diff_format(&mut self, diff_format: DiffFormat, viewport_height: u16) -> Result<()> {
         self.diff_format = diff_format;
-        if !matches!(self.view.command(), JjCommand::Show | JjCommand::Diff) {
+        if !matches!(self.view.command(), jj::Command::Show | jj::Command::Diff) {
             self.status = StatusLine::with_message(
                 &self.view,
                 format!("show/diff format: {}", diff_format.label()),

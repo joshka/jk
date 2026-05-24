@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::prompts::{rebase_plan_from_prompt, squash_plan_from_prompt};
 use crate::actions::{JjRebasePlan, JjSquashPlan};
+use crate::app::reducers::prompts::{rebase_plan_from_prompt, squash_plan_from_prompt};
 use crate::menus::{ActionKind, RolePrompt};
 use crate::modes::view_menu_options;
 

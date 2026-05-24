@@ -1,7 +1,7 @@
 use color_eyre::Result;
 
-use super::{WorkspaceContext, WorkspaceItem, WorkspacesView, load_workspace_context};
 use crate::jj::ViewSpec;
+use crate::workspaces::{WorkspaceContext, WorkspaceItem, WorkspacesView, load_workspace_context};
 
 impl WorkspacesView {
     /// Reloads the workspace context while preserving the selected workspace name when possible.

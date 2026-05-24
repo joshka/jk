@@ -1,5 +1,5 @@
-use super::super::command::option_value;
-use super::DiffFormat;
+use crate::jj::command::option_value;
+use crate::jj::view_spec::DiffFormat;
 
 /// Infer the app-level diff-format modal state from direct startup args.
 pub fn parse_diff_format(args: &[String]) -> DiffFormat {

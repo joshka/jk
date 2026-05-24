@@ -6,7 +6,7 @@
 
 use color_eyre::Result;
 
-use super::App;
+use crate::app::App;
 use crate::app::status_line::StatusLine;
 use crate::command::ViewEffect;
 use crate::modes::InteractionMode;

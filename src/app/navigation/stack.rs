@@ -1,14 +1,14 @@
 use color_eyre::Result;
 
-use super::super::App;
+use crate::app::App;
 use crate::app::status_line::StatusLine;
-use crate::jj::{JjCommand, LogViewMode, ViewSpec};
+use crate::jj::{self, LogViewMode, ViewSpec};
 use crate::modes::InteractionMode;
 
 impl App {
     /// Open a detail surface only when the requested command has a valid detail
     /// `ViewSpec`.
-    pub fn push_detail(&mut self, command: JjCommand, revset: String) -> Result<()> {
+    pub fn push_detail(&mut self, command: jj::Command, revset: String) -> Result<()> {
         let Some(spec) = self.detail_spec(command, revset) else {
             return Ok(());
         };
@@ -21,10 +21,10 @@ impl App {
     /// Exact-change provenance is preserved only when the source surface
     /// actually knows an exact change target. Direct startup revsets such as
     /// `jk show main` intentionally stay inexact.
-    pub fn detail_spec(&self, command: JjCommand, revset: String) -> Option<ViewSpec> {
+    pub fn detail_spec(&self, command: jj::Command, revset: String) -> Option<ViewSpec> {
         let source_has_exact_target = self.view_has_exact_detail_target();
         let spec = match command {
-            JjCommand::Show => {
+            jj::Command::Show => {
                 let spec = ViewSpec::show(revset, self.diff_format);
                 if source_has_exact_target {
                     spec
@@ -32,7 +32,7 @@ impl App {
                     spec.without_exact_change_target()
                 }
             }
-            JjCommand::Diff => {
+            jj::Command::Diff => {
                 let spec = ViewSpec::diff(revset, self.diff_format);
                 if source_has_exact_target {
                     spec
@@ -40,7 +40,7 @@ impl App {
                     spec.without_exact_change_target()
                 }
             }
-            JjCommand::FileShow => {
+            jj::Command::FileShow => {
                 let spec = ViewSpec::file_show(self.view.spec().navigation_revset(), revset);
                 if self.view.spec().has_exact_change_target() {
                     spec.with_exact_change_target()
@@ -48,16 +48,16 @@ impl App {
                     spec
                 }
             }
-            JjCommand::Default
-            | JjCommand::Log
-            | JjCommand::Status
-            | JjCommand::Resolve
-            | JjCommand::FileList
-            | JjCommand::Bookmarks
-            | JjCommand::Workspaces
-            | JjCommand::OperationLog
-            | JjCommand::OperationShow
-            | JjCommand::OperationDiff => return None,
+            jj::Command::Default
+            | jj::Command::Log
+            | jj::Command::Status
+            | jj::Command::Resolve
+            | jj::Command::FileList
+            | jj::Command::Bookmarks
+            | jj::Command::Workspaces
+            | jj::Command::OperationLog
+            | jj::Command::OperationShow
+            | jj::Command::OperationDiff => return None,
         };
         Some(spec)
     }
@@ -65,22 +65,22 @@ impl App {
     /// Report whether the current surface can vouch for an exact change-id
     /// detail target.
     fn view_has_exact_detail_target(&self) -> bool {
-        matches!(self.view.command(), JjCommand::Default | JjCommand::Log)
+        matches!(self.view.command(), jj::Command::Default | jj::Command::Log)
             || self.view.spec().has_exact_change_target()
     }
 
     /// Push the shipped status surface unless it is already active.
     pub fn open_status(&mut self) -> Result<()> {
-        if matches!(self.view.command(), JjCommand::Status) {
+        if matches!(self.view.command(), jj::Command::Status) {
             return Ok(());
         }
 
-        self.push_view(ViewSpec::new(JjCommand::Status, Vec::new()))
+        self.push_view(ViewSpec::new(jj::Command::Status, Vec::new()))
     }
 
     /// Push the shipped resolve surface unless it is already active.
     pub fn open_resolve(&mut self) -> Result<()> {
-        if matches!(self.view.command(), JjCommand::Resolve) {
+        if matches!(self.view.command(), jj::Command::Resolve) {
             return Ok(());
         }
 
@@ -89,29 +89,29 @@ impl App {
 
     /// Push the shipped operation-log surface unless it is already active.
     pub fn open_operation_log(&mut self) -> Result<()> {
-        if matches!(self.view.command(), JjCommand::OperationLog) {
+        if matches!(self.view.command(), jj::Command::OperationLog) {
             return Ok(());
         }
 
-        self.push_view(ViewSpec::new(JjCommand::OperationLog, Vec::new()))
+        self.push_view(ViewSpec::new(jj::Command::OperationLog, Vec::new()))
     }
 
     /// Push the shipped bookmarks surface unless it is already active.
     pub fn open_bookmarks(&mut self) -> Result<()> {
-        if matches!(self.view.command(), JjCommand::Bookmarks) {
+        if matches!(self.view.command(), jj::Command::Bookmarks) {
             return Ok(());
         }
 
-        self.push_view(ViewSpec::new(JjCommand::Bookmarks, Vec::new()))
+        self.push_view(ViewSpec::new(jj::Command::Bookmarks, Vec::new()))
     }
 
     /// Push the shipped workspaces surface unless it is already active.
     pub fn open_workspaces(&mut self) -> Result<()> {
-        if matches!(self.view.command(), JjCommand::Workspaces) {
+        if matches!(self.view.command(), jj::Command::Workspaces) {
             return Ok(());
         }
 
-        self.push_view(ViewSpec::new(JjCommand::Workspaces, Vec::new()))
+        self.push_view(ViewSpec::new(jj::Command::Workspaces, Vec::new()))
     }
 
     /// Push a newly loaded view and keep the previous view on the app-owned
@@ -136,7 +136,7 @@ impl App {
         self.stack.clear();
         self.view = self
             .services
-            .load_view(ViewSpec::new(JjCommand::Log, Vec::new()))?;
+            .load_view(ViewSpec::new(jj::Command::Log, Vec::new()))?;
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }
@@ -151,7 +151,7 @@ impl App {
 
     /// Enter the custom-revset prompt only from the log-oriented home surfaces.
     pub fn open_log_revset_prompt(&mut self) {
-        if matches!(self.view.command(), JjCommand::Default | JjCommand::Log) {
+        if matches!(self.view.command(), jj::Command::Default | jj::Command::Log) {
             self.mode = InteractionMode::LogRevsetPrompt(String::new());
         }
     }
