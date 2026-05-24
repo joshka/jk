@@ -86,6 +86,10 @@ Use names that expose ownership and side effects:
 Avoid vague names such as `data`, `manager`, `handler`, `processor`, `context`, or `state` unless
 the surrounding type gives the term precise meaning.
 
+In non-test modules, prefer direct module or crate-root imports over `super`/`super::super`
+climbing. Reserve relative parent imports for tests and tightly local test support where the scope
+stays obvious.
+
 ## Error Handling
 
 Use `color_eyre::Result` for app-level fallible paths, matching the existing crate style.

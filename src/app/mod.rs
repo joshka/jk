@@ -67,7 +67,7 @@ pub struct App {
     view: ViewState,
     /// Back-stack of previously active views for app-level history navigation.
     stack: Vec<ViewState>,
-    /// Main viewport from the last completed frame, reused for immediate dispatch.
+    /// Main viewport from the last completed frame, or an unbounded fallback before first layout.
     viewport: Rect,
     /// Active show/diff presentation format chosen at the app level.
     diff_format: DiffFormat,
@@ -212,12 +212,7 @@ fn clamp_view_to_current_viewport(view: &mut ViewState) {
 fn current_viewport_rect() -> Rect {
     crossterm::terminal::size()
         .map(|(width, height)| viewport_from_terminal_size(width, height))
-        .unwrap_or(Rect {
-            x: 0,
-            y: 0,
-            height: u16::MAX,
-            width: u16::MAX,
-        })
+        .unwrap_or(Rect::MAX)
 }
 
 /// Build the app's main viewport area from the raw terminal size.

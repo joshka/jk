@@ -74,7 +74,7 @@ impl ResolveView {
     #[cfg(test)]
     pub fn test_new(entries: Vec<ResolveEntry>) -> Self {
         Self {
-            spec: ViewSpec::resolve(None),
+            spec: ViewSpec::resolve_current(),
             entries,
             selection: Selection::default(),
         }

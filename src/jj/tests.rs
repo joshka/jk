@@ -8,7 +8,10 @@ use crate::workspaces::WORKSPACE_METADATA_TEMPLATE;
 
 #[test]
 fn bookmark_list_command_uses_bookmark_words_and_labels() {
-    let spec = ViewSpec::bookmarks(vec!["--revision".to_owned(), "main".to_owned()]);
+    let spec = ViewSpec::new(
+        JjCommand::Bookmarks,
+        vec!["--revision".to_owned(), "main".to_owned()],
+    );
 
     assert_eq!(spec.command(), JjCommand::Bookmarks);
     assert_eq!(
@@ -21,7 +24,7 @@ fn bookmark_list_command_uses_bookmark_words_and_labels() {
 
 #[test]
 fn workspace_commands_use_read_only_root_list_and_metadata_template() {
-    let spec = ViewSpec::workspaces(Vec::new());
+    let spec = ViewSpec::new(JjCommand::Workspaces, Vec::new());
 
     assert_eq!(workspace_root_command_args(), vec!["root"]);
     assert_eq!(spec.command(), JjCommand::Workspaces);
@@ -70,7 +73,7 @@ fn file_show_command_keeps_exact_path_identity() {
 
 #[test]
 fn resolve_command_defaults_to_current_revision() {
-    let spec = ViewSpec::resolve(None);
+    let spec = ViewSpec::resolve_current();
 
     assert_eq!(spec.command(), JjCommand::Resolve);
     assert_eq!(spec.args(), ["-r", "@"]);
@@ -93,7 +96,7 @@ fn resolve_command_defaults_to_current_revision() {
 
 #[test]
 fn resolve_command_uses_log_template_contract_without_graph() {
-    let spec = ViewSpec::resolve(Some("main".to_owned()));
+    let spec = ViewSpec::resolve_revset("main".to_owned());
 
     assert_eq!(spec.command(), JjCommand::Resolve);
     assert_eq!(spec.args(), ["-r", "main"]);

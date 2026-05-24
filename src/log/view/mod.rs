@@ -113,7 +113,7 @@ impl LogView {
         Self {
             home_command: JjCommand::Default,
             mode: LogViewMode::Default,
-            spec: ViewSpec::new(JjCommand::Default, Vec::new()),
+            spec: ViewSpec::home(),
             entries,
             selection: Selection::default(),
             selected_change_ids: Vec::new(),

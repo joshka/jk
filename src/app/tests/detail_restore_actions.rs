@@ -205,7 +205,7 @@ fn file_show_navigation_preserves_source_exactness_only() {
 fn file_show_navigation_from_resolve_uses_resolve_revision() {
     let app = test_app(ViewState::Resolve(
         crate::resolve::ResolveView::test_with_spec(
-            ViewSpec::resolve(Some("main".to_owned())),
+            ViewSpec::resolve_revset("main".to_owned()),
             vec![crate::resolve::ResolveEntry::parsed(
                 Some("src/main.rs".to_owned()),
                 Some("file".to_owned()),
@@ -228,7 +228,7 @@ fn file_show_navigation_from_resolve_uses_resolve_revision() {
 fn file_show_navigation_from_default_resolve_uses_current_revision() {
     let app = test_app(ViewState::Resolve(
         crate::resolve::ResolveView::test_with_spec(
-            ViewSpec::resolve(None),
+            ViewSpec::resolve_current(),
             vec![crate::resolve::ResolveEntry::parsed(
                 Some("src/main.rs".to_owned()),
                 Some("file".to_owned()),

@@ -64,6 +64,11 @@ pub struct ViewSpec {
 }
 
 impl ViewSpec {
+    /// Build the app's home surface using the default `jj` command with no extra argv.
+    pub fn home() -> Self {
+        Self::new(JjCommand::Default, Vec::new())
+    }
+
     /// Build a direct `ViewSpec` from a top-level command and raw argv.
     ///
     /// This is the startup path constructor: it preserves argv as entered, derives the diff-format
@@ -78,28 +83,6 @@ impl ViewSpec {
             target_is_exact_change: false,
             path: None,
             diff_format,
-        }
-    }
-
-    pub fn bookmarks(args: Vec<String>) -> Self {
-        Self {
-            command: JjCommand::Bookmarks,
-            args,
-            target: None,
-            target_is_exact_change: false,
-            path: None,
-            diff_format: DiffFormat::Default,
-        }
-    }
-
-    pub fn workspaces(args: Vec<String>) -> Self {
-        Self {
-            command: JjCommand::Workspaces,
-            args,
-            target: None,
-            target_is_exact_change: false,
-            path: None,
-            diff_format: DiffFormat::Default,
         }
     }
 
@@ -127,9 +110,13 @@ impl ViewSpec {
         }
     }
 
-    /// Build a resolve view, defaulting to the current working copy when startup omits `-r`.
-    pub fn resolve(revset: Option<String>) -> Self {
-        let revset = revset.unwrap_or_else(|| "@".to_owned());
+    /// Build a resolve view for the current working copy.
+    pub fn resolve_current() -> Self {
+        Self::resolve_revset("@".to_owned())
+    }
+
+    /// Build a resolve view for one explicit revision or revset.
+    pub fn resolve_revset(revset: String) -> Self {
         let args = vec!["-r".to_owned(), revset.clone()];
 
         Self {

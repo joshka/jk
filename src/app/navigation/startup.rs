@@ -1,12 +1,13 @@
 use std::ffi::OsString;
+use std::str::FromStr;
 
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
+use color_eyre::eyre::{Report, bail, eyre};
 use itertools::Itertools;
 use ratatui::layout::Rect;
 
-use super::super::App;
-use super::super::services::AppServices;
+use crate::app::App;
+use crate::app::services::AppServices;
 use crate::app::status_line::StatusLine;
 use crate::jj::{JjCommand, ViewSpec};
 use crate::modes::InteractionMode;
@@ -25,12 +26,8 @@ impl App {
         Ok(Self {
             view,
             stack: Vec::new(),
-            viewport: Rect {
-                x: 0,
-                y: 0,
-                height: u16::MAX,
-                width: u16::MAX,
-            },
+            // Before the first draw, treat the main viewport as effectively unbounded.
+            viewport: Rect::MAX,
             diff_format,
             status,
             mode: InteractionMode::Normal,
@@ -45,8 +42,12 @@ impl App {
 
 /// Parse process arguments into the first `ViewSpec` the app should load.
 ///
-/// Startup accepts only top-level shipped views here. Deeper drill-down views
-/// are reached from in-app navigation once the first surface is loaded.
+/// Startup accepts only top-level shipped views here. `StartupCommand` owns the subset of command
+/// names that make sense before the app has any active surface, while `JjCommand` continues to own
+/// the broader rendered-view vocabulary once startup has already chosen that top-level surface.
+/// Deeper drill-down views are reached from in-app navigation once the first surface is loaded.
+/// Returns an error when a startup argument is not valid UTF-8 or when the first argument is not
+/// one of the shipped top-level startup views.
 pub fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
     let args_utf8: Vec<String> = args
         .into_iter()
@@ -55,26 +56,67 @@ pub fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
         .map_err(|arg| eyre!("startup argument is not valid UTF-8: {arg:?}"))?;
 
     let Some((command, rest)) = args_utf8.split_first() else {
-        return Ok(ViewSpec::new(JjCommand::Default, Vec::new()));
+        return Ok(ViewSpec::home());
     };
 
-    match command.as_str() {
-        "log" => Ok(ViewSpec::new(JjCommand::Log, rest.to_vec())),
-        "show" => Ok(ViewSpec::new(JjCommand::Show, rest.to_vec())),
-        "diff" => Ok(ViewSpec::new(JjCommand::Diff, rest.to_vec())),
-        "status" => Ok(ViewSpec::new(JjCommand::Status, rest.to_vec())),
-        "resolve" => {
-            if rest.is_empty() {
-                Ok(ViewSpec::resolve(None))
-            } else {
-                Ok(ViewSpec::new(JjCommand::Resolve, rest.to_vec()))
-            }
+    let command: StartupCommand = command.parse()?;
+    match command {
+        StartupCommand::Resolve if rest.is_empty() => Ok(ViewSpec::resolve_current()),
+        _ => Ok(ViewSpec::new(command.jj_command(), rest.to_vec())),
+    }
+}
+
+/// Startup-only top-level commands accepted on the `jk` CLI.
+///
+/// This remains narrower than `JjCommand`: startup chooses one shipped home surface, then later
+/// in-app navigation can move into detail-oriented command families that are not valid as direct
+/// startup entry points. This enum owns the textual startup boundary only; it does not try to
+/// represent the full in-app rendered-view command vocabulary.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StartupCommand {
+    Log,
+    Show,
+    Diff,
+    Status,
+    Resolve,
+    Bookmarks,
+    Workspaces,
+    OperationLog,
+}
+
+impl StartupCommand {
+    /// Map one startup-only command to the rendered `jj` command family it opens.
+    fn jj_command(self) -> JjCommand {
+        match self {
+            Self::Log => JjCommand::Log,
+            Self::Show => JjCommand::Show,
+            Self::Diff => JjCommand::Diff,
+            Self::Status => JjCommand::Status,
+            Self::Resolve => JjCommand::Resolve,
+            Self::Bookmarks => JjCommand::Bookmarks,
+            Self::Workspaces => JjCommand::Workspaces,
+            Self::OperationLog => JjCommand::OperationLog,
         }
-        "bookmarks" => Ok(ViewSpec::bookmarks(rest.to_vec())),
-        "workspaces" => Ok(ViewSpec::workspaces(rest.to_vec())),
-        "operation-log" => Ok(ViewSpec::new(JjCommand::OperationLog, rest.to_vec())),
-        unknown => Err(eyre!(
-            "unsupported jk command '{unknown}'. Expected one of: log, show, diff, status, resolve, bookmarks, workspaces, operation-log"
-        )),
+    }
+}
+
+impl FromStr for StartupCommand {
+    type Err = Report;
+
+    fn from_str(command: &str) -> Result<Self, Self::Err> {
+        match command {
+            "log" => Ok(Self::Log),
+            "show" => Ok(Self::Show),
+            "diff" => Ok(Self::Diff),
+            "status" => Ok(Self::Status),
+            "resolve" => Ok(Self::Resolve),
+            "bookmarks" => Ok(Self::Bookmarks),
+            "workspaces" => Ok(Self::Workspaces),
+            "operation-log" => Ok(Self::OperationLog),
+            _ => bail!(
+                "unsupported jk command '{command}'. Expected one of: \
+                 log, show, diff, status, resolve, bookmarks, workspaces, operation-log"
+            ),
+        }
     }
 }

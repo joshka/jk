@@ -3,7 +3,10 @@ use super::*;
 
 #[test]
 fn bookmark_list_spec_uses_bookmark_labels() {
-    let spec = ViewSpec::bookmarks(vec!["--revision".to_owned(), "main".to_owned()]);
+    let spec = ViewSpec::new(
+        JjCommand::Bookmarks,
+        vec!["--revision".to_owned(), "main".to_owned()],
+    );
 
     assert_eq!(spec.command(), JjCommand::Bookmarks);
     assert_eq!(spec.args(), ["--revision", "main"]);
@@ -13,7 +16,7 @@ fn bookmark_list_spec_uses_bookmark_labels() {
 
 #[test]
 fn workspace_spec_uses_workspace_labels() {
-    let spec = ViewSpec::workspaces(Vec::new());
+    let spec = ViewSpec::new(JjCommand::Workspaces, Vec::new());
 
     assert_eq!(spec.command(), JjCommand::Workspaces);
     assert!(spec.args().is_empty());
@@ -59,7 +62,7 @@ fn file_show_context_revset_defaults_to_current_revision() {
 
 #[test]
 fn resolve_spec_defaults_to_current_revision() {
-    let spec = ViewSpec::resolve(None);
+    let spec = ViewSpec::resolve_current();
 
     assert_eq!(spec.command(), JjCommand::Resolve);
     assert_eq!(spec.args(), ["-r", "@"]);
@@ -71,7 +74,7 @@ fn resolve_spec_defaults_to_current_revision() {
 
 #[test]
 fn resolve_spec_records_direct_revset_without_exact_target() {
-    let spec = ViewSpec::resolve(Some("main".to_owned()));
+    let spec = ViewSpec::resolve_revset("main".to_owned());
 
     assert_eq!(spec.command(), JjCommand::Resolve);
     assert_eq!(spec.args(), ["-r", "main"]);

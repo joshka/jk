@@ -84,7 +84,7 @@ impl App {
             return Ok(());
         }
 
-        self.push_view(ViewSpec::resolve(None))
+        self.push_view(ViewSpec::resolve_current())
     }
 
     /// Push the shipped operation-log surface unless it is already active.
@@ -111,7 +111,7 @@ impl App {
             return Ok(());
         }
 
-        self.push_view(ViewSpec::workspaces(Vec::new()))
+        self.push_view(ViewSpec::new(JjCommand::Workspaces, Vec::new()))
     }
 
     /// Push a newly loaded view and keep the previous view on the app-owned
@@ -144,9 +144,7 @@ impl App {
     /// Replace the current stack with the default view.
     pub fn switch_to_default(&mut self) -> Result<()> {
         self.stack.clear();
-        self.view = self
-            .services
-            .load_view(ViewSpec::new(JjCommand::Default, Vec::new()))?;
+        self.view = self.services.load_view(ViewSpec::home())?;
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }
