@@ -784,6 +784,7 @@ dependencies = [
  "color-eyre",
  "crossterm",
  "insta",
+ "itertools",
  "ratatui",
  "ratatui-macros",
  "serde_json",

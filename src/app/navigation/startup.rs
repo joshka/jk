@@ -2,6 +2,7 @@ use std::ffi::OsString;
 
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
+use itertools::Itertools;
 use ratatui::layout::Rect;
 
 use super::super::App;
@@ -47,15 +48,13 @@ impl App {
 /// Startup accepts only top-level shipped views here. Deeper drill-down views
 /// are reached from in-app navigation once the first surface is loaded.
 pub fn initial_view(args: Vec<OsString>) -> Result<ViewSpec> {
-    let args = args
+    let args_utf8: Vec<String> = args
         .into_iter()
-        .map(|arg| {
-            arg.into_string()
-                .map_err(|arg| eyre!("argument is not valid UTF-8: {arg:?}"))
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .map(OsString::into_string)
+        .try_collect()
+        .map_err(|arg| eyre!("startup argument is not valid UTF-8: {arg:?}"))?;
 
-    let Some((command, rest)) = args.split_first() else {
+    let Some((command, rest)) = args_utf8.split_first() else {
         return Ok(ViewSpec::new(JjCommand::Default, Vec::new()));
     };
 
