@@ -91,13 +91,13 @@ fn action_pane_scroll_keys_clamp_to_visible_body() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Char('j'), 4)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Char('j'), 4)
         .unwrap();
-    app.handle_mode_key(crossterm::event::KeyCode::PageDown, 4)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::PageDown, 4)
         .unwrap();
-    app.handle_mode_key(crossterm::event::KeyCode::PageDown, 4)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::PageDown, 4)
         .unwrap();
-    app.handle_mode_key(crossterm::event::KeyCode::PageDown, 4)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::PageDown, 4)
         .unwrap();
 
     let output = match &app.mode {
@@ -109,11 +109,11 @@ fn action_pane_scroll_keys_clamp_to_visible_body() {
         output.max_scroll(action_pane_visible_lines(4))
     );
 
-    app.handle_mode_key(crossterm::event::KeyCode::PageUp, 4)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::PageUp, 4)
         .unwrap();
-    app.handle_mode_key(crossterm::event::KeyCode::Char('k'), 4)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Char('k'), 4)
         .unwrap();
-    app.handle_mode_key(crossterm::event::KeyCode::Char('g'), 4)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Char('g'), 4)
         .unwrap();
 
     let output = match &app.mode {
@@ -149,7 +149,7 @@ fn closing_action_pane_preserves_log_selection() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Esc, 12)
         .unwrap();
 
     let ViewState::Log(graph) = &app.view else {
@@ -165,14 +165,22 @@ fn bookmark_create_prompt_uses_exact_log_target() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('c'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "feature/name".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (mutation, output) = match &app.mode {
         InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
@@ -200,12 +208,17 @@ fn bookmark_set_prompt_uses_status_current_working_copy_target() {
         "M src/app.rs",
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('='), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('='), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "feature/name".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (mutation, output) = match &app.mode {
         InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
@@ -230,12 +243,17 @@ fn bookmark_move_prompt_uses_exact_pattern_preview() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('m'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('m'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "feature/name".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -259,18 +277,30 @@ fn bookmark_prompt_cancel_and_empty_input_do_not_open_preview() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('c'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('x'), 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "bookmark create cancelled");
 
-    app.handle_normal_key(key(KeyCode::Char('='), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('='), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
@@ -284,10 +314,16 @@ fn bookmark_mutation_rejects_unsupported_and_inexact_contexts() {
         crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('c'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
@@ -297,8 +333,11 @@ fn bookmark_mutation_rejects_unsupported_and_inexact_contexts() {
     let mut app = test_app(ViewState::OperationLog(
         crate::operation_log::OperationLogView::test_new(Vec::new()),
     ));
-    app.handle_normal_key(key(KeyCode::Char('m'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('m'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert_eq!(
         app.status.message(),
         "bookmark move is only available from log or status views"
@@ -316,8 +355,11 @@ fn bookmark_delete_preview_uses_selected_exact_local_bookmark() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('x'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let (mutation, output) = match &app.mode {
         InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
@@ -342,8 +384,11 @@ fn bookmark_delete_rejects_nonlocal_bookmark_rows() {
         crate::bookmarks::BookmarksView::test_new(vec![remote]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('x'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -358,10 +403,16 @@ fn bookmark_forget_preview_uses_metadata_gated_selected_bookmark() {
         crate::bookmarks::BookmarksView::test_new(vec![tracked_local_bookmark("feature/name")]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let (mutation, output) = match &app.mode {
         InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
@@ -394,10 +445,16 @@ fn bookmark_forget_preview_uses_include_remotes_for_single_remote_only_row() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -422,10 +479,16 @@ fn bookmark_forget_rejects_remote_only_row_from_filtered_metadata() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -440,20 +503,34 @@ fn bookmark_forget_cancel_confirm_success_and_failure_are_inspectable() {
         crate::bookmarks::BookmarksView::test_new(vec![tracked_local_bookmark("feature/name")]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "bookmark forget cancelled");
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -479,11 +556,18 @@ fn bookmark_forget_cancel_confirm_success_and_failure_are_inspectable() {
     ));
     app.services.bookmark_mutation_run = mock_bookmark_mutation_failure;
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -514,10 +598,16 @@ fn bookmark_forget_reports_disabled_rows_without_preview() {
         ),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -532,10 +622,16 @@ fn bookmark_forget_reports_disabled_rows_without_preview() {
         ]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -553,10 +649,16 @@ fn bookmark_track_preview_uses_exact_selected_remote_bookmark() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('t'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('t'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let (mutation, output) = match &app.mode {
         InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
@@ -593,10 +695,16 @@ fn bookmark_untrack_preview_uses_exact_selected_remote_bookmark() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('u'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let (mutation, output) = match &app.mode {
         InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
@@ -633,10 +741,16 @@ fn bookmark_track_and_untrack_report_disabled_rows_without_preview() {
         ),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('t'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('t'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -651,10 +765,16 @@ fn bookmark_track_and_untrack_report_disabled_rows_without_preview() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('u'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -672,20 +792,34 @@ fn bookmark_track_confirm_success_failure_and_cancel_are_inspectable() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('t'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('t'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "bookmark track cancelled");
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('t'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('t'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -710,11 +844,18 @@ fn bookmark_track_confirm_success_failure_and_cancel_are_inspectable() {
     ));
     app.services.bookmark_mutation_run = mock_bookmark_mutation_failure;
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('t'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('t'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -733,8 +874,11 @@ fn bookmark_delete_rename_and_forget_use_distinct_actions() {
         crate::bookmarks::BookmarksView::test_new(vec![tracked_local_bookmark("feature/name")]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('x'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(matches!(
         app.mode,
         InteractionMode::BookmarkMutationPreview { ref mutation, .. }
@@ -742,20 +886,32 @@ fn bookmark_delete_rename_and_forget_use_distinct_actions() {
     ));
 
     app.mode = InteractionMode::Normal;
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(matches!(
         app.mode,
         InteractionMode::BookmarkRenamePrompt { .. }
     ));
 
     app.mode = InteractionMode::Normal;
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(matches!(
         app.mode,
         InteractionMode::BookmarkMutationPreview { ref mutation, .. }
@@ -774,10 +930,16 @@ fn bookmark_rename_prompt_uses_selected_exact_local_bookmark() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(matches!(
         app.mode,
         InteractionMode::BookmarkRenamePrompt { ref old_name, .. }
@@ -785,9 +947,11 @@ fn bookmark_rename_prompt_uses_selected_exact_local_bookmark() {
     ));
 
     for character in "feature/renamed".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (mutation, output) = match &app.mode {
         InteractionMode::BookmarkMutationPreview { mutation, output } => (mutation, output),
@@ -822,14 +986,22 @@ fn bookmark_rename_prompt_rejects_whitespace_wrapped_input_before_preview() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in " feature/renamed ".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -852,20 +1024,34 @@ fn bookmark_rename_prompt_cancel_and_invalid_inputs_do_not_open_preview() {
     };
 
     let mut app = test_app(view());
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "bookmark rename cancelled");
 
     let mut app = test_app(view());
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
@@ -873,14 +1059,22 @@ fn bookmark_rename_prompt_cancel_and_invalid_inputs_do_not_open_preview() {
     );
 
     let mut app = test_app(view());
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "feature/name".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
@@ -888,14 +1082,22 @@ fn bookmark_rename_prompt_cancel_and_invalid_inputs_do_not_open_preview() {
     );
 
     let mut app = test_app(view());
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "bad name".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
@@ -915,10 +1117,16 @@ fn bookmark_rename_rejects_nonlocal_bookmark_rows() {
         crate::bookmarks::BookmarksView::test_new(vec![remote]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -937,10 +1145,16 @@ fn bookmark_rename_rejects_nonlocal_bookmark_rows() {
         crate::bookmarks::BookmarksView::test_new(vec![unknown]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -968,7 +1182,8 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -1008,7 +1223,8 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -1044,7 +1260,8 @@ fn bookmark_rename_confirm_success_failure_and_cancel_are_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "bookmark rename cancelled");
@@ -1070,7 +1287,8 @@ fn bookmark_rename_confirm_duplicate_name_failure_preserves_error_output() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -1093,8 +1311,11 @@ fn file_list_x_is_not_bookmark_delete() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('x'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('x'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "1 files");
@@ -1118,7 +1339,8 @@ fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -1157,7 +1379,8 @@ fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::BookmarkMutationPreview { output, .. } => output,
@@ -1191,7 +1414,8 @@ fn bookmark_mutation_confirm_success_failure_and_cancel_are_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "bookmark move cancelled");

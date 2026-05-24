@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use color_eyre::Result;
 use crossterm::event;
-use ratatui::layout::{Rect, Size};
+use ratatui::layout::Rect;
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::actions::JjSplitPlan;
@@ -126,7 +126,7 @@ impl App {
             if event::poll(Duration::from_millis(200))? {
                 self.handle_event(event::read()?)?;
             } else {
-                self.flush_expired_pending_command(completed_viewport.height)?;
+                self.flush_expired_pending_command()?;
             }
             self.run_pending_interactive_action(Some(terminal))?;
         }
@@ -152,9 +152,7 @@ impl App {
                 self.handle_resize(width, height);
                 Ok(())
             }
-            event::Event::Key(key) if key.is_press() => {
-                self.handle_key_press(key, self.viewport.height)
-            }
+            event::Event::Key(key) if key.is_press() => self.handle_key_press(key),
             _ => Ok(()),
         }
     }
@@ -162,7 +160,7 @@ impl App {
     /// Clamp the active view to the new terminal size and refresh ready status text.
     fn handle_resize(&mut self, width: u16, height: u16) {
         self.viewport = viewport_from_terminal_size(width, height);
-        self.view.clamp(viewport_size(self.viewport));
+        self.view.clamp(self.viewport.into());
         if self.status.is_ready() {
             self.status = StatusLine::ready(&self.view);
         }
@@ -190,7 +188,7 @@ impl App {
         self.view.execute(
             command,
             CommandContext {
-                size: viewport_size(self.viewport),
+                size: self.viewport.into(),
                 search: self.search.as_ref(),
             },
         )
@@ -209,7 +207,7 @@ fn viewport_from_completed_frame(area: Rect) -> Rect {
 /// width together keeps the clamp inputs consistent with each other.
 fn clamp_view_to_current_viewport(view: &mut ViewState) {
     let viewport = current_viewport_rect();
-    view.clamp(viewport_size(viewport));
+    view.clamp(viewport.into());
 }
 
 /// Read the current main viewport area from one terminal-size snapshot.
@@ -231,13 +229,5 @@ fn viewport_from_terminal_size(width: u16, height: u16) -> Rect {
         y: 0,
         height: height.saturating_sub(2),
         width,
-    }
-}
-
-/// Convert one viewport area into the dimensions view dispatch and clamping need.
-fn viewport_size(viewport: Rect) -> Size {
-    Size {
-        height: viewport.height,
-        width: viewport.width,
     }
 }

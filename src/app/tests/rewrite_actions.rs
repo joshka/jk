@@ -17,7 +17,7 @@ fn rebase_preview_entering_cancel_restores_normal_mode() {
     };
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Esc, 12)
             .is_ok()
     );
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -40,7 +40,7 @@ fn rebase_preview_completion_stays_until_closed() {
     app.status = StatusLine::with_message(&app.view, "rebased");
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
             .is_ok()
     );
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -65,7 +65,7 @@ fn rebase_confirm_success_with_reveal_failure_stays_completed() {
     };
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
             .is_ok()
     );
 
@@ -98,7 +98,7 @@ fn rebase_confirm_success_with_reveal_failure_stays_completed() {
     );
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
             .is_ok()
     );
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -125,7 +125,7 @@ fn rebase_confirm_success_keeps_review_and_undo_paths_visible() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -156,7 +156,7 @@ fn rebase_failure_keeps_full_error_output_readable() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -193,7 +193,7 @@ fn rebase_role_prompt_enters_preview_with_explicit_plan() {
         selected: 0,
     };
 
-    let result = app.handle_mode_key(crossterm::event::KeyCode::Enter, 12);
+    let result = app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12);
     assert!(result.is_ok());
     let (command_label, status_context, preview_output) = match app.mode {
         InteractionMode::RebasePreview { ref output, .. } => (
@@ -244,7 +244,7 @@ fn squash_role_prompt_enters_preview_with_explicit_plan() {
         selected: 0,
     };
 
-    let result = app.handle_mode_key(crossterm::event::KeyCode::Enter, 12);
+    let result = app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12);
     assert!(result.is_ok());
     let (command_label, status_context, preview_output) = match app.mode {
         InteractionMode::SquashPreview { ref output, .. } => (
@@ -285,7 +285,7 @@ fn squash_preview_cancel_restores_normal_mode() {
     };
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Esc, 12)
             .is_ok()
     );
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -307,7 +307,7 @@ fn squash_confirm_success_refreshes_and_reveals_destination() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -342,7 +342,7 @@ fn squash_confirm_refresh_failure_keeps_undo_visible() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -371,7 +371,7 @@ fn squash_failure_keeps_full_error_output_readable() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -407,7 +407,7 @@ fn absorb_action_menu_enter_opens_preview_with_current_source_and_candidates() {
         selected: 3,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let (source, destinations, command_label, body) = match &app.mode {
@@ -446,7 +446,7 @@ fn absorb_preview_cancel_restores_normal_mode() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Esc, 12)
         .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -467,7 +467,7 @@ fn absorb_confirm_success_keeps_undo_and_operation_review_visible() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -495,7 +495,7 @@ fn absorb_failure_keeps_full_error_output_readable() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {

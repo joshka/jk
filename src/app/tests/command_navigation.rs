@@ -106,32 +106,44 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('S'), KeyModifiers::SHIFT), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('S'), KeyModifiers::SHIFT),
+        12,
+    )
+    .unwrap();
     assert_eq!(app.view.command(), JjCommand::Status);
     assert!(app.pending_command.is_none());
 
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('B'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('B'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert_eq!(app.view.command(), JjCommand::Bookmarks);
     assert!(app.pending_command.is_none());
 
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('X'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('X'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert_eq!(app.view.command(), JjCommand::Workspaces);
     assert!(app.pending_command.is_none());
 
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('O'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('O'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert_eq!(app.view.command(), JjCommand::OperationLog);
     assert!(app.pending_command.is_none());
 }
@@ -145,8 +157,11 @@ fn direct_log_key_reuses_startup_args_and_clears_stack() {
         crate::bookmarks::BookmarksView::test_new(vec![]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('L'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('L'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Log);
     assert_eq!(app.view.spec().args(), ["-r", "mine()"]);
@@ -163,8 +178,11 @@ fn direct_default_key_loads_default_view_and_clears_stack() {
         crate::bookmarks::BookmarksView::test_new(vec![]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('J'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('J'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Default);
     assert!(app.view.spec().args().is_empty());
@@ -218,11 +236,15 @@ fn help_menu_executes_listed_command_and_closes() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(matches!(app.mode, InteractionMode::Help));
 
-    app.handle_mode_key(KeyCode::Char('S'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('S'), 12)
+        .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Status);
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -234,9 +256,13 @@ fn help_menu_close_key_closes_without_executing() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Default);
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -248,9 +274,12 @@ fn help_menu_close_key_accepts_shifted_question_mark() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_mode_key_event(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::SHIFT), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_event(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::SHIFT))
         .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Default);
@@ -265,12 +294,17 @@ fn help_menu_ignores_arrow_keys_without_moving_log_selection() {
         log_item("second"),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::SHIFT), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::SHIFT),
+        12,
+    )
+    .unwrap();
     assert!(matches!(app.mode, InteractionMode::Help));
 
-    app.handle_mode_key(KeyCode::Down, 12).unwrap();
-    app.handle_mode_key(KeyCode::Up, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Down, 12)
+        .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Up, 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Help));
     assert_eq!(app.graph_selected_revision().as_deref(), Some("first"));
@@ -283,9 +317,13 @@ fn help_menu_does_not_execute_hidden_commands() {
         crate::show::ShowView::test_new(ViewSpec::show("change-a".to_owned(), DiffFormat::Default));
     let mut app = test_app(ViewState::Show(show));
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('D'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('D'), 12).unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Help));
     assert_eq!(app.view.command(), JjCommand::Show);
@@ -297,15 +335,20 @@ fn help_menu_supports_multikey_options_and_fallbacks() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.git_fetch_run = mock_fetch_success;
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('g'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('g'), 12).unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Help));
     assert!(app.pending_command.is_some());
     assert_eq!(app.status.message(), "help: g -> f/p/r");
 
-    app.handle_mode_key(KeyCode::Char('f'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('f'), 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::FetchPreview { .. }));
     assert!(app.pending_command.is_none());
@@ -318,12 +361,17 @@ fn expired_help_prefix_runs_fallback_before_routing_next_key_to_opened_mode() {
         log_item("change-a"),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('b'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('b'), 12).unwrap();
     app.pending_command.as_mut().unwrap().deadline = Instant::now() - Duration::from_millis(1);
 
-    app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('x'), 12)
+        .unwrap();
 
     assert!(app.pending_command.is_none());
     let InteractionMode::BookmarkNamePrompt { input, .. } = &app.mode else {
@@ -339,10 +387,15 @@ fn help_prefix_nonmatching_suffix_runs_fallback_then_routes_suffix() {
         log_item("second"),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('?'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('?'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('g'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('g'), 12).unwrap();
-    app.handle_mode_key(KeyCode::Char('j'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('j'), 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert!(app.pending_command.is_none());
@@ -381,27 +434,42 @@ fn view_menu_selects_shipped_top_level_views() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('v'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for _ in 0..3 {
-        app.handle_mode_key(KeyCode::Down, 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Down, 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Bookmarks);
     assert!(matches!(app.mode, InteractionMode::Normal));
 
-    app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('v'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Down, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Down, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Workspaces);
 
-    app.handle_normal_key(key(KeyCode::Char('v'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('v'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Down, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Down, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::OperationLog);
 }
@@ -422,13 +490,19 @@ fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(app.pending_command.is_some());
     assert_eq!(app.status.message(), "prefix: b -> c/r/f/t/u");
 
-    app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('c'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     match &app.mode {
         InteractionMode::BookmarkNamePrompt { input, .. } => assert_eq!(input, ""),
         _ => panic!("expected bookmark name prompt"),
@@ -440,13 +514,19 @@ fn multi_key_bookmark_create_dispatches_without_typing_prefix_suffix() {
 fn multi_key_fetch_dispatches_from_git_prefix() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
-    app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('g'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert!(app.pending_command.is_some());
     assert_eq!(app.status.message(), "prefix: g -> f/p/r");
 
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert_eq!(app.status.message(), "fetch: fetched");
     assert!(app.pending_command.is_none());
@@ -472,8 +552,11 @@ fn git_fetch_prefix_does_not_delay_non_log_g_navigation() {
         "M src/app.rs",
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('g'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(app.pending_command.is_none());
     assert_eq!(app.status.message(), "1/2 lines");
@@ -485,11 +568,17 @@ fn expired_bookmark_prefix_runs_fallback_before_next_key() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     app.pending_command.as_mut().unwrap().deadline = Instant::now() - Duration::from_millis(1);
-    app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('c'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     match &app.mode {
         InteractionMode::BookmarkNamePrompt { input, .. } => assert_eq!(input, "c"),
@@ -516,10 +605,14 @@ fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
     );
     let mut app = test_app(ViewState::Log(graph));
 
-    app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('g'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     app.pending_command.as_mut().unwrap().deadline = Instant::now() - Duration::from_millis(1);
-    app.flush_expired_pending_command(12).unwrap();
+    app.flush_expired_pending_command_at_viewport_height(12)
+        .unwrap();
 
     let ViewState::Log(graph) = &app.view else {
         panic!("expected log view");
@@ -533,9 +626,12 @@ fn idle_command_prefix_timeout_runs_exact_fallback_and_refreshes_status() {
 fn command_prefix_cancel_does_not_run_global_escape() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
-    app.handle_normal_key(key(KeyCode::Char('b'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Esc, KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('b'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(key(KeyCode::Esc, KeyModifiers::NONE), 12)
         .unwrap();
 
     assert!(!app.should_quit);
@@ -551,12 +647,18 @@ fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
     ])));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('l'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('l'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert_eq!(app.view.command(), JjCommand::Show);
 
-    app.handle_normal_key(key(KeyCode::Char('h'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('h'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     assert_eq!(app.view.command(), JjCommand::Default);
 
     let mut app = test_app(ViewState::Bookmarks(
@@ -569,11 +671,11 @@ fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
     ));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Right, KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(key(KeyCode::Right, KeyModifiers::NONE), 12)
         .unwrap();
     assert_eq!(app.view.command(), JjCommand::Show);
 
-    app.handle_normal_key(key(KeyCode::Left, KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(key(KeyCode::Left, KeyModifiers::NONE), 12)
         .unwrap();
     assert_eq!(app.view.command(), JjCommand::Bookmarks);
 }
@@ -591,8 +693,11 @@ fn operation_log_l_opens_operation_detail() {
     ));
     app.services.load_view = mock_load_view;
 
-    app.handle_normal_key(key(KeyCode::Char('l'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('l'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::OperationShow);
 }

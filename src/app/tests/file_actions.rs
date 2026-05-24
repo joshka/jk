@@ -9,10 +9,16 @@ fn status_untracked_path_opens_track_preview() {
         "? scratch file.txt",
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('j'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('j'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let menu = match &app.mode {
         InteractionMode::ActionMenu { menu, .. } => menu,
@@ -21,7 +27,8 @@ fn status_untracked_path_opens_track_preview() {
     assert_eq!(menu.items().len(), 1);
     assert_eq!(menu.items()[0].action(), ActionKind::FileTrack);
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (command_label, body, path) = match &app.mode {
         InteractionMode::FileMutationPreview { mutation, output } => (
@@ -48,10 +55,16 @@ fn status_tracked_path_opens_untrack_and_chmod_previews() {
         "M src/main.rs",
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('j'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('j'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let actions = match &app.mode {
         InteractionMode::ActionMenu { menu, .. } => menu
@@ -71,7 +84,8 @@ fn status_tracked_path_opens_untrack_and_chmod_previews() {
         ]
     );
 
-    app.handle_mode_key(KeyCode::Char('u'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('u'), 12)
+        .unwrap();
 
     let (command_label, body) = match &app.mode {
         InteractionMode::FileMutationPreview { output, .. } => (
@@ -86,7 +100,8 @@ fn status_tracked_path_opens_untrack_and_chmod_previews() {
     );
     assert!(body.contains("jj requires the path to already be ignored"));
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
     assert_eq!(app.status.message(), "file untrack cancelled");
 }
 
@@ -102,8 +117,11 @@ fn file_list_working_copy_offers_untrack_and_chmod() {
         ),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let actions = match &app.mode {
         InteractionMode::ActionMenu { menu, .. } => menu
@@ -135,9 +153,13 @@ fn exact_file_list_chmod_passes_exact_revision() {
         ),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('x'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
 
     let command_label = match &app.mode {
         InteractionMode::FileMutationPreview { output, .. } => output.command_label().to_owned(),
@@ -162,7 +184,10 @@ fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
     ));
 
     direct
-        .handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+        .handle_normal_key_at_viewport_height_for_test(
+            key(KeyCode::Char('a'), KeyModifiers::NONE),
+            12,
+        )
         .unwrap();
 
     assert!(matches!(direct.mode, InteractionMode::Normal));
@@ -178,7 +203,10 @@ fn direct_file_revset_and_resolve_file_show_disable_file_actions() {
     )));
 
     resolve
-        .handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+        .handle_normal_key_at_viewport_height_for_test(
+            key(KeyCode::Char('a'), KeyModifiers::NONE),
+            12,
+        )
         .unwrap();
 
     assert!(matches!(resolve.mode, InteractionMode::Normal));
@@ -207,7 +235,8 @@ fn file_mutation_confirm_preserves_result_output_and_refreshes() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::FileMutationPreview { output, .. } => output,
@@ -231,7 +260,8 @@ fn file_mutation_confirm_preserves_result_output_and_refreshes() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::FileMutationPreview { output, .. } => output,

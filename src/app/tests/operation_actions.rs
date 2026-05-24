@@ -14,7 +14,7 @@ fn push_remote_prompt_without_selection_stays_ready() {
     };
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
             .is_ok()
     );
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -46,8 +46,11 @@ fn operation_log_undo_key_opens_global_preview_without_selected_operation_id() {
     );
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
-    app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('u'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let output = match &app.mode {
         InteractionMode::OperationRecoveryPreview { recovery, output } => {
@@ -73,15 +76,23 @@ fn operation_recovery_preview_can_cancel_or_confirm_success() {
     ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
-    app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('u'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "undo cancelled");
 
-    app.handle_normal_key(key(KeyCode::Char('u'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('u'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
     let output = match &app.mode {
         InteractionMode::OperationRecoveryPreview { output, .. } => output,
@@ -108,9 +119,13 @@ fn operation_redo_failure_keeps_command_output_readable() {
     let mut app = test_app(ViewState::OperationLog(operation_log));
     app.services.operation_recovery_run = mock_operation_recovery_failure;
 
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::CONTROL), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::CONTROL),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
     let output = match &app.mode {
         InteractionMode::OperationRecoveryPreview { recovery, output } => {
@@ -140,8 +155,11 @@ fn operation_action_menu_requires_exact_operation_id() {
     ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -161,9 +179,13 @@ fn operation_restore_preview_can_cancel_or_confirm_success() {
     ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { target, output } => {
@@ -184,14 +206,20 @@ fn operation_restore_preview_can_cancel_or_confirm_success() {
         "confirmation: press Enter to run jj operation restore {operation_id}"
     )));
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "operation restore cancelled");
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { output, .. } => output,
@@ -224,10 +252,15 @@ fn operation_restore_confirm_refreshes_non_empty_repo_stack() {
             "Working copy changes:",
         ])));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     assert_eq!(OPERATION_RESTORE_REFRESH_CALLS.load(Ordering::SeqCst), 2);
     let output = match &app.mode {
@@ -264,11 +297,17 @@ fn operation_revert_confirm_keeps_stacked_refresh_failure_inspectable() {
             "Working copy changes:",
         ])));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Down, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Down, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     assert_eq!(OPERATION_REVERT_REFRESH_CALLS.load(Ordering::SeqCst), 2);
     let output = match &app.mode {
@@ -293,10 +332,15 @@ fn operation_revert_preview_confirm_failure_keeps_output_readable() {
     ]);
     let mut app = test_app(ViewState::OperationLog(operation_log));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Down, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Down, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { target, output } => {
@@ -315,7 +359,8 @@ fn operation_revert_preview_confirm_failure_keeps_output_readable() {
     assert!(body.contains("revert exactly the selected operation by applying its inverse"));
 
     app.services.operation_target_run = mock_operation_target_failure;
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::OperationTargetPreview { output, .. } => output,

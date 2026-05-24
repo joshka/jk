@@ -66,7 +66,10 @@ impl PlainDocument {
 
     /// Scrolls down by `amount` lines.
     pub fn scroll_down(&mut self, amount: usize) {
-        self.set_scroll_offset(self.scroll_offset.saturating_add(amount));
+        self.scroll_offset = self
+            .scroll_offset
+            .saturating_add(amount)
+            .min(self.max_scroll_offset());
     }
 
     /// Scrolls up by `amount` lines.
@@ -76,7 +79,7 @@ impl PlainDocument {
 
     /// Reapplies the current offset through clamping after document changes.
     pub fn clamp(&mut self) {
-        self.set_scroll_offset(self.scroll_offset);
+        self.scroll_offset = self.scroll_offset.min(self.max_scroll_offset());
     }
 
     /// Counts rendered matches for the current query.

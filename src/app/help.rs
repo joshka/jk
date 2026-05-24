@@ -77,8 +77,12 @@ impl App {
             .as_ref()
             .is_some_and(|pending| now >= pending.deadline)
         {
-            self.run_pending_fallback(viewport_height)?;
-            return self.handle_key_after_prefix_fallback(key, viewport_height, now);
+            self.run_pending_fallback_at_viewport_height(viewport_height)?;
+            return self.handle_key_after_prefix_fallback_at_viewport_height(
+                key,
+                viewport_height,
+                now,
+            );
         }
 
         let Some(mut pending) = self.pending_command.take() else {
@@ -121,7 +125,11 @@ impl App {
                 };
 
                 self.execute_help_binding(fallback, viewport_height)?;
-                return self.handle_key_after_prefix_fallback(key, viewport_height, now);
+                return self.handle_key_after_prefix_fallback_at_viewport_height(
+                    key,
+                    viewport_height,
+                    now,
+                );
             }
         }
 
@@ -132,6 +140,6 @@ impl App {
     pub fn execute_help_binding(&mut self, binding: Binding, viewport_height: u16) -> Result<()> {
         self.pending_command = None;
         self.mode = InteractionMode::Normal;
-        self.run_binding_with_status_refresh(binding, viewport_height)
+        self.run_binding_with_status_refresh_at_viewport_height(binding, viewport_height)
     }
 }

@@ -8,14 +8,21 @@ fn describe_prompt_types_backspaces_and_opens_preview_for_exact_log_target() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('D'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "Mesx".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Backspace, 12).unwrap();
-    app.handle_mode_key(KeyCode::Char('g'), 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Backspace, 12)
+        .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('g'), 12)
+        .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (describe, output) = match &app.mode {
         InteractionMode::DescribePreview { describe, output } => (describe, output),
@@ -42,12 +49,17 @@ fn describe_prompt_types_and_opens_preview_for_status_target() {
         "M src/app.rs",
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('D'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "Message".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (describe, output) = match &app.mode {
         InteractionMode::DescribePreview { describe, output } => (describe, output),
@@ -67,16 +79,25 @@ fn describe_prompt_cancel_and_empty_input_do_not_open_preview() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('D'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('x'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "describe cancelled");
 
-    app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('D'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
         app.status.message(),
@@ -90,8 +111,11 @@ fn describe_requires_exact_log_target_and_rejects_unsupported_context() {
         crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('D'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -108,8 +132,11 @@ fn describe_requires_exact_log_target_and_rejects_unsupported_context() {
         )]),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('D'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('D'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert_eq!(
         app.status.message(),
@@ -135,7 +162,8 @@ fn describe_confirm_success_refreshes_reveals_and_keeps_undo_visible() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::DescribePreview { output, .. } => output,
@@ -166,7 +194,8 @@ fn describe_failure_and_refresh_failure_remain_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::DescribePreview { output, .. } => output,
@@ -194,7 +223,8 @@ fn describe_failure_and_refresh_failure_remain_inspectable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::DescribePreview { output, .. } => output,
@@ -227,13 +257,19 @@ fn commit_prompt_is_honest_about_current_working_copy_target() {
     );
     let mut app = test_app(ViewState::Log(graph));
 
-    app.handle_normal_key(key(KeyCode::Char('C'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('C'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
     for character in "Commitx".chars() {
-        app.handle_mode_key(KeyCode::Char(character), 12).unwrap();
+        app.handle_mode_key_at_viewport_height(KeyCode::Char(character), 12)
+            .unwrap();
     }
-    app.handle_mode_key(KeyCode::Backspace, 12).unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Backspace, 12)
+        .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::CommitPreview { output, .. } => output,
@@ -252,16 +288,25 @@ fn commit_prompt_cancel_and_empty_input_do_not_open_preview() {
         crate::log::LogItem::new(Vec::new(), Some("change-a".to_owned()), None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('C'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('C'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('x'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('x'), 12).unwrap();
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "commit cancelled");
 
-    app.handle_normal_key(key(KeyCode::Char('C'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('C'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "commit cancelled: empty description");
 }
@@ -280,7 +325,8 @@ fn commit_confirm_success_and_failure_keep_output_readable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::CommitPreview { output, .. } => output,
@@ -309,7 +355,8 @@ fn commit_confirm_success_and_failure_keep_output_readable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::CommitPreview { output, .. } => output,
@@ -340,7 +387,8 @@ fn commit_refresh_failure_keeps_undo_and_new_working_copy_effect_visible() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::CommitPreview { output, .. } => output,

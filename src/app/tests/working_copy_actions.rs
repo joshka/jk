@@ -71,7 +71,7 @@ fn new_action_menu_enter_opens_preview_with_exact_parents() {
         selected: 0,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let (parents, command_label, body) = match &app.mode {
@@ -102,7 +102,8 @@ fn action_menu_shortcut_opens_item_without_moving_selection() {
         selected: 3,
     };
 
-    app.handle_mode_key(KeyCode::Char('n'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('n'), 12)
+        .unwrap();
 
     let parents = match &app.mode {
         InteractionMode::NewPreview { new_change, .. } => new_change.parents().to_vec(),
@@ -123,7 +124,8 @@ fn action_menu_close_key_preserves_normal_context() {
         selected: 4,
     };
 
-    app.handle_mode_key(KeyCode::Char('q'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('q'), 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.graph_selected_revision().as_deref(), Some("change-a"));
@@ -141,7 +143,8 @@ fn edit_action_menu_enter_opens_preview_with_exact_target() {
         selected: 0,
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (navigation, command_label, body) = match &app.mode {
         InteractionMode::WorkingCopyNavigationPreview { navigation, output } => (
@@ -164,8 +167,11 @@ fn edit_direct_key_requires_exact_selected_log_row() {
         crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('e'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('e'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -181,8 +187,11 @@ fn next_direct_key_opens_preview_without_selected_row_targeting() {
         crate::log::LogItem::new(Vec::new(), None, None),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char(']'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char(']'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let (navigation, command_label, body) = match &app.mode {
         InteractionMode::WorkingCopyNavigationPreview { navigation, output } => (
@@ -212,7 +221,8 @@ fn working_copy_navigation_preview_cancel_restores_normal_mode() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "edit cancelled");
@@ -233,7 +243,8 @@ fn edit_confirm_success_refreshes_and_reveals_target() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::WorkingCopyNavigationPreview { output, .. } => output,
@@ -261,7 +272,8 @@ fn split_action_menu_enter_opens_exact_target_preview() {
         selected: 2,
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (target, command_label, body) = match &app.mode {
         InteractionMode::SplitPreview { split, output } => (
@@ -297,7 +309,8 @@ fn duplicate_action_menu_enter_opens_exact_source_preview() {
         selected: 4,
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (source, command_label, body) = match &app.mode {
         InteractionMode::DuplicatePreview { duplicate, output } => (
@@ -344,7 +357,8 @@ fn duplicate_preview_cancel_preserves_log_selection() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
 
     let ViewState::Log(graph) = &app.view else {
         panic!("expected log view");
@@ -369,7 +383,8 @@ fn duplicate_confirm_success_refreshes_and_uses_recent_source_fallback() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::DuplicatePreview { output, .. } => output,
@@ -403,7 +418,8 @@ fn duplicate_confirm_success_from_exact_detail_view_refreshes_without_graph_reve
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::DuplicatePreview { output, .. } => output,
@@ -439,7 +455,8 @@ fn duplicate_failure_keeps_full_error_output_readable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::DuplicatePreview { output, .. } => output,
@@ -469,9 +486,13 @@ fn split_visible_working_copy_uses_bare_command() {
         ),
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('s'), 12)
         .unwrap();
-    app.handle_mode_key(KeyCode::Char('s'), 12).unwrap();
 
     let (target, command_label, body) = match &app.mode {
         InteractionMode::SplitPreview { split, output } => (
@@ -513,7 +534,8 @@ fn split_preview_cancel_preserves_log_selection() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
 
     let ViewState::Log(graph) = &app.view else {
         panic!("expected log view");
@@ -538,7 +560,8 @@ fn split_confirm_success_refreshes_reveals_and_keeps_recovery_visible() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::SplitPreview { output, .. } => output,
@@ -570,7 +593,8 @@ fn split_current_confirm_success_reveals_current_working_copy_when_possible() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::SplitPreview { output, .. } => output,
@@ -598,7 +622,8 @@ fn split_failure_keeps_app_owned_result_without_claiming_captured_stderr() {
         output: ActionPane::pending("jj split".to_owned(), "preview only".to_owned(), None),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::SplitPreview { output, .. } => output,
@@ -635,7 +660,8 @@ fn prev_confirm_success_resolves_current_working_copy_and_reveals_recent() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::WorkingCopyNavigationPreview { output, .. } => output,
@@ -661,7 +687,8 @@ fn working_copy_navigation_failure_keeps_output_readable() {
         output: ActionPane::pending("jj next --edit".to_owned(), "preview only".to_owned(), None),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::WorkingCopyNavigationPreview { output, .. } => output,
@@ -692,7 +719,7 @@ fn new_preview_cancel_restores_normal_mode() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Esc, 12)
         .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -714,7 +741,7 @@ fn new_confirm_success_refreshes_and_reveals_working_copy() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -738,8 +765,11 @@ fn graph_new_trunk_uses_test_service_and_reveals_working_copy() {
     app.services.resolve_revision = mock_resolve_trunk_and_current_change_id;
     app.services.reveal_log_change = mock_reveal_new_change_in_recent;
 
-    app.handle_normal_key(key(KeyCode::Char('c'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('c'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert_eq!(NEW_TRUNK_CALLS.load(Ordering::SeqCst), 1);
     assert_eq!(
@@ -763,7 +793,7 @@ fn new_failure_keeps_full_error_output_readable() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {

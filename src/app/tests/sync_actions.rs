@@ -6,8 +6,11 @@ use super::support::*;
 fn default_fetch_runs_immediately_and_keeps_result_output() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
-    app.handle_normal_key(key(KeyCode::Char('f'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('f'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(app.pending_command.is_none());
     assert_eq!(app.status.message(), "fetch: fetched");
@@ -35,10 +38,16 @@ fn default_fetch_runs_immediately_and_keeps_result_output() {
 fn graph_remote_fetch_key_opens_remote_prompt_for_multiple_remotes() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
 
-    app.handle_normal_key(key(KeyCode::Char('g'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('r'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('g'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('r'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     match &app.mode {
         InteractionMode::FetchRemotePrompt { remotes, selected } => {
@@ -54,9 +63,9 @@ fn fetch_remote_prompt_selects_remote_for_preview() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.open_fetch_remote_prompt();
 
-    app.handle_mode_key(crossterm::event::KeyCode::Down, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Down, 12)
         .unwrap();
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -158,7 +167,7 @@ fn fetch_preview_enter_runs_remote_fetch_and_keeps_result_output() {
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
     app.open_fetch_preview("origin".to_owned());
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     assert_eq!(app.status.message(), "fetch origin: fetched origin");
@@ -183,7 +192,7 @@ fn fetch_failure_keeps_error_output() {
     app.services.git_fetch_run = mock_fetch_failure;
     app.open_fetch_preview("origin".to_owned());
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     assert!(matches!(app.status.kind(), StatusKind::Error));
@@ -210,7 +219,7 @@ fn fetch_success_with_refresh_error_keeps_output() {
     app.services.refresh_view = mock_refresh_failure;
     app.open_fetch_preview("origin".to_owned());
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     assert!(matches!(app.status.kind(), StatusKind::Error));
@@ -385,7 +394,7 @@ fn push_result_keeps_context_until_closed() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -404,7 +413,7 @@ fn push_result_keeps_context_until_closed() {
             .contains("pushed: jj git push --remote origin --revision abcdef")
     );
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
     assert!(matches!(app.mode, InteractionMode::Normal));
 }
@@ -424,7 +433,7 @@ fn push_preview_entering_cancel_restores_normal_mode() {
     };
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Esc, 12)
             .is_ok()
     );
     assert!(matches!(app.mode, InteractionMode::Normal));
@@ -446,7 +455,7 @@ fn push_confirm_success_with_refresh_error_keeps_output() {
         ),
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -477,7 +486,7 @@ fn push_preview_completion_stays_until_closed() {
     app.status = StatusLine::with_message(&app.view, "pushed");
 
     assert!(
-        app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
             .is_ok()
     );
     assert!(matches!(app.mode, InteractionMode::Normal));

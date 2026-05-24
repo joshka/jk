@@ -8,8 +8,11 @@ fn detail_action_menu_from_exact_show_offers_duplicate_restore_and_revert() {
         ViewSpec::show("change-a".to_owned(), DiffFormat::Default),
     )));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let actions = match &app.mode {
         InteractionMode::ActionMenu { menu, .. } => menu
@@ -42,8 +45,11 @@ fn detail_action_menu_from_exact_file_list_offers_path_restore_first() {
         ),
     ));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let menu = match &app.mode {
         InteractionMode::ActionMenu { menu, .. } => menu,
@@ -78,8 +84,11 @@ fn open_action_menu_rejects_direct_show_startup_revset() {
         ViewSpec::new(JjCommand::Show, vec!["main".to_owned()]),
     )));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -95,8 +104,11 @@ fn open_action_menu_rejects_bookmark_derived_show() {
         ViewSpec::show("change-a".to_owned(), DiffFormat::Default).without_exact_change_target(),
     )));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -256,10 +268,16 @@ fn status_action_menu_opens_working_copy_path_restore_preview() {
         "M src/status.rs",
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('j'), KeyModifiers::NONE), 12)
-        .unwrap();
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('j'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     let menu = match &app.mode {
         InteractionMode::ActionMenu { menu, .. } => menu,
@@ -271,7 +289,8 @@ fn status_action_menu_opens_working_copy_path_restore_preview() {
         FollowUp::RestoreWorkingCopyPath { path } if path == "src/status.rs"
     ));
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (path, command_label, body) = match &app.mode {
         InteractionMode::RestorePreview { restore, output } => (
@@ -293,8 +312,11 @@ fn status_action_menu_reports_disabled_ambiguous_row() {
         "R {old.rs => new.rs}",
     ])));
 
-    app.handle_normal_key(key(KeyCode::Char('a'), KeyModifiers::NONE), 12)
-        .unwrap();
+    app.handle_normal_key_at_viewport_height_for_test(
+        key(KeyCode::Char('a'), KeyModifiers::NONE),
+        12,
+    )
+    .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(
@@ -323,7 +345,8 @@ fn restore_action_menu_enter_opens_path_preview() {
         selected: 0,
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (path, command_label, body) = match &app.mode {
         InteractionMode::RestorePreview { restore, output } => (
@@ -362,7 +385,8 @@ fn restore_action_menu_path_shortcut_opens_path_preview() {
         selected: 1,
     };
 
-    app.handle_mode_key(KeyCode::Char('p'), 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Char('p'), 12)
+        .unwrap();
 
     let path = match &app.mode {
         InteractionMode::RestorePreview { restore, .. } => restore.path().map(str::to_owned),
@@ -385,7 +409,8 @@ fn restore_preview_cancel_restores_normal_mode() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "restore cancelled");
@@ -406,7 +431,8 @@ fn restore_confirm_success_and_failure_keep_output_readable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::RestorePreview { output, .. } => output,
@@ -430,7 +456,8 @@ fn restore_confirm_success_and_failure_keep_output_readable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::RestorePreview { output, .. } => output,
@@ -458,7 +485,8 @@ fn revert_action_menu_enter_opens_preview_and_cancel_restores_normal_mode() {
         selected: 2,
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let (command_label, body) = match &app.mode {
         InteractionMode::RevertPreview { output, .. } => (
@@ -473,7 +501,8 @@ fn revert_action_menu_enter_opens_preview_and_cancel_restores_normal_mode() {
     );
     assert!(body.contains("target revision: change-a"));
 
-    app.handle_mode_key(KeyCode::Esc, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
+        .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert_eq!(app.status.message(), "revert cancelled");
@@ -493,7 +522,8 @@ fn revert_confirm_success_and_failure_keep_output_readable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::RevertPreview { output, .. } => output,
@@ -514,7 +544,8 @@ fn revert_confirm_success_and_failure_keep_output_readable() {
         ),
     };
 
-    app.handle_mode_key(KeyCode::Enter, 12).unwrap();
+    app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
+        .unwrap();
 
     let output = match &app.mode {
         InteractionMode::RevertPreview { output, .. } => output,

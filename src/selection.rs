@@ -41,7 +41,7 @@ impl Selection {
 
     /// Reapplies the current index through clamping after row counts change.
     pub fn clamp(&mut self, len: usize) {
-        self.set(self.index, len);
+        self.index = self.index.min(len.saturating_sub(1));
     }
 }
 

@@ -15,7 +15,7 @@ fn abandon_action_menu_enter_opens_preview_with_exact_target() {
         selected: 3,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let (revision, command_label, body) = match &app.mode {
@@ -54,7 +54,7 @@ fn empty_abandon_preview_enter_runs_and_keeps_undo_visible() {
         preview,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -94,7 +94,7 @@ fn empty_abandon_rechecks_before_running_and_requires_confirmation_after_drift()
         preview,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let (input, body) = match &app.mode {
@@ -111,7 +111,7 @@ fn empty_abandon_rechecks_before_running_and_requires_confirmation_after_drift()
         "change is no longer empty; type exact revision to confirm abandon"
     );
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
     assert_eq!(
         app.status.message(),
@@ -120,10 +120,10 @@ fn empty_abandon_rechecks_before_running_and_requires_confirmation_after_drift()
 
     app.services.abandon_run = mock_abandon_success;
     for character in "change-a".chars() {
-        app.handle_mode_key(crossterm::event::KeyCode::Char(character), 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Char(character), 12)
             .unwrap();
     }
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -162,7 +162,7 @@ fn empty_abandon_recheck_failure_stays_readable_without_running() {
         preview,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -199,13 +199,13 @@ fn non_empty_abandon_requires_exact_typed_revision() {
         preview,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
     assert!(matches!(app.mode, InteractionMode::AbandonConfirm { .. }));
 
-    app.handle_mode_key(crossterm::event::KeyCode::Char('x'), 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Char('x'), 12)
         .unwrap();
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
     assert_eq!(
         app.status.message(),
@@ -213,13 +213,13 @@ fn non_empty_abandon_requires_exact_typed_revision() {
     );
 
     app.services.abandon_run = mock_abandon_success;
-    app.handle_mode_key(crossterm::event::KeyCode::Backspace, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Backspace, 12)
         .unwrap();
     for character in "change-a".chars() {
-        app.handle_mode_key(crossterm::event::KeyCode::Char(character), 12)
+        app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Char(character), 12)
             .unwrap();
     }
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
@@ -259,7 +259,7 @@ fn abandon_cancel_restores_normal_mode_and_selection() {
         preview,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Esc, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Esc, 12)
         .unwrap();
 
     let ViewState::Log(graph) = &app.view else {
@@ -287,7 +287,7 @@ fn abandon_failure_keeps_full_error_output_readable() {
         preview,
     };
 
-    app.handle_mode_key(crossterm::event::KeyCode::Enter, 12)
+    app.handle_mode_key_at_viewport_height(crossterm::event::KeyCode::Enter, 12)
         .unwrap();
 
     let output = match &app.mode {
