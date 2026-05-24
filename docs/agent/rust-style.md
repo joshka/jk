@@ -23,6 +23,13 @@ Prefer code that is direct, explicit, and boring:
 Avoid clever generic layers, broad context objects, callback-heavy control flow, and wrappers that
 exist only to hide one line of code.
 
+When a method argument is usually derived directly from `self`, prefer reading that state in the
+callee instead of threading it through sibling methods. Keep explicit parameters only when the value
+genuinely varies by caller or when tests and shared flows need a distinct entry point.
+
+Prefer standard `From`/`Into` conversions over local one-line conversion helpers when the helper
+adds no policy beyond the type conversion itself.
+
 ## Module Shape
 
 Put the main concept near the top after imports and module docs. Arrange code in the order a reader

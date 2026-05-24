@@ -13,8 +13,8 @@ use crate::modes::InteractionMode;
 impl App {
     /// Build the initial app state from process arguments.
     ///
-    /// Startup chooses the first `ViewSpec`, wires the production service seam,
-    /// and records any log argv that `switch_to_log` should later restore.
+    /// Startup chooses the first `ViewSpec`, wires the production service seam, and records any log
+    /// argv that `switch_to_log` should later restore.
     pub fn load(args: Vec<OsString>) -> Result<Self> {
         let initial_spec = initial_view(args)?;
         let startup_log_args =
