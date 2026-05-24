@@ -131,13 +131,12 @@ impl App {
         }
     }
 
-    /// Replace the current stack with the startup log view.
+    /// Replace the current stack with the explicit top-level log view.
     pub fn switch_to_log(&mut self) -> Result<()> {
-        let args = self.startup_log_args.clone().unwrap_or_default();
         self.stack.clear();
         self.view = self
             .services
-            .load_view(ViewSpec::new(JjCommand::Log, args))?;
+            .load_view(ViewSpec::new(JjCommand::Log, Vec::new()))?;
         self.status = StatusLine::ready(&self.view);
         Ok(())
     }

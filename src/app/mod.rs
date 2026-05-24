@@ -69,8 +69,6 @@ pub struct App {
     stack: Vec<ViewState>,
     /// Main viewport from the last completed frame, reused for immediate dispatch.
     viewport: Rect,
-    /// Startup `jj log` argv restored by direct log switching.
-    startup_log_args: Option<Vec<String>>,
     /// Active show/diff presentation format chosen at the app level.
     diff_format: DiffFormat,
     /// Current status-line state shown in shared chrome.

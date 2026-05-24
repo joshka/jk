@@ -149,10 +149,9 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
 }
 
 #[test]
-fn direct_log_key_reuses_startup_args_and_clears_stack() {
+fn direct_log_key_loads_plain_log_and_clears_stack() {
     let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[])));
     app.services.load_view = mock_load_view;
-    app.startup_log_args = Some(vec!["-r".to_owned(), "mine()".to_owned()]);
     app.stack.push(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new(vec![]),
     ));
@@ -164,7 +163,7 @@ fn direct_log_key_reuses_startup_args_and_clears_stack() {
     .unwrap();
 
     assert_eq!(app.view.command(), JjCommand::Log);
-    assert_eq!(app.view.spec().args(), ["-r", "mine()"]);
+    assert!(app.view.spec().args().is_empty());
     assert!(app.stack.is_empty());
     assert!(app.pending_command.is_none());
 }
@@ -173,7 +172,6 @@ fn direct_log_key_reuses_startup_args_and_clears_stack() {
 fn direct_default_key_loads_default_view_and_clears_stack() {
     let mut app = test_app(ViewState::Status(crate::status::StatusView::test_new(&[])));
     app.services.load_view = mock_load_view;
-    app.startup_log_args = Some(vec!["-r".to_owned(), "mine()".to_owned()]);
     app.stack.push(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new(vec![]),
     ));

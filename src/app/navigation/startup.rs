@@ -13,12 +13,9 @@ use crate::modes::InteractionMode;
 impl App {
     /// Build the initial app state from process arguments.
     ///
-    /// Startup chooses the first `ViewSpec`, wires the production service seam, and records any log
-    /// argv that `switch_to_log` should later restore.
+    /// Startup chooses the first `ViewSpec` and wires the production service seam.
     pub fn load(args: Vec<OsString>) -> Result<Self> {
         let initial_spec = initial_view(args)?;
-        let startup_log_args =
-            (initial_spec.command() == JjCommand::Log).then(|| initial_spec.args().to_vec());
         let diff_format = initial_spec.diff_format();
         let services = AppServices::default();
         let view = services.load_view(initial_spec)?;
@@ -33,7 +30,6 @@ impl App {
                 height: u16::MAX,
                 width: u16::MAX,
             },
-            startup_log_args,
             diff_format,
             status,
             mode: InteractionMode::Normal,

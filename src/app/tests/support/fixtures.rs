@@ -16,7 +16,6 @@ pub fn test_app(view: ViewState) -> App {
             height: 12,
             width: 80,
         },
-        startup_log_args: None,
         diff_format: DiffFormat::Default,
         mode: InteractionMode::Normal,
         pending_command: None,
