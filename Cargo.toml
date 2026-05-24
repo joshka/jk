@@ -5,6 +5,7 @@ edition = "2024"
 
 [lints.clippy]
 fn_params_excessive_bools = "warn"
+redundant_pub_crate = "warn"
 
 [dependencies]
 ansi-to-tui = "8.0.1"
