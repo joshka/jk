@@ -93,6 +93,9 @@ In non-test modules, prefer direct module or crate-root imports over `super`/`su
 climbing. Reserve relative parent imports for tests and tightly local test support where the scope
 stays obvious.
 
+When documenting struct fields, prefer a blank line between one field and the next field's doc
+comment so the field list scans as separated entries instead of one dense block.
+
 ## Error Handling
 
 Use `color_eyre::Result` for app-level fallible paths, matching the existing crate style.

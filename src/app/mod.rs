@@ -65,24 +65,34 @@ pub fn run() -> Result<()> {
 pub struct App {
     /// Currently active feature view.
     view: ViewState,
+
     /// Back-stack of previously active views for app-level history navigation.
     stack: Vec<ViewState>,
+
     /// Main viewport from the last completed frame, or an unbounded fallback before first layout.
     viewport: Rect,
+
     /// Active show/diff presentation format chosen at the app level.
     diff_format: DiffFormat,
+
     /// Current status-line state shown in shared chrome.
     status: StatusLine,
+
     /// Active modal or prompt state layered over the current view.
     mode: InteractionMode,
+
     /// In-progress multi-key command prefix waiting for resolution or timeout.
     pending_command: Option<PendingCommand>,
+
     /// Interactive command waiting for a top-level terminal handoff.
     pending_interactive_action: Option<PendingInteractiveAction>,
+
     /// Active search query shared with the current view.
     search: Option<SearchQuery>,
+
     /// Exit flag set by app-level quit handling.
     should_quit: bool,
+
     /// Injected seam for jj, refresh, and alternate-view side effects.
     services: AppServices,
 }
@@ -95,8 +105,10 @@ pub struct App {
 struct PendingCommand {
     /// Keys already typed for the prefix currently being resolved.
     keys: Vec<crossterm::event::KeyEvent>,
+
     /// Exact binding to run if the prefix expires or no longer matches a longer sequence.
     fallback: Option<Binding>,
+
     /// Instant after which the prefix should fall back automatically.
     deadline: Instant,
 }
