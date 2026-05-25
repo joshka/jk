@@ -23,12 +23,12 @@ impl App {
         let view = services.load_view(initial_spec)?;
         let status = StatusLine::ready(&view);
         // Before the first draw, treat the main viewport as effectively unbounded.
-        let viewport = Rect::MAX;
+        let frame_area = Rect::MAX;
 
         Ok(Self {
             view,
             stack: Vec::new(),
-            viewport,
+            frame_area,
             diff_format,
             status,
             mode: InteractionMode::Normal,

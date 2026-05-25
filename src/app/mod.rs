@@ -69,8 +69,8 @@ pub struct App {
     /// Back-stack of previously active views for app-level history navigation.
     stack: Vec<ViewState>,
 
-    /// Main viewport from the last completed frame, or an unbounded fallback before first layout.
-    viewport: Rect,
+    /// Last completed full frame area, or an unbounded fallback before first layout.
+    frame_area: Rect,
 
     /// Active show/diff presentation format chosen at the app level.
     diff_format: DiffFormat,
@@ -130,8 +130,7 @@ impl App {
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.should_quit {
             let completed_frame = terminal.draw(|frame| self.render(frame))?;
-            let completed_viewport = viewport_from_completed_frame(completed_frame.area);
-            self.viewport = completed_viewport;
+            self.frame_area = completed_frame.area;
 
             if event::poll(Duration::from_millis(200))? {
                 self.handle_event(event::read()?)?;
@@ -169,8 +168,8 @@ impl App {
 
     /// Clamp the active view to the new terminal size and refresh ready status text.
     fn handle_resize(&mut self, width: u16, height: u16) {
-        self.viewport = viewport_from_terminal_size(width, height);
-        self.view.clamp(self.viewport.into());
+        self.frame_area = Rect::new(0, 0, width, height);
+        self.view.clamp(self.main_viewport().into());
         if self.status.is_ready() {
             self.status = StatusLine::ready(&self.view);
         }
@@ -198,16 +197,21 @@ impl App {
         self.view.execute(
             command,
             CommandContext {
-                size: self.viewport.into(),
+                size: self.main_viewport().into(),
                 search: self.search.as_ref(),
             },
         )
     }
-}
 
-/// Build the app's main viewport area from the last completed frame.
-fn viewport_from_completed_frame(area: Rect) -> Rect {
-    tui::areas(area).main
+    /// Return the active view's main content area from the stored frame layout.
+    fn main_viewport(&self) -> Rect {
+        tui::areas(self.frame_area).main
+    }
+
+    /// Return the active view's main content height from the stored frame layout.
+    fn main_viewport_height(&self) -> u16 {
+        self.main_viewport().height
+    }
 }
 
 /// Clamp one view to the live main viewport using a single size snapshot.
@@ -216,23 +220,13 @@ fn viewport_from_completed_frame(area: Rect) -> Rect {
 /// while an external command, reveal step, or terminal handoff was in flight. Sampling height and
 /// width together keeps the clamp inputs consistent with each other.
 fn clamp_view_to_current_viewport(view: &mut ViewState) {
-    let viewport = current_viewport_rect();
-    view.clamp(viewport.into());
+    let frame_area = current_frame_area();
+    view.clamp(tui::areas(frame_area).main.into());
 }
 
-/// Read the current main viewport area from one terminal-size snapshot.
-fn current_viewport_rect() -> Rect {
+/// Read the current full frame area from one terminal-size snapshot.
+fn current_frame_area() -> Rect {
     crossterm::terminal::size()
-        .map(|(width, height)| viewport_from_terminal_size(width, height))
+        .map(|(width, height)| Rect::new(0, 0, width, height))
         .unwrap_or(Rect::MAX)
-}
-
-/// Build the app's main viewport area from the raw terminal size.
-fn viewport_from_terminal_size(width: u16, height: u16) -> Rect {
-    Rect {
-        x: 0,
-        y: 0,
-        height: height.saturating_sub(2),
-        width,
-    }
 }

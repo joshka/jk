@@ -81,7 +81,7 @@ fn detail_action_menu_from_exact_file_list_offers_path_restore_first() {
 #[test]
 fn open_action_menu_rejects_direct_show_startup_revset() {
     let mut app = test_app(ViewState::Show(crate::show::ShowView::test_new(
-        ViewSpec::new(jj::Command::Show, vec!["main".to_owned()]),
+        ViewSpec::new(Command::Show, vec!["main".to_owned()]),
     )));
 
     app.handle_normal_key_at_viewport_height_for_test(
@@ -123,10 +123,10 @@ fn detail_navigation_marks_log_targets_exact() {
     let app = test_app(ViewState::Log(crate::log::LogView::test_new(Vec::new())));
 
     let show = app
-        .detail_spec(jj::Command::Show, "change-a".to_owned())
+        .detail_spec(Command::Show, "change-a".to_owned())
         .unwrap();
     let diff = app
-        .detail_spec(jj::Command::Diff, "change-a".to_owned())
+        .detail_spec(Command::Diff, "change-a".to_owned())
         .unwrap();
 
     assert_eq!(show.exact_change_target(), Some("change-a"));
@@ -145,10 +145,10 @@ fn detail_navigation_from_bookmarks_is_not_exact() {
     ));
 
     let show = app
-        .detail_spec(jj::Command::Show, "change-a".to_owned())
+        .detail_spec(Command::Show, "change-a".to_owned())
         .unwrap();
     let diff = app
-        .detail_spec(jj::Command::Diff, "change-a".to_owned())
+        .detail_spec(Command::Diff, "change-a".to_owned())
         .unwrap();
 
     assert_eq!(show.exact_change_target(), None);
@@ -158,11 +158,11 @@ fn detail_navigation_from_bookmarks_is_not_exact() {
 #[test]
 fn detail_navigation_preserves_inexact_direct_startup_revsets() {
     let app = test_app(ViewState::Show(crate::show::ShowView::test_new(
-        ViewSpec::new(jj::Command::Show, vec!["main".to_owned()]),
+        ViewSpec::new(Command::Show, vec!["main".to_owned()]),
     )));
 
     let diff = app
-        .detail_spec(jj::Command::Diff, "main".to_owned())
+        .detail_spec(Command::Diff, "main".to_owned())
         .unwrap();
 
     assert_eq!(diff.navigation_revset().as_deref(), Some("main"));
@@ -192,10 +192,10 @@ fn file_show_navigation_preserves_source_exactness_only() {
     ));
 
     let exact = exact_app
-        .detail_spec(jj::Command::FileShow, "src/main.rs".to_owned())
+        .detail_spec(Command::FileShow, "src/main.rs".to_owned())
         .unwrap();
     let direct = direct_app
-        .detail_spec(jj::Command::FileShow, "src/main.rs".to_owned())
+        .detail_spec(Command::FileShow, "src/main.rs".to_owned())
         .unwrap();
 
     assert_eq!(exact.exact_change_target(), Some("change-a"));
@@ -217,10 +217,10 @@ fn file_show_navigation_from_resolve_uses_resolve_revision() {
     ));
 
     let file_show = app
-        .detail_spec(jj::Command::FileShow, "src/main.rs".to_owned())
+        .detail_spec(Command::FileShow, "src/main.rs".to_owned())
         .unwrap();
 
-    assert_eq!(file_show.command(), jj::Command::FileShow);
+    assert_eq!(file_show.command(), Command::FileShow);
     assert_eq!(file_show.args(), ["-r", "main", "src/main.rs"]);
     assert_eq!(file_show.navigation_revset().as_deref(), Some("main"));
     assert_eq!(file_show.exact_change_target(), None);
@@ -240,10 +240,10 @@ fn file_show_navigation_from_default_resolve_uses_current_revision() {
     ));
 
     let file_show = app
-        .detail_spec(jj::Command::FileShow, "src/main.rs".to_owned())
+        .detail_spec(Command::FileShow, "src/main.rs".to_owned())
         .unwrap();
 
-    assert_eq!(file_show.command(), jj::Command::FileShow);
+    assert_eq!(file_show.command(), Command::FileShow);
     assert_eq!(file_show.args(), ["-r", "@", "src/main.rs"]);
     assert_eq!(file_show.navigation_revset().as_deref(), Some("@"));
     assert_eq!(file_show.exact_change_target(), None);

@@ -45,7 +45,7 @@ impl App {
     /// Route one key through modal dispatch without running any queued interactive terminal
     /// handoff.
     pub fn handle_mode_key_event_inner(&mut self, key: KeyEvent) -> Result<bool> {
-        let viewport_height = self.viewport.height;
+        let viewport_height = self.main_viewport_height();
         if matches!(self.mode, InteractionMode::Help) {
             return self.handle_help_key(key, viewport_height);
         }
@@ -60,7 +60,7 @@ impl App {
 
     /// Dispatch a key to the currently active non-preview interaction mode.
     fn handle_active_mode_key(&mut self, code: KeyCode) -> Result<bool> {
-        let viewport_height = self.viewport.height;
+        let viewport_height = self.main_viewport_height();
         match &mut self.mode {
             InteractionMode::Normal => Ok(false),
             InteractionMode::Help => unreachable!("help mode is handled before borrowing mode"),
@@ -112,7 +112,7 @@ impl App {
 
     /// Dispatch one normal-mode key using the current time for prefix resolution.
     pub fn handle_normal_key(&mut self, key: KeyEvent) -> Result<bool> {
-        self.handle_normal_key_at_viewport_height(key, self.viewport.height, Instant::now())
+        self.handle_normal_key_at_viewport_height(key, self.main_viewport_height(), Instant::now())
     }
 
     /// Dispatch one normal-mode key with an explicit prefix-resolution timestamp.
@@ -243,7 +243,7 @@ impl App {
 
     /// Run the exact binding that a prefix should fall back to when the longer match fails.
     pub fn run_pending_fallback(&mut self) -> Result<()> {
-        let viewport_height = self.viewport.height;
+        let viewport_height = self.main_viewport_height();
         let fallback = self
             .pending_command
             .take()

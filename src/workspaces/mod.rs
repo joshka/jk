@@ -14,6 +14,8 @@ pub use rows::WORKSPACE_METADATA_TEMPLATE;
 pub use rows::{WorkspaceContext, WorkspaceItem, load_workspace_context};
 
 use crate::command::{Binding, Command, KeyPattern, ViewCommand};
+#[cfg(test)]
+use crate::jj::Command as JjCommand;
 use crate::jj::ViewSpec;
 use crate::selection::Selection;
 
@@ -71,7 +73,7 @@ impl WorkspacesView {
     #[cfg(test)]
     pub fn test_new(context: WorkspaceContext) -> Self {
         Self {
-            spec: ViewSpec::new(jj::Command::Workspaces, Vec::new()),
+            spec: ViewSpec::new(JjCommand::Workspaces, Vec::new()),
             context,
             selection: Selection::default(),
         }

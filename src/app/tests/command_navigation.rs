@@ -6,7 +6,7 @@ use super::support::*;
 fn parses_default_startup_view() {
     let spec = initial_view(Vec::new()).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Default);
+    assert_eq!(spec.command(), Command::Default);
     assert!(spec.args().is_empty());
 }
 
@@ -14,7 +14,7 @@ fn parses_default_startup_view() {
 fn parses_passthrough_startup_view() {
     let spec = initial_view(vec!["log".into(), "-r".into(), "::".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Log);
+    assert_eq!(spec.command(), Command::Log);
     assert_eq!(spec.args(), ["-r", "::"]);
 }
 
@@ -22,7 +22,7 @@ fn parses_passthrough_startup_view() {
 fn parses_show_startup_view() {
     let spec = initial_view(vec!["show".into(), "--git".into(), "main".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Show);
+    assert_eq!(spec.command(), Command::Show);
     assert_eq!(spec.args(), ["--git", "main"]);
     assert_eq!(spec.diff_format(), DiffFormat::Git);
 }
@@ -31,7 +31,7 @@ fn parses_show_startup_view() {
 fn parses_diff_startup_view() {
     let spec = initial_view(vec!["diff".into(), "-r".into(), "main".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Diff);
+    assert_eq!(spec.command(), Command::Diff);
     assert_eq!(spec.args(), ["-r", "main"]);
 }
 
@@ -39,7 +39,7 @@ fn parses_diff_startup_view() {
 fn parses_status_startup_view() {
     let spec = initial_view(vec!["status".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Status);
+    assert_eq!(spec.command(), Command::Status);
     assert!(spec.args().is_empty());
 }
 
@@ -47,7 +47,7 @@ fn parses_status_startup_view() {
 fn parses_resolve_startup_view() {
     let spec = initial_view(vec!["resolve".into(), "-r".into(), "main".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Resolve);
+    assert_eq!(spec.command(), Command::Resolve);
     assert_eq!(spec.args(), ["-r", "main"]);
     assert_eq!(spec.navigation_revset().as_deref(), Some("main"));
 }
@@ -56,7 +56,7 @@ fn parses_resolve_startup_view() {
 fn parses_default_resolve_startup_view() {
     let spec = initial_view(vec!["resolve".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Resolve);
+    assert_eq!(spec.command(), Command::Resolve);
     assert_eq!(spec.args(), ["-r", "@"]);
     assert_eq!(spec.navigation_revset().as_deref(), Some("@"));
 }
@@ -67,7 +67,7 @@ fn open_resolve_uses_default_target() {
 
     app.open_resolve().unwrap();
 
-    assert_eq!(app.view.spec().command(), jj::Command::Resolve);
+    assert_eq!(app.view.spec().command(), Command::Resolve);
     assert_eq!(app.view.spec().args(), ["-r", "@"]);
     assert_eq!(app.view.spec().navigation_revset().as_deref(), Some("@"));
 }
@@ -76,7 +76,7 @@ fn open_resolve_uses_default_target() {
 fn parses_operation_log_startup_view() {
     let spec = initial_view(vec!["operation-log".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::OperationLog);
+    assert_eq!(spec.command(), Command::OperationLog);
     assert!(spec.args().is_empty());
 }
 
@@ -84,7 +84,7 @@ fn parses_operation_log_startup_view() {
 fn parses_bookmarks_startup_view() {
     let spec = initial_view(vec!["bookmarks".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Bookmarks);
+    assert_eq!(spec.command(), Command::Bookmarks);
     assert!(spec.args().is_empty());
 }
 
@@ -92,7 +92,7 @@ fn parses_bookmarks_startup_view() {
 fn parses_workspaces_startup_view() {
     let spec = initial_view(vec!["workspaces".into()]).unwrap();
 
-    assert_eq!(spec.command(), jj::Command::Workspaces);
+    assert_eq!(spec.command(), Command::Workspaces);
     assert!(spec.args().is_empty());
 }
 
@@ -111,7 +111,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
         12,
     )
     .unwrap();
-    assert_eq!(app.view.command(), jj::Command::Status);
+    assert_eq!(app.view.command(), Command::Status);
     assert!(app.pending_command.is_none());
 
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
@@ -122,7 +122,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
         12,
     )
     .unwrap();
-    assert_eq!(app.view.command(), jj::Command::Bookmarks);
+    assert_eq!(app.view.command(), Command::Bookmarks);
     assert!(app.pending_command.is_none());
 
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
@@ -133,7 +133,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
         12,
     )
     .unwrap();
-    assert_eq!(app.view.command(), jj::Command::Workspaces);
+    assert_eq!(app.view.command(), Command::Workspaces);
     assert!(app.pending_command.is_none());
 
     let mut app = test_app(ViewState::Log(crate::log::LogView::test_new(vec![])));
@@ -144,7 +144,7 @@ fn direct_view_entry_keys_open_shipped_top_level_views() {
         12,
     )
     .unwrap();
-    assert_eq!(app.view.command(), jj::Command::OperationLog);
+    assert_eq!(app.view.command(), Command::OperationLog);
     assert!(app.pending_command.is_none());
 }
 
@@ -162,7 +162,7 @@ fn direct_log_key_loads_plain_log_and_clears_stack() {
     )
     .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::Log);
+    assert_eq!(app.view.command(), Command::Log);
     assert!(app.view.spec().args().is_empty());
     assert!(app.stack.is_empty());
     assert!(app.pending_command.is_none());
@@ -182,7 +182,7 @@ fn direct_default_key_loads_default_view_and_clears_stack() {
     )
     .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::Default);
+    assert_eq!(app.view.command(), Command::Default);
     assert!(app.view.spec().args().is_empty());
     assert!(app.stack.is_empty());
     assert!(app.pending_command.is_none());
@@ -244,7 +244,7 @@ fn help_menu_executes_listed_command_and_closes() {
     app.handle_mode_key_at_viewport_height(KeyCode::Char('S'), 12)
         .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::Status);
+    assert_eq!(app.view.command(), Command::Status);
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert!(app.pending_command.is_none());
 }
@@ -262,7 +262,7 @@ fn help_menu_close_key_closes_without_executing() {
     app.handle_mode_key_at_viewport_height(KeyCode::Esc, 12)
         .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::Default);
+    assert_eq!(app.view.command(), Command::Default);
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert!(app.pending_command.is_none());
 }
@@ -280,7 +280,7 @@ fn help_menu_close_key_accepts_shifted_question_mark() {
     app.handle_mode_key_event(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::SHIFT))
         .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::Default);
+    assert_eq!(app.view.command(), Command::Default);
     assert!(matches!(app.mode, InteractionMode::Normal));
     assert!(app.pending_command.is_none());
 }
@@ -324,7 +324,7 @@ fn help_menu_does_not_execute_hidden_commands() {
         .unwrap();
 
     assert!(matches!(app.mode, InteractionMode::Help));
-    assert_eq!(app.view.command(), jj::Command::Show);
+    assert_eq!(app.view.command(), Command::Show);
     assert_eq!(app.status.message(), "not available from help menu");
 }
 
@@ -444,7 +444,7 @@ fn view_menu_selects_shipped_top_level_views() {
     app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::Bookmarks);
+    assert_eq!(app.view.command(), Command::Bookmarks);
     assert!(matches!(app.mode, InteractionMode::Normal));
 
     app.handle_normal_key_at_viewport_height_for_test(
@@ -457,7 +457,7 @@ fn view_menu_selects_shipped_top_level_views() {
     app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::Workspaces);
+    assert_eq!(app.view.command(), Command::Workspaces);
 
     app.handle_normal_key_at_viewport_height_for_test(
         key(KeyCode::Char('v'), KeyModifiers::NONE),
@@ -469,7 +469,7 @@ fn view_menu_selects_shipped_top_level_views() {
     app.handle_mode_key_at_viewport_height(KeyCode::Enter, 12)
         .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::OperationLog);
+    assert_eq!(app.view.command(), Command::OperationLog);
 }
 
 #[test]
@@ -650,14 +650,14 @@ fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
         12,
     )
     .unwrap();
-    assert_eq!(app.view.command(), jj::Command::Show);
+    assert_eq!(app.view.command(), Command::Show);
 
     app.handle_normal_key_at_viewport_height_for_test(
         key(KeyCode::Char('h'), KeyModifiers::NONE),
         12,
     )
     .unwrap();
-    assert_eq!(app.view.command(), jj::Command::Default);
+    assert_eq!(app.view.command(), Command::Default);
 
     let mut app = test_app(ViewState::Bookmarks(
         crate::bookmarks::BookmarksView::test_new(vec![crate::bookmarks::BookmarkItem::new(
@@ -671,11 +671,11 @@ fn right_and_l_open_expandable_detail_and_h_or_left_backs_out() {
 
     app.handle_normal_key_at_viewport_height_for_test(key(KeyCode::Right, KeyModifiers::NONE), 12)
         .unwrap();
-    assert_eq!(app.view.command(), jj::Command::Show);
+    assert_eq!(app.view.command(), Command::Show);
 
     app.handle_normal_key_at_viewport_height_for_test(key(KeyCode::Left, KeyModifiers::NONE), 12)
         .unwrap();
-    assert_eq!(app.view.command(), jj::Command::Bookmarks);
+    assert_eq!(app.view.command(), Command::Bookmarks);
 }
 
 #[test]
@@ -697,5 +697,5 @@ fn operation_log_l_opens_operation_detail() {
     )
     .unwrap();
 
-    assert_eq!(app.view.command(), jj::Command::OperationShow);
+    assert_eq!(app.view.command(), Command::OperationShow);
 }
