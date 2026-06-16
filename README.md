@@ -1,5 +1,11 @@
 # jk
 
+> Prototype archive: `joshka/prototype-2-codex-cook` is the broad Codex-cooked
+> experiment. It explored many screens, wrappers, command aliases, safety prompts,
+> workflow help, docs, CI, and release scaffolding quickly. Mine it for interaction
+> ideas, UI density, and edge-case test inspiration; do not treat its architecture,
+> command breadth, or generated planning artifacts as release-ready.
+
 `jk` is a full-screen companion for `jj` that keeps your day-to-day flow in one place.
 
 > This project is vibe-coded nonsense.
