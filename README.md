@@ -1,5 +1,10 @@
 # jk
 
+> Prototype archive: `joshka/prototype-2-clean-slate-spec` is a planning
+> cutline on top of the broad Codex-cooked experiment. It keeps the prototype
+> implementation for reference but adds specs for a smaller v1 reset. Use it for
+> release-boundary ideas and screen cutlines, not as an implementation baseline.
+
 `jk` is a full-screen companion for `jj` that keeps your day-to-day flow in one place.
 
 > This project is vibe-coded nonsense.
