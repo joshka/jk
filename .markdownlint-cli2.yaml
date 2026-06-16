@@ -1,0 +1,15 @@
+config:
+  MD013:
+    line_length: 100
+    heading_line_length: 100
+    code_block_line_length: 100
+    tables: false
+  MD024:
+    siblings_only: true
+  MD055:
+    style: leading_and_trailing
+  MD060:
+    style: aligned
+    aligned_delimiter: true
+ignores:
+  - "target/**"

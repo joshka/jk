@@ -1,0 +1,41 @@
+[workspace]
+members = [
+    "crates/jk",
+    "crates/jk-cli",
+    "crates/jk-core",
+    "crates/jk-tui",
+]
+default-members = ["crates/jk"]
+resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/joshka/jk"
+
+[workspace.dependencies]
+clap = { version = "4.6.1", features = ["derive", "wrap_help"] }
+color-eyre = "0.6.5"
+crossterm = "0.29.0"
+jj-cli = "0.42.0"
+jj-lib = "0.42.0"
+ratatui = "0.30.0"
+thiserror = "2.0.17"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = [
+    "ansi",
+    "env-filter",
+    "fmt",
+] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"

@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  pull_request:
+  # Keep this workflow compatible with GitHub merge queue. If branch protection
+  # later requires these jobs, queued batches need the same status names as PRs.
+  merge_group:
+  push:
+    branches:
+      - main
+
+# New pushes supersede older runs for the same ref. Release jobs are separate
+# because they need different cancellation behavior.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions: {}
+
+jobs:
+  check:
+    name: Check
+    # Main release-candidate gate for Rust behavior and packaging. Markdown is a
+    # separate job so branch protection can require it independently.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Install nightly rustfmt
+        run: rustup toolchain install nightly --component rustfmt
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
+        with:
+          tool: cargo-deny,cargo-udeps,just
+
+      - name: Check release baseline
+        # Mirrors local release validation except for Markdown, which is split
+        # into the `Markdown` job to make automerge requirements clearer.
+        run: just rust-release-check
+
+      - name: Check dependency policy
+        # Keep cargo-deny outside `just rust-release-check` so policy failures
+        # show up as their own CI step instead of being buried in the baseline.
+        run: cargo deny check advisories licenses bans sources
+
+  markdown:
+    name: Markdown
+    # Separate required-status candidate for automerge. This keeps prose/table
+    # formatting failures quick to diagnose and independent from Rust builds.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: lts/*
+
+      - name: Install markdownlint
+        run: npm install --global markdownlint-cli2@0.22.1
+
+      - name: Install just
+        uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
+        with:
+          tool: just
+
+      - name: Check Markdown
+        run: just lint-md
+
+  msrv:
+    name: MSRV
+    # The published crates advertise this rust-version. Keep the check small so
+    # it answers only "does the declared floor still compile?"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: "1.89"
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Check MSRV
+        run: cargo check --all-targets

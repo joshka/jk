@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Avoid opening noisy follow-up PRs immediately after an upstream action
+    # release; this repo benefits more from batched, reviewable maintenance.
+    cooldown:
+      default-days: 7
+    groups:
+      # Keep pinned action updates together so CI drift is reviewed as one
+      # maintenance change.
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    # Prefer lockfile refreshes and compatible updates. Raising manifest
+    # minimums should be an explicit choice, especially before public APIs exist.
+    versioning-strategy: "increase-if-necessary"
+    groups:
+      # Cargo dependency churn should land as a single policy/release-baseline
+      # check unless a semver or MSRV problem needs a focused follow-up.
+      rust:
+        patterns:
+          - "*"
