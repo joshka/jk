@@ -1,5 +1,12 @@
 # jk
 
+> Prototype archive: `joshka/prototype-3-guided` is the more guided follow-up
+> experiment. It narrows the product direction around a log-first, single-view
+> TUI and adds stronger docs, tests, feature roots, and exact-target action
+> checks. Mine it for tested behavior, module ownership ideas, and product
+> language; do not treat the whole broad surface as reviewable enough for the
+> first curated crate release.
+
 `jk` is a terminal UI for [Jujutsu](https://github.com/jj-vcs/jj) that keeps your day-to-day `jj`
 flow in one place.
 
