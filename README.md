@@ -1,5 +1,11 @@
 # jk
 
+> Prototype archive: `joshka/prototype-1-rewrite` is the first cleaned-up rewrite
+> experiment. It keeps the surface intentionally narrow around log, show, diff,
+> refresh, search, copy, and sticky file context. Use it as the most reviewable
+> baseline for product shape, but treat its rendered CLI parsing as something to
+> replace with stronger `jj` library/rendering contracts before a curated release.
+
 `jk` is an experimental Rust TUI for [Jujutsu](https://github.com/jj-vcs/jj). It is a log-first
 interface for keeping `jj` visible while work happens in an editor, another terminal, or an agent
 session, then refreshing in place instead of repeatedly quitting and rerunning `jj log`.
