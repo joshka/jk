@@ -7,8 +7,9 @@ Jujutsu. The root `Cargo.toml` is workspace-only. The publishable
 crates live under `crates/`:
 
 - `crates/jk`: binary crate and current default workspace member.
-- `crates/jk-cli`, `crates/jk-core`, `crates/jk-tui`: reserved
-  library boundaries.
+- `crates/jk-core`: shared log records.
+- `crates/jk-cli`: temporary `jj` process integration.
+- `crates/jk-tui`: Ratatui state and rendering.
 
 Release and CI automation lives in `.github/`, `release-plz.toml`,
 `cliff.toml`, `deny.toml`, and `scripts/package-release-archive.sh`.
@@ -49,11 +50,21 @@ Use `just fmt-check` when checking formatting without editing. Both
 tasks intentionally call `cargo +nightly fmt --all` so local formatting
 matches CI and the full workspace is covered.
 
+Rust comments and Rustdoc should be reflowed to the configured
+100-character comment width. Do not hand-wrap Rust comments at 72 or 80
+characters unless a narrower shape is needed for readability.
+
 Keep Rust module names lowercase with underscores. Prefer clear, small
 modules over broad utility buckets, stacked in abstraction layers where
 each module owns one coherent concept. Avoid `unsafe`; the workspace
 forbids it. Markdown uses `markdownlint-cli2`, 100-character prose, and
 aligned tables.
+
+Document Rust modules, items, and meaningful helpers by intent. Public
+Rustdoc should describe the caller-facing contract. Private helper docs or
+comments should explain ownership, invariants, side effects, or why the helper
+exists, not restate the implementation. Binary crate roots should still have
+crate-level `//!` docs when the package publishes docs.rs metadata.
 
 ## Testing Guidelines
 

@@ -33,6 +33,7 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 ] }
 
 [workspace.lints.rust]
+missing_docs = "warn"
 unsafe_code = "forbid"
 unused = { level = "warn", priority = -1 }
 

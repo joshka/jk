@@ -3,6 +3,12 @@
 //! The template emits one JSON commit object plus one JSON details string per commit row. The
 //! parser accepts that stream even when it is embedded in rendered graph lines, because `jj` may
 //! still print graph prefixes around the template output.
+//!
+//! The template pass is a temporary semantic side channel. It lets jj keep ownership of configured
+//! templates, colors, graph layout, and default revsets while `jk` gets enough typed state to drive
+//! selection and expansion. If jj grows a reusable log core that emits semantic row events
+//! alongside rendered output, this module should collapse into that API instead of learning more of
+//! jj's display behavior.
 
 use jk_core::LogEntry;
 use serde::Deserialize;

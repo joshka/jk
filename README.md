@@ -3,9 +3,9 @@
 `jk` is a log-first terminal UI for [Jujutsu](https://github.com/jj-vcs/jj). It is being rebuilt
 from a clean root so the first release can be small, reviewed, tested, and useful.
 
-The immediate goal is modest: keep a `jj` view open beside an editor, terminal, or coding agent,
-then refresh in place when work changes. You should be able to look at the graph, open the relevant
-diff, understand what changed, and get back to work without repeatedly quitting and rerunning
+The immediate goal is modest: keep a `jj` log-like view open beside an editor, terminal, or coding
+agent, then refresh in place when work changes. You should be able to look at the graph, expand the
+selected change's description inline, and keep context without repeatedly quitting and rerunning
 `jj log`.
 
 Or, less formally: we shall know them by the diffs.
@@ -27,7 +27,8 @@ workflow is:
 - keep a log-like view open;
 - refresh with one key, and later refresh automatically when the repo changes;
 - move through graph items rather than raw terminal lines;
-- open `show` and `diff` for the selected change;
+- expand the selected change's description inline;
+- later open `show` and `diff` for the selected change;
 - preserve `jj` concepts, wording, templates, colors, and behavior wherever the library surface
   allows it.
 
@@ -58,20 +59,21 @@ not. The useful lessons are:
 
 The first release target is intentionally narrow.
 
-`jk` should start with:
+`jk` starts with:
 
 - a full-screen log view;
 - manual refresh;
 - selection movement;
-- `show` and `diff` inspection for the selected change;
+- inline expansion for the selected change's full description;
 - enough help text to discover the current keys;
 - tests for state transitions and rendered output.
 
 Everything else is later:
 
+- selected-change `show` and `diff` inspection;
 - auto-refresh;
 - operation log;
-- status;
+- repository status view;
 - bookmarks;
 - file views;
 - guided mutation actions;
@@ -79,6 +81,30 @@ Everything else is later:
 - broader command coverage.
 
 Those are valid directions, but they are not prerequisites for the first reviewable crate.
+
+## Current Command Surface
+
+Bare `jk` opens the same log-like command that `jj` would run from the configured
+`ui.default-command`. Explicit `jk log` opens the `jj log` path directly. Both forms accept
+`-R` / `--repository` to choose a repository and `-n` / `--limit` to bound loaded log entries.
+
+The initial view keeps the rendered `jj` log body borderless and preserves terminal colors by
+forcing `jj --color always` and removing common color-suppression environment variables from the
+child process. `jk` adds only a title bar, status bar, selected-row highlight, movement, refresh,
+view switching, and inline description expansion.
+
+The current key surface is:
+
+- `H`: switch to the configured default `jj` command view.
+- `L`: switch to the explicit `jj log` view.
+- `r`: refresh the current view.
+- `j` / `Down` and `k` / `Up`: move by change.
+- `Space` / `PageDown` / `Ctrl-f`: move one page down.
+- `Shift-Space` / `PageUp` / `Ctrl-b`: move one page up.
+- `g` / `Home` and `G` / `End`: move to the first or last change.
+- `Enter` / `Right`: toggle inline details for the selected change.
+- `Left`: collapse inline details.
+- `q` / `Esc`: quit.
 
 ## Integration Principle
 
@@ -97,6 +123,10 @@ The first technical question is therefore:
 If the answer is "not cleanly yet", that is useful evidence. `jk` should then make the missing
 contract explicit instead of burying it under fragile text parsing.
 
+The current MVP uses that temporary shell-out bridge. Bare `jk` follows `jj`'s configured
+`ui.default-command`, but the command must be log-like enough to accept the semantic template pass
+that `jk` uses for navigation. Explicit `jk log` uses the log command path directly.
+
 ## Interaction Bias
 
 `jk` is view-centric rather than pane-centric.
@@ -106,6 +136,12 @@ Preview layouts may become inline, split, or fullscreen, but panes are presentat
 core mental model.
 
 The initial workflow should be:
+
+```text
+log -> expand details -> refresh
+```
+
+The next workflow slice is:
 
 ```text
 log -> show/diff -> back -> refresh
@@ -145,11 +181,11 @@ also builds `jk` binary archives for macOS and Linux on `x86_64` and `aarch64`. 
 named for cargo-binstall and include `.sha256` files so the Homebrew tap can install upstream
 release assets and smoke-test `jk --version` / `jk --help`.
 
-The workspace also carries placeholder crates for possible future boundaries:
+The workspace now uses separate crates for the first reviewed boundaries:
 
-- `jk-core`
-- `jk-cli`
-- `jk-tui`
+- `jk-core` owns shared log records and small text helpers.
+- `jk-cli` owns the temporary `jj` process integration.
+- `jk-tui` owns Ratatui state, rendering, and input actions.
 
-They are intentionally empty reservation crates until there is a reviewed reason to make those
-boundaries real.
+Those boundaries are intentionally narrow. They should keep `jj` presentation decisions at the edge
+instead of growing a shadow implementation of `jj`.

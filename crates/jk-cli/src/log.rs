@@ -21,6 +21,13 @@ const LOG_COMMAND: &str = "log";
 /// emitted by jj's own template engine. That second pass is a narrow adapter while the direct
 /// `jj-cli`/`jj-lib` integration contract is still being proved.
 ///
+/// This bridge exists because the reusable jj layers do not currently expose the exact contract
+/// `jk` needs. `jj-lib` owns repository and revset machinery, but not the configured CLI log view.
+/// `jj-cli` owns the log behavior, but the useful path is still command-shaped and writes through a
+/// terminal-oriented `Ui` instead of returning semantic row events beside rendered bytes. Until jj
+/// exposes that boundary, spawning `jj` is the least duplicative way to preserve user-visible log
+/// behavior.
+///
 /// This loader runs `jj` as a child process and removes common color-suppression environment
 /// variables so the rendered pass keeps the configured terminal colors. Configured default commands
 /// must be log-like enough to accept the semantic template pass; unsupported commands return

@@ -3,6 +3,11 @@
 //! The rendered pass keeps user-facing `jj` colors, templates, and graph layout. This module
 //! detects commit rows in that rendered text so semantic entries can navigate and highlight the
 //! matching rendered line.
+//!
+//! This is intentionally a small compatibility adapter, not a local graph renderer. A future jj API
+//! should provide row identity before or while graph bytes are rendered; until then, this module
+//! recognizes enough of jj's visible graph markers to align the semantic pass with the rendered
+//! pass and fails loudly when those streams drift.
 
 use jk_core::LogEntry;
 
