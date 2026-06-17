@@ -4,16 +4,29 @@ default:
     @just --list
 
 fmt:
-    cargo +nightly fmt
+    # rustfmt.toml uses unstable rustfmt options for comment wrapping and import grouping.
+    scripts/reflow-rust-comments.py crates
+    cargo +nightly fmt --all
+
+fmt-comments:
+    scripts/reflow-rust-comments.py crates
+
+fmt-comments-check:
+    scripts/reflow-rust-comments.py --check crates
 
 fmt-check:
-    cargo +nightly fmt --check
+    # Keep check mode on the same toolchain as fmt so CI and local formatting agree.
+    scripts/reflow-rust-comments.py --check crates
+    cargo +nightly fmt --all -- --check
 
 check:
     cargo check --workspace --all-targets
 
 test:
     cargo test --workspace
+
+betamax:
+    cargo run --manifest-path ../betamax/Cargo.toml -p betamax -- run tapes/jk-log.tape
 
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
