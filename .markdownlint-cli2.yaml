@@ -13,3 +13,4 @@ config:
     aligned_delimiter: true
 ignores:
   - "target/**"
+  - "AGENTS.override.md"
