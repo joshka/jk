@@ -1,7 +1,9 @@
 # jk-core
 
-Reserved core-state crate for `jk`.
+Shared log records and small text helpers for `jk`.
 
-This package exists so the crate name is available for the `jk` workspace if shared domain state,
-`jj` integration contracts, or testable non-UI behavior need a stable library boundary. It is
-intentionally empty for now; no public API is promised yet.
+This crate keeps the first shared contract narrow: a rendered `jj` log body plus semantic records
+for navigation, selection preservation, and inline expansion.
+
+The rendered text remains opaque `jj` output. Structured fields exist only where the TUI needs
+stable state that cannot be recovered safely from terminal text.
