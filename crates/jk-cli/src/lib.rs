@@ -1,4 +1,14 @@
-//! Command-line entry points and `jj` integration helpers for `jk`.
+//! `jj` process integration for `jk`.
 //!
-//! This crate is a placeholder for experiments with `jj-cli` and `jj-lib`
-//! integration. It should stay small until the library contract is proven.
+//! The log-first MVP needs two views of the same `jj` command:
+//!
+//! - rendered terminal output that keeps the user's configured template, graph, revset, and colors;
+//! - semantic records that let the TUI move by change, preserve selection, and expand the selected
+//!   description.
+//!
+//! `JjLog` provides that bridge by running `jj` as a child process. This is a temporary integration
+//! boundary until `jj-cli` / `jj-lib` can provide both pieces without parsing command output.
+
+pub mod log;
+
+pub use log::{JjLog, JjLogCommand, JjLogError};

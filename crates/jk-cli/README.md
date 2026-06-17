@@ -1,7 +1,10 @@
 # jk-cli
 
-Reserved command-line integration crate for `jk`.
+Command-line and `jj` process integration helpers for `jk`.
 
-This package exists so the crate name is available for the `jk` workspace if a reviewed CLI/library
-boundary becomes useful. It is intentionally empty for now; depend on the `jk` binary crate instead
-of this package until real APIs are published.
+This crate owns the temporary shell-out boundary used by the log-first MVP. It runs `jj` once for
+CLI-equivalent rendered output and once with a narrow JSON template for semantic records.
+
+The long-term direction is direct `jj-cli` / `jj-lib` integration when that can preserve user
+templates, colors, graph rendering, revsets, and command semantics without duplicating `jj` display
+logic.
