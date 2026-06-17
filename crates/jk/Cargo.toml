@@ -19,6 +19,10 @@ repository.workspace = true
 [dependencies]
 clap.workspace = true
 color-eyre.workspace = true
+crossterm.workspace = true
+jk-cli = { path = "../jk-cli", version = "0.2.0" }
+jk-tui = { path = "../jk-tui", version = "0.2.0" }
+ratatui.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

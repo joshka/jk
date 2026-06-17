@@ -8,5 +8,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[dependencies]
+ansi-to-tui.workspace = true
+jk-core = { path = "../jk-core", version = "0.2.0" }
+ratatui.workspace = true
+textwrap.workspace = true
+
 [lints]
 workspace = true
