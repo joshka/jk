@@ -1,7 +1,9 @@
 # jk-tui
 
-Reserved TUI crate for `jk`.
+Ratatui views and interaction state for `jk`.
 
-This package exists so the crate name is available for the `jk` workspace if Ratatui views,
-interaction state, or rendering helpers need a separate library boundary. It is intentionally empty
-for now; no public API is promised yet.
+This crate owns the log-first TUI surface: title and status chrome, movement and expansion actions,
+rendered-log conversion, and selected-row highlighting.
+
+The log body is intentionally borderless and remains visually based on `jj` output. `jk-tui` adds
+only the interaction state needed for selection, refresh, and inline details.
