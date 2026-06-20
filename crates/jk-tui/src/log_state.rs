@@ -56,11 +56,11 @@ impl LogState {
             .or_else(|| (!self.entries.is_empty()).then_some(0));
 
         if let Some(expanded_change_id) = &self.expanded_change_id {
-            let expanded_still_exists = self
+            let expanded_still_exists_with_details = self
                 .entries
                 .iter()
-                .any(|entry| entry.change_id() == expanded_change_id);
-            if !expanded_still_exists {
+                .any(|entry| entry.change_id() == expanded_change_id && entry_has_details(entry));
+            if !expanded_still_exists_with_details {
                 self.expanded_change_id = None;
             }
         }
@@ -168,8 +168,10 @@ impl LogState {
 
         if self.selected_is_expanded() {
             self.expanded_change_id = None;
-        } else {
+        } else if entry_has_details(entry) {
             self.expanded_change_id = Some(entry.change_id().to_owned());
+        } else {
+            self.expanded_change_id = None;
         }
     }
 
@@ -207,10 +209,7 @@ impl LogState {
         self.entries
             .iter()
             .find(|entry| entry.change_id() == expanded_change_id)
-            .and_then(|entry| {
-                let details = entry.details();
-                (!details.trim().is_empty()).then_some(details)
-            })
+            .and_then(|entry| entry_has_details(entry).then_some(entry.details()))
     }
 
     /// Returns the rendered line after which inline details should be inserted.
@@ -298,6 +297,11 @@ fn is_graph_elision_line(line: &str) -> bool {
     strip_ansi(line).trim() == "~"
 }
 
+/// Returns whether an entry has detail text worth expanding inline.
+fn entry_has_details(entry: &LogEntry) -> bool {
+    !entry.details().trim().is_empty()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,6 +336,77 @@ mod tests {
         state.refresh(snapshot(["aaa", "bbb", "ccc", "ddd"]));
 
         assert_eq!(state.scroll_offset(), 1);
+    }
+
+    #[test]
+    fn refresh_preserves_expansion_when_selected_change_still_has_details() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second")
+                    .with_details("old body")
+                    .with_rendered_line(1),
+            ],
+        ));
+        state.select_next();
+        state.toggle_expanded();
+
+        state.refresh(LogSnapshot::new(
+            "@  xxx new\n○  bbb second\n◆  yyy newer\n",
+            vec![
+                LogEntry::new("xxx", "333", "new").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second")
+                    .with_details("new body")
+                    .with_rendered_line(1),
+                LogEntry::new("yyy", "444", "newer").with_rendered_line(2),
+            ],
+        ));
+
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("bbb"));
+        assert!(state.selected_is_expanded());
+        assert_eq!(state.expanded_details(), Some("new body"));
+    }
+
+    #[test]
+    fn refresh_collapses_expansion_when_expanded_change_disappears() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second")
+                    .with_details("body")
+                    .with_rendered_line(1),
+            ],
+        ));
+        state.select_next();
+        state.toggle_expanded();
+
+        state.refresh(snapshot(["ccc", "ddd"]));
+
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("ccc"));
+        assert!(!state.selected_is_expanded());
+        assert_eq!(state.expanded_details(), None);
+        assert_eq!(state.expanded_insertion_line(), None);
+    }
+
+    #[test]
+    fn toggle_expanded_ignores_entries_without_details() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second")
+                    .with_details("body")
+                    .with_rendered_line(1),
+            ],
+        ));
+
+        state.toggle_expanded();
+        state.select_next();
+
+        assert!(!state.selected_is_expanded());
+        assert_eq!(state.expanded_details(), None);
     }
 
     #[test]

@@ -63,6 +63,16 @@ Sleep 300ms
 Screenshot target/betamax/jk-log-expanded.png
 State target/betamax/jk-log-expanded.json
 
+Left
+Sleep 300ms
+Screenshot target/betamax/jk-log-collapsed-left.png
+State target/betamax/jk-log-collapsed-left.json
+
+Right
+Sleep 300ms
+Screenshot target/betamax/jk-log-expanded-right.png
+State target/betamax/jk-log-expanded-right.json
+
 Type "r"
 Sleep 500ms
 Screenshot target/betamax/jk-log-refreshed.png

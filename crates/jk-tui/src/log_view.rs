@@ -396,6 +396,38 @@ mod tests {
     }
 
     #[test]
+    fn wrapped_expanded_details_keep_selected_row_visible() {
+        let mut view = LogView::new(LogSnapshot::new(
+            "@  aaa first\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first\n\none two three four five six")
+                    .with_details("one two three four five six")
+                    .with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(1),
+            ],
+        ));
+        let _ = view.apply(LogAction::ToggleExpanded);
+        let backend = TestBackend::new(24, 8);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let buffer = terminal.backend().buffer();
+        let rendered = buffer_to_string(buffer);
+        let selected = rendered.find("@  aaa first").unwrap_or_default();
+        let wrapped = rendered.find("five six").unwrap_or_default();
+        let second = rendered.find("○  bbb second").unwrap_or_default();
+        assert_eq!(view.state.scroll_offset(), 0);
+        assert_eq!(buffer[(0, 1)].bg, Color::Rgb(82, 196, 192));
+        assert!(selected < wrapped);
+        assert!(wrapped < second);
+    }
+
+    #[test]
     fn collapse_action_hides_expanded_details() {
         let mut view = LogView::new(LogSnapshot::new(
             "@  aaa first\n○  bbb second\n",
@@ -419,6 +451,32 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(!rendered.contains("│  body"));
+    }
+
+    #[test]
+    fn narrow_title_and_status_are_clipped_to_terminal_width() {
+        let mut view = LogView::new(
+            LogSnapshot::new(
+                "@  aaa first\n",
+                vec![LogEntry::new("aaa", "111", "first").with_rendered_line(0)],
+            )
+            .with_title("jj log --revisions very-long-revision-name"),
+        );
+        view.show_error("refresh failed because the status message is long");
+        let backend = TestBackend::new(16, 4);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer_line(buffer, 0).chars().count(), 16);
+        assert_eq!(buffer_line(buffer, 3).chars().count(), 16);
+        assert!(buffer_line(buffer, 0).contains("jk jj"));
+        assert!(buffer_line(buffer, 3).contains("refresh failed"));
     }
 
     fn snapshot<const N: usize>(change_ids: [&str; N]) -> LogSnapshot {

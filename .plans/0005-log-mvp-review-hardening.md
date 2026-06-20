@@ -24,12 +24,29 @@ should be split out.
 
 ## Hardening Queue
 
-1. Add Betamax coverage for Right expansion and Left collapse.
-1. Refresh while expanded and preserve expansion when the selected change still exists.
-1. Collapse cleanly when the expanded change disappears after refresh.
-1. Handle expansion on rows without details.
-1. Check selection and scroll behavior when expanded content wraps.
-1. Verify title and status truncation on narrow terminals.
+- [x] Add Betamax coverage for Right expansion and Left collapse.
+- [x] Refresh while expanded and preserve expansion when the selected change still exists.
+- [x] Collapse cleanly when the expanded change disappears after refresh.
+- [x] Handle expansion on rows without details.
+- [x] Check selection and scroll behavior when expanded content wraps.
+- [x] Verify title and status truncation on narrow terminals.
+
+## Review Result
+
+Keep the log-first MVP as one reviewable product slice for now. The current crate split is earning
+its keep: `jk-cli` owns the temporary `jj` bridge, `jk-core` owns the narrow semantic snapshot, and
+`jk-tui` owns interaction and rendering state without reimplementing `jj` graph presentation.
+
+The hardening pass tightened expansion state rather than adding new product scope. Empty-detail rows
+no longer enter a hidden expanded mode, refresh preserves expansion only when the expanded change
+still has details, and refresh collapses when the expanded change disappears.
+
+## Validation
+
+- `just test`
+- `just clippy`
+- `just lint-md`
+- `just betamax`
 
 ## Done When
 
