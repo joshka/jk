@@ -28,9 +28,40 @@ Avoid mutation actions, staging-like concepts, or a broad command launcher in th
 - Does refresh preserve collapsed sections by file path, hunk identity, or visible order?
 - Which vimish movement commands must be shared with the log view?
 
+## First Slice
+
+Use the existing shell-out boundary for this slice. `JjDiff` runs `jj diff -r <change>` with color
+preserved, and the TUI treats the body as opaque rendered `jj` output except for the narrow file
+headers needed by collapse state.
+
+The log keeps its existing inline expansion on enter/right. The selected-change diff opens from the
+log with `d`, or directly with `jk diff [REVISION]`. In the diff view, `r` refreshes, `j/k` scrolls
+line by line, space/PageUp/PageDown keep less-style page movement, and `[`/`]` jump between file
+sections. File folding uses `h`/left and unfolding uses `l`/right; Ctrl-left folds all files and
+Ctrl-right unfolds all files. `H`/`L` return to the log when the diff was opened from a log view,
+preserving the same `LogView` instance so selection and scroll are not reloaded. `d` does not close
+the diff view.
+
+File-section collapse is intentionally path-based and limited to recognizable `jj diff` file
+headers such as `Modified regular file path:`. Refresh keeps collapsed paths that still appear and
+drops paths that disappear. Folded file rows append the colored per-file `jj diff --stat` suffix on
+the header line, with the stat pipe aligned after the full diff header text rather than only the
+path. When a file header scrolls above the viewport, the diff view pins that current file header at
+the top of the content area so the active file stays visible while reading large diffs. The diff
+view uses a flat, subtle selected-file highlight instead of the log view's graph-row gradient.
+Hunk-level collapse remains out of scope.
+
 ## Done When
 
 - The selected log row can open a diff view and return.
 - Manual refresh works in the diff view.
 - Collapsed file sections survive refresh when the file still exists.
 - Tests cover target selection, refresh, return navigation, and collapse state.
+
+## Validation
+
+- `cargo test -p jk-cli -p jk-tui -p jk --lib --bins`
+- `just fmt-check`
+- `just check`
+- `just test`
+- `just clippy`

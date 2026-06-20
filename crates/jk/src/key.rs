@@ -42,6 +42,18 @@ impl AppKey {
                 ..
             } => Self::Action(LogAction::Log),
             KeyEvent {
+                code: KeyCode::Char('l'),
+                ..
+            }
+            | KeyEvent {
+                code: KeyCode::Enter | KeyCode::Right,
+                ..
+            } => Self::Action(LogAction::ToggleExpanded),
+            KeyEvent {
+                code: KeyCode::Char('d'),
+                ..
+            } => Self::Action(LogAction::OpenDiff),
+            KeyEvent {
                 code: KeyCode::Char('k') | KeyCode::Up,
                 ..
             } => Self::Action(LogAction::Previous),
@@ -75,11 +87,15 @@ impl AppKey {
                 ..
             } => Self::Action(LogAction::Last),
             KeyEvent {
-                code: KeyCode::Enter | KeyCode::Right,
+                code: KeyCode::Char('['),
                 ..
-            } => Self::Action(LogAction::ToggleExpanded),
+            } => Self::Action(LogAction::PreviousFile),
             KeyEvent {
-                code: KeyCode::Left,
+                code: KeyCode::Char(']'),
+                ..
+            } => Self::Action(LogAction::NextFile),
+            KeyEvent {
+                code: KeyCode::Char('h') | KeyCode::Left,
                 ..
             } => Self::Action(LogAction::CollapseExpanded),
             _ => Self::Ignore,
@@ -92,6 +108,8 @@ const fn action_for_control_key(code: KeyCode) -> AppKey {
     match code {
         KeyCode::Char('b') => AppKey::Action(LogAction::PagePrevious),
         KeyCode::Char('f') => AppKey::Action(LogAction::PageNext),
+        KeyCode::Left => AppKey::Action(LogAction::FoldAll),
+        KeyCode::Right => AppKey::Action(LogAction::UnfoldAll),
         _ => AppKey::Ignore,
     }
 }
@@ -101,13 +119,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn enter_and_right_toggle_expanded_details() {
+    fn enter_toggles_expanded_details() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
-            AppKey::Action(LogAction::ToggleExpanded)
-        );
-        assert_eq!(
-            AppKey::from_crossterm(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
             AppKey::Action(LogAction::ToggleExpanded)
         );
     }
@@ -117,6 +131,22 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE)),
             AppKey::Action(LogAction::CollapseExpanded)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::CollapseExpanded)
+        );
+    }
+
+    #[test]
+    fn right_and_l_toggle_expanded_details() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleExpanded)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleExpanded)
         );
     }
 
@@ -129,6 +159,38 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::Log)
+        );
+    }
+
+    #[test]
+    fn lowercase_d_opens_selected_diff() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::OpenDiff)
+        );
+    }
+
+    #[test]
+    fn brackets_jump_between_diff_files() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('['), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::PreviousFile)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(']'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::NextFile)
+        );
+    }
+
+    #[test]
+    fn control_arrows_fold_and_unfold_diff_files() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::FoldAll)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::UnfoldAll)
         );
     }
 

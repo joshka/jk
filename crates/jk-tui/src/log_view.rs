@@ -31,6 +31,9 @@ pub enum ActionResult {
     /// Switch to the explicit `jj log` view.
     SwitchLog,
 
+    /// Open the selected change's diff.
+    OpenDiff,
+
     /// Exit the application.
     Quit,
 }
@@ -60,6 +63,18 @@ pub enum LogAction {
     /// Move to the last visible change.
     Last,
 
+    /// Move to the previous file section in views that support file sections.
+    PreviousFile,
+
+    /// Move to the next file section in views that support file sections.
+    NextFile,
+
+    /// Fold all collapsible sections in views that support sections.
+    FoldAll,
+
+    /// Unfold all collapsible sections in views that support sections.
+    UnfoldAll,
+
     /// Toggle inline details for the selected change.
     ToggleExpanded,
 
@@ -74,6 +89,9 @@ pub enum LogAction {
 
     /// Switch to the explicit `jj log` view.
     Log,
+
+    /// Open the selected change's diff.
+    OpenDiff,
 
     /// Quit the TUI.
     Quit,
@@ -114,6 +132,13 @@ impl LogView {
         self.status_message = Some(error.into());
     }
 
+    /// Returns the selected change identifier for follow-up inspection commands.
+    pub fn selected_change_id(&self) -> Option<&str> {
+        self.state
+            .selected_entry()
+            .map(jk_core::LogEntry::change_id)
+    }
+
     /// Applies a single input action.
     ///
     /// [`ActionResult::Refresh`] asks the caller to load a new [`LogSnapshot`]. The view does not
@@ -145,6 +170,10 @@ impl LogView {
                 self.state.select_last();
                 ActionResult::Continue
             }
+            LogAction::PreviousFile
+            | LogAction::NextFile
+            | LogAction::FoldAll
+            | LogAction::UnfoldAll => ActionResult::Continue,
             LogAction::ToggleExpanded => {
                 self.state.toggle_expanded();
                 ActionResult::Continue
@@ -156,6 +185,13 @@ impl LogView {
             LogAction::Refresh => ActionResult::Refresh,
             LogAction::Home => ActionResult::SwitchHome,
             LogAction::Log => ActionResult::SwitchLog,
+            LogAction::OpenDiff => {
+                if self.selected_change_id().is_some() {
+                    ActionResult::OpenDiff
+                } else {
+                    ActionResult::Continue
+                }
+            }
             LogAction::Quit => ActionResult::Quit,
         }
     }
@@ -210,6 +246,7 @@ mod tests {
         assert_eq!(view.apply(LogAction::Refresh), ActionResult::Refresh);
         assert_eq!(view.apply(LogAction::Home), ActionResult::SwitchHome);
         assert_eq!(view.apply(LogAction::Log), ActionResult::SwitchLog);
+        assert_eq!(view.apply(LogAction::OpenDiff), ActionResult::OpenDiff);
         assert_eq!(view.apply(LogAction::Quit), ActionResult::Quit);
     }
 

@@ -13,6 +13,7 @@ const SELECTED_ROW_END: RgbColor = RgbColor::new(12, 32, 38);
 const SELECTED_GRAPH_FG: RgbColor = RgbColor::new(15, 20, 31);
 const SELECTED_ROW_FADE_COLUMNS: usize = 24;
 const SELECTED_ROW_TOTAL_COLUMNS: usize = 36;
+const SUBTLE_SELECTED_ROW_BG: RgbColor = RgbColor::new(34, 40, 44);
 
 /// Paints the visible selected row background in the content area.
 pub fn paint_selected_row(
@@ -44,6 +45,34 @@ pub fn paint_selected_row(
     }
 
     frame.buffer_mut()[(area.left(), y)].set_fg(SELECTED_GRAPH_FG.into_color());
+}
+
+/// Paints a quiet full-width selected row for non-graph content.
+pub fn paint_subtle_selected_row(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    rendered_line: usize,
+    scroll_offset: usize,
+) {
+    if area.is_empty() {
+        return;
+    }
+
+    let Some(visible_line) = rendered_line.checked_sub(scroll_offset) else {
+        return;
+    };
+    let Ok(visible_line) = u16::try_from(visible_line) else {
+        return;
+    };
+
+    if visible_line >= area.height {
+        return;
+    }
+
+    let y = area.y + visible_line;
+    for x in area.left()..area.right() {
+        frame.buffer_mut()[(x, y)].set_bg(SUBTLE_SELECTED_ROW_BG.into_color());
+    }
 }
 
 /// Returns the background color for one column of the selection highlight.
@@ -147,5 +176,25 @@ mod tests {
         });
 
         assert!(draw_result.is_ok());
+    }
+
+    #[test]
+    fn subtle_selected_row_uses_flat_background() {
+        let backend = ratatui::backend::TestBackend::new(3, 1);
+        let mut terminal = ratatui::Terminal::new(backend).expect("test backend should initialize");
+
+        let draw_result = terminal.draw(|frame| {
+            paint_subtle_selected_row(frame, Rect::new(0, 0, 3, 1), 0, 0);
+        });
+
+        assert!(draw_result.is_ok());
+        assert_eq!(
+            terminal.backend().buffer()[(0, 0)].bg,
+            SUBTLE_SELECTED_ROW_BG.into_color()
+        );
+        assert_eq!(
+            terminal.backend().buffer()[(2, 0)].bg,
+            SUBTLE_SELECTED_ROW_BG.into_color()
+        );
     }
 }

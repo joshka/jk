@@ -61,6 +61,125 @@ impl LogSnapshot {
     }
 }
 
+/// A rendered `jj diff` view for one change.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DiffSnapshot {
+    title: String,
+    change_id: String,
+    rendered: String,
+    file_stats: Vec<DiffFileStat>,
+}
+
+impl DiffSnapshot {
+    /// Creates a diff snapshot from the target change and rendered terminal text.
+    #[must_use]
+    pub fn new(change_id: impl Into<String>, rendered: impl Into<String>) -> Self {
+        Self {
+            title: String::new(),
+            change_id: change_id.into(),
+            rendered: rendered.into(),
+            file_stats: Vec::new(),
+        }
+    }
+
+    /// Sets the command context shown in the title bar.
+    #[must_use]
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+
+    /// Sets per-file line counts for the rendered diff.
+    #[must_use]
+    pub fn with_file_stats(mut self, file_stats: Vec<DiffFileStat>) -> Self {
+        self.file_stats = file_stats;
+        self
+    }
+
+    /// Returns the human-readable command context for the current view.
+    #[must_use]
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    /// Returns the `jj` change identifier being inspected.
+    #[must_use]
+    pub fn change_id(&self) -> &str {
+        &self.change_id
+    }
+
+    /// Returns the opaque output rendered by `jj`.
+    #[must_use]
+    pub fn rendered(&self) -> &str {
+        &self.rendered
+    }
+
+    /// Returns per-file line counts for changed files.
+    #[must_use]
+    pub fn file_stats(&self) -> &[DiffFileStat] {
+        &self.file_stats
+    }
+
+    /// Consumes the snapshot into its owned title, target change, and rendered body.
+    #[must_use]
+    pub fn into_parts(self) -> (String, String, String, Vec<DiffFileStat>) {
+        (self.title, self.change_id, self.rendered, self.file_stats)
+    }
+}
+
+/// Per-file line counts for a rendered diff.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DiffFileStat {
+    path: String,
+    added: usize,
+    removed: usize,
+    rendered: String,
+}
+
+impl DiffFileStat {
+    /// Creates line-count stats for one displayed diff path.
+    #[must_use]
+    pub fn new(path: impl Into<String>, added: usize, removed: usize) -> Self {
+        Self {
+            path: path.into(),
+            added,
+            removed,
+            rendered: String::new(),
+        }
+    }
+
+    /// Sets the rendered `--stat` suffix for this path, including the separator.
+    #[must_use]
+    pub fn with_rendered(mut self, rendered: impl Into<String>) -> Self {
+        self.rendered = rendered.into();
+        self
+    }
+
+    /// Returns the displayed diff path.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// Returns the number of added lines.
+    #[must_use]
+    pub const fn added(&self) -> usize {
+        self.added
+    }
+
+    /// Returns the number of removed lines.
+    #[must_use]
+    pub const fn removed(&self) -> usize {
+        self.removed
+    }
+
+    /// Returns the rendered `--stat` suffix for this path.
+    #[must_use]
+    pub fn rendered(&self) -> &str {
+        &self.rendered
+    }
+}
+
 /// A semantic log item that the TUI can navigate without knowing how `jj` produced it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LogEntry {

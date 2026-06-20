@@ -10,7 +10,10 @@ use ratatui::widgets::Paragraph;
 
 /// Default log-view status text shown when there is no transient error.
 pub const LOG_STATUS: &str =
-    "H home  L log  r refresh  j/k move  space page  g/G edge  enter/right expand  q quit";
+    "H home  L log  d diff  r refresh  j/k move  space page  enter/right expand  q quit";
+
+/// Default diff-view status text shown when there is no transient error.
+pub const DIFF_STATUS: &str = "H/L log  r refresh  j/k line  space page  [/]: file  h/left fold  l/right unfold  ctrl+arrows all";
 
 const DEFAULT_TITLE: &str = "jj log";
 
