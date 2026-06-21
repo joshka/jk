@@ -1,6 +1,18 @@
 # Changelog
 
 <!-- markdownlint-disable MD012 MD013 MD024 -->
+# Changelog
+
+# Changelog
+
+# Changelog
+
+
+## Other
+
+
+- Clean up README media captures ([#25](https://github.com/joshka/jk/pull/25))
+
 
 ## Other
 
