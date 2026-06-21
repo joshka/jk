@@ -8,6 +8,29 @@ keep context open while an editor, shell, or coding agent changes the repository
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
+## Installation
+
+Install with Homebrew:
+
+```sh
+brew trust --formula joshka/tap/jk
+brew install joshka/tap/jk
+```
+
+The trust command scopes Homebrew's non-official tap trust to the `jk` formula.
+
+Install prebuilt release assets with [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall):
+
+```sh
+cargo binstall jk
+```
+
+Or build from the crates.io source package:
+
+```sh
+cargo install jk --locked
+```
+
 ## What Works Today
 
 `jk` currently focuses on the inspection loop:
