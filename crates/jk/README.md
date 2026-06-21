@@ -5,9 +5,9 @@
 It keeps a `jj` log-like view open, lets you refresh in place, and adds interactive navigation for
 reviewing change descriptions and selected-change diffs.
 
-![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log.gif)
+![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
-![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff.gif)
+![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff-v3.gif)
 
 ## Current Status
 
