@@ -75,6 +75,8 @@ Hunk-level collapse remains out of scope.
 1. Empty and error states: an empty `jj diff` body renders an intentional no-diff message, and
    initial `jk diff REV` load failures open a retryable diff view instead of exiting before the TUI
    starts.
+1. Visual review: Betamax screenshots were inspected for the pinned file header, help overlay,
+   search status, folded file row, and horizontal-scroll behavior in a real terminal rendering.
 
 ## Validation
 
