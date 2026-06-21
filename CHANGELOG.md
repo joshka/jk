@@ -5,6 +5,30 @@
 ## Other
 
 
+- Add selected-change diff experience ([#21](https://github.com/joshka/jk/pull/21))
+
+
+## Other
+
+
+- Add selected-change diff experience ([#21](https://github.com/joshka/jk/pull/21))
+
+
+## Other
+
+
+- Add selected-change diff experience ([#21](https://github.com/joshka/jk/pull/21))
+
+
+## Other
+
+
+- Add selected-change diff experience ([#21](https://github.com/joshka/jk/pull/21))
+
+
+## Other
+
+
 - Wire log MVP workspace dependencies
 
 - Wire jk log terminal app
