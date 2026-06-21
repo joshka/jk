@@ -1,4 +1,4 @@
-Output ../../jk-screenshots/assets/jk-diff.gif
+Output ../../jk-screenshots/assets/jk-diff-v3.gif
 Output target/betamax/readme-diff-final-state.json
 
 Require cargo
@@ -8,7 +8,7 @@ Set Shell "bash"
 Set Theme "Aardvark Ink"
 Set Width 1200
 Set Height 720
-Set Padding 8
+Set Padding 0
 Set Margin 0
 Set WindowBar Colorful
 Set BorderRadius 0
@@ -29,18 +29,18 @@ Enter
 Wait+Screen "JK_BUILD_READY"
 Ctrl+L
 Sleep 200ms
-Show
 
 Type "./target/debug/jk -R . diff @-"
 Enter
 Wait+Screen "jk jj diff"
 Sleep 1100ms
-Screenshot ../../jk-screenshots/assets/jk-diff.png
+Show
+Screenshot ../../jk-screenshots/assets/jk-diff-v3.png
 
 Hide
 Type "?"
 Sleep 500ms
-Screenshot ../../jk-screenshots/assets/jk-diff-help.png
+Screenshot ../../jk-screenshots/assets/jk-diff-help-v3.png
 
 Type "?"
 Sleep 300ms
@@ -50,13 +50,13 @@ Sleep 250ms
 Type "diff"
 Enter
 Sleep 800ms
-Screenshot ../../jk-screenshots/assets/jk-diff-search.png
+Screenshot ../../jk-screenshots/assets/jk-diff-search-v3.png
 
 Type "}"
 Sleep 700ms
 Type "-"
 Sleep 1s
-Screenshot ../../jk-screenshots/assets/jk-diff-folded-hunk.png
+Screenshot ../../jk-screenshots/assets/jk-diff-folded-hunk-v3.png
 
 Type "j"
 Sleep 180ms
@@ -74,7 +74,7 @@ Type "+"
 Sleep 700ms
 Type "h"
 Sleep 1s
-Screenshot ../../jk-screenshots/assets/jk-diff-folded-file.png
+Screenshot ../../jk-screenshots/assets/jk-diff-folded-file-v3.png
 
 Hide
 Type "q"

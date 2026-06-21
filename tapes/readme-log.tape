@@ -1,4 +1,4 @@
-Output ../../jk-screenshots/assets/jk-log.gif
+Output ../../jk-screenshots/assets/jk-log-v3.gif
 Output target/betamax/readme-log-final-state.json
 
 Require cargo
@@ -8,7 +8,7 @@ Set Shell "bash"
 Set Theme "Aardvark Ink"
 Set Width 1200
 Set Height 720
-Set Padding 8
+Set Padding 0
 Set Margin 0
 Set WindowBar Colorful
 Set BorderRadius 0
@@ -29,18 +29,18 @@ Enter
 Wait+Screen "JK_BUILD_READY"
 Ctrl+L
 Sleep 200ms
-Show
 
 Type "./target/debug/jk -R . -n 8"
 Enter
 Wait+Screen "jk jj"
 Sleep 1s
-Screenshot ../../jk-screenshots/assets/jk-log.png
+Show
+Screenshot ../../jk-screenshots/assets/jk-log-v3.png
 
 Hide
 Type "?"
 Sleep 500ms
-Screenshot ../../jk-screenshots/assets/jk-log-help.png
+Screenshot ../../jk-screenshots/assets/jk-log-help-v3.png
 
 Type "?"
 Sleep 300ms
@@ -49,11 +49,11 @@ Type "j"
 Sleep 450ms
 Type "j"
 Sleep 700ms
-Screenshot ../../jk-screenshots/assets/jk-log-selection.png
+Screenshot ../../jk-screenshots/assets/jk-log-selection-v3.png
 
 Enter
 Sleep 700ms
-Screenshot ../../jk-screenshots/assets/jk-log-expanded.png
+Screenshot ../../jk-screenshots/assets/jk-log-expanded-v3.png
 
 Type "d"
 Wait+Screen "jk jj diff"

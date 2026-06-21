@@ -6,7 +6,7 @@ It keeps the parts of `jj` you already trust: the graph, colors, wording, revset
 diff output still come from `jj`. `jk` adds an interactive review loop around that output so you can
 keep context open while an editor, shell, or coding agent changes the repository.
 
-![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log.gif)
+![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
 ## What Works Today
 
@@ -40,7 +40,7 @@ TUI parses only enough structure to support navigation, search, sticky headers, 
 
 The diff view preserves `jj diff` output while adding review controls around it.
 
-![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff.gif)
+![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff-v3.gif)
 
 Useful bindings in the diff view:
 
