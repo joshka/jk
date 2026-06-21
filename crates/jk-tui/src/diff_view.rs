@@ -129,6 +129,19 @@ impl DiffView {
         }
     }
 
+    /// Creates a diff view that starts in an error state for an unloaded target.
+    #[must_use]
+    pub fn from_error(
+        change_id: impl Into<String>,
+        title: impl Into<String>,
+        error: String,
+    ) -> Self {
+        let snapshot = DiffSnapshot::new(change_id, "").with_title(title);
+        let mut view = Self::new(snapshot);
+        view.show_error(error);
+        view
+    }
+
     /// Returns the target change identifier for refresh requests.
     #[must_use]
     pub fn change_id(&self) -> &str {
@@ -283,7 +296,7 @@ impl DiffView {
         let chrome = ViewChrome::new(self.state.title(), status);
         chrome.render(frame, areas);
 
-        let rendered = self.state.visible_rendered();
+        let rendered = self.visible_body();
         let text = rendered_text(&rendered);
         let scroll = u16::try_from(self.state.scroll_offset()).unwrap_or(u16::MAX);
         let horizontal_scroll = u16::try_from(self.state.horizontal_offset()).unwrap_or(u16::MAX);
@@ -307,6 +320,24 @@ impl DiffView {
         if self.help_visible {
             render_help_overlay(frame, areas.content, "Diff keys", DIFF_HELP);
         }
+    }
+
+    fn visible_body(&self) -> String {
+        if !self.state.is_empty_diff() {
+            return self.state.visible_rendered();
+        }
+
+        if let Some(error) = &self.status_message {
+            return format!(
+                "Unable to load diff for {}.\n\n{error}\n\nPress r to retry or H/L to return to the log.\n",
+                self.state.change_id()
+            );
+        }
+
+        format!(
+            "No diff for {}.\n\nThis change has no file content differences.\n",
+            self.state.change_id()
+        )
     }
 }
 
@@ -384,6 +415,45 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Modified regular file src/b.rs:"));
         assert!(buffer_line(terminal.backend().buffer(), 4).contains("r refresh"));
+    }
+
+    #[test]
+    fn empty_diff_renders_intentional_message() {
+        let mut view = DiffView::new(snapshot("aaa", ""));
+        let backend = TestBackend::new(64, 7);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("No diff for aaa."));
+        assert!(rendered.contains("This change has no file content differences."));
+    }
+
+    #[test]
+    fn initial_diff_error_renders_retryable_message() {
+        let mut view = DiffView::from_error(
+            "missing",
+            "jj diff -r missing",
+            "jj failed: Revision missing doesn't exist".to_owned(),
+        );
+        let backend = TestBackend::new(72, 8);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("Unable to load diff for missing."));
+        assert!(rendered.contains("Revision missing doesn't exist"));
+        assert!(rendered.contains("Press r to retry"));
     }
 
     #[test]

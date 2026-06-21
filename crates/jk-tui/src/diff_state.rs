@@ -93,6 +93,11 @@ impl DiffState {
         &self.change_id
     }
 
+    /// Returns whether `jj diff` produced no visible body.
+    pub fn is_empty_diff(&self) -> bool {
+        self.rendered.trim().is_empty()
+    }
+
     /// Returns the first rendered line currently visible in the viewport.
     pub const fn scroll_offset(&self) -> usize {
         self.scroll_offset

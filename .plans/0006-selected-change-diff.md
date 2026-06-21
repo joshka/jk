@@ -72,6 +72,9 @@ Hunk-level collapse remains out of scope.
    visible.
 1. Mode-specific help: `?` opens a compact overlay for the active log or diff mode, keeping the
    status line focused on the most common commands.
+1. Empty and error states: an empty `jj diff` body renders an intentional no-diff message, and
+   initial `jk diff REV` load failures open a retryable diff view instead of exiting before the TUI
+   starts.
 
 ## Validation
 

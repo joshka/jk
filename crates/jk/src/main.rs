@@ -68,10 +68,18 @@ fn main() -> Result<()> {
     let source = log_source(&args);
     let diff_source = diff_source(&args);
     let app = if let Some(Command::Diff(diff_args)) = &args.command {
-        let snapshot = diff_source.load(&diff_args.revision)?;
+        let snapshot = diff_source.load(&diff_args.revision);
+        let diff = match snapshot {
+            Ok(snapshot) => DiffView::new(snapshot),
+            Err(error) => DiffView::from_error(
+                diff_args.revision.clone(),
+                format!("jj diff -r {}", diff_args.revision),
+                error.to_string(),
+            ),
+        };
         AppView::Diff {
             log: None,
-            diff: Box::new(DiffView::new(snapshot)),
+            diff: Box::new(diff),
         }
     } else {
         let entries = source.load()?;
