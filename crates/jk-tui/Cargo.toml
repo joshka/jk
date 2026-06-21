@@ -11,7 +11,7 @@ repository.workspace = true
 
 [dependencies]
 ansi-to-tui.workspace = true
-jk-core = { path = "../jk-core", version = "0.2.4" }
+jk-core = { path = "../jk-core", version = "0.2.5" }
 ratatui.workspace = true
 textwrap.workspace = true
 
