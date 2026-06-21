@@ -7,6 +7,30 @@
 
 - Clean up README media captures ([#25](https://github.com/joshka/jk/pull/25))
 
+- chore: release v0.2.3 ([#26](https://github.com/joshka/jk/pull/26))
+
+- Start README media inside jk ([#27](https://github.com/joshka/jk/pull/27))
+
+- Document install commands ([#29](https://github.com/joshka/jk/pull/29))
+
+
+## Other
+
+
+- chore: release v0.2.3 ([#26](https://github.com/joshka/jk/pull/26))
+
+
+## Other
+
+
+- chore: release v0.2.3 ([#26](https://github.com/joshka/jk/pull/26))
+
+
+## Other
+
+
+- Clean up README media captures ([#25](https://github.com/joshka/jk/pull/25))
+
 
 ## Other
 
