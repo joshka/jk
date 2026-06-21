@@ -13,6 +13,15 @@ pub enum AppKey {
     /// Dispatch this action to the active view.
     Action(LogAction),
 
+    /// Start a search prompt in views that support search.
+    StartSearch,
+
+    /// Jump to the next search match.
+    SearchNext,
+
+    /// Jump to the previous search match.
+    SearchPrevious,
+
     /// Leave the active view unchanged.
     Ignore,
 }
@@ -53,6 +62,18 @@ impl AppKey {
                 code: KeyCode::Char('d'),
                 ..
             } => Self::Action(LogAction::OpenDiff),
+            KeyEvent {
+                code: KeyCode::Char('/'),
+                ..
+            } => Self::StartSearch,
+            KeyEvent {
+                code: KeyCode::Char('n'),
+                ..
+            } => Self::SearchNext,
+            KeyEvent {
+                code: KeyCode::Char('N'),
+                ..
+            } => Self::SearchPrevious,
             KeyEvent {
                 code: KeyCode::Char('k') | KeyCode::Up,
                 ..
@@ -167,6 +188,22 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::OpenDiff)
+        );
+    }
+
+    #[test]
+    fn slash_and_navigate_search_matches() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE)),
+            AppKey::StartSearch
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)),
+            AppKey::SearchNext
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE)),
+            AppKey::SearchPrevious
         );
     }
 

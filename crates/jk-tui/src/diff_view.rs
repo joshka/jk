@@ -28,7 +28,7 @@ pub enum DiffActionResult {
 }
 
 /// Input actions understood by the selected-change diff view.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum DiffAction {
     /// Leave the diff view unchanged.
@@ -69,6 +69,15 @@ pub enum DiffAction {
 
     /// Unfold every file section.
     UnfoldAll,
+
+    /// Search visible diff lines for text.
+    Search(String),
+
+    /// Jump to the next search match.
+    SearchNext,
+
+    /// Jump to the previous search match.
+    SearchPrevious,
 
     /// Refresh the diff.
     Refresh,
@@ -167,6 +176,18 @@ impl DiffView {
                 self.state.unfold_all_files();
                 DiffActionResult::Continue
             }
+            DiffAction::Search(query) => {
+                self.state.search(&query);
+                DiffActionResult::Continue
+            }
+            DiffAction::SearchNext => {
+                self.state.search_next();
+                DiffActionResult::Continue
+            }
+            DiffAction::SearchPrevious => {
+                self.state.search_previous();
+                DiffActionResult::Continue
+            }
             DiffAction::Refresh => DiffActionResult::Refresh,
             DiffAction::ReturnToLog => DiffActionResult::ReturnToLog,
             DiffAction::Quit => DiffActionResult::Quit,
@@ -176,10 +197,16 @@ impl DiffView {
     /// Renders the diff view.
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
-        self.render_area(frame, area);
+        self.render_area(frame, area, None);
     }
 
-    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect) {
+    /// Renders the diff view with a temporary status-line override.
+    pub fn render_with_status(&mut self, frame: &mut Frame<'_>, status: &str) {
+        let area = frame.area();
+        self.render_area(frame, area, Some(status));
+    }
+
+    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
         let areas = ViewChrome::layout(area);
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
@@ -192,7 +219,11 @@ impl DiffView {
         self.state
             .keep_selected_in_view(usize::from(body_area.height));
 
-        let status = self.status_message.as_deref().unwrap_or(DIFF_STATUS);
+        let search_status = self.state.search_status();
+        let status = status_override
+            .or(self.status_message.as_deref())
+            .or(search_status.as_deref())
+            .unwrap_or(DIFF_STATUS);
         let chrome = ViewChrome::new(self.state.title(), status);
         chrome.render(frame, areas);
 
@@ -310,6 +341,22 @@ mod tests {
 
         let _ = view.apply(DiffAction::UnfoldAll);
         assert!(!view.state.visible_rendered().contains(" | folded"));
+    }
+
+    #[test]
+    fn search_status_replaces_default_status_after_search() {
+        let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
+        let _ = view.apply(DiffAction::Search("alpha".to_owned()));
+        let backend = TestBackend::new(64, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("/alpha  1/1"));
     }
 
     #[test]

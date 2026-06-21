@@ -58,6 +58,11 @@ Hunk-level collapse remains out of scope.
 - Collapsed file sections survive refresh when the file still exists.
 - Tests cover target selection, refresh, return navigation, and collapse state.
 
+## Follow-Up Slices
+
+1. Diff search: `/` opens a search prompt, Enter jumps to the first visible line match, and `n`/`N`
+   repeat the last search forward or backward with wrapping.
+
 ## Validation
 
 - `cargo test -p jk-cli -p jk-tui -p jk --lib --bins`

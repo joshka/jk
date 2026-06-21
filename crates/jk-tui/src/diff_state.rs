@@ -16,6 +16,7 @@ pub struct DiffState {
     sections: Vec<FileSection>,
     selected: Option<usize>,
     collapsed_paths: BTreeSet<String>,
+    search: Option<SearchState>,
     scroll_offset: usize,
     viewport_height: usize,
 }
@@ -33,6 +34,7 @@ impl DiffState {
             sections,
             selected,
             collapsed_paths: BTreeSet::new(),
+            search: None,
             scroll_offset: 0,
             viewport_height: 10,
         }
@@ -58,6 +60,7 @@ impl DiffState {
             .or_else(|| (!self.sections.is_empty()).then_some(0));
 
         self.clamp_scroll_offset();
+        self.refresh_search_matches();
     }
 
     /// Returns the command context shown in the title bar.
@@ -255,6 +258,66 @@ impl DiffState {
             .map(ToOwned::to_owned)
     }
 
+    /// Searches visible diff lines and moves to the first match at or below the viewport.
+    pub fn search(&mut self, query: &str) {
+        if query.is_empty() {
+            self.search = None;
+            return;
+        }
+
+        let matches = matching_visible_lines(&self.visible_rendered(), query);
+        let selected = selected_match_at_or_after(&matches, self.scroll_offset);
+        self.search = Some(SearchState {
+            query: query.to_owned(),
+            matches,
+            selected,
+        });
+        self.scroll_to_selected_match();
+    }
+
+    /// Moves to the next search match, wrapping at the end of the diff.
+    pub fn search_next(&mut self) {
+        let Some(search) = &mut self.search else {
+            return;
+        };
+        if search.matches.is_empty() {
+            return;
+        }
+
+        let selected = search.selected.unwrap_or(0);
+        search.selected = Some((selected + 1) % search.matches.len());
+        self.scroll_to_selected_match();
+    }
+
+    /// Moves to the previous search match, wrapping at the beginning of the diff.
+    pub fn search_previous(&mut self) {
+        let Some(search) = &mut self.search else {
+            return;
+        };
+        if search.matches.is_empty() {
+            return;
+        }
+
+        let selected = search.selected.unwrap_or(0);
+        search.selected = Some(selected.checked_sub(1).unwrap_or(search.matches.len() - 1));
+        self.scroll_to_selected_match();
+    }
+
+    /// Returns status-line text for the current search, if any.
+    pub fn search_status(&self) -> Option<String> {
+        let search = self.search.as_ref()?;
+        let Some(selected) = search.selected else {
+            return Some(format!("/{}  no matches", search.query));
+        };
+
+        Some(format!(
+            "/{}  {}/{}  n next  N previous",
+            search.query,
+            selected + 1,
+            search.matches.len()
+        ))
+    }
+
     /// Returns whether the selected file section is collapsed.
     #[cfg(test)]
     pub fn selected_file_is_collapsed(&self) -> bool {
@@ -315,6 +378,32 @@ impl DiffState {
         }
     }
 
+    /// Recomputes search matches after the rendered visible body changes.
+    fn refresh_search_matches(&mut self) {
+        let Some(query) = self.search.as_ref().map(|search| search.query.clone()) else {
+            return;
+        };
+
+        let matches = matching_visible_lines(&self.visible_rendered(), &query);
+        let selected = selected_match_at_or_after(&matches, self.scroll_offset);
+        self.search = Some(SearchState {
+            query,
+            matches,
+            selected,
+        });
+    }
+
+    /// Scrolls to the selected search match and updates the current file from that line.
+    fn scroll_to_selected_match(&mut self) {
+        let Some(line) = self.search.as_ref().and_then(SearchState::selected_line) else {
+            return;
+        };
+
+        self.scroll_offset = line;
+        self.clamp_scroll_offset();
+        self.select_file_for_scroll_offset();
+    }
+
     /// Keeps scroll offset within the currently visible diff body.
     fn clamp_scroll_offset(&mut self) {
         let max_scroll_offset = self
@@ -349,6 +438,22 @@ impl DiffState {
             .map(|header| visible_width(header.trim_end_matches('\n')))
             .max()
             .unwrap_or_default()
+    }
+}
+
+/// State for the last submitted diff search.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SearchState {
+    query: String,
+    matches: Vec<usize>,
+    selected: Option<usize>,
+}
+
+impl SearchState {
+    /// Returns the visible line number of the selected search match.
+    fn selected_line(&self) -> Option<usize> {
+        self.selected
+            .and_then(|index| self.matches.get(index).copied())
     }
 }
 
@@ -446,6 +551,31 @@ fn file_header_path(line: &str) -> Option<String> {
 /// Returns the terminal-visible width of text after removing ANSI color escapes.
 fn visible_width(text: &str) -> usize {
     strip_ansi(text).chars().count()
+}
+
+/// Returns visible line numbers whose plain text contains `query`.
+fn matching_visible_lines(rendered: &str, query: &str) -> Vec<usize> {
+    let query = query.to_lowercase();
+    rendered
+        .lines()
+        .enumerate()
+        .filter_map(|(line, text)| {
+            let text = strip_ansi(text).to_lowercase();
+            text.contains(&query).then_some(line)
+        })
+        .collect()
+}
+
+/// Selects the first match at or below the current viewport, wrapping to the first match.
+fn selected_match_at_or_after(matches: &[usize], scroll_offset: usize) -> Option<usize> {
+    if matches.is_empty() {
+        return None;
+    }
+
+    matches
+        .iter()
+        .position(|line| *line >= scroll_offset)
+        .or(Some(0))
 }
 
 #[cfg(test)]
@@ -578,6 +708,55 @@ mod tests {
         state.select_first();
 
         assert_eq!(state.sticky_header(), None);
+    }
+
+    #[test]
+    fn search_jumps_to_matching_visible_line_and_repeats() {
+        let mut state = DiffState::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n alpha\n beta\nModified regular file src/b.rs:\n alphabet\n",
+        ));
+        state.keep_selected_in_view(2);
+
+        state.search("alpha");
+
+        assert_eq!(state.scroll_offset(), 1);
+        assert_eq!(
+            state.search_status(),
+            Some("/alpha  1/2  n next  N previous".to_owned())
+        );
+
+        state.search_next();
+
+        assert_eq!(state.scroll_offset(), 3);
+        assert_eq!(state.selected_visible_line(), Some(3));
+        assert_eq!(
+            state.search_status(),
+            Some("/alpha  2/2  n next  N previous".to_owned())
+        );
+
+        state.search_previous();
+
+        assert_eq!(state.scroll_offset(), 1);
+        assert_eq!(
+            state.search_status(),
+            Some("/alpha  1/2  n next  N previous".to_owned())
+        );
+    }
+
+    #[test]
+    fn search_reports_no_matches_without_moving_scroll() {
+        let mut state =
+            DiffState::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
+        state.keep_selected_in_view(2);
+
+        state.search("missing");
+
+        assert_eq!(state.scroll_offset(), 0);
+        assert_eq!(
+            state.search_status(),
+            Some("/missing  no matches".to_owned())
+        );
     }
 
     #[test]
