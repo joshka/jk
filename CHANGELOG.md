@@ -1,5 +1,6 @@
 # Changelog
 
+<!-- markdownlint-disable MD012 MD013 MD024 -->
 
 ## Other
 
@@ -35,5 +36,7 @@
 
 
 - Add semantic log snapshot model
+
+<!-- markdownlint-enable MD012 MD013 MD024 -->
 
 All notable changes to `jk` will be documented here.
