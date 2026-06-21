@@ -5,6 +5,30 @@
 ## Other
 
 
+- Set package homepage to jk site
+
+
+## Other
+
+
+- Set package homepage to jk site
+
+
+## Other
+
+
+- Set package homepage to jk site
+
+
+## Other
+
+
+- Set package homepage to jk site
+
+
+## Other
+
+
 - Clean up README media captures ([#25](https://github.com/joshka/jk/pull/25))
 
 - chore: release v0.2.3 ([#26](https://github.com/joshka/jk/pull/26))

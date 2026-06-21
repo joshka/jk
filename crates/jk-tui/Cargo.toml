@@ -6,11 +6,12 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
 ansi-to-tui.workspace = true
-jk-core = { path = "../jk-core", version = "0.2.3" }
+jk-core = { path = "../jk-core", version = "0.2.4" }
 ratatui.workspace = true
 textwrap.workspace = true
 
