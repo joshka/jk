@@ -5,12 +5,56 @@
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::prelude::{Color, Line, Modifier, Span, Style};
-use ratatui::widgets::Paragraph;
+use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
+use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
 /// Default log-view status text shown when there is no transient error.
 pub const LOG_STATUS: &str =
-    "H home  L log  r refresh  j/k move  space page  g/G edge  enter/right expand  q quit";
+    "? help  H home  L log  d diff  r refresh  j/k move  space/b page  q quit";
+
+/// Default diff-view status text shown when there is no transient error.
+pub const DIFF_STATUS: &str = "? help  r refresh  j/k line  space/b page  q quit";
+
+/// Renders a small mode-specific help overlay centered in the content area.
+pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[&str]) {
+    if area.is_empty() {
+        return;
+    }
+
+    let overlay = centered_rect(area, 72, lines.len().saturating_add(4));
+    frame.render_widget(Clear, overlay);
+
+    let text = Text::from(
+        std::iter::once(Line::from(Span::styled(
+            title,
+            Style::new().add_modifier(Modifier::BOLD),
+        )))
+        .chain(std::iter::once(Line::from("")))
+        .chain(lines.iter().copied().map(Line::from))
+        .collect::<Vec<_>>(),
+    );
+    let paragraph = Paragraph::new(text)
+        .block(Block::bordered())
+        .style(Style::new().fg(Color::White).bg(Color::Black))
+        .wrap(Wrap { trim: false });
+    frame.render_widget(paragraph, overlay);
+}
+
+fn centered_rect(area: Rect, preferred_width: usize, preferred_height: usize) -> Rect {
+    let width = u16::try_from(preferred_width)
+        .unwrap_or(u16::MAX)
+        .min(area.width);
+    let height = u16::try_from(preferred_height)
+        .unwrap_or(u16::MAX)
+        .min(area.height);
+
+    Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    }
+}
 
 const DEFAULT_TITLE: &str = "jj log";
 

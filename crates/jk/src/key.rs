@@ -13,6 +13,15 @@ pub enum AppKey {
     /// Dispatch this action to the active view.
     Action(LogAction),
 
+    /// Start a search prompt in views that support search.
+    StartSearch,
+
+    /// Jump to the next search match.
+    SearchNext,
+
+    /// Jump to the previous search match.
+    SearchPrevious,
+
     /// Leave the active view unchanged.
     Ignore,
 }
@@ -24,29 +33,26 @@ impl AppKey {
             return action_for_control_key(key.code);
         }
 
+        if let KeyCode::Char(character) = key.code
+            && let Some(action) = action_for_character_key(character)
+        {
+            return action;
+        }
+
         match key {
             KeyEvent {
                 code: KeyCode::Char('q') | KeyCode::Esc,
                 ..
             } => Self::Action(LogAction::Quit),
             KeyEvent {
-                code: KeyCode::Char('r'),
+                code: KeyCode::Right | KeyCode::Enter,
                 ..
-            } => Self::Action(LogAction::Refresh),
+            } => Self::Action(LogAction::ToggleExpanded),
             KeyEvent {
-                code: KeyCode::Char('H'),
-                ..
-            } => Self::Action(LogAction::Home),
-            KeyEvent {
-                code: KeyCode::Char('L'),
-                ..
-            } => Self::Action(LogAction::Log),
-            KeyEvent {
-                code: KeyCode::Char('k') | KeyCode::Up,
-                ..
+                code: KeyCode::Up, ..
             } => Self::Action(LogAction::Previous),
             KeyEvent {
-                code: KeyCode::Char('j') | KeyCode::Down,
+                code: KeyCode::Down,
                 ..
             } => Self::Action(LogAction::Next),
             KeyEvent {
@@ -67,17 +73,12 @@ impl AppKey {
                 ..
             } => Self::Action(LogAction::PageNext),
             KeyEvent {
-                code: KeyCode::Char('g') | KeyCode::Home,
+                code: KeyCode::Home,
                 ..
             } => Self::Action(LogAction::First),
             KeyEvent {
-                code: KeyCode::Char('G') | KeyCode::End,
-                ..
+                code: KeyCode::End, ..
             } => Self::Action(LogAction::Last),
-            KeyEvent {
-                code: KeyCode::Enter | KeyCode::Right,
-                ..
-            } => Self::Action(LogAction::ToggleExpanded),
             KeyEvent {
                 code: KeyCode::Left,
                 ..
@@ -87,11 +88,44 @@ impl AppKey {
     }
 }
 
+/// Interprets unmodified character keys.
+const fn action_for_character_key(character: char) -> Option<AppKey> {
+    match character {
+        'q' => Some(AppKey::Action(LogAction::Quit)),
+        'r' => Some(AppKey::Action(LogAction::Refresh)),
+        'H' => Some(AppKey::Action(LogAction::Home)),
+        'L' => Some(AppKey::Action(LogAction::Log)),
+        'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
+        'd' => Some(AppKey::Action(LogAction::OpenDiff)),
+        '?' => Some(AppKey::Action(LogAction::ToggleHelp)),
+        '/' => Some(AppKey::StartSearch),
+        'n' => Some(AppKey::SearchNext),
+        'N' => Some(AppKey::SearchPrevious),
+        'b' => Some(AppKey::Action(LogAction::PagePrevious)),
+        'k' => Some(AppKey::Action(LogAction::Previous)),
+        'j' => Some(AppKey::Action(LogAction::Next)),
+        'g' => Some(AppKey::Action(LogAction::First)),
+        'G' => Some(AppKey::Action(LogAction::Last)),
+        '[' => Some(AppKey::Action(LogAction::PreviousFile)),
+        ']' => Some(AppKey::Action(LogAction::NextFile)),
+        '{' => Some(AppKey::Action(LogAction::PreviousHunk)),
+        '}' => Some(AppKey::Action(LogAction::NextHunk)),
+        '-' => Some(AppKey::Action(LogAction::FoldHunk)),
+        '+' => Some(AppKey::Action(LogAction::UnfoldHunk)),
+        '<' => Some(AppKey::Action(LogAction::HorizontalPrevious)),
+        '>' => Some(AppKey::Action(LogAction::HorizontalNext)),
+        'h' => Some(AppKey::Action(LogAction::CollapseExpanded)),
+        _ => None,
+    }
+}
+
 /// Interprets Ctrl-key bindings that should override ordinary character keys.
 const fn action_for_control_key(code: KeyCode) -> AppKey {
     match code {
         KeyCode::Char('b') => AppKey::Action(LogAction::PagePrevious),
         KeyCode::Char('f') => AppKey::Action(LogAction::PageNext),
+        KeyCode::Left => AppKey::Action(LogAction::FoldAll),
+        KeyCode::Right => AppKey::Action(LogAction::UnfoldAll),
         _ => AppKey::Ignore,
     }
 }
@@ -101,13 +135,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn enter_and_right_toggle_expanded_details() {
+    fn enter_toggles_expanded_details() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
-            AppKey::Action(LogAction::ToggleExpanded)
-        );
-        assert_eq!(
-            AppKey::from_crossterm(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
             AppKey::Action(LogAction::ToggleExpanded)
         );
     }
@@ -117,6 +147,22 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE)),
             AppKey::Action(LogAction::CollapseExpanded)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::CollapseExpanded)
+        );
+    }
+
+    #[test]
+    fn right_and_l_toggle_expanded_details() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleExpanded)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleExpanded)
         );
     }
 
@@ -133,6 +179,98 @@ mod tests {
     }
 
     #[test]
+    fn lowercase_d_opens_selected_diff() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::OpenDiff)
+        );
+    }
+
+    #[test]
+    fn question_mark_toggles_mode_help() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleHelp)
+        );
+    }
+
+    #[test]
+    fn slash_and_navigate_search_matches() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE)),
+            AppKey::StartSearch
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)),
+            AppKey::SearchNext
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE)),
+            AppKey::SearchPrevious
+        );
+    }
+
+    #[test]
+    fn brackets_jump_between_diff_files() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('['), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::PreviousFile)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(']'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::NextFile)
+        );
+    }
+
+    #[test]
+    fn angle_brackets_scroll_horizontally() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('<'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::HorizontalPrevious)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('>'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::HorizontalNext)
+        );
+    }
+
+    #[test]
+    fn braces_jump_between_diff_hunks() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('{'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::PreviousHunk)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('}'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::NextHunk)
+        );
+    }
+
+    #[test]
+    fn minus_and_plus_fold_and_unfold_diff_hunks() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::FoldHunk)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::UnfoldHunk)
+        );
+    }
+
+    #[test]
+    fn control_arrows_fold_and_unfold_diff_files() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::FoldAll)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::UnfoldAll)
+        );
+    }
+
+    #[test]
     fn page_and_vimish_navigation_keys_move_by_larger_steps() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE)),
@@ -144,6 +282,10 @@ mod tests {
         );
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::PagePrevious)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::PagePrevious)
         );
         assert_eq!(

@@ -8,9 +8,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use color_eyre::Result;
-use crossterm::event::{self, Event};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
-use jk_cli::{JjLog, JjLogCommand};
+use jk_cli::{JjDiff, JjLog, JjLogCommand};
+use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogView};
 
 mod key;
@@ -39,6 +40,9 @@ struct Args {
 enum Command {
     /// Show the jj log view.
     Log(LogArgs),
+
+    /// Show the jj diff view for a revision.
+    Diff(DiffArgs),
 }
 
 /// Options for the explicit `jk log` command.
@@ -49,15 +53,40 @@ struct LogArgs {
     limit: Option<usize>,
 }
 
+/// Options for the explicit `jk diff` command.
+#[derive(Debug, Parser)]
+struct DiffArgs {
+    /// Revision to diff against its parent.
+    #[arg(default_value = "@")]
+    revision: String,
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     let source = log_source(&args);
-    let entries = source.load()?;
-    let app = LogView::new(entries);
+    let diff_source = diff_source(&args);
+    let app = if let Some(Command::Diff(diff_args)) = &args.command {
+        let snapshot = diff_source.load(&diff_args.revision);
+        let diff = match snapshot {
+            Ok(snapshot) => DiffView::new(snapshot),
+            Err(error) => DiffView::from_error(
+                diff_args.revision.clone(),
+                format!("jj diff -r {}", diff_args.revision),
+                error.to_string(),
+            ),
+        };
+        AppView::Diff {
+            log: None,
+            diff: Box::new(diff),
+        }
+    } else {
+        let entries = source.load()?;
+        AppView::Log(LogView::new(entries))
+    };
 
-    run_terminal(app, source)?;
+    run_terminal(app, source, &diff_source)?;
     Ok(())
 }
 
@@ -69,7 +98,7 @@ fn main() -> Result<()> {
 fn log_source(args: &Args) -> JjLog {
     let (command, limit) = match &args.command {
         Some(Command::Log(log_args)) => (JjLogCommand::Log, log_args.limit.or(args.limit)),
-        None => (JjLogCommand::ConfiguredDefault, args.limit),
+        Some(Command::Diff(_)) | None => (JjLogCommand::ConfiguredDefault, args.limit),
     };
 
     let source = JjLog::default().with_command(command).with_limit(limit);
@@ -80,41 +109,85 @@ fn log_source(args: &Args) -> JjLog {
     }
 }
 
+/// Builds the diff source for selected-change inspection.
+fn diff_source(args: &Args) -> JjDiff {
+    let source = JjDiff::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Active top-level application view.
+#[derive(Debug)]
+enum AppView {
+    Log(LogView),
+    Diff {
+        log: Option<LogView>,
+        diff: Box<DiffView>,
+    },
+}
+
 /// Owns the terminal event loop for the current log-first application.
 ///
 /// The view remains responsible for state transitions and rendering. This loop only translates
 /// terminal events, performs I/O requested by the view, and redraws when input or terminal resize
 /// events can change the screen.
-fn run_terminal(mut app: LogView, mut source: JjLog) -> Result<()> {
+fn run_terminal(mut app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result<()> {
     // jj should keep configured colors even when the parent process was run by an agent or tool
     // that exports NO_COLOR.
     force_color_output(true);
     let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
     let _terminal_restore = TerminalRestore;
     let mut needs_redraw = true;
+    let mut input_mode = InputMode::Normal;
 
     loop {
         if needs_redraw {
-            terminal.draw(|frame| app.render(frame))?;
+            terminal.draw(|frame| match &mut app {
+                AppView::Log(log) => log.render(frame),
+                AppView::Diff { diff, .. } => match &input_mode {
+                    InputMode::Normal => diff.render(frame),
+                    InputMode::DiffSearch { query } => {
+                        let status = format!("/{query}");
+                        diff.render_with_status(frame, &status);
+                    }
+                },
+            })?;
             needs_redraw = false;
         }
 
         match event::read()? {
             Event::Key(key) => {
+                if handle_input_mode(&mut app, &mut input_mode, key) == InputModeResult::Handled {
+                    needs_redraw = true;
+                    continue;
+                }
+
                 let AppKey::Action(action) = AppKey::from_crossterm(key) else {
+                    match AppKey::from_crossterm(key) {
+                        AppKey::StartSearch if matches!(app, AppView::Diff { .. }) => {
+                            input_mode = InputMode::DiffSearch {
+                                query: String::new(),
+                            };
+                            needs_redraw = true;
+                        }
+                        AppKey::SearchNext => {
+                            apply_diff_search_action(&mut app, DiffAction::SearchNext);
+                            needs_redraw = true;
+                        }
+                        AppKey::SearchPrevious => {
+                            apply_diff_search_action(&mut app, DiffAction::SearchPrevious);
+                            needs_redraw = true;
+                        }
+                        _ => {}
+                    }
                     continue;
                 };
 
-                match app.apply(action) {
-                    ActionResult::Refresh => refresh_log(&mut app, &source),
-                    ActionResult::SwitchHome => {
-                        switch_log_command(&mut app, &mut source, JjLogCommand::ConfiguredDefault);
-                    }
-                    ActionResult::SwitchLog => {
-                        switch_log_command(&mut app, &mut source, JjLogCommand::Log);
-                    }
-                    ActionResult::Quit => break,
-                    _ => {}
+                if apply_action(&mut app, &mut source, diff_source, action) == AppLoop::Quit {
+                    break;
                 }
                 needs_redraw = true;
             }
@@ -128,9 +201,214 @@ fn run_terminal(mut app: LogView, mut source: JjLog) -> Result<()> {
     Ok(())
 }
 
+/// Transient input modes owned by the terminal loop.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum InputMode {
+    Normal,
+    DiffSearch { query: String },
+}
+
+/// Whether an input-mode handler consumed a key event.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum InputModeResult {
+    Handled,
+    Unhandled,
+}
+
+/// Handles key input while a prompt-like mode is active.
+fn handle_input_mode(
+    app: &mut AppView,
+    input_mode: &mut InputMode,
+    key: KeyEvent,
+) -> InputModeResult {
+    let InputMode::DiffSearch { query } = input_mode else {
+        return InputModeResult::Unhandled;
+    };
+
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc, ..
+        } => {
+            *input_mode = InputMode::Normal;
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            apply_diff_search_action(app, DiffAction::Search(query.clone()));
+            *input_mode = InputMode::Normal;
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        } => {
+            query.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            query.push(character);
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+/// Applies a search-only diff action when the active view supports it.
+fn apply_diff_search_action(app: &mut AppView, action: DiffAction) {
+    if let AppView::Diff { diff, .. } = app {
+        let _ = diff.apply(action);
+    }
+}
+
+/// Applies an action to the active view and performs any requested I/O.
+fn apply_action(
+    app: &mut AppView,
+    source: &mut JjLog,
+    diff_source: &JjDiff,
+    action: jk_tui::log_view::LogAction,
+) -> AppLoop {
+    let transition = match app {
+        AppView::Log(log) => apply_log_action(log, source, diff_source, action),
+        AppView::Diff { diff, .. } => apply_diff_action(diff, diff_source, action),
+    };
+
+    match transition {
+        AppTransition::Continue => AppLoop::Continue,
+        AppTransition::OpenDiff(diff) => {
+            let previous = std::mem::replace(app, AppView::Log(LogView::default()));
+            if let AppView::Log(log) = previous {
+                *app = AppView::Diff {
+                    log: Some(log),
+                    diff,
+                };
+            }
+            AppLoop::Continue
+        }
+        AppTransition::ReturnToLog => {
+            let previous = std::mem::replace(app, AppView::Log(LogView::default()));
+            if let AppView::Diff { log, diff } = previous {
+                if let Some(log) = log {
+                    *app = AppView::Log(log);
+                } else {
+                    *app = AppView::Diff { log: None, diff };
+                }
+            }
+            AppLoop::Continue
+        }
+        AppTransition::Quit => AppLoop::Quit,
+    }
+}
+
+/// Applies an action while the log view is active.
+fn apply_log_action(
+    log: &mut LogView,
+    source: &mut JjLog,
+    diff_source: &JjDiff,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    match log.apply(action) {
+        ActionResult::Refresh => refresh_log(log, source),
+        ActionResult::SwitchHome => {
+            switch_log_command(log, source, JjLogCommand::ConfiguredDefault);
+        }
+        ActionResult::SwitchLog => switch_log_command(log, source, JjLogCommand::Log),
+        ActionResult::Quit => return AppTransition::Quit,
+        _ => {}
+    }
+
+    if action == jk_tui::log_view::LogAction::OpenDiff {
+        let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
+            return AppTransition::Continue;
+        };
+
+        match diff_source.load(&change_id) {
+            Ok(snapshot) => {
+                let diff = DiffView::new(snapshot);
+                return AppTransition::OpenDiff(Box::new(diff));
+            }
+            Err(error) => log.show_error(error.to_string()),
+        }
+    }
+
+    AppTransition::Continue
+}
+
+/// Applies an action while the diff view is active.
+fn apply_diff_action(
+    diff: &mut DiffView,
+    diff_source: &JjDiff,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let diff_action = match action {
+        jk_tui::log_view::LogAction::Previous => DiffAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::Next => DiffAction::ScrollNext,
+        jk_tui::log_view::LogAction::PagePrevious => DiffAction::PagePrevious,
+        jk_tui::log_view::LogAction::PageNext => DiffAction::PageNext,
+        jk_tui::log_view::LogAction::First => DiffAction::First,
+        jk_tui::log_view::LogAction::Last => DiffAction::Last,
+        jk_tui::log_view::LogAction::PreviousFile => DiffAction::PreviousFile,
+        jk_tui::log_view::LogAction::NextFile => DiffAction::NextFile,
+        jk_tui::log_view::LogAction::PreviousHunk => DiffAction::PreviousHunk,
+        jk_tui::log_view::LogAction::NextHunk => DiffAction::NextHunk,
+        jk_tui::log_view::LogAction::FoldHunk => DiffAction::FoldHunk,
+        jk_tui::log_view::LogAction::UnfoldHunk => DiffAction::UnfoldHunk,
+        jk_tui::log_view::LogAction::HorizontalPrevious => DiffAction::ScrollLeft,
+        jk_tui::log_view::LogAction::HorizontalNext => DiffAction::ScrollRight,
+        jk_tui::log_view::LogAction::ToggleHelp => DiffAction::ToggleHelp,
+        jk_tui::log_view::LogAction::ToggleExpanded => DiffAction::UnfoldFile,
+        jk_tui::log_view::LogAction::CollapseExpanded => DiffAction::FoldFile,
+        jk_tui::log_view::LogAction::FoldAll => DiffAction::FoldAll,
+        jk_tui::log_view::LogAction::UnfoldAll => DiffAction::UnfoldAll,
+        jk_tui::log_view::LogAction::Refresh => DiffAction::Refresh,
+        jk_tui::log_view::LogAction::OpenDiff => DiffAction::Ignore,
+        jk_tui::log_view::LogAction::Quit => DiffAction::Quit,
+        _ => DiffAction::ReturnToLog,
+    };
+
+    match diff.apply(diff_action) {
+        DiffActionResult::Refresh => refresh_diff(diff, diff_source),
+        DiffActionResult::ReturnToLog => return AppTransition::ReturnToLog,
+        DiffActionResult::Quit => return AppTransition::Quit,
+        _ => {}
+    }
+
+    AppTransition::Continue
+}
+
+/// Whether the terminal event loop should continue running.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AppLoop {
+    Continue,
+    Quit,
+}
+
+/// View transition requested after an action is applied.
+#[derive(Debug)]
+enum AppTransition {
+    Continue,
+    OpenDiff(Box<DiffView>),
+    ReturnToLog,
+    Quit,
+}
+
 /// Reloads the current command without replacing the view on failure.
 fn refresh_log(app: &mut LogView, source: &JjLog) {
     match source.load() {
+        Ok(snapshot) => app.refresh(snapshot),
+        Err(error) => app.show_error(error.to_string()),
+    }
+}
+
+/// Reloads the active diff without replacing the view on failure.
+fn refresh_diff(app: &mut DiffView, source: &JjDiff) {
+    let change_id = app.change_id().to_owned();
+    match source.load(&change_id) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
