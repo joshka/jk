@@ -64,6 +64,8 @@ Hunk-level collapse remains out of scope.
    repeat the last search forward or backward with wrapping.
 1. Current-file context: when the real file header scrolls offscreen, the pinned header includes
    the same stat suffix and a compact file index such as `[file 1/3]`.
+1. Horizontal overflow: `<` and `>` scroll wide diff content horizontally, with the current column
+   shown in the status line when shifted.
 
 ## Validation
 

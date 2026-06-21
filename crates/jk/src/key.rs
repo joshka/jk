@@ -116,6 +116,14 @@ impl AppKey {
                 ..
             } => Self::Action(LogAction::NextFile),
             KeyEvent {
+                code: KeyCode::Char('<'),
+                ..
+            } => Self::Action(LogAction::HorizontalPrevious),
+            KeyEvent {
+                code: KeyCode::Char('>'),
+                ..
+            } => Self::Action(LogAction::HorizontalNext),
+            KeyEvent {
                 code: KeyCode::Char('h') | KeyCode::Left,
                 ..
             } => Self::Action(LogAction::CollapseExpanded),
@@ -216,6 +224,18 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(']'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::NextFile)
+        );
+    }
+
+    #[test]
+    fn angle_brackets_scroll_horizontally() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('<'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::HorizontalPrevious)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('>'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::HorizontalNext)
         );
     }
 

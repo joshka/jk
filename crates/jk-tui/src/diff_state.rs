@@ -8,6 +8,9 @@ use jk_core::{DiffFileStat, DiffSnapshot};
 use crate::ansi_text::strip_ansi;
 use crate::chrome::title_or_default;
 
+const HORIZONTAL_SCROLL_STEP: usize = 8;
+const DIFF_HORIZONTAL_STATUS: &str = "</> horizontal scroll";
+
 /// Semantic state behind a rendered selected-change diff.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DiffState {
@@ -19,7 +22,9 @@ pub struct DiffState {
     collapsed_paths: BTreeSet<String>,
     search: Option<SearchState>,
     scroll_offset: usize,
+    horizontal_offset: usize,
     viewport_height: usize,
+    viewport_width: usize,
 }
 
 impl DiffState {
@@ -37,7 +42,9 @@ impl DiffState {
             collapsed_paths: BTreeSet::new(),
             search: None,
             scroll_offset: 0,
+            horizontal_offset: 0,
             viewport_height: 10,
+            viewport_width: 80,
         }
     }
 
@@ -61,6 +68,7 @@ impl DiffState {
             .or_else(|| (!self.sections.is_empty()).then_some(0));
 
         self.clamp_scroll_offset();
+        self.clamp_horizontal_offset();
         self.refresh_search_matches();
     }
 
@@ -77,6 +85,11 @@ impl DiffState {
     /// Returns the first rendered line currently visible in the viewport.
     pub const fn scroll_offset(&self) -> usize {
         self.scroll_offset
+    }
+
+    /// Returns the first rendered column currently visible in the viewport.
+    pub const fn horizontal_offset(&self) -> usize {
+        self.horizontal_offset
     }
 
     /// Scrolls one visible line toward the start of the diff.
@@ -126,6 +139,21 @@ impl DiffState {
         self.scroll_offset = usize::MAX;
         self.clamp_scroll_offset();
         self.select_file_for_scroll_offset();
+    }
+
+    /// Scrolls wide diff lines toward the start.
+    pub const fn scroll_left(&mut self) {
+        self.horizontal_offset = self
+            .horizontal_offset
+            .saturating_sub(HORIZONTAL_SCROLL_STEP);
+    }
+
+    /// Scrolls wide diff lines toward the end.
+    pub fn scroll_right(&mut self) {
+        self.horizontal_offset = self
+            .horizontal_offset
+            .saturating_add(HORIZONTAL_SCROLL_STEP);
+        self.clamp_horizontal_offset();
     }
 
     /// Jumps to the previous file section.
@@ -191,6 +219,12 @@ impl DiffState {
     pub fn keep_selected_in_view(&mut self, height: usize) {
         self.viewport_height = height.max(1);
         self.clamp_scroll_offset();
+    }
+
+    /// Updates viewport width and clamps horizontal scrolling to visible content.
+    pub fn set_viewport_width(&mut self, width: usize) {
+        self.viewport_width = width.max(1);
+        self.clamp_horizontal_offset();
     }
 
     /// Returns the visible diff body after applying collapsed file sections.
@@ -335,6 +369,16 @@ impl DiffState {
         ))
     }
 
+    /// Returns status-line text for horizontal scroll state, if the view is shifted.
+    pub fn horizontal_status(&self) -> Option<String> {
+        (self.horizontal_offset > 0).then(|| {
+            format!(
+                "{DIFF_HORIZONTAL_STATUS}  col {}",
+                self.horizontal_offset + 1
+            )
+        })
+    }
+
     /// Returns whether the selected file section is collapsed.
     #[cfg(test)]
     pub fn selected_file_is_collapsed(&self) -> bool {
@@ -429,6 +473,18 @@ impl DiffState {
             .count()
             .saturating_sub(self.viewport_height);
         self.scroll_offset = self.scroll_offset.min(max_scroll_offset);
+    }
+
+    /// Keeps horizontal offset within the widest visible line.
+    fn clamp_horizontal_offset(&mut self) {
+        let max_horizontal_offset = self
+            .visible_rendered()
+            .lines()
+            .map(visible_width)
+            .max()
+            .unwrap_or_default()
+            .saturating_sub(self.viewport_width);
+        self.horizontal_offset = self.horizontal_offset.min(max_horizontal_offset);
     }
 
     /// Maps an original rendered line number to its line number after collapsed sections are
@@ -808,6 +864,31 @@ mod tests {
             state.search_status(),
             Some("/missing  no matches".to_owned())
         );
+    }
+
+    #[test]
+    fn horizontal_scroll_moves_by_columns_and_clamps_to_wide_content() {
+        let mut state = DiffState::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n 12345678901234567890\n",
+        ));
+        state.set_viewport_width(10);
+
+        state.scroll_right();
+
+        assert_eq!(state.horizontal_offset(), 8);
+        assert_eq!(
+            state.horizontal_status(),
+            Some("</> horizontal scroll  col 9".to_owned())
+        );
+
+        state.scroll_right();
+
+        assert_eq!(state.horizontal_offset(), 16);
+
+        state.scroll_left();
+
+        assert_eq!(state.horizontal_offset(), 8);
     }
 
     #[test]

@@ -70,6 +70,12 @@ pub enum DiffAction {
     /// Unfold every file section.
     UnfoldAll,
 
+    /// Scroll wide diff lines toward the start.
+    ScrollLeft,
+
+    /// Scroll wide diff lines toward the end.
+    ScrollRight,
+
     /// Search visible diff lines for text.
     Search(String),
 
@@ -176,6 +182,14 @@ impl DiffView {
                 self.state.unfold_all_files();
                 DiffActionResult::Continue
             }
+            DiffAction::ScrollLeft => {
+                self.state.scroll_left();
+                DiffActionResult::Continue
+            }
+            DiffAction::ScrollRight => {
+                self.state.scroll_right();
+                DiffActionResult::Continue
+            }
             DiffAction::Search(query) => {
                 self.state.search(&query);
                 DiffActionResult::Continue
@@ -210,6 +224,8 @@ impl DiffView {
         let areas = ViewChrome::layout(area);
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
+        self.state
+            .set_viewport_width(usize::from(areas.content.width));
         let sticky_header = self.state.sticky_header();
         let body_area = if sticky_header.is_some() {
             area_below_sticky_header(areas.content)
@@ -218,11 +234,14 @@ impl DiffView {
         };
         self.state
             .keep_selected_in_view(usize::from(body_area.height));
+        self.state.set_viewport_width(usize::from(body_area.width));
 
         let search_status = self.state.search_status();
+        let horizontal_status = self.state.horizontal_status();
         let status = status_override
             .or(self.status_message.as_deref())
             .or(search_status.as_deref())
+            .or(horizontal_status.as_deref())
             .unwrap_or(DIFF_STATUS);
         let chrome = ViewChrome::new(self.state.title(), status);
         chrome.render(frame, areas);
@@ -230,7 +249,8 @@ impl DiffView {
         let rendered = self.state.visible_rendered();
         let text = rendered_text(&rendered);
         let scroll = u16::try_from(self.state.scroll_offset()).unwrap_or(u16::MAX);
-        let paragraph = Paragraph::new(text).scroll((scroll, 0));
+        let horizontal_scroll = u16::try_from(self.state.horizontal_offset()).unwrap_or(u16::MAX);
+        let paragraph = Paragraph::new(text).scroll((scroll, horizontal_scroll));
         frame.render_widget(paragraph, body_area);
 
         if let Some(header) = sticky_header {
@@ -238,7 +258,7 @@ impl DiffView {
                 height: 1,
                 ..areas.content
             };
-            let paragraph = Paragraph::new(rendered_text(&header));
+            let paragraph = Paragraph::new(rendered_text(&header)).scroll((0, horizontal_scroll));
             frame.render_widget(paragraph, sticky_area);
             paint_subtle_selected_row(frame, sticky_area, 0, 0);
         }
@@ -357,6 +377,28 @@ mod tests {
         assert!(draw_result.is_ok());
 
         assert!(buffer_line(terminal.backend().buffer(), 4).contains("/alpha  1/1"));
+    }
+
+    #[test]
+    fn horizontal_scroll_shifts_body_and_reports_column() {
+        let mut view = DiffView::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n 1234567890123456789012345678901234567890\n",
+        ));
+        let backend = TestBackend::new(32, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        let _ = view.apply(DiffAction::ScrollRight);
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert_eq!(view.state.horizontal_offset(), 8);
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("col 9"));
     }
 
     #[test]

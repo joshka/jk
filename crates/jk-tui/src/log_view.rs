@@ -69,6 +69,12 @@ pub enum LogAction {
     /// Move to the next file section in views that support file sections.
     NextFile,
 
+    /// Scroll horizontally toward the start in views that support wide content.
+    HorizontalPrevious,
+
+    /// Scroll horizontally toward the end in views that support wide content.
+    HorizontalNext,
+
     /// Fold all collapsible sections in views that support sections.
     FoldAll,
 
@@ -172,6 +178,8 @@ impl LogView {
             }
             LogAction::PreviousFile
             | LogAction::NextFile
+            | LogAction::HorizontalPrevious
+            | LogAction::HorizontalNext
             | LogAction::FoldAll
             | LogAction::UnfoldAll => ActionResult::Continue,
             LogAction::ToggleExpanded => {
