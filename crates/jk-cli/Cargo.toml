@@ -9,7 +9,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-jk-core = { path = "../jk-core", version = "0.2.0" }
+jk-core = { path = "../jk-core", version = "0.2.1" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
