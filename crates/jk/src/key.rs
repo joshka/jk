@@ -108,6 +108,8 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         ']' => Some(AppKey::Action(LogAction::NextFile)),
         '{' => Some(AppKey::Action(LogAction::PreviousHunk)),
         '}' => Some(AppKey::Action(LogAction::NextHunk)),
+        '-' => Some(AppKey::Action(LogAction::FoldHunk)),
+        '+' => Some(AppKey::Action(LogAction::UnfoldHunk)),
         '<' => Some(AppKey::Action(LogAction::HorizontalPrevious)),
         '>' => Some(AppKey::Action(LogAction::HorizontalNext)),
         'h' => Some(AppKey::Action(LogAction::CollapseExpanded)),
@@ -231,6 +233,18 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('}'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::NextHunk)
+        );
+    }
+
+    #[test]
+    fn minus_and_plus_fold_and_unfold_diff_hunks() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::FoldHunk)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::UnfoldHunk)
         );
     }
 

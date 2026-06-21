@@ -14,7 +14,7 @@ pub const LOG_STATUS: &str =
 
 /// Default diff-view status text shown when there is no transient error.
 pub const DIFF_STATUS: &str =
-    "H/L log  r refresh  j/k line  space page  [/]: file  {/}: hunk  </> hscroll  h/l fold";
+    "H/L log  r refresh  j/k line  space page  [/]: file  {/}: hunk  -/+ fold hunk  h/l fold file";
 
 const DEFAULT_TITLE: &str = "jj log";
 

@@ -22,6 +22,7 @@ pub struct DiffState {
     selected: Option<usize>,
     selected_hunk: Option<usize>,
     collapsed_paths: BTreeSet<String>,
+    collapsed_hunks: BTreeSet<String>,
     search: Option<SearchState>,
     scroll_offset: usize,
     horizontal_offset: usize,
@@ -45,6 +46,7 @@ impl DiffState {
             selected,
             selected_hunk: None,
             collapsed_paths: BTreeSet::new(),
+            collapsed_hunks: BTreeSet::new(),
             search: None,
             scroll_offset: 0,
             horizontal_offset: 0,
@@ -66,6 +68,8 @@ impl DiffState {
         self.selected_hunk = None;
         self.collapsed_paths
             .retain(|path| self.sections.iter().any(|section| section.path == *path));
+        self.collapsed_hunks
+            .retain(|key| self.hunks.iter().any(|hunk| hunk.key == *key));
         self.selected = selected_path
             .and_then(|path| {
                 self.sections
@@ -206,6 +210,34 @@ impl DiffState {
         self.select_hunk_index((index + 1).min(self.hunks.len().saturating_sub(1)));
     }
 
+    /// Folds the selected or current hunk.
+    pub fn fold_selected_hunk(&mut self) {
+        let Some(index) = self.current_hunk_index() else {
+            return;
+        };
+        let Some(hunk) = self.hunks.get(index) else {
+            return;
+        };
+
+        self.collapsed_hunks.insert(hunk.key.clone());
+        self.select_hunk_index(index);
+        self.clamp_scroll_offset();
+    }
+
+    /// Unfolds the selected or current hunk.
+    pub fn unfold_selected_hunk(&mut self) {
+        let Some(index) = self.current_hunk_index() else {
+            return;
+        };
+        let Some(hunk) = self.hunks.get(index) else {
+            return;
+        };
+
+        self.collapsed_hunks.remove(&hunk.key);
+        self.select_hunk_index(index);
+        self.clamp_scroll_offset();
+    }
+
     /// Folds the selected file section.
     pub fn fold_selected_file(&mut self) {
         let Some(path) = self.selected_section().map(|section| section.path.clone()) else {
@@ -258,9 +290,11 @@ impl DiffState {
         self.clamp_horizontal_offset();
     }
 
-    /// Returns the visible diff body after applying collapsed file sections.
+    /// Returns the visible diff body after applying collapsed sections.
     pub fn visible_rendered(&self) -> String {
-        if self.sections.is_empty() || self.collapsed_paths.is_empty() {
+        if self.sections.is_empty()
+            || (self.collapsed_paths.is_empty() && self.collapsed_hunks.is_empty())
+        {
             return self.rendered.clone();
         }
 
@@ -269,7 +303,7 @@ impl DiffState {
         let mut visible = String::new();
         let mut line_index = 0;
 
-        for section in &self.sections {
+        for (section_index, section) in self.sections.iter().enumerate() {
             while line_index < section.start_line {
                 if let Some(line) = lines.get(line_index) {
                     visible.push_str(line);
@@ -278,6 +312,21 @@ impl DiffState {
             }
 
             if !self.collapsed_paths.contains(&section.path) {
+                let folded_hunks = self
+                    .hunks
+                    .iter()
+                    .filter(|hunk| hunk.file_index == section_index)
+                    .filter(|hunk| self.collapsed_hunks.contains(&hunk.key));
+                for hunk in folded_hunks {
+                    while line_index <= hunk.start_line {
+                        if let Some(line) = lines.get(line_index) {
+                            visible.push_str(line);
+                        }
+                        line_index += 1;
+                    }
+                    visible.push_str("  | folded hunk\n");
+                    line_index = hunk.end_line;
+                }
                 while line_index < section.end_line {
                     if let Some(line) = lines.get(line_index) {
                         visible.push_str(line);
@@ -565,6 +614,21 @@ impl DiffState {
             }
         }
 
+        for hunk in self
+            .hunks
+            .iter()
+            .filter(|hunk| hunk.start_line < rendered_line)
+        {
+            let Some(section) = self.sections.get(hunk.file_index) else {
+                continue;
+            };
+            if !self.collapsed_paths.contains(&section.path)
+                && self.collapsed_hunks.contains(&hunk.key)
+            {
+                hidden_lines += hunk.end_line.saturating_sub(hunk.start_line + 1);
+            }
+        }
+
         rendered_line.saturating_sub(hidden_lines)
     }
 
@@ -600,6 +664,8 @@ impl SearchState {
 struct HunkSection {
     file_index: usize,
     start_line: usize,
+    end_line: usize,
+    key: String,
 }
 
 /// A file section discovered in `jj diff` output.
@@ -686,6 +752,7 @@ fn hunk_sections(rendered: &str, file_sections: &[FileSection]) -> Vec<HunkSecti
     let mut hunks = Vec::new();
 
     for (file_index, section) in file_sections.iter().enumerate() {
+        let hunk_start = hunks.len();
         for line_index in (section.start_line + 1)..section.end_line {
             let Some(line) = lines.get(line_index) else {
                 continue;
@@ -694,7 +761,19 @@ fn hunk_sections(rendered: &str, file_sections: &[FileSection]) -> Vec<HunkSecti
                 hunks.push(HunkSection {
                     file_index,
                     start_line: line_index,
+                    end_line: section.end_line,
+                    key: hunk_key(&section.path, line),
                 });
+            }
+        }
+
+        for index in hunk_start..hunks.len() {
+            let end_line = hunks
+                .get(index + 1)
+                .filter(|next| next.file_index == file_index)
+                .map_or(section.end_line, |next| next.start_line);
+            if let Some(hunk) = hunks.get_mut(index) {
+                hunk.end_line = end_line;
             }
         }
     }
@@ -730,6 +809,11 @@ fn hunk_header_line(line: &str) -> bool {
     let line = strip_ansi(line);
     let line = line.trim_start();
     line.starts_with("@@") && line.contains("@@")
+}
+
+/// Builds a refresh-stable identity for a hunk within one diff file.
+fn hunk_key(path: &str, header: &str) -> String {
+    format!("{}\0{}", path, strip_ansi(header).trim())
 }
 
 /// Returns the terminal-visible width of text after removing ANSI color escapes.
@@ -1023,6 +1107,31 @@ mod tests {
 
         assert_eq!(state.scroll_offset(), 3);
         assert_eq!(state.selected_visible_line(), Some(0));
+    }
+
+    #[test]
+    fn hunk_folding_hides_only_selected_hunk_body() {
+        let mut state = DiffState::new(snapshot(
+            "aaa",
+            concat!(
+                "Modified regular file src/a.rs:\n",
+                "@@ -1,1 +1,1 @@\n",
+                " hidden\n",
+                "@@ -8,1 +8,1 @@\n",
+                " visible\n",
+            ),
+        ));
+
+        state.fold_selected_hunk();
+
+        let rendered = state.visible_rendered();
+        assert!(rendered.contains("@@ -1,1 +1,1 @@\n  | folded hunk\n"));
+        assert!(!rendered.contains(" hidden"));
+        assert!(rendered.contains(" visible"));
+
+        state.unfold_selected_hunk();
+
+        assert!(state.visible_rendered().contains(" hidden"));
     }
 
     #[test]

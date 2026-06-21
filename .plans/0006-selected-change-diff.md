@@ -68,6 +68,8 @@ Hunk-level collapse remains out of scope.
    shown in the status line when shifted.
 1. Hunk navigation: `{` and `}` jump to previous and next unified diff hunk headers, updating the
    current file selection when movement crosses file boundaries.
+1. Hunk folding: `-` folds the current hunk body and `+` unfolds it while keeping the hunk header
+   visible.
 
 ## Validation
 
