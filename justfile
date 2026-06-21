@@ -27,6 +27,14 @@ test:
 
 betamax: betamax-log betamax-diff
 
+readme-media: readme-log-media readme-diff-media
+
+readme-log-media:
+    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/readme-log.tape
+
+readme-diff-media:
+    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/readme-diff.tape
+
 betamax-log:
     cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/jk-log.tape
 
