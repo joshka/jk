@@ -7,8 +7,6 @@ reviewing change descriptions and selected-change diffs.
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
-![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff-v3.gif)
-
 ## Installation
 
 Install with Homebrew:
