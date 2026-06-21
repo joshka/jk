@@ -18,7 +18,7 @@ Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "repo=${JK_REPO:-$HOME/local/jk}"
+Type "repo=${JK_REPO:-$HOME/local/jk/default}"
 Enter
 Wait
 Type "cd \"$repo\" && test -f Cargo.toml && test -d .jj && pwd"

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use color_eyre::Result;
-use crossterm::event::{self, Event};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{JjDiff, JjLog, JjLogCommand};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
@@ -68,10 +68,18 @@ fn main() -> Result<()> {
     let source = log_source(&args);
     let diff_source = diff_source(&args);
     let app = if let Some(Command::Diff(diff_args)) = &args.command {
-        let snapshot = diff_source.load(&diff_args.revision)?;
+        let snapshot = diff_source.load(&diff_args.revision);
+        let diff = match snapshot {
+            Ok(snapshot) => DiffView::new(snapshot),
+            Err(error) => DiffView::from_error(
+                diff_args.revision.clone(),
+                format!("jj diff -r {}", diff_args.revision),
+                error.to_string(),
+            ),
+        };
         AppView::Diff {
             log: None,
-            diff: DiffView::new(snapshot),
+            diff: Box::new(diff),
         }
     } else {
         let entries = source.load()?;
@@ -117,7 +125,7 @@ enum AppView {
     Log(LogView),
     Diff {
         log: Option<LogView>,
-        diff: DiffView,
+        diff: Box<DiffView>,
     },
 }
 
@@ -133,19 +141,48 @@ fn run_terminal(mut app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Re
     let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
     let _terminal_restore = TerminalRestore;
     let mut needs_redraw = true;
+    let mut input_mode = InputMode::Normal;
 
     loop {
         if needs_redraw {
             terminal.draw(|frame| match &mut app {
                 AppView::Log(log) => log.render(frame),
-                AppView::Diff { diff, .. } => diff.render(frame),
+                AppView::Diff { diff, .. } => match &input_mode {
+                    InputMode::Normal => diff.render(frame),
+                    InputMode::DiffSearch { query } => {
+                        let status = format!("/{query}");
+                        diff.render_with_status(frame, &status);
+                    }
+                },
             })?;
             needs_redraw = false;
         }
 
         match event::read()? {
             Event::Key(key) => {
+                if handle_input_mode(&mut app, &mut input_mode, key) == InputModeResult::Handled {
+                    needs_redraw = true;
+                    continue;
+                }
+
                 let AppKey::Action(action) = AppKey::from_crossterm(key) else {
+                    match AppKey::from_crossterm(key) {
+                        AppKey::StartSearch if matches!(app, AppView::Diff { .. }) => {
+                            input_mode = InputMode::DiffSearch {
+                                query: String::new(),
+                            };
+                            needs_redraw = true;
+                        }
+                        AppKey::SearchNext => {
+                            apply_diff_search_action(&mut app, DiffAction::SearchNext);
+                            needs_redraw = true;
+                        }
+                        AppKey::SearchPrevious => {
+                            apply_diff_search_action(&mut app, DiffAction::SearchPrevious);
+                            needs_redraw = true;
+                        }
+                        _ => {}
+                    }
                     continue;
                 };
 
@@ -162,6 +199,71 @@ fn run_terminal(mut app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Re
     }
 
     Ok(())
+}
+
+/// Transient input modes owned by the terminal loop.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum InputMode {
+    Normal,
+    DiffSearch { query: String },
+}
+
+/// Whether an input-mode handler consumed a key event.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum InputModeResult {
+    Handled,
+    Unhandled,
+}
+
+/// Handles key input while a prompt-like mode is active.
+fn handle_input_mode(
+    app: &mut AppView,
+    input_mode: &mut InputMode,
+    key: KeyEvent,
+) -> InputModeResult {
+    let InputMode::DiffSearch { query } = input_mode else {
+        return InputModeResult::Unhandled;
+    };
+
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc, ..
+        } => {
+            *input_mode = InputMode::Normal;
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            apply_diff_search_action(app, DiffAction::Search(query.clone()));
+            *input_mode = InputMode::Normal;
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        } => {
+            query.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            query.push(character);
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+/// Applies a search-only diff action when the active view supports it.
+fn apply_diff_search_action(app: &mut AppView, action: DiffAction) {
+    if let AppView::Diff { diff, .. } = app {
+        let _ = diff.apply(action);
+    }
 }
 
 /// Applies an action to the active view and performs any requested I/O.
@@ -228,7 +330,7 @@ fn apply_log_action(
         match diff_source.load(&change_id) {
             Ok(snapshot) => {
                 let diff = DiffView::new(snapshot);
-                return AppTransition::OpenDiff(diff);
+                return AppTransition::OpenDiff(Box::new(diff));
             }
             Err(error) => log.show_error(error.to_string()),
         }
@@ -252,6 +354,13 @@ fn apply_diff_action(
         jk_tui::log_view::LogAction::Last => DiffAction::Last,
         jk_tui::log_view::LogAction::PreviousFile => DiffAction::PreviousFile,
         jk_tui::log_view::LogAction::NextFile => DiffAction::NextFile,
+        jk_tui::log_view::LogAction::PreviousHunk => DiffAction::PreviousHunk,
+        jk_tui::log_view::LogAction::NextHunk => DiffAction::NextHunk,
+        jk_tui::log_view::LogAction::FoldHunk => DiffAction::FoldHunk,
+        jk_tui::log_view::LogAction::UnfoldHunk => DiffAction::UnfoldHunk,
+        jk_tui::log_view::LogAction::HorizontalPrevious => DiffAction::ScrollLeft,
+        jk_tui::log_view::LogAction::HorizontalNext => DiffAction::ScrollRight,
+        jk_tui::log_view::LogAction::ToggleHelp => DiffAction::ToggleHelp,
         jk_tui::log_view::LogAction::ToggleExpanded => DiffAction::UnfoldFile,
         jk_tui::log_view::LogAction::CollapseExpanded => DiffAction::FoldFile,
         jk_tui::log_view::LogAction::FoldAll => DiffAction::FoldAll,
@@ -283,7 +392,7 @@ enum AppLoop {
 #[derive(Debug)]
 enum AppTransition {
     Continue,
-    OpenDiff(DiffView),
+    OpenDiff(Box<DiffView>),
     ReturnToLog,
     Quit,
 }

@@ -25,8 +25,13 @@ check:
 test:
     cargo test --workspace
 
-betamax:
-    cargo run --manifest-path ../betamax/Cargo.toml -p betamax -- run tapes/jk-log.tape
+betamax: betamax-log betamax-diff
+
+betamax-log:
+    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/jk-log.tape
+
+betamax-diff:
+    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/jk-diff.tape
 
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings

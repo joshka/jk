@@ -58,6 +58,28 @@ Hunk-level collapse remains out of scope.
 - Collapsed file sections survive refresh when the file still exists.
 - Tests cover target selection, refresh, return navigation, and collapse state.
 
+## Follow-Up Slices
+
+1. Diff search: `/` opens a search prompt, Enter jumps to the first visible line match, and `n`/`N`
+   repeat the last search forward or backward with wrapping.
+1. Current-file context: when the real file header scrolls offscreen, the pinned header includes
+   the same stat suffix and a compact file index such as `[file 1/3]`.
+1. Horizontal overflow: `<` and `>` scroll wide diff content horizontally, with the current column
+   shown in the status line when shifted.
+1. Hunk navigation: `{` and `}` jump to previous and next unified diff hunk headers, updating the
+   current file selection when movement crosses file boundaries.
+1. Hunk folding: `-` folds the current hunk body and `+` unfolds it while keeping the hunk header
+   visible.
+1. Mode-specific help: `?` opens a compact overlay for the active log or diff mode, keeping the
+   status line focused on the most common commands.
+1. Empty and error states: an empty `jj diff` body renders an intentional no-diff message, and
+   initial `jk diff REV` load failures open a retryable diff view instead of exiting before the TUI
+   starts.
+1. Visual review: Betamax screenshots were inspected for the pinned file header, help overlay,
+   search status, folded file row, and horizontal-scroll behavior in a real terminal rendering.
+1. Visual tapes: `tapes/jk-diff.tape` records opening the selected diff, help, search, hunk
+   navigation, hunk/file folding, horizontal scroll, and return-to-log behavior.
+
 ## Validation
 
 - `cargo test -p jk-cli -p jk-tui -p jk --lib --bins`

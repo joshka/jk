@@ -5,7 +5,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{DIFF_STATUS, ViewChrome};
+use crate::chrome::{DIFF_STATUS, ViewChrome, render_help_overlay};
 use crate::diff_state::DiffState;
 use crate::rendered_log::rendered_text;
 use crate::selected_row::paint_subtle_selected_row;
@@ -28,7 +28,7 @@ pub enum DiffActionResult {
 }
 
 /// Input actions understood by the selected-change diff view.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum DiffAction {
     /// Leave the diff view unchanged.
@@ -58,6 +58,18 @@ pub enum DiffAction {
     /// Jump to the next file section.
     NextFile,
 
+    /// Jump to the previous hunk.
+    PreviousHunk,
+
+    /// Jump to the next hunk.
+    NextHunk,
+
+    /// Fold the selected hunk.
+    FoldHunk,
+
+    /// Unfold the selected hunk.
+    UnfoldHunk,
+
     /// Fold the selected file section.
     FoldFile,
 
@@ -69,6 +81,24 @@ pub enum DiffAction {
 
     /// Unfold every file section.
     UnfoldAll,
+
+    /// Scroll wide diff lines toward the start.
+    ScrollLeft,
+
+    /// Scroll wide diff lines toward the end.
+    ScrollRight,
+
+    /// Search visible diff lines for text.
+    Search(String),
+
+    /// Toggle mode-specific help.
+    ToggleHelp,
+
+    /// Jump to the next search match.
+    SearchNext,
+
+    /// Jump to the previous search match.
+    SearchPrevious,
 
     /// Refresh the diff.
     Refresh,
@@ -85,6 +115,7 @@ pub enum DiffAction {
 pub struct DiffView {
     state: DiffState,
     status_message: Option<String>,
+    help_visible: bool,
 }
 
 impl DiffView {
@@ -94,7 +125,21 @@ impl DiffView {
         Self {
             state: DiffState::new(snapshot),
             status_message: None,
+            help_visible: false,
         }
+    }
+
+    /// Creates a diff view that starts in an error state for an unloaded target.
+    #[must_use]
+    pub fn from_error(
+        change_id: impl Into<String>,
+        title: impl Into<String>,
+        error: String,
+    ) -> Self {
+        let snapshot = DiffSnapshot::new(change_id, "").with_title(title);
+        let mut view = Self::new(snapshot);
+        view.show_error(error);
+        view
     }
 
     /// Returns the target change identifier for refresh requests.
@@ -151,6 +196,22 @@ impl DiffView {
                 self.state.select_next_file();
                 DiffActionResult::Continue
             }
+            DiffAction::PreviousHunk => {
+                self.state.select_previous_hunk();
+                DiffActionResult::Continue
+            }
+            DiffAction::NextHunk => {
+                self.state.select_next_hunk();
+                DiffActionResult::Continue
+            }
+            DiffAction::FoldHunk => {
+                self.state.fold_selected_hunk();
+                DiffActionResult::Continue
+            }
+            DiffAction::UnfoldHunk => {
+                self.state.unfold_selected_hunk();
+                DiffActionResult::Continue
+            }
             DiffAction::FoldFile => {
                 self.state.fold_selected_file();
                 DiffActionResult::Continue
@@ -167,8 +228,36 @@ impl DiffView {
                 self.state.unfold_all_files();
                 DiffActionResult::Continue
             }
+            DiffAction::ScrollLeft => {
+                self.state.scroll_left();
+                DiffActionResult::Continue
+            }
+            DiffAction::ScrollRight => {
+                self.state.scroll_right();
+                DiffActionResult::Continue
+            }
+            DiffAction::Search(query) => {
+                self.state.search(&query);
+                DiffActionResult::Continue
+            }
+            DiffAction::ToggleHelp => {
+                self.help_visible = !self.help_visible;
+                DiffActionResult::Continue
+            }
+            DiffAction::SearchNext => {
+                self.state.search_next();
+                DiffActionResult::Continue
+            }
+            DiffAction::SearchPrevious => {
+                self.state.search_previous();
+                DiffActionResult::Continue
+            }
             DiffAction::Refresh => DiffActionResult::Refresh,
             DiffAction::ReturnToLog => DiffActionResult::ReturnToLog,
+            DiffAction::Quit if self.help_visible => {
+                self.help_visible = false;
+                DiffActionResult::Continue
+            }
             DiffAction::Quit => DiffActionResult::Quit,
         }
     }
@@ -176,13 +265,21 @@ impl DiffView {
     /// Renders the diff view.
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
-        self.render_area(frame, area);
+        self.render_area(frame, area, None);
     }
 
-    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect) {
+    /// Renders the diff view with a temporary status-line override.
+    pub fn render_with_status(&mut self, frame: &mut Frame<'_>, status: &str) {
+        let area = frame.area();
+        self.render_area(frame, area, Some(status));
+    }
+
+    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
         let areas = ViewChrome::layout(area);
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
+        self.state
+            .set_viewport_width(usize::from(areas.content.width));
         let sticky_header = self.state.sticky_header();
         let body_area = if sticky_header.is_some() {
             area_below_sticky_header(areas.content)
@@ -191,15 +288,23 @@ impl DiffView {
         };
         self.state
             .keep_selected_in_view(usize::from(body_area.height));
+        self.state.set_viewport_width(usize::from(body_area.width));
 
-        let status = self.status_message.as_deref().unwrap_or(DIFF_STATUS);
+        let search_status = self.state.search_status();
+        let horizontal_status = self.state.horizontal_status();
+        let status = status_override
+            .or(self.status_message.as_deref())
+            .or(search_status.as_deref())
+            .or(horizontal_status.as_deref())
+            .unwrap_or(DIFF_STATUS);
         let chrome = ViewChrome::new(self.state.title(), status);
         chrome.render(frame, areas);
 
-        let rendered = self.state.visible_rendered();
+        let rendered = self.visible_body();
         let text = rendered_text(&rendered);
         let scroll = u16::try_from(self.state.scroll_offset()).unwrap_or(u16::MAX);
-        let paragraph = Paragraph::new(text).scroll((scroll, 0));
+        let horizontal_scroll = u16::try_from(self.state.horizontal_offset()).unwrap_or(u16::MAX);
+        let paragraph = Paragraph::new(text).scroll((scroll, horizontal_scroll));
         frame.render_widget(paragraph, body_area);
 
         if let Some(header) = sticky_header {
@@ -207,7 +312,7 @@ impl DiffView {
                 height: 1,
                 ..areas.content
             };
-            let paragraph = Paragraph::new(rendered_text(&header));
+            let paragraph = Paragraph::new(rendered_text(&header)).scroll((0, horizontal_scroll));
             frame.render_widget(paragraph, sticky_area);
             paint_subtle_selected_row(frame, sticky_area, 0, 0);
         }
@@ -215,8 +320,46 @@ impl DiffView {
         if let Some(line) = self.state.selected_visible_line() {
             paint_subtle_selected_row(frame, body_area, line, self.state.scroll_offset());
         }
+
+        if self.help_visible {
+            render_help_overlay(frame, areas.content, "Diff keys", DIFF_HELP);
+        }
+    }
+
+    fn visible_body(&self) -> String {
+        if !self.state.is_empty_diff() {
+            return self.state.visible_rendered();
+        }
+
+        if let Some(error) = &self.status_message {
+            return format!(
+                "Unable to load diff for {}.\n\n{error}\n\nPress r to retry or H/L to return to the log.\n",
+                self.state.change_id()
+            );
+        }
+
+        format!(
+            "No diff for {}.\n\nThis change has no file content differences.\n",
+            self.state.change_id()
+        )
     }
 }
+
+const DIFF_HELP: &[&str] = &[
+    "j/k or arrows        scroll one line",
+    "space / b, Ctrl-f/b  page down/up",
+    "g/G or Home/End      jump to top/bottom",
+    "[ / ]                previous/next file",
+    "{ / }                previous/next hunk",
+    "h / l                fold/unfold current file",
+    "Ctrl-left/right      fold/unfold all files",
+    "- / +                fold/unfold current hunk",
+    "< / >                horizontal scroll",
+    "/, n, N              search, next, previous",
+    "r                    refresh",
+    "H / L                return to log",
+    "?, q, Esc            close help",
+];
 
 /// Returns the portion of a content area left after a sticky file header row.
 const fn area_below_sticky_header(area: Rect) -> Rect {
@@ -278,6 +421,45 @@ mod tests {
     }
 
     #[test]
+    fn empty_diff_renders_intentional_message() {
+        let mut view = DiffView::new(snapshot("aaa", ""));
+        let backend = TestBackend::new(64, 7);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("No diff for aaa."));
+        assert!(rendered.contains("This change has no file content differences."));
+    }
+
+    #[test]
+    fn initial_diff_error_renders_retryable_message() {
+        let mut view = DiffView::from_error(
+            "missing",
+            "jj diff -r missing",
+            "jj failed: Revision missing doesn't exist".to_owned(),
+        );
+        let backend = TestBackend::new(72, 8);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("Unable to load diff for missing."));
+        assert!(rendered.contains("Revision missing doesn't exist"));
+        assert!(rendered.contains("Press r to retry"));
+    }
+
+    #[test]
     fn toggles_file_section_collapse() {
         let mut view = DiffView::new(snapshot(
             "aaa",
@@ -310,6 +492,72 @@ mod tests {
 
         let _ = view.apply(DiffAction::UnfoldAll);
         assert!(!view.state.visible_rendered().contains(" | folded"));
+    }
+
+    #[test]
+    fn search_status_replaces_default_status_after_search() {
+        let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
+        let _ = view.apply(DiffAction::Search("alpha".to_owned()));
+        let backend = TestBackend::new(64, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("/alpha  1/1"));
+    }
+
+    #[test]
+    fn help_action_shows_diff_specific_keys() {
+        let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
+        let _ = view.apply(DiffAction::ToggleHelp);
+        let backend = TestBackend::new(72, 18);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("Diff keys"));
+        assert!(rendered.contains("[ / ]                previous/next file"));
+        assert!(rendered.contains("/, n, N              search, next, previous"));
+    }
+
+    #[test]
+    fn quit_closes_diff_help_before_quitting() {
+        let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
+        let _ = view.apply(DiffAction::ToggleHelp);
+
+        assert_eq!(view.apply(DiffAction::Quit), DiffActionResult::Continue);
+        assert_eq!(view.apply(DiffAction::Quit), DiffActionResult::Quit);
+    }
+
+    #[test]
+    fn horizontal_scroll_shifts_body_and_reports_column() {
+        let mut view = DiffView::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n 1234567890123456789012345678901234567890\n",
+        ));
+        let backend = TestBackend::new(32, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        let _ = view.apply(DiffAction::ScrollRight);
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert_eq!(view.state.horizontal_offset(), 8);
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("col 9"));
     }
 
     #[test]
