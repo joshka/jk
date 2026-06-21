@@ -1,6 +1,11 @@
 # Changelog
 
 <!-- markdownlint-disable MD012 MD013 MD024 -->
+## Other
+
+
+- Reduce crate README GIFs ([#34](https://github.com/joshka/jk/pull/34))
+
 
 ## Other
 
