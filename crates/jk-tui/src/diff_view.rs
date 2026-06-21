@@ -5,7 +5,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{DIFF_STATUS, ViewChrome};
+use crate::chrome::{DIFF_STATUS, ViewChrome, render_help_overlay};
 use crate::diff_state::DiffState;
 use crate::rendered_log::rendered_text;
 use crate::selected_row::paint_subtle_selected_row;
@@ -91,6 +91,9 @@ pub enum DiffAction {
     /// Search visible diff lines for text.
     Search(String),
 
+    /// Toggle mode-specific help.
+    ToggleHelp,
+
     /// Jump to the next search match.
     SearchNext,
 
@@ -112,6 +115,7 @@ pub enum DiffAction {
 pub struct DiffView {
     state: DiffState,
     status_message: Option<String>,
+    help_visible: bool,
 }
 
 impl DiffView {
@@ -121,6 +125,7 @@ impl DiffView {
         Self {
             state: DiffState::new(snapshot),
             status_message: None,
+            help_visible: false,
         }
     }
 
@@ -222,6 +227,10 @@ impl DiffView {
                 self.state.search(&query);
                 DiffActionResult::Continue
             }
+            DiffAction::ToggleHelp => {
+                self.help_visible = !self.help_visible;
+                DiffActionResult::Continue
+            }
             DiffAction::SearchNext => {
                 self.state.search_next();
                 DiffActionResult::Continue
@@ -294,8 +303,29 @@ impl DiffView {
         if let Some(line) = self.state.selected_visible_line() {
             paint_subtle_selected_row(frame, body_area, line, self.state.scroll_offset());
         }
+
+        if self.help_visible {
+            render_help_overlay(frame, areas.content, "Diff keys", DIFF_HELP);
+        }
     }
 }
+
+const DIFF_HELP: &[&str] = &[
+    "j/k or arrows        scroll one line",
+    "space, Ctrl-f/b      page down/up",
+    "g/G or Home/End      jump to top/bottom",
+    "[ / ]                previous/next file",
+    "{ / }                previous/next hunk",
+    "h / l                fold/unfold current file",
+    "Ctrl-left/right      fold/unfold all files",
+    "- / +                fold/unfold current hunk",
+    "< / >                horizontal scroll",
+    "/, n, N              search, next, previous",
+    "r                    refresh",
+    "H / L                return to log",
+    "?                    close help",
+    "q or Esc             quit",
+];
 
 /// Returns the portion of a content area left after a sticky file header row.
 const fn area_below_sticky_header(area: Rect) -> Rect {
@@ -405,6 +435,25 @@ mod tests {
         assert!(draw_result.is_ok());
 
         assert!(buffer_line(terminal.backend().buffer(), 4).contains("/alpha  1/1"));
+    }
+
+    #[test]
+    fn help_action_shows_diff_specific_keys() {
+        let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
+        let _ = view.apply(DiffAction::ToggleHelp);
+        let backend = TestBackend::new(72, 18);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("Diff keys"));
+        assert!(rendered.contains("[ / ]                previous/next file"));
+        assert!(rendered.contains("/, n, N              search, next, previous"));
     }
 
     #[test]

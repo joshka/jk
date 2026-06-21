@@ -10,7 +10,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{LOG_STATUS, ViewChrome};
+use crate::chrome::{LOG_STATUS, ViewChrome, render_help_overlay};
 use crate::log_state::LogState;
 use crate::rendered_log::{ExpandedDetails, RenderedLog, rendered_text};
 use crate::selected_row::paint_selected_row;
@@ -111,6 +111,9 @@ pub enum LogAction {
     /// Open the selected change's diff.
     OpenDiff,
 
+    /// Toggle mode-specific help.
+    ToggleHelp,
+
     /// Quit the TUI.
     Quit,
 }
@@ -124,6 +127,7 @@ pub enum LogAction {
 pub struct LogView {
     state: LogState,
     status_message: Option<String>,
+    help_visible: bool,
 }
 
 impl LogView {
@@ -133,6 +137,7 @@ impl LogView {
         Self {
             state: LogState::new(snapshot),
             status_message: None,
+            help_visible: false,
         }
     }
 
@@ -216,6 +221,10 @@ impl LogView {
                     ActionResult::Continue
                 }
             }
+            LogAction::ToggleHelp => {
+                self.help_visible = !self.help_visible;
+                ActionResult::Continue
+            }
             LogAction::Quit => ActionResult::Quit,
         }
     }
@@ -251,8 +260,25 @@ impl LogView {
         if let Some(line) = self.state.selected_rendered_line() {
             paint_selected_row(frame, areas.content, line, self.state.scroll_offset());
         }
+
+        if self.help_visible {
+            render_help_overlay(frame, areas.content, "Log keys", LOG_HELP);
+        }
     }
 }
+
+const LOG_HELP: &[&str] = &[
+    "j/k or arrows        move selection",
+    "space, Ctrl-f/b      page down/up",
+    "g/G or Home/End      jump to top/bottom",
+    "enter, right, l      expand selected change",
+    "left, h              collapse selected change",
+    "d                    open selected-change diff",
+    "r                    refresh",
+    "H / L                home command / jj log",
+    "?                    close help",
+    "q or Esc             quit",
+];
 
 #[cfg(test)]
 mod tests {
@@ -315,6 +341,25 @@ mod tests {
         let buffer = terminal.backend().buffer();
         assert!(buffer_line(buffer, 0).contains("jk jj log"));
         assert!(buffer_line(buffer, 3).contains("r refresh"));
+    }
+
+    #[test]
+    fn help_action_shows_log_specific_keys() {
+        let mut view = LogView::new(snapshot(["aaa"]));
+        let _ = view.apply(LogAction::ToggleHelp);
+        let backend = TestBackend::new(72, 16);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("Log keys"));
+        assert!(rendered.contains("d                    open selected-change diff"));
+        assert!(rendered.contains("?                    close help"));
     }
 
     #[test]

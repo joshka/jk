@@ -97,6 +97,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'L' => Some(AppKey::Action(LogAction::Log)),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
+        '?' => Some(AppKey::Action(LogAction::ToggleHelp)),
         '/' => Some(AppKey::StartSearch),
         'n' => Some(AppKey::SearchNext),
         'N' => Some(AppKey::SearchPrevious),
@@ -181,6 +182,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::OpenDiff)
+        );
+    }
+
+    #[test]
+    fn question_mark_toggles_mode_help() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleHelp)
         );
     }
 
