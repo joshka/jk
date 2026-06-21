@@ -77,6 +77,8 @@ Hunk-level collapse remains out of scope.
    starts.
 1. Visual review: Betamax screenshots were inspected for the pinned file header, help overlay,
    search status, folded file row, and horizontal-scroll behavior in a real terminal rendering.
+1. Visual tapes: `tapes/jk-diff.tape` records opening the selected diff, help, search, hunk
+   navigation, hunk/file folding, horizontal scroll, and return-to-log behavior.
 
 ## Validation
 
