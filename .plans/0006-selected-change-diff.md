@@ -62,6 +62,8 @@ Hunk-level collapse remains out of scope.
 
 1. Diff search: `/` opens a search prompt, Enter jumps to the first visible line match, and `n`/`N`
    repeat the last search forward or backward with wrapping.
+1. Current-file context: when the real file header scrolls offscreen, the pinned header includes
+   the same stat suffix and a compact file index such as `[file 1/3]`.
 
 ## Validation
 

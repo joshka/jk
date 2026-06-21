@@ -1,6 +1,7 @@
 //! State machine for selected-change diff inspection.
 
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 
 use jk_core::{DiffFileStat, DiffSnapshot};
 
@@ -252,10 +253,26 @@ impl DiffState {
             return None;
         }
 
-        self.visible_rendered()
-            .lines()
-            .nth(selected_line)
-            .map(ToOwned::to_owned)
+        let selected_index = self.selected?;
+        let selected = self.selected_section()?;
+        let lines = self.rendered.split_inclusive('\n').collect::<Vec<_>>();
+        let header = lines
+            .get(selected.start_line)?
+            .trim_end_matches('\n')
+            .to_owned();
+        let mut sticky_header = header.clone();
+        if let Some(suffix) =
+            selected.stat_suffix(self.folded_header_width(&lines), visible_width(&header))
+        {
+            sticky_header.push_str(&suffix);
+        }
+        let _ = write!(
+            sticky_header,
+            "  [file {}/{}]",
+            selected_index + 1,
+            self.sections.len()
+        );
+        Some(sticky_header)
     }
 
     /// Searches visible diff lines and moves to the first match at or below the viewport.
@@ -469,22 +486,32 @@ struct FileSection {
 impl FileSection {
     /// Returns the folded suffix appended to this file section's header.
     fn folded_suffix(&self, target_width: usize, header_width: usize) -> String {
-        let padding = " ".repeat(target_width.saturating_sub(header_width) + 1);
-        match &self.stat {
-            Some(stat) if !stat.rendered.is_empty() => {
-                let mut suffix = padding;
-                suffix.push_str(&stat.rendered);
-                suffix
-            }
-            Some(stat) => format!(
-                "{padding}| {:>3} \u{1b}[38;5;2m{}\u{1b}[38;5;1m{}\u{1b}[39m",
-                stat.added + stat.removed,
-                "+".repeat(stat.added.min(10)),
-                "-".repeat(stat.removed.min(10)),
-            ),
-            None => format!("{padding}| folded"),
-        }
+        self.stat_suffix(target_width, header_width)
+            .unwrap_or_else(|| stat_padding(target_width, header_width) + "| folded")
     }
+
+    /// Returns the stat suffix appended after a file section header.
+    fn stat_suffix(&self, target_width: usize, header_width: usize) -> Option<String> {
+        let padding = stat_padding(target_width, header_width);
+        let stat = self.stat.as_ref()?;
+        if !stat.rendered.is_empty() {
+            let mut suffix = padding;
+            suffix.push_str(&stat.rendered);
+            return Some(suffix);
+        }
+
+        Some(format!(
+            "{padding}| {:>3} \u{1b}[38;5;2m{}\u{1b}[38;5;1m{}\u{1b}[39m",
+            stat.added + stat.removed,
+            "+".repeat(stat.added.min(10)),
+            "-".repeat(stat.removed.min(10)),
+        ))
+    }
+}
+
+/// Returns the spaces between a diff file header and its stat suffix.
+fn stat_padding(target_width: usize, header_width: usize) -> String {
+    " ".repeat(target_width.saturating_sub(header_width) + 1)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -702,12 +729,36 @@ mod tests {
 
         assert_eq!(
             state.sticky_header(),
-            Some("Modified regular file src/a.rs:".to_owned())
+            Some("Modified regular file src/a.rs:  [file 1/2]".to_owned())
         );
 
         state.select_first();
 
         assert_eq!(state.sticky_header(), None);
+    }
+
+    #[test]
+    fn sticky_header_includes_stat_suffix_and_file_index() {
+        let mut state = DiffState::new(snapshot_with_stats(
+            "aaa",
+            "Modified regular file src/a.rs:\n a1\n a2\nModified regular file src/b.rs:\n b\n",
+            vec![
+                DiffFileStat::new("src/a.rs", 2, 1)
+                    .with_rendered("| 3 \u{1b}[38;5;2m++\u{1b}[38;5;1m-\u{1b}[39m"),
+                DiffFileStat::new("src/b.rs", 1, 0).with_rendered("| 1 \u{1b}[38;5;2m+\u{1b}[39m"),
+            ],
+        ));
+        state.keep_selected_in_view(2);
+
+        state.scroll_next_line();
+
+        let sticky_header = state
+            .sticky_header()
+            .map_or_else(String::new, |sticky_header| strip_ansi(&sticky_header));
+        assert_eq!(
+            sticky_header,
+            "Modified regular file src/a.rs: | 3 ++-  [file 1/2]"
+        );
     }
 
     #[test]
