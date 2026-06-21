@@ -5,6 +5,12 @@
 ## Other
 
 
+- Clean up README media captures ([#25](https://github.com/joshka/jk/pull/25))
+
+
+## Other
+
+
 - Add selected-change diff experience ([#21](https://github.com/joshka/jk/pull/21))
 
 
