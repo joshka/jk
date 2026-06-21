@@ -162,6 +162,23 @@ jobs:
         # leg or a packaging-script fix.
         run: gh release upload "$RELEASE_TAG" "$ARCHIVE" "$CHECKSUM" --clobber
 
+  bump-homebrew-tap:
+    name: Bump Homebrew tap
+    runs-on: ubuntu-latest
+    needs: prepare-release-assets
+    if: ${{ needs.prepare-release-assets.outputs.jk_released == 'true' }}
+    steps:
+      - name: Trigger tap bump
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.prepare-release-assets.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh workflow run bump-package.yml \
+            --repo joshka/homebrew-tap \
+            --field package=jk \
+            --field version="$VERSION"
+
   release-pr:
     name: Release-plz PR
     # release-plz's quickstart runs `release` and `release-pr` as sibling jobs
