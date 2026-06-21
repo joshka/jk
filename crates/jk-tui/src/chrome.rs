@@ -10,10 +10,10 @@ use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
 /// Default log-view status text shown when there is no transient error.
 pub const LOG_STATUS: &str =
-    "? help  H home  L log  d diff  r refresh  j/k move  space page  q quit";
+    "? help  H home  L log  d diff  r refresh  j/k move  space/b page  q quit";
 
 /// Default diff-view status text shown when there is no transient error.
-pub const DIFF_STATUS: &str = "? help  r refresh  j/k line  space page  q quit";
+pub const DIFF_STATUS: &str = "? help  r refresh  j/k line  space/b page  q quit";
 
 /// Renders a small mode-specific help overlay centered in the content area.
 pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[&str]) {

@@ -254,6 +254,10 @@ impl DiffView {
             }
             DiffAction::Refresh => DiffActionResult::Refresh,
             DiffAction::ReturnToLog => DiffActionResult::ReturnToLog,
+            DiffAction::Quit if self.help_visible => {
+                self.help_visible = false;
+                DiffActionResult::Continue
+            }
             DiffAction::Quit => DiffActionResult::Quit,
         }
     }
@@ -343,7 +347,7 @@ impl DiffView {
 
 const DIFF_HELP: &[&str] = &[
     "j/k or arrows        scroll one line",
-    "space, Ctrl-f/b      page down/up",
+    "space / b, Ctrl-f/b  page down/up",
     "g/G or Home/End      jump to top/bottom",
     "[ / ]                previous/next file",
     "{ / }                previous/next hunk",
@@ -354,8 +358,7 @@ const DIFF_HELP: &[&str] = &[
     "/, n, N              search, next, previous",
     "r                    refresh",
     "H / L                return to log",
-    "?                    close help",
-    "q or Esc             quit",
+    "?, q, Esc            close help",
 ];
 
 /// Returns the portion of a content area left after a sticky file header row.
@@ -524,6 +527,15 @@ mod tests {
         assert!(rendered.contains("Diff keys"));
         assert!(rendered.contains("[ / ]                previous/next file"));
         assert!(rendered.contains("/, n, N              search, next, previous"));
+    }
+
+    #[test]
+    fn quit_closes_diff_help_before_quitting() {
+        let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
+        let _ = view.apply(DiffAction::ToggleHelp);
+
+        assert_eq!(view.apply(DiffAction::Quit), DiffActionResult::Continue);
+        assert_eq!(view.apply(DiffAction::Quit), DiffActionResult::Quit);
     }
 
     #[test]

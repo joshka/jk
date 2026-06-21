@@ -225,6 +225,10 @@ impl LogView {
                 self.help_visible = !self.help_visible;
                 ActionResult::Continue
             }
+            LogAction::Quit if self.help_visible => {
+                self.help_visible = false;
+                ActionResult::Continue
+            }
             LogAction::Quit => ActionResult::Quit,
         }
     }
@@ -269,15 +273,14 @@ impl LogView {
 
 const LOG_HELP: &[&str] = &[
     "j/k or arrows        move selection",
-    "space, Ctrl-f/b      page down/up",
+    "space / b, Ctrl-f/b  page down/up",
     "g/G or Home/End      jump to top/bottom",
     "enter, right, l      expand selected change",
     "left, h              collapse selected change",
     "d                    open selected-change diff",
     "r                    refresh",
     "H / L                home command / jj log",
-    "?                    close help",
-    "q or Esc             quit",
+    "?, q, Esc            close help",
 ];
 
 #[cfg(test)]
@@ -359,7 +362,16 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Log keys"));
         assert!(rendered.contains("d                    open selected-change diff"));
-        assert!(rendered.contains("?                    close help"));
+        assert!(rendered.contains("?, q, Esc            close help"));
+    }
+
+    #[test]
+    fn quit_closes_log_help_before_quitting() {
+        let mut view = LogView::new(snapshot(["aaa"]));
+        let _ = view.apply(LogAction::ToggleHelp);
+
+        assert_eq!(view.apply(LogAction::Quit), ActionResult::Continue);
+        assert_eq!(view.apply(LogAction::Quit), ActionResult::Quit);
     }
 
     #[test]

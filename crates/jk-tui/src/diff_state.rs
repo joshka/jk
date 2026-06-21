@@ -1,7 +1,6 @@
 //! State machine for selected-change diff inspection.
 
 use std::collections::BTreeSet;
-use std::fmt::Write as _;
 
 use jk_core::{DiffFileStat, DiffSnapshot};
 
@@ -297,9 +296,7 @@ impl DiffState {
 
     /// Returns the visible diff body after applying collapsed sections.
     pub fn visible_rendered(&self) -> String {
-        if self.sections.is_empty()
-            || (self.collapsed_paths.is_empty() && self.collapsed_hunks.is_empty())
-        {
+        if self.sections.is_empty() {
             return self.rendered.clone();
         }
 
@@ -323,19 +320,16 @@ impl DiffState {
                     .filter(|hunk| hunk.file_index == section_index)
                     .filter(|hunk| self.collapsed_hunks.contains(&hunk.key));
                 for hunk in folded_hunks {
-                    while line_index <= hunk.start_line {
-                        if let Some(line) = lines.get(line_index) {
-                            visible.push_str(line);
-                        }
+                    while line_index < hunk.start_line {
+                        self.push_visible_line(&mut visible, &lines, line_index);
                         line_index += 1;
                     }
+                    self.push_visible_line(&mut visible, &lines, hunk.start_line);
                     visible.push_str("  | folded hunk\n");
                     line_index = hunk.end_line;
                 }
                 while line_index < section.end_line {
-                    if let Some(line) = lines.get(line_index) {
-                        visible.push_str(line);
-                    }
+                    self.push_visible_line(&mut visible, &lines, line_index);
                     line_index += 1;
                 }
                 continue;
@@ -344,8 +338,11 @@ impl DiffState {
             if let Some(header) = lines.get(section.start_line) {
                 let header = header.trim_end_matches('\n');
                 visible.push_str(header);
-                visible
-                    .push_str(&section.folded_suffix(folded_header_width, visible_width(header)));
+                visible.push_str(&section.folded_suffix(
+                    folded_header_width,
+                    visible_width(header),
+                    &self.file_index_suffix(section_index),
+                ));
                 visible.push('\n');
             }
             line_index = section.end_line;
@@ -357,6 +354,34 @@ impl DiffState {
         }
 
         visible
+    }
+
+    fn push_visible_line(&self, visible: &mut String, lines: &[&str], line_index: usize) {
+        let Some(line) = lines.get(line_index) else {
+            return;
+        };
+
+        let Some(section_index) = self
+            .sections
+            .iter()
+            .position(|section| section.start_line == line_index)
+        else {
+            visible.push_str(line);
+            return;
+        };
+
+        let header = line.trim_end_matches('\n');
+        visible.push_str(header);
+        if let Some(section) = self.sections.get(section_index)
+            && self.selected == Some(section_index)
+        {
+            visible.push_str(&section.selected_suffix(
+                self.folded_header_width(lines),
+                visible_width(header),
+                &self.file_index_suffix(section_index),
+            ));
+        }
+        visible.push('\n');
     }
 
     /// Returns the visible line for the selected file header after collapse is applied.
@@ -385,12 +410,7 @@ impl DiffState {
         {
             sticky_header.push_str(&suffix);
         }
-        let _ = write!(
-            sticky_header,
-            "  [file {}/{}]",
-            selected_index + 1,
-            self.sections.len()
-        );
+        sticky_header.push_str(&self.file_index_suffix(selected_index));
         Some(sticky_header)
     }
 
@@ -646,6 +666,10 @@ impl DiffState {
             .max()
             .unwrap_or_default()
     }
+
+    fn file_index_suffix(&self, section_index: usize) -> String {
+        format!("  [file {}/{}]", section_index + 1, self.sections.len())
+    }
 }
 
 /// State for the last submitted diff search.
@@ -684,9 +708,17 @@ struct FileSection {
 
 impl FileSection {
     /// Returns the folded suffix appended to this file section's header.
-    fn folded_suffix(&self, target_width: usize, header_width: usize) -> String {
+    fn folded_suffix(&self, target_width: usize, header_width: usize, extra: &str) -> String {
         self.stat_suffix(target_width, header_width)
             .unwrap_or_else(|| stat_padding(target_width, header_width) + "| folded")
+            + extra
+    }
+
+    /// Returns the suffix appended to the selected file section's visible header.
+    fn selected_suffix(&self, target_width: usize, header_width: usize, extra: &str) -> String {
+        self.stat_suffix(target_width, header_width)
+            .unwrap_or_default()
+            + extra
     }
 
     /// Returns the stat suffix appended after a file section header.
@@ -1005,6 +1037,23 @@ mod tests {
             sticky_header,
             "Modified regular file src/a.rs: | 3 ++-  [file 1/2]"
         );
+    }
+
+    #[test]
+    fn visible_selected_file_header_includes_stat_suffix_and_file_index() {
+        let state = DiffState::new(snapshot_with_stats(
+            "aaa",
+            "Modified regular file src/a.rs:\n a1\nModified regular file src/b.rs:\n b\n",
+            vec![
+                DiffFileStat::new("src/a.rs", 1, 1)
+                    .with_rendered("| 2 \u{1b}[38;5;2m+\u{1b}[38;5;1m-\u{1b}[39m"),
+                DiffFileStat::new("src/b.rs", 1, 0).with_rendered("| 1 \u{1b}[38;5;2m+\u{1b}[39m"),
+            ],
+        ));
+
+        let rendered = strip_ansi(&state.visible_rendered());
+
+        assert!(rendered.contains("Modified regular file src/a.rs: | 2 +-  [file 1/2]"));
     }
 
     #[test]
