@@ -58,6 +58,12 @@ pub enum DiffAction {
     /// Jump to the next file section.
     NextFile,
 
+    /// Jump to the previous hunk.
+    PreviousHunk,
+
+    /// Jump to the next hunk.
+    NextHunk,
+
     /// Fold the selected file section.
     FoldFile,
 
@@ -164,6 +170,14 @@ impl DiffView {
             }
             DiffAction::NextFile => {
                 self.state.select_next_file();
+                DiffActionResult::Continue
+            }
+            DiffAction::PreviousHunk => {
+                self.state.select_previous_hunk();
+                DiffActionResult::Continue
+            }
+            DiffAction::NextHunk => {
+                self.state.select_next_hunk();
                 DiffActionResult::Continue
             }
             DiffAction::FoldFile => {

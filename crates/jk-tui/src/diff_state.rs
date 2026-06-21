@@ -18,7 +18,9 @@ pub struct DiffState {
     change_id: String,
     rendered: String,
     sections: Vec<FileSection>,
+    hunks: Vec<HunkSection>,
     selected: Option<usize>,
+    selected_hunk: Option<usize>,
     collapsed_paths: BTreeSet<String>,
     search: Option<SearchState>,
     scroll_offset: usize,
@@ -32,13 +34,16 @@ impl DiffState {
     pub fn new(snapshot: DiffSnapshot) -> Self {
         let (title, change_id, rendered, file_stats) = snapshot.into_parts();
         let sections = file_sections(&rendered, &file_stats);
+        let hunks = hunk_sections(&rendered, &sections);
         let selected = (!sections.is_empty()).then_some(0);
         Self {
             title: title_or_default(title),
             change_id,
             rendered,
             sections,
+            hunks,
             selected,
+            selected_hunk: None,
             collapsed_paths: BTreeSet::new(),
             search: None,
             scroll_offset: 0,
@@ -57,6 +62,8 @@ impl DiffState {
         self.change_id = change_id;
         self.rendered = rendered;
         self.sections = file_sections(&self.rendered, &file_stats);
+        self.hunks = hunk_sections(&self.rendered, &self.sections);
+        self.selected_hunk = None;
         self.collapsed_paths
             .retain(|path| self.sections.iter().any(|section| section.path == *path));
         self.selected = selected_path
@@ -99,6 +106,7 @@ impl DiffState {
         if self.scroll_offset == old_offset {
             self.select_previous_file();
         } else {
+            self.selected_hunk = None;
             self.select_file_for_scroll_offset();
         }
     }
@@ -111,6 +119,7 @@ impl DiffState {
         if self.scroll_offset == old_offset {
             self.select_next_file();
         } else {
+            self.selected_hunk = None;
             self.select_file_for_scroll_offset();
         }
     }
@@ -118,6 +127,7 @@ impl DiffState {
     /// Scrolls one viewport toward the start of the diff.
     pub fn select_page_previous(&mut self) {
         self.scroll_offset = self.scroll_offset.saturating_sub(self.viewport_height);
+        self.selected_hunk = None;
         self.select_file_for_scroll_offset();
     }
 
@@ -125,12 +135,14 @@ impl DiffState {
     pub fn select_page_next(&mut self) {
         self.scroll_offset = self.scroll_offset.saturating_add(self.viewport_height);
         self.clamp_scroll_offset();
+        self.selected_hunk = None;
         self.select_file_for_scroll_offset();
     }
 
     /// Moves to the first visible diff line.
     pub fn select_first(&mut self) {
         self.scroll_offset = 0;
+        self.selected_hunk = None;
         self.select_file_for_scroll_offset();
     }
 
@@ -138,6 +150,7 @@ impl DiffState {
     pub fn select_last(&mut self) {
         self.scroll_offset = usize::MAX;
         self.clamp_scroll_offset();
+        self.selected_hunk = None;
         self.select_file_for_scroll_offset();
     }
 
@@ -173,6 +186,24 @@ impl DiffState {
 
         let last_index = self.sections.len().saturating_sub(1);
         self.select_index((selected + 1).min(last_index));
+    }
+
+    /// Jumps to the previous hunk.
+    pub fn select_previous_hunk(&mut self) {
+        let Some(index) = self.current_hunk_index() else {
+            return;
+        };
+
+        self.select_hunk_index(index.saturating_sub(1));
+    }
+
+    /// Jumps to the next hunk.
+    pub fn select_next_hunk(&mut self) {
+        let Some(index) = self.current_hunk_index() else {
+            return;
+        };
+
+        self.select_hunk_index((index + 1).min(self.hunks.len().saturating_sub(1)));
     }
 
     /// Folds the selected file section.
@@ -398,8 +429,41 @@ impl DiffState {
         };
 
         self.selected = Some(index);
+        self.selected_hunk = None;
         self.scroll_offset = self.visible_line_for_rendered_line(section.start_line);
         self.clamp_scroll_offset();
+    }
+
+    /// Selects a hunk by index and scrolls its header to the top.
+    fn select_hunk_index(&mut self, index: usize) {
+        let Some(hunk) = self.hunks.get(index) else {
+            return;
+        };
+
+        self.selected = Some(hunk.file_index);
+        self.selected_hunk = Some(index);
+        self.scroll_offset = self.visible_line_for_rendered_line(hunk.start_line);
+        self.clamp_scroll_offset();
+    }
+
+    /// Returns the hunk containing, or nearest before, the current scroll offset.
+    fn current_hunk_index(&self) -> Option<usize> {
+        if self.hunks.is_empty() {
+            return None;
+        }
+        if let Some(selected_hunk) = self.selected_hunk {
+            return Some(selected_hunk.min(self.hunks.len() - 1));
+        }
+
+        self.hunks
+            .iter()
+            .enumerate()
+            .take_while(|(_, hunk)| {
+                self.visible_line_for_rendered_line(hunk.start_line) <= self.scroll_offset
+            })
+            .map(|(index, _)| index)
+            .last()
+            .or(Some(0))
     }
 
     /// Selects the file section containing, or nearest before, the current scroll offset.
@@ -462,6 +526,7 @@ impl DiffState {
 
         self.scroll_offset = line;
         self.clamp_scroll_offset();
+        self.selected_hunk = None;
         self.select_file_for_scroll_offset();
     }
 
@@ -528,6 +593,13 @@ impl SearchState {
         self.selected
             .and_then(|index| self.matches.get(index).copied())
     }
+}
+
+/// A diff hunk header discovered in rendered `jj diff` output.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct HunkSection {
+    file_index: usize,
+    start_line: usize,
 }
 
 /// A file section discovered in `jj diff` output.
@@ -608,6 +680,28 @@ fn file_sections(rendered: &str, file_stats: &[DiffFileStat]) -> Vec<FileSection
     sections
 }
 
+/// Finds diff hunk headers inside recognized file sections.
+fn hunk_sections(rendered: &str, file_sections: &[FileSection]) -> Vec<HunkSection> {
+    let lines = rendered.lines().collect::<Vec<_>>();
+    let mut hunks = Vec::new();
+
+    for (file_index, section) in file_sections.iter().enumerate() {
+        for line_index in (section.start_line + 1)..section.end_line {
+            let Some(line) = lines.get(line_index) else {
+                continue;
+            };
+            if hunk_header_line(line) {
+                hunks.push(HunkSection {
+                    file_index,
+                    start_line: line_index,
+                });
+            }
+        }
+    }
+
+    hunks
+}
+
 /// Extracts a stable file path from a visible `jj diff` file header line.
 fn file_header_path(line: &str) -> Option<String> {
     let line = strip_ansi(line);
@@ -629,6 +723,13 @@ fn file_header_path(line: &str) -> Option<String> {
     .find_map(|prefix| line.strip_prefix(prefix))?;
 
     path.strip_suffix(':').map(ToOwned::to_owned)
+}
+
+/// Returns whether a rendered line looks like a unified diff hunk header.
+fn hunk_header_line(line: &str) -> bool {
+    let line = strip_ansi(line);
+    let line = line.trim_start();
+    line.starts_with("@@") && line.contains("@@")
 }
 
 /// Returns the terminal-visible width of text after removing ANSI color escapes.
@@ -889,6 +990,39 @@ mod tests {
         state.scroll_left();
 
         assert_eq!(state.horizontal_offset(), 8);
+    }
+
+    #[test]
+    fn brace_movement_selects_hunk_headers_across_files() {
+        let mut state = DiffState::new(snapshot(
+            "aaa",
+            concat!(
+                "Modified regular file src/a.rs:\n",
+                "@@ -1,1 +1,1 @@\n",
+                " a1\n",
+                "@@ -8,1 +8,1 @@\n",
+                " a2\n",
+                "Modified regular file src/b.rs:\n",
+                "@@ -1,1 +1,1 @@\n",
+                " b1\n",
+            ),
+        ));
+        state.keep_selected_in_view(3);
+
+        state.select_next_hunk();
+
+        assert_eq!(state.scroll_offset(), 3);
+        assert_eq!(state.selected_visible_line(), Some(0));
+
+        state.select_next_hunk();
+
+        assert_eq!(state.scroll_offset(), 5);
+        assert_eq!(state.selected_visible_line(), Some(5));
+
+        state.select_previous_hunk();
+
+        assert_eq!(state.scroll_offset(), 3);
+        assert_eq!(state.selected_visible_line(), Some(0));
     }
 
     #[test]

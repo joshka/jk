@@ -33,53 +33,26 @@ impl AppKey {
             return action_for_control_key(key.code);
         }
 
+        if let KeyCode::Char(character) = key.code
+            && let Some(action) = action_for_character_key(character)
+        {
+            return action;
+        }
+
         match key {
             KeyEvent {
                 code: KeyCode::Char('q') | KeyCode::Esc,
                 ..
             } => Self::Action(LogAction::Quit),
             KeyEvent {
-                code: KeyCode::Char('r'),
-                ..
-            } => Self::Action(LogAction::Refresh),
-            KeyEvent {
-                code: KeyCode::Char('H'),
-                ..
-            } => Self::Action(LogAction::Home),
-            KeyEvent {
-                code: KeyCode::Char('L'),
-                ..
-            } => Self::Action(LogAction::Log),
-            KeyEvent {
-                code: KeyCode::Char('l'),
-                ..
-            }
-            | KeyEvent {
-                code: KeyCode::Enter | KeyCode::Right,
+                code: KeyCode::Right | KeyCode::Enter,
                 ..
             } => Self::Action(LogAction::ToggleExpanded),
             KeyEvent {
-                code: KeyCode::Char('d'),
-                ..
-            } => Self::Action(LogAction::OpenDiff),
-            KeyEvent {
-                code: KeyCode::Char('/'),
-                ..
-            } => Self::StartSearch,
-            KeyEvent {
-                code: KeyCode::Char('n'),
-                ..
-            } => Self::SearchNext,
-            KeyEvent {
-                code: KeyCode::Char('N'),
-                ..
-            } => Self::SearchPrevious,
-            KeyEvent {
-                code: KeyCode::Char('k') | KeyCode::Up,
-                ..
+                code: KeyCode::Up, ..
             } => Self::Action(LogAction::Previous),
             KeyEvent {
-                code: KeyCode::Char('j') | KeyCode::Down,
+                code: KeyCode::Down,
                 ..
             } => Self::Action(LogAction::Next),
             KeyEvent {
@@ -100,35 +73,45 @@ impl AppKey {
                 ..
             } => Self::Action(LogAction::PageNext),
             KeyEvent {
-                code: KeyCode::Char('g') | KeyCode::Home,
+                code: KeyCode::Home,
                 ..
             } => Self::Action(LogAction::First),
             KeyEvent {
-                code: KeyCode::Char('G') | KeyCode::End,
-                ..
+                code: KeyCode::End, ..
             } => Self::Action(LogAction::Last),
             KeyEvent {
-                code: KeyCode::Char('['),
-                ..
-            } => Self::Action(LogAction::PreviousFile),
-            KeyEvent {
-                code: KeyCode::Char(']'),
-                ..
-            } => Self::Action(LogAction::NextFile),
-            KeyEvent {
-                code: KeyCode::Char('<'),
-                ..
-            } => Self::Action(LogAction::HorizontalPrevious),
-            KeyEvent {
-                code: KeyCode::Char('>'),
-                ..
-            } => Self::Action(LogAction::HorizontalNext),
-            KeyEvent {
-                code: KeyCode::Char('h') | KeyCode::Left,
+                code: KeyCode::Left,
                 ..
             } => Self::Action(LogAction::CollapseExpanded),
             _ => Self::Ignore,
         }
+    }
+}
+
+/// Interprets unmodified character keys.
+const fn action_for_character_key(character: char) -> Option<AppKey> {
+    match character {
+        'q' => Some(AppKey::Action(LogAction::Quit)),
+        'r' => Some(AppKey::Action(LogAction::Refresh)),
+        'H' => Some(AppKey::Action(LogAction::Home)),
+        'L' => Some(AppKey::Action(LogAction::Log)),
+        'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
+        'd' => Some(AppKey::Action(LogAction::OpenDiff)),
+        '/' => Some(AppKey::StartSearch),
+        'n' => Some(AppKey::SearchNext),
+        'N' => Some(AppKey::SearchPrevious),
+        'k' => Some(AppKey::Action(LogAction::Previous)),
+        'j' => Some(AppKey::Action(LogAction::Next)),
+        'g' => Some(AppKey::Action(LogAction::First)),
+        'G' => Some(AppKey::Action(LogAction::Last)),
+        '[' => Some(AppKey::Action(LogAction::PreviousFile)),
+        ']' => Some(AppKey::Action(LogAction::NextFile)),
+        '{' => Some(AppKey::Action(LogAction::PreviousHunk)),
+        '}' => Some(AppKey::Action(LogAction::NextHunk)),
+        '<' => Some(AppKey::Action(LogAction::HorizontalPrevious)),
+        '>' => Some(AppKey::Action(LogAction::HorizontalNext)),
+        'h' => Some(AppKey::Action(LogAction::CollapseExpanded)),
+        _ => None,
     }
 }
 
@@ -236,6 +219,18 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('>'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::HorizontalNext)
+        );
+    }
+
+    #[test]
+    fn braces_jump_between_diff_hunks() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('{'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::PreviousHunk)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('}'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::NextHunk)
         );
     }
 

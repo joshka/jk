@@ -346,6 +346,8 @@ fn apply_diff_action(
         jk_tui::log_view::LogAction::Last => DiffAction::Last,
         jk_tui::log_view::LogAction::PreviousFile => DiffAction::PreviousFile,
         jk_tui::log_view::LogAction::NextFile => DiffAction::NextFile,
+        jk_tui::log_view::LogAction::PreviousHunk => DiffAction::PreviousHunk,
+        jk_tui::log_view::LogAction::NextHunk => DiffAction::NextHunk,
         jk_tui::log_view::LogAction::HorizontalPrevious => DiffAction::ScrollLeft,
         jk_tui::log_view::LogAction::HorizontalNext => DiffAction::ScrollRight,
         jk_tui::log_view::LogAction::ToggleExpanded => DiffAction::UnfoldFile,

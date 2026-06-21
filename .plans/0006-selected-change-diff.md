@@ -66,6 +66,8 @@ Hunk-level collapse remains out of scope.
    the same stat suffix and a compact file index such as `[file 1/3]`.
 1. Horizontal overflow: `<` and `>` scroll wide diff content horizontally, with the current column
    shown in the status line when shifted.
+1. Hunk navigation: `{` and `}` jump to previous and next unified diff hunk headers, updating the
+   current file selection when movement crosses file boundaries.
 
 ## Validation
 

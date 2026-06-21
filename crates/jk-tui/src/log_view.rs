@@ -69,6 +69,12 @@ pub enum LogAction {
     /// Move to the next file section in views that support file sections.
     NextFile,
 
+    /// Move to the previous hunk in views that support diff hunks.
+    PreviousHunk,
+
+    /// Move to the next hunk in views that support diff hunks.
+    NextHunk,
+
     /// Scroll horizontally toward the start in views that support wide content.
     HorizontalPrevious,
 
@@ -178,6 +184,8 @@ impl LogView {
             }
             LogAction::PreviousFile
             | LogAction::NextFile
+            | LogAction::PreviousHunk
+            | LogAction::NextHunk
             | LogAction::HorizontalPrevious
             | LogAction::HorizontalNext
             | LogAction::FoldAll
