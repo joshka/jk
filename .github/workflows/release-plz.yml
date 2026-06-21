@@ -182,6 +182,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      RELEASE_PLZ_APP_ID: ${{ secrets.RELEASE_PLZ_APP_ID }}
+      RELEASE_PLZ_APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLZ_APP_PRIVATE_KEY }}
     concurrency:
       group: release-plz-${{ github.ref }}
       cancel-in-progress: false
@@ -197,9 +200,28 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Generate release PR token
+        id: release-pr-token
+        # Pull requests opened with the default GITHUB_TOKEN require manual
+        # workflow approval before CI starts. A narrowly scoped GitHub App token
+        # lets release-plz open same-repo PRs that trigger CI normally, without
+        # storing a broad personal access token.
+        if: ${{ env.RELEASE_PLZ_APP_ID != '' && env.RELEASE_PLZ_APP_PRIVATE_KEY != '' }}
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ env.RELEASE_PLZ_APP_ID }}
+          private-key: ${{ env.RELEASE_PLZ_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Run release-plz
         uses: release-plz/action@e8792575c7f2366cf6ff3ccc33ead9ace5b691c7 # v0.5.130
         with:
           command: release-pr
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: >-
+            ${{
+              steps.release-pr-token.outputs.token ||
+              secrets.RELEASE_PLZ_TOKEN ||
+              secrets.GITHUB_TOKEN
+            }}
