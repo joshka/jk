@@ -6,14 +6,14 @@ Require jj
 
 Set Shell "bash"
 Set Theme "Aardvark Ink"
-Set FontSize 22
 Set Width 1200
 Set Height 720
-Set Margin 12
+Set Padding 8
+Set Margin 0
 Set WindowBar Colorful
-Set BorderRadius 8
+Set BorderRadius 0
 Set CursorBlink false
-Set TypingSpeed 18ms
+Set TypingSpeed 24ms
 Set WaitTimeout 30s
 Env NO_COLOR "1"
 
@@ -27,32 +27,60 @@ Wait+Line
 Type "cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-readme-betamax-build.log 2>&1 && echo JK_BUILD_READY"
 Enter
 Wait+Screen "JK_BUILD_READY"
+Ctrl+L
+Sleep 200ms
 Show
 
 Type "./target/debug/jk -R . -n 8"
 Enter
 Wait+Screen "jk jj"
-Sleep 700ms
+Sleep 1s
 Screenshot ../../jk-screenshots/assets/jk-log.png
 
+Hide
 Type "?"
 Sleep 500ms
 Screenshot ../../jk-screenshots/assets/jk-log-help.png
 
 Type "?"
 Sleep 300ms
+Show
 Type "j"
-Sleep 250ms
+Sleep 450ms
 Type "j"
-Sleep 250ms
+Sleep 700ms
 Screenshot ../../jk-screenshots/assets/jk-log-selection.png
 
 Enter
-Sleep 500ms
+Sleep 700ms
 Screenshot ../../jk-screenshots/assets/jk-log-expanded.png
 
-Type "q"
-Sleep 300ms
+Type "d"
+Wait+Screen "jk jj diff"
+Sleep 1200ms
+Type "}"
+Sleep 700ms
+Type "-"
+Sleep 1s
+Type "j"
+Sleep 180ms
+Type "j"
+Sleep 180ms
+Type "j"
+Sleep 180ms
+Type "j"
+Sleep 180ms
+Type "j"
+Sleep 180ms
+Type "j"
+Sleep 900ms
+Type "+"
+Sleep 800ms
+Type "H"
+Wait+Screen "jk jj"
+Sleep 900ms
 Hide
+Type "q"
+Sleep 400ms
 Type "exit"
 Enter

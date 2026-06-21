@@ -7,6 +7,8 @@ reviewing change descriptions and selected-change diffs.
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log.gif)
 
+![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff.gif)
+
 ## Current Status
 
 The supported surface includes:
