@@ -1,6 +1,6 @@
 # jk
 
-`jk` is a log-first terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
+`jk` is a jj-native terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
 
 It keeps the parts of `jj` you already trust: the graph, colors, wording, revsets, templates, and
 diff output still come from `jj`. `jk` adds an interactive review loop around that output so you can
@@ -54,7 +54,7 @@ The supported surface includes:
 - diff search with `/`, `n`, and `N`;
 - retryable empty/error states for selected diffs;
 - mode-specific help overlays with `?`;
-- Betamax visual tapes for the log and diff workflows.
+- [Betamax](https://www.joshka.net/betamax/) visual tapes for the log and diff workflows.
 
 The current implementation intentionally treats rendered `jj` output as the source of truth. The
 TUI parses only enough structure to support navigation, search, sticky headers, and folding.
@@ -100,27 +100,17 @@ the semantic navigation pass. Use `jk log` when you want the explicit log comman
 
 ## Roadmap
 
-The next good diff-review improvements are:
+The detailed product and engineering plan lives in
+[docs/product-plan.md](docs/product-plan.md). The shorter
+[docs/roadmap.md](docs/roadmap.md) turns that plan into issue-sized milestones.
 
-- file list or jump overlay for large diffs;
-- search highlighting;
-- a clearer current-hunk visual marker;
-- fold-state indicators on expanded file and hunk headers;
-- fold/unfold all hunks for the current file or whole diff;
-- optional wrapping mode for prose-heavy or very wide diffs;
-- more intentional binary, rename, conflict, mode-change, and permission-change presentation;
-- a command palette if the keymap keeps growing;
-- visual regression checks over Betamax screenshots or captured state;
-- mouse support for file/hunk selection and wheel scrolling.
+The near-term direction is:
 
-Broader application directions:
-
-- automatic refresh when repository state changes;
-- selected-change `show` view;
-- operation log inspection;
-- repository status and bookmark views;
-- copy/export helpers for review notes;
-- carefully scoped mutation actions once target selection and confirmation semantics are boring.
+- preserve jj-rendered output while improving navigation, marks, and command-shaped inspection;
+- add `show`, `status`, command mode, command history, and a first-class workspace screen;
+- move mutating workflows behind command previews, command history, and operation recovery;
+- make [Betamax](https://www.joshka.net/betamax/) tapes the source for regression tests,
+  README/site media, and release demos.
 
 ## Development
 

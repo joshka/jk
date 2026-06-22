@@ -1,9 +1,9 @@
 # jk
 
-`jk` is a log-first terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
+`jk` is a jj-native terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
 
-It keeps a `jj` log-like view open, lets you refresh in place, and adds interactive navigation for
-reviewing change descriptions and selected-change diffs.
+It keeps a `jj` log-like view open today, lets you refresh in place, and adds interactive navigation
+for reviewing change descriptions and selected-change diffs.
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
@@ -58,11 +58,12 @@ navigation. Use `jk log` for the explicit log path.
 
 ## Roadmap
 
-Near-term diff-review improvements include a file jump overlay, search highlighting, clearer
-current-hunk affordances, richer fold indicators, wrapping mode, and better presentation for
-binary, rename, conflict, mode-change, and permission-change output.
+The detailed roadmap lives in the repository docs:
 
-Broader directions include automatic refresh, selected-change `show`, operation log inspection,
-repository status and bookmark views, copy/export helpers, and carefully scoped mutation actions.
+- [product plan](https://github.com/joshka/jk/blob/main/docs/product-plan.md);
+- [issue-sized roadmap](https://github.com/joshka/jk/blob/main/docs/roadmap.md).
 
-See the repository README for the full status and development workflow.
+Near-term work preserves jj-rendered output while adding command-shaped inspection, `show`,
+`status`, command mode, command history, workspaces, command previews, and operation recovery.
+
+See the repository README for the current status and development workflow.

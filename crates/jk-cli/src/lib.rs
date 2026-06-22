@@ -1,6 +1,6 @@
 //! `jj` process integration for `jk`.
 //!
-//! The log-first MVP needs two views of the same `jj` command:
+//! The current MVP needs two views of the same `jj` command:
 //!
 //! - rendered terminal output that keeps the user's configured template, graph, revset, and colors;
 //! - semantic records that let the TUI move by change, preserve selection, and expand the selected
