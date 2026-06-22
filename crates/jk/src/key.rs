@@ -27,7 +27,7 @@ pub enum AppKey {
 }
 
 impl AppKey {
-    /// Converts a crossterm key event into the log-first action surface.
+    /// Converts a crossterm key event into the current action surface.
     pub const fn from_crossterm(key: KeyEvent) -> Self {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             return action_for_control_key(key.code);

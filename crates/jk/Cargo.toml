@@ -1,6 +1,6 @@
 [package]
 name = "jk"
-description = "A log-first terminal UI for Jujutsu"
+description = "A jj-native terminal UI for Jujutsu"
 documentation = "https://docs.rs/jk"
 readme = "README.md"
 include = [

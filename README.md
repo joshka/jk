@@ -101,7 +101,7 @@ the semantic navigation pass. Use `jk log` when you want the explicit log comman
 ## Roadmap
 
 The detailed product and engineering plan lives in
-[docs/golden-plan.md](docs/golden-plan.md). The shorter
+[docs/product-plan.md](docs/product-plan.md). The shorter
 [docs/roadmap.md](docs/roadmap.md) turns that plan into issue-sized milestones.
 
 The near-term direction is:

@@ -60,7 +60,7 @@ navigation. Use `jk log` for the explicit log path.
 
 The detailed roadmap lives in the repository docs:
 
-- [golden plan](https://github.com/joshka/jk/blob/main/docs/golden-plan.md);
+- [product plan](https://github.com/joshka/jk/blob/main/docs/product-plan.md);
 - [issue-sized roadmap](https://github.com/joshka/jk/blob/main/docs/roadmap.md).
 
 Near-term work preserves jj-rendered output while adding command-shaped inspection, `show`,

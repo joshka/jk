@@ -129,7 +129,7 @@ enum AppView {
     },
 }
 
-/// Owns the terminal event loop for the current log-first application.
+/// Owns the terminal event loop for the current jj-native application.
 ///
 /// The view remains responsible for state transitions and rendering. This loop only translates
 /// terminal events, performs I/O requested by the view, and redraws when input or terminal resize

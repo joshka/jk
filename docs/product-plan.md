@@ -1,4 +1,4 @@
-# jk Golden Plan
+# jk Product Plan
 
 > A single document of record for building `jk` into the obvious terminal UI for Jujutsu (`jj`).
 >
@@ -35,7 +35,7 @@ Useful source links for `jj` compatibility and ecosystem context:
 `jk` should become the terminal workbench that feels like the interactive form of `jj` itself.
 
 The product should not be positioned as "a lazygit for jj" and should not be constrained by the
-current phrase "log-first." The default screen can remain the revision graph because that is where
+narrow first-screen framing. The default screen can remain the revision graph because that is where
 many jj workflows begin, but the durable positioning is broader:
 
 > `jk` is a jj-native terminal workbench. It follows Jujutsu's command model and configuration, then
@@ -280,6 +280,65 @@ GitButler / but tui
   a Rust backend, and a CLI using the same Rust backend engine.
 ```
 
+### 2.7 User demand signals from prior art
+
+The planning implication is not "copy the most active TUI." It is that repeated user requests
+cluster around a small number of workflow pressures. These should steer issue priority, docs,
+website demos, release notes, and Betamax tapes.
+
+Important framing:
+
+- Treat the project author's theme/dark-mode and
+  [jj-vcs/jj#9319](https://github.com/jj-vcs/jj/pull/9319) design material as product intent,
+  not as independent demand evidence.
+- Preserve the "interactive jj" stance. Users praise tools that extend jj and teach the underlying
+  command, while pane-first tools are criticized when it is unclear which region or object is active.
+- Do not optimize for a permanent pane grid. The demand is for fast focus changes, previews,
+  pickers, overlays, and stable context.
+- Workspaces show up as normal daily jj usage. They should stay early core scope.
+
+Signals to incorporate:
+
+- **TUI adoption pressure is real, but blessing one tool is contentious.** Some users want an
+  obvious default recommendation because newcomers ask which TUI to use. Others worry that a blessed
+  UI would narrow experimentation. `jk` should win by being clearly jj-native, well documented, and
+  demonstrably safer rather than by claiming official status.
+- **Command discovery needs to be searchable.** `?` should not only be a static help sheet. Users
+  ask for a command palette or filterable command list that can find actions by name, key, and jj
+  command shape. `:` remains command entry; searchable help is a separate discovery surface.
+- **Revision navigation needs more than cursor movement.** Long histories and rebase targets far
+  away from the cursor need `/` search, jump-to-revision, quick filters, and a way to return to the
+  previous filter or default revset without losing context.
+- **Diff and file browsing are a major product differentiator.** Users ask for repo-at-revision file
+  browsing, searchable file lists, sticky revision/file context, next/previous file navigation,
+  diff search, range diffs, two-revision diffs, and easy toggles between patch, stat, summary, and
+  file-only views.
+- **Rebase and graph manipulation should be visual before they mutate.** Strong demand clusters
+  around multi-parent change creation, rebase destination picking, insert-before/after, selection
+  order that is hard to get wrong, and live or ghost previews of the resulting graph.
+- **Large repositories must stay responsive.** Existing TUIs struggle with large monorepos, large
+  diffs, slow external diff tools, preview panes that keep rendering after the cursor moves, and
+  stale state after outside commands. Cancellable preview tasks and refresh discipline are not
+  polish; they are table stakes.
+- **Customization has to cover actions, not only colors.** Users ask for keymaps, command groups,
+  custom commands with selected revision values, clipboard actions, template-aware log display, and
+  theme/color overrides that preserve legibility.
+- **Maintenance and jj compatibility matter.** Prior tools have broken across jj releases or forked
+  when releases stalled. `jk` should prefer structured jj data where possible, isolate CLI parsing,
+  test against jj config variants, and document compatibility gaps explicitly.
+- **Docs and demos need to show day-to-day workflows, not only feature lists.** The strongest demos
+  should be short stories: inspect a stack, search to a target, preview a rebase, recover through
+  the op log, use a workspace, and see the jj command behind the action.
+
+Related upstream discussion anchors:
+
+- [jj-vcs/jj#8836](https://github.com/jj-vcs/jj/pull/8836): TUI for editing history.
+- [jj-vcs/jj#5121](https://github.com/jj-vcs/jj/issues/5121): refreshable jj log.
+- [jj-vcs/jj#2765](https://github.com/jj-vcs/jj/issues/2765): interactive log/op-log viewing.
+- [jj-vcs/jj#6903](https://github.com/jj-vcs/jj/issues/6903): interactive command defaults.
+- [jj-vcs/jj#7045](https://github.com/jj-vcs/jj/issues/7045): split TUI documentation confusion.
+- [jj-vcs/jj#8947](https://github.com/jj-vcs/jj/pull/8947): terminal color compatibility.
+
 ## 3. Non-negotiable design principles
 
 ### 3.1 Command-shaped actions
@@ -333,6 +392,14 @@ movement uses `[ ]` and `{ }`.
 
 `?` opens generated contextual help. The help content and hotbar are generated from the active
 keymap and view state. If a keybinding changes, help changes automatically.
+
+Help should also become searchable. The help surface and command palette are related but distinct:
+
+- `?` explains what is currently possible.
+- typing inside help filters by action name, key, screen, and jj command family.
+- `:` runs jj commands.
+- command-mode suggestions may reuse the same action registry, but should not replace searchable
+  help.
 
 ### 3.5 Safe mutation loop
 
@@ -411,6 +478,17 @@ tabs: files/bookmarks/config/etc.
 
 An optional split preview can exist later, but it should be a focused view mode, not the default
 mental model.
+
+### 3.9 Responsive by construction
+
+Interaction should stay responsive even when jj, a diff tool, or a large repository is slow. This is
+a product principle, not only an optimization pass:
+
+- expensive preview work should be cancellable when selection changes;
+- long-running commands should show visible progress or a pending state;
+- stale external state should be detected and explained where possible;
+- slow diff rendering should not block graph navigation;
+- refresh should be explicit, predictable, and tied to operation changes where possible.
 
 ## 4. Core mental model
 
@@ -1086,8 +1164,41 @@ Diff view:
 - Preserve selected file/hunk across refresh if path/header still exists.
 - Sticky current-file header.
 - File picker overlay for large diffs.
-- Search highlights eventually.
+- Search highlights and next/previous match navigation.
+- Next/previous file navigation without reopening the picker.
+- Toggle between patch, stat, summary, name-only, and file-only details.
+- Keep revision metadata visible enough that users know which change/range they are inspecting.
 - File/hunk marks feed squash/split/restore/diffedit.
+
+Diff workflow should grow in three layers:
+
+1. **jj-shaped inspection:** render `jj diff`, `jj show`, and `jj status` faithfully, with cursor and
+   marks resolving to visible commands.
+2. **File-centric navigation:** add a searchable file list, sticky revision/file context,
+   next/previous file commands, and quick format toggles.
+3. **Repository-at-revision browsing:** let users inspect the file tree for a selected revision,
+   then jump from a file to its diff or full content without switching to another tool.
+
+Range and comparison behavior should be explicit:
+
+- one revision means `jj diff -r REV`;
+- two ordered revisions mean `jj diff --from A --to B`;
+- selected contiguous ranges may offer a range revset preview;
+- non-contiguous selections should prompt or use an action menu rather than guessing.
+
+Large diffs should never make graph navigation feel broken. If an expensive diff preview is still
+rendering when selection changes, cancel it or mark it stale before starting the next preview.
+
+Diff follow-up work should keep these details visible as separate reviewable slices:
+
+- horizontal overflow controls for wide diffs, with status text showing the shifted column;
+- empty-diff and failed-load states that stay retryable inside the TUI instead of exiting before the
+  user can recover;
+- edge-case fixtures for binary files, renames, copies, conflicts, mode changes, symlinks, file
+  permission changes, empty diffs, and very wide lines;
+- clearer current-hunk markers and fold-state indicators for files and hunks;
+- copy actions for path, hunk location, or selected line text after selection semantics are stable;
+- optional mouse selection and wheel scrolling only after keyboard behavior is complete.
 
 ### 9.2 Show/details workflow
 
@@ -1118,6 +1229,8 @@ UI:
 - Highlight source revisions.
 - Highlight destination candidate.
 - Show ghost/preview summary if possible.
+- Support search and jump while choosing a far-away destination.
+- Preserve enough context that users can return to the source after previewing destinations.
 - Footer shows role toggles:
 
 ```text
@@ -1136,7 +1249,20 @@ Advanced:
 
 - Multiple sources supported by repeating args where jj supports it.
 - Multiple destinations supported for merges where jj supports repeated `-o`.
+- Insert-before/insert-after should detect obviously inverted child/parent selection order and
+  either swap roles safely or ask for confirmation.
+- Multi-parent change creation should share the same role-picker vocabulary as rebase so users do
+  not learn a separate model for merge-like changes.
 - If source/destination invalid, show jj stderr or preflight validation.
+
+Long-term rebase preview should be visual:
+
+- render the current graph and the proposed result side by side only as a focused preview mode, not
+  as the default app layout;
+- show added, moved, and unchanged nodes distinctly;
+- keep the exact jj command visible;
+- make `Enter` run and `Esc` cancel;
+- preserve the pre-run operation recovery path after success.
 
 ### 9.4 Describe/message workflow
 
@@ -1378,6 +1504,12 @@ Move to a row/cell model while still using jj to evaluate templates.
 - Ask jj to render user template fragments where fidelity matters.
 - `jk` owns line wrapping, selection, marks, previews, and hotbar layout.
 
+Structured data should be preferred whenever jj exposes it. Plain rendered output is still useful
+for fidelity, but brittle string parsing should stay behind provider boundaries so jj compatibility
+changes are isolated. When `json()` templates or other structured jj output can provide stable
+identity, parentage, bookmarks, flags, and operation metadata, use that data for state and reserve
+rendered text for presentation.
+
 ### 12.3 Phase C: native graph rendering
 
 Native graph rendering is justified when it enables:
@@ -1406,8 +1538,44 @@ Initial diff rendering can remain jj-rendered. Native diff enhancements may come
 - Syntax highlighting.
 - Side-by-side diff.
 - Conflict visualization.
+- Sticky revision and file metadata.
+- Searchable file list and inline diff search.
+- Fast file-only/details mode for large changes.
 
 Do not replace jj diff formatting until there is a strong reason and fidelity tests.
+
+Diff rendering has a higher complexity ceiling than graph rendering because it touches diff
+algorithms, word highlighting, syntax highlighting, split/diffedit behavior, conflict rendering,
+binary files, and external diff tools. Treat native diff work as a series of narrowly scoped
+enhancements, not a wholesale replacement.
+
+### 12.5 jj integration cleanup
+
+The current rendered-output bridge is acceptable only because it preserves jj's real CLI behavior
+while the product is young. Treat it as a compatibility adapter, not as the desired end state.
+
+The provider layer needs two different products from jj:
+
+1. the exact terminal presentation jj would render for the user's config, template, graph style,
+   terminal width, colors, revset defaults, default command behavior, and warnings;
+1. semantic records for navigation, expansion, diff targeting, row identity, marks, and future
+   mutation previews.
+
+Those are not the same contract. `jj-lib` owns repository semantics, but it does not own the whole
+CLI log presentation contract. Direct `jj-lib` integration is not a win if it forces `jk` to copy
+`jj log` selection, template, graph, color, and warning behavior. In-process `jj-cli` integration is
+worth a spike only if it reduces process overhead without changing product behavior.
+
+Cleanup rules:
+
+- keep rendered output opaque outside the provider boundary;
+- keep semantic parsing narrow, fixture-backed, and version/config-drift aware;
+- document parser failures in terms of the jj version or config contract that changed;
+- prefer structured jj output where it gives stable identity, but do not make `jk` duplicate
+  presentation behavior for aesthetic architecture reasons;
+- revisit shell-out replacement only when the replacement reduces duplicated jj behavior;
+- if semantic row access requires copying `cmd_log`, draft an upstream reusable log-core proposal
+  instead of reimplementing jj log in `jk`.
 
 ## 13. Testing and quality gates
 
@@ -1824,7 +1992,7 @@ command history export
 This should be embraced. The projects can demonstrate how terminal tools can evolve with
 browser-grade workflow testing, but with terminal-native artifacts.
 
-The golden rule for demos:
+Demo artifact rule:
 
 ```text
 README GIF       <- tapes/media/readme-overview.tape
@@ -1859,6 +2027,15 @@ just package-smoke
 
 CI should keep one stable required aggregate status, even as jobs split.
 
+For the current repo, the required status baseline should stay explicit and boring:
+
+- `Check`
+- `Markdown`
+- `MSRV`
+
+If GitHub merge queue is enabled, it should run the same checks through `merge_group`. Keep the
+Markdown check separate from Rust checks so docs and formatting failures stay quick to diagnose.
+
 ## 14. Performance plan
 
 Performance goals:
@@ -1867,6 +2044,8 @@ Performance goals:
 - Smooth navigation independent of jj subprocess latency.
 - Avoid reloading expensive views unless inputs changed.
 - Preserve UI responsiveness during command execution with cancellable tasks.
+- Keep graph navigation usable in large monorepos and histories with tens of thousands of changes.
+- Keep large diffs and slow external diff tools from blocking unrelated navigation.
 
 Implementation ideas:
 
@@ -1877,6 +2056,39 @@ Implementation ideas:
 - Optional file watcher/op watcher.
 - Limit huge logs by default but make expansion easy.
 - Use virtualized list rendering for large graphs.
+- Debounce selection-driven previews and cancel stale preview work when the cursor moves.
+- Prefer op-id-based refresh checks after mutating commands.
+- Detect external repo state changes and explain when the user needs a refresh.
+- Add a slow-command status line for operations that take longer than an interaction threshold.
+- Include large-log, large-diff, slow-diff-tool, and external-change fixtures in validation.
+
+Responsive behavior to test explicitly:
+
+- moving through a graph while a previous diff preview is still rendering;
+- opening a large change and immediately moving to another revision;
+- running a mutation, refreshing by operation ID, and preserving cursor identity;
+- editing the repo outside `jk`, then returning to a stale view;
+- using a custom diff tool or template that makes preview rendering slow.
+
+### 14.1 Auto-refresh policy
+
+Auto-refresh belongs after the manual refresh model is solid in both log and selected-change diff
+views. It should make editor, shell, and agent workflows smoother without turning repository writes
+into flicker or focus theft.
+
+Policy requirements:
+
+- manual refresh remains available and predictable;
+- auto-refresh has a debounce/coalescing window for editors, shells, and agents that write several
+  files or operations in quick succession;
+- selection, scroll, expansion, marks, and collapsed diff state follow the same preservation rules
+  as manual refresh;
+- refresh failures surface in status text or a retryable output view without stealing focus;
+- the status bar makes refresh mode visible without adding noisy chrome;
+- default/opt-in/configurable behavior is decided before enabling auto-refresh by default.
+
+Tests should cover debounce timing, stale command results, external repo edits, disappeared selected
+changes, and refresh while the user is scrolling or reading expanded details.
 
 ## 15. Safety and security
 
@@ -1923,12 +2135,14 @@ SECURITY.md
 CODE_OF_CONDUCT.md optional
 LICENSE files already present
 docs/
-  golden-plan.md
+  product-plan.md
   architecture.md
   keymap.md
   command-mapping.md
+  user-demand-signals.md
   workflows/
     inspect.md
+    search-and-filter.md
     rebase.md
     describe.md
     squash-split-absorb.md
@@ -1970,7 +2184,8 @@ Keep one dominant documentation job per page:
   operation recovery, bookmarks/tags, fetch/push, command mode, and workspaces.
 - **Reference pages:** state exact keys, commands, config keys, safety classes, and command mappings.
 - **Explanation pages:** carry mental models, tradeoffs, compatibility principles, and prior-art
-  comparison.
+  comparison. Keep user-demand evidence factual and respectful: describe what users are trying to
+  accomplish, not which tool is "wrong."
 - **ADRs:** record durable decisions that change product direction, ownership boundaries,
   rendering strategy, command mode semantics, keymap policy, or stability guarantees.
 - **Release docs:** state user-visible changes, keymap changes, config changes, safety changes,
@@ -1986,7 +2201,8 @@ Website pages:
 
 - Home: promise, GIF, install, why jk.
 - Quick start: first five minutes.
-- Workflows: inspect, rebase, squash/split, op recovery, bookmarks, push.
+- Workflows: inspect, search/filter, rebase, squash/split, op recovery, workspaces, bookmarks,
+  push.
 - Keymap: generated from source if possible.
 - Command mapping: jk action -> jj command.
 - Config fidelity: how jk honors jj config.
@@ -2001,6 +2217,9 @@ Website assets:
 - Static screenshots for key screens, generated from Betamax media tapes.
 - Copyable command examples.
 - A "learn jj by using jk" section showing command previews.
+- Short demos that make demand-backed differentiators obvious: searchable help, far-away rebase
+  target search, visual rebase preview, workspace inspection, op-log recovery, and rich diff/file
+  navigation.
 
 ### 16.5 Docs generation
 
@@ -2013,6 +2232,14 @@ Generate from source where possible:
 - Screenshots, GIFs, and release demos from Betamax tapes.
 
 Docs must not drift from implementation.
+
+The docs should make the product roadmap visible without overstating current behavior:
+
+- current README and crate README describe what works now;
+- roadmap and product plan describe planned work;
+- workflow pages move from planned to current only when implementation, tests, and tapes exist;
+- community demand notes should be preserved in maintainer docs or issues, but user-facing copy
+  should speak in terms of user problems and workflows.
 
 ## 17. Release and distribution plan
 
@@ -2027,6 +2254,18 @@ Keep the current release foundation:
 - Homebrew tap bump.
 - CI with Rust check/test/clippy/docs/package/install smoke, markdown, MSRV, actionlint, and GitHub
   Actions security checks.
+
+Release infrastructure requirements:
+
+- crates.io publishing should use Trusted Publishing through GitHub Actions OIDC for `jk`,
+  `jk-cli`, `jk-core`, and `jk-tui`;
+- the release workflow should use the `release` GitHub environment and `id-token: write`;
+- the workflow should not require `CARGO_REGISTRY_TOKEN` once trusted publishing is proven;
+- any bootstrap crates.io token should be revoked after an OIDC-backed release succeeds;
+- GitHub Release archives and `.sha256` files should be smoke-tested through cargo-binstall and a
+  Homebrew formula path;
+- archive naming must stay consistent across `crates/jk/Cargo.toml`,
+  `.github/workflows/release-plz.yml`, and `scripts/package-release-archive.sh`.
 
 ### 17.2 Versioning
 
@@ -2046,12 +2285,12 @@ After 1.0:
 | Version | Theme                       | Must-have deliverables                                                                     |
 | ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
 | 0.3     | Foundation                  | CommandSpec, view stack, generated help/hotbar, line scrolling, mark model.                |
-| 0.4     | jj-shaped inspection        | `jk diff -r/--from/--to`, show, status, view-format menu, command history.                 |
-| 0.5     | Command mode and workspaces | `:`, `!`, command output panel, rerun/copy, external runner, `W` workspace screen.         |
-| 0.6     | Safe mutation core          | describe inline/editor, new, commit, edit, rebase, abandon, undo/redo, op log.             |
+| 0.4     | jj-shaped inspection        | `jk diff -r/--from/--to`, show, status, view-format menu, diff search, command history.    |
+| 0.5     | Command mode and workspaces | `:`, `!`, searchable help, command output, rerun/copy, external runner, `W` workspace.     |
+| 0.6     | Safe mutation core          | describe inline/editor, new, commit, edit, rebase picker, abandon, undo/redo, op log.      |
 | 0.7     | Content workflows           | squash, split, restore, diffedit, absorb; file selection; initial hunk path via jj editor. |
 | 0.8     | Refs and remotes            | bookmarks, tags, fetch, push dry-run, remote management.                                   |
-| 0.9     | Native/hybrid graph beta    | config-fidelity test suite, native graph previews, rebase ghost preview.                   |
+| 0.9     | Native/hybrid graph beta    | config-fidelity tests, native graph previews, rebase ghost preview, large-repo checks.     |
 | 1.0     | Obvious daily driver        | Stability, docs/site complete, release channels solid, broad workflows polished.           |
 | 1.1+    | Advanced jj                 | sparse, bisect, fix, signing, Gerrit, forge integrations if desired.                       |
 
@@ -2177,10 +2416,14 @@ Compatibility notes:
 - The default keymap feels coherent and does not rely on remembering arbitrary uppercase/lowercase
   collisions.
 - `?` and the hotbar make the app self-teaching.
+- Help and command discovery are searchable enough that users can find actions without reading a
+  manual first.
 - The command history teaches users the jj commands behind actions.
 - Mutations are safer than shell usage because preview and recovery are built in.
 - jj config-heavy users feel respected, not forced into a separate visual grammar.
 - Large repos remain navigable.
+- Large diffs remain inspectable without blocking graph navigation.
+- Rebase and graph manipulation have preview paths that make role mistakes hard to commit.
 - Installation is one command on major platforms.
 - Docs/site explain the mental model in minutes.
 - Prior-art users can see why `jk` is jj-native rather than lazygit-inspired.
@@ -2189,9 +2432,9 @@ Compatibility notes:
 
 Start here.
 
-### Step 1: Add the golden-plan docs
+### Step 1: Add the product planning docs
 
-- Add this document as `docs/golden-plan.md`.
+- Add this document as `docs/product-plan.md`.
 - Add `docs/keymap.md` with the default keymap table.
 - Add `docs/architecture.md` with CommandSpec/ViewStack/Provider/Renderer.
 - Link from README roadmap.
@@ -2306,3 +2549,16 @@ Betamax is the canonical way jk proves, documents, and reviews terminal behavior
 every important workflow should become both a validation tape and, when useful,
 a human-readable media tape.
 ```
+
+### 24.4 Community demand guardrails
+
+Community feedback should keep sharpening the roadmap, but public docs should express those signals
+as user problems and workflow requirements:
+
+- people want an obvious jj TUI recommendation, but `jk` should earn that through quality rather
+  than relying on blessed-tool language;
+- users respond strongly to TUIs that teach the underlying jj command instead of hiding it;
+- searchable command discovery, graph search, filter backtracking, rich diff/file navigation,
+  rebase preview, workspaces, and operation recovery should stay visible in issues and demos;
+- large-repo and large-diff responsiveness should be validated early, not left as late polish;
+- prior-art comparison should remain respectful, factual, and useful for design decisions.
