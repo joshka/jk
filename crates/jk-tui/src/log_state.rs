@@ -9,6 +9,43 @@ use jk_core::{LogEntry, LogSnapshot};
 use crate::ansi_text::strip_ansi;
 use crate::chrome::title_or_default;
 
+/// Ordered revision marks keyed by stable change id.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct OrderedRevisionMarks {
+    change_ids: Vec<String>,
+}
+
+impl OrderedRevisionMarks {
+    fn toggle(&mut self, change_id: &str) {
+        if let Some(index) = self.index_for(change_id) {
+            self.change_ids.remove(index);
+        } else {
+            self.change_ids.push(change_id.to_owned());
+        }
+    }
+
+    fn clear(&mut self) -> bool {
+        let had_marks = !self.change_ids.is_empty();
+        self.change_ids.clear();
+        had_marks
+    }
+
+    fn retain_visible(&mut self, entries: &[LogEntry]) {
+        self.change_ids
+            .retain(|change_id| entries.iter().any(|entry| entry.change_id() == change_id));
+    }
+
+    fn index_for(&self, change_id: &str) -> Option<usize> {
+        self.change_ids
+            .iter()
+            .position(|marked| marked == change_id)
+    }
+
+    fn change_ids(&self) -> &[String] {
+        &self.change_ids
+    }
+}
+
 /// Semantic state behind the interactive log view.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LogState {
@@ -19,6 +56,8 @@ pub struct LogState {
     expanded_change_id: Option<String>,
     scroll_offset: usize,
     viewport_height: usize,
+    follow_selection: bool,
+    marks: OrderedRevisionMarks,
 }
 
 impl LogState {
@@ -34,6 +73,8 @@ impl LogState {
             expanded_change_id: None,
             scroll_offset: 0,
             viewport_height: 10,
+            follow_selection: true,
+            marks: OrderedRevisionMarks::default(),
         }
     }
 
@@ -47,6 +88,7 @@ impl LogState {
         self.title = title_or_default(title);
         self.rendered = rendered;
         self.entries = entries;
+        self.marks.retain_visible(&self.entries);
         self.selected = selected_change_id
             .and_then(|change_id| {
                 self.entries
@@ -86,6 +128,19 @@ impl LogState {
     /// Returns the first rendered line currently visible in the viewport.
     pub const fn scroll_offset(&self) -> usize {
         self.scroll_offset
+    }
+
+    /// Scrolls one rendered line toward newer changes without changing selection.
+    pub const fn scroll_previous_line(&mut self) {
+        self.follow_selection = false;
+        self.scroll_offset = self.scroll_offset.saturating_sub(1);
+    }
+
+    /// Scrolls one rendered line toward older changes without changing selection.
+    pub fn scroll_next_line(&mut self) {
+        self.follow_selection = false;
+        self.scroll_offset = self.scroll_offset.saturating_add(1);
+        self.clamp_scroll_offset();
     }
 
     /// Returns whether the selected change currently owns inline details.
@@ -180,9 +235,59 @@ impl LogState {
         self.expanded_change_id = None;
     }
 
+    /// Toggles the selected change in the ordered revision marks.
+    pub fn toggle_selected_mark(&mut self) {
+        let Some(change_id) = self
+            .selected_entry()
+            .map(|entry| entry.change_id().to_owned())
+        else {
+            return;
+        };
+
+        self.marks.toggle(&change_id);
+    }
+
+    /// Clears all revision marks and returns whether anything changed.
+    pub fn clear_marks(&mut self) -> bool {
+        self.marks.clear()
+    }
+
+    /// Returns whether any revision marks are set.
+    pub fn has_marks(&self) -> bool {
+        !self.marks.change_ids().is_empty()
+    }
+
+    /// Returns marked change ids in insertion order.
+    pub fn marked_change_ids(&self) -> &[String] {
+        self.marks.change_ids()
+    }
+
+    /// Returns the selected change's zero-based mark index, if marked.
+    pub fn selected_mark_index(&self) -> Option<usize> {
+        self.selected_entry()
+            .and_then(|entry| self.mark_index_for_change_id(entry.change_id()))
+    }
+
+    /// Returns the zero-based mark index for a change id.
+    pub fn mark_index_for_change_id(&self, change_id: &str) -> Option<usize> {
+        self.marks.index_for(change_id)
+    }
+
+    /// Returns the rendered line for a visible change id.
+    pub fn rendered_line_for_change_id(&self, change_id: &str) -> Option<usize> {
+        self.entries
+            .iter()
+            .find(|entry| entry.change_id() == change_id)
+            .map(LogEntry::rendered_line)
+    }
+
     /// Updates viewport height and scrolls enough to keep selection visible.
     pub fn keep_selected_in_view(&mut self, height: usize) {
         self.viewport_height = height.max(1);
+        if !self.follow_selection {
+            self.clamp_scroll_offset();
+            return;
+        }
 
         let Some(selected_line) = self.selected_rendered_line() else {
             self.scroll_offset = 0;
@@ -195,8 +300,11 @@ impl LogState {
         }
 
         let last_visible = self.scroll_offset + height.saturating_sub(1);
-        if selected_line > last_visible {
-            self.scroll_offset = selected_line + 1 - height;
+        let selected_end_line = self.selected_entry_end_line().unwrap_or(selected_line);
+        if selected_end_line > last_visible {
+            let scroll_for_entry_end = selected_end_line + 1 - height;
+            self.scroll_offset = scroll_for_entry_end.min(selected_line);
+            self.clamp_scroll_offset();
         }
     }
 
@@ -230,6 +338,15 @@ impl LogState {
         self.selected_entry().map(LogEntry::rendered_line)
     }
 
+    /// Returns the final rendered line that belongs to the selected entry.
+    fn selected_entry_end_line(&self) -> Option<usize> {
+        let selected = self.selected?;
+        self.entries
+            .get(selected + 1)
+            .map(|entry| entry.rendered_line().saturating_sub(1))
+            .or_else(|| last_entry_line(&self.rendered))
+    }
+
     /// Scrolls upward when selection moves above the current viewport.
     fn keep_selected_visible(&mut self) {
         let Some(selected_line) = self.selected_rendered_line() else {
@@ -250,6 +367,7 @@ impl LogState {
 
         let was_expanded = self.selected_is_expanded();
         self.selected = Some(index);
+        self.follow_selection = true;
         self.apply_expansion_to_selected(was_expanded);
         self.keep_selected_visible();
     }
@@ -271,12 +389,7 @@ impl LogState {
             return;
         }
 
-        let max_scroll_offset = self
-            .rendered
-            .lines()
-            .count()
-            .saturating_sub(1)
-            .min(self.entries.last().map_or(0, LogEntry::rendered_line));
+        let max_scroll_offset = self.rendered.lines().count().saturating_sub(1);
         self.scroll_offset = self.scroll_offset.min(max_scroll_offset);
     }
 }
@@ -391,6 +504,107 @@ mod tests {
     }
 
     #[test]
+    fn toggle_selected_mark_adds_change_id_in_order() {
+        let mut state = LogState::new(snapshot(["aaa", "bbb", "ccc"]));
+
+        state.toggle_selected_mark();
+        state.select_next();
+        state.toggle_selected_mark();
+
+        assert_eq!(state.marked_change_ids(), ["aaa", "bbb"]);
+        assert_eq!(state.selected_mark_index(), Some(1));
+    }
+
+    #[test]
+    fn toggle_selected_mark_removes_existing_mark_and_closes_gap() {
+        let mut state = LogState::new(snapshot(["aaa", "bbb", "ccc"]));
+
+        state.toggle_selected_mark();
+        state.select_next();
+        state.toggle_selected_mark();
+        state.select_previous();
+        state.toggle_selected_mark();
+
+        assert_eq!(state.marked_change_ids(), ["bbb"]);
+        assert_eq!(state.mark_index_for_change_id("bbb"), Some(0));
+    }
+
+    #[test]
+    fn toggle_selected_mark_does_not_duplicate_change_id() {
+        let mut state = LogState::new(snapshot(["aaa", "bbb"]));
+
+        state.toggle_selected_mark();
+        state.toggle_selected_mark();
+        state.toggle_selected_mark();
+
+        assert_eq!(state.marked_change_ids(), ["aaa"]);
+    }
+
+    #[test]
+    fn clear_marks_empties_marks_and_reports_change() {
+        let mut state = LogState::new(snapshot(["aaa", "bbb"]));
+
+        assert!(!state.clear_marks());
+        state.toggle_selected_mark();
+        assert!(state.has_marks());
+
+        assert!(state.clear_marks());
+
+        assert!(!state.has_marks());
+        assert!(state.marked_change_ids().is_empty());
+    }
+
+    #[test]
+    fn refresh_preserves_marks_when_change_ids_still_exist() {
+        let mut state = LogState::new(snapshot(["aaa", "bbb", "ccc"]));
+        state.toggle_selected_mark();
+        state.select_next();
+        state.select_next();
+        state.toggle_selected_mark();
+
+        state.refresh(snapshot(["ccc", "xxx", "aaa"]));
+
+        assert_eq!(state.marked_change_ids(), ["aaa", "ccc"]);
+        assert_eq!(state.mark_index_for_change_id("aaa"), Some(0));
+        assert_eq!(state.mark_index_for_change_id("ccc"), Some(1));
+    }
+
+    #[test]
+    fn refresh_drops_marks_for_disappeared_changes() {
+        let mut state = LogState::new(snapshot(["aaa", "bbb", "ccc"]));
+        state.toggle_selected_mark();
+        state.select_next();
+        state.toggle_selected_mark();
+        state.select_next();
+        state.toggle_selected_mark();
+
+        state.refresh(snapshot(["ccc", "aaa"]));
+
+        assert_eq!(state.marked_change_ids(), ["aaa", "ccc"]);
+    }
+
+    #[test]
+    fn line_scroll_and_mark_toggle_do_not_change_selection_or_scroll() {
+        let mut state = LogState::new(snapshot(["aaa", "bbb", "ccc", "ddd"]));
+        state.select_next();
+        state.scroll_next_line();
+        let selected = state
+            .selected_entry()
+            .map(|entry| entry.change_id().to_owned());
+        let scroll_offset = state.scroll_offset();
+
+        state.toggle_selected_mark();
+
+        assert_eq!(
+            state
+                .selected_entry()
+                .map(|entry| entry.change_id().to_owned()),
+            selected
+        );
+        assert_eq!(state.scroll_offset(), scroll_offset);
+    }
+
+    #[test]
     fn toggle_expanded_ignores_entries_without_details() {
         let mut state = LogState::new(LogSnapshot::new(
             "@  aaa first\n○  bbb second\n",
@@ -425,6 +639,81 @@ mod tests {
         state.keep_selected_in_view(2);
 
         assert_eq!(state.scroll_offset(), 3);
+    }
+
+    #[test]
+    fn selected_multiline_entry_keeps_whole_message_visible_when_it_fits() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  second body\n│  more body\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(5),
+            ],
+        ));
+
+        state.select_next();
+        state.keep_selected_in_view(3);
+
+        assert_eq!(state.scroll_offset(), 2);
+    }
+
+    #[test]
+    fn selected_tall_entry_keeps_commit_row_and_body_visible() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  line one\n│  line two\n│  line three\n│  line four\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(7),
+            ],
+        ));
+
+        state.select_next();
+        state.keep_selected_in_view(3);
+
+        assert_eq!(state.scroll_offset(), 2);
+    }
+
+    #[test]
+    fn line_scroll_moves_view_without_changing_selection() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  second body\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(4),
+            ],
+        ));
+
+        state.scroll_next_line();
+        state.scroll_next_line();
+        state.scroll_previous_line();
+        state.keep_selected_in_view(2);
+
+        assert_eq!(state.scroll_offset(), 1);
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("aaa"));
+    }
+
+    #[test]
+    fn selection_movement_resumes_following_selection_after_line_scroll() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  second body\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(4),
+            ],
+        ));
+
+        state.scroll_next_line();
+        state.scroll_next_line();
+        state.keep_selected_in_view(2);
+        state.select_next();
+        state.keep_selected_in_view(2);
+
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("bbb"));
+        assert_eq!(state.scroll_offset(), 2);
     }
 
     #[test]

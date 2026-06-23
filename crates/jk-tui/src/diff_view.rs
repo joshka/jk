@@ -5,8 +5,9 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{DIFF_STATUS, ViewChrome, render_help_overlay};
+use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::diff_state::DiffState;
+use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::rendered_log::rendered_text;
 use crate::selected_row::paint_subtle_selected_row;
 
@@ -154,6 +155,29 @@ impl DiffView {
         self.status_message = None;
     }
 
+    /// Returns the number of file sections available for navigation.
+    #[must_use]
+    pub const fn file_count(&self) -> usize {
+        self.state.file_count()
+    }
+
+    /// Returns the file paths available for navigation.
+    #[must_use]
+    pub fn file_paths(&self) -> Vec<&str> {
+        self.state.file_paths()
+    }
+
+    /// Returns the currently selected file section index.
+    #[must_use]
+    pub const fn selected_file_index(&self) -> Option<usize> {
+        self.state.selected_file_index()
+    }
+
+    /// Jumps to a file section by index.
+    pub fn select_file_index(&mut self, index: usize) {
+        self.state.select_file_index(index);
+    }
+
     /// Shows a refresh or integration error without replacing the current diff.
     pub fn show_error(&mut self, error: impl Into<String>) {
         self.status_message = Some(error.into());
@@ -274,6 +298,14 @@ impl DiffView {
         self.render_area(frame, area, Some(status));
     }
 
+    /// Renders the diff view with a caller-owned centered overlay.
+    pub fn render_with_overlay(&mut self, frame: &mut Frame<'_>, title: &str, lines: &[String]) {
+        let area = frame.area();
+        self.render_area(frame, area, None);
+        let areas = ViewChrome::layout(area);
+        render_help_overlay(frame, areas.content, title, lines);
+    }
+
     fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
         let areas = ViewChrome::layout(area);
         let height = usize::from(areas.content.height);
@@ -292,11 +324,16 @@ impl DiffView {
 
         let search_status = self.state.search_status();
         let horizontal_status = self.state.horizontal_status();
+        let file_status = self
+            .state
+            .current_file_status(usize::from(areas.status_width()));
+        let fallback_status = adaptive_hotbar(BindingContext::Diff, areas.status_width());
         let status = status_override
             .or(self.status_message.as_deref())
             .or(search_status.as_deref())
             .or(horizontal_status.as_deref())
-            .unwrap_or(DIFF_STATUS);
+            .or(file_status.as_deref())
+            .unwrap_or(&fallback_status);
         let chrome = ViewChrome::new(self.state.title(), status);
         chrome.render(frame, areas);
 
@@ -322,7 +359,12 @@ impl DiffView {
         }
 
         if self.help_visible {
-            render_help_overlay(frame, areas.content, "Diff keys", DIFF_HELP);
+            render_help_overlay(
+                frame,
+                areas.content,
+                help_title(BindingContext::Diff),
+                &help_lines(BindingContext::Diff),
+            );
         }
     }
 
@@ -344,22 +386,6 @@ impl DiffView {
         )
     }
 }
-
-const DIFF_HELP: &[&str] = &[
-    "j/k or arrows        scroll one line",
-    "space / b, Ctrl-f/b  page down/up",
-    "g/G or Home/End      jump to top/bottom",
-    "[ / ]                previous/next file",
-    "{ / }                previous/next hunk",
-    "h / l                fold/unfold current file",
-    "Ctrl-left/right      fold/unfold all files",
-    "- / +                fold/unfold current hunk",
-    "< / >                horizontal scroll",
-    "/, n, N              search, next, previous",
-    "r                    refresh",
-    "H / L                return to log",
-    "?, q, Esc            close help",
-];
 
 /// Returns the portion of a content area left after a sticky file header row.
 const fn area_below_sticky_header(area: Rect) -> Rect {
@@ -417,7 +443,7 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Modified regular file src/b.rs:"));
-        assert!(buffer_line(terminal.backend().buffer(), 4).contains("r refresh"));
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("file 1/1 src/b.rs"));
     }
 
     #[test]
@@ -511,6 +537,25 @@ mod tests {
     }
 
     #[test]
+    fn render_status_shows_current_file_context() {
+        let mut view = DiffView::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n a\nModified regular file src/b.rs:\n b\n",
+        ));
+        let backend = TestBackend::new(72, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("file 1/2 src/a.rs"));
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("f files"));
+    }
+
+    #[test]
     fn help_action_shows_diff_specific_keys() {
         let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
         let _ = view.apply(DiffAction::ToggleHelp);
@@ -525,8 +570,25 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Diff keys"));
+        assert!(rendered.contains("f                    open file list"));
         assert!(rendered.contains("[ / ]                previous/next file"));
         assert!(rendered.contains("/, n, N              search, next, previous"));
+    }
+
+    #[test]
+    fn exposes_file_list_navigation_state() {
+        let mut view = DiffView::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n a\nModified regular file src/b.rs:\n b\n",
+        ));
+
+        assert_eq!(view.file_count(), 2);
+        assert_eq!(view.file_paths(), vec!["src/a.rs", "src/b.rs"]);
+        assert_eq!(view.selected_file_index(), Some(0));
+
+        view.select_file_index(1);
+
+        assert_eq!(view.selected_file_index(), Some(1));
     }
 
     #[test]

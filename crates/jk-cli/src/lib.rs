@@ -10,8 +10,34 @@
 //! rendered-output-first boundary for selected-change inspection. This is a temporary integration
 //! boundary until `jj-cli` / `jj-lib` can provide both pieces without parsing command output.
 
-pub mod diff;
-pub mod log;
+mod command;
 
-pub use diff::{JjDiff, JjDiffError};
-pub use log::{JjLog, JjLogCommand, JjLogError};
+pub mod abandon;
+pub mod describe;
+pub mod diff;
+pub mod edit;
+pub mod evolog;
+pub mod log;
+pub mod new;
+pub mod operation;
+pub mod recovery;
+pub mod show;
+pub mod status;
+pub mod workspaces;
+
+pub use abandon::{AbandonQuery, JjAbandon};
+pub use command::{JjCommandRunner, RecordingJjCommandRunner, SystemJjCommandRunner};
+pub use describe::{DescribeQuery, JjDescribe};
+pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
+pub use edit::{EditQuery, JjEdit};
+pub use evolog::{EvologQuery, JjEvolog, JjEvologError};
+pub use log::{JjLog, JjLogCommand, JjLogError, LogTemplateSelection};
+pub use new::{JjNew, NewQuery};
+pub use operation::{JjOperation, JjOperationError, OperationQuery};
+pub use recovery::{JjRecovery, RecoveryCommand};
+pub use show::{JjShow, JjShowError, ShowQuery};
+pub use status::{JjStatus, JjStatusError, StatusQuery};
+pub use workspaces::{
+    JjWorkspaces, JjWorkspacesError, WorkspaceInspectionQuery, WorkspaceListParseError,
+    WorkspaceListSnapshot, WorkspaceSummary,
+};

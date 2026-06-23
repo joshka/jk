@@ -8,9 +8,11 @@
 use jk_core::LogSnapshot;
 use ratatui::Frame;
 use ratatui::layout::Rect;
+use ratatui::prelude::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{LOG_STATUS, ViewChrome, render_help_overlay};
+use crate::chrome::{ViewChrome, render_help_overlay};
+use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::log_state::LogState;
 use crate::rendered_log::{ExpandedDetails, RenderedLog, rendered_text};
 use crate::selected_row::paint_selected_row;
@@ -50,6 +52,12 @@ pub enum LogAction {
 
     /// Move to the next visible change.
     Next,
+
+    /// Scroll one rendered line toward newer changes.
+    ScrollPreviousLine,
+
+    /// Scroll one rendered line toward older changes.
+    ScrollNextLine,
 
     /// Move one visible page toward older changes.
     PagePrevious,
@@ -98,6 +106,12 @@ pub enum LogAction {
 
     /// Collapse inline details for the selected change.
     CollapseExpanded,
+
+    /// Toggle the selected change in ordered revision marks.
+    ToggleMark,
+
+    /// Clear ordered revision marks.
+    ClearMarks,
 
     /// Refresh the log.
     Refresh,
@@ -155,11 +169,41 @@ impl LogView {
         self.status_message = Some(error.into());
     }
 
+    /// Shows a non-error status message without replacing the current log.
+    pub fn show_status(&mut self, status: impl Into<String>) {
+        self.status_message = Some(status.into());
+    }
+
     /// Returns the selected change identifier for follow-up inspection commands.
     pub fn selected_change_id(&self) -> Option<&str> {
         self.state
             .selected_entry()
             .map(jk_core::LogEntry::change_id)
+    }
+
+    /// Returns the selected change's full description for editing commands.
+    pub fn selected_description(&self) -> Option<&str> {
+        self.state
+            .selected_entry()
+            .map(jk_core::LogEntry::description)
+    }
+
+    /// Returns whether the log has ordered revision marks.
+    #[must_use]
+    pub fn has_marks(&self) -> bool {
+        self.state.has_marks()
+    }
+
+    /// Returns marked change ids in insertion order.
+    #[must_use]
+    pub fn marked_change_ids(&self) -> &[String] {
+        self.state.marked_change_ids()
+    }
+
+    /// Returns the selected change's zero-based mark index, if marked.
+    #[must_use]
+    pub fn selected_mark_index(&self) -> Option<usize> {
+        self.state.selected_mark_index()
     }
 
     /// Applies a single input action.
@@ -175,6 +219,14 @@ impl LogView {
             }
             LogAction::Next => {
                 self.state.select_next();
+                ActionResult::Continue
+            }
+            LogAction::ScrollPreviousLine => {
+                self.state.scroll_previous_line();
+                ActionResult::Continue
+            }
+            LogAction::ScrollNextLine => {
+                self.state.scroll_next_line();
                 ActionResult::Continue
             }
             LogAction::PagePrevious => {
@@ -211,6 +263,14 @@ impl LogView {
                 self.state.collapse_expanded();
                 ActionResult::Continue
             }
+            LogAction::ToggleMark => {
+                self.state.toggle_selected_mark();
+                ActionResult::Continue
+            }
+            LogAction::ClearMarks => {
+                self.state.clear_marks();
+                ActionResult::Continue
+            }
             LogAction::Refresh => ActionResult::Refresh,
             LogAction::Home => ActionResult::SwitchHome,
             LogAction::Log => ActionResult::SwitchLog,
@@ -236,16 +296,33 @@ impl LogView {
     /// Renders the log view.
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
-        self.render_area(frame, area);
+        self.render_area(frame, area, None);
     }
 
-    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect) {
+    /// Renders the log view with a caller-owned status line.
+    pub fn render_with_status(&mut self, frame: &mut Frame<'_>, status: &str) {
+        let area = frame.area();
+        self.render_area(frame, area, Some(status));
+    }
+
+    /// Renders the log view with a centered selector overlay.
+    pub fn render_with_selector(&mut self, frame: &mut Frame<'_>, title: &str, lines: &[String]) {
+        let area = frame.area();
+        self.render_area(frame, area, None);
+        let areas = ViewChrome::layout(area);
+        render_help_overlay(frame, areas.content, title, lines);
+    }
+
+    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status: Option<&str>) {
         let areas = ViewChrome::layout(area);
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
 
-        let status = self.status_message.as_deref().unwrap_or(LOG_STATUS);
-        let chrome = ViewChrome::new(self.state.title(), status);
+        let status = status
+            .map(ToOwned::to_owned)
+            .or_else(|| self.status_message.clone())
+            .unwrap_or_else(|| adaptive_hotbar(BindingContext::Log, areas.status_width()));
+        let chrome = ViewChrome::new(self.state.title(), &status);
         chrome.render(frame, areas);
 
         let expanded_details = self
@@ -253,35 +330,78 @@ impl LogView {
             .expanded_insertion_line()
             .zip(self.state.expanded_details())
             .map(|(line, description)| ExpandedDetails::new(line, description));
-        let rendered =
+        let rendered_log =
             RenderedLog::new(self.state.rendered()).with_expanded_details(expanded_details);
-        let rendered = rendered.render_with_width(usize::from(areas.content.width));
+        let content_width = usize::from(areas.content.width);
+        let rendered = rendered_log.render_with_width(content_width);
         let text = rendered_text(&rendered);
         let scroll = u16::try_from(self.state.scroll_offset()).unwrap_or(u16::MAX);
         let paragraph = Paragraph::new(text).scroll((scroll, 0));
         frame.render_widget(paragraph, areas.content);
 
+        paint_mark_overlays(frame, areas.content, &self.state, &rendered_log);
         if let Some(line) = self.state.selected_rendered_line() {
             paint_selected_row(frame, areas.content, line, self.state.scroll_offset());
         }
 
         if self.help_visible {
-            render_help_overlay(frame, areas.content, "Log keys", LOG_HELP);
+            render_help_overlay(
+                frame,
+                areas.content,
+                help_title(BindingContext::Log),
+                &help_lines(BindingContext::Log),
+            );
         }
     }
 }
 
-const LOG_HELP: &[&str] = &[
-    "j/k or arrows        move selection",
-    "space / b, Ctrl-f/b  page down/up",
-    "g/G or Home/End      jump to top/bottom",
-    "enter, right, l      expand selected change",
-    "left, h              collapse selected change",
-    "d                    open selected-change diff",
-    "r                    refresh",
-    "H / L                home command / jj log",
-    "?, q, Esc            close help",
-];
+fn paint_mark_overlays(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &LogState,
+    rendered_log: &RenderedLog<'_>,
+) {
+    if area.is_empty() || area.width < 3 {
+        return;
+    }
+
+    let content_width = usize::from(area.width);
+    for change_id in state.marked_change_ids() {
+        let Some(mark_index) = state.mark_index_for_change_id(change_id) else {
+            continue;
+        };
+        let Some(rendered_line) = state.rendered_line_for_change_id(change_id) else {
+            continue;
+        };
+        let rendered_line = rendered_log.line_after_insertions(rendered_line, content_width);
+        let Some(visible_line) = rendered_line.checked_sub(state.scroll_offset()) else {
+            continue;
+        };
+        let Ok(visible_line) = u16::try_from(visible_line) else {
+            continue;
+        };
+        if visible_line >= area.height {
+            continue;
+        }
+
+        let label = format!("[{}]", mark_index + 1);
+        let label_width = u16::try_from(label.chars().count()).unwrap_or(u16::MAX);
+        if label_width > area.width {
+            continue;
+        }
+
+        let y = area.y + visible_line;
+        let x = area.right() - label_width;
+        frame.buffer_mut().set_string(
+            x,
+            y,
+            label,
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -330,6 +450,27 @@ mod tests {
     }
 
     #[test]
+    fn status_messages_replace_default_hotbar_until_refresh() {
+        let mut view = LogView::new(snapshot(["aaa"]));
+        view.show_status("u undo  U redo  o operation  C history");
+        let backend = TestBackend::new(56, 4);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        assert!(buffer_line(terminal.backend().buffer(), 3).contains("u undo"));
+        assert!(buffer_line(terminal.backend().buffer(), 3).contains("C history"));
+
+        view.refresh(snapshot(["bbb"]));
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        assert!(!buffer_line(terminal.backend().buffer(), 3).contains("u undo"));
+    }
+
+    #[test]
     fn empty_log_renders_chrome_without_selection() {
         let mut view = LogView::new(LogSnapshot::new("", Vec::new()).with_title("jj log"));
         let backend = TestBackend::new(48, 4);
@@ -350,7 +491,7 @@ mod tests {
     fn help_action_shows_log_specific_keys() {
         let mut view = LogView::new(snapshot(["aaa"]));
         let _ = view.apply(LogAction::ToggleHelp);
-        let backend = TestBackend::new(72, 16);
+        let backend = TestBackend::new(72, 32);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -362,6 +503,13 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Log keys"));
         assert!(rendered.contains("d                    open selected-change diff"));
+        assert!(rendered.contains("m                    describe selected revision"));
+        assert!(rendered.contains("s                    open repository status"));
+        assert!(rendered.contains("n                    preview jj new"));
+        assert!(rendered.contains("e                    preview jj edit"));
+        assert!(rendered.contains("a                    preview jj abandon"));
+        assert!(rendered.contains("u                    preview jj undo"));
+        assert!(rendered.contains("U                    preview jj redo"));
         assert!(rendered.contains("?, q, Esc            close help"));
     }
 
@@ -482,6 +630,108 @@ mod tests {
         assert_eq!(buffer[(23, 2)].bg, Color::Rgb(12, 32, 38));
         assert_eq!(buffer[(35, 2)].bg, Color::Rgb(12, 32, 38));
         assert_eq!(buffer[(36, 2)].bg, Color::Reset);
+    }
+
+    #[test]
+    fn marked_rows_render_ordered_affordances() {
+        let mut view = LogView::new(snapshot(["aaa", "bbb", "ccc"]));
+        let _ = view.apply(LogAction::ToggleMark);
+        let _ = view.apply(LogAction::Next);
+        let _ = view.apply(LogAction::Next);
+        let _ = view.apply(LogAction::ToggleMark);
+        let backend = TestBackend::new(48, 6);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let buffer = terminal.backend().buffer();
+        assert!(buffer_line(buffer, 1).ends_with("[1]"));
+        assert!(!buffer_line(buffer, 2).contains('['));
+        assert!(buffer_line(buffer, 3).ends_with("[2]"));
+    }
+
+    #[test]
+    fn selected_marked_row_keeps_selected_background() {
+        let mut view = LogView::new(snapshot(["aaa", "bbb"]));
+        let _ = view.apply(LogAction::ToggleMark);
+        let backend = TestBackend::new(48, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 1)].bg, Color::Rgb(82, 196, 192));
+        assert!(buffer_line(buffer, 1).contains("[1]"));
+    }
+
+    #[test]
+    fn marked_rows_after_expanded_details_render_on_shifted_line() {
+        let mut view = LogView::new(LogSnapshot::new(
+            "@  aaa first\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first\n\nbody")
+                    .with_details("body")
+                    .with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(1),
+            ],
+        ));
+        let _ = view.apply(LogAction::Next);
+        let _ = view.apply(LogAction::ToggleMark);
+        let _ = view.apply(LogAction::Previous);
+        let _ = view.apply(LogAction::ToggleExpanded);
+        let backend = TestBackend::new(64, 8);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let buffer = terminal.backend().buffer();
+        assert!(buffer_line(buffer, 5).contains("○  bbb second"));
+        assert!(buffer_line(buffer, 5).ends_with("[1]"));
+        assert!(!buffer_line(buffer, 1).contains("[1]"));
+    }
+
+    #[test]
+    fn clear_marks_removes_visible_affordances() {
+        let mut view = LogView::new(snapshot(["aaa", "bbb"]));
+        let _ = view.apply(LogAction::ToggleMark);
+        let _ = view.apply(LogAction::ClearMarks);
+        let backend = TestBackend::new(48, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert!(!buffer_to_string(terminal.backend().buffer()).contains("[1]"));
+    }
+
+    #[test]
+    fn narrow_mark_overlay_rendering_does_not_panic() {
+        let mut view = LogView::new(snapshot(["aaa"]));
+        let _ = view.apply(LogAction::ToggleMark);
+        let backend = TestBackend::new(2, 4);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+
+        assert!(draw_result.is_ok());
     }
 
     #[test]

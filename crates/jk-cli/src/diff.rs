@@ -1,12 +1,123 @@
 //! Selected-change `jj diff` command integration.
 
 use std::path::PathBuf;
+#[cfg(test)]
 use std::process::Command;
 
-use jk_core::{DiffFileStat, DiffSnapshot};
+use jk_core::{DiffFileStat, DiffSnapshot, JjCommandSpec};
 use thiserror::Error;
 
+#[cfg(test)]
+use crate::command::build_jj_command;
+use crate::command::{JjCommandRunner, SystemJjCommandRunner};
+
 const DIFF_COMMAND: &str = "diff";
+
+/// Rendered `jj diff` output shape.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DiffFormat {
+    /// Render a patch.
+    #[default]
+    Patch,
+    /// Render `jj diff --summary`.
+    Summary,
+    /// Render `jj diff --stat`.
+    Stat,
+    /// Render `jj diff --types`.
+    Types,
+    /// Render `jj diff --name-only`.
+    NameOnly,
+    /// Render `jj diff --git`.
+    Git,
+    /// Render `jj diff --color-words`.
+    ColorWords,
+}
+
+impl DiffFormat {
+    /// Returns the `jj diff` flag for this format, when the default patch shape needs no flag.
+    #[must_use]
+    pub const fn flag(self) -> Option<&'static str> {
+        match self {
+            Self::Patch => None,
+            Self::Summary => Some("--summary"),
+            Self::Stat => Some("--stat"),
+            Self::Types => Some("--types"),
+            Self::NameOnly => Some("--name-only"),
+            Self::Git => Some("--git"),
+            Self::ColorWords => Some("--color-words"),
+        }
+    }
+
+    /// Returns a compact user-visible label for this format.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Patch => "patch",
+            Self::Summary => "summary",
+            Self::Stat => "stat",
+            Self::Types => "types",
+            Self::NameOnly => "name only",
+            Self::Git => "git",
+            Self::ColorWords => "color words",
+        }
+    }
+}
+
+/// Canonical query shapes supported by `jk diff`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DiffQuery {
+    /// Diff one revision against its parent.
+    Revision {
+        /// Revision to diff against its parent.
+        rev: String,
+        /// Rendered output shape.
+        format: DiffFormat,
+    },
+    /// Diff two revisions.
+    FromTo {
+        /// Starting revision.
+        from: String,
+        /// Ending revision.
+        to: String,
+        /// Rendered output shape.
+        format: DiffFormat,
+    },
+}
+
+impl DiffQuery {
+    /// Returns the query format.
+    #[must_use]
+    pub const fn format(&self) -> DiffFormat {
+        match self {
+            Self::Revision { format, .. } | Self::FromTo { format, .. } => *format,
+        }
+    }
+
+    /// Returns a compact label for places that still expect one diff target.
+    #[must_use]
+    pub fn target_label(&self) -> String {
+        match self {
+            Self::Revision { rev, .. } => rev.clone(),
+            Self::FromTo { from, to, .. } => format!("{from}..{to}"),
+        }
+    }
+
+    /// Returns this query with a different rendered output format.
+    #[must_use]
+    pub fn with_format(&self, format: DiffFormat) -> Self {
+        match self {
+            Self::Revision { rev, .. } => Self::Revision {
+                rev: rev.clone(),
+                format,
+            },
+            Self::FromTo { from, to, .. } => Self::FromTo {
+                from: from.clone(),
+                to: to.clone(),
+                format,
+            },
+        }
+    }
+}
 
 /// Loads a rendered diff for a selected `jj` change.
 ///
@@ -26,23 +137,78 @@ impl JjDiff {
         self
     }
 
+    /// Loads the rendered diff for `query`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_query(&self, query: &DiffQuery) -> Result<DiffSnapshot, JjDiffError> {
+        self.load_query_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Loads the rendered diff for `query` using the provided command runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_query_with_runner(
+        &self,
+        query: &DiffQuery,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<DiffSnapshot, JjDiffError> {
+        let spec = self.spec_for(query);
+        let rendered = Self::run(runner, &spec)?;
+        let stats_output;
+        let stats = if query.format() == DiffFormat::Stat {
+            &rendered
+        } else {
+            stats_output = Self::run(runner, &self.spec_for(&query.with_format(DiffFormat::Stat)))?;
+            &stats_output
+        };
+        let file_stats = parse_stats_lines(stats);
+
+        Ok(DiffSnapshot::new(query.target_label(), rendered)
+            .with_file_stats(file_stats)
+            .with_title(spec.title()))
+    }
+
     /// Loads the rendered diff for `change_id`.
+    ///
+    /// This is compatibility sugar for selected-change callers.
     ///
     /// # Errors
     ///
     /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
     pub fn load(&self, change_id: &str) -> Result<DiffSnapshot, JjDiffError> {
-        let rendered = Self::run(self.diff_command(change_id))?;
-        let stats = Self::run(self.stats_command(change_id))?;
-        let file_stats = parse_stats_lines(&stats);
-
-        Ok(DiffSnapshot::new(change_id, rendered)
-            .with_file_stats(file_stats)
-            .with_title(command_title(change_id)))
+        self.load_query(&DiffQuery::Revision {
+            rev: change_id.to_owned(),
+            format: DiffFormat::Patch,
+        })
     }
 
-    fn run(mut command: Command) -> Result<String, JjDiffError> {
-        let output = command.output()?;
+    /// Returns the command spec for `query`.
+    #[must_use]
+    pub fn spec_for(&self, query: &DiffQuery) -> JjCommandSpec {
+        match query {
+            DiffQuery::Revision { rev, format } => {
+                let mut argv = vec![DIFF_COMMAND, "-r", rev.as_str()];
+                if let Some(flag) = format.flag() {
+                    argv.push(flag);
+                }
+                self.spec(argv)
+            }
+            DiffQuery::FromTo { from, to, format } => {
+                let mut argv = vec![DIFF_COMMAND, "--from", from.as_str(), "--to", to.as_str()];
+                if let Some(flag) = format.flag() {
+                    argv.push(flag);
+                }
+                self.spec(argv)
+            }
+        }
+    }
+
+    fn run(runner: &mut impl JjCommandRunner, spec: &JjCommandSpec) -> Result<String, JjDiffError> {
+        let output = runner.run(spec)?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
@@ -51,42 +217,30 @@ impl JjDiff {
         }
     }
 
+    #[cfg(test)]
     fn diff_command(&self, change_id: &str) -> Command {
-        let mut command = self.base_command("always");
-        command.command.args([DIFF_COMMAND, "-r", change_id]);
-        command.command
+        build_jj_command(&self.spec_for(&DiffQuery::Revision {
+            rev: change_id.to_owned(),
+            format: DiffFormat::Patch,
+        }))
     }
 
+    #[cfg(test)]
     fn stats_command(&self, change_id: &str) -> Command {
-        let mut command = self.base_command("always");
-        command
-            .command
-            .args([DIFF_COMMAND, "-r", change_id, "--stat"]);
-        command.command
+        build_jj_command(&self.spec_for(&DiffQuery::Revision {
+            rev: change_id.to_owned(),
+            format: DiffFormat::Stat,
+        }))
     }
 
-    fn base_command(&self, color: &str) -> JjCommand {
-        let mut command = Command::new("jj");
-        command.args(["--no-pager", "--color", color]);
-        command.env_remove("NO_COLOR");
-        command.env_remove("CLICOLOR");
-        command.env_remove("CLICOLOR_FORCE");
-
+    fn spec<'a>(&self, argv: impl IntoIterator<Item = &'a str>) -> JjCommandSpec {
+        let spec = JjCommandSpec::render_read_only(argv);
         if let Some(repository) = &self.repository {
-            command.arg("--repository").arg(repository);
+            spec.with_repository(repository)
+        } else {
+            spec
         }
-
-        JjCommand { command }
     }
-}
-
-struct JjCommand {
-    command: Command,
-}
-
-/// Builds the title-bar command label for a selected-change diff.
-fn command_title(change_id: &str) -> String {
-    format!("jj diff -r {change_id}")
 }
 
 /// Parses per-file diff stats from jj's rendered `--stat` rows.
@@ -189,8 +343,87 @@ mod tests {
     }
 
     #[test]
-    fn command_title_names_targeted_jj_diff() {
-        assert_eq!(command_title("abc123"), "jj diff -r abc123");
+    fn revision_query_builds_targeted_jj_diff_spec() {
+        let spec = JjDiff::default().spec_for(&DiffQuery::Revision {
+            rev: "abc123".to_owned(),
+            format: DiffFormat::Patch,
+        });
+
+        let argv = spec
+            .argv()
+            .iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(argv, ["diff", "-r", "abc123"]);
+        assert_eq!(spec.title(), "jj diff -r abc123");
+    }
+
+    #[test]
+    fn revision_query_renders_repository_before_diff() {
+        let command = JjDiff::default()
+            .with_repository("/tmp/repo")
+            .diff_command("abc123");
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            args,
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/repo",
+                "diff",
+                "-r",
+                "abc123"
+            ]
+        );
+    }
+
+    #[test]
+    fn from_to_stat_query_builds_canonical_spec() {
+        let spec = JjDiff::default().spec_for(&DiffQuery::FromTo {
+            from: "main".to_owned(),
+            to: "@".to_owned(),
+            format: DiffFormat::Stat,
+        });
+
+        let argv = spec
+            .argv()
+            .iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(argv, ["diff", "--from", "main", "--to", "@", "--stat"]);
+        assert_eq!(spec.title(), "jj diff --from main --to @ --stat");
+    }
+
+    #[test]
+    fn revision_query_builds_supported_format_specs() {
+        for (format, flag) in [
+            (DiffFormat::Summary, "--summary"),
+            (DiffFormat::Types, "--types"),
+            (DiffFormat::NameOnly, "--name-only"),
+            (DiffFormat::Git, "--git"),
+            (DiffFormat::ColorWords, "--color-words"),
+        ] {
+            let spec = JjDiff::default().spec_for(&DiffQuery::Revision {
+                rev: "abc123".to_owned(),
+                format,
+            });
+            let argv = spec
+                .argv()
+                .iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+
+            assert_eq!(argv, ["diff", "-r", "abc123", flag]);
+            assert_eq!(spec.title(), format!("jj diff -r abc123 {flag}"));
+        }
     }
 
     #[test]
