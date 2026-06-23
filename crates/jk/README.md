@@ -2,8 +2,9 @@
 
 `jk` is a jj-native terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
 
-It keeps a `jj` log-like view open today, lets you refresh in place, and adds interactive navigation
-for reviewing change descriptions and selected-change diffs.
+It keeps `jj` output as the source of truth and adds an interactive workbench around it: inspect
+changes, run safe command previews, review command history, and recover through operation views
+without losing terminal context.
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
@@ -35,21 +36,36 @@ cargo install jk --locked
 The supported surface includes:
 
 - log view backed by `jj`;
-- manual refresh;
-- movement by change, page, and edge;
+- manual refresh and movement by change, line, page, and edge;
+- ordered revision marks;
 - inline expansion of the selected change description;
-- selected-change diff inspection from the log or with `jk diff [REVISION]`;
-- diff search, file/hunk navigation, horizontal scrolling, and folding;
-- mode-specific help overlays;
-- retryable empty/error states for selected diffs.
+- selected-change show, diff, evolog, and repository status inspection;
+- root `jk diff`, `jk show`, and `jk status` entry points;
+- diff search, file/hunk navigation, horizontal scrolling, folding, file list, and View Options;
+- `:` command mode for direct `jj` commands with captured output;
+- in-memory Command History with copy, details, and operation links;
+- Workspaces and Operation Log screens;
+- command previews for describe, abandon, new, edit, undo, and redo;
+- generated help and searchable command discovery.
+
+Current limitations:
+
+- command history is in-memory for the current `jk` session;
+- rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
+- direct `a`, `n`, and `e` mutation keys are dogfood shortcuts until the broader action menu exists.
 
 ## Commands
 
 ```sh
 jk
 jk log
+jk log -T builtin_log_compact_full_description
 jk diff
-jk diff <revision>
+jk diff -r <revision>
+jk diff --from <revision> --to <revision>
+jk diff --stat
+jk show <revision>
+jk status
 jk -R /path/to/repo -n 20
 ```
 
@@ -63,7 +79,7 @@ The detailed roadmap lives in the repository docs:
 - [product plan](https://github.com/joshka/jk/blob/main/docs/product-plan.md);
 - [issue-sized roadmap](https://github.com/joshka/jk/blob/main/docs/roadmap.md).
 
-Near-term work preserves jj-rendered output while adding command-shaped inspection, `show`,
-`status`, command mode, command history, workspaces, command previews, and operation recovery.
+Near-term work stabilizes this dogfoodable workbench for release before adding rebase-specific
+behavior.
 
 See the repository README for the current status and development workflow.
