@@ -8,6 +8,23 @@ keep context open while an editor, shell, or coding agent changes the repository
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
+## Project Status
+
+`jk` is early, useful for a narrow inspection loop, and moving quickly.
+
+Today it is mostly a refreshable `jj log` / `jj diff` workflow: keep context open while an editor,
+IDE, or coding agent changes the repository, refresh in place, and inspect selected changes without
+losing your place.
+
+The longer-term direction is broader. `jk` should accept the command shapes and flags you would
+normally pass to `jj`, preserve your jj config, and add interaction where it helps: selected
+objects, prompts, confirmation for risky changes, command output, refresh, and operation recovery.
+
+This is not ready for broad adoption yet. Feedback is most useful when it is about product
+direction, current inspection workflows, visual and accessibility problems, large graphs, multiple
+workspaces, narrow terminal splits, or how close a TUI should stay to jj's command and config
+model.
+
 ## Installation
 
 Install with Homebrew:
@@ -98,19 +115,29 @@ jk log --repository /path/to/repo --limit 20
 Bare `jk` follows `jj`'s configured `ui.default-command` when that command is log-like enough for
 the semantic navigation pass. Use `jk log` when you want the explicit log command path.
 
-## Roadmap
+## Current Focus
 
 The detailed product and engineering plan lives in
 [docs/product-plan.md](docs/product-plan.md). The shorter
 [docs/roadmap.md](docs/roadmap.md) turns that plan into issue-sized milestones.
 
-The near-term direction is:
+The active planning and dogfood work is concentrated around the 0.3 to 0.6 foundations:
 
-- preserve jj-rendered output while improving navigation, marks, and command-shaped inspection;
-- add `show`, `status`, command mode, command history, and a first-class workspace screen;
-- move mutating workflows behind command previews, command history, and operation recovery;
+- keep `jj` output and config fidelity at the center: revsets, templates, graph style, colors, and
+  diff output should still matter;
+- build the command-spec, global-options, view-stack, mode-stack, keymap, and task foundations that
+  make later workflows reviewable;
+- improve inspection around `log`, `diff`, `show`, `status`, `evolog`, View Options, and file
+  navigation without turning the default screen into a dashboard;
+- dogfood command history, `:` command mode, workspace views, operation recovery, and safe mutation
+  previews before presenting them as stable user workflows;
+- replace rough UI experiments, including selection and highlight behavior, with more readable and
+  accessible defaults;
 - make [Betamax](https://www.joshka.net/betamax/) tapes the source for regression tests,
   README/site media, and release demos.
+
+Some of that work exists only in local dogfood spikes today. The README describes the released
+surface first; the planning docs describe the direction.
 
 ## Development
 
