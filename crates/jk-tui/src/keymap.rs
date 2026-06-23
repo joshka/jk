@@ -38,6 +38,8 @@ enum ActionId {
     OpenOperation,
     OpenOperationLog,
     OpenCommandHistory,
+    Undo,
+    Redo,
     UpdateStale,
     ViewOptions,
     Refresh,
@@ -74,6 +76,8 @@ impl ActionId {
             Self::OpenOperation => "Open operation",
             Self::OpenOperationLog => "Open operation log",
             Self::OpenCommandHistory => "Open command history",
+            Self::Undo => "Undo",
+            Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
             Self::ViewOptions => "View options",
             Self::Refresh => "Refresh",
@@ -272,6 +276,14 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["operation", "op log", "undo", "redo", "recovery"])
         .with_hotbar(9, "o ops"),
+    KeyBinding::new(ActionId::Undo, "u", "preview jj undo")
+        .with_family(CommandFamily::JjOperation)
+        .with_aliases(&["undo", "operation", "recovery"])
+        .with_hotbar(10, "u undo"),
+    KeyBinding::new(ActionId::Redo, "U", "preview jj redo")
+        .with_family(CommandFamily::JjOperation)
+        .with_aliases(&["redo", "operation", "recovery"])
+        .with_hotbar(11, "U redo"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
@@ -809,7 +821,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  j/k move  V options  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  V options  q quit"
         );
     }
 
@@ -955,6 +967,8 @@ mod tests {
                 "v                    open selected-change evolog",
                 "s                    open repository status",
                 "o                    open operation log",
+                "u                    preview jj undo",
+                "U                    preview jj redo",
                 "C                    open command history",
                 "V                    open view options",
                 "r                    refresh",

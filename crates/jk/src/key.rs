@@ -31,8 +31,11 @@ pub enum AppKey {
     /// Open the operation log list.
     OpenOperationLog,
 
-    /// Update stale metadata for the selected workspace.
-    UpdateSelectedWorkspaceStale,
+    /// Preview and run `jj undo`.
+    StartUndo,
+
+    /// Preview and run `jj redo`.
+    StartRedo,
 
     /// Start an inline describe mutation for the selected revision.
     StartDescribe,
@@ -137,7 +140,8 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'W' => Some(AppKey::OpenWorkspaces),
         'C' => Some(AppKey::OpenCommandHistory),
         'o' => Some(AppKey::OpenOperationLog),
-        'u' => Some(AppKey::UpdateSelectedWorkspaceStale),
+        'u' => Some(AppKey::StartUndo),
+        'U' => Some(AppKey::StartRedo),
         'm' => Some(AppKey::StartDescribe),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
@@ -260,10 +264,18 @@ mod tests {
     }
 
     #[test]
-    fn lowercase_u_requests_selected_workspace_stale_update() {
+    fn lowercase_u_starts_undo_preview() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE)),
-            AppKey::UpdateSelectedWorkspaceStale
+            AppKey::StartUndo
+        );
+    }
+
+    #[test]
+    fn uppercase_u_starts_redo_preview() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('U'), KeyModifiers::NONE)),
+            AppKey::StartRedo
         );
     }
 

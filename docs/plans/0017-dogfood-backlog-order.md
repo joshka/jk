@@ -1,0 +1,102 @@
+# Dogfood Backlog Order
+
+This note records the current `vibe` spike ordering for dogfoodable progress. It is intentionally
+more execution-oriented than the product plan: finish the tight recovery and command surfaces first,
+then broaden into mutation flows, selectors, run options, and generated help.
+
+## Next Dogfood Sprint
+
+1. Finish mutation-to-operation linking: confirmed mutations in Command History should open the
+   exact resulting `jj op show` with `o`, not fall back to op log.
+1. Add `u` undo preview: pressing `u` shows `jj undo` in command preview, runs only on confirm,
+   refreshes, and records history.
+1. Add `U` redo preview: same shape as undo, with `jj redo`, so recovery feels complete
+   immediately.
+1. Add post-mutation recovery footer: after a mutation succeeds, make `u undo`, `U redo`,
+   `o operation`, and `C history` visible.
+1. Add copy command from preview/history: let users copy the exact `jj ...` command that ran or will
+   run.
+1. Add Command History output/details view: Enter on a history row should show full argv,
+   stdout/stderr summary, status, duration, and operation id.
+1. Add simple `:` command mode MVP: run jj commands from an overlay, capture output in a rendered
+   view, and record history.
+1. Add failed-command output view: failed `:` commands should keep stderr visible with retry/back
+   behavior.
+1. Add `!` external command MVP: run non-shell external commands safely, with explicit argv handling
+   and output capture.
+1. Add diff View Options quick wins: `V` should toggle stat, summary, name-only, git format, and
+   maybe color-words where jj supports it.
+1. Make rich diff navigation solid: improve `[ ]`, `{ }`, search, horizontal scroll, and sticky
+   file/hunk context.
+1. Add diff file list overlay: show files in the current diff and jump to selected file.
+
+## First Useful Mutation Sprint
+
+1. Add `jj abandon` preview flow: a high-value simple mutation using selected revision, command
+   preview, confirm, refresh, and recovery.
+1. Add `jj new` preview flow: create a new change from selected context with clear preview and
+   recovery.
+1. Add `jj edit` preview flow: move working copy to selected change, with warning when the action
+   may surprise.
+1. Add inline describe polish: multiline/editor describe, better prompt editing, and clearer
+   before/after description display.
+1. Add minimal rebase preview: resolve source/destination from marks plus cursor and show exact
+   `jj rebase` command before running.
+1. Add rebase destination search: search/filter the log while choosing a destination.
+1. Add rebase role resolver UI: make source, branch, destination, insert-before, and insert-after
+   roles explicit.
+1. Add `jj squash` preview flow: use selected/marked revisions and show the exact squash command.
+1. Add `jj split` entry point: likely external/editor-backed first, with preview and recovery rather
+   than native hunk UI.
+1. Add `jj restore` preview flow: start with file-level restore before hunk-level restore.
+
+## Foundation Catch-Up
+
+1. Add shared revision selector: reusable selector output for selected revision, marked revisions,
+   revsets, and role picking.
+1. Add shared fileset selector: reusable file/fileset picker for diff, status, restore, split, and
+   squash workflows.
+1. Add shared operation selector: reuse operation choices for op show/diff, undo context, restore,
+   revert, and history links.
+1. Add Run Options drawer MVP: expose repository, working-copy policy, operation context, operation
+   integration, immutable override, and config overlays.
+1. Add generated jj help manifest: ingest `jj help` / `jj util markdown-help` so supported flags and
+   command families stay grounded.
+1. Add cancellable command runner: slow diff/log/preview work should not freeze navigation or apply
+   stale results.
+1. Define refresh policy in code: preserve selection, scroll, marks, expansion, and diff state
+   consistently across refreshes.
+1. Add auto-refresh opt-in: only after manual refresh preservation is reliable.
+
+## Later Broadening
+
+1. Expand workspace actions: add workspace add, forget, rename if supported, and better stale/update
+   flows.
+1. Add workspace-scoped log/status/diff: make selected workspace context explicit and reusable.
+1. Add bookmark list screen: list bookmarks, show target commits, and expose safe actions.
+1. Add bookmark create/move/delete previews: command-preview first, no blind mutation.
+1. Add `git fetch` flow: first read/network-safe fetch path with visible output and history.
+1. Add push dry-run flow: `git push --dry-run` first, then confirmed push only after preview.
+1. Add tag/remotes screens: after bookmarks/fetch/push establish the refs/remotes pattern.
+1. Add op restore preview: strong confirmation, clear warning, and recovery docs.
+1. Add op revert preview: safer-than-restore messaging, still treated as a mutation.
+1. Add command rerun from history: probably after command details/copy are stable.
+1. Add persistent command history: durable local history once in-memory history semantics are good.
+1. Add Betamax validation taxonomy: organize tapes by global options, selectors, view options, run
+   options, workspaces, recovery, and mutations.
+1. Add user docs for dogfood flows: local docs for command mode, safe mutation loop, operation
+   recovery, diff navigation, and workspaces.
+1. Add config-fidelity fixtures: aliases, templates, colors, graph styles, and wrapping.
+1. Add hybrid graph previews: only after config-fidelity and rebase preview behavior are well
+   tested.
+
+## Steering Notes
+
+- Treat items 1-12 as the next dogfood sprint.
+- Treat items 13-22 as the first useful mutation sprint.
+- Treat items 23-30 as the point where roadmap foundation needs to catch up before broadening
+  further.
+- For the near-term `vibe` spike, favor direct implementation in the orchestration thread for small
+  app wiring, crash fixes, and live `cargo run` feedback.
+- Use subagents only for independent, file-scoped chunks large enough to amortize context setup.
+- Reserve Betamax GIF work for milestone user-visible flows rather than every incremental patch.

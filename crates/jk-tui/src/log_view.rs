@@ -169,6 +169,11 @@ impl LogView {
         self.status_message = Some(error.into());
     }
 
+    /// Shows a non-error status message without replacing the current log.
+    pub fn show_status(&mut self, status: impl Into<String>) {
+        self.status_message = Some(status.into());
+    }
+
     /// Returns the selected change identifier for follow-up inspection commands.
     pub fn selected_change_id(&self) -> Option<&str> {
         self.state
@@ -435,6 +440,27 @@ mod tests {
     }
 
     #[test]
+    fn status_messages_replace_default_hotbar_until_refresh() {
+        let mut view = LogView::new(snapshot(["aaa"]));
+        view.show_status("u undo  U redo  o operation  C history");
+        let backend = TestBackend::new(56, 4);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        assert!(buffer_line(terminal.backend().buffer(), 3).contains("u undo"));
+        assert!(buffer_line(terminal.backend().buffer(), 3).contains("C history"));
+
+        view.refresh(snapshot(["bbb"]));
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        assert!(!buffer_line(terminal.backend().buffer(), 3).contains("u undo"));
+    }
+
+    #[test]
     fn empty_log_renders_chrome_without_selection() {
         let mut view = LogView::new(LogSnapshot::new("", Vec::new()).with_title("jj log"));
         let backend = TestBackend::new(48, 4);
@@ -455,7 +481,7 @@ mod tests {
     fn help_action_shows_log_specific_keys() {
         let mut view = LogView::new(snapshot(["aaa"]));
         let _ = view.apply(LogAction::ToggleHelp);
-        let backend = TestBackend::new(72, 24);
+        let backend = TestBackend::new(72, 28);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -469,6 +495,8 @@ mod tests {
         assert!(rendered.contains("d                    open selected-change diff"));
         assert!(rendered.contains("m                    describe selected revision"));
         assert!(rendered.contains("s                    open repository status"));
+        assert!(rendered.contains("u                    preview jj undo"));
+        assert!(rendered.contains("U                    preview jj redo"));
         assert!(rendered.contains("?, q, Esc            close help"));
     }
 

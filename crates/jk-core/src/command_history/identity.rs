@@ -173,6 +173,10 @@ pub enum SourceAction {
     OperationShow,
     /// Diff a selected operation.
     OperationDiff,
+    /// Undo the latest operation.
+    Undo,
+    /// Redo the latest undone operation.
+    Redo,
     /// A source action not yet modeled.
     Other(String),
 }

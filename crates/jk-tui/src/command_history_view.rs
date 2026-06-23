@@ -446,6 +446,8 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::OperationLog => "op log".to_owned(),
         SourceAction::OperationShow => "op show".to_owned(),
         SourceAction::OperationDiff => "op diff".to_owned(),
+        SourceAction::Undo => "undo".to_owned(),
+        SourceAction::Redo => "redo".to_owned(),
         SourceAction::Other(label) => label,
         _ => "unknown".to_owned(),
     }

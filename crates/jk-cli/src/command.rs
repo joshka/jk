@@ -5,8 +5,10 @@ use std::process::{Command, Output, Stdio};
 use std::time::SystemTime;
 
 use jk_core::{
-    CommandHistory, CommandRecordFinish, CommandRecordStart, CommandResultSummary, CommandSource,
-    ExitStatusSummary, JjCommandSpec, StreamSummary,
+    ColorPolicy, CommandHistory, CommandRecordFinish, CommandRecordStart, CommandResultSummary,
+    CommandSource, ExecutionMode, ExitStatusSummary, ImmutabilityPolicy, JjCommandSpec,
+    OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, SafetyClass, StreamSummary,
+    WorkingCopyPolicy,
 };
 
 const HISTORY_STREAM_LIMIT: usize = 8 * 1024;
@@ -84,6 +86,101 @@ where
         self.history.finish(&pending, finish);
         result
     }
+}
+
+impl<R> RecordingJjCommandRunner<'_, R>
+where
+    R: JjCommandRunner,
+{
+    /// Runs a confirmed mutation and records the resulting operation id when the current operation
+    /// context advances in a bounded before/after probe.
+    ///
+    /// The operation probes are intentionally not recorded in command history. Callers should use
+    /// this only after user confirmation, and ordinary read-only specs fall back to [`run`].
+    pub fn run_confirmed_mutation(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
+        if !should_probe_resulting_operation(spec) {
+            return self.run(spec);
+        }
+
+        let before_operation_id = current_operation_id(&mut self.inner, spec).ok();
+        let pending = self
+            .history
+            .start(CommandRecordStart::from_spec(spec, self.source.clone()));
+        let result = self.inner.run(spec);
+        let mut finish = match &result {
+            Ok(output) => finish_from_output(output, SystemTime::now()),
+            Err(error) => {
+                CommandRecordFinish::from_spawn_error(error.to_string(), "", "", SystemTime::now())
+            }
+        };
+
+        if let (Ok(output), Some(before_operation_id)) = (&result, before_operation_id) {
+            if output.status.success() {
+                if let Ok(after_operation_id) = current_operation_id(&mut self.inner, spec) {
+                    if after_operation_id != before_operation_id {
+                        finish.operation_id = Some(after_operation_id);
+                    }
+                }
+            }
+        }
+
+        self.history.finish(&pending, finish);
+        result
+    }
+}
+
+fn should_probe_resulting_operation(spec: &JjCommandSpec) -> bool {
+    matches!(spec.mode(), ExecutionMode::ConfirmMutation)
+        && matches!(
+            spec.safety(),
+            SafetyClass::LocalMetadata | SafetyClass::LocalRewrite | SafetyClass::DestructiveLocal
+        )
+}
+
+fn current_operation_id(
+    runner: &mut impl JjCommandRunner,
+    spec: &JjCommandSpec,
+) -> std::io::Result<String> {
+    let output = runner.run(&current_operation_id_spec(spec))?;
+    if !output.status.success() {
+        return Err(std::io::Error::other("jj op log failed"));
+    }
+
+    parse_single_operation_id(&output.stdout)
+        .ok_or_else(|| std::io::Error::other("jj op log did not return one operation id"))
+}
+
+fn current_operation_id_spec(spec: &JjCommandSpec) -> JjCommandSpec {
+    let global_options = spec
+        .global_options()
+        .clone()
+        .with_working_copy(WorkingCopyPolicy::Ignore)
+        .with_operation(OperationLoadPolicy::AtOperation("@".to_owned()))
+        .with_operation_integration(OperationIntegrationPolicy::Integrate)
+        .with_immutability(ImmutabilityPolicy::Enforce)
+        .with_output(OutputPolicy {
+            color: ColorPolicy::Never,
+            ..OutputPolicy::default()
+        });
+    JjCommandSpec::render_read_only(["op", "log", "--no-graph", "-T", "id ++ \"\\n\"", "-n", "1"])
+        .with_global_options(global_options)
+}
+
+fn parse_single_operation_id(stdout: &[u8]) -> Option<String> {
+    let rendered = String::from_utf8_lossy(stdout);
+    let mut lines = rendered
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty());
+    let operation_id = lines.next()?;
+    if lines.next().is_some() || !looks_like_operation_id(operation_id) {
+        return None;
+    }
+    Some(operation_id.to_owned())
+}
+
+fn looks_like_operation_id(value: &str) -> bool {
+    value.len() >= 12 && value.chars().all(|character| character.is_ascii_hexdigit())
 }
 
 fn run_system_jj_spec(spec: &JjCommandSpec) -> std::io::Result<Output> {
@@ -166,6 +263,12 @@ mod tests {
     use std::os::unix::process::ExitStatusExt;
 
     use jk_core::{SafetyClass, SourceAction, SourceView};
+
+    fn strings(argv: impl IntoIterator<Item = std::ffi::OsString>) -> Vec<String> {
+        argv.into_iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect()
+    }
 
     #[test]
     fn command_adapter_forces_color_and_cleans_color_env() {
@@ -321,6 +424,118 @@ mod tests {
         assert_eq!(record.result.stderr.snippet, "updated\n");
     }
 
+    #[test]
+    fn confirmed_mutation_records_changed_operation_id() {
+        let mut history = CommandHistory::new(4);
+        let spec = JjCommandSpec::confirm_mutation(
+            ["describe", "-m", "message", "abc123"],
+            SafetyClass::LocalRewrite,
+        );
+        let mut runner = RecordingJjCommandRunner::new(
+            SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
+                output(0, "described\n", ""),
+                output(0, "222222222222\n", ""),
+            ]),
+            &mut history,
+            CommandSource::new(SourceView::Log, SourceAction::DescribeRevision),
+        );
+
+        runner
+            .run_confirmed_mutation(&spec)
+            .expect("fake mutation succeeds");
+
+        let record = history.records().next().expect("recorded mutation");
+        assert_eq!(record.command.spec_preview, "jj describe -m message abc123");
+        assert_eq!(record.operation_id.as_deref(), Some("222222222222"));
+        assert_eq!(history.records().count(), 1);
+    }
+
+    #[test]
+    fn confirmed_mutation_operation_probe_disables_color() {
+        let spec = JjCommandSpec::confirm_mutation(
+            ["describe", "-m", "message", "abc123"],
+            SafetyClass::LocalRewrite,
+        );
+
+        let argv = strings(current_operation_id_spec(&spec).process_argv());
+
+        assert!(argv.windows(2).any(|args| args == ["--color", "never"]));
+        assert!(!argv.windows(2).any(|args| args == ["--color", "always"]));
+    }
+
+    #[test]
+    fn confirmed_mutation_leaves_operation_id_empty_when_context_does_not_change() {
+        let mut history = CommandHistory::new(4);
+        let spec = JjCommandSpec::confirm_mutation(
+            ["describe", "-m", "message", "abc123"],
+            SafetyClass::LocalRewrite,
+        );
+        let mut runner = RecordingJjCommandRunner::new(
+            SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
+                output(0, "described\n", ""),
+                output(0, "111111111111\n", ""),
+            ]),
+            &mut history,
+            CommandSource::new(SourceView::Log, SourceAction::DescribeRevision),
+        );
+
+        runner
+            .run_confirmed_mutation(&spec)
+            .expect("fake mutation succeeds");
+
+        let record = history.records().next().expect("recorded mutation");
+        assert_eq!(record.operation_id, None);
+        assert_eq!(history.records().count(), 1);
+    }
+
+    #[test]
+    fn confirmed_mutation_leaves_operation_id_empty_when_mutation_fails() {
+        let mut history = CommandHistory::new(4);
+        let spec = JjCommandSpec::confirm_mutation(
+            ["describe", "-m", "message", "abc123"],
+            SafetyClass::LocalRewrite,
+        );
+        let mut runner = RecordingJjCommandRunner::new(
+            SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
+                output(1, "", "failed\n"),
+            ]),
+            &mut history,
+            CommandSource::new(SourceView::Log, SourceAction::DescribeRevision),
+        );
+
+        let output = runner
+            .run_confirmed_mutation(&spec)
+            .expect("fake mutation runs");
+
+        assert!(!output.status.success());
+        let record = history.records().next().expect("recorded mutation");
+        assert_eq!(record.operation_id, None);
+        assert_eq!(history.records().count(), 1);
+    }
+
+    #[test]
+    fn confirmed_mutation_runner_does_not_probe_read_only_specs() {
+        let mut history = CommandHistory::new(4);
+        let spec = JjCommandSpec::render_read_only(["status"]);
+        let mut runner = RecordingJjCommandRunner::new(
+            SequencedRunner::successes(vec![output(0, "clean\n", "")]),
+            &mut history,
+            CommandSource::new(SourceView::Status, SourceAction::Refresh),
+        );
+
+        runner
+            .run_confirmed_mutation(&spec)
+            .expect("fake read-only command succeeds");
+
+        let record = history.records().next().expect("recorded command");
+        assert_eq!(record.command.spec_preview, "jj status");
+        assert_eq!(record.operation_id, None);
+        assert_eq!(history.records().count(), 1);
+    }
+
     struct FakeRunner {
         result: io::Result<Output>,
     }
@@ -349,6 +564,34 @@ mod tests {
                 &mut self.result,
                 Err(io::Error::other("fake runner result already consumed")),
             )
+        }
+    }
+
+    struct SequencedRunner {
+        outputs: Vec<Output>,
+    }
+
+    impl SequencedRunner {
+        fn successes(outputs: Vec<Output>) -> Self {
+            let mut outputs = outputs;
+            outputs.reverse();
+            Self { outputs }
+        }
+    }
+
+    impl JjCommandRunner for SequencedRunner {
+        fn run(&mut self, _spec: &JjCommandSpec) -> io::Result<Output> {
+            self.outputs
+                .pop()
+                .ok_or_else(|| io::Error::other("fake runner output already consumed"))
+        }
+    }
+
+    fn output(code: i32, stdout: &str, stderr: &str) -> Output {
+        Output {
+            status: exit_status(code),
+            stdout: stdout.as_bytes().to_vec(),
+            stderr: stderr.as_bytes().to_vec(),
         }
     }
 

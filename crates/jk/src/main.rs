@@ -13,9 +13,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
     DescribeQuery, DiffFormat, DiffQuery, EvologQuery, JjCommandRunner, JjDescribe, JjDiff,
-    JjEvolog, JjLog, JjLogCommand, JjOperation, JjShow, JjStatus, JjWorkspaces,
-    LogTemplateSelection, OperationQuery, RecordingJjCommandRunner, ShowQuery, StatusQuery,
-    SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot, WorkspaceSummary,
+    JjEvolog, JjLog, JjLogCommand, JjOperation, JjRecovery, JjShow, JjStatus, JjWorkspaces,
+    LogTemplateSelection, OperationQuery, RecordingJjCommandRunner, RecoveryCommand, ShowQuery,
+    StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot,
+    WorkspaceSummary,
 };
 use jk_core::{CommandHistory, CommandPreview, CommandSource, SourceAction, SourceView};
 use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
@@ -38,6 +39,8 @@ use jk_tui::workspaces_view::{
 mod key;
 
 use key::AppKey;
+
+const POST_MUTATION_RECOVERY_STATUS: &str = "u undo  U redo  o operation  C history";
 
 /// Command-line options for the first log-oriented `jk` surface.
 #[derive(Debug, Parser)]
@@ -183,6 +186,7 @@ fn main() -> Result<()> {
     let status_source = status_source(&args);
     let describe_source = describe_source(&args);
     let operation_source = operation_source(&args);
+    let recovery_source = recovery_source(&args);
     let workspaces_source = workspaces_source(&args);
     let mut history = CommandHistory::default();
     let app = match &args.command {
@@ -217,6 +221,7 @@ fn main() -> Result<()> {
         &status_source,
         &describe_source,
         &operation_source,
+        &recovery_source,
         &workspaces_source,
         history,
     )?;
@@ -310,6 +315,16 @@ fn describe_source(args: &Args) -> JjDescribe {
 /// Builds the operation source for operation log/show/diff inspection.
 fn operation_source(args: &Args) -> JjOperation {
     let source = JjOperation::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Builds the recovery source for undo/redo mutation previews.
+fn recovery_source(args: &Args) -> JjRecovery {
+    let source = JjRecovery::default();
     if let Some(repository) = &args.repository {
         source.with_repository(repository)
     } else {
@@ -562,6 +577,43 @@ impl AppState {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PendingCommandPreview {
+    preview: CommandPreview,
+    source_action: SourceAction,
+    source_key: &'static str,
+    failure_label: &'static str,
+}
+
+impl PendingCommandPreview {
+    fn describe(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::DescribeRevision,
+            source_key: "m",
+            failure_label: "jj describe",
+        }
+    }
+
+    fn undo(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::Undo,
+            source_key: "u",
+            failure_label: "jj undo",
+        }
+    }
+
+    fn redo(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::Redo,
+            source_key: "U",
+            failure_label: "jj redo",
+        }
+    }
+}
+
 /// Non-empty stack of top-level views.
 #[derive(Debug)]
 struct ViewStack {
@@ -637,6 +689,7 @@ fn run_terminal(
     status_source: &JjStatus,
     describe_source: &JjDescribe,
     operation_source: &JjOperation,
+    recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
     history: CommandHistory,
 ) -> Result<()> {
@@ -678,9 +731,9 @@ fn run_terminal(
                         let lines = describe_message_lines(rev, message);
                         render_mode_overlay(frame, "Describe revision", &lines);
                     }
-                    Some(InputMode::CommandPreview { preview }) => {
+                    Some(InputMode::CommandPreview { pending }) => {
                         log.render(frame);
-                        CommandPreviewView::new(preview.clone()).render(frame);
+                        CommandPreviewView::new(pending.preview.clone()).render(frame);
                     }
                     _ => log.render(frame),
                 },
@@ -897,8 +950,24 @@ fn run_terminal(
                             }
                             needs_redraw = true;
                         }
-                        AppKey::UpdateSelectedWorkspaceStale => {
-                            update_selected_workspace_stale(&mut state, workspaces_source);
+                        AppKey::StartUndo => {
+                            if matches!(state.views.active(), AppView::Workspaces { .. }) {
+                                update_selected_workspace_stale(&mut state, workspaces_source);
+                            } else {
+                                open_recovery_preview(
+                                    &mut state,
+                                    recovery_source,
+                                    RecoveryCommand::Undo,
+                                );
+                            }
+                            needs_redraw = true;
+                        }
+                        AppKey::StartRedo => {
+                            open_recovery_preview(
+                                &mut state,
+                                recovery_source,
+                                RecoveryCommand::Redo,
+                            );
                             needs_redraw = true;
                         }
                         AppKey::StartDescribe => {
@@ -1025,7 +1094,7 @@ enum InputMode {
         message: String,
     },
     CommandPreview {
-        preview: CommandPreview,
+        pending: PendingCommandPreview,
     },
     LogTemplate {
         options: Vec<LogTemplateSelection>,
@@ -1089,7 +1158,9 @@ fn handle_input_mode(
                         .spec_for(&DescribeQuery::new(rev.clone(), message.clone()))
                         .command_preview();
                     state.modes.pop();
-                    state.modes.push(InputMode::CommandPreview { preview });
+                    state.modes.push(InputMode::CommandPreview {
+                        pending: PendingCommandPreview::describe(preview),
+                    });
                     return InputModeResult::Handled;
                 }
                 InputMode::ViewOptions { .. } => unreachable!(),
@@ -1246,10 +1317,10 @@ fn handle_command_preview_mode(
             code: KeyCode::Enter,
             ..
         } => {
-            let Some(InputMode::CommandPreview { preview }) = state.modes.pop() else {
+            let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
                 return InputModeResult::Handled;
             };
-            confirm_command_preview(state, source, preview);
+            confirm_command_preview(state, source, pending);
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
@@ -1280,42 +1351,67 @@ fn describe_message_lines(rev: &str, message: &str) -> Vec<String> {
     ]
 }
 
-fn confirm_command_preview(state: &mut AppState, source: &mut JjLog, preview: CommandPreview) {
-    confirm_command_preview_with_runner(state, source, preview, SystemJjCommandRunner);
+fn confirm_command_preview(
+    state: &mut AppState,
+    source: &mut JjLog,
+    pending: PendingCommandPreview,
+) {
+    confirm_command_preview_with_runner(state, source, pending, SystemJjCommandRunner);
 }
 
 fn confirm_command_preview_with_runner<R: JjCommandRunner>(
     state: &mut AppState,
     source: &mut JjLog,
-    preview: CommandPreview,
+    pending: PendingCommandPreview,
     runner: R,
 ) {
-    let command_source =
-        CommandSource::new(SourceView::Log, SourceAction::DescribeRevision).with_key("m");
+    let command_source = CommandSource::new(SourceView::Log, pending.source_action.clone())
+        .with_key(pending.source_key);
     let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);
-    match runner.run(&preview.spec) {
+    match runner.run_confirmed_mutation(&pending.preview.spec) {
         Ok(output) if output.status.success() => {
             if let AppView::Log(log) = state.views.active_mut() {
-                refresh_log(
+                let refreshed = refresh_log(
                     log,
                     &mut state.history,
                     source,
                     CommandSource::new(SourceView::Log, SourceAction::Refresh),
                 );
+                if refreshed {
+                    log.show_status(POST_MUTATION_RECOVERY_STATUS);
+                }
             }
         }
         Ok(output) => {
-            let message = command_failure_message("jj describe", &output.stderr, &output.stdout);
+            let message =
+                command_failure_message(pending.failure_label, &output.stderr, &output.stdout);
             if let AppView::Log(log) = state.views.active_mut() {
                 log.show_error(message);
             }
         }
         Err(error) => {
             if let AppView::Log(log) = state.views.active_mut() {
-                log.show_error(format!("failed to run jj describe: {error}"));
+                log.show_error(format!("failed to run {}: {error}", pending.failure_label));
             }
         }
     }
+}
+
+fn open_recovery_preview(
+    state: &mut AppState,
+    recovery_source: &JjRecovery,
+    command: RecoveryCommand,
+) {
+    if !matches!(state.views.active(), AppView::Log(_)) {
+        return;
+    }
+
+    let preview = recovery_source.spec_for(command).command_preview();
+    let pending = match command {
+        RecoveryCommand::Undo => PendingCommandPreview::undo(preview),
+        RecoveryCommand::Redo => PendingCommandPreview::redo(preview),
+    };
+    state.modes.push(InputMode::CommandPreview { pending });
 }
 
 fn command_failure_message(command: &str, stderr: &[u8], stdout: &[u8]) -> String {
@@ -1884,12 +1980,14 @@ fn apply_log_action(
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
     match log.apply(action) {
-        ActionResult::Refresh => refresh_log(
-            log,
-            history,
-            source,
-            CommandSource::new(SourceView::Log, SourceAction::Refresh),
-        ),
+        ActionResult::Refresh => {
+            refresh_log(
+                log,
+                history,
+                source,
+                CommandSource::new(SourceView::Log, SourceAction::Refresh),
+            );
+        }
         ActionResult::SwitchHome => {
             switch_log_command(log, history, source, JjLogCommand::ConfiguredDefault);
         }
@@ -2758,11 +2856,17 @@ fn refresh_log(
     history: &mut CommandHistory,
     source: &JjLog,
     command_source: CommandSource,
-) {
+) -> bool {
     let mut runner = recording_runner(history, command_source);
     match source.load_with_runner(&mut runner) {
-        Ok(snapshot) => app.refresh(snapshot),
-        Err(error) => app.show_error(error.to_string()),
+        Ok(snapshot) => {
+            app.refresh(snapshot);
+            true
+        }
+        Err(error) => {
+            app.show_error(error.to_string());
+            false
+        }
     }
 }
 
@@ -3052,6 +3156,8 @@ mod tests {
     use std::process::Output;
 
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
 
     use super::*;
 
@@ -3808,9 +3914,12 @@ mod tests {
         );
 
         assert_eq!(result, InputModeResult::Handled);
-        let Some(InputMode::CommandPreview { preview }) = state.modes.active() else {
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
             panic!("expected command preview mode");
         };
+        let preview = &pending.preview;
+        assert_eq!(pending.source_action, SourceAction::DescribeRevision);
+        assert_eq!(pending.source_key, "m");
         assert_eq!(preview.spec.argv()[0].to_string_lossy(), "describe");
         assert_eq!(
             preview.command_line,
@@ -3854,12 +3963,19 @@ mod tests {
             .spec_for(&DescribeQuery::new("abc123", "New description"))
             .command_preview();
         let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
             output(0, "Working copy now at: abc123\n", ""),
+            output(0, "222222222222\n", ""),
             output(0, "refreshed rendered log\n", ""),
             output(0, "{}\n", ""),
         ]);
 
-        confirm_command_preview_with_runner(&mut state, &mut source, preview, runner);
+        confirm_command_preview_with_runner(
+            &mut state,
+            &mut source,
+            PendingCommandPreview::describe(preview),
+            runner,
+        );
 
         let records = state.command_history().records().collect::<Vec<_>>();
         assert_eq!(records.len(), 3);
@@ -3876,9 +3992,78 @@ mod tests {
             records[0].execution_mode,
             jk_core::ExecutionMode::ConfirmMutation
         );
+        assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[0].refresh, jk_core::RefreshPlan::None);
         assert_eq!(records[1].source.action, SourceAction::Refresh);
         assert_eq!(records[2].source.action, SourceAction::Refresh);
+        assert!(active_log_status(&mut state).contains(POST_MUTATION_RECOVERY_STATUS));
+    }
+
+    #[test]
+    fn undo_preview_uses_recovery_command_spec() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        open_recovery_preview(&mut state, &JjRecovery::default(), RecoveryCommand::Undo);
+
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+            panic!("expected undo command preview");
+        };
+        assert_eq!(pending.source_action, SourceAction::Undo);
+        assert_eq!(pending.source_key, "u");
+        assert_eq!(
+            pending.preview.command_line,
+            "jj --no-pager --color always undo"
+        );
+        assert_eq!(pending.preview.safety, jk_core::SafetyClass::LocalRewrite);
+    }
+
+    #[test]
+    fn redo_preview_uses_recovery_command_spec() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        open_recovery_preview(&mut state, &JjRecovery::default(), RecoveryCommand::Redo);
+
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+            panic!("expected redo command preview");
+        };
+        assert_eq!(pending.source_action, SourceAction::Redo);
+        assert_eq!(pending.source_key, "U");
+        assert_eq!(
+            pending.preview.command_line,
+            "jj --no-pager --color always redo"
+        );
+    }
+
+    #[test]
+    fn confirming_undo_preview_records_recovery_action_before_refresh() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let preview = JjRecovery::default()
+            .spec_for(RecoveryCommand::Undo)
+            .command_preview();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "undid\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        confirm_command_preview_with_runner(
+            &mut state,
+            &mut source,
+            PendingCommandPreview::undo(preview),
+            runner,
+        );
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].command.spec_preview, "jj undo");
+        assert_eq!(records[0].source.action, SourceAction::Undo);
+        assert_eq!(records[0].source.key.as_deref(), Some("u"));
+        assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
+        assert_eq!(records[1].source.action, SourceAction::Refresh);
+        assert!(active_log_status(&mut state).contains(POST_MUTATION_RECOVERY_STATUS));
     }
 
     #[test]
@@ -4274,6 +4459,26 @@ mod tests {
             )
             .with_title("jj log"),
         ))
+    }
+
+    fn active_log_status(state: &mut AppState) -> String {
+        let AppView::Log(log) = state.views.active_mut() else {
+            panic!("expected active log view");
+        };
+        let backend = TestBackend::new(96, 4);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+        let draw_result = terminal.draw(|frame| log.render(frame));
+        assert!(draw_result.is_ok());
+        buffer_line(terminal.backend().buffer(), 3)
+    }
+
+    fn buffer_line(buffer: &ratatui::buffer::Buffer, y: u16) -> String {
+        (0..buffer.area.width)
+            .map(|x| buffer[(x, y)].symbol())
+            .collect::<String>()
     }
 
     fn workspace_app_view() -> WorkspacesView {
