@@ -3,7 +3,11 @@
 //! Callers map retained command records into [`CommandHistorySnapshot`]. The view only owns
 //! selection, scrolling, and rendering for a read-only first history surface.
 
-use jk_core::{CommandRecord, SourceAction, SourceView, StreamSummary};
+use std::time::Duration;
+
+use jk_core::{
+    CommandRecord, ExitStatusSummary, InspectionSnapshot, SourceAction, SourceView, StreamSummary,
+};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
@@ -84,6 +88,8 @@ pub struct CommandHistoryRow {
     pub command_line: String,
     /// Compact output or failure summary.
     pub summary: String,
+    /// Full retained details for the command-history details view.
+    pub details: CommandHistoryDetails,
 }
 
 impl CommandHistoryRow {
@@ -96,14 +102,17 @@ impl CommandHistoryRow {
         command: impl Into<String>,
         summary: impl Into<String>,
     ) -> Self {
+        let command = command.into();
+        let summary = summary.into();
         Self {
             id,
             operation_id: None,
             status: status.into(),
             source: source.into(),
-            command: command.into(),
+            command: command.clone(),
             command_line: String::new(),
-            summary: summary.into(),
+            summary: summary.clone(),
+            details: CommandHistoryDetails::from_display_parts(id, command, String::new(), summary),
         }
     }
 
@@ -118,6 +127,7 @@ impl CommandHistoryRow {
     #[must_use]
     pub fn with_command_line(mut self, command_line: impl Into<String>) -> Self {
         self.command_line = command_line.into();
+        self.details.command_line = self.command_line.clone();
         self
     }
 
@@ -132,7 +142,126 @@ impl CommandHistoryRow {
             result_summary(record),
         )
         .with_command_line(record.command.process_preview())
+        .with_details(CommandHistoryDetails::from_record(record))
         .with_operation_id(record.operation_id.clone())
+    }
+
+    /// Attaches retained command details for the details view.
+    #[must_use]
+    pub fn with_details(mut self, details: CommandHistoryDetails) -> Self {
+        self.details = details;
+        self
+    }
+}
+
+/// Retained display details for one command-history row.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommandHistoryDetails {
+    record_id: u64,
+    title: String,
+    source: String,
+    status: String,
+    command_line: String,
+    summary: String,
+    operation_id: Option<String>,
+    duration: Option<Duration>,
+    exit_status: Option<ExitStatusSummary>,
+    spawn_error: Option<String>,
+    stdout: StreamSummary,
+    stderr: StreamSummary,
+}
+
+impl CommandHistoryDetails {
+    fn from_display_parts(
+        record_id: u64,
+        title: impl Into<String>,
+        command_line: impl Into<String>,
+        summary: impl Into<String>,
+    ) -> Self {
+        Self {
+            record_id,
+            title: title.into(),
+            source: String::new(),
+            status: String::new(),
+            command_line: command_line.into(),
+            summary: summary.into(),
+            operation_id: None,
+            duration: None,
+            exit_status: None,
+            spawn_error: None,
+            stdout: StreamSummary::empty(),
+            stderr: StreamSummary::empty(),
+        }
+    }
+
+    fn from_record(record: &CommandRecord) -> Self {
+        Self {
+            record_id: record.id.get(),
+            title: command_label(record),
+            source: source_label(record.source.view.clone(), record.source.action.clone()),
+            status: status_marker(record).to_owned(),
+            command_line: record.command.process_preview(),
+            summary: result_summary(record),
+            operation_id: record.operation_id.clone(),
+            duration: record.timing.duration,
+            exit_status: record.result.exit_status,
+            spawn_error: record.result.spawn_error.clone(),
+            stdout: record.result.stdout.clone(),
+            stderr: record.result.stderr.clone(),
+        }
+    }
+
+    /// Converts retained details into a read-only rendered snapshot.
+    #[must_use]
+    pub fn into_snapshot(self) -> InspectionSnapshot {
+        let target = format!("command {}", self.record_id);
+        InspectionSnapshot::new(target, self.rendered())
+            .with_title(format!("Command {}", self.record_id))
+    }
+
+    fn rendered(&self) -> String {
+        let mut rendered = String::new();
+        push_field(
+            &mut rendered,
+            "Command",
+            command_or_title(&self.command_line, &self.title),
+        );
+        push_field(&mut rendered, "Source", fallback(&self.source, "unknown"));
+        push_field(&mut rendered, "Status", self.status_label());
+        push_field(&mut rendered, "Duration", duration_label(self.duration));
+        push_field(
+            &mut rendered,
+            "Operation",
+            self.operation_id.as_deref().unwrap_or("none"),
+        );
+        if !self.summary.is_empty() {
+            push_field(&mut rendered, "Summary", &self.summary);
+        }
+        if let Some(error) = &self.spawn_error {
+            push_section(&mut rendered, "Spawn error", error);
+        }
+        push_stream_section(&mut rendered, "Stdout", &self.stdout);
+        push_stream_section(&mut rendered, "Stderr", &self.stderr);
+        rendered
+    }
+
+    fn status_label(&self) -> String {
+        if let Some(status) = self.exit_status {
+            if status.success {
+                return "success".to_owned();
+            }
+            if let Some(code) = status.code {
+                return format!("exit {code}");
+            }
+            if let Some(signal) = status.signal {
+                return format!("signal {signal}");
+            }
+            return "failed".to_owned();
+        }
+        if self.spawn_error.is_some() {
+            return "spawn error".to_owned();
+        }
+        fallback(&self.status, "running").to_owned()
     }
 }
 
@@ -151,6 +280,11 @@ pub enum CommandHistoryActionResult {
     },
     /// Open the operation log fallback when the selected command has no operation id.
     OpenOperationLog,
+    /// Open retained details for the selected command.
+    OpenDetails {
+        /// Details snapshot for a selected command record.
+        details: CommandHistoryDetails,
+    },
     /// Copy the selected command line.
     CopyCommand {
         /// Exact redacted process command line selected for copying.
@@ -182,6 +316,8 @@ pub enum CommandHistoryAction {
     Refresh,
     /// Open the recorded operation, or the operation log fallback when no id is available.
     OpenOperation,
+    /// Open retained details for the selected command.
+    OpenDetails,
     /// Copy the selected command line.
     CopyCommand,
     /// Toggle mode-specific help.
@@ -281,6 +417,12 @@ impl CommandHistoryView {
                         )
                     })
             }
+            CommandHistoryAction::OpenDetails => self
+                .selected_row()
+                .map(|row| CommandHistoryActionResult::OpenDetails {
+                    details: row.details.clone(),
+                })
+                .unwrap_or(CommandHistoryActionResult::Continue),
             CommandHistoryAction::CopyCommand => self
                 .selected_row()
                 .and_then(|row| {
@@ -564,6 +706,74 @@ fn compact(text: impl AsRef<str>) -> String {
     truncated
 }
 
+fn push_field(rendered: &mut String, label: &str, value: impl AsRef<str>) {
+    rendered.push_str(label);
+    rendered.push_str(": ");
+    rendered.push_str(value.as_ref());
+    rendered.push('\n');
+}
+
+fn push_section(rendered: &mut String, label: &str, body: &str) {
+    rendered.push('\n');
+    rendered.push_str(label);
+    rendered.push_str(":\n");
+    rendered.push_str(body);
+    if !body.ends_with('\n') {
+        rendered.push('\n');
+    }
+}
+
+fn push_stream_section(rendered: &mut String, label: &str, stream: &StreamSummary) {
+    rendered.push('\n');
+    rendered.push_str(label);
+    rendered.push_str(":\n");
+    push_field(rendered, "  bytes", stream.byte_len.to_string());
+    push_field(rendered, "  lines", stream.line_count.to_string());
+    push_field(rendered, "  truncated", bool_label(stream.truncated));
+    push_field(rendered, "  redacted", bool_label(stream.redacted));
+
+    if stream.snippet.is_empty() {
+        rendered.push_str("  <empty>\n");
+        return;
+    }
+
+    rendered.push('\n');
+    rendered.push_str(&stream.snippet);
+    if !stream.snippet.ends_with('\n') {
+        rendered.push('\n');
+    }
+}
+
+fn command_or_title<'a>(command_line: &'a str, title: &'a str) -> &'a str {
+    if command_line.is_empty() {
+        title
+    } else {
+        command_line
+    }
+}
+
+fn fallback<'a>(value: &'a str, fallback: &'a str) -> &'a str {
+    if value.is_empty() { fallback } else { value }
+}
+
+fn duration_label(duration: Option<Duration>) -> String {
+    duration.map_or_else(
+        || "unknown".to_owned(),
+        |duration| {
+            let millis = duration.as_millis();
+            if millis == 0 {
+                format!("{} us", duration.as_micros())
+            } else {
+                format!("{millis} ms")
+            }
+        },
+    )
+}
+
+const fn bool_label(value: bool) -> &'static str {
+    if value { "yes" } else { "no" }
+}
+
 fn clamp_index(index: Option<usize>, len: usize) -> Option<usize> {
     let index = index?;
     if len == 0 {
@@ -700,6 +910,40 @@ mod tests {
                 command_line: "jj --no-pager --color always log".to_owned()
             }
         );
+    }
+
+    #[test]
+    fn open_details_result_carries_selected_details() {
+        let snapshot = CommandHistorySnapshot::from_records(history_with_records().records());
+        let mut view = CommandHistoryView::new(snapshot);
+
+        let CommandHistoryActionResult::OpenDetails { details } =
+            view.apply(CommandHistoryAction::OpenDetails)
+        else {
+            panic!("expected details result");
+        };
+        let details = details.into_snapshot();
+
+        assert_eq!(details.title(), "Command 2");
+        assert_eq!(details.target(), "command 2");
+        assert!(
+            details
+                .rendered()
+                .contains("Command: jj --no-pager --color always status")
+        );
+        assert!(details.rendered().contains("Source: log status"));
+        assert!(details.rendered().contains("Status: exit 1"));
+        assert!(details.rendered().contains("Duration: 1 ms"));
+        assert!(details.rendered().contains("Operation: op-status"));
+        assert!(
+            details
+                .rendered()
+                .contains("Summary: exit 1: workspace is stale")
+        );
+        assert!(details.rendered().contains("Stdout:"));
+        assert!(details.rendered().contains("<empty>"));
+        assert!(details.rendered().contains("Stderr:"));
+        assert!(details.rendered().contains("workspace is stale"));
     }
 
     #[test]

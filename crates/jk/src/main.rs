@@ -528,6 +528,9 @@ enum AppView {
     CommandHistory {
         view: CommandHistoryView,
     },
+    CommandHistoryDetails {
+        view: RenderedView,
+    },
     OperationLog {
         view: OperationLogView,
     },
@@ -865,7 +868,8 @@ fn run_terminal(
                     }
                     _ => view.render(frame),
                 },
-                AppView::WorkspaceStatus { view, .. }
+                AppView::CommandHistoryDetails { view }
+                | AppView::WorkspaceStatus { view, .. }
                 | AppView::WorkspaceDiff { view, .. }
                 | AppView::OperationShow { view, .. }
                 | AppView::OperationDiff { view, .. } => match &mode {
@@ -923,6 +927,9 @@ fn run_terminal(
                                 push_selected_operation_show(&mut state, operation_source);
                             } else if matches!(state.views.active(), AppView::Workspaces { .. }) {
                                 push_selected_workspace_status(&mut state, workspaces_source);
+                            } else if matches!(state.views.active(), AppView::CommandHistory { .. })
+                            {
+                                push_selected_command_history_details(&mut state);
                             } else {
                                 push_selected_show(&mut state, show_source);
                             }
@@ -1001,6 +1008,7 @@ fn run_terminal(
                                     | AppView::WorkspaceDiff { .. }
                                     | AppView::OperationShow { .. }
                                     | AppView::OperationDiff { .. }
+                                    | AppView::CommandHistoryDetails { .. }
                             ) =>
                         {
                             let mode = match state.views.active() {
@@ -1028,10 +1036,15 @@ fn run_terminal(
                                 AppView::OperationDiff { .. } => InputMode::InspectionSearch {
                                     query: String::new(),
                                 },
+                                AppView::CommandHistoryDetails { .. } => {
+                                    InputMode::InspectionSearch {
+                                        query: String::new(),
+                                    }
+                                }
                                 AppView::Log(_)
                                 | AppView::Workspaces { .. }
-                                | AppView::OperationLog { .. } => unreachable!(),
-                                AppView::CommandHistory { .. } => unreachable!(),
+                                | AppView::OperationLog { .. }
+                                | AppView::CommandHistory { .. } => unreachable!(),
                             };
                             state.modes.push(mode);
                             needs_redraw = true;
@@ -1608,7 +1621,8 @@ fn active_binding_context(state: &AppState) -> BindingContext {
         | AppView::WorkspaceStatus { .. }
         | AppView::WorkspaceDiff { .. }
         | AppView::OperationShow { .. }
-        | AppView::OperationDiff { .. } => BindingContext::Inspection,
+        | AppView::OperationDiff { .. }
+        | AppView::CommandHistoryDetails { .. } => BindingContext::Inspection,
         AppView::Workspaces { .. } => BindingContext::Workspaces,
         AppView::CommandHistory { .. } => BindingContext::CommandHistory,
         AppView::OperationLog { .. } => BindingContext::OperationLog,
@@ -1905,7 +1919,8 @@ fn apply_search_submit(state: &mut AppState, action: SearchSubmit) {
         (AppView::WorkspaceStatus { view, .. }, SearchSubmit::Inspection(query))
         | (AppView::WorkspaceDiff { view, .. }, SearchSubmit::Inspection(query))
         | (AppView::OperationShow { view, .. }, SearchSubmit::Inspection(query))
-        | (AppView::OperationDiff { view, .. }, SearchSubmit::Inspection(query)) => {
+        | (AppView::OperationDiff { view, .. }, SearchSubmit::Inspection(query))
+        | (AppView::CommandHistoryDetails { view }, SearchSubmit::Inspection(query)) => {
             let _ = view.apply(RenderedAction::Search(query));
         }
         _ => {}
@@ -1946,7 +1961,8 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
         AppView::WorkspaceStatus { view, .. }
         | AppView::WorkspaceDiff { view, .. }
         | AppView::OperationShow { view, .. }
-        | AppView::OperationDiff { view, .. } => {
+        | AppView::OperationDiff { view, .. }
+        | AppView::CommandHistoryDetails { view } => {
             let action = match direction {
                 SearchDirection::Next => RenderedAction::SearchNext,
                 SearchDirection::Previous => RenderedAction::SearchPrevious,
@@ -2001,6 +2017,7 @@ fn apply_action(
                 apply_workspaces_action(view, history, workspaces_source, action)
             }
             AppView::CommandHistory { view } => apply_command_history_action(view, history, action),
+            AppView::CommandHistoryDetails { view } => apply_static_rendered_action(view, action),
             AppView::OperationLog { view } => {
                 apply_operation_log_action(view, history, operation_source, action)
             }
@@ -2225,6 +2242,21 @@ fn open_command_history(state: &mut AppState) {
 
 fn command_history_snapshot(history: &CommandHistory) -> CommandHistorySnapshot {
     CommandHistorySnapshot::from_records(history.records())
+}
+
+fn push_selected_command_history_details(state: &mut AppState) {
+    let action = {
+        let AppView::CommandHistory { view } = state.views.active_mut() else {
+            return;
+        };
+        view.apply(CommandHistoryAction::OpenDetails)
+    };
+
+    if let CommandHistoryActionResult::OpenDetails { details } = action {
+        state.views.push(AppView::CommandHistoryDetails {
+            view: RenderedView::new(details.into_snapshot()),
+        });
+    }
 }
 
 fn open_command_history_operation(state: &mut AppState, operation_source: &JjOperation) {
@@ -2580,6 +2612,11 @@ fn apply_command_history_action(
 
     match view.apply(history_action) {
         CommandHistoryActionResult::Refresh => view.refresh(command_history_snapshot(history)),
+        CommandHistoryActionResult::OpenDetails { details } => {
+            return AppTransition::Push(AppView::CommandHistoryDetails {
+                view: RenderedView::new(details.into_snapshot()),
+            });
+        }
         CommandHistoryActionResult::ReturnBack => return AppTransition::PopView,
         CommandHistoryActionResult::Quit => return AppTransition::Quit,
         CommandHistoryActionResult::Continue => {}
@@ -2762,6 +2799,41 @@ fn apply_operation_rendered_action(
     match view.apply(rendered_action) {
         RenderedActionResult::Refresh => {
             refresh_operation_rendered(view, query, history, operation_source, source_view);
+        }
+        RenderedActionResult::ReturnToLog => return AppTransition::PopView,
+        RenderedActionResult::Quit => return AppTransition::Quit,
+        RenderedActionResult::Continue => {}
+        _ => {}
+    }
+
+    AppTransition::Continue
+}
+
+/// Applies an action while a static rendered in-memory view is active.
+fn apply_static_rendered_action(
+    view: &mut RenderedView,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let rendered_action = match action {
+        jk_tui::log_view::LogAction::Previous => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::Next => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::ScrollPreviousLine => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::ScrollNextLine => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::PagePrevious => RenderedAction::PagePrevious,
+        jk_tui::log_view::LogAction::PageNext => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ToggleMark => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ClearMarks => RenderedAction::Ignore,
+        jk_tui::log_view::LogAction::First => RenderedAction::First,
+        jk_tui::log_view::LogAction::Last => RenderedAction::Last,
+        jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
+        jk_tui::log_view::LogAction::Refresh => RenderedAction::Refresh,
+        jk_tui::log_view::LogAction::Quit => RenderedAction::Quit,
+        _ => RenderedAction::ReturnToLog,
+    };
+
+    match view.apply(rendered_action) {
+        RenderedActionResult::Refresh => {
+            view.show_error("Command details are retained in memory; refresh Command History.");
         }
         RenderedActionResult::ReturnToLog => return AppTransition::PopView,
         RenderedActionResult::Quit => return AppTransition::Quit,
@@ -3402,6 +3474,52 @@ mod tests {
         );
 
         assert!(matches!(transition, AppTransition::Continue));
+    }
+
+    #[test]
+    fn command_history_enter_pushes_details_view() {
+        let mut history = CommandHistory::new(4);
+        append_history_record_with_operation_id(
+            &mut history,
+            jk_core::JjCommandSpec::render_read_only(["status"]),
+            SourceView::Log,
+            SourceAction::OpenStatus,
+            Some("op-status"),
+        );
+        let mut state = AppState::with_history(
+            AppView::CommandHistory {
+                view: CommandHistoryView::new(command_history_snapshot(&history)),
+            },
+            history,
+        );
+
+        push_selected_command_history_details(&mut state);
+
+        assert_eq!(state.views.views.len(), 2);
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandHistoryDetails { .. }
+        ));
+    }
+
+    #[test]
+    fn static_command_details_refresh_shows_local_status() {
+        let snapshot = jk_core::InspectionSnapshot::new("command 1", "Command: jj status\n")
+            .with_title("Command 1");
+        let mut view = RenderedView::new(snapshot);
+
+        let transition =
+            apply_static_rendered_action(&mut view, jk_tui::log_view::LogAction::Refresh);
+
+        assert!(matches!(transition, AppTransition::Continue));
+        let backend = TestBackend::new(92, 4);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        assert!(buffer_line(terminal.backend().buffer(), 3).contains("retained in memory"));
     }
 
     #[test]

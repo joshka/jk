@@ -38,6 +38,7 @@ enum ActionId {
     OpenOperation,
     OpenOperationLog,
     OpenCommandHistory,
+    OpenCommandDetails,
     CopyCommand,
     Undo,
     Redo,
@@ -77,6 +78,7 @@ impl ActionId {
             Self::OpenOperation => "Open operation",
             Self::OpenOperationLog => "Open operation log",
             Self::OpenCommandHistory => "Open command history",
+            Self::OpenCommandDetails => "Open command details",
             Self::CopyCommand => "Copy command",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
@@ -451,19 +453,27 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
 ];
 
 const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(
+        ActionId::OpenCommandDetails,
+        "enter",
+        "open command details",
+    )
+    .with_family(CommandFamily::History)
+    .with_aliases(&["details", "output", "stdout", "stderr", "argv"])
+    .with_hotbar(2, "enter details"),
     KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "command", "current row"])
-        .with_hotbar(2, "j/k move"),
+        .with_hotbar(3, "j/k move"),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["page", "pagedown", "pageup"])
-        .with_hotbar(3, "space/b page"),
+        .with_hotbar(4, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::Refresh, "r", "refresh history")
         .with_family(CommandFamily::Refresh)
-        .with_hotbar(4, "r refresh"),
+        .with_hotbar(5, "r refresh"),
     KeyBinding::new(
         ActionId::OpenOperation,
         "o",
@@ -471,11 +481,11 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::JjOperation)
     .with_aliases(&["operation", "op log", "recovery", "selected command"])
-    .with_hotbar(5, "o operation"),
+    .with_hotbar(6, "o operation"),
     KeyBinding::new(ActionId::CopyCommand, "y", "copy selected command")
         .with_family(CommandFamily::History)
         .with_aliases(&["copy", "clipboard", "command", "argv"])
-        .with_hotbar(6, "y copy"),
+        .with_hotbar(7, "y copy"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "refresh command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
@@ -486,13 +496,13 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::Navigation)
     .with_aliases(&["back", "return", "previous"])
-    .with_hotbar(7, "Esc back"),
+    .with_hotbar(8, "Esc back"),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(8, "q quit")
+        .with_hotbar(9, "q quit")
         .hotbar_only(),
 ];
 
@@ -851,7 +861,7 @@ mod tests {
     fn command_history_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::CommandHistory),
-            "? help  j/k move  space/b page  r refresh  o operation  y copy  Esc back  q quit"
+            "? help  enter details  j/k move  space/b page  r refresh  o operation  y copy  Esc back  q quit"
         );
     }
 
@@ -1052,6 +1062,7 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::CommandHistory),
             vec![
+                "enter                open command details",
                 "j/k or arrows        move selection",
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
