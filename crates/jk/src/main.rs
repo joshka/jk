@@ -2259,10 +2259,7 @@ fn move_diff_file_list_selection(state: &mut AppState, direction: FileListMove) 
         return;
     }
 
-    match direction {
-        FileListMove::Previous => *selected = selected.saturating_sub(1),
-        FileListMove::Next => *selected = (*selected + 1).min(row_count - 1),
-    }
+    *selected = wrapped_selection(*selected, row_count, direction);
 }
 
 fn active_diff_file_count(state: &AppState) -> usize {
@@ -2359,8 +2356,18 @@ fn open_view_options(state: &mut AppState) {
 
     state.modes.push(InputMode::ViewOptions {
         context: active_binding_context(state),
-        selected: 0,
+        selected: active_view_option_index(state),
     });
+}
+
+fn active_view_option_index(state: &AppState) -> usize {
+    match state.views.active() {
+        AppView::Diff { query, .. } => DIFF_VIEW_OPTION_ROWS
+            .iter()
+            .position(|row| *row == ViewOptionRow::DiffFormat(query.format()))
+            .unwrap_or_default(),
+        _ => 0,
+    }
 }
 
 fn active_binding_context(state: &AppState) -> BindingContext {
@@ -2447,10 +2454,7 @@ fn move_command_discovery_selection(state: &mut AppState, direction: DiscoveryMo
         return;
     }
 
-    match direction {
-        DiscoveryMove::Previous => *selected = selected.saturating_sub(1),
-        DiscoveryMove::Next => *selected = (*selected + 1).min(row_count - 1),
-    }
+    *selected = wrapped_selection(*selected, row_count, direction);
 }
 
 fn clamp_command_discovery_selection(context: BindingContext, query: &str, selected: &mut usize) {
@@ -2495,10 +2499,7 @@ fn move_view_options_selection(state: &mut AppState, direction: ViewOptionsMove)
         return;
     }
 
-    match direction {
-        ViewOptionsMove::Previous => *selected = selected.saturating_sub(1),
-        ViewOptionsMove::Next => *selected = (*selected + 1).min(row_count - 1),
-    }
+    *selected = wrapped_selection(*selected, row_count, direction);
 }
 
 fn selected_view_option(state: &AppState) -> Option<ViewOptionRow> {
@@ -2645,9 +2646,51 @@ fn move_template_selection(state: &mut AppState, direction: TemplateMove) {
         return;
     }
 
-    match direction {
-        TemplateMove::Previous => *selected = selected.saturating_sub(1),
-        TemplateMove::Next => *selected = (*selected + 1).min(options.len() - 1),
+    *selected = wrapped_selection(*selected, options.len(), direction);
+}
+
+trait MenuMoveDirection {
+    fn is_previous(self) -> bool;
+}
+
+impl MenuMoveDirection for DiscoveryMove {
+    fn is_previous(self) -> bool {
+        matches!(self, Self::Previous)
+    }
+}
+
+impl MenuMoveDirection for FileListMove {
+    fn is_previous(self) -> bool {
+        matches!(self, Self::Previous)
+    }
+}
+
+impl MenuMoveDirection for ViewOptionsMove {
+    fn is_previous(self) -> bool {
+        matches!(self, Self::Previous)
+    }
+}
+
+impl MenuMoveDirection for TemplateMove {
+    fn is_previous(self) -> bool {
+        matches!(self, Self::Previous)
+    }
+}
+
+fn wrapped_selection(
+    selected: usize,
+    row_count: usize,
+    direction: impl MenuMoveDirection,
+) -> usize {
+    if row_count == 0 {
+        return 0;
+    }
+
+    let selected = selected.min(row_count - 1);
+    if direction.is_previous() {
+        selected.checked_sub(1).unwrap_or(row_count - 1)
+    } else {
+        (selected + 1) % row_count
     }
 }
 
@@ -4832,22 +4875,33 @@ mod tests {
     }
 
     #[test]
-    fn command_discovery_navigation_clamps_to_visible_rows() {
+    fn command_discovery_navigation_wraps_between_edges() {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.modes.push(InputMode::CommandDiscovery {
             context: BindingContext::Log,
-            query: "jj show".to_owned(),
+            query: String::new(),
             selected: 0,
         });
+        let row_count = filtered_discovery_len(BindingContext::Log, "");
 
-        move_command_discovery_selection(&mut state, DiscoveryMove::Next);
         move_command_discovery_selection(&mut state, DiscoveryMove::Previous);
 
         assert_eq!(
             state.modes.active(),
             Some(&InputMode::CommandDiscovery {
                 context: BindingContext::Log,
-                query: "jj show".to_owned(),
+                query: String::new(),
+                selected: row_count - 1,
+            })
+        );
+
+        move_command_discovery_selection(&mut state, DiscoveryMove::Next);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::CommandDiscovery {
+                context: BindingContext::Log,
+                query: String::new(),
                 selected: 0,
             })
         );
@@ -5521,6 +5575,56 @@ mod tests {
     }
 
     #[test]
+    fn view_options_opens_on_active_diff_format() {
+        let mut state = AppState::new(AppView::Diff {
+            view: diff_view("aaa"),
+            query: DiffQuery::Revision {
+                rev: "aaa".to_owned(),
+                format: DiffFormat::Summary,
+            },
+        });
+
+        open_view_options(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ViewOptions {
+                context: BindingContext::Diff,
+                selected: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn view_options_navigation_wraps_between_edges() {
+        let mut state = AppState::new(diff_app_view("aaa"));
+        state.modes.push(InputMode::ViewOptions {
+            context: BindingContext::Diff,
+            selected: 0,
+        });
+
+        move_view_options_selection(&mut state, ViewOptionsMove::Previous);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ViewOptions {
+                context: BindingContext::Diff,
+                selected: DIFF_VIEW_OPTION_ROWS.len() - 1,
+            })
+        );
+
+        move_view_options_selection(&mut state, ViewOptionsMove::Next);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ViewOptions {
+                context: BindingContext::Diff,
+                selected: 0,
+            })
+        );
+    }
+
+    #[test]
     fn diff_file_list_opens_with_current_file_selected() {
         let mut view = real_diff_view("aaa");
         view.select_file_index(1);
@@ -5534,6 +5638,29 @@ mod tests {
         assert_eq!(
             state.modes.active(),
             Some(&InputMode::DiffFileList { selected: 1 })
+        );
+    }
+
+    #[test]
+    fn diff_file_list_navigation_wraps_between_edges() {
+        let mut state = AppState::new(AppView::Diff {
+            view: real_diff_view("aaa"),
+            query: diff_query("aaa"),
+        });
+        state.modes.push(InputMode::DiffFileList { selected: 0 });
+
+        move_diff_file_list_selection(&mut state, FileListMove::Previous);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::DiffFileList { selected: 1 })
+        );
+
+        move_diff_file_list_selection(&mut state, FileListMove::Next);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::DiffFileList { selected: 0 })
         );
     }
 
@@ -5615,6 +5742,36 @@ mod tests {
         assert_eq!(
             state.modes.active(),
             Some(&InputMode::LogTemplate { options, selected })
+        );
+    }
+
+    #[test]
+    fn template_selection_navigation_wraps_between_edges() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let options = JjLog::default().template_options();
+        state.modes.push(InputMode::LogTemplate {
+            options: options.clone(),
+            selected: 0,
+        });
+
+        move_template_selection(&mut state, TemplateMove::Previous);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::LogTemplate {
+                options: options.clone(),
+                selected: options.len() - 1,
+            })
+        );
+
+        move_template_selection(&mut state, TemplateMove::Next);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::LogTemplate {
+                options,
+                selected: 0,
+            })
         );
     }
 

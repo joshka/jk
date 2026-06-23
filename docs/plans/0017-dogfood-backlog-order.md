@@ -35,6 +35,9 @@ then broaden into mutation flows, selectors, run options, and generated help.
    in multi-file diffs.
 1. Done: add diff file list overlay. Pressing `f` from a diff shows files in the current diff,
    preserves the active file as the selected row, and jumps to the chosen file on Enter.
+1. Done: polish selector menus and help ordering. View menus now wrap at the edges, View Options
+   opens on the active diff format, and generated help reads in task-first order instead of raw
+   registry order.
 
 ## First Useful Mutation Sprint
 

@@ -397,6 +397,10 @@ movement uses `[ ]` and `{ }`.
 `?` opens generated contextual help. The help content and hotbar are generated from the active
 keymap and view state. If a keybinding changes, help changes automatically.
 
+Help rows should be ordered for the reader: primary view actions first, then mutation, recovery, and
+command actions, then view/refresh controls, navigation, and close/help commands. The order should
+not merely mirror implementation or dispatch registration order.
+
 Help should also become searchable. The help surface and command palette are related but distinct:
 
 - `?` explains what is currently possible.

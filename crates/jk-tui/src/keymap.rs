@@ -244,44 +244,13 @@ impl KeyBinding {
 }
 
 const LOG_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
-        .with_family(CommandFamily::Navigation)
-        .with_aliases(&["selection", "current row"])
-        .with_hotbar(11, "j/k move"),
-    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
-        .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Mark, "space", "mark/unmark selected revision")
-        .with_family(CommandFamily::Mark)
-        .with_aliases(&["selected", "revision", "toggle"])
-        .with_hotbar(9, "space mark"),
-    KeyBinding::new(
-        ActionId::ClearMarks,
-        "c",
-        "clear revision marks when marks exist",
-    )
-    .with_family(CommandFamily::Mark)
-    .with_aliases(&["clear", "unmark", "selected", "revision"])
-    .with_hotbar(10, "c clear"),
-    KeyBinding::new(ActionId::Page, "b, Ctrl-f/b, PgUp/Dn", "page down/up")
-        .with_family(CommandFamily::Navigation)
-        .with_aliases(&["page", "pagedown", "pageup"]),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
-        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::OpenShow, "enter", "open selected-change show")
         .with_family(CommandFamily::JjShow)
         .with_aliases(&["details", "inspect"])
         .with_hotbar(4, "enter show"),
-    KeyBinding::new(ActionId::Expand, "right, l", "expand selected change")
-        .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Collapse, "left, h", "collapse selected change")
-        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff")
         .with_family(CommandFamily::JjDiff)
         .with_hotbar(5, "d diff"),
-    KeyBinding::new(ActionId::OpenDescribe, "m", "describe selected revision")
-        .with_family(CommandFamily::JjDescribe)
-        .with_aliases(&["message", "description", "mutation", "preview"])
-        .with_hotbar(6, "m describe"),
     KeyBinding::new(ActionId::OpenEvolog, "v", "open selected-change evolog")
         .with_family(CommandFamily::JjEvolog)
         .with_aliases(&[
@@ -298,27 +267,43 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenOperationLog, "o", "open operation log")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["operation", "op log", "undo", "redo", "recovery"])
-        .with_hotbar(9, "o ops"),
+        .with_hotbar(10, "o ops"),
+    KeyBinding::new(ActionId::OpenDescribe, "m", "describe selected revision")
+        .with_family(CommandFamily::JjDescribe)
+        .with_aliases(&["message", "description", "mutation", "preview"])
+        .with_hotbar(6, "m describe"),
     KeyBinding::new(ActionId::NewChange, "n", "preview jj new")
         .with_family(CommandFamily::JjNew)
         .with_aliases(&["new", "change", "parent", "mutation", "preview"])
-        .with_hotbar(12, "n new"),
+        .with_hotbar(15, "n new"),
     KeyBinding::new(ActionId::EditChange, "e", "preview jj edit")
         .with_family(CommandFamily::JjEdit)
         .with_aliases(&["edit", "checkout", "working copy", "mutation", "preview"])
-        .with_hotbar(14, "e edit"),
+        .with_hotbar(17, "e edit"),
     KeyBinding::new(ActionId::Abandon, "a", "preview jj abandon")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["abandon", "delete", "destructive", "mutation", "preview"])
-        .with_hotbar(13, "a abandon"),
+        .with_hotbar(16, "a abandon"),
     KeyBinding::new(ActionId::Undo, "u", "preview jj undo")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["undo", "operation", "recovery"])
-        .with_hotbar(10, "u undo"),
+        .with_hotbar(12, "u undo"),
     KeyBinding::new(ActionId::Redo, "U", "preview jj redo")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["redo", "operation", "recovery"])
-        .with_hotbar(11, "U redo"),
+        .with_hotbar(14, "U redo"),
+    KeyBinding::new(ActionId::Mark, "space", "mark/unmark selected revision")
+        .with_family(CommandFamily::Mark)
+        .with_aliases(&["selected", "revision", "toggle"])
+        .with_hotbar(9, "space mark"),
+    KeyBinding::new(
+        ActionId::ClearMarks,
+        "c",
+        "clear revision marks when marks exist",
+    )
+    .with_family(CommandFamily::Mark)
+    .with_aliases(&["clear", "unmark", "selected", "revision"])
+    .with_hotbar(11, "c clear"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
@@ -328,7 +313,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
-        .with_hotbar(15, "V options"),
+        .with_hotbar(18, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
@@ -336,30 +321,35 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["home", "current screen"])
         .with_hotbar(2, "H home  L log"),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["selection", "current row"])
+        .with_hotbar(13, "j/k move"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::Page, "b, Ctrl-f/b, PgUp/Dn", "page down/up")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["page", "pagedown", "pageup"]),
+    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::Expand, "right, l", "expand selected change")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::Collapse, "left, h", "collapse selected change")
+        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(16, "q quit")
+        .with_hotbar(19, "q quit")
         .hotbar_only(),
 ];
 
 const DIFF_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
-        .with_family(CommandFamily::Navigation)
-        .with_hotbar(4, "j/k line"),
-    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
-        .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
-        .with_family(CommandFamily::Navigation)
-        .with_hotbar(5, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
-        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::OpenFileList, "f", "open file list")
         .with_family(CommandFamily::File)
         .with_aliases(&["files", "paths", "jump", "file list"])
-        .with_hotbar(4, "f files"),
+        .with_hotbar(5, "f files"),
     KeyBinding::new(ActionId::File, "[ / ]", "previous/next file").with_family(CommandFamily::File),
     KeyBinding::new(ActionId::Hunk, "{ / }", "previous/next hunk").with_family(CommandFamily::Hunk),
     KeyBinding::new(ActionId::FoldFile, "h / l", "fold/unfold current file")
@@ -390,6 +380,16 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
+        .with_family(CommandFamily::Navigation)
+        .with_hotbar(4, "j/k line"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+        .with_family(CommandFamily::Navigation)
+        .with_hotbar(6, "space/b page"),
+    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::ReturnToLog, "H / L", "go back")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
@@ -398,21 +398,11 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(6, "q quit")
+        .with_hotbar(7, "q quit")
         .hotbar_only(),
 ];
 
 const INSPECTION_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
-        .with_family(CommandFamily::Navigation)
-        .with_hotbar(4, "j/k line"),
-    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
-        .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
-        .with_family(CommandFamily::Navigation)
-        .with_hotbar(5, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
-        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::Search, "/, n, N", "search, next, previous")
         .with_family(CommandFamily::Search)
         .with_aliases(&["find", "filter", "details", "status"]),
@@ -429,6 +419,16 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
+        .with_family(CommandFamily::Navigation)
+        .with_hotbar(4, "j/k line"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+        .with_family(CommandFamily::Navigation)
+        .with_hotbar(5, "space/b page"),
+    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::ReturnToLog, "H / L", "go back")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
@@ -442,12 +442,6 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
 ];
 
 const WORKSPACES_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
-        .with_family(CommandFamily::Navigation)
-        .with_aliases(&["selection", "workspace", "current row"])
-        .with_hotbar(5, "j/k move"),
-    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
-        .with_family(CommandFamily::Navigation),
     KeyBinding::new(
         ActionId::OpenStatus,
         "enter, s",
@@ -467,7 +461,7 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::JjWorkspace)
     .with_aliases(&["update", "stale", "workspace", "selected", "refresh"])
-    .with_hotbar(5, "u update-stale"),
+    .with_hotbar(6, "u update-stale"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
@@ -482,6 +476,12 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::Refresh)
         .with_aliases(&["reload", "workspace"])
         .with_hotbar(2, "r refresh"),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["selection", "workspace", "current row"])
+        .with_hotbar(5, "j/k move"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
+        .with_family(CommandFamily::Navigation),
     KeyBinding::new(
         ActionId::ReturnBack,
         "Backspace, Esc, H/L",
@@ -508,19 +508,6 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     .with_family(CommandFamily::History)
     .with_aliases(&["details", "output", "stdout", "stderr", "argv"])
     .with_hotbar(2, "enter details"),
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
-        .with_family(CommandFamily::Navigation)
-        .with_aliases(&["selection", "command", "current row"])
-        .with_hotbar(3, "j/k move"),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
-        .with_family(CommandFamily::Navigation)
-        .with_aliases(&["page", "pagedown", "pageup"])
-        .with_hotbar(4, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
-        .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Refresh, "r", "refresh history")
-        .with_family(CommandFamily::Refresh)
-        .with_hotbar(5, "r refresh"),
     KeyBinding::new(
         ActionId::OpenOperation,
         "o",
@@ -533,12 +520,25 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::History)
         .with_aliases(&["copy", "clipboard", "command", "argv"])
         .with_hotbar(7, "y copy"),
+    KeyBinding::new(ActionId::Refresh, "r", "refresh history")
+        .with_family(CommandFamily::Refresh)
+        .with_hotbar(5, "r refresh"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "refresh command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["selection", "command", "current row"])
+        .with_hotbar(3, "j/k move"),
+    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["page", "pagedown", "pageup"])
+        .with_hotbar(4, "space/b page"),
+    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_family(CommandFamily::Navigation),
     KeyBinding::new(
         ActionId::ReturnBack,
         "Backspace, Esc",
@@ -557,16 +557,6 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
 ];
 
 const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
-        .with_family(CommandFamily::Navigation)
-        .with_aliases(&["selection", "operation", "current row"])
-        .with_hotbar(4, "j/k move"),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
-        .with_family(CommandFamily::Navigation)
-        .with_aliases(&["page", "pagedown", "pageup"])
-        .with_hotbar(5, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
-        .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::OpenShow, "enter", "open selected operation show")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["show", "details", "inspect", "operation"])
@@ -582,6 +572,16 @@ const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["selection", "operation", "current row"])
+        .with_hotbar(4, "j/k move"),
+    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["page", "pagedown", "pageup"])
+        .with_hotbar(5, "space/b page"),
+    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_family(CommandFamily::Navigation),
     KeyBinding::new(
         ActionId::ReturnBack,
         "Backspace, Esc",
@@ -1025,30 +1025,30 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::Log),
             vec![
-                "j/k or arrows        move selection",
-                "Ctrl-j/k             scroll one line",
-                "space                mark/unmark selected revision",
-                "c                    clear revision marks when marks exist",
-                "b, Ctrl-f/b, PgUp/Dn page down/up",
-                "g/G or Home/End      jump to top/bottom",
                 "enter                open selected-change show",
-                "right, l             expand selected change",
-                "left, h              collapse selected change",
                 "d                    open selected-change diff",
-                "m                    describe selected revision",
                 "v                    open selected-change evolog",
                 "s                    open repository status",
                 "o                    open operation log",
+                "m                    describe selected revision",
                 "n                    preview jj new",
                 "e                    preview jj edit",
                 "a                    preview jj abandon",
                 "u                    preview jj undo",
                 "U                    preview jj redo",
+                "space                mark/unmark selected revision",
+                "c                    clear revision marks when marks exist",
                 "C                    open command history",
                 ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh",
                 "H / L                home command / jj log",
+                "j/k or arrows        move selection",
+                "Ctrl-j/k             scroll one line",
+                "b, Ctrl-f/b, PgUp/Dn page down/up",
+                "g/G or Home/End      jump to top/bottom",
+                "right, l             expand selected change",
+                "left, h              collapse selected change",
                 "?, q, Esc            close help",
             ]
         );
@@ -1059,10 +1059,6 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::Diff),
             vec![
-                "j/k or arrows        scroll one line",
-                "Ctrl-j/k             scroll one line",
-                "space / b, Ctrl-f/b  page down/up",
-                "g/G or Home/End      jump to top/bottom",
                 "f                    open file list",
                 "[ / ]                previous/next file",
                 "{ / }                previous/next hunk",
@@ -1075,6 +1071,10 @@ mod tests {
                 ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh",
+                "j/k or arrows        scroll one line",
+                "Ctrl-j/k             scroll one line",
+                "space / b, Ctrl-f/b  page down/up",
+                "g/G or Home/End      jump to top/bottom",
                 "H / L                go back",
                 "?, q, Esc            close help",
             ]
@@ -1086,15 +1086,15 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::Inspection),
             vec![
-                "j/k or arrows        scroll one line",
-                "Ctrl-j/k             scroll one line",
-                "space / b, Ctrl-f/b  page down/up",
-                "g/G or Home/End      jump to top/bottom",
                 "/, n, N              search, next, previous",
                 "C                    open command history",
                 ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh",
+                "j/k or arrows        scroll one line",
+                "Ctrl-j/k             scroll one line",
+                "space / b, Ctrl-f/b  page down/up",
+                "g/G or Home/End      jump to top/bottom",
                 "H / L                go back",
                 "?, q, Esc            close help",
             ]
@@ -1106,8 +1106,6 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::Workspaces),
             vec![
-                "j/k or arrows        move selection",
-                "Ctrl-j/k             scroll one line",
                 "enter, s             open selected workspace status",
                 "d                    open selected workspace diff",
                 "u                    update selected stale workspace",
@@ -1115,6 +1113,8 @@ mod tests {
                 ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh workspaces",
+                "j/k or arrows        move selection",
+                "Ctrl-j/k             scroll one line",
                 "Backspace, Esc, H/L  return to previous view",
                 "?, q, Esc            close help",
             ]
@@ -1127,14 +1127,14 @@ mod tests {
             help_lines(BindingContext::CommandHistory),
             vec![
                 "enter                open command details",
+                "o                    open operation or operation log",
+                "y                    copy selected command",
+                "r                    refresh history",
+                "C                    refresh command history",
+                ":                    run jj command",
                 "j/k or arrows        move selection",
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
-                "r                    refresh history",
-                "o                    open operation or operation log",
-                "y                    copy selected command",
-                "C                    refresh command history",
-                ":                    run jj command",
                 "Backspace, Esc       return to previous view",
                 "?, q, Esc            close help",
             ]
@@ -1146,13 +1146,13 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::OperationLog),
             vec![
-                "j/k or arrows        move selection",
-                "space / b, Ctrl-f/b  page down/up",
-                "g/G or Home/End      jump to top/bottom",
                 "enter                open selected operation show",
                 "d                    open selected operation diff",
                 "r                    refresh operation log",
                 ":                    run jj command",
+                "j/k or arrows        move selection",
+                "space / b, Ctrl-f/b  page down/up",
+                "g/G or Home/End      jump to top/bottom",
                 "Backspace, Esc       return to previous view",
                 "?, q, Esc            close help",
             ]
