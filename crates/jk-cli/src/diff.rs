@@ -9,7 +9,7 @@ use thiserror::Error;
 
 #[cfg(test)]
 use crate::command::build_jj_command;
-use crate::command::run_jj_spec;
+use crate::command::{JjCommandRunner, SystemJjCommandRunner};
 
 const DIFF_COMMAND: &str = "diff";
 
@@ -101,13 +101,26 @@ impl JjDiff {
     ///
     /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
     pub fn load_query(&self, query: &DiffQuery) -> Result<DiffSnapshot, JjDiffError> {
+        self.load_query_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Loads the rendered diff for `query` using the provided command runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_query_with_runner(
+        &self,
+        query: &DiffQuery,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<DiffSnapshot, JjDiffError> {
         let spec = self.spec_for(query);
-        let rendered = Self::run(&spec)?;
+        let rendered = Self::run(runner, &spec)?;
         let stats_output;
         let stats = if query.format() == DiffFormat::Stat {
             &rendered
         } else {
-            stats_output = Self::run(&self.spec_for(&query.with_format(DiffFormat::Stat)))?;
+            stats_output = Self::run(runner, &self.spec_for(&query.with_format(DiffFormat::Stat)))?;
             &stats_output
         };
         let file_stats = parse_stats_lines(&stats);
@@ -152,8 +165,8 @@ impl JjDiff {
         }
     }
 
-    fn run(spec: &JjCommandSpec) -> Result<String, JjDiffError> {
-        let output = run_jj_spec(spec)?;
+    fn run(runner: &mut impl JjCommandRunner, spec: &JjCommandSpec) -> Result<String, JjDiffError> {
+        let output = runner.run(spec)?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {

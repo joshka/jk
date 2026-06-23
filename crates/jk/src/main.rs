@@ -11,10 +11,12 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
-    DiffFormat, DiffQuery, EvologQuery, JjDiff, JjEvolog, JjLog, JjLogCommand, JjShow, JjStatus,
-    JjWorkspaces, LogTemplateSelection, ShowQuery, StatusQuery, WorkspaceInspectionQuery,
-    WorkspaceListSnapshot, WorkspaceSummary,
+    DiffFormat, DiffQuery, EvologQuery, JjCommandRunner, JjDiff, JjEvolog, JjLog, JjLogCommand,
+    JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, RecordingJjCommandRunner, ShowQuery,
+    StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot,
+    WorkspaceSummary,
 };
+use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
 use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogAction, LogView};
@@ -171,21 +173,26 @@ fn main() -> Result<()> {
     let show_source = show_source(&args);
     let status_source = status_source(&args);
     let workspaces_source = workspaces_source(&args);
+    let mut history = CommandHistory::default();
     let app = match &args.command {
         Some(Command::Diff(diff_args)) => {
             let query = diff_args.query();
-            root_diff_view(&diff_source, query)
+            root_diff_view(&diff_source, query, &mut history)
         }
         Some(Command::Show(show_args)) => {
             let query = show_args.query();
-            root_show_view(&show_source, query)
+            root_show_view(&show_source, query, &mut history)
         }
         Some(Command::Status(status_args)) => {
             let query = status_args.query();
-            root_status_view(&status_source, query)
+            root_status_view(&status_source, query, &mut history)
         }
         Some(Command::Log(_)) | None => {
-            let entries = source.load()?;
+            let mut runner = recording_runner(
+                &mut history,
+                CommandSource::new(SourceView::Log, SourceAction::InitialLoad),
+            );
+            let entries = source.load_with_runner(&mut runner)?;
             AppView::Log(LogView::new(entries))
         }
     };
@@ -198,6 +205,7 @@ fn main() -> Result<()> {
         &show_source,
         &status_source,
         &workspaces_source,
+        history,
     )?;
     Ok(())
 }
@@ -286,8 +294,12 @@ fn workspaces_source(args: &Args) -> JjWorkspaces {
     }
 }
 
-fn root_diff_view(diff_source: &JjDiff, query: DiffQuery) -> AppView {
-    let snapshot = diff_source.load_query(&query);
+fn root_diff_view(diff_source: &JjDiff, query: DiffQuery, history: &mut CommandHistory) -> AppView {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Diff, SourceAction::InitialLoad),
+    );
+    let snapshot = diff_source.load_query_with_runner(&query, &mut runner);
     let diff = match snapshot {
         Ok(snapshot) => DiffView::new(snapshot),
         Err(error) => DiffView::from_error(
@@ -299,8 +311,12 @@ fn root_diff_view(diff_source: &JjDiff, query: DiffQuery) -> AppView {
     AppView::Diff { view: diff, query }
 }
 
-fn root_show_view(show_source: &JjShow, query: ShowQuery) -> AppView {
-    let snapshot = show_source.load_query(&query);
+fn root_show_view(show_source: &JjShow, query: ShowQuery, history: &mut CommandHistory) -> AppView {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Show, SourceAction::InitialLoad),
+    );
+    let snapshot = show_source.load_query_with_runner(&query, &mut runner);
     let show = match snapshot {
         Ok(snapshot) => RenderedView::new(snapshot),
         Err(error) => RenderedView::from_error(
@@ -312,8 +328,16 @@ fn root_show_view(show_source: &JjShow, query: ShowQuery) -> AppView {
     AppView::Show { view: show, query }
 }
 
-fn root_status_view(status_source: &JjStatus, query: StatusQuery) -> AppView {
-    let snapshot = status_source.load_query(&query);
+fn root_status_view(
+    status_source: &JjStatus,
+    query: StatusQuery,
+    history: &mut CommandHistory,
+) -> AppView {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Status, SourceAction::InitialLoad),
+    );
+    let snapshot = status_source.load_query_with_runner(&query, &mut runner);
     let status = match snapshot {
         Ok(snapshot) => RenderedView::new(snapshot),
         Err(error) => RenderedView::from_error(
@@ -356,6 +380,13 @@ fn workspace_view_row(workspace: WorkspaceSummary) -> WorkspaceViewRow {
     row
 }
 
+fn recording_runner(
+    history: &mut CommandHistory,
+    source: CommandSource,
+) -> RecordingJjCommandRunner<'_, SystemJjCommandRunner> {
+    RecordingJjCommandRunner::new(SystemJjCommandRunner, history, source)
+}
+
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum AppView {
@@ -394,14 +425,26 @@ enum AppView {
 struct AppState {
     views: ViewStack,
     modes: ModeStack,
+    history: CommandHistory,
 }
 
 impl AppState {
+    #[cfg(test)]
     fn new(root: AppView) -> Self {
+        Self::with_history(root, CommandHistory::default())
+    }
+
+    fn with_history(root: AppView, history: CommandHistory) -> Self {
         Self {
             views: ViewStack::new(root),
             modes: ModeStack::default(),
+            history,
         }
+    }
+
+    #[cfg(test)]
+    fn command_history(&self) -> &CommandHistory {
+        &self.history
     }
 }
 
@@ -479,6 +522,7 @@ fn run_terminal(
     show_source: &JjShow,
     status_source: &JjStatus,
     workspaces_source: &JjWorkspaces,
+    history: CommandHistory,
 ) -> Result<()> {
     // jj should keep configured colors even when the parent process was run by an agent or tool
     // that exports NO_COLOR.
@@ -486,7 +530,7 @@ fn run_terminal(
     let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
     let _terminal_restore = TerminalRestore;
     let mut needs_redraw = true;
-    let mut state = AppState::new(app);
+    let mut state = AppState::with_history(app, history);
 
     loop {
         if needs_redraw {
@@ -1376,27 +1420,42 @@ fn apply_action(
     workspaces_source: &JjWorkspaces,
     action: jk_tui::log_view::LogAction,
 ) -> AppLoop {
-    let transition = match state.views.active_mut() {
-        AppView::Log(log) => apply_log_action(log, source, diff_source, action),
-        AppView::Diff { view, query } => apply_diff_action(view, query, diff_source, action),
-        AppView::Show { view, query } => apply_show_action(view, query, show_source, action),
-        AppView::Evolog { view, query } => apply_evolog_action(view, query, evolog_source, action),
-        AppView::Status { view, query } => apply_status_action(view, query, status_source, action),
-        AppView::Workspaces { view } => apply_workspaces_action(view, workspaces_source, action),
-        AppView::WorkspaceStatus { view, query } => apply_workspace_inspection_action(
-            view,
-            query,
-            workspaces_source,
-            WorkspaceInspectionKind::Status,
-            action,
-        ),
-        AppView::WorkspaceDiff { view, query } => apply_workspace_inspection_action(
-            view,
-            query,
-            workspaces_source,
-            WorkspaceInspectionKind::Diff,
-            action,
-        ),
+    let transition = {
+        let AppState { views, history, .. } = state;
+        match views.active_mut() {
+            AppView::Log(log) => apply_log_action(log, history, source, diff_source, action),
+            AppView::Diff { view, query } => {
+                apply_diff_action(view, query, history, diff_source, action)
+            }
+            AppView::Show { view, query } => {
+                apply_show_action(view, query, history, show_source, action)
+            }
+            AppView::Evolog { view, query } => {
+                apply_evolog_action(view, query, history, evolog_source, action)
+            }
+            AppView::Status { view, query } => {
+                apply_status_action(view, query, history, status_source, action)
+            }
+            AppView::Workspaces { view } => {
+                apply_workspaces_action(view, history, workspaces_source, action)
+            }
+            AppView::WorkspaceStatus { view, query } => apply_workspace_inspection_action(
+                view,
+                query,
+                history,
+                workspaces_source,
+                WorkspaceInspectionKind::Status,
+                action,
+            ),
+            AppView::WorkspaceDiff { view, query } => apply_workspace_inspection_action(
+                view,
+                query,
+                history,
+                workspaces_source,
+                WorkspaceInspectionKind::Diff,
+                action,
+            ),
+        }
     };
 
     match transition {
@@ -1428,16 +1487,22 @@ fn apply_action(
 /// Applies an action while the log view is active.
 fn apply_log_action(
     log: &mut LogView,
+    history: &mut CommandHistory,
     source: &mut JjLog,
     diff_source: &JjDiff,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
     match log.apply(action) {
-        ActionResult::Refresh => refresh_log(log, source),
+        ActionResult::Refresh => refresh_log(
+            log,
+            history,
+            source,
+            CommandSource::new(SourceView::Log, SourceAction::Refresh),
+        ),
         ActionResult::SwitchHome => {
-            switch_log_command(log, source, JjLogCommand::ConfiguredDefault);
+            switch_log_command(log, history, source, JjLogCommand::ConfiguredDefault);
         }
-        ActionResult::SwitchLog => switch_log_command(log, source, JjLogCommand::Log),
+        ActionResult::SwitchLog => switch_log_command(log, history, source, JjLogCommand::Log),
         ActionResult::Quit => return AppTransition::Quit,
         _ => {}
     }
@@ -1451,7 +1516,11 @@ fn apply_log_action(
             rev: change_id.clone(),
             format: DiffFormat::Patch,
         };
-        match diff_source.load_query(&query) {
+        let mut runner = recording_runner(
+            history,
+            CommandSource::new(SourceView::Log, SourceAction::OpenDiff),
+        );
+        match diff_source.load_query_with_runner(&query, &mut runner) {
             Ok(snapshot) => {
                 let diff = DiffView::new(snapshot);
                 return AppTransition::Push(AppView::Diff { view: diff, query });
@@ -1464,22 +1533,33 @@ fn apply_log_action(
 }
 
 fn push_selected_show(state: &mut AppState, show_source: &JjShow) {
-    let AppView::Log(log) = state.views.active_mut() else {
-        return;
-    };
-    let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
-        return;
+    let change_id = {
+        let AppView::Log(log) = state.views.active_mut() else {
+            return;
+        };
+        let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
+            return;
+        };
+        change_id
     };
 
     let query = ShowQuery::from(change_id);
-    match show_source.load_query(&query) {
+    let mut runner = recording_runner(
+        &mut state.history,
+        CommandSource::new(SourceView::Log, SourceAction::OpenShow),
+    );
+    match show_source.load_query_with_runner(&query, &mut runner) {
         Ok(snapshot) => {
             state.views.push(AppView::Show {
                 view: RenderedView::new(snapshot),
                 query,
             });
         }
-        Err(error) => log.show_error(error.to_string()),
+        Err(error) => {
+            if let AppView::Log(log) = state.views.active_mut() {
+                log.show_error(error.to_string());
+            }
+        }
     }
 }
 
@@ -1495,7 +1575,11 @@ fn push_selected_evolog(state: &mut AppState, evolog_source: &JjEvolog) {
     };
 
     let query = EvologQuery::from(change_id);
-    match evolog_source.load_query(&query) {
+    let mut runner = recording_runner(
+        &mut state.history,
+        CommandSource::new(SourceView::Log, SourceAction::OpenEvolog),
+    );
+    match evolog_source.load_query_with_runner(&query, &mut runner) {
         Ok(snapshot) => push_evolog_view(state, query, RenderedView::new(snapshot)),
         Err(error) => {
             if let AppView::Log(log) = state.views.active_mut() {
@@ -1514,12 +1598,29 @@ fn push_evolog_view(state: &mut AppState, query: EvologQuery, view: RenderedView
 }
 
 fn push_status(state: &mut AppState, status_source: &JjStatus) {
+    push_status_with_runner(state, status_source, SystemJjCommandRunner);
+}
+
+fn open_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
+    open_workspaces_with_runner(state, workspaces_source, SystemJjCommandRunner);
+}
+
+fn push_status_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    status_source: &JjStatus,
+    runner: R,
+) {
     if !matches!(state.views.active(), AppView::Log(_)) {
         return;
     }
 
     let query = StatusQuery::default();
-    match status_source.load_query(&query) {
+    let mut runner = RecordingJjCommandRunner::new(
+        runner,
+        &mut state.history,
+        CommandSource::new(SourceView::Log, SourceAction::OpenStatus),
+    );
+    match status_source.load_query_with_runner(&query, &mut runner) {
         Ok(snapshot) => {
             state.views.push(AppView::Status {
                 view: RenderedView::new(snapshot),
@@ -1534,8 +1635,14 @@ fn push_status(state: &mut AppState, status_source: &JjStatus) {
     }
 }
 
-fn push_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
-    let view = match workspaces_source.load_list() {
+fn push_workspaces_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    workspaces_source: &JjWorkspaces,
+    source: CommandSource,
+    runner: R,
+) {
+    let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, source);
+    let view = match workspaces_source.load_list_with_runner(&mut runner) {
         Ok(snapshot) => WorkspacesView::new(workspace_view_snapshot(snapshot)),
         Err(error) => {
             let mut view = WorkspacesView::new(WorkspaceViewSnapshot::new(Vec::new()));
@@ -1546,12 +1653,25 @@ fn push_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
     push_workspace_view(state, view);
 }
 
-fn open_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
-    if let AppView::Workspaces { view } = state.views.active_mut() {
-        refresh_workspaces(view, workspaces_source);
-    } else {
-        push_workspaces(state, workspaces_source);
+fn open_workspaces_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    workspaces_source: &JjWorkspaces,
+    runner: R,
+) {
+    if matches!(state.views.active(), AppView::Workspaces { .. }) {
+        let AppState { views, history, .. } = state;
+        if let AppView::Workspaces { view } = views.active_mut() {
+            refresh_workspaces_with_runner(view, history, workspaces_source, runner);
+        }
+        return;
     }
+
+    push_workspaces_with_runner(
+        state,
+        workspaces_source,
+        CommandSource::new(SourceView::Log, SourceAction::WorkspaceList),
+        runner,
+    );
 }
 
 fn push_workspace_view(state: &mut AppState, view: WorkspacesView) {
@@ -1585,9 +1705,22 @@ fn push_selected_workspace_inspection(
         WorkspaceInspectionQuery::new(root)
     };
 
+    let command_source = match kind {
+        WorkspaceInspectionKind::Status => {
+            CommandSource::new(SourceView::Workspaces, SourceAction::WorkspaceStatus)
+        }
+        WorkspaceInspectionKind::Diff => {
+            CommandSource::new(SourceView::Workspaces, SourceAction::WorkspaceDiff)
+        }
+    };
+    let mut runner = recording_runner(&mut state.history, command_source);
     let snapshot = match kind {
-        WorkspaceInspectionKind::Status => workspaces_source.load_status(&query),
-        WorkspaceInspectionKind::Diff => workspaces_source.load_diff(&query),
+        WorkspaceInspectionKind::Status => {
+            workspaces_source.load_status_with_runner(&query, &mut runner)
+        }
+        WorkspaceInspectionKind::Diff => {
+            workspaces_source.load_diff_with_runner(&query, &mut runner)
+        }
     };
     match snapshot {
         Ok(snapshot) => {
@@ -1623,7 +1756,11 @@ fn update_selected_workspace_stale(state: &mut AppState, workspaces_source: &JjW
         (workspace_name, WorkspaceInspectionQuery::new(root))
     };
 
-    match workspaces_source.update_stale(&query) {
+    let mut update_runner = recording_runner(
+        &mut state.history,
+        CommandSource::new(SourceView::Workspaces, SourceAction::WorkspaceUpdateStale),
+    );
+    match workspaces_source.update_stale_with_runner(&query, &mut update_runner) {
         Ok(outcome) => {
             let success = update_stale_success_message(
                 &workspace_name,
@@ -1631,8 +1768,15 @@ fn update_selected_workspace_stale(state: &mut AppState, workspaces_source: &JjW
                 &outcome.stderr,
                 &outcome.stdout,
             );
+            let refresh_result = {
+                let mut refresh_runner = recording_runner(
+                    &mut state.history,
+                    CommandSource::new(SourceView::Workspaces, SourceAction::Refresh),
+                );
+                workspaces_source.load_list_with_runner(&mut refresh_runner)
+            };
             if let AppView::Workspaces { view } = state.views.active_mut() {
-                match workspaces_source.load_list() {
+                match refresh_result {
                     Ok(snapshot) => {
                         view.refresh(workspace_view_snapshot(snapshot));
                         view.show_status(success);
@@ -1696,6 +1840,7 @@ enum WorkspaceInspectionKind {
 /// Applies an action while the workspace list is active.
 fn apply_workspaces_action(
     view: &mut WorkspacesView,
+    history: &mut CommandHistory,
     workspaces_source: &JjWorkspaces,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
@@ -1719,7 +1864,7 @@ fn apply_workspaces_action(
     };
 
     match view.apply(workspaces_action) {
-        WorkspacesActionResult::Refresh => refresh_workspaces(view, workspaces_source),
+        WorkspacesActionResult::Refresh => refresh_workspaces(view, history, workspaces_source),
         WorkspacesActionResult::OpenStatus => {
             return AppTransition::PushSelectedWorkspaceStatus;
         }
@@ -1740,6 +1885,7 @@ fn apply_workspaces_action(
 fn apply_workspace_inspection_action(
     view: &mut RenderedView,
     query: &WorkspaceInspectionQuery,
+    history: &mut CommandHistory,
     workspaces_source: &JjWorkspaces,
     kind: WorkspaceInspectionKind,
     action: jk_tui::log_view::LogAction,
@@ -1763,7 +1909,7 @@ fn apply_workspace_inspection_action(
 
     match view.apply(rendered_action) {
         RenderedActionResult::Refresh => {
-            refresh_workspace_inspection(view, query, workspaces_source, kind);
+            refresh_workspace_inspection(view, query, history, workspaces_source, kind);
         }
         RenderedActionResult::ReturnToLog => return AppTransition::PopView,
         RenderedActionResult::Quit => return AppTransition::Quit,
@@ -1778,6 +1924,7 @@ fn apply_workspace_inspection_action(
 fn apply_diff_action(
     diff: &mut DiffView,
     query: &DiffQuery,
+    history: &mut CommandHistory,
     diff_source: &JjDiff,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
@@ -1812,7 +1959,7 @@ fn apply_diff_action(
     };
 
     match diff.apply(diff_action) {
-        DiffActionResult::Refresh => refresh_diff(diff, query, diff_source),
+        DiffActionResult::Refresh => refresh_diff(diff, query, history, diff_source),
         DiffActionResult::ReturnToLog => return AppTransition::PopView,
         DiffActionResult::Quit => return AppTransition::Quit,
         _ => {}
@@ -1825,6 +1972,7 @@ fn apply_diff_action(
 fn apply_show_action(
     view: &mut RenderedView,
     query: &ShowQuery,
+    history: &mut CommandHistory,
     show_source: &JjShow,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
@@ -1846,7 +1994,7 @@ fn apply_show_action(
     };
 
     match view.apply(rendered_action) {
-        RenderedActionResult::Refresh => refresh_show(view, query, show_source),
+        RenderedActionResult::Refresh => refresh_show(view, query, history, show_source),
         RenderedActionResult::ReturnToLog => return AppTransition::PopView,
         RenderedActionResult::Quit => return AppTransition::Quit,
         _ => {}
@@ -1859,6 +2007,7 @@ fn apply_show_action(
 fn apply_evolog_action(
     view: &mut RenderedView,
     query: &EvologQuery,
+    history: &mut CommandHistory,
     evolog_source: &JjEvolog,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
@@ -1880,7 +2029,7 @@ fn apply_evolog_action(
     };
 
     match view.apply(rendered_action) {
-        RenderedActionResult::Refresh => refresh_evolog(view, query, evolog_source),
+        RenderedActionResult::Refresh => refresh_evolog(view, query, history, evolog_source),
         RenderedActionResult::ReturnToLog => return AppTransition::PopView,
         RenderedActionResult::Quit => return AppTransition::Quit,
         _ => {}
@@ -1893,6 +2042,7 @@ fn apply_evolog_action(
 fn apply_status_action(
     view: &mut RenderedView,
     query: &StatusQuery,
+    history: &mut CommandHistory,
     status_source: &JjStatus,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
@@ -1914,7 +2064,7 @@ fn apply_status_action(
     };
 
     match view.apply(rendered_action) {
-        RenderedActionResult::Refresh => refresh_status(view, query, status_source),
+        RenderedActionResult::Refresh => refresh_status(view, query, history, status_source),
         RenderedActionResult::ReturnToLog => return AppTransition::PopView,
         RenderedActionResult::Quit => return AppTransition::Quit,
         _ => {}
@@ -1943,48 +2093,108 @@ enum AppTransition {
 }
 
 /// Reloads the current command without replacing the view on failure.
-fn refresh_log(app: &mut LogView, source: &JjLog) {
-    match source.load() {
+fn refresh_log(
+    app: &mut LogView,
+    history: &mut CommandHistory,
+    source: &JjLog,
+    command_source: CommandSource,
+) {
+    let mut runner = recording_runner(history, command_source);
+    match source.load_with_runner(&mut runner) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
 }
 
 /// Reloads the active diff without replacing the view on failure.
-fn refresh_diff(app: &mut DiffView, query: &DiffQuery, source: &JjDiff) {
-    match source.load_query(query) {
+fn refresh_diff(
+    app: &mut DiffView,
+    query: &DiffQuery,
+    history: &mut CommandHistory,
+    source: &JjDiff,
+) {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Diff, SourceAction::Refresh),
+    );
+    match source.load_query_with_runner(query, &mut runner) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
 }
 
 /// Reloads the active show/details view without replacing it on failure.
-fn refresh_show(app: &mut RenderedView, query: &ShowQuery, source: &JjShow) {
-    match source.load_query(query) {
+fn refresh_show(
+    app: &mut RenderedView,
+    query: &ShowQuery,
+    history: &mut CommandHistory,
+    source: &JjShow,
+) {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Show, SourceAction::Refresh),
+    );
+    match source.load_query_with_runner(query, &mut runner) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
 }
 
 /// Reloads the active evolog view without replacing it on failure.
-fn refresh_evolog(app: &mut RenderedView, query: &EvologQuery, source: &JjEvolog) {
-    match source.load_query(query) {
+fn refresh_evolog(
+    app: &mut RenderedView,
+    query: &EvologQuery,
+    history: &mut CommandHistory,
+    source: &JjEvolog,
+) {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Evolog, SourceAction::Refresh),
+    );
+    match source.load_query_with_runner(query, &mut runner) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
 }
 
 /// Reloads the active status view without replacing it on failure.
-fn refresh_status(app: &mut RenderedView, query: &StatusQuery, source: &JjStatus) {
-    match source.load_query(query) {
+fn refresh_status(
+    app: &mut RenderedView,
+    query: &StatusQuery,
+    history: &mut CommandHistory,
+    source: &JjStatus,
+) {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Status, SourceAction::Refresh),
+    );
+    match source.load_query_with_runner(query, &mut runner) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
 }
 
 /// Reloads the workspace list without replacing the view on failure.
-fn refresh_workspaces(app: &mut WorkspacesView, source: &JjWorkspaces) {
-    match source.load_list() {
+fn refresh_workspaces(
+    app: &mut WorkspacesView,
+    history: &mut CommandHistory,
+    source: &JjWorkspaces,
+) {
+    refresh_workspaces_with_runner(app, history, source, SystemJjCommandRunner);
+}
+
+fn refresh_workspaces_with_runner<R: JjCommandRunner>(
+    app: &mut WorkspacesView,
+    history: &mut CommandHistory,
+    source: &JjWorkspaces,
+    runner: R,
+) {
+    let mut runner = RecordingJjCommandRunner::new(
+        runner,
+        history,
+        CommandSource::new(SourceView::Workspaces, SourceAction::Refresh),
+    );
+    match source.load_list_with_runner(&mut runner) {
         Ok(snapshot) => app.refresh(workspace_view_snapshot(snapshot)),
         Err(error) => app.show_error(error.to_string()),
     }
@@ -1994,12 +2204,22 @@ fn refresh_workspaces(app: &mut WorkspacesView, source: &JjWorkspaces) {
 fn refresh_workspace_inspection(
     app: &mut RenderedView,
     query: &WorkspaceInspectionQuery,
+    history: &mut CommandHistory,
     source: &JjWorkspaces,
     kind: WorkspaceInspectionKind,
 ) {
+    let command_source = match kind {
+        WorkspaceInspectionKind::Status => {
+            CommandSource::new(SourceView::WorkspaceStatus, SourceAction::Refresh)
+        }
+        WorkspaceInspectionKind::Diff => {
+            CommandSource::new(SourceView::WorkspaceDiff, SourceAction::Refresh)
+        }
+    };
+    let mut runner = recording_runner(history, command_source);
     let snapshot = match kind {
-        WorkspaceInspectionKind::Status => source.load_status(query),
-        WorkspaceInspectionKind::Diff => source.load_diff(query),
+        WorkspaceInspectionKind::Status => source.load_status_with_runner(query, &mut runner),
+        WorkspaceInspectionKind::Diff => source.load_diff_with_runner(query, &mut runner),
     };
     match snapshot {
         Ok(snapshot) => app.refresh(snapshot),
@@ -2008,12 +2228,21 @@ fn refresh_workspace_inspection(
 }
 
 /// Switches the command context only after the replacement log loads.
-fn switch_log_command(app: &mut LogView, source: &mut JjLog, command: JjLogCommand) {
+fn switch_log_command(
+    app: &mut LogView,
+    history: &mut CommandHistory,
+    source: &mut JjLog,
+    command: JjLogCommand,
+) {
     let mut next_source = source.clone().with_command(command);
     if command == JjLogCommand::ConfiguredDefault {
         next_source = next_source.with_configured_template();
     }
-    match next_source.load() {
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Log, SourceAction::Refresh),
+    );
+    match next_source.load_with_runner(&mut runner) {
         Ok(snapshot) => {
             *source = next_source;
             app.refresh(snapshot);
@@ -2045,7 +2274,11 @@ fn apply_log_template_selection(
         .clone()
         .with_command(JjLogCommand::Log)
         .with_template(template);
-    match next_source.load() {
+    let mut runner = recording_runner(
+        &mut state.history,
+        CommandSource::new(SourceView::Log, SourceAction::Refresh),
+    );
+    match next_source.load_with_runner(&mut runner) {
         Ok(snapshot) => {
             *source = next_source;
             if let AppView::Log(log) = state.views.active_mut() {
@@ -2073,6 +2306,10 @@ impl Drop for TerminalRestore {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+    use std::io;
+    use std::process::Output;
+
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     use super::*;
@@ -2084,6 +2321,109 @@ mod tests {
 
         assert!(!stack.pop());
         assert_eq!(stack.active(), &root);
+    }
+
+    #[test]
+    fn app_state_exposes_retained_command_history_for_tests() {
+        let mut history = CommandHistory::new(4);
+        let spec = jk_core::JjCommandSpec::render_read_only(["status"]);
+        history.start(jk_core::CommandRecordStart::from_spec(
+            &spec,
+            CommandSource::new(SourceView::Status, SourceAction::InitialLoad),
+        ));
+        let state = AppState::with_history(AppView::Log(LogView::default()), history);
+
+        assert_eq!(state.command_history().records().count(), 1);
+    }
+
+    #[test]
+    fn opening_workspaces_from_log_records_log_workspace_list() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let source = JjWorkspaces::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "vibe\t/repo/vibe\tabc123\tdef456\n", ""),
+            output(0, "/repo/vibe\n", ""),
+        ]);
+
+        open_workspaces_with_runner(&mut state, &source, runner);
+
+        assert_eq!(state.views.views.len(), 2);
+        assert!(matches!(state.views.active(), AppView::Workspaces { .. }));
+        assert_eq!(state.command_history().records().count(), 2);
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert!(
+            records[0]
+                .command
+                .spec_preview
+                .starts_with("jj workspace list")
+        );
+        assert!(records[1].command.spec_preview.starts_with("jj root"));
+        assert!(
+            records
+                .iter()
+                .all(|record| record.source.view == SourceView::Log)
+        );
+        assert!(
+            records
+                .iter()
+                .all(|record| record.source.action == SourceAction::WorkspaceList)
+        );
+    }
+
+    #[test]
+    fn refreshing_workspaces_keeps_workspace_source_and_refresh_action() {
+        let mut state = AppState::new(AppView::Workspaces {
+            view: WorkspacesView::new(WorkspaceViewSnapshot::new(Vec::new())),
+        });
+        let source = JjWorkspaces::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "vibe\t/repo/vibe\tabc123\tdef456\n", ""),
+            output(0, "/repo/vibe\n", ""),
+        ]);
+
+        open_workspaces_with_runner(&mut state, &source, runner);
+
+        assert_eq!(state.views.views.len(), 1);
+        assert!(matches!(state.views.active(), AppView::Workspaces { .. }));
+        assert_eq!(state.command_history().records().count(), 2);
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert!(
+            records[0]
+                .command
+                .spec_preview
+                .starts_with("jj workspace list")
+        );
+        assert!(records[1].command.spec_preview.starts_with("jj root"));
+        assert!(
+            records
+                .iter()
+                .all(|record| record.source.view == SourceView::Workspaces)
+        );
+        assert!(
+            records
+                .iter()
+                .all(|record| record.source.action == SourceAction::Refresh)
+        );
+    }
+
+    #[test]
+    fn opening_status_from_log_records_log_open_status() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let source = JjStatus::default();
+        let runner = SequencedRunner::successes(vec![output(0, "status output\n", "")]);
+
+        push_status_with_runner(&mut state, &source, runner);
+
+        assert_eq!(state.views.views.len(), 2);
+        assert!(matches!(state.views.active(), AppView::Status { .. }));
+        assert_eq!(state.command_history().records().count(), 1);
+
+        let record = state.command_history().records().next().expect("record");
+        assert_eq!(record.command.spec_preview, "jj status");
+        assert_eq!(record.source.view, SourceView::Log);
+        assert_eq!(record.source.action, SourceAction::OpenStatus);
     }
 
     #[test]
@@ -2618,11 +2958,23 @@ mod tests {
         let source = JjDiff::default();
         let mut mark_view = diff_view("aaa");
         let mut page_view = diff_view("aaa");
+        let mut mark_history = CommandHistory::default();
+        let mut page_history = CommandHistory::default();
 
-        let mark_transition =
-            apply_diff_action(&mut mark_view, &query, &source, LogAction::ToggleMark);
-        let page_transition =
-            apply_diff_action(&mut page_view, &query, &source, LogAction::PageNext);
+        let mark_transition = apply_diff_action(
+            &mut mark_view,
+            &query,
+            &mut mark_history,
+            &source,
+            LogAction::ToggleMark,
+        );
+        let page_transition = apply_diff_action(
+            &mut page_view,
+            &query,
+            &mut page_history,
+            &source,
+            LogAction::PageNext,
+        );
 
         assert!(matches!(mark_transition, AppTransition::Continue));
         assert!(matches!(page_transition, AppTransition::Continue));
@@ -2635,16 +2987,20 @@ mod tests {
         let show_source = JjShow::default();
         let mut mark_show = RenderedView::from_error("aaa", "jj show aaa", "fixture".to_owned());
         let mut page_show = mark_show.clone();
+        let mut mark_history = CommandHistory::default();
+        let mut page_history = CommandHistory::default();
 
         let mark_transition = apply_show_action(
             &mut mark_show,
             &show_query,
+            &mut mark_history,
             &show_source,
             LogAction::ToggleMark,
         );
         let page_transition = apply_show_action(
             &mut page_show,
             &show_query,
+            &mut page_history,
             &show_source,
             LogAction::PageNext,
         );
@@ -2658,16 +3014,20 @@ mod tests {
         let mut mark_evolog =
             RenderedView::from_error("aaa", "jj evolog -r aaa", "fixture".to_owned());
         let mut page_evolog = mark_evolog.clone();
+        let mut mark_history = CommandHistory::default();
+        let mut page_history = CommandHistory::default();
 
         let mark_transition = apply_evolog_action(
             &mut mark_evolog,
             &evolog_query,
+            &mut mark_history,
             &evolog_source,
             LogAction::ToggleMark,
         );
         let page_transition = apply_evolog_action(
             &mut page_evolog,
             &evolog_query,
+            &mut page_history,
             &evolog_source,
             LogAction::PageNext,
         );
@@ -2680,16 +3040,20 @@ mod tests {
         let status_source = JjStatus::default();
         let mut mark_status = RenderedView::from_error("status", "jj status", "fixture".to_owned());
         let mut page_status = mark_status.clone();
+        let mut mark_history = CommandHistory::default();
+        let mut page_history = CommandHistory::default();
 
         let mark_transition = apply_status_action(
             &mut mark_status,
             &status_query,
+            &mut mark_history,
             &status_source,
             LogAction::ToggleMark,
         );
         let page_transition = apply_status_action(
             &mut page_status,
             &status_query,
+            &mut page_history,
             &status_source,
             LogAction::PageNext,
         );
@@ -2855,5 +3219,52 @@ mod tests {
             WorkspaceViewRow::new("default", "/repo/default", false).with_root("/repo/default"),
             WorkspaceViewRow::new("vibe", "/repo/vibe", true).with_root("/repo/vibe"),
         ]))
+    }
+
+    fn output(code: i32, stdout: &str, stderr: &str) -> Output {
+        Output {
+            status: exit_status(code),
+            stdout: stdout.as_bytes().to_vec(),
+            stderr: stderr.as_bytes().to_vec(),
+        }
+    }
+
+    struct SequencedRunner {
+        outputs: VecDeque<io::Result<Output>>,
+    }
+
+    impl SequencedRunner {
+        fn successes(outputs: Vec<Output>) -> Self {
+            Self {
+                outputs: outputs.into_iter().map(Ok).collect(),
+            }
+        }
+    }
+
+    impl JjCommandRunner for SequencedRunner {
+        fn run(&mut self, _spec: &jk_core::JjCommandSpec) -> io::Result<Output> {
+            self.outputs
+                .pop_front()
+                .expect("runner called too many times")
+        }
+    }
+
+    #[cfg(unix)]
+    fn exit_status(code: i32) -> std::process::ExitStatus {
+        use std::os::unix::process::ExitStatusExt;
+
+        std::process::ExitStatus::from_raw(code << 8)
+    }
+
+    #[cfg(not(unix))]
+    fn exit_status(code: i32) -> std::process::ExitStatus {
+        std::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            .args(if cfg!(windows) {
+                vec!["/C".into(), format!("exit {code}").into()]
+            } else {
+                vec!["-c".into(), format!("exit {code}").into()]
+            })
+            .status()
+            .unwrap()
     }
 }

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use jk_core::{InspectionSnapshot, JjCommandSpec};
 use thiserror::Error;
 
-use crate::command::run_jj_spec;
+use crate::command::{JjCommandRunner, SystemJjCommandRunner};
 
 const EVOLOG_COMMAND: &str = "evolog";
 
@@ -61,8 +61,21 @@ impl JjEvolog {
     ///
     /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
     pub fn load_query(&self, query: &EvologQuery) -> Result<InspectionSnapshot, JjEvologError> {
+        self.load_query_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Loads the rendered evolog output for `query` using the provided command runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_query_with_runner(
+        &self,
+        query: &EvologQuery,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<InspectionSnapshot, JjEvologError> {
         let spec = self.spec_for(query);
-        let rendered = Self::run(&spec)?;
+        let rendered = Self::run(runner, &spec)?;
         Ok(InspectionSnapshot::new(query.target_label(), rendered).with_title(spec.title()))
     }
 
@@ -77,8 +90,11 @@ impl JjEvolog {
         }
     }
 
-    fn run(spec: &JjCommandSpec) -> Result<String, JjEvologError> {
-        let output = run_jj_spec(spec)?;
+    fn run(
+        runner: &mut impl JjCommandRunner,
+        spec: &JjCommandSpec,
+    ) -> Result<String, JjEvologError> {
+        let output = runner.run(spec)?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {

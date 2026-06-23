@@ -8,7 +8,7 @@ use jk_core::{
 };
 use thiserror::Error;
 
-use crate::command::run_jj_spec;
+use crate::command::{JjCommandRunner, SystemJjCommandRunner};
 
 const WORKSPACE_LIST_TEMPLATE: &str = r#"name ++ "\t" ++ root ++ "\t" ++ target.change_id().short() ++ "\t" ++ target.commit_id().short() ++ "\n""#;
 
@@ -114,8 +114,21 @@ impl JjWorkspaces {
     /// Returns an error if `jj` cannot be executed, exits unsuccessfully, or returns malformed
     /// machine output.
     pub fn load_list(&self) -> Result<WorkspaceListSnapshot, JjWorkspacesError> {
+        self.load_list_with_runner(&mut SystemJjCommandRunner)
+    }
+
+    /// Loads and parses the workspace list using the provided command runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed, exits unsuccessfully, or returns malformed
+    /// machine output.
+    pub fn load_list_with_runner(
+        &self,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<WorkspaceListSnapshot, JjWorkspacesError> {
         let spec = self.list_spec();
-        let output = run_jj_spec(&spec)?;
+        let output = runner.run(&spec)?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
             return Err(JjWorkspacesError::CommandFailed(stderr));
@@ -123,7 +136,7 @@ impl JjWorkspaces {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let current_root = self
-            .load_current_root()
+            .load_current_root_with_runner(runner)
             .ok()
             .or_else(|| self.repository.clone());
         let workspaces = parse_workspace_list(&stdout, current_root.as_deref())?;
@@ -142,8 +155,21 @@ impl JjWorkspaces {
         &self,
         query: &WorkspaceInspectionQuery,
     ) -> Result<InspectionSnapshot, JjWorkspacesError> {
+        self.load_status_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Loads rendered `jj status` output scoped to a selected workspace using the provided runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_status_with_runner(
+        &self,
+        query: &WorkspaceInspectionQuery,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<InspectionSnapshot, JjWorkspacesError> {
         let spec = self.status_spec(query);
-        let rendered = Self::run_inspection(&spec, WorkspaceInspectionCommand::Status)?;
+        let rendered = Self::run_inspection(runner, &spec, WorkspaceInspectionCommand::Status)?;
         Ok(InspectionSnapshot::new(query.target_label(), rendered).with_title(spec.title()))
     }
 
@@ -156,8 +182,21 @@ impl JjWorkspaces {
         &self,
         query: &WorkspaceInspectionQuery,
     ) -> Result<InspectionSnapshot, JjWorkspacesError> {
+        self.load_diff_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Loads rendered `jj diff` output scoped to a selected workspace using the provided runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_diff_with_runner(
+        &self,
+        query: &WorkspaceInspectionQuery,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<InspectionSnapshot, JjWorkspacesError> {
         let spec = self.diff_spec(query);
-        let rendered = Self::run_inspection(&spec, WorkspaceInspectionCommand::Diff)?;
+        let rendered = Self::run_inspection(runner, &spec, WorkspaceInspectionCommand::Diff)?;
         Ok(InspectionSnapshot::new(query.target_label(), rendered).with_title(spec.title()))
     }
 
@@ -170,8 +209,21 @@ impl JjWorkspaces {
         &self,
         query: &WorkspaceInspectionQuery,
     ) -> Result<WorkspaceUpdateStaleOutcome, JjWorkspacesError> {
+        self.update_stale_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Runs `jj workspace update-stale` scoped to a selected workspace root using the runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn update_stale_with_runner(
+        &self,
+        query: &WorkspaceInspectionQuery,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<WorkspaceUpdateStaleOutcome, JjWorkspacesError> {
         let spec = self.update_stale_spec(query);
-        let output = run_jj_spec(&spec)?;
+        let output = runner.run(&spec)?;
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
         if output.status.success() {
@@ -268,10 +320,11 @@ impl JjWorkspaces {
     }
 
     fn run_inspection(
+        runner: &mut impl JjCommandRunner,
         spec: &JjCommandSpec,
         command: WorkspaceInspectionCommand,
     ) -> Result<String, JjWorkspacesError> {
-        let output = run_jj_spec(spec)?;
+        let output = runner.run(spec)?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
@@ -280,8 +333,11 @@ impl JjWorkspaces {
         }
     }
 
-    fn load_current_root(&self) -> Result<PathBuf, JjWorkspacesError> {
-        let output = run_jj_spec(&self.root_spec())?;
+    fn load_current_root_with_runner(
+        &self,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<PathBuf, JjWorkspacesError> {
+        let output = runner.run(&self.root_spec())?;
         if output.status.success() {
             let root = String::from_utf8_lossy(&output.stdout).trim().to_owned();
             Ok(normalized_path(Path::new(&root)))

@@ -719,6 +719,7 @@ dependencies = [
  "color-eyre",
  "crossterm",
  "jk-cli",
+ "jk-core",
  "jk-tui",
  "ratatui",
  "tracing",

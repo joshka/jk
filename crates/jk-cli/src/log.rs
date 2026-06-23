@@ -9,7 +9,7 @@ use thiserror::Error;
 
 #[cfg(test)]
 use crate::command::build_jj_command;
-use crate::command::run_jj_spec;
+use crate::command::{JjCommandRunner, SystemJjCommandRunner};
 
 mod rendered;
 mod semantic;
@@ -180,10 +180,25 @@ impl JjLog {
     /// does not match the expected schema, or the selected command cannot provide semantic log
     /// records.
     pub fn load(&self) -> Result<LogSnapshot, JjLogError> {
+        self.load_with_runner(&mut SystemJjCommandRunner)
+    }
+
+    /// Loads a rendered log snapshot using the provided command runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed, exits unsuccessfully, emits a JSON record that
+    /// does not match the expected schema, or the selected command cannot provide semantic log
+    /// records.
+    pub fn load_with_runner(
+        &self,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<LogSnapshot, JjLogError> {
         let command_args = self.command_args();
         let rendered_spec = self.command_spec(DefaultCommandMode::Rendered, &command_args);
-        let rendered = self.run(DefaultCommandMode::Rendered, &rendered_spec)?;
+        let rendered = self.run(runner, DefaultCommandMode::Rendered, &rendered_spec)?;
         let semantic = self.run(
+            runner,
             DefaultCommandMode::Json,
             &self.command_spec(DefaultCommandMode::Json, &command_args),
         )?;
@@ -193,8 +208,13 @@ impl JjLog {
         Ok(LogSnapshot::new(rendered, entries).with_title(rendered_spec.title()))
     }
 
-    fn run(&self, mode: DefaultCommandMode, spec: &JjCommandSpec) -> Result<String, JjLogError> {
-        let output = run_jj_spec(spec)?;
+    fn run(
+        &self,
+        runner: &mut impl JjCommandRunner,
+        mode: DefaultCommandMode,
+        spec: &JjCommandSpec,
+    ) -> Result<String, JjLogError> {
+        let output = runner.run(spec)?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
