@@ -20,6 +20,8 @@ enum ActionId {
     LineScroll,
     Page,
     FirstLast,
+    Mark,
+    ClearMarks,
     Expand,
     Collapse,
     OpenShow,
@@ -47,6 +49,8 @@ impl ActionId {
             Self::LineScroll => "Scroll line",
             Self::Page => "Page",
             Self::FirstLast => "Jump to edge",
+            Self::Mark => "Mark revision",
+            Self::ClearMarks => "Clear marks",
             Self::Expand => "Expand change",
             Self::Collapse => "Collapse change",
             Self::OpenShow => "Open show",
@@ -86,6 +90,8 @@ pub enum CommandFamily {
     Refresh,
     /// Selection, scrolling, and viewport movement.
     Navigation,
+    /// Ordered revision mark actions.
+    Mark,
     /// Diff folding actions.
     Fold,
     /// Diff file-section movement.
@@ -108,6 +114,7 @@ impl CommandFamily {
             Self::Search => "search",
             Self::Refresh => "refresh",
             Self::Navigation => "navigation",
+            Self::Mark => "mark",
             Self::Fold => "fold",
             Self::File => "file",
             Self::Hunk => "hunk",
@@ -175,12 +182,24 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "current row"])
-        .with_hotbar(8, "j/k move"),
+        .with_hotbar(10, "j/k move"),
     KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+    KeyBinding::new(ActionId::Mark, "space", "mark/unmark selected revision")
+        .with_family(CommandFamily::Mark)
+        .with_aliases(&["selected", "revision", "toggle"])
+        .with_hotbar(8, "space mark"),
+    KeyBinding::new(
+        ActionId::ClearMarks,
+        "c",
+        "clear revision marks when marks exist",
+    )
+    .with_family(CommandFamily::Mark)
+    .with_aliases(&["clear", "unmark", "selected", "revision"])
+    .with_hotbar(9, "c clear"),
+    KeyBinding::new(ActionId::Page, "b, Ctrl-f/b, PgUp/Dn", "page down/up")
         .with_family(CommandFamily::Navigation)
-        .with_hotbar(9, "space/b page"),
+        .with_aliases(&["page", "pagedown", "pageup"]),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::OpenShow, "enter", "open selected-change show")
@@ -213,7 +232,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(10, "q quit")
+        .with_hotbar(11, "q quit")
         .hotbar_only(),
 ];
 
@@ -454,7 +473,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  s status  T template  j/k move  space/b page  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  s status  T template  space mark  c clear  j/k move  q quit"
         );
     }
 
@@ -481,7 +500,9 @@ mod tests {
             vec![
                 "j/k or arrows        move selection",
                 "Ctrl-j/k             scroll one line",
-                "space / b, Ctrl-f/b  page down/up",
+                "space                mark/unmark selected revision",
+                "c                    clear revision marks when marks exist",
+                "b, Ctrl-f/b, PgUp/Dn page down/up",
                 "g/G or Home/End      jump to top/bottom",
                 "enter                open selected-change show",
                 "right, l             expand selected change",
@@ -567,6 +588,18 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].keys, "T");
         assert_eq!(rows[0].command_family_label(), Some("jj log"));
+    }
+
+    #[test]
+    fn log_discovery_finds_mark_and_clear_bindings() {
+        let mark_rows = filter_discovery_rows(BindingContext::Log, "space mark");
+        assert_eq!(mark_rows.len(), 1);
+        assert_eq!(mark_rows[0].keys, "space");
+        assert_eq!(mark_rows[0].command_family_label(), Some("mark"));
+
+        let clear_rows = filter_discovery_rows(BindingContext::Log, "clear marks");
+        assert_eq!(clear_rows.len(), 1);
+        assert_eq!(clear_rows[0].keys, "c");
     }
 
     #[test]

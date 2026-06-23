@@ -1078,6 +1078,8 @@ fn apply_diff_action(
         jk_tui::log_view::LogAction::ScrollNextLine => DiffAction::ScrollNext,
         jk_tui::log_view::LogAction::PagePrevious => DiffAction::PagePrevious,
         jk_tui::log_view::LogAction::PageNext => DiffAction::PageNext,
+        jk_tui::log_view::LogAction::ToggleMark => DiffAction::PageNext,
+        jk_tui::log_view::LogAction::ClearMarks => DiffAction::Ignore,
         jk_tui::log_view::LogAction::First => DiffAction::First,
         jk_tui::log_view::LogAction::Last => DiffAction::Last,
         jk_tui::log_view::LogAction::PreviousFile => DiffAction::PreviousFile,
@@ -1124,6 +1126,8 @@ fn apply_show_action(
         jk_tui::log_view::LogAction::ScrollNextLine => RenderedAction::ScrollNext,
         jk_tui::log_view::LogAction::PagePrevious => RenderedAction::PagePrevious,
         jk_tui::log_view::LogAction::PageNext => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ToggleMark => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ClearMarks => RenderedAction::Ignore,
         jk_tui::log_view::LogAction::First => RenderedAction::First,
         jk_tui::log_view::LogAction::Last => RenderedAction::Last,
         jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
@@ -1157,6 +1161,8 @@ fn apply_status_action(
         jk_tui::log_view::LogAction::ScrollNextLine => RenderedAction::ScrollNext,
         jk_tui::log_view::LogAction::PagePrevious => RenderedAction::PagePrevious,
         jk_tui::log_view::LogAction::PageNext => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ToggleMark => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ClearMarks => RenderedAction::Ignore,
         jk_tui::log_view::LogAction::First => RenderedAction::First,
         jk_tui::log_view::LogAction::Last => RenderedAction::Last,
         jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
@@ -1455,6 +1461,70 @@ mod tests {
 
         assert_eq!(result, InputModeResult::Handled);
         assert_eq!(state.modes.active(), None);
+    }
+
+    #[test]
+    fn mark_action_pages_diff_view() {
+        let query = diff_query("aaa");
+        let source = JjDiff::default();
+        let mut mark_view = diff_view("aaa");
+        let mut page_view = diff_view("aaa");
+
+        let mark_transition =
+            apply_diff_action(&mut mark_view, &query, &source, LogAction::ToggleMark);
+        let page_transition =
+            apply_diff_action(&mut page_view, &query, &source, LogAction::PageNext);
+
+        assert!(matches!(mark_transition, AppTransition::Continue));
+        assert!(matches!(page_transition, AppTransition::Continue));
+        assert_eq!(mark_view, page_view);
+    }
+
+    #[test]
+    fn mark_action_pages_inspection_views() {
+        let show_query = ShowQuery::from("aaa".to_owned());
+        let show_source = JjShow::default();
+        let mut mark_show = RenderedView::from_error("aaa", "jj show aaa", "fixture".to_owned());
+        let mut page_show = mark_show.clone();
+
+        let mark_transition = apply_show_action(
+            &mut mark_show,
+            &show_query,
+            &show_source,
+            LogAction::ToggleMark,
+        );
+        let page_transition = apply_show_action(
+            &mut page_show,
+            &show_query,
+            &show_source,
+            LogAction::PageNext,
+        );
+
+        assert!(matches!(mark_transition, AppTransition::Continue));
+        assert!(matches!(page_transition, AppTransition::Continue));
+        assert_eq!(mark_show, page_show);
+
+        let status_query = StatusQuery::default();
+        let status_source = JjStatus::default();
+        let mut mark_status = RenderedView::from_error("status", "jj status", "fixture".to_owned());
+        let mut page_status = mark_status.clone();
+
+        let mark_transition = apply_status_action(
+            &mut mark_status,
+            &status_query,
+            &status_source,
+            LogAction::ToggleMark,
+        );
+        let page_transition = apply_status_action(
+            &mut page_status,
+            &status_query,
+            &status_source,
+            LogAction::PageNext,
+        );
+
+        assert!(matches!(mark_transition, AppTransition::Continue));
+        assert!(matches!(page_transition, AppTransition::Continue));
+        assert_eq!(mark_status, page_status);
     }
 
     #[test]

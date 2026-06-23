@@ -84,11 +84,11 @@ impl AppKey {
             KeyEvent {
                 code: KeyCode::PageDown,
                 ..
-            }
-            | KeyEvent {
+            } => Self::Action(LogAction::PageNext),
+            KeyEvent {
                 code: KeyCode::Char(' '),
                 ..
-            } => Self::Action(LogAction::PageNext),
+            } => Self::Action(LogAction::ToggleMark),
             KeyEvent {
                 code: KeyCode::Home,
                 ..
@@ -115,6 +115,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'T' => Some(AppKey::Action(LogAction::SwitchTemplate)),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
+        'c' => Some(AppKey::Action(LogAction::ClearMarks)),
         's' => Some(AppKey::OpenStatus),
         '?' => Some(AppKey::Action(LogAction::ToggleHelp)),
         '/' => Some(AppKey::StartSearch),
@@ -212,6 +213,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::OpenDiff)
+        );
+    }
+
+    #[test]
+    fn lowercase_c_clears_log_marks() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ClearMarks)
         );
     }
 
@@ -338,12 +347,16 @@ mod tests {
             AppKey::Action(LogAction::PageNext)
         );
         assert_eq!(
-            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)),
-            AppKey::Action(LogAction::PageNext)
-        );
-        assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::SHIFT)),
             AppKey::Action(LogAction::PagePrevious)
+        );
+    }
+
+    #[test]
+    fn space_toggles_log_mark() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleMark)
         );
     }
 

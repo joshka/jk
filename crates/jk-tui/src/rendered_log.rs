@@ -48,6 +48,25 @@ impl<'a> RenderedLog<'a> {
         rendered
     }
 
+    /// Maps an original body line to its final rendered line after inserted details.
+    pub fn line_after_insertions(&self, line: usize, width: usize) -> usize {
+        let Some(details) = self.expanded_details else {
+            return line;
+        };
+        if details.after_line >= line {
+            return line;
+        }
+
+        let inserted_lines = self
+            .body
+            .lines()
+            .nth(details.after_line)
+            .map(expanded_prefix)
+            .map(|prefix| expanded_details_line_count(details.text, &prefix, width))
+            .unwrap_or_default();
+        line + inserted_lines
+    }
+
     /// Writes the body, inserting details after the configured rendered line.
     fn write_to(&self, rendered: &mut String, width: usize) {
         let Some(details) = self.expanded_details else {
@@ -97,6 +116,19 @@ fn write_expanded_details(rendered: &mut String, details: &str, prefix: &str, wi
     }
 
     write_expanded_line(rendered, prefix, "");
+}
+
+/// Counts the lines that [`write_expanded_details`] would insert.
+fn expanded_details_line_count(details: &str, prefix: &str, width: usize) -> usize {
+    let detail_lines = details.lines().map(|line| {
+        if line.is_empty() {
+            1
+        } else {
+            textwrap::wrap(line, wrap_options(detail_width(width, prefix))).len()
+        }
+    });
+
+    1 + detail_lines.sum::<usize>() + 1
 }
 
 /// Writes one inserted detail line with the graph prefix.
@@ -246,5 +278,14 @@ mod tests {
             rendered,
             "│ ○  aaa\n│ │  \n│ │  one two\n│ │  three\n│ │  four\n│ │  five\n│ │  \n"
         );
+    }
+
+    #[test]
+    fn maps_body_lines_after_inserted_details() {
+        let log = RenderedLog::new("@  aaa\n○  bbb\n")
+            .with_expanded_details(Some(ExpandedDetails::new(0, "one two three four five")));
+
+        assert_eq!(log.line_after_insertions(0, 16), 0);
+        assert_eq!(log.line_after_insertions(1, 16), 5);
     }
 }
