@@ -17,9 +17,14 @@ pub mod evolog;
 pub mod log;
 pub mod show;
 pub mod status;
+pub mod workspaces;
 
 pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
 pub use evolog::{EvologQuery, JjEvolog, JjEvologError};
 pub use log::{JjLog, JjLogCommand, JjLogError, LogTemplateSelection};
 pub use show::{JjShow, JjShowError, ShowQuery};
 pub use status::{JjStatus, JjStatusError, StatusQuery};
+pub use workspaces::{
+    JjWorkspaces, JjWorkspacesError, WorkspaceInspectionQuery, WorkspaceListParseError,
+    WorkspaceListSnapshot, WorkspaceSummary,
+};
