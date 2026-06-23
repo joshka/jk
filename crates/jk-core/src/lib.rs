@@ -4,6 +4,10 @@
 //! rendered log body is still owned by `jj`; `jk` only keeps enough structured metadata to move by
 //! change, preserve selection across refresh, and insert inline details at the right rendered line.
 
+mod command;
+
+pub use command::{ExecutionMode, JjCommandSpec, RefreshPlan, SafetyClass};
+
 /// A rendered `jj` log view plus semantic records for navigation.
 ///
 /// The `rendered` body is opaque terminal text produced by `jj`. Each [`LogEntry`] in `entries`
