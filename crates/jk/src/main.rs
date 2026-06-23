@@ -10,7 +10,9 @@ use clap::{Parser, Subcommand};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
-use jk_cli::{DiffFormat, DiffQuery, JjDiff, JjLog, JjLogCommand, JjShow, ShowQuery};
+use jk_cli::{
+    DiffFormat, DiffQuery, JjDiff, JjLog, JjLogCommand, JjShow, JjStatus, ShowQuery, StatusQuery,
+};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogView};
 use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
@@ -47,6 +49,9 @@ enum Command {
 
     /// Show one or more revisions.
     Show(ShowArgs),
+
+    /// Show repository status.
+    Status(StatusArgs),
 }
 
 /// Options for the explicit `jk log` command.
@@ -99,6 +104,20 @@ struct ShowArgs {
     revs: Vec<String>,
 }
 
+/// Options for the explicit `jk status` command.
+#[derive(Debug, Parser)]
+struct StatusArgs {
+    /// Filesets to pass to jj status.
+    #[arg(value_name = "FILESET")]
+    filesets: Vec<String>,
+}
+
+impl StatusArgs {
+    fn query(&self) -> StatusQuery {
+        StatusQuery::new(self.filesets.clone())
+    }
+}
+
 impl ShowArgs {
     fn query(&self) -> ShowQuery {
         ShowQuery::new(self.revs.clone())
@@ -138,6 +157,7 @@ fn main() -> Result<()> {
     let source = log_source(&args);
     let diff_source = diff_source(&args);
     let show_source = show_source(&args);
+    let status_source = status_source(&args);
     let app = match &args.command {
         Some(Command::Diff(diff_args)) => {
             let query = diff_args.query();
@@ -147,13 +167,17 @@ fn main() -> Result<()> {
             let query = show_args.query();
             root_show_view(&show_source, query)
         }
+        Some(Command::Status(status_args)) => {
+            let query = status_args.query();
+            root_status_view(&status_source, query)
+        }
         Some(Command::Log(_)) | None => {
             let entries = source.load()?;
             AppView::Log(LogView::new(entries))
         }
     };
 
-    run_terminal(app, source, &diff_source, &show_source)?;
+    run_terminal(app, source, &diff_source, &show_source, &status_source)?;
     Ok(())
 }
 
@@ -165,7 +189,7 @@ fn main() -> Result<()> {
 fn log_source(args: &Args) -> JjLog {
     let (command, limit) = match &args.command {
         Some(Command::Log(log_args)) => (JjLogCommand::Log, log_args.limit.or(args.limit)),
-        Some(Command::Diff(_) | Command::Show(_)) | None => {
+        Some(Command::Diff(_) | Command::Show(_) | Command::Status(_)) | None => {
             (JjLogCommand::ConfiguredDefault, args.limit)
         }
     };
@@ -191,6 +215,16 @@ fn diff_source(args: &Args) -> JjDiff {
 /// Builds the show source for selected-change inspection.
 fn show_source(args: &Args) -> JjShow {
     let source = JjShow::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Builds the status source for repository inspection.
+fn status_source(args: &Args) -> JjStatus {
+    let source = JjStatus::default();
     if let Some(repository) = &args.repository {
         source.with_repository(repository)
     } else {
@@ -224,6 +258,22 @@ fn root_show_view(show_source: &JjShow, query: ShowQuery) -> AppView {
     AppView::Show { view: show, query }
 }
 
+fn root_status_view(status_source: &JjStatus, query: StatusQuery) -> AppView {
+    let snapshot = status_source.load_query(&query);
+    let status = match snapshot {
+        Ok(snapshot) => RenderedView::new(snapshot),
+        Err(error) => RenderedView::from_error(
+            query.target_label(),
+            status_source.spec_for(&query).title().to_owned(),
+            error.to_string(),
+        ),
+    };
+    AppView::Status {
+        view: status,
+        query,
+    }
+}
+
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum AppView {
@@ -235,6 +285,10 @@ enum AppView {
     Show {
         view: RenderedView,
         query: ShowQuery,
+    },
+    Status {
+        view: RenderedView,
+        query: StatusQuery,
     },
 }
 
@@ -325,6 +379,7 @@ fn run_terminal(
     mut source: JjLog,
     diff_source: &JjDiff,
     show_source: &JjShow,
+    status_source: &JjStatus,
 ) -> Result<()> {
     // jj should keep configured colors even when the parent process was run by an agent or tool
     // that exports NO_COLOR.
@@ -353,6 +408,13 @@ fn run_terminal(
                     }
                     _ => view.render(frame),
                 },
+                AppView::Status { view, .. } => match &mode {
+                    Some(InputMode::InspectionSearch { query }) => {
+                        let status = format!("/{query}");
+                        view.render_with_status(frame, &status);
+                    }
+                    _ => view.render(frame),
+                },
             })?;
             needs_redraw = false;
         }
@@ -374,10 +436,16 @@ fn run_terminal(
                             push_selected_show(&mut state, show_source);
                             needs_redraw = true;
                         }
+                        AppKey::OpenStatus => {
+                            push_status(&mut state, status_source);
+                            needs_redraw = true;
+                        }
                         AppKey::StartSearch
                             if matches!(
                                 state.views.active(),
-                                AppView::Diff { .. } | AppView::Show { .. }
+                                AppView::Diff { .. }
+                                    | AppView::Show { .. }
+                                    | AppView::Status { .. }
                             ) =>
                         {
                             let mode = match state.views.active() {
@@ -385,6 +453,9 @@ fn run_terminal(
                                     query: String::new(),
                                 },
                                 AppView::Show { .. } => InputMode::InspectionSearch {
+                                    query: String::new(),
+                                },
+                                AppView::Status { .. } => InputMode::InspectionSearch {
                                     query: String::new(),
                                 },
                                 AppView::Log(_) => unreachable!(),
@@ -405,8 +476,14 @@ fn run_terminal(
                     continue;
                 };
 
-                if apply_action(&mut state, &mut source, diff_source, show_source, action)
-                    == AppLoop::Quit
+                if apply_action(
+                    &mut state,
+                    &mut source,
+                    diff_source,
+                    show_source,
+                    status_source,
+                    action,
+                ) == AppLoop::Quit
                 {
                     break;
                 }
@@ -503,6 +580,9 @@ fn apply_search_submit(state: &mut AppState, action: SearchSubmit) {
         (AppView::Show { view, .. }, SearchSubmit::Inspection(query)) => {
             let _ = view.apply(RenderedAction::Search(query));
         }
+        (AppView::Status { view, .. }, SearchSubmit::Inspection(query)) => {
+            let _ = view.apply(RenderedAction::Search(query));
+        }
         _ => {}
     }
 }
@@ -518,6 +598,13 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
             let _ = view.apply(action);
         }
         AppView::Show { view, .. } => {
+            let action = match direction {
+                SearchDirection::Next => RenderedAction::SearchNext,
+                SearchDirection::Previous => RenderedAction::SearchPrevious,
+            };
+            let _ = view.apply(action);
+        }
+        AppView::Status { view, .. } => {
             let action = match direction {
                 SearchDirection::Next => RenderedAction::SearchNext,
                 SearchDirection::Previous => RenderedAction::SearchPrevious,
@@ -543,12 +630,14 @@ fn apply_action(
     source: &mut JjLog,
     diff_source: &JjDiff,
     show_source: &JjShow,
+    status_source: &JjStatus,
     action: jk_tui::log_view::LogAction,
 ) -> AppLoop {
     let transition = match state.views.active_mut() {
         AppView::Log(log) => apply_log_action(log, source, diff_source, action),
         AppView::Diff { view, query } => apply_diff_action(view, query, diff_source, action),
         AppView::Show { view, query } => apply_show_action(view, query, show_source, action),
+        AppView::Status { view, query } => apply_status_action(view, query, status_source, action),
     };
 
     match transition {
@@ -620,6 +709,27 @@ fn push_selected_show(state: &mut AppState, show_source: &JjShow) {
             });
         }
         Err(error) => log.show_error(error.to_string()),
+    }
+}
+
+fn push_status(state: &mut AppState, status_source: &JjStatus) {
+    if !matches!(state.views.active(), AppView::Log(_)) {
+        return;
+    }
+
+    let query = StatusQuery::default();
+    match status_source.load_query(&query) {
+        Ok(snapshot) => {
+            state.views.push(AppView::Status {
+                view: RenderedView::new(snapshot),
+                query,
+            });
+        }
+        Err(error) => {
+            if let AppView::Log(log) = state.views.active_mut() {
+                log.show_error(error.to_string());
+            }
+        }
     }
 }
 
@@ -696,6 +806,36 @@ fn apply_show_action(
     AppTransition::Continue
 }
 
+/// Applies an action while a repository status view is active.
+fn apply_status_action(
+    view: &mut RenderedView,
+    query: &StatusQuery,
+    status_source: &JjStatus,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let rendered_action = match action {
+        jk_tui::log_view::LogAction::Previous => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::Next => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::PagePrevious => RenderedAction::PagePrevious,
+        jk_tui::log_view::LogAction::PageNext => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::First => RenderedAction::First,
+        jk_tui::log_view::LogAction::Last => RenderedAction::Last,
+        jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
+        jk_tui::log_view::LogAction::Refresh => RenderedAction::Refresh,
+        jk_tui::log_view::LogAction::Quit => RenderedAction::Quit,
+        _ => RenderedAction::ReturnToLog,
+    };
+
+    match view.apply(rendered_action) {
+        RenderedActionResult::Refresh => refresh_status(view, query, status_source),
+        RenderedActionResult::ReturnToLog => return AppTransition::PopView,
+        RenderedActionResult::Quit => return AppTransition::Quit,
+        _ => {}
+    }
+
+    AppTransition::Continue
+}
+
 /// Whether the terminal event loop should continue running.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AppLoop {
@@ -730,6 +870,14 @@ fn refresh_diff(app: &mut DiffView, query: &DiffQuery, source: &JjDiff) {
 
 /// Reloads the active show/details view without replacing it on failure.
 fn refresh_show(app: &mut RenderedView, query: &ShowQuery, source: &JjShow) {
+    match source.load_query(query) {
+        Ok(snapshot) => app.refresh(snapshot),
+        Err(error) => app.show_error(error.to_string()),
+    }
+}
+
+/// Reloads the active status view without replacing it on failure.
+fn refresh_status(app: &mut RenderedView, query: &StatusQuery, source: &JjStatus) {
     match source.load_query(query) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
@@ -903,6 +1051,30 @@ mod tests {
     fn diff_args_require_from_and_to_together() {
         assert!(Args::try_parse_from(["jk", "diff", "--from", "main"]).is_err());
         assert!(Args::try_parse_from(["jk", "diff", "--to", "@"]).is_err());
+    }
+
+    #[test]
+    fn status_args_default_to_repository_status() {
+        let args = Args::try_parse_from(["jk", "status"]).expect("valid status args");
+        let Some(Command::Status(status_args)) = args.command else {
+            panic!("expected status command");
+        };
+
+        assert_eq!(status_args.query(), StatusQuery::default());
+    }
+
+    #[test]
+    fn status_args_preserve_filesets() {
+        let args =
+            Args::try_parse_from(["jk", "status", "crates/jk", "docs"]).expect("valid status args");
+        let Some(Command::Status(status_args)) = args.command else {
+            panic!("expected status command");
+        };
+
+        assert_eq!(
+            status_args.query(),
+            StatusQuery::new(vec!["crates/jk".to_owned(), "docs".to_owned()])
+        );
     }
 
     fn diff_app_view(change_id: &str) -> AppView {

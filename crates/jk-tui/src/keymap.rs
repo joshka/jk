@@ -20,6 +20,7 @@ enum ActionId {
     Collapse,
     OpenShow,
     OpenDiff,
+    OpenStatus,
     Refresh,
     SwitchLogCommand,
     File,
@@ -73,21 +74,22 @@ impl KeyBinding {
 }
 
 const LOG_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection").with_hotbar(6, "j/k move"),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection").with_hotbar(7, "j/k move"),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
-        .with_hotbar(7, "space/b page"),
+        .with_hotbar(8, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom"),
     KeyBinding::new(ActionId::OpenShow, "enter", "open selected-change show")
         .with_hotbar(4, "enter show"),
     KeyBinding::new(ActionId::Expand, "right, l", "expand selected change"),
     KeyBinding::new(ActionId::Collapse, "left, h", "collapse selected change"),
     KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff").with_hotbar(5, "d diff"),
+    KeyBinding::new(ActionId::OpenStatus, "s", "open repository status").with_hotbar(6, "s status"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh").with_hotbar(3, "r refresh"),
     KeyBinding::new(ActionId::SwitchLogCommand, "H / L", "home command / jj log")
         .with_hotbar(2, "H home  L log"),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help").with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
-        .with_hotbar(8, "q quit")
+        .with_hotbar(9, "q quit")
         .hotbar_only(),
 ];
 
@@ -177,7 +179,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  j/k move  space/b page  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  s status  j/k move  space/b page  q quit"
         );
     }
 
@@ -209,6 +211,7 @@ mod tests {
                 "right, l             expand selected change",
                 "left, h              collapse selected change",
                 "d                    open selected-change diff",
+                "s                    open repository status",
                 "r                    refresh",
                 "H / L                home command / jj log",
                 "?, q, Esc            close help",

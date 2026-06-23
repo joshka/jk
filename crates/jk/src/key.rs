@@ -16,6 +16,9 @@ pub enum AppKey {
     /// Open the selected revision show/details view.
     OpenShow,
 
+    /// Open repository status.
+    OpenStatus,
+
     /// Close the active mode or return to the previous view.
     Back,
 
@@ -111,6 +114,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'L' => Some(AppKey::Action(LogAction::Log)),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
+        's' => Some(AppKey::OpenStatus),
         '?' => Some(AppKey::Action(LogAction::ToggleHelp)),
         '/' => Some(AppKey::StartSearch),
         'n' => Some(AppKey::SearchNext),
@@ -197,6 +201,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::OpenDiff)
+        );
+    }
+
+    #[test]
+    fn lowercase_s_opens_status() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
+            AppKey::OpenStatus
         );
     }
 
