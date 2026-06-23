@@ -14,8 +14,9 @@ use jk_cli::{
     DiffFormat, DiffQuery, JjDiff, JjLog, JjLogCommand, JjShow, JjStatus, LogTemplateSelection,
     ShowQuery, StatusQuery,
 };
+use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
-use jk_tui::log_view::{ActionResult, LogView};
+use jk_tui::log_view::{ActionResult, LogAction, LogView};
 use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
 
 mod key;
@@ -416,12 +417,28 @@ fn run_terminal(
                         let lines = template_selector_lines(options, *selected);
                         log.render_with_selector(frame, "Log template", &lines);
                     }
+                    Some(InputMode::CommandDiscovery {
+                        context,
+                        query,
+                        selected,
+                    }) => {
+                        let lines = discovery_lines(*context, query, *selected);
+                        log.render_with_selector(frame, "Command discovery", &lines);
+                    }
                     _ => log.render(frame),
                 },
                 AppView::Diff { view, .. } => match &mode {
                     Some(InputMode::DiffSearch { query }) => {
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
+                    }
+                    Some(InputMode::CommandDiscovery {
+                        context,
+                        query,
+                        selected,
+                    }) => {
+                        let lines = discovery_lines(*context, query, *selected);
+                        view.render_with_overlay(frame, "Command discovery", &lines);
                     }
                     _ => view.render(frame),
                 },
@@ -430,12 +447,28 @@ fn run_terminal(
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
                     }
+                    Some(InputMode::CommandDiscovery {
+                        context,
+                        query,
+                        selected,
+                    }) => {
+                        let lines = discovery_lines(*context, query, *selected);
+                        view.render_with_overlay(frame, "Command discovery", &lines);
+                    }
                     _ => view.render(frame),
                 },
                 AppView::Status { view, .. } => match &mode {
                     Some(InputMode::InspectionSearch { query }) => {
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
+                    }
+                    Some(InputMode::CommandDiscovery {
+                        context,
+                        query,
+                        selected,
+                    }) => {
+                        let lines = discovery_lines(*context, query, *selected);
+                        view.render_with_overlay(frame, "Command discovery", &lines);
                     }
                     _ => view.render(frame),
                 },
@@ -450,8 +483,9 @@ fn run_terminal(
                     continue;
                 }
 
-                let AppKey::Action(action) = AppKey::from_crossterm(key) else {
-                    match AppKey::from_crossterm(key) {
+                let app_key = AppKey::from_crossterm(key);
+                let AppKey::Action(action) = app_key else {
+                    match app_key {
                         AppKey::Back => {
                             handle_back(&mut state);
                             needs_redraw = true;
@@ -500,6 +534,12 @@ fn run_terminal(
                     continue;
                 };
 
+                if matches!(app_key, AppKey::Action(LogAction::ToggleHelp)) {
+                    open_command_discovery(&mut state);
+                    needs_redraw = true;
+                    continue;
+                }
+
                 if apply_action(
                     &mut state,
                     &mut source,
@@ -532,6 +572,11 @@ enum InputMode {
     InspectionSearch {
         query: String,
     },
+    CommandDiscovery {
+        context: BindingContext,
+        query: String,
+        selected: usize,
+    },
     LogTemplate {
         options: Vec<LogTemplateSelection>,
         selected: usize,
@@ -549,6 +594,12 @@ enum InputModeResult {
 fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) -> InputModeResult {
     if matches!(state.modes.active(), Some(InputMode::LogTemplate { .. })) {
         return handle_template_mode(state, source, key);
+    }
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::CommandDiscovery { .. })
+    ) {
+        return handle_command_discovery_mode(state, key);
     }
 
     let Some(mode) = state.modes.active_mut() else {
@@ -569,6 +620,7 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
             let action = match mode {
                 InputMode::DiffSearch { query } => SearchSubmit::Diff(query.clone()),
                 InputMode::InspectionSearch { query } => SearchSubmit::Inspection(query.clone()),
+                InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
             state.modes.pop();
@@ -591,11 +643,148 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
                 InputMode::DiffSearch { query } | InputMode::InspectionSearch { query } => {
                     query.push(character);
                 }
+                InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
+    }
+}
+
+fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc | KeyCode::Enter,
+            ..
+        } => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char('q' | '?'),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        } => {
+            let should_close = match state.modes.active_mut() {
+                Some(InputMode::CommandDiscovery {
+                    query, selected, ..
+                }) if query.is_empty() => {
+                    *selected = 0;
+                    true
+                }
+                Some(InputMode::CommandDiscovery {
+                    context,
+                    query,
+                    selected,
+                }) => {
+                    query.pop();
+                    clamp_command_discovery_selection(*context, query, selected);
+                    false
+                }
+                _ => false,
+            };
+            if should_close {
+                state.modes.pop();
+            }
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Up, ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('k'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            move_command_discovery_selection(state, DiscoveryMove::Previous);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            move_command_discovery_selection(state, DiscoveryMove::Next);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            if let Some(InputMode::CommandDiscovery {
+                context,
+                query,
+                selected,
+            }) = state.modes.active_mut()
+            {
+                query.push(character);
+                clamp_command_discovery_selection(*context, query, selected);
+            }
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+fn open_command_discovery(state: &mut AppState) {
+    let context = match state.views.active() {
+        AppView::Log(_) => BindingContext::Log,
+        AppView::Diff { .. } => BindingContext::Diff,
+        AppView::Show { .. } | AppView::Status { .. } => BindingContext::Inspection,
+    };
+    state.modes.push(InputMode::CommandDiscovery {
+        context,
+        query: String::new(),
+        selected: 0,
+    });
+}
+
+#[derive(Clone, Copy)]
+enum DiscoveryMove {
+    Previous,
+    Next,
+}
+
+fn move_command_discovery_selection(state: &mut AppState, direction: DiscoveryMove) {
+    let Some(InputMode::CommandDiscovery {
+        context,
+        query,
+        selected,
+    }) = state.modes.active_mut()
+    else {
+        return;
+    };
+    let row_count = filtered_discovery_len(*context, query);
+    if row_count == 0 {
+        *selected = 0;
+        return;
+    }
+
+    match direction {
+        DiscoveryMove::Previous => *selected = selected.saturating_sub(1),
+        DiscoveryMove::Next => *selected = (*selected + 1).min(row_count - 1),
+    }
+}
+
+fn clamp_command_discovery_selection(context: BindingContext, query: &str, selected: &mut usize) {
+    let row_count = filtered_discovery_len(context, query);
+    if row_count == 0 {
+        *selected = 0;
+    } else {
+        *selected = (*selected).min(row_count - 1);
     }
 }
 
@@ -1159,6 +1348,113 @@ mod tests {
                 query: diff_query("aaa")
             }
         );
+    }
+
+    #[test]
+    fn command_discovery_opens_for_active_context() {
+        let mut state = AppState::new(diff_app_view("aaa"));
+
+        open_command_discovery(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::CommandDiscovery {
+                context: BindingContext::Diff,
+                query: String::new(),
+                selected: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn command_discovery_filters_and_clamps_selection() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::CommandDiscovery {
+            context: BindingContext::Log,
+            query: "jj sho".to_owned(),
+            selected: 12,
+        });
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::CommandDiscovery {
+                context: BindingContext::Log,
+                query: "jj show".to_owned(),
+                selected: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn command_discovery_navigation_clamps_to_visible_rows() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::CommandDiscovery {
+            context: BindingContext::Log,
+            query: "jj show".to_owned(),
+            selected: 0,
+        });
+
+        move_command_discovery_selection(&mut state, DiscoveryMove::Next);
+        move_command_discovery_selection(&mut state, DiscoveryMove::Previous);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::CommandDiscovery {
+                context: BindingContext::Log,
+                query: "jj show".to_owned(),
+                selected: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn command_discovery_enter_closes_without_executing() {
+        let mut state = AppState::new(diff_app_view("aaa"));
+        let expected_view = state.views.active().clone();
+        state.modes.push(InputMode::CommandDiscovery {
+            context: BindingContext::Diff,
+            query: "refresh".to_owned(),
+            selected: 0,
+        });
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(state.modes.active(), None);
+        assert_eq!(state.views.active(), &expected_view);
+    }
+
+    #[test]
+    fn command_discovery_backspace_closes_when_query_empty() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::CommandDiscovery {
+            context: BindingContext::Log,
+            query: String::new(),
+            selected: 0,
+        });
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(state.modes.active(), None);
     }
 
     #[test]

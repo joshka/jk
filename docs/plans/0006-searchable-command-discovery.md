@@ -86,7 +86,9 @@ Initial row examples:
 
 Exact spacing can change during implementation, but rows should stay scan-friendly on a normal
 80-column terminal. On narrow terminals, the rightmost metadata should clip before key or action
-labels become unreadable.
+labels become unreadable. Keep the first slice current-context only: opening help from the log shows
+log actions, opening help from diff shows diff actions, and opening help from show/status shows
+inspection actions.
 
 ## Search Behavior
 
@@ -121,15 +123,15 @@ The discovery overlay is an input mode. While it is active:
 - `Backspace` closes the overlay when the filter is empty;
 - `Esc` closes the overlay;
 - `q` closes the overlay;
-- `?` closes the overlay or leaves it open; choose one behavior and test it;
+- `?` closes the overlay;
 - up/down arrows and `j/k` move the highlighted row when at least one row exists;
 - row movement clamps at the first and last visible rows;
-- `Enter` closes the overlay or no-ops in the first slice;
+- `Enter` closes the overlay without executing anything;
 - page keys can be ignored in the first slice unless overlay height requires scrolling.
 
-Recommended first-slice `Enter` behavior: close the overlay without executing anything. This gives
-users a clear way out after selecting a row while preserving the no-execution boundary. If that
-feels misleading in implementation, make `Enter` a no-op and document it in the footer.
+`Enter` intentionally behaves like "done reading" in the first slice. It does not execute the
+highlighted action, does not push a view, and does not run a `jj` command. That keeps searchable
+help distinct from the future `:` command mode while still making keyboard dismissal predictable.
 
 The global `?` key should keep working from log, diff, show, and status contexts. Existing
 `q`/`Esc` close-help-before-quit behavior should remain true through the new mode.
@@ -172,10 +174,9 @@ and searchable rows. Avoid duplicating the same action text in a second table.
 - whether the binding is relevant to discovery;
 - whether the binding is only contextual to one active view.
 
-Rows should be built from the active context first. The first slice may include only active-context
-rows, but the filter must still expose the current context and command-family fields. A small
-follow-up can add "related but inactive" rows if usage shows that users expect cross-screen
-discovery.
+Rows should be built from the active context only. The filter must still expose the current context
+and command-family fields. A small follow-up can add "related but inactive" rows if usage shows that
+users expect cross-screen discovery.
 
 ## Context Ownership
 
@@ -189,10 +190,15 @@ The source of truth should remain split the same way it is today:
 
 Suggested new or changed internals:
 
-- add `DiscoveryState` or `InputMode::CommandDiscovery { query, selected }` in `main.rs`;
+- add `DiscoveryState` or `InputMode::CommandDiscovery { context, query, selected }` in `main.rs`;
 - add `discovery_rows(context)` and `filter_discovery_rows(context, query)` in `keymap.rs`;
 - add a reusable `render_discovery_overlay` helper in `chrome.rs` or a small new TUI module;
 - add render methods that can draw a caller-owned discovery overlay on top of an active view.
+
+The current log-template selector already renders caller-owned popup lines through active views.
+Searchable discovery can start with the same shape: the application owns query and selected-index
+state, `jk-tui` owns filtered row construction and popup line formatting, and each active view only
+needs a render hook that layers the popup over its existing content.
 
 Keep `BindingContext` internal unless the binary crate needs to ask the active view for it. If the
 binary needs the context, prefer a small public method or public enum from `jk-tui` over leaking the
@@ -282,7 +288,7 @@ The first implementation is complete when these user-visible behaviors work:
 - pressing `?` in show/status inspection shows inspection-context search, navigation, refresh, and
   return rows;
 - arrow keys and `j/k` move the highlighted row when filtered rows exist;
-- `Backspace`, `Esc`, and `q` cancel in the specified ways;
+- `Backspace`, `Esc`, `?`, and `q` cancel in the specified ways;
 - `Enter` does not execute a command;
 - `:` command mode remains unimplemented and unaffected;
 - `jk-cli` command execution paths are unchanged.

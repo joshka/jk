@@ -275,6 +275,14 @@ impl DiffView {
         self.render_area(frame, area, Some(status));
     }
 
+    /// Renders the diff view with a caller-owned centered overlay.
+    pub fn render_with_overlay(&mut self, frame: &mut Frame<'_>, title: &str, lines: &[String]) {
+        let area = frame.area();
+        self.render_area(frame, area, None);
+        let areas = ViewChrome::layout(area);
+        render_help_overlay(frame, areas.content, title, lines);
+    }
+
     fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
         let areas = ViewChrome::layout(area);
         let height = usize::from(areas.content.height);
