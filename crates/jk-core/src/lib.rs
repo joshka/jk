@@ -5,11 +5,18 @@
 //! change, preserve selection across refresh, and insert inline details at the right rendered line.
 
 mod command;
+mod command_history;
 
 pub use command::{
     ColorPolicy, ConfigOverlay, ExecutionMode, GlobalOptions, ImmutabilityPolicy, JjCommandSpec,
     OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, PagerPolicy, RefreshPlan,
     SafetyClass, WorkingCopyPolicy,
+};
+pub use command_history::{
+    CommandExecutionContext, CommandFamily, CommandHistory, CommandIdentity, CommandRecord,
+    CommandRecordFinish, CommandRecordId, CommandRecordStart, CommandResultSummary, CommandSource,
+    CommandTiming, ExitStatusSummary, GlobalOptionsSnapshot, OutputRetention, PendingCommandRecord,
+    SourceAction, SourceView, StreamSummary,
 };
 
 /// A rendered `jj` log view plus semantic records for navigation.
