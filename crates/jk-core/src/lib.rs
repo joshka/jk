@@ -131,6 +131,57 @@ impl DiffSnapshot {
     }
 }
 
+/// A rendered read-only `jj` inspection view.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct InspectionSnapshot {
+    title: String,
+    target: String,
+    rendered: String,
+}
+
+impl InspectionSnapshot {
+    /// Creates an inspection snapshot from the target label and rendered terminal text.
+    #[must_use]
+    pub fn new(target: impl Into<String>, rendered: impl Into<String>) -> Self {
+        Self {
+            title: String::new(),
+            target: target.into(),
+            rendered: rendered.into(),
+        }
+    }
+
+    /// Sets the command context shown in the title bar.
+    #[must_use]
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+
+    /// Returns the human-readable command context for the current view.
+    #[must_use]
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    /// Returns the inspected target label.
+    #[must_use]
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// Returns the opaque output rendered by `jj`.
+    #[must_use]
+    pub fn rendered(&self) -> &str {
+        &self.rendered
+    }
+
+    /// Consumes the snapshot into its owned title, target, and rendered body.
+    #[must_use]
+    pub fn into_parts(self) -> (String, String, String) {
+        (self.title, self.target, self.rendered)
+    }
+}
+
 /// Per-file line counts for a rendered diff.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DiffFileStat {

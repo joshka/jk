@@ -8,6 +8,8 @@ use jk_core::JjCommandSpec;
 /// Runs a typed `jj` command spec with the color policy required by the caller.
 pub(crate) fn run_jj_spec(spec: &JjCommandSpec, color: &str) -> std::io::Result<Output> {
     let mut command = build_jj_command(spec, color);
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
     if spec.stdin().is_some() {
         command.stdin(Stdio::piped());
     }
@@ -79,5 +81,15 @@ mod tests {
                 .any(|args| args == ["--repository", "/tmp/repository"])
         );
         assert!(args.windows(3).any(|args| args == ["diff", "-r", "@"]));
+    }
+
+    #[test]
+    fn command_adapter_captures_stdout() {
+        let spec = JjCommandSpec::render_read_only(["--version"]);
+        let output = run_jj_spec(&spec, "always").expect("jj --version should run");
+
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stdout).contains("jj "));
+        assert!(output.stderr.is_empty());
     }
 }

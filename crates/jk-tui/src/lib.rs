@@ -7,6 +7,7 @@
 
 pub mod diff_view;
 pub mod log_view;
+pub mod rendered_view;
 
 mod ansi_text;
 mod chrome;
@@ -14,4 +15,5 @@ mod diff_state;
 mod keymap;
 mod log_state;
 mod rendered_log;
+mod rendered_state;
 mod selected_row;

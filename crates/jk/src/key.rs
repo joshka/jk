@@ -13,6 +13,9 @@ pub enum AppKey {
     /// Dispatch this action to the active view.
     Action(LogAction),
 
+    /// Open the selected revision show/details view.
+    OpenShow,
+
     /// Close the active mode or return to the previous view.
     Back,
 
@@ -52,7 +55,11 @@ impl AppKey {
                 ..
             } => Self::Action(LogAction::Quit),
             KeyEvent {
-                code: KeyCode::Right | KeyCode::Enter,
+                code: KeyCode::Enter,
+                ..
+            } => Self::OpenShow,
+            KeyEvent {
+                code: KeyCode::Right,
                 ..
             } => Self::Action(LogAction::ToggleExpanded),
             KeyEvent {
@@ -142,10 +149,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn enter_toggles_expanded_details() {
+    fn enter_opens_show_details() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
-            AppKey::Action(LogAction::ToggleExpanded)
+            AppKey::OpenShow
         );
     }
 

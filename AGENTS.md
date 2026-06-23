@@ -75,11 +75,13 @@ release-oriented changes.
 
 ## Commit & Pull Request Guidelines
 
-Use plain imperative commit summaries, not conventional commits. Wrap
-commit message bodies at 72 columns. Pull requests should explain
-user-visible behavior, list validation run, and call out release or
-crates.io impact. Link related issues when they exist. Include terminal
-screenshots only for meaningful TUI rendering changes.
+Use plain imperative commit summaries, not conventional commits. Keep
+summary lines short, then wrap every commit-message body line at 72
+columns, including multiline `jj desc` descriptions created during local
+work. Pull requests should explain user-visible behavior, list
+validation run, and call out release or crates.io impact. Link related
+issues when they exist. Include terminal screenshots only for meaningful
+TUI rendering changes.
 
 ## Security & Release Notes
 

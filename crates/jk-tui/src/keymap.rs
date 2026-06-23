@@ -8,6 +8,7 @@
 pub(crate) enum BindingContext {
     Log,
     Diff,
+    Inspection,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -17,6 +18,7 @@ enum ActionId {
     FirstLast,
     Expand,
     Collapse,
+    OpenShow,
     OpenDiff,
     Refresh,
     SwitchLogCommand,
@@ -71,23 +73,21 @@ impl KeyBinding {
 }
 
 const LOG_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection").with_hotbar(5, "j/k move"),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection").with_hotbar(6, "j/k move"),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
-        .with_hotbar(6, "space/b page"),
+        .with_hotbar(7, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom"),
-    KeyBinding::new(
-        ActionId::Expand,
-        "enter, right, l",
-        "expand selected change",
-    ),
+    KeyBinding::new(ActionId::OpenShow, "enter", "open selected-change show")
+        .with_hotbar(4, "enter show"),
+    KeyBinding::new(ActionId::Expand, "right, l", "expand selected change"),
     KeyBinding::new(ActionId::Collapse, "left, h", "collapse selected change"),
-    KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff").with_hotbar(3, "d diff"),
-    KeyBinding::new(ActionId::Refresh, "r", "refresh").with_hotbar(4, "r refresh"),
+    KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff").with_hotbar(5, "d diff"),
+    KeyBinding::new(ActionId::Refresh, "r", "refresh").with_hotbar(3, "r refresh"),
     KeyBinding::new(ActionId::SwitchLogCommand, "H / L", "home command / jj log")
         .with_hotbar(2, "H home  L log"),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help").with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
-        .with_hotbar(7, "q quit")
+        .with_hotbar(8, "q quit")
         .hotbar_only(),
 ];
 
@@ -106,6 +106,20 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     ),
     KeyBinding::new(ActionId::FoldHunk, "- / +", "fold/unfold current hunk"),
     KeyBinding::new(ActionId::HorizontalScroll, "< / >", "horizontal scroll"),
+    KeyBinding::new(ActionId::Search, "/, n, N", "search, next, previous"),
+    KeyBinding::new(ActionId::Refresh, "r", "refresh").with_hotbar(2, "r refresh"),
+    KeyBinding::new(ActionId::ReturnToLog, "H / L", "return to log"),
+    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help").with_hotbar(1, "? help"),
+    KeyBinding::new(ActionId::Quit, "q", "quit")
+        .with_hotbar(5, "q quit")
+        .hotbar_only(),
+];
+
+const INSPECTION_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line").with_hotbar(3, "j/k line"),
+    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+        .with_hotbar(4, "space/b page"),
+    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom"),
     KeyBinding::new(ActionId::Search, "/, n, N", "search, next, previous"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh").with_hotbar(2, "r refresh"),
     KeyBinding::new(ActionId::ReturnToLog, "H / L", "return to log"),
@@ -134,6 +148,7 @@ pub(crate) const fn help_title(context: BindingContext) -> &'static str {
     match context {
         BindingContext::Log => "Log keys",
         BindingContext::Diff => "Diff keys",
+        BindingContext::Inspection => "Inspection keys",
     }
 }
 
@@ -150,6 +165,7 @@ const fn bindings(context: BindingContext) -> &'static [KeyBinding] {
     match context {
         BindingContext::Log => LOG_BINDINGS,
         BindingContext::Diff => DIFF_BINDINGS,
+        BindingContext::Inspection => INSPECTION_BINDINGS,
     }
 }
 
@@ -161,7 +177,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  d diff  r refresh  j/k move  space/b page  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  j/k move  space/b page  q quit"
         );
     }
 
@@ -174,6 +190,14 @@ mod tests {
     }
 
     #[test]
+    fn inspection_hotbar_matches_current_status_text() {
+        assert_eq!(
+            hotbar(BindingContext::Inspection),
+            "? help  r refresh  j/k line  space/b page  q quit"
+        );
+    }
+
+    #[test]
     fn log_help_lines_match_current_overlay() {
         assert_eq!(
             help_lines(BindingContext::Log),
@@ -181,7 +205,8 @@ mod tests {
                 "j/k or arrows        move selection",
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
-                "enter, right, l      expand selected change",
+                "enter                open selected-change show",
+                "right, l             expand selected change",
                 "left, h              collapse selected change",
                 "d                    open selected-change diff",
                 "r                    refresh",
@@ -214,8 +239,28 @@ mod tests {
     }
 
     #[test]
+    fn inspection_help_lines_match_current_overlay() {
+        assert_eq!(
+            help_lines(BindingContext::Inspection),
+            vec![
+                "j/k or arrows        scroll one line",
+                "space / b, Ctrl-f/b  page down/up",
+                "g/G or Home/End      jump to top/bottom",
+                "/, n, N              search, next, previous",
+                "r                    refresh",
+                "H / L                return to log",
+                "?, q, Esc            close help",
+            ]
+        );
+    }
+
+    #[test]
     fn hotbar_bindings_have_help() {
-        for context in [BindingContext::Log, BindingContext::Diff] {
+        for context in [
+            BindingContext::Log,
+            BindingContext::Diff,
+            BindingContext::Inspection,
+        ] {
             for binding in bindings(context) {
                 if binding.hotbar.is_some() {
                     assert!(!binding.help.is_empty());

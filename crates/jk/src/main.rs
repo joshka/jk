@@ -10,9 +10,10 @@ use clap::{Parser, Subcommand};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
-use jk_cli::{DiffFormat, DiffQuery, JjDiff, JjLog, JjLogCommand};
+use jk_cli::{DiffFormat, DiffQuery, JjDiff, JjLog, JjLogCommand, JjShow, ShowQuery};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogView};
+use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
 
 mod key;
 
@@ -43,6 +44,9 @@ enum Command {
 
     /// Show the jj diff view for a revision.
     Diff(DiffArgs),
+
+    /// Show one or more revisions.
+    Show(ShowArgs),
 }
 
 /// Options for the explicit `jk log` command.
@@ -87,6 +91,20 @@ struct DiffArgs {
     stat: bool,
 }
 
+/// Options for the explicit `jk show` command.
+#[derive(Debug, Parser)]
+struct ShowArgs {
+    /// Revisions to show.
+    #[arg(value_name = "REV", required = true)]
+    revs: Vec<String>,
+}
+
+impl ShowArgs {
+    fn query(&self) -> ShowQuery {
+        ShowQuery::new(self.revs.clone())
+    }
+}
+
 impl DiffArgs {
     fn query(&self) -> DiffQuery {
         let format = if self.stat {
@@ -119,24 +137,23 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let source = log_source(&args);
     let diff_source = diff_source(&args);
-    let app = if let Some(Command::Diff(diff_args)) = &args.command {
-        let query = diff_args.query();
-        let snapshot = diff_source.load_query(&query);
-        let diff = match snapshot {
-            Ok(snapshot) => DiffView::new(snapshot),
-            Err(error) => DiffView::from_error(
-                query.target_label(),
-                diff_source.spec_for(&query).title().to_owned(),
-                error.to_string(),
-            ),
-        };
-        AppView::Diff { view: diff, query }
-    } else {
-        let entries = source.load()?;
-        AppView::Log(LogView::new(entries))
+    let show_source = show_source(&args);
+    let app = match &args.command {
+        Some(Command::Diff(diff_args)) => {
+            let query = diff_args.query();
+            root_diff_view(&diff_source, query)
+        }
+        Some(Command::Show(show_args)) => {
+            let query = show_args.query();
+            root_show_view(&show_source, query)
+        }
+        Some(Command::Log(_)) | None => {
+            let entries = source.load()?;
+            AppView::Log(LogView::new(entries))
+        }
     };
 
-    run_terminal(app, source, &diff_source)?;
+    run_terminal(app, source, &diff_source, &show_source)?;
     Ok(())
 }
 
@@ -148,7 +165,9 @@ fn main() -> Result<()> {
 fn log_source(args: &Args) -> JjLog {
     let (command, limit) = match &args.command {
         Some(Command::Log(log_args)) => (JjLogCommand::Log, log_args.limit.or(args.limit)),
-        Some(Command::Diff(_)) | None => (JjLogCommand::ConfiguredDefault, args.limit),
+        Some(Command::Diff(_) | Command::Show(_)) | None => {
+            (JjLogCommand::ConfiguredDefault, args.limit)
+        }
     };
 
     let source = JjLog::default().with_command(command).with_limit(limit);
@@ -169,11 +188,54 @@ fn diff_source(args: &Args) -> JjDiff {
     }
 }
 
+/// Builds the show source for selected-change inspection.
+fn show_source(args: &Args) -> JjShow {
+    let source = JjShow::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+fn root_diff_view(diff_source: &JjDiff, query: DiffQuery) -> AppView {
+    let snapshot = diff_source.load_query(&query);
+    let diff = match snapshot {
+        Ok(snapshot) => DiffView::new(snapshot),
+        Err(error) => DiffView::from_error(
+            query.target_label(),
+            diff_source.spec_for(&query).title().to_owned(),
+            error.to_string(),
+        ),
+    };
+    AppView::Diff { view: diff, query }
+}
+
+fn root_show_view(show_source: &JjShow, query: ShowQuery) -> AppView {
+    let snapshot = show_source.load_query(&query);
+    let show = match snapshot {
+        Ok(snapshot) => RenderedView::new(snapshot),
+        Err(error) => RenderedView::from_error(
+            query.target_label(),
+            show_source.spec_for(&query).title().to_owned(),
+            error.to_string(),
+        ),
+    };
+    AppView::Show { view: show, query }
+}
+
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum AppView {
     Log(LogView),
-    Diff { view: DiffView, query: DiffQuery },
+    Diff {
+        view: DiffView,
+        query: DiffQuery,
+    },
+    Show {
+        view: RenderedView,
+        query: ShowQuery,
+    },
 }
 
 /// Application state owned by the terminal loop.
@@ -258,7 +320,12 @@ impl ModeStack {
 /// The view remains responsible for state transitions and rendering. This loop only translates
 /// terminal events, performs I/O requested by the view, and redraws when input or terminal resize
 /// events can change the screen.
-fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result<()> {
+fn run_terminal(
+    app: AppView,
+    mut source: JjLog,
+    diff_source: &JjDiff,
+    show_source: &JjShow,
+) -> Result<()> {
     // jj should keep configured colors even when the parent process was run by an agent or tool
     // that exports NO_COLOR.
     force_color_output(true);
@@ -277,7 +344,14 @@ fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
                     }
-                    None => view.render(frame),
+                    _ => view.render(frame),
+                },
+                AppView::Show { view, .. } => match &mode {
+                    Some(InputMode::InspectionSearch { query }) => {
+                        let status = format!("/{query}");
+                        view.render_with_status(frame, &status);
+                    }
+                    _ => view.render(frame),
                 },
             })?;
             needs_redraw = false;
@@ -296,20 +370,34 @@ fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result
                             handle_back(&mut state);
                             needs_redraw = true;
                         }
+                        AppKey::OpenShow => {
+                            push_selected_show(&mut state, show_source);
+                            needs_redraw = true;
+                        }
                         AppKey::StartSearch
-                            if matches!(state.views.active(), AppView::Diff { .. }) =>
+                            if matches!(
+                                state.views.active(),
+                                AppView::Diff { .. } | AppView::Show { .. }
+                            ) =>
                         {
-                            state.modes.push(InputMode::DiffSearch {
-                                query: String::new(),
-                            });
+                            let mode = match state.views.active() {
+                                AppView::Diff { .. } => InputMode::DiffSearch {
+                                    query: String::new(),
+                                },
+                                AppView::Show { .. } => InputMode::InspectionSearch {
+                                    query: String::new(),
+                                },
+                                AppView::Log(_) => unreachable!(),
+                            };
+                            state.modes.push(mode);
                             needs_redraw = true;
                         }
                         AppKey::SearchNext => {
-                            apply_diff_search_action(&mut state, DiffAction::SearchNext);
+                            apply_search_action(&mut state, SearchDirection::Next);
                             needs_redraw = true;
                         }
                         AppKey::SearchPrevious => {
-                            apply_diff_search_action(&mut state, DiffAction::SearchPrevious);
+                            apply_search_action(&mut state, SearchDirection::Previous);
                             needs_redraw = true;
                         }
                         _ => {}
@@ -317,7 +405,9 @@ fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result
                     continue;
                 };
 
-                if apply_action(&mut state, &mut source, diff_source, action) == AppLoop::Quit {
+                if apply_action(&mut state, &mut source, diff_source, show_source, action)
+                    == AppLoop::Quit
+                {
                     break;
                 }
                 needs_redraw = true;
@@ -336,6 +426,7 @@ fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum InputMode {
     DiffSearch { query: String },
+    InspectionSearch { query: String },
 }
 
 /// Whether an input-mode handler consumed a key event.
@@ -347,7 +438,7 @@ enum InputModeResult {
 
 /// Handles key input while a prompt-like mode is active.
 fn handle_input_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
-    let Some(InputMode::DiffSearch { query }) = state.modes.active_mut() else {
+    let Some(mode) = state.modes.active_mut() else {
         return InputModeResult::Unhandled;
     };
 
@@ -362,9 +453,12 @@ fn handle_input_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
             code: KeyCode::Enter,
             ..
         } => {
-            let query = query.clone();
-            apply_diff_search_action(state, DiffAction::Search(query));
+            let action = match mode {
+                InputMode::DiffSearch { query } => SearchSubmit::Diff(query.clone()),
+                InputMode::InspectionSearch { query } => SearchSubmit::Inspection(query.clone()),
+            };
             state.modes.pop();
+            apply_search_submit(state, action);
             InputModeResult::Handled
         }
         KeyEvent {
@@ -379,17 +473,58 @@ fn handle_input_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
             modifiers,
             ..
         } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
-            query.push(character);
+            match mode {
+                InputMode::DiffSearch { query } | InputMode::InspectionSearch { query } => {
+                    query.push(character);
+                }
+            }
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
     }
 }
 
-/// Applies a search-only diff action when the active view supports it.
-fn apply_diff_search_action(state: &mut AppState, action: DiffAction) {
-    if let AppView::Diff { view, .. } = state.views.active_mut() {
-        let _ = view.apply(action);
+enum SearchSubmit {
+    Diff(String),
+    Inspection(String),
+}
+
+#[derive(Clone, Copy)]
+enum SearchDirection {
+    Next,
+    Previous,
+}
+
+fn apply_search_submit(state: &mut AppState, action: SearchSubmit) {
+    match (state.views.active_mut(), action) {
+        (AppView::Diff { view, .. }, SearchSubmit::Diff(query)) => {
+            let _ = view.apply(DiffAction::Search(query));
+        }
+        (AppView::Show { view, .. }, SearchSubmit::Inspection(query)) => {
+            let _ = view.apply(RenderedAction::Search(query));
+        }
+        _ => {}
+    }
+}
+
+/// Applies a search navigation action when the active view supports it.
+fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
+    match state.views.active_mut() {
+        AppView::Diff { view, .. } => {
+            let action = match direction {
+                SearchDirection::Next => DiffAction::SearchNext,
+                SearchDirection::Previous => DiffAction::SearchPrevious,
+            };
+            let _ = view.apply(action);
+        }
+        AppView::Show { view, .. } => {
+            let action = match direction {
+                SearchDirection::Next => RenderedAction::SearchNext,
+                SearchDirection::Previous => RenderedAction::SearchPrevious,
+            };
+            let _ = view.apply(action);
+        }
+        AppView::Log(_) => {}
     }
 }
 
@@ -407,11 +542,13 @@ fn apply_action(
     state: &mut AppState,
     source: &mut JjLog,
     diff_source: &JjDiff,
+    show_source: &JjShow,
     action: jk_tui::log_view::LogAction,
 ) -> AppLoop {
     let transition = match state.views.active_mut() {
         AppView::Log(log) => apply_log_action(log, source, diff_source, action),
         AppView::Diff { view, query } => apply_diff_action(view, query, diff_source, action),
+        AppView::Show { view, query } => apply_show_action(view, query, show_source, action),
     };
 
     match transition {
@@ -466,6 +603,26 @@ fn apply_log_action(
     AppTransition::Continue
 }
 
+fn push_selected_show(state: &mut AppState, show_source: &JjShow) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
+        return;
+    };
+
+    let query = ShowQuery::from(change_id);
+    match show_source.load_query(&query) {
+        Ok(snapshot) => {
+            state.views.push(AppView::Show {
+                view: RenderedView::new(snapshot),
+                query,
+            });
+        }
+        Err(error) => log.show_error(error.to_string()),
+    }
+}
+
 /// Applies an action while the diff view is active.
 fn apply_diff_action(
     diff: &mut DiffView,
@@ -509,6 +666,36 @@ fn apply_diff_action(
     AppTransition::Continue
 }
 
+/// Applies an action while a rendered inspection view is active.
+fn apply_show_action(
+    view: &mut RenderedView,
+    query: &ShowQuery,
+    show_source: &JjShow,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let rendered_action = match action {
+        jk_tui::log_view::LogAction::Previous => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::Next => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::PagePrevious => RenderedAction::PagePrevious,
+        jk_tui::log_view::LogAction::PageNext => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::First => RenderedAction::First,
+        jk_tui::log_view::LogAction::Last => RenderedAction::Last,
+        jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
+        jk_tui::log_view::LogAction::Refresh => RenderedAction::Refresh,
+        jk_tui::log_view::LogAction::Quit => RenderedAction::Quit,
+        _ => RenderedAction::ReturnToLog,
+    };
+
+    match view.apply(rendered_action) {
+        RenderedActionResult::Refresh => refresh_show(view, query, show_source),
+        RenderedActionResult::ReturnToLog => return AppTransition::PopView,
+        RenderedActionResult::Quit => return AppTransition::Quit,
+        _ => {}
+    }
+
+    AppTransition::Continue
+}
+
 /// Whether the terminal event loop should continue running.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AppLoop {
@@ -535,6 +722,14 @@ fn refresh_log(app: &mut LogView, source: &JjLog) {
 
 /// Reloads the active diff without replacing the view on failure.
 fn refresh_diff(app: &mut DiffView, query: &DiffQuery, source: &JjDiff) {
+    match source.load_query(query) {
+        Ok(snapshot) => app.refresh(snapshot),
+        Err(error) => app.show_error(error.to_string()),
+    }
+}
+
+/// Reloads the active show/details view without replacing it on failure.
+fn refresh_show(app: &mut RenderedView, query: &ShowQuery, source: &JjShow) {
     match source.load_query(query) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
