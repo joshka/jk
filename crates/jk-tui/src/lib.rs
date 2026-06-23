@@ -1,13 +1,14 @@
 //! Ratatui views and interaction state for `jk`.
 //!
-//! The public surface is currently the log view in [`log_view`] and selected-change diff view in
-//! [`diff_view`]. They accept rendered snapshots from `jk-cli`, apply input actions, and render
-//! borderless views that keep `jj` output visually intact while adding title/status chrome and
-//! selected-row highlighting.
+//! The public surface is currently the log view in [`log_view`], selected-change diff view in
+//! [`diff_view`], and workspace list view in [`workspaces_view`]. They accept caller-provided
+//! snapshots, apply input actions, and render borderless views that keep `jj` output visually
+//! intact while adding title/status chrome and selected-row highlighting.
 
 pub mod diff_view;
 pub mod log_view;
 pub mod rendered_view;
+pub mod workspaces_view;
 
 mod ansi_text;
 mod chrome;

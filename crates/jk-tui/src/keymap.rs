@@ -12,6 +12,8 @@ pub enum BindingContext {
     Diff,
     /// A rendered read-only inspection view, such as show or status.
     Inspection,
+    /// The workspace list view.
+    Workspaces,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,6 +41,7 @@ enum ActionId {
     HorizontalScroll,
     Search,
     ReturnToLog,
+    ReturnBack,
     CloseHelp,
     Quit,
 }
@@ -69,6 +72,7 @@ impl ActionId {
             Self::HorizontalScroll => "Horizontal scroll",
             Self::Search => "Search output",
             Self::ReturnToLog => "Return to log",
+            Self::ReturnBack => "Return back",
             Self::CloseHelp => "Close help",
             Self::Quit => "Quit",
         }
@@ -88,6 +92,8 @@ pub enum CommandFamily {
     JjShow,
     /// Commands and actions related to `jj status`.
     JjStatus,
+    /// Commands and actions related to `jj workspace`.
+    JjWorkspace,
     /// In-view output search.
     Search,
     /// Refreshing the active view.
@@ -118,6 +124,7 @@ impl CommandFamily {
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
+            Self::JjWorkspace => "jj workspace",
             Self::Search => "search",
             Self::Refresh => "refresh",
             Self::Navigation => "navigation",
@@ -334,6 +341,50 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
         .hotbar_only(),
 ];
 
+const WORKSPACES_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["selection", "workspace", "current row"])
+        .with_hotbar(5, "j/k move"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(
+        ActionId::OpenStatus,
+        "enter, s",
+        "open selected workspace status",
+    )
+    .with_family(CommandFamily::JjStatus)
+    .with_aliases(&["status", "workspace", "selected"])
+    .with_hotbar(3, "s status"),
+    KeyBinding::new(ActionId::OpenDiff, "d", "open selected workspace diff")
+        .with_family(CommandFamily::JjDiff)
+        .with_aliases(&["diff", "workspace", "selected"])
+        .with_hotbar(4, "d diff"),
+    KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
+        .with_family(CommandFamily::ViewOptions)
+        .with_aliases(&["view", "options", "display"])
+        .with_hotbar(6, "V options"),
+    KeyBinding::new(ActionId::Refresh, "r", "refresh workspaces")
+        .with_family(CommandFamily::Refresh)
+        .with_aliases(&["reload", "workspace"])
+        .with_hotbar(2, "r refresh"),
+    KeyBinding::new(
+        ActionId::ReturnBack,
+        "Backspace, Esc, H/L",
+        "return to previous view",
+    )
+    .with_family(CommandFamily::Navigation)
+    .with_aliases(&["back", "return", "previous"])
+    .with_hotbar(7, "Esc back"),
+    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+        .with_family(CommandFamily::Help)
+        .with_hotbar(1, "? help"),
+    KeyBinding::new(ActionId::Quit, "q", "quit")
+        .with_family(CommandFamily::Quit)
+        .with_hotbar(8, "q quit")
+        .hotbar_only(),
+];
+
 /// Returns hotbar text for the current binding context.
 pub fn hotbar(context: BindingContext) -> String {
     hotbar_items(context)
@@ -471,6 +522,7 @@ pub const fn help_title(context: BindingContext) -> &'static str {
         BindingContext::Log => "Log keys",
         BindingContext::Diff => "Diff keys",
         BindingContext::Inspection => "Inspection keys",
+        BindingContext::Workspaces => "Workspaces keys",
     }
 }
 
@@ -597,6 +649,7 @@ const fn bindings(context: BindingContext) -> &'static [KeyBinding] {
         BindingContext::Log => LOG_BINDINGS,
         BindingContext::Diff => DIFF_BINDINGS,
         BindingContext::Inspection => INSPECTION_BINDINGS,
+        BindingContext::Workspaces => WORKSPACES_BINDINGS,
     }
 }
 
@@ -605,6 +658,7 @@ const fn context_label(context: BindingContext) -> &'static str {
         BindingContext::Log => "log",
         BindingContext::Diff => "diff",
         BindingContext::Inspection => "inspection",
+        BindingContext::Workspaces => "workspaces",
     }
 }
 
@@ -633,6 +687,14 @@ mod tests {
         assert_eq!(
             hotbar(BindingContext::Inspection),
             "? help  V options  r refresh  j/k line  space/b page  q quit"
+        );
+    }
+
+    #[test]
+    fn workspaces_hotbar_matches_current_status_text() {
+        assert_eq!(
+            hotbar(BindingContext::Workspaces),
+            "? help  r refresh  s status  d diff  j/k move  V options  Esc back  q quit"
         );
     }
 
@@ -704,6 +766,7 @@ mod tests {
             BindingContext::Log,
             BindingContext::Diff,
             BindingContext::Inspection,
+            BindingContext::Workspaces,
         ] {
             for width in 0..=140 {
                 let status = adaptive_hotbar(context, width);
@@ -783,11 +846,29 @@ mod tests {
     }
 
     #[test]
+    fn workspaces_help_lines_match_current_overlay() {
+        assert_eq!(
+            help_lines(BindingContext::Workspaces),
+            vec![
+                "j/k or arrows        move selection",
+                "Ctrl-j/k             scroll one line",
+                "enter, s             open selected workspace status",
+                "d                    open selected workspace diff",
+                "V                    open view options",
+                "r                    refresh workspaces",
+                "Backspace, Esc, H/L  return to previous view",
+                "?, q, Esc            close help",
+            ]
+        );
+    }
+
+    #[test]
     fn hotbar_bindings_have_help() {
         for context in [
             BindingContext::Log,
             BindingContext::Diff,
             BindingContext::Inspection,
+            BindingContext::Workspaces,
         ] {
             for binding in bindings(context) {
                 if binding.hotbar.is_some() {
@@ -850,6 +931,19 @@ mod tests {
             assert_eq!(evolog_row.action, "Open evolog");
             assert_eq!(evolog_row.command_family_label(), Some("jj evolog"));
         }
+    }
+
+    #[test]
+    fn workspaces_discovery_finds_workspace_actions() {
+        let status_rows = filter_discovery_rows(BindingContext::Workspaces, "workspace status");
+        assert_eq!(status_rows.len(), 1);
+        assert_eq!(status_rows[0].keys, "enter, s");
+        assert_eq!(status_rows[0].command_family_label(), Some("jj status"));
+
+        let back_rows = filter_discovery_rows(BindingContext::Workspaces, "back previous");
+        assert_eq!(back_rows.len(), 1);
+        assert_eq!(back_rows[0].keys, "Backspace, Esc, H/L");
+        assert_eq!(back_rows[0].context_label(), "workspaces");
     }
 
     #[test]

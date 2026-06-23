@@ -975,7 +975,9 @@ fn selected_view_option(state: &AppState) -> Option<ViewOptionRow> {
 fn view_option_rows(context: BindingContext) -> &'static [ViewOptionRow] {
     match context {
         BindingContext::Log => &[ViewOptionRow::LogTemplate],
-        BindingContext::Diff | BindingContext::Inspection => &[ViewOptionRow::Placeholder],
+        BindingContext::Diff | BindingContext::Inspection | BindingContext::Workspaces => {
+            &[ViewOptionRow::Placeholder]
+        }
     }
 }
 
@@ -995,6 +997,11 @@ fn view_options_lines(
         }
         BindingContext::Diff | BindingContext::Inspection => vec![
             "No view options in this slice.".to_owned(),
+            String::new(),
+            "esc close".to_owned(),
+        ],
+        BindingContext::Workspaces => vec![
+            "No workspace view options in this slice.".to_owned(),
             String::new(),
             "esc close".to_owned(),
         ],
