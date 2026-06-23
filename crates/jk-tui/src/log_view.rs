@@ -181,6 +181,13 @@ impl LogView {
             .map(jk_core::LogEntry::change_id)
     }
 
+    /// Returns the selected change's full description for editing commands.
+    pub fn selected_description(&self) -> Option<&str> {
+        self.state
+            .selected_entry()
+            .map(jk_core::LogEntry::description)
+    }
+
     /// Returns whether the log has ordered revision marks.
     pub fn has_marks(&self) -> bool {
         self.state.has_marks()

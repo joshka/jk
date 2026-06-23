@@ -1430,6 +1430,16 @@ fn handle_input_mode(
             InputModeResult::Handled
         }
         KeyEvent {
+            code: KeyCode::Char('u'),
+            modifiers,
+            ..
+        } if modifiers == KeyModifiers::CONTROL => {
+            if let InputMode::DescribeMessage { message, .. } = mode {
+                message.clear();
+            }
+            InputModeResult::Handled
+        }
+        KeyEvent {
             code: KeyCode::Char(character),
             modifiers,
             ..
@@ -1884,11 +1894,11 @@ fn open_describe_message(state: &mut AppState) {
         log.show_error("No revision selected");
         return;
     };
+    let message = log.selected_description().unwrap_or_default().to_owned();
 
-    state.modes.push(InputMode::DescribeMessage {
-        rev,
-        message: String::new(),
-    });
+    state
+        .modes
+        .push(InputMode::DescribeMessage { rev, message });
 }
 
 fn open_abandon_preview(state: &mut AppState, abandon_source: &JjAbandon) {
@@ -1957,7 +1967,7 @@ fn describe_message_lines(rev: &str, message: &str) -> Vec<String> {
         format!("Revision: {rev}"),
         format!("Message: {message}"),
         String::new(),
-        "type message   enter preview   backspace edit   esc cancel".to_owned(),
+        "type message   enter preview   Ctrl-u clear   backspace edit   esc cancel".to_owned(),
     ]
 }
 
@@ -4901,6 +4911,49 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abc123".to_owned(),
+                message: "abc123 summary".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn describe_message_prefills_full_selected_description() {
+        let mut state = AppState::new(log_app_view_with_description(
+            "abc123",
+            "Current summary\n\nCurrent body",
+        ));
+
+        open_describe_message(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::DescribeMessage {
+                rev: "abc123".to_owned(),
+                message: "Current summary\n\nCurrent body".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn describe_message_control_u_clears_prefilled_message() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        open_describe_message(&mut state);
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            &JjDiff::default(),
+            &JjDescribe::default(),
+            None,
+            KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::DescribeMessage {
+                rev: "abc123".to_owned(),
                 message: String::new(),
             })
         );
@@ -5998,6 +6051,18 @@ mod tests {
 
     fn log_app_view(change_id: &str) -> AppView {
         log_app_view_with_changes([change_id])
+    }
+
+    fn log_app_view_with_description(change_id: &str, description: &str) -> AppView {
+        AppView::Log(LogView::new(
+            jk_core::LogSnapshot::new(
+                format!("@  {change_id} {description}\n"),
+                vec![
+                    jk_core::LogEntry::new(change_id, "commit", description).with_rendered_line(0),
+                ],
+            )
+            .with_title("jj log"),
+        ))
     }
 
     fn log_app_view_with_changes<const N: usize>(change_ids: [&str; N]) -> AppView {

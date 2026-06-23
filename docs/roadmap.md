@@ -67,7 +67,9 @@ Introduce mutating workflows only through command preview and recovery.
 
 - Add a reusable Run Options drawer for global options and advanced safety toggles before mutating
   wizards depend on them.
-- Add inline and editor describe flows.
+- Add inline and editor describe flows. The `vibe` spike now prefills the inline `m` prompt from
+  the selected revision's full description and supports `Ctrl-u` clear before preview; editor
+  describe and before/after review remain follow-up work.
 - Add new, commit, edit, rebase, and abandon flows. The `vibe` spike now has direct
   selected-revision `a` -> `jj abandon REV`, `n` -> `jj new PARENT...`, and
   `e` -> `jj edit REV` previews. `jj new` already uses ordered marks as parents when present and

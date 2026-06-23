@@ -48,8 +48,10 @@ then broaden into mutation flows, selectors, run options, and generated help.
 1. Done: add `jj edit` preview flow. Pressing `e` on the selected log revision opens a
    local-rewrite command preview for `jj edit REV`; Enter runs it, refreshes the log, records
    history with the resulting operation id, and exposes recovery actions.
-1. Add inline describe polish: multiline/editor describe, better prompt editing, and clearer
-   before/after description display.
+1. Done: add inline describe prompt prefill and clear. Pressing `m` opens the prompt with the
+   selected revision's current full description, and `Ctrl-u` clears the prompt before preview.
+1. Add remaining describe polish: multiline/editor describe and clearer before/after description
+   display.
 1. Add minimal rebase preview: resolve source/destination from marks plus cursor and show exact
    `jj rebase` command before running.
 1. Add rebase destination search: search/filter the log while choosing a destination.

@@ -1300,8 +1300,14 @@ Prompt keys:
 
 - `Enter`: run `jj describe -m <message> <rev>`.
 - `Ctrl-e`: open editor with current text as seed if supported.
+- `Ctrl-u`: clear the current inline prompt text.
 - `Esc`: cancel.
 - `Ctrl+s`: save when multiline editor is active.
+
+Current `vibe` status: `m` opens the inline prompt prefilled with the selected revision's full
+description, and `Ctrl-u` clears the prefilled text before preview. The prompt still submits through
+command preview, command history, operation-id capture, log refresh, and recovery footer. It does
+not yet support multiline editing, editor handoff, or a before/after review panel.
 
 `M` opens configured editor directly:
 
