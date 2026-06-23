@@ -8,6 +8,9 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
+const CHROME_STYLE: Style = Style::new().fg(Color::White).bg(Color::Black);
+const CHROME_BADGE_STYLE: Style = Style::new().fg(Color::Black).bg(Color::White);
+
 /// Renders a small mode-specific help overlay centered in the content area.
 pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[String]) {
     if area.is_empty() {
@@ -92,14 +95,14 @@ impl<'a> ViewChrome<'a> {
     /// Renders the title and status rows without touching the content area.
     pub fn render(&self, frame: &mut Frame<'_>, areas: ChromeAreas) {
         let title = Paragraph::new(Line::from(vec![
-            Span::styled("jk", Style::new().fg(Color::Black).bg(Color::White)),
-            Span::raw(" "),
-            Span::styled(self.title, Style::new().add_modifier(Modifier::BOLD)),
-        ]));
+            Span::styled("jk", CHROME_BADGE_STYLE),
+            Span::styled(" ", CHROME_STYLE),
+            Span::styled(self.title, CHROME_STYLE.add_modifier(Modifier::BOLD)),
+        ]))
+        .style(CHROME_STYLE);
         frame.render_widget(title, areas.title);
 
-        let status = Paragraph::new(Line::from(self.status))
-            .style(Style::new().fg(Color::Black).bg(Color::White));
+        let status = Paragraph::new(Line::from(self.status)).style(CHROME_STYLE);
         frame.render_widget(status, areas.status);
     }
 }

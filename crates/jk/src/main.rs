@@ -1318,6 +1318,7 @@ fn apply_log_action(
             switch_log_command(log, history, source, JjLogCommand::ConfiguredDefault);
         }
         ActionResult::SwitchLog => switch_log_command(log, history, source, JjLogCommand::Log),
+        ActionResult::DrillElision => drill_log_elision(log, history, source),
         ActionResult::Quit => return AppTransition::Quit,
         _ => {}
     }
@@ -1801,6 +1802,25 @@ fn open_template_selector(modes: &mut ModeStack, source: &JjLog) {
         .position(|template| template == source.template())
         .unwrap_or(0);
     modes.push(InputMode::LogTemplate { options, selected });
+}
+
+/// Replaces the log with a revset that reveals the selected graph elision.
+fn drill_log_elision(app: &mut LogView, history: &mut CommandHistory, source: &mut JjLog) {
+    let Some(revset) = app.selected_elision_revset() else {
+        return;
+    };
+    let next_source = source.clone().with_revset(revset);
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Log, SourceAction::Refresh),
+    );
+    match next_source.load_with_runner(&mut runner) {
+        Ok(snapshot) => {
+            *source = next_source;
+            app.refresh(snapshot);
+        }
+        Err(error) => app.show_error(error.to_string()),
+    }
 }
 
 /// Restores terminal mode even when the event loop returns through an error.

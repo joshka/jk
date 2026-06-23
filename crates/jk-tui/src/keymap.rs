@@ -334,7 +334,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_aliases(&["page", "pagedown", "pageup"]),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Expand, "right, l", "expand selected change")
+    KeyBinding::new(ActionId::Expand, "right, l", "expand change / drill into ~")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::Collapse, "left, h", "collapse selected change")
         .with_family(CommandFamily::Navigation),
@@ -1053,7 +1053,7 @@ mod tests {
                 "Ctrl-j/k             scroll one line",
                 "b, Ctrl-f/b, PgUp/Dn page down/up",
                 "g/G or Home/End      jump to top/bottom",
-                "right, l             expand selected change",
+                "right, l             expand change / drill into ~",
                 "left, h              collapse selected change",
                 "?, q, Esc            close help",
             ]

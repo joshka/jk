@@ -36,6 +36,9 @@ pub enum ActionResult {
     /// Open the selected change's diff.
     OpenDiff,
 
+    /// Drill into the selected graph elision.
+    DrillElision,
+
     /// Exit the application.
     Quit,
 }
@@ -206,6 +209,12 @@ impl LogView {
         self.state.selected_mark_index()
     }
 
+    /// Returns the revset that reveals the selected graph elision.
+    #[must_use]
+    pub fn selected_elision_revset(&self) -> Option<String> {
+        self.state.selected_elision_revset()
+    }
+
     /// Applies a single input action.
     ///
     /// [`ActionResult::Refresh`] asks the caller to load a new [`LogSnapshot`]. The view does not
@@ -256,6 +265,9 @@ impl LogView {
             | LogAction::FoldAll
             | LogAction::UnfoldAll => ActionResult::Continue,
             LogAction::ToggleExpanded => {
+                if self.selected_elision_revset().is_some() {
+                    return ActionResult::DrillElision;
+                }
                 self.state.toggle_expanded();
                 ActionResult::Continue
             }
@@ -424,6 +436,25 @@ mod tests {
     }
 
     #[test]
+    fn toggle_expanded_on_elision_requests_drill_in() {
+        let mut view = LogView::new(LogSnapshot::new(
+            "@  aaa first\n~  (elided revisions)\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+            ],
+        ));
+
+        let _ = view.apply(LogAction::Next);
+
+        assert_eq!(
+            view.apply(LogAction::ToggleExpanded),
+            ActionResult::DrillElision
+        );
+        assert_eq!(view.selected_elision_revset(), Some("bbb::aaa".to_owned()));
+    }
+
+    #[test]
     fn refresh_errors_replace_status_without_replacing_log() {
         let mut view = LogView::new(snapshot(["aaa"]));
         view.show_error("jj failed");
@@ -485,6 +516,14 @@ mod tests {
         let buffer = terminal.backend().buffer();
         assert!(buffer_line(buffer, 0).contains("jk jj log"));
         assert!(buffer_line(buffer, 3).contains("r refresh"));
+        assert_eq!(buffer[(0, 0)].fg, Color::Black);
+        assert_eq!(buffer[(0, 0)].bg, Color::White);
+        assert_eq!(buffer[(3, 0)].fg, Color::White);
+        assert_eq!(buffer[(3, 0)].bg, Color::Black);
+        assert_eq!(buffer[(47, 0)].bg, Color::Black);
+        assert_eq!(buffer[(0, 3)].fg, Color::White);
+        assert_eq!(buffer[(0, 3)].bg, Color::Black);
+        assert_eq!(buffer[(47, 3)].bg, Color::Black);
     }
 
     #[test]
@@ -510,6 +549,7 @@ mod tests {
         assert!(rendered.contains("a                    preview jj abandon"));
         assert!(rendered.contains("u                    preview jj undo"));
         assert!(rendered.contains("U                    preview jj redo"));
+        assert!(rendered.contains("right, l             expand change / drill into ~"));
         assert!(rendered.contains("?, q, Esc            close help"));
     }
 
@@ -546,7 +586,7 @@ mod tests {
     fn renders_jj_output_with_title_and_status_bars_but_no_border() {
         let mut view = LogView::new(
             LogSnapshot::new(
-                "@  aaaabbbb summary\n│  body\n~\n",
+                "@  aaaabbbb summary\n│  body\n~  (elided revisions)\n",
                 vec![LogEntry::new("aaaabbbb", "11112222", "summary")],
             )
             .with_title("jj log -n 3"),
