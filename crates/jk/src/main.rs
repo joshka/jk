@@ -18,6 +18,9 @@ use jk_cli::{
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
 use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
+use jk_tui::command_history_view::{
+    CommandHistoryAction, CommandHistoryActionResult, CommandHistorySnapshot, CommandHistoryView,
+};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogAction, LogView};
 use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
@@ -410,6 +413,9 @@ enum AppView {
     Workspaces {
         view: WorkspacesView,
     },
+    CommandHistory {
+        view: CommandHistoryView,
+    },
     WorkspaceStatus {
         view: RenderedView,
         query: WorkspaceInspectionQuery,
@@ -648,6 +654,18 @@ fn run_terminal(
                     }
                     _ => view.render(frame),
                 },
+                AppView::CommandHistory { view } => match &mode {
+                    Some(InputMode::CommandDiscovery {
+                        context,
+                        query,
+                        selected,
+                    }) => {
+                        let lines = discovery_lines(*context, query, *selected);
+                        view.render(frame);
+                        render_mode_overlay(frame, "Command discovery", &lines);
+                    }
+                    _ => view.render(frame),
+                },
                 AppView::WorkspaceStatus { view, .. } | AppView::WorkspaceDiff { view, .. } => {
                     match &mode {
                         Some(InputMode::ViewOptions { context, selected }) => {
@@ -681,8 +699,10 @@ fn run_terminal(
                 }
 
                 let app_key = AppKey::from_crossterm(key);
-                if matches!(state.views.active(), AppView::Workspaces { .. })
-                    && matches!(key.code, KeyCode::Esc)
+                if matches!(
+                    state.views.active(),
+                    AppView::Workspaces { .. } | AppView::CommandHistory { .. }
+                ) && matches!(key.code, KeyCode::Esc)
                 {
                     handle_back(&mut state);
                     needs_redraw = true;
@@ -718,13 +738,19 @@ fn run_terminal(
                             open_workspaces(&mut state, workspaces_source);
                             needs_redraw = true;
                         }
+                        AppKey::OpenCommandHistory => {
+                            open_command_history(&mut state);
+                            needs_redraw = true;
+                        }
                         AppKey::UpdateSelectedWorkspaceStale => {
                             update_selected_workspace_stale(&mut state, workspaces_source);
                             needs_redraw = true;
                         }
                         AppKey::OpenViewOptions => {
-                            open_view_options(&mut state);
-                            needs_redraw = true;
+                            if !matches!(state.views.active(), AppView::CommandHistory { .. }) {
+                                open_view_options(&mut state);
+                                needs_redraw = true;
+                            }
                         }
                         AppKey::StartSearch
                             if matches!(
@@ -757,6 +783,7 @@ fn run_terminal(
                                     query: String::new(),
                                 },
                                 AppView::Log(_) | AppView::Workspaces { .. } => unreachable!(),
+                                AppView::CommandHistory { .. } => unreachable!(),
                             };
                             state.modes.push(mode);
                             needs_redraw = true;
@@ -1056,6 +1083,10 @@ fn open_command_discovery(state: &mut AppState) {
 }
 
 fn open_view_options(state: &mut AppState) {
+    if matches!(state.views.active(), AppView::CommandHistory { .. }) {
+        return;
+    }
+
     state.modes.push(InputMode::ViewOptions {
         context: active_binding_context(state),
         selected: 0,
@@ -1072,6 +1103,7 @@ fn active_binding_context(state: &AppState) -> BindingContext {
         | AppView::WorkspaceStatus { .. }
         | AppView::WorkspaceDiff { .. } => BindingContext::Inspection,
         AppView::Workspaces { .. } => BindingContext::Workspaces,
+        AppView::CommandHistory { .. } => BindingContext::CommandHistory,
     }
 }
 
@@ -1193,9 +1225,10 @@ fn selected_view_option(state: &AppState) -> Option<ViewOptionRow> {
 fn view_option_rows(context: BindingContext) -> &'static [ViewOptionRow] {
     match context {
         BindingContext::Log => &[ViewOptionRow::LogTemplate],
-        BindingContext::Diff | BindingContext::Inspection | BindingContext::Workspaces => {
-            &[ViewOptionRow::Placeholder]
-        }
+        BindingContext::Diff
+        | BindingContext::Inspection
+        | BindingContext::Workspaces
+        | BindingContext::CommandHistory => &[ViewOptionRow::Placeholder],
     }
 }
 
@@ -1220,6 +1253,11 @@ fn view_options_lines(
         ],
         BindingContext::Workspaces => vec![
             "No workspace view options in this slice.".to_owned(),
+            String::new(),
+            "esc close".to_owned(),
+        ],
+        BindingContext::CommandHistory => vec![
+            "No command history options in this slice.".to_owned(),
             String::new(),
             "esc close".to_owned(),
         ],
@@ -1396,7 +1434,7 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
             };
             let _ = view.apply(action);
         }
-        AppView::Log(_) | AppView::Workspaces { .. } => {}
+        AppView::Log(_) | AppView::Workspaces { .. } | AppView::CommandHistory { .. } => {}
     }
 }
 
@@ -1439,6 +1477,7 @@ fn apply_action(
             AppView::Workspaces { view } => {
                 apply_workspaces_action(view, history, workspaces_source, action)
             }
+            AppView::CommandHistory { view } => apply_command_history_action(view, history, action),
             AppView::WorkspaceStatus { view, query } => apply_workspace_inspection_action(
                 view,
                 query,
@@ -1603,6 +1642,21 @@ fn push_status(state: &mut AppState, status_source: &JjStatus) {
 
 fn open_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
     open_workspaces_with_runner(state, workspaces_source, SystemJjCommandRunner);
+}
+
+fn open_command_history(state: &mut AppState) {
+    let snapshot = command_history_snapshot(&state.history);
+    if let AppView::CommandHistory { view } = state.views.active_mut() {
+        view.refresh(snapshot);
+        return;
+    }
+
+    let view = CommandHistoryView::new(snapshot);
+    state.views.push(AppView::CommandHistory { view });
+}
+
+fn command_history_snapshot(history: &CommandHistory) -> CommandHistorySnapshot {
+    CommandHistorySnapshot::from_records(history.records())
 }
 
 fn push_status_with_runner<R: JjCommandRunner>(
@@ -1835,6 +1889,40 @@ fn compact_command_output(output: &str) -> Option<String> {
 enum WorkspaceInspectionKind {
     Status,
     Diff,
+}
+
+/// Applies an action while the command-history list is active.
+fn apply_command_history_action(
+    view: &mut CommandHistoryView,
+    history: &CommandHistory,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let history_action = match action {
+        jk_tui::log_view::LogAction::Previous => CommandHistoryAction::Previous,
+        jk_tui::log_view::LogAction::Next => CommandHistoryAction::Next,
+        jk_tui::log_view::LogAction::ScrollPreviousLine => CommandHistoryAction::Previous,
+        jk_tui::log_view::LogAction::ScrollNextLine => CommandHistoryAction::Next,
+        jk_tui::log_view::LogAction::PagePrevious => CommandHistoryAction::PagePrevious,
+        jk_tui::log_view::LogAction::PageNext | jk_tui::log_view::LogAction::ToggleMark => {
+            CommandHistoryAction::PageNext
+        }
+        jk_tui::log_view::LogAction::First => CommandHistoryAction::First,
+        jk_tui::log_view::LogAction::Last => CommandHistoryAction::Last,
+        jk_tui::log_view::LogAction::Refresh => CommandHistoryAction::Refresh,
+        jk_tui::log_view::LogAction::ToggleHelp => CommandHistoryAction::ToggleHelp,
+        jk_tui::log_view::LogAction::Quit => CommandHistoryAction::Quit,
+        _ => return AppTransition::Continue,
+    };
+
+    match view.apply(history_action) {
+        CommandHistoryActionResult::Refresh => view.refresh(command_history_snapshot(history)),
+        CommandHistoryActionResult::ReturnBack => return AppTransition::PopView,
+        CommandHistoryActionResult::Quit => return AppTransition::Quit,
+        CommandHistoryActionResult::Continue => {}
+        _ => {}
+    }
+
+    AppTransition::Continue
 }
 
 /// Applies an action while the workspace list is active.
@@ -2334,6 +2422,131 @@ mod tests {
         let state = AppState::with_history(AppView::Log(LogView::default()), history);
 
         assert_eq!(state.command_history().records().count(), 1);
+    }
+
+    #[test]
+    fn opening_command_history_from_log_pushes_snapshot_without_recording() {
+        let mut history = CommandHistory::new(4);
+        append_history_record(
+            &mut history,
+            jk_core::JjCommandSpec::render_read_only(["log"]),
+            SourceView::Log,
+            SourceAction::InitialLoad,
+        );
+        let mut state = AppState::with_history(AppView::Log(LogView::default()), history);
+
+        open_command_history(&mut state);
+
+        assert_eq!(state.views.views.len(), 2);
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandHistory { .. }
+        ));
+        assert_eq!(state.command_history().records().count(), 1);
+    }
+
+    #[test]
+    fn opening_command_history_from_workspaces_preserves_previous_view() {
+        let mut history = CommandHistory::new(4);
+        append_history_record(
+            &mut history,
+            jk_core::JjCommandSpec::render_read_only(["workspace", "list"]),
+            SourceView::Workspaces,
+            SourceAction::WorkspaceList,
+        );
+        let workspace_view = workspace_app_view();
+        let expected = workspace_view.clone();
+        let mut state = AppState::with_history(
+            AppView::Workspaces {
+                view: workspace_view,
+            },
+            history,
+        );
+
+        open_command_history(&mut state);
+
+        assert_eq!(state.views.views.len(), 2);
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandHistory { .. }
+        ));
+
+        handle_back(&mut state);
+
+        assert_eq!(
+            state.views.active(),
+            &AppView::Workspaces { view: expected }
+        );
+        assert_eq!(state.command_history().records().count(), 1);
+    }
+
+    #[test]
+    fn opening_command_history_again_refreshes_without_stacking() {
+        let mut history = CommandHistory::new(4);
+        append_history_record(
+            &mut history,
+            jk_core::JjCommandSpec::render_read_only(["log"]),
+            SourceView::Log,
+            SourceAction::InitialLoad,
+        );
+        let mut state = AppState::with_history(AppView::Log(LogView::default()), history);
+
+        open_command_history(&mut state);
+        open_command_history(&mut state);
+
+        assert_eq!(state.views.views.len(), 2);
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandHistory { .. }
+        ));
+        assert_eq!(state.command_history().records().count(), 1);
+    }
+
+    #[test]
+    fn refreshing_command_history_rebuilds_snapshot_without_recording() {
+        let mut history = CommandHistory::new(4);
+        append_history_record(
+            &mut history,
+            jk_core::JjCommandSpec::render_read_only(["log"]),
+            SourceView::Log,
+            SourceAction::InitialLoad,
+        );
+        let mut view = CommandHistoryView::new(CommandHistorySnapshot::new(Vec::new()));
+
+        let transition =
+            apply_command_history_action(&mut view, &history, jk_tui::log_view::LogAction::Refresh);
+
+        assert!(matches!(transition, AppTransition::Continue));
+        assert_eq!(
+            view.selected_row().map(|row| row.command.as_str()),
+            Some("jj log")
+        );
+        assert_eq!(history.records().count(), 1);
+    }
+
+    #[test]
+    fn unsupported_command_history_actions_do_not_pop_view() {
+        let history = CommandHistory::new(4);
+        let mut view = CommandHistoryView::new(CommandHistorySnapshot::new(Vec::new()));
+
+        let transition = apply_command_history_action(
+            &mut view,
+            &history,
+            jk_tui::log_view::LogAction::OpenDiff,
+        );
+
+        assert!(matches!(transition, AppTransition::Continue));
+    }
+
+    #[test]
+    fn view_options_are_ignored_from_command_history() {
+        let mut state = AppState::new(AppView::CommandHistory {
+            view: CommandHistoryView::new(CommandHistorySnapshot::new(Vec::new())),
+        });
+
+        open_view_options(&mut state);
+
+        assert_eq!(state.modes.active(), None);
     }
 
     #[test]
@@ -3219,6 +3432,23 @@ mod tests {
             WorkspaceViewRow::new("default", "/repo/default", false).with_root("/repo/default"),
             WorkspaceViewRow::new("vibe", "/repo/vibe", true).with_root("/repo/vibe"),
         ]))
+    }
+
+    fn append_history_record(
+        history: &mut CommandHistory,
+        spec: jk_core::JjCommandSpec,
+        view: SourceView,
+        action: SourceAction,
+    ) {
+        let start = jk_core::CommandRecordStart::from_spec(&spec, CommandSource::new(view, action))
+            .with_started_at(std::time::SystemTime::UNIX_EPOCH);
+        let finish = jk_core::CommandRecordFinish::from_exit_code(
+            0,
+            "",
+            "",
+            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(1),
+        );
+        history.append(start, finish);
     }
 
     fn output(code: i32, stdout: &str, stderr: &str) -> Output {

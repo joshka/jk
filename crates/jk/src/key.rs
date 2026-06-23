@@ -25,6 +25,9 @@ pub enum AppKey {
     /// Open the workspace list.
     OpenWorkspaces,
 
+    /// Open the command-history list.
+    OpenCommandHistory,
+
     /// Update stale metadata for the selected workspace.
     UpdateSelectedWorkspaceStale,
 
@@ -126,6 +129,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'L' => Some(AppKey::Action(LogAction::Log)),
         'V' => Some(AppKey::OpenViewOptions),
         'W' => Some(AppKey::OpenWorkspaces),
+        'C' => Some(AppKey::OpenCommandHistory),
         'u' => Some(AppKey::UpdateSelectedWorkspaceStale),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
@@ -228,6 +232,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::NONE)),
             AppKey::OpenWorkspaces
+        );
+    }
+
+    #[test]
+    fn uppercase_c_opens_command_history() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('C'), KeyModifiers::NONE)),
+            AppKey::OpenCommandHistory
         );
     }
 

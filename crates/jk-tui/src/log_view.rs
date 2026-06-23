@@ -455,7 +455,7 @@ mod tests {
     fn help_action_shows_log_specific_keys() {
         let mut view = LogView::new(snapshot(["aaa"]));
         let _ = view.apply(LogAction::ToggleHelp);
-        let backend = TestBackend::new(72, 22);
+        let backend = TestBackend::new(72, 23);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
