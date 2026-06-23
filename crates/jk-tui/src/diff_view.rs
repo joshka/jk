@@ -301,11 +301,15 @@ impl DiffView {
 
         let search_status = self.state.search_status();
         let horizontal_status = self.state.horizontal_status();
+        let file_status = self
+            .state
+            .current_file_status(usize::from(areas.status_width()));
         let fallback_status = adaptive_hotbar(BindingContext::Diff, areas.status_width());
         let status = status_override
             .or(self.status_message.as_deref())
             .or(search_status.as_deref())
             .or(horizontal_status.as_deref())
+            .or(file_status.as_deref())
             .unwrap_or(&fallback_status);
         let chrome = ViewChrome::new(self.state.title(), status);
         chrome.render(frame, areas);
@@ -416,7 +420,7 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Modified regular file src/b.rs:"));
-        assert!(buffer_line(terminal.backend().buffer(), 4).contains("r refresh"));
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("file 1/1 src/b.rs"));
     }
 
     #[test]
@@ -507,6 +511,26 @@ mod tests {
         assert!(draw_result.is_ok());
 
         assert!(buffer_line(terminal.backend().buffer(), 4).contains("/alpha  1/1"));
+    }
+
+    #[test]
+    fn render_status_shows_current_file_context() {
+        let mut view = DiffView::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n a\nModified regular file src/b.rs:\n b\n",
+        ));
+        let backend = TestBackend::new(72, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert!(
+            buffer_line(terminal.backend().buffer(), 4).contains("file 1/2 src/a.rs  [/] file")
+        );
     }
 
     #[test]

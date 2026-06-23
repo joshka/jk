@@ -9,6 +9,7 @@ use crate::chrome::title_or_default;
 
 const HORIZONTAL_SCROLL_STEP: usize = 8;
 const DIFF_HORIZONTAL_STATUS: &str = "</> horizontal scroll";
+const DIFF_FILE_STATUS_HINT: &str = "  [/] file  { } hunk  ? help";
 
 /// Semantic state behind a rendered selected-change diff.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -484,6 +485,29 @@ impl DiffState {
         })
     }
 
+    /// Returns compact status-line text for the current file selection.
+    pub fn current_file_status(&self, width: usize) -> Option<String> {
+        let selected = self.selected?;
+        let section = self.selected_section()?;
+        let file_count = self.sections.len();
+        let prefix = format!("file {}/{} ", selected + 1, file_count);
+        let minimal = prefix.trim_end().to_owned();
+
+        if width <= visible_width(&minimal) {
+            return Some(minimal);
+        }
+
+        let hint_width = visible_width(DIFF_FILE_STATUS_HINT);
+        let hint = if width >= visible_width(&prefix) + visible_width(&section.path) + hint_width {
+            DIFF_FILE_STATUS_HINT
+        } else {
+            ""
+        };
+        let path_width = width.saturating_sub(visible_width(&prefix) + visible_width(hint));
+        let path = compact_status_path(&section.path, path_width);
+        Some(format!("{prefix}{path}{hint}"))
+    }
+
     /// Returns whether the selected file section is collapsed.
     #[cfg(test)]
     pub fn selected_file_is_collapsed(&self) -> bool {
@@ -858,6 +882,26 @@ fn visible_width(text: &str) -> usize {
     strip_ansi(text).chars().count()
 }
 
+fn compact_status_path(path: &str, width: usize) -> String {
+    if visible_width(path) <= width {
+        return path.to_owned();
+    }
+    if width == 0 {
+        return String::new();
+    }
+    if width <= 3 {
+        return take_tail_chars(path, width);
+    }
+
+    format!("...{}", take_tail_chars(path, width - 3))
+}
+
+fn take_tail_chars(text: &str, count: usize) -> String {
+    let mut tail = text.chars().rev().take(count).collect::<Vec<_>>();
+    tail.reverse();
+    tail.into_iter().collect()
+}
+
 /// Returns visible line numbers whose plain text contains `query`.
 fn matching_visible_lines(rendered: &str, query: &str) -> Vec<usize> {
     let query = query.to_lowercase();
@@ -1128,6 +1172,40 @@ mod tests {
         state.scroll_left();
 
         assert_eq!(state.horizontal_offset(), 8);
+    }
+
+    #[test]
+    fn current_file_status_tracks_selected_file() {
+        let mut state = DiffState::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n a\nModified regular file src/b.rs:\n b\n",
+        ));
+
+        assert_eq!(
+            state.current_file_status(80),
+            Some("file 1/2 src/a.rs  [/] file  { } hunk  ? help".to_owned())
+        );
+
+        state.select_next_file();
+
+        assert_eq!(
+            state.current_file_status(80),
+            Some("file 2/2 src/b.rs  [/] file  { } hunk  ? help".to_owned())
+        );
+    }
+
+    #[test]
+    fn current_file_status_compacts_long_paths_to_width() {
+        let state = DiffState::new(snapshot(
+            "aaa",
+            "Modified regular file crates/jk-tui/src/very/long/path/component/diff_state.rs:\n a\n",
+        ));
+        let status = state.current_file_status(32).expect("status");
+
+        assert!(visible_width(&status) <= 32);
+        assert!(status.starts_with("file 1/1 "));
+        assert!(status.contains("..."));
+        assert!(status.ends_with("diff_state.rs"));
     }
 
     #[test]

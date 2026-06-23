@@ -28,8 +28,10 @@ then broaden into mutation flows, selectors, run options, and generated help.
    and output capture.
 1. Add diff View Options quick wins: `V` should toggle stat, summary, name-only, git format, and
    maybe color-words where jj supports it.
-1. Make rich diff navigation solid: improve `[ ]`, `{ }`, search, horizontal scroll, and sticky
-   file/hunk context.
+1. Partly done: make rich diff navigation solid. Diff already supports `[ ]` file movement, `{ }`
+   hunk movement, search, horizontal scroll, sticky headers, and now a current-file status line;
+   remaining polish includes file list jump, broader view options, and any dogfood issues found in
+   multi-file diffs.
 1. Add diff file list overlay: show files in the current diff and jump to selected file.
 
 ## First Useful Mutation Sprint
