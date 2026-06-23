@@ -46,6 +46,9 @@ pub enum AppKey {
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
+    /// Start the `:` prompt for an arbitrary jj command.
+    StartCommandMode,
+
     /// Close the active mode or return to the previous view.
     Back,
 
@@ -136,6 +139,7 @@ impl AppKey {
 const fn action_for_character_key(character: char) -> Option<AppKey> {
     match character {
         'q' => Some(AppKey::Action(LogAction::Quit)),
+        ':' => Some(AppKey::StartCommandMode),
         'r' => Some(AppKey::Action(LogAction::Refresh)),
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
@@ -240,6 +244,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::NONE)),
             AppKey::OpenViewOptions
+        );
+    }
+
+    #[test]
+    fn colon_starts_command_mode() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::NONE)),
+            AppKey::StartCommandMode
         );
     }
 

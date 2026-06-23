@@ -3,7 +3,9 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use super::*;
-use crate::{ConfigOverlay, GlobalOptions, JjCommandSpec, OutputPolicy, PagerPolicy};
+use crate::{
+    ConfigOverlay, ExecutionMode, GlobalOptions, JjCommandSpec, OutputPolicy, PagerPolicy,
+};
 
 fn strings(argv: &[OsString]) -> Vec<String> {
     argv.iter()
@@ -162,6 +164,21 @@ fn identity_uses_argv_and_global_options_from_spec() {
         ]
     );
     assert_eq!(start.command.command_family, CommandFamily::JjWorkspace);
+}
+
+#[test]
+fn command_mode_specs_use_user_command_family() {
+    let spec = JjCommandSpec::render_read_only(["status"]).with_mode(ExecutionMode::CommandMode);
+    let start = CommandRecordStart::from_spec(
+        &spec,
+        source(
+            SourceView::Other("command mode".to_owned()),
+            SourceAction::UserJjCommand,
+        ),
+    );
+
+    assert_eq!(start.command.command_family, CommandFamily::UserJjCommand);
+    assert_eq!(start.source.action, SourceAction::UserJjCommand);
 }
 
 #[test]

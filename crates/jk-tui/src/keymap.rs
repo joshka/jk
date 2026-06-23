@@ -40,6 +40,7 @@ enum ActionId {
     OpenCommandHistory,
     OpenCommandDetails,
     CopyCommand,
+    CommandMode,
     Undo,
     Redo,
     UpdateStale,
@@ -80,6 +81,7 @@ impl ActionId {
             Self::OpenCommandHistory => "Open command history",
             Self::OpenCommandDetails => "Open command details",
             Self::CopyCommand => "Copy command",
+            Self::CommandMode => "Run jj command",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
@@ -138,6 +140,8 @@ pub enum CommandFamily {
     Hunk,
     /// View-scoped display and template options.
     ViewOptions,
+    /// User-entered `jj` command mode.
+    CommandMode,
     /// Help and discovery controls.
     Help,
     /// Quitting the application.
@@ -164,6 +168,7 @@ impl CommandFamily {
             Self::File => "file",
             Self::Hunk => "hunk",
             Self::ViewOptions => "view options",
+            Self::CommandMode => "jj command",
             Self::Help => "help",
             Self::Quit => "quit",
         }
@@ -291,6 +296,9 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
+    KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
+        .with_family(CommandFamily::CommandMode)
+        .with_aliases(&["command", "prompt", "colon", "jj"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
@@ -342,6 +350,9 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
+    KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
+        .with_family(CommandFamily::CommandMode)
+        .with_aliases(&["command", "prompt", "colon", "jj"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -378,6 +389,9 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
+    KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
+        .with_family(CommandFamily::CommandMode)
+        .with_aliases(&["command", "prompt", "colon", "jj"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -427,6 +441,9 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
+    KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
+        .with_family(CommandFamily::CommandMode)
+        .with_aliases(&["command", "prompt", "colon", "jj"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -489,6 +506,9 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "refresh command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
+    KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
+        .with_family(CommandFamily::CommandMode)
+        .with_aliases(&["command", "prompt", "colon", "jj"]),
     KeyBinding::new(
         ActionId::ReturnBack,
         "Backspace, Esc",
@@ -529,6 +549,9 @@ const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::Refresh)
         .with_aliases(&["reload", "operation"])
         .with_hotbar(6, "r refresh"),
+    KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
+        .with_family(CommandFamily::CommandMode)
+        .with_aliases(&["command", "prompt", "colon", "jj"]),
     KeyBinding::new(
         ActionId::ReturnBack,
         "Backspace, Esc",
@@ -986,6 +1009,7 @@ mod tests {
                 "u                    preview jj undo",
                 "U                    preview jj redo",
                 "C                    open command history",
+                ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh",
                 "H / L                home command / jj log",
@@ -1011,6 +1035,7 @@ mod tests {
                 "< / >                horizontal scroll",
                 "/, n, N              search, next, previous",
                 "C                    open command history",
+                ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh",
                 "H / L                go back",
@@ -1030,6 +1055,7 @@ mod tests {
                 "g/G or Home/End      jump to top/bottom",
                 "/, n, N              search, next, previous",
                 "C                    open command history",
+                ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh",
                 "H / L                go back",
@@ -1049,6 +1075,7 @@ mod tests {
                 "d                    open selected workspace diff",
                 "u                    update selected stale workspace",
                 "C                    open command history",
+                ":                    run jj command",
                 "V                    open view options",
                 "r                    refresh workspaces",
                 "Backspace, Esc, H/L  return to previous view",
@@ -1070,6 +1097,7 @@ mod tests {
                 "o                    open operation or operation log",
                 "y                    copy selected command",
                 "C                    refresh command history",
+                ":                    run jj command",
                 "Backspace, Esc       return to previous view",
                 "?, q, Esc            close help",
             ]
@@ -1087,6 +1115,7 @@ mod tests {
                 "enter                open selected operation show",
                 "d                    open selected operation diff",
                 "r                    refresh operation log",
+                ":                    run jj command",
                 "Backspace, Esc       return to previous view",
                 "?, q, Esc            close help",
             ]
@@ -1197,6 +1226,25 @@ mod tests {
             assert_eq!(rows.len(), 1, "{context:?}");
             assert_eq!(rows[0].keys, "C");
             assert_eq!(rows[0].command_family_label(), Some("history"));
+        }
+    }
+
+    #[test]
+    fn discovery_finds_colon_command_mode() {
+        for context in [
+            BindingContext::Log,
+            BindingContext::Diff,
+            BindingContext::Inspection,
+            BindingContext::Workspaces,
+            BindingContext::CommandHistory,
+            BindingContext::OperationLog,
+        ] {
+            let rows = filter_discovery_rows(context, "colon prompt");
+
+            assert_eq!(rows.len(), 1, "{context:?}");
+            assert_eq!(rows[0].keys, ":");
+            assert_eq!(rows[0].action, "Run jj command");
+            assert_eq!(rows[0].command_family_label(), Some("jj command"));
         }
     }
 

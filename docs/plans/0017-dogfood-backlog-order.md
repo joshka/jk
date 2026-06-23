@@ -18,10 +18,10 @@ then broaden into mutation flows, selectors, run options, and generated help.
    run.
 1. Add Command History output/details view: Enter on a history row should show full argv,
    stdout/stderr summary, status, duration, and operation id.
-1. Add simple `:` command mode MVP: run jj commands from an overlay, capture output in a rendered
-   view, and record history.
-1. Add failed-command output view: failed `:` commands should keep stderr visible with retry/back
-   behavior.
+1. Done in the `:` command mode MVP: run jj commands from an overlay, capture output in a rendered
+   view, record history, and preserve failed-command stderr.
+1. Add command-mode follow-ups: retry/edit from output, success refresh policy, and richer prompt
+   editing after the MVP proves the command/result loop.
 1. Add `!` external command MVP: run non-shell external commands safely, with explicit argv handling
    and output capture.
 1. Add diff View Options quick wins: `V` should toggle stat, summary, name-only, git format, and

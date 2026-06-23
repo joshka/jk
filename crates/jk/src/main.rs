@@ -5,7 +5,8 @@
 //! `jk-cli` and `jk-tui` so the binary stays a thin orchestration layer.
 
 use std::io::{self, IsTerminal, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Output;
 
 use clap::{Parser, Subcommand};
 use color_eyre::{Result, eyre::eyre};
@@ -18,7 +19,10 @@ use jk_cli::{
     StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot,
     WorkspaceSummary,
 };
-use jk_core::{CommandHistory, CommandPreview, CommandSource, SourceAction, SourceView};
+use jk_core::{
+    CommandHistory, CommandPreview, CommandSource, ExecutionMode, InspectionSnapshot,
+    JjCommandSpec, RefreshPlan, SafetyClass, SourceAction, SourceView,
+};
 use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
 use jk_tui::command_history_view::{
     CommandHistoryAction, CommandHistoryActionResult, CommandHistorySnapshot, CommandHistoryView,
@@ -223,6 +227,7 @@ fn main() -> Result<()> {
         &operation_source,
         &recovery_source,
         &workspaces_source,
+        args.repository.clone(),
         history,
     )?;
     Ok(())
@@ -531,6 +536,9 @@ enum AppView {
     CommandHistoryDetails {
         view: RenderedView,
     },
+    CommandOutput {
+        view: RenderedView,
+    },
     OperationLog {
         view: OperationLogView,
     },
@@ -698,6 +706,7 @@ fn run_terminal(
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
+    command_repository: Option<PathBuf>,
     history: CommandHistory,
 ) -> Result<()> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
@@ -733,6 +742,11 @@ fn run_terminal(
                         let lines = discovery_lines(*context, query, *selected);
                         log.render_with_selector(frame, "Command discovery", &lines);
                     }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        log.render(frame);
+                        let lines = jj_command_lines(input, error.as_deref());
+                        render_mode_overlay(frame, "jj command", &lines);
+                    }
                     Some(InputMode::DescribeMessage { rev, message }) => {
                         log.render(frame);
                         let lines = describe_message_lines(rev, message);
@@ -763,6 +777,10 @@ fn run_terminal(
                         let lines = discovery_lines(*context, query, *selected);
                         view.render_with_overlay(frame, "Command discovery", &lines);
                     }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        let lines = jj_command_lines(input, error.as_deref());
+                        view.render_with_overlay(frame, "jj command", &lines);
+                    }
                     _ => view.render(frame),
                 },
                 AppView::Show { view, .. } => match &mode {
@@ -781,6 +799,10 @@ fn run_terminal(
                     }) => {
                         let lines = discovery_lines(*context, query, *selected);
                         view.render_with_overlay(frame, "Command discovery", &lines);
+                    }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        let lines = jj_command_lines(input, error.as_deref());
+                        view.render_with_overlay(frame, "jj command", &lines);
                     }
                     _ => view.render(frame),
                 },
@@ -801,6 +823,10 @@ fn run_terminal(
                         let lines = discovery_lines(*context, query, *selected);
                         view.render_with_overlay(frame, "Command discovery", &lines);
                     }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        let lines = jj_command_lines(input, error.as_deref());
+                        view.render_with_overlay(frame, "jj command", &lines);
+                    }
                     _ => view.render(frame),
                 },
                 AppView::Status { view, .. } => match &mode {
@@ -820,6 +846,10 @@ fn run_terminal(
                         let lines = discovery_lines(*context, query, *selected);
                         view.render_with_overlay(frame, "Command discovery", &lines);
                     }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        let lines = jj_command_lines(input, error.as_deref());
+                        view.render_with_overlay(frame, "jj command", &lines);
+                    }
                     _ => view.render(frame),
                 },
                 AppView::Workspaces { view } => match &mode {
@@ -837,6 +867,11 @@ fn run_terminal(
                         view.render(frame);
                         render_mode_overlay(frame, "Command discovery", &lines);
                     }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        view.render(frame);
+                        let lines = jj_command_lines(input, error.as_deref());
+                        render_mode_overlay(frame, "jj command", &lines);
+                    }
                     _ => view.render(frame),
                 },
                 AppView::CommandHistory { view } => match &mode {
@@ -848,6 +883,11 @@ fn run_terminal(
                         let lines = discovery_lines(*context, query, *selected);
                         view.render(frame);
                         render_mode_overlay(frame, "Command discovery", &lines);
+                    }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        view.render(frame);
+                        let lines = jj_command_lines(input, error.as_deref());
+                        render_mode_overlay(frame, "jj command", &lines);
                     }
                     _ => view.render(frame),
                 },
@@ -866,9 +906,15 @@ fn run_terminal(
                         view.render(frame);
                         render_mode_overlay(frame, "Command discovery", &lines);
                     }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        view.render(frame);
+                        let lines = jj_command_lines(input, error.as_deref());
+                        render_mode_overlay(frame, "jj command", &lines);
+                    }
                     _ => view.render(frame),
                 },
                 AppView::CommandHistoryDetails { view }
+                | AppView::CommandOutput { view }
                 | AppView::WorkspaceStatus { view, .. }
                 | AppView::WorkspaceDiff { view, .. }
                 | AppView::OperationShow { view, .. }
@@ -889,6 +935,10 @@ fn run_terminal(
                         let lines = discovery_lines(*context, query, *selected);
                         view.render_with_overlay(frame, "Command discovery", &lines);
                     }
+                    Some(InputMode::JjCommand { input, error }) => {
+                        let lines = jj_command_lines(input, error.as_deref());
+                        view.render_with_overlay(frame, "jj command", &lines);
+                    }
                     _ => view.render(frame),
                 },
             })?;
@@ -897,8 +947,13 @@ fn run_terminal(
 
         match event::read()? {
             Event::Key(key) => {
-                if handle_input_mode(&mut state, &mut source, describe_source, key)
-                    == InputModeResult::Handled
+                if handle_input_mode(
+                    &mut state,
+                    &mut source,
+                    describe_source,
+                    command_repository.as_deref(),
+                    key,
+                ) == InputModeResult::Handled
                 {
                     needs_redraw = true;
                     continue;
@@ -997,6 +1052,10 @@ fn run_terminal(
                                 needs_redraw = true;
                             }
                         }
+                        AppKey::StartCommandMode => {
+                            open_jj_command_mode(&mut state);
+                            needs_redraw = true;
+                        }
                         AppKey::StartSearch
                             if matches!(
                                 state.views.active(),
@@ -1008,6 +1067,7 @@ fn run_terminal(
                                     | AppView::WorkspaceDiff { .. }
                                     | AppView::OperationShow { .. }
                                     | AppView::OperationDiff { .. }
+                                    | AppView::CommandOutput { .. }
                                     | AppView::CommandHistoryDetails { .. }
                             ) =>
                         {
@@ -1041,6 +1101,9 @@ fn run_terminal(
                                         query: String::new(),
                                     }
                                 }
+                                AppView::CommandOutput { .. } => InputMode::InspectionSearch {
+                                    query: String::new(),
+                                },
                                 AppView::Log(_)
                                 | AppView::Workspaces { .. }
                                 | AppView::OperationLog { .. }
@@ -1119,6 +1182,10 @@ enum InputMode {
     CommandPreview {
         pending: PendingCommandPreview,
     },
+    JjCommand {
+        input: String,
+        error: Option<String>,
+    },
     LogTemplate {
         options: Vec<LogTemplateSelection>,
         selected: usize,
@@ -1137,6 +1204,7 @@ fn handle_input_mode(
     state: &mut AppState,
     source: &mut JjLog,
     describe_source: &JjDescribe,
+    command_repository: Option<&Path>,
     key: KeyEvent,
 ) -> InputModeResult {
     if matches!(state.modes.active(), Some(InputMode::ViewOptions { .. })) {
@@ -1153,6 +1221,9 @@ fn handle_input_mode(
     }
     if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
         return handle_command_preview_mode(state, source, key);
+    }
+    if matches!(state.modes.active(), Some(InputMode::JjCommand { .. })) {
+        return handle_jj_command_mode(state, command_repository, key);
     }
 
     let Some(mode) = state.modes.active_mut() else {
@@ -1189,6 +1260,7 @@ fn handle_input_mode(
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
             state.modes.pop();
@@ -1223,6 +1295,7 @@ fn handle_input_mode(
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
             InputModeResult::Handled
@@ -1355,6 +1428,289 @@ fn handle_command_preview_mode(
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
+    }
+}
+
+fn handle_jj_command_mode(
+    state: &mut AppState,
+    repository: Option<&Path>,
+    key: KeyEvent,
+) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc, ..
+        } => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        } => {
+            let should_close = match state.modes.active_mut() {
+                Some(InputMode::JjCommand { input, error }) if input.is_empty() => {
+                    *error = None;
+                    true
+                }
+                Some(InputMode::JjCommand { input, error }) => {
+                    input.pop();
+                    *error = None;
+                    false
+                }
+                _ => false,
+            };
+            if should_close {
+                state.modes.pop();
+            }
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            submit_jj_command_mode(state, repository);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char('u'),
+            modifiers,
+            ..
+        } if modifiers == KeyModifiers::CONTROL => {
+            if let Some(InputMode::JjCommand { input, error }) = state.modes.active_mut() {
+                input.clear();
+                *error = None;
+            }
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            if let Some(InputMode::JjCommand { input, error }) = state.modes.active_mut() {
+                input.push(character);
+                *error = None;
+            }
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+fn open_jj_command_mode(state: &mut AppState) {
+    state.modes.push(InputMode::JjCommand {
+        input: String::new(),
+        error: None,
+    });
+}
+
+fn submit_jj_command_mode(state: &mut AppState, repository: Option<&Path>) {
+    let input = match state.modes.active() {
+        Some(InputMode::JjCommand { input, .. }) => input.clone(),
+        _ => return,
+    };
+
+    match run_jj_command_mode_with_runner(state, repository, &input, SystemJjCommandRunner) {
+        Ok(()) => {
+            state.modes.pop();
+        }
+        Err(error) => {
+            if let Some(InputMode::JjCommand {
+                error: active_error,
+                ..
+            }) = state.modes.active_mut()
+            {
+                *active_error = Some(error);
+            }
+        }
+    }
+}
+
+fn run_jj_command_mode_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    repository: Option<&Path>,
+    input: &str,
+    runner: R,
+) -> std::result::Result<(), String> {
+    let mut argv = parse_jj_command_args(input)?;
+    if argv.first().is_some_and(|arg| arg == "jj") {
+        argv.remove(0);
+    }
+    if argv.is_empty() {
+        return Err("type a jj command after :".to_owned());
+    }
+
+    let spec = command_mode_spec(argv, repository);
+    let command_line = spec.command_preview().command_line;
+    let mut runner = RecordingJjCommandRunner::new(
+        runner,
+        &mut state.history,
+        CommandSource::new(
+            SourceView::Other("command mode".to_owned()),
+            SourceAction::UserJjCommand,
+        )
+        .with_key(":"),
+    );
+    let result = runner.run(&spec);
+    let snapshot = command_mode_snapshot(&command_line, result.as_ref());
+    state.views.push(AppView::CommandOutput {
+        view: RenderedView::new(snapshot),
+    });
+    Ok(())
+}
+
+fn command_mode_spec(argv: Vec<String>, repository: Option<&Path>) -> JjCommandSpec {
+    let mut spec = JjCommandSpec::render_read_only(argv)
+        .with_mode(ExecutionMode::CommandMode)
+        .with_safety(SafetyClass::LocalMetadata)
+        .with_refresh_plan(RefreshPlan::None);
+    if let Some(repository) = repository {
+        spec = spec.with_repository(repository);
+    }
+    let title = format!(": {}", spec.preview());
+    spec.with_title(title)
+}
+
+fn jj_command_lines(input: &str, error: Option<&str>) -> Vec<String> {
+    let mut lines = vec![format!(": {input}")];
+    if let Some(error) = error {
+        lines.push(format!("error: {error}"));
+    }
+    lines.push(String::new());
+    lines.push("enter run   Ctrl-u clear   backspace edit   esc cancel".to_owned());
+    lines
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum QuoteMode {
+    Single,
+    Double,
+}
+
+fn parse_jj_command_args(input: &str) -> std::result::Result<Vec<String>, String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut quote = None;
+    let mut in_arg = false;
+    let mut chars = input.chars();
+
+    while let Some(character) = chars.next() {
+        match quote {
+            Some(QuoteMode::Single) => {
+                if character == '\'' {
+                    quote = None;
+                } else {
+                    current.push(character);
+                    in_arg = true;
+                }
+            }
+            Some(QuoteMode::Double) => match character {
+                '"' => quote = None,
+                '\\' => {
+                    let Some(next) = chars.next() else {
+                        return Err("dangling escape".to_owned());
+                    };
+                    current.push(next);
+                    in_arg = true;
+                }
+                _ => {
+                    current.push(character);
+                    in_arg = true;
+                }
+            },
+            None => match character {
+                character if character.is_whitespace() => {
+                    if in_arg {
+                        args.push(std::mem::take(&mut current));
+                        in_arg = false;
+                    }
+                }
+                '\'' => {
+                    quote = Some(QuoteMode::Single);
+                    in_arg = true;
+                }
+                '"' => {
+                    quote = Some(QuoteMode::Double);
+                    in_arg = true;
+                }
+                '\\' => {
+                    let Some(next) = chars.next() else {
+                        return Err("dangling escape".to_owned());
+                    };
+                    current.push(next);
+                    in_arg = true;
+                }
+                _ => {
+                    current.push(character);
+                    in_arg = true;
+                }
+            },
+        }
+    }
+
+    match quote {
+        Some(QuoteMode::Single) => Err("unterminated single quote".to_owned()),
+        Some(QuoteMode::Double) => Err("unterminated double quote".to_owned()),
+        None => {
+            if in_arg {
+                args.push(current);
+            }
+            Ok(args)
+        }
+    }
+}
+
+fn command_mode_snapshot(
+    command_line: &str,
+    result: std::result::Result<&Output, &io::Error>,
+) -> InspectionSnapshot {
+    let rendered = command_mode_rendered(command_line, result);
+    InspectionSnapshot::new(command_line, rendered).with_title(command_line)
+}
+
+fn command_mode_rendered(
+    command_line: &str,
+    result: std::result::Result<&Output, &io::Error>,
+) -> String {
+    let mut rendered = String::new();
+    rendered.push_str(&format!("Command: {command_line}\n"));
+    match result {
+        Ok(output) => {
+            rendered.push_str(&format!("Status: {}\n", exit_status_label(output)));
+            push_command_stream(&mut rendered, "Stdout", &output.stdout);
+            push_command_stream(&mut rendered, "Stderr", &output.stderr);
+        }
+        Err(error) => {
+            rendered.push_str("Status: spawn error\n");
+            rendered.push_str(&format!("Spawn error: {error}\n"));
+            push_command_stream(&mut rendered, "Stdout", &[]);
+            push_command_stream(&mut rendered, "Stderr", &[]);
+        }
+    }
+    rendered
+}
+
+fn exit_status_label(output: &Output) -> String {
+    if output.status.success() {
+        return "success".to_owned();
+    }
+
+    output
+        .status
+        .code()
+        .map_or_else(|| "failed".to_owned(), |code| format!("exit {code}"))
+}
+
+fn push_command_stream(rendered: &mut String, label: &str, bytes: &[u8]) {
+    rendered.push_str(&format!("\n{label}:\n"));
+    let text = String::from_utf8_lossy(bytes);
+    if text.is_empty() {
+        rendered.push_str("<empty>\n");
+    } else {
+        rendered.push_str(&text);
+        if !text.ends_with('\n') {
+            rendered.push('\n');
+        }
     }
 }
 
@@ -1622,6 +1978,7 @@ fn active_binding_context(state: &AppState) -> BindingContext {
         | AppView::WorkspaceDiff { .. }
         | AppView::OperationShow { .. }
         | AppView::OperationDiff { .. }
+        | AppView::CommandOutput { .. }
         | AppView::CommandHistoryDetails { .. } => BindingContext::Inspection,
         AppView::Workspaces { .. } => BindingContext::Workspaces,
         AppView::CommandHistory { .. } => BindingContext::CommandHistory,
@@ -1920,6 +2277,7 @@ fn apply_search_submit(state: &mut AppState, action: SearchSubmit) {
         | (AppView::WorkspaceDiff { view, .. }, SearchSubmit::Inspection(query))
         | (AppView::OperationShow { view, .. }, SearchSubmit::Inspection(query))
         | (AppView::OperationDiff { view, .. }, SearchSubmit::Inspection(query))
+        | (AppView::CommandOutput { view }, SearchSubmit::Inspection(query))
         | (AppView::CommandHistoryDetails { view }, SearchSubmit::Inspection(query)) => {
             let _ = view.apply(RenderedAction::Search(query));
         }
@@ -1962,6 +2320,7 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
         | AppView::WorkspaceDiff { view, .. }
         | AppView::OperationShow { view, .. }
         | AppView::OperationDiff { view, .. }
+        | AppView::CommandOutput { view }
         | AppView::CommandHistoryDetails { view } => {
             let action = match direction {
                 SearchDirection::Next => RenderedAction::SearchNext,
@@ -2017,7 +2376,9 @@ fn apply_action(
                 apply_workspaces_action(view, history, workspaces_source, action)
             }
             AppView::CommandHistory { view } => apply_command_history_action(view, history, action),
-            AppView::CommandHistoryDetails { view } => apply_static_rendered_action(view, action),
+            AppView::CommandHistoryDetails { view } | AppView::CommandOutput { view } => {
+                apply_static_rendered_action(view, action)
+            }
             AppView::OperationLog { view } => {
                 apply_operation_log_action(view, history, operation_source, action)
             }
@@ -3983,6 +4344,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -4027,6 +4389,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE),
         );
 
@@ -4078,6 +4441,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -4100,6 +4464,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
         );
 
@@ -4135,6 +4500,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -4166,6 +4532,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -4260,6 +4627,113 @@ mod tests {
     }
 
     #[test]
+    fn command_mode_parser_handles_quotes_and_escapes() {
+        assert_eq!(
+            parse_jj_command_args("status").expect("valid args"),
+            vec!["status"]
+        );
+        assert_eq!(
+            parse_jj_command_args("describe -m 'two words' @").expect("valid args"),
+            vec!["describe", "-m", "two words", "@"]
+        );
+        assert_eq!(
+            parse_jj_command_args("log -r \"description(\\\"done\\\")\"").expect("valid args"),
+            vec!["log", "-r", "description(\"done\")"]
+        );
+    }
+
+    #[test]
+    fn command_mode_parser_reports_incomplete_quotes() {
+        assert_eq!(
+            parse_jj_command_args("describe -m 'unfinished"),
+            Err("unterminated single quote".to_owned())
+        );
+        assert_eq!(
+            parse_jj_command_args("log \\"),
+            Err("dangling escape".to_owned())
+        );
+    }
+
+    #[test]
+    fn command_mode_empty_enter_keeps_prompt_with_error() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        open_jj_command_mode(&mut state);
+
+        submit_jj_command_mode(&mut state, None);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::JjCommand {
+                input: String::new(),
+                error: Some("type a jj command after :".to_owned()),
+            })
+        );
+        assert_eq!(state.views.views.len(), 1);
+    }
+
+    #[test]
+    fn command_mode_runs_command_and_records_user_source() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        run_jj_command_mode_with_runner(
+            &mut state,
+            Some(Path::new("/repo/vibe")),
+            "status",
+            SequencedRunner::successes(vec![output(0, "clean\n", "")]),
+        )
+        .expect("command mode runs");
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandOutput { .. }
+        ));
+        let record = state.command_history().records().next().expect("record");
+        assert_eq!(
+            record.command.command_family,
+            jk_core::CommandFamily::UserJjCommand
+        );
+        assert_eq!(record.command.spec_preview, "jj status");
+        assert_eq!(
+            record.command.process_preview(),
+            "jj --no-pager --color always --repository /repo/vibe status"
+        );
+        assert_eq!(
+            record.source.view,
+            SourceView::Other("command mode".to_owned())
+        );
+        assert_eq!(record.source.action, SourceAction::UserJjCommand);
+        assert_eq!(record.source.key.as_deref(), Some(":"));
+        assert_eq!(record.execution_mode, jk_core::ExecutionMode::CommandMode);
+    }
+
+    #[test]
+    fn command_mode_accepts_optional_jj_prefix() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        run_jj_command_mode_with_runner(
+            &mut state,
+            None,
+            "jj status",
+            SequencedRunner::successes(vec![output(0, "clean\n", "")]),
+        )
+        .expect("command mode runs");
+
+        let record = state.command_history().records().next().expect("record");
+        assert_eq!(record.command.spec_preview, "jj status");
+    }
+
+    #[test]
+    fn command_mode_output_preserves_failure_stderr() {
+        let result = output(1, "", "bad revset\n");
+        let rendered = command_mode_rendered("jj log -r bad", Ok(&result));
+
+        assert!(rendered.contains("Command: jj log -r bad"));
+        assert!(rendered.contains("Status: exit 1"));
+        assert!(rendered.contains("Stdout:\n<empty>"));
+        assert!(rendered.contains("Stderr:\nbad revset"));
+    }
+
+    #[test]
     fn confirming_undo_preview_records_recovery_action_before_refresh() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
@@ -4319,6 +4793,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -4347,6 +4822,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -4368,6 +4844,7 @@ mod tests {
             &mut state,
             &mut source,
             &JjDescribe::default(),
+            None,
             KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
         );
 

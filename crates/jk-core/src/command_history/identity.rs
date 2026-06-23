@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use super::redaction::{redact_argv, redact_text};
 use crate::command::preview_argv;
-use crate::{GlobalOptions, JjCommandSpec};
+use crate::{ExecutionMode, GlobalOptions, JjCommandSpec};
 
 /// Command data captured from a typed command spec.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -69,6 +69,10 @@ pub enum CommandFamily {
 
 impl CommandFamily {
     fn from_spec(spec: &JjCommandSpec) -> Self {
+        if spec.mode() == ExecutionMode::CommandMode {
+            return Self::UserJjCommand;
+        }
+
         let Some(command) = spec.argv().first() else {
             return Self::JjDefault;
         };
@@ -184,6 +188,8 @@ pub enum SourceAction {
     Undo,
     /// Redo the latest undone operation.
     Redo,
+    /// Run a user-entered `jj` command.
+    UserJjCommand,
     /// A source action not yet modeled.
     Other(String),
 }
