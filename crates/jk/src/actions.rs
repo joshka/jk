@@ -9,7 +9,7 @@ use crate::key::AppKey;
 use crate::state::{AppState, AppView, InputMode};
 use crate::{
     AppLoop, SearchDirection, apply_action, apply_search_action, copy_selected_command,
-    edit_command_output, handle_back, open_abandon_preview, open_command_discovery,
+    edit_command_output, handle_back_with_log_source, open_abandon_preview, open_command_discovery,
     open_command_history, open_command_history_operation, open_diff_file_list, open_edit_preview,
     open_jj_command_mode, open_new_preview, open_operation_log, open_recovery_preview,
     open_view_options, open_workspaces, push_selected_command_history_details,
@@ -48,7 +48,7 @@ pub fn dispatch_app_key(
         AppView::Workspaces { .. } | AppView::CommandHistory { .. } | AppView::OperationLog { .. }
     ) && matches!(key.code, KeyCode::Esc)
     {
-        handle_back(state);
+        handle_back_with_log_source(state, sources.log);
         return DispatchResult::Continue;
     }
 
@@ -56,6 +56,13 @@ pub fn dispatch_app_key(
         dispatch_direct_app_key(state, sources, app_key);
         return DispatchResult::Continue;
     };
+
+    if matches!(action, LogAction::CollapseExpanded)
+        && matches!(key.code, KeyCode::Left)
+        && state.pop_log_drill(sources.log)
+    {
+        return DispatchResult::Continue;
+    }
 
     if matches!(app_key, AppKey::Action(LogAction::ToggleHelp)) {
         open_command_discovery(state);
@@ -83,7 +90,7 @@ pub fn dispatch_app_key(
 fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, app_key: AppKey) {
     match app_key {
         AppKey::Back => {
-            handle_back(state);
+            handle_back_with_log_source(state, sources.log);
         }
         AppKey::OpenShow => {
             if matches!(state.views.active(), AppView::OperationLog { .. }) {
@@ -92,6 +99,18 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
                 push_selected_workspace_status(state, sources.workspaces);
             } else if matches!(state.views.active(), AppView::CommandHistory { .. }) {
                 push_selected_command_history_details(state);
+            } else if active_log_has_selected_elision(state) {
+                let _ = apply_action(
+                    state,
+                    sources.log,
+                    sources.diff,
+                    sources.evolog,
+                    sources.show,
+                    sources.status,
+                    sources.operation,
+                    sources.workspaces,
+                    LogAction::ToggleExpanded,
+                );
             } else {
                 push_selected_show(state, sources.show);
             }
@@ -170,6 +189,13 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         }
         AppKey::Action(_) | AppKey::Ignore | AppKey::StartSearch => {}
     }
+}
+
+fn active_log_has_selected_elision(state: &AppState) -> bool {
+    let AppView::Log(log) = state.views.active() else {
+        return false;
+    };
+    log.selected_elision_revset().is_some()
 }
 
 fn active_view_supports_search(state: &AppState) -> bool {

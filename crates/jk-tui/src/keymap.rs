@@ -246,10 +246,10 @@ impl KeyBinding {
 }
 
 const LOG_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::OpenShow, "enter", "open selected-change show")
+    KeyBinding::new(ActionId::OpenShow, "enter", "open change / drill into ~")
         .with_family(CommandFamily::JjShow)
         .with_aliases(&["details", "inspect"])
-        .with_hotbar(4, "enter show"),
+        .with_hotbar(4, "enter open"),
     KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff")
         .with_family(CommandFamily::JjDiff)
         .with_hotbar(5, "d diff"),
@@ -896,7 +896,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  n new  a abandon  e edit  V options  q quit"
+            "? help  H home  L log  r refresh  enter open  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  n new  a abandon  e edit  V options  q quit"
         );
     }
 
@@ -955,7 +955,7 @@ mod tests {
         assert!(status.chars().count() <= 104);
         assert!(status.contains("? help"));
         assert!(status.contains("q quit"));
-        assert!(status.contains("enter show"));
+        assert!(status.contains("enter open"));
         assert!(status.contains("d diff"));
         assert!(status.contains("m describe"));
         assert!(status.contains("v evolog"));
@@ -974,7 +974,7 @@ mod tests {
 
         assert_eq!(
             status,
-            "? help  H home  L log  r refresh  enter show  d diff  ...  q quit"
+            "? help  H home  L log  r refresh  enter open  d diff  ...  q quit"
         );
     }
 
@@ -1031,7 +1031,7 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::Log),
             vec![
-                "enter                open selected-change show",
+                "enter                open change / drill into ~",
                 "d                    open selected-change diff",
                 "v                    open selected-change evolog",
                 "s                    open repository status",

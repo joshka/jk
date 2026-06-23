@@ -184,6 +184,24 @@ impl LogView {
             .map(jk_core::LogEntry::change_id)
     }
 
+    /// Returns the selected revision identifier for follow-up commands.
+    #[must_use]
+    pub fn selected_revision_id(&self) -> Option<&str> {
+        self.state.selected_revision_id()
+    }
+
+    /// Returns the visible change before the selected graph elision.
+    #[must_use]
+    pub fn selected_elision_before_change_id(&self) -> Option<&str> {
+        self.state.selected_elision_before_change_id()
+    }
+
+    /// Selects the first entry rendered after the given visible change.
+    #[must_use]
+    pub fn select_first_entry_after_change_id(&mut self, change_id: &str) -> bool {
+        self.state.select_first_entry_after_change_id(change_id)
+    }
+
     /// Returns the selected change's full description for editing commands.
     pub fn selected_description(&self) -> Option<&str> {
         self.state
@@ -201,6 +219,12 @@ impl LogView {
     #[must_use]
     pub fn marked_change_ids(&self) -> &[String] {
         self.state.marked_change_ids()
+    }
+
+    /// Returns marked revision identifiers shortened for follow-up commands.
+    #[must_use]
+    pub fn marked_revision_ids(&self) -> Vec<String> {
+        self.state.marked_revision_ids()
     }
 
     /// Returns the selected change's zero-based mark index, if marked.
@@ -451,7 +475,10 @@ mod tests {
             view.apply(LogAction::ToggleExpanded),
             ActionResult::DrillElision
         );
-        assert_eq!(view.selected_elision_revset(), Some("bbb::aaa".to_owned()));
+        assert_eq!(
+            view.selected_elision_revset(),
+            Some("(bbb::aaa) | aaa | bbb".to_owned())
+        );
     }
 
     #[test]
