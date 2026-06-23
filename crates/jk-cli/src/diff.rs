@@ -19,8 +19,48 @@ pub enum DiffFormat {
     /// Render a patch.
     #[default]
     Patch,
+    /// Render `jj diff --summary`.
+    Summary,
     /// Render `jj diff --stat`.
     Stat,
+    /// Render `jj diff --types`.
+    Types,
+    /// Render `jj diff --name-only`.
+    NameOnly,
+    /// Render `jj diff --git`.
+    Git,
+    /// Render `jj diff --color-words`.
+    ColorWords,
+}
+
+impl DiffFormat {
+    /// Returns the `jj diff` flag for this format, when the default patch shape needs no flag.
+    #[must_use]
+    pub const fn flag(self) -> Option<&'static str> {
+        match self {
+            Self::Patch => None,
+            Self::Summary => Some("--summary"),
+            Self::Stat => Some("--stat"),
+            Self::Types => Some("--types"),
+            Self::NameOnly => Some("--name-only"),
+            Self::Git => Some("--git"),
+            Self::ColorWords => Some("--color-words"),
+        }
+    }
+
+    /// Returns a compact user-visible label for this format.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Patch => "patch",
+            Self::Summary => "summary",
+            Self::Stat => "stat",
+            Self::Types => "types",
+            Self::NameOnly => "name only",
+            Self::Git => "git",
+            Self::ColorWords => "color words",
+        }
+    }
 }
 
 /// Canonical query shapes supported by `jk diff`.
@@ -62,7 +102,9 @@ impl DiffQuery {
         }
     }
 
-    fn with_format(&self, format: DiffFormat) -> Self {
+    /// Returns this query with a different rendered output format.
+    #[must_use]
+    pub fn with_format(&self, format: DiffFormat) -> Self {
         match self {
             Self::Revision { rev, .. } => Self::Revision {
                 rev: rev.clone(),
@@ -150,15 +192,15 @@ impl JjDiff {
         match query {
             DiffQuery::Revision { rev, format } => {
                 let mut argv = vec![DIFF_COMMAND, "-r", rev.as_str()];
-                if *format == DiffFormat::Stat {
-                    argv.push("--stat");
+                if let Some(flag) = format.flag() {
+                    argv.push(flag);
                 }
                 self.spec(argv)
             }
             DiffQuery::FromTo { from, to, format } => {
                 let mut argv = vec![DIFF_COMMAND, "--from", from.as_str(), "--to", to.as_str()];
-                if *format == DiffFormat::Stat {
-                    argv.push("--stat");
+                if let Some(flag) = format.flag() {
+                    argv.push(flag);
                 }
                 self.spec(argv)
             }
@@ -358,6 +400,30 @@ mod tests {
 
         assert_eq!(argv, ["diff", "--from", "main", "--to", "@", "--stat"]);
         assert_eq!(spec.title(), "jj diff --from main --to @ --stat");
+    }
+
+    #[test]
+    fn revision_query_builds_supported_format_specs() {
+        for (format, flag) in [
+            (DiffFormat::Summary, "--summary"),
+            (DiffFormat::Types, "--types"),
+            (DiffFormat::NameOnly, "--name-only"),
+            (DiffFormat::Git, "--git"),
+            (DiffFormat::ColorWords, "--color-words"),
+        ] {
+            let spec = JjDiff::default().spec_for(&DiffQuery::Revision {
+                rev: "abc123".to_owned(),
+                format,
+            });
+            let argv = spec
+                .argv()
+                .iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+
+            assert_eq!(argv, ["diff", "-r", "abc123", flag]);
+            assert_eq!(spec.title(), format!("jj diff -r abc123 {flag}"));
+        }
     }
 
     #[test]

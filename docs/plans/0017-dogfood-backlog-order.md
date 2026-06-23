@@ -26,8 +26,9 @@ then broaden into mutation flows, selectors, run options, and generated help.
    remain follow-up work.
 1. Add `!` external command MVP: run non-shell external commands safely, with explicit argv handling
    and output capture.
-1. Add diff View Options quick wins: `V` should toggle stat, summary, name-only, git format, and
-   maybe color-words where jj supports it.
+1. Done: add diff View Options quick wins. `V` from diff can reload the active diff as patch,
+   summary, stat, types, name-only, git, or color-words output, matching the supported local
+   `jj diff` flags.
 1. Partly done: make rich diff navigation solid. Diff already supports `[ ]` file movement, `{ }`
    hunk movement, search, horizontal scroll, sticky headers, and now a current-file status line;
    remaining polish includes file list jump, broader view options, and any dogfood issues found in

@@ -121,8 +121,28 @@ struct DiffArgs {
     to: Option<String>,
 
     /// Render `jj diff --stat`.
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["summary", "types", "name_only", "git", "color_words"])]
     stat: bool,
+
+    /// Render `jj diff --summary`.
+    #[arg(short = 's', long, conflicts_with_all = ["stat", "types", "name_only", "git", "color_words"])]
+    summary: bool,
+
+    /// Render `jj diff --types`.
+    #[arg(long, conflicts_with_all = ["stat", "summary", "name_only", "git", "color_words"])]
+    types: bool,
+
+    /// Render `jj diff --name-only`.
+    #[arg(long, conflicts_with_all = ["stat", "summary", "types", "git", "color_words"])]
+    name_only: bool,
+
+    /// Render `jj diff --git`.
+    #[arg(long, conflicts_with_all = ["stat", "summary", "types", "name_only", "color_words"])]
+    git: bool,
+
+    /// Render `jj diff --color-words`.
+    #[arg(long, conflicts_with_all = ["stat", "summary", "types", "name_only", "git"])]
+    color_words: bool,
 }
 
 /// Options for the explicit `jk show` command.
@@ -155,11 +175,7 @@ impl ShowArgs {
 
 impl DiffArgs {
     fn query(&self) -> DiffQuery {
-        let format = if self.stat {
-            DiffFormat::Stat
-        } else {
-            DiffFormat::Patch
-        };
+        let format = self.format();
 
         if let (Some(from), Some(to)) = (&self.from, &self.to) {
             return DiffQuery::FromTo {
@@ -176,6 +192,24 @@ impl DiffArgs {
             .cloned()
             .unwrap_or_else(|| "@".to_owned());
         DiffQuery::Revision { rev, format }
+    }
+
+    fn format(&self) -> DiffFormat {
+        if self.summary {
+            DiffFormat::Summary
+        } else if self.stat {
+            DiffFormat::Stat
+        } else if self.types {
+            DiffFormat::Types
+        } else if self.name_only {
+            DiffFormat::NameOnly
+        } else if self.git {
+            DiffFormat::Git
+        } else if self.color_words {
+            DiffFormat::ColorWords
+        } else {
+            DiffFormat::Patch
+        }
     }
 }
 
@@ -728,7 +762,8 @@ fn run_terminal(
             terminal.draw(|frame| match state.views.active_mut() {
                 AppView::Log(log) => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines =
+                            view_options_lines(*context, *selected, source.template(), None);
                         log.render_with_selector(frame, "View Options", &lines);
                     }
                     Some(InputMode::LogTemplate { options, selected }) => {
@@ -761,9 +796,14 @@ fn run_terminal(
                     }
                     _ => log.render(frame),
                 },
-                AppView::Diff { view, .. } => match &mode {
+                AppView::Diff { view, query } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines = view_options_lines(
+                            *context,
+                            *selected,
+                            source.template(),
+                            Some(query.format()),
+                        );
                         view.render_with_overlay(frame, "View Options", &lines);
                     }
                     Some(InputMode::DiffSearch { query }) => {
@@ -786,7 +826,8 @@ fn run_terminal(
                 },
                 AppView::Show { view, .. } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines =
+                            view_options_lines(*context, *selected, source.template(), None);
                         view.render_with_overlay(frame, "View Options", &lines);
                     }
                     Some(InputMode::InspectionSearch { query }) => {
@@ -809,7 +850,8 @@ fn run_terminal(
                 },
                 AppView::Evolog { view, .. } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines =
+                            view_options_lines(*context, *selected, source.template(), None);
                         view.render_with_overlay(frame, "View Options", &lines);
                     }
                     Some(InputMode::InspectionSearch { query }) => {
@@ -832,7 +874,8 @@ fn run_terminal(
                 },
                 AppView::Status { view, .. } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines =
+                            view_options_lines(*context, *selected, source.template(), None);
                         view.render_with_overlay(frame, "View Options", &lines);
                     }
                     Some(InputMode::InspectionSearch { query }) => {
@@ -855,7 +898,8 @@ fn run_terminal(
                 },
                 AppView::Workspaces { view } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines =
+                            view_options_lines(*context, *selected, source.template(), None);
                         view.render(frame);
                         render_mode_overlay(frame, "View Options", &lines);
                     }
@@ -894,7 +938,8 @@ fn run_terminal(
                 },
                 AppView::OperationLog { view } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines =
+                            view_options_lines(*context, *selected, source.template(), None);
                         view.render(frame);
                         render_mode_overlay(frame, "View Options", &lines);
                     }
@@ -921,7 +966,8 @@ fn run_terminal(
                 | AppView::OperationShow { view, .. }
                 | AppView::OperationDiff { view, .. } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
-                        let lines = view_options_lines(*context, *selected, source.template());
+                        let lines =
+                            view_options_lines(*context, *selected, source.template(), None);
                         view.render_with_overlay(frame, "View Options", &lines);
                     }
                     Some(InputMode::InspectionSearch { query }) => {
@@ -951,6 +997,7 @@ fn run_terminal(
                 if handle_input_mode(
                     &mut state,
                     &mut source,
+                    diff_source,
                     describe_source,
                     command_repository.as_deref(),
                     key,
@@ -1208,12 +1255,13 @@ enum InputModeResult {
 fn handle_input_mode(
     state: &mut AppState,
     source: &mut JjLog,
+    diff_source: &JjDiff,
     describe_source: &JjDescribe,
     command_repository: Option<&Path>,
     key: KeyEvent,
 ) -> InputModeResult {
     if matches!(state.modes.active(), Some(InputMode::ViewOptions { .. })) {
-        return handle_view_options_mode(state, source, key);
+        return handle_view_options_mode(state, source, diff_source, key);
     }
     if matches!(state.modes.active(), Some(InputMode::LogTemplate { .. })) {
         return handle_template_mode(state, source, key);
@@ -1911,6 +1959,7 @@ fn base64_encode(bytes: &[u8]) -> String {
 fn handle_view_options_mode(
     state: &mut AppState,
     source: &JjLog,
+    diff_source: &JjDiff,
     key: KeyEvent,
 ) -> InputModeResult {
     match key {
@@ -1955,12 +2004,52 @@ fn handle_view_options_mode(
         } => {
             let selected = selected_view_option(state);
             state.modes.pop();
-            if selected == Some(ViewOptionRow::LogTemplate) {
-                open_template_selector(&mut state.modes, source);
+            match selected {
+                Some(ViewOptionRow::LogTemplate) => {
+                    open_template_selector(&mut state.modes, source);
+                }
+                Some(ViewOptionRow::DiffFormat(format)) => {
+                    apply_diff_format_option(state, diff_source, format);
+                }
+                Some(ViewOptionRow::Placeholder) | None => {}
             }
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
+    }
+}
+
+fn apply_diff_format_option(state: &mut AppState, diff_source: &JjDiff, format: DiffFormat) {
+    apply_diff_format_option_with_runner(state, diff_source, format, SystemJjCommandRunner);
+}
+
+fn apply_diff_format_option_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    diff_source: &JjDiff,
+    format: DiffFormat,
+    runner: R,
+) {
+    let new_query = match state.views.active() {
+        AppView::Diff { query, .. } => query.with_format(format),
+        _ => return,
+    };
+
+    let mut runner = RecordingJjCommandRunner::new(
+        runner,
+        &mut state.history,
+        CommandSource::new(SourceView::Diff, SourceAction::Refresh),
+    );
+    let result = diff_source.load_query_with_runner(&new_query, &mut runner);
+
+    let AppView::Diff { view, query } = state.views.active_mut() else {
+        return;
+    };
+    match result {
+        Ok(snapshot) => {
+            *query = new_query;
+            view.refresh(snapshot);
+        }
+        Err(error) => view.show_error(error.to_string()),
     }
 }
 
@@ -2092,8 +2181,19 @@ enum ViewOptionsMove {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ViewOptionRow {
     LogTemplate,
+    DiffFormat(DiffFormat),
     Placeholder,
 }
+
+const DIFF_VIEW_OPTION_ROWS: &[ViewOptionRow] = &[
+    ViewOptionRow::DiffFormat(DiffFormat::Patch),
+    ViewOptionRow::DiffFormat(DiffFormat::Summary),
+    ViewOptionRow::DiffFormat(DiffFormat::Stat),
+    ViewOptionRow::DiffFormat(DiffFormat::Types),
+    ViewOptionRow::DiffFormat(DiffFormat::NameOnly),
+    ViewOptionRow::DiffFormat(DiffFormat::Git),
+    ViewOptionRow::DiffFormat(DiffFormat::ColorWords),
+];
 
 fn move_view_options_selection(state: &mut AppState, direction: ViewOptionsMove) {
     let Some(InputMode::ViewOptions { context, selected }) = state.modes.active_mut() else {
@@ -2121,8 +2221,8 @@ fn selected_view_option(state: &AppState) -> Option<ViewOptionRow> {
 fn view_option_rows(context: BindingContext) -> &'static [ViewOptionRow] {
     match context {
         BindingContext::Log => &[ViewOptionRow::LogTemplate],
-        BindingContext::Diff
-        | BindingContext::Inspection
+        BindingContext::Diff => DIFF_VIEW_OPTION_ROWS,
+        BindingContext::Inspection
         | BindingContext::Workspaces
         | BindingContext::CommandHistory
         | BindingContext::OperationLog => &[ViewOptionRow::Placeholder],
@@ -2133,6 +2233,7 @@ fn view_options_lines(
     context: BindingContext,
     selected: usize,
     template: &LogTemplateSelection,
+    active_diff_format: Option<DiffFormat>,
 ) -> Vec<String> {
     match context {
         BindingContext::Log => {
@@ -2143,7 +2244,25 @@ fn view_options_lines(
                 "j/k or arrows move   enter open   esc close".to_owned(),
             ]
         }
-        BindingContext::Diff | BindingContext::Inspection => vec![
+        BindingContext::Diff => {
+            let active = active_diff_format.unwrap_or(DiffFormat::Patch);
+            let mut lines = DIFF_VIEW_OPTION_ROWS
+                .iter()
+                .enumerate()
+                .map(|(index, row)| {
+                    let marker = if index == selected { ">" } else { " " };
+                    let ViewOptionRow::DiffFormat(format) = row else {
+                        unreachable!("diff view rows are all formats");
+                    };
+                    let active_marker = if *format == active { "*" } else { " " };
+                    format!("{marker} {active_marker} {:<14}", format.label())
+                })
+                .collect::<Vec<_>>();
+            lines.push(String::new());
+            lines.push("j/k or arrows move   enter apply   esc close".to_owned());
+            lines
+        }
+        BindingContext::Inspection => vec![
             "No view options in this slice.".to_owned(),
             String::new(),
             "esc close".to_owned(),
@@ -4359,6 +4478,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
@@ -4404,6 +4524,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE),
@@ -4456,6 +4577,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
@@ -4479,6 +4601,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
@@ -4515,6 +4638,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
@@ -4547,6 +4671,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
@@ -4875,6 +5000,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
@@ -4893,10 +5019,15 @@ mod tests {
     }
 
     #[test]
-    fn view_options_placeholder_enter_closes_non_log_overlay() {
-        let mut state = AppState::new(diff_app_view("aaa"));
+    fn view_options_placeholder_enter_closes_inspection_overlay() {
+        let snapshot =
+            jk_core::InspectionSnapshot::new("show", "rendered show\n").with_title("jj show aaa");
+        let mut state = AppState::new(AppView::Show {
+            view: RenderedView::new(snapshot),
+            query: ShowQuery::new(vec!["aaa".to_owned()]),
+        });
         state.modes.push(InputMode::ViewOptions {
-            context: BindingContext::Diff,
+            context: BindingContext::Inspection,
             selected: 0,
         });
         let mut source = JjLog::default();
@@ -4904,6 +5035,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
@@ -4911,6 +5043,33 @@ mod tests {
 
         assert_eq!(result, InputModeResult::Handled);
         assert_eq!(state.modes.active(), None);
+    }
+
+    #[test]
+    fn diff_view_options_apply_selected_format() {
+        let mut state = AppState::new(diff_app_view("aaa"));
+
+        apply_diff_format_option_with_runner(
+            &mut state,
+            &JjDiff::default(),
+            DiffFormat::Summary,
+            SequencedRunner::successes(vec![
+                output(0, "M src/a.rs\n", ""),
+                output(0, "src/a.rs | 1 +\n", ""),
+            ]),
+        );
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::Diff {
+                query: DiffQuery::Revision { rev, format },
+                ..
+            } if rev == "aaa" && *format == DiffFormat::Summary
+        ));
+        let newest = state.command_history().records().last().expect("record");
+        assert_eq!(newest.command.title, "jj diff -r aaa --stat");
+        assert_eq!(newest.source.view, SourceView::Diff);
+        assert_eq!(newest.source.action, SourceAction::Refresh);
     }
 
     #[test]
@@ -4926,6 +5085,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDiff::default(),
             &JjDescribe::default(),
             None,
             KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
@@ -4943,6 +5103,7 @@ mod tests {
                 BindingContext::Log,
                 0,
                 &LogTemplateSelection::CompactFullDescription,
+                None,
             ),
             vec![
                 "> Template           full description",
@@ -4951,8 +5112,23 @@ mod tests {
             ]
         );
         assert_eq!(
-            view_options_lines(BindingContext::Diff, 0, &LogTemplateSelection::Configured),
-            vec!["No view options in this slice.", "", "esc close"]
+            view_options_lines(
+                BindingContext::Diff,
+                2,
+                &LogTemplateSelection::Configured,
+                Some(DiffFormat::Stat),
+            ),
+            vec![
+                "    patch         ",
+                "    summary       ",
+                "> * stat          ",
+                "    types         ",
+                "    name only     ",
+                "    git           ",
+                "    color words   ",
+                "",
+                "j/k or arrows move   enter apply   esc close",
+            ]
         );
     }
 
@@ -5145,6 +5321,36 @@ mod tests {
                 format: DiffFormat::Patch,
             }
         );
+    }
+
+    #[test]
+    fn diff_args_resolve_supported_format_flags() {
+        for (flag, format) in [
+            ("--summary", DiffFormat::Summary),
+            ("--types", DiffFormat::Types),
+            ("--name-only", DiffFormat::NameOnly),
+            ("--git", DiffFormat::Git),
+            ("--color-words", DiffFormat::ColorWords),
+        ] {
+            let args = Args::try_parse_from(["jk", "diff", "-r", "abc123", flag])
+                .expect("valid diff args");
+            let Some(Command::Diff(diff_args)) = args.command else {
+                panic!("expected diff command");
+            };
+
+            assert_eq!(
+                diff_args.query(),
+                DiffQuery::Revision {
+                    rev: "abc123".to_owned(),
+                    format,
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn diff_args_reject_multiple_format_flags() {
+        assert!(Args::try_parse_from(["jk", "diff", "--stat", "--summary"]).is_err());
     }
 
     #[test]
