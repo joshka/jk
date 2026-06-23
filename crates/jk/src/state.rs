@@ -222,7 +222,7 @@ pub enum InputMode {
     CommandDiscovery {
         context: BindingContext,
         query: String,
-        selected: usize,
+        scroll_offset: usize,
     },
     DescribeMessage {
         rev: String,

@@ -22,10 +22,11 @@ mod rendered_log;
 mod rendered_state;
 mod selected_row;
 
-/// Searchable command-discovery metadata and popup formatting.
+/// Contextual command-help metadata and popup formatting.
 pub mod command_discovery {
     pub use crate::keymap::{
-        BindingContext, CommandFamily, DiscoveryRow, discovery_lines, discovery_rows,
-        filter_discovery_rows, filtered_discovery_len,
+        BindingContext, CommandFamily, DiscoveryRow, discovery_len, discovery_lines,
+        discovery_lines_for_width, discovery_lines_for_width_and_rows, discovery_rows,
+        discovery_scroll_limit,
     };
 }

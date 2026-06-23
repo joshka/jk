@@ -663,7 +663,7 @@ mod tests {
     fn help_overlay_uses_workspace_bindings() {
         let mut view = WorkspacesView::new(snapshot([row("default", true)]));
         let _ = view.apply(WorkspacesAction::ToggleHelp);
-        let backend = TestBackend::new(72, 16);
+        let backend = TestBackend::new(72, 32);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -674,8 +674,10 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Workspaces keys"));
-        assert!(rendered.contains("enter, s             open selected workspace status"));
-        assert!(rendered.contains("u                    update selected stale workspace"));
+        assert!(rendered.contains("Open and inspect:"));
+        assert!(rendered.contains("open selected workspace status"));
+        assert!(rendered.contains("Session:"));
+        assert!(rendered.contains("update selected stale workspace"));
     }
 
     fn snapshot<const N: usize>(rows: [WorkspaceViewRow; N]) -> WorkspaceViewSnapshot {

@@ -55,7 +55,8 @@ Add the two features that turn `jk` from an inspection helper into a daily jj TU
 
 - Add `:` jj command mode with optional `jj` prefix.
 - Add `!` external command mode without shell interpretation by default.
-- Add searchable contextual help so users can find actions by key, name, and jj command family.
+- Add contextual help and searchable command discovery so users can scan current actions and find
+  commands by key, name, and jj command family outside the Help overlay.
 - Record command history with argv, output, status, duration, and resulting operation.
 - Add `W` workspace screen backed by `jj workspace list`.
 - Add workspace actions for status, diff, update-stale, add, and forget.
@@ -186,13 +187,14 @@ Make `?` and the future hotbar generate from the same binding registry.
 - Acceptance: adding or remapping a key updates contextual help without hand-editing text.
 - Tests: key conflict tests and generated help snapshots.
 
-### Add Searchable Command Discovery
+### Add Contextual Help And Command Discovery
 
-Make help and command discovery searchable without replacing `:` command mode.
+Make Help scannable and make command discovery searchable without replacing `:` command mode.
 
-- Scope: help overlay, action registry metadata, command family tags, and filter input.
-- Acceptance: users can filter actions by key, action name, current screen, and jj command family.
-- Tests: action metadata tests, filter tests, and Betamax searchable-help tape.
+- Scope: help overlay, action registry metadata, command family tags, and command-mode suggestions.
+- Acceptance: Help answers "what can I do here?" at a glance, and users can search actions by key,
+  action name, current screen, and jj command family outside the Help overlay.
+- Tests: action metadata tests, command-discovery tests, and Betamax help tapes.
 
 ### Add Independent Scrolling And Ordered Marks
 

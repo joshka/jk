@@ -73,53 +73,96 @@ behavior, such as `refresh_keeps_selected_change_when_still_visible`.
 Run focused tests while editing and `just release-check` before
 release-oriented changes.
 
+## Betamax Demo & Media Guidelines
+
+Betamax tapes should show the behavior under review, not setup noise.
+Hide setup work with `Hide`, build or fixture-prep while hidden, and
+clear the terminal before the first visible frame. The first visible
+frame should usually be either one clean command line or the app already
+open when the command itself is not the point of the demo.
+
+Avoid extraneous output unrelated to the behavior being shown. Do not
+record dependency builds, `cd`, fixture setup, cargo output, shell
+prompts from pre-work, cleanup commands, or transient diagnostics unless
+that output is the thing under review. If a tape needs that work, run it
+while hidden and use `Wait+Screen` or `Wait+Line` assertions before
+showing the terminal.
+
+Prefer PNG screenshots for simple UI states, layout checks, and
+before/after comparisons that do not need motion. Use GIFs or videos
+only when animation, navigation, typing, state transitions, or timing
+are part of the behavior being reviewed. For GIFs, also capture one or
+more PNG checkpoints when they make review easier.
+
+Use readable dwell times, but keep them intentional:
+
+- Wait on semantic screen text before sleeping.
+- Use short sleeps, around `300ms`, after closing overlays or returning
+  to the shell.
+- Use medium sleeps, around `600ms` to `1200ms`, after opening a new app
+  view or popup that humans need to read.
+- Use longer sleeps only when the demo intentionally teaches a state or
+  transition, and keep those rare.
+- Clear captions with `Caption ""` before cleanup or any frame that
+  should return to a clean terminal.
+
+Keyboard overlays and captions should clarify the action being shown.
+Avoid showing long setup commands in keyboard overlays; keep setup hidden
+or disable overlays until the user-facing interaction begins.
+
 ## TUI App Layout Guidelines
 
-Default to user comprehension over implementation structure. Screens, overlays,
-hotbars, menus, previews, and other discretionary layout should read like
-user-facing product surfaces, not debug views of internal enums or dispatch
-order.
+Default to user comprehension over implementation structure. Screens,
+overlays, hotbars, menus, previews, and other discretionary layout
+should read like user-facing product surfaces, not debug views of
+internal enums or dispatch order.
 
-- Group actions and information by user task, not implementation type. Prefer
-  broad groups such as Open and inspect, Move and find, Change actions, History
-  and recovery, and Session.
-- Keep labels concrete without repeating the same idea twice. Use a command
-  name when the command is the clearest label, or use an action label when the
-  action is clearer; avoid command-plus-parenthetical forms that restate each
-  other.
-- Align columns globally within a surface. Key, action, object, status, and
-  command columns should share column stops rather than jittering per section.
-- Avoid accidental horizontal spread. Multi-column layouts are useful only when
-  related columns remain visually connected by a deliberate gap.
-- Size overlays and modals to rendered content with minimal padding. Avoid fixed
-  large dialog dimensions when the content is smaller. Scrollable document
-  overlays should size from the full rendered document, not from the current
-  scroll slice, so the box does not resize while scrolling.
-- Use available space before scrolling when it improves scanning. Show all
-  relevant content when the terminal can fit it cleanly, but width-constrained
-  document overlays may keep a stable viewport instead of expanding into a tall
-  sheet. Show scroll indicators only when content is hidden.
+- Group actions and information by user task, not implementation type.
+  Prefer broad groups such as Open and inspect, Move and find, Change
+  actions, History and recovery, and Session.
+- Keep labels concrete without repeating the same idea twice. Use a
+  command name when the command is the clearest label, or use an action
+  label when the action is clearer; avoid command-plus-parenthetical
+  forms that restate each other.
+- Align columns globally within a surface. Key, action, object, status,
+  and command columns should share column stops rather than jittering
+  per section.
+- Avoid accidental horizontal spread. Multi-column layouts are useful
+  only when related columns remain visually connected by a deliberate
+  gap.
+- Size overlays and modals to rendered content with minimal padding.
+  Avoid fixed large dialog dimensions when the content is smaller.
+  Scrollable document overlays should size from the full rendered
+  document, not from the current scroll slice, so the box does not
+  resize while scrolling.
+- Use available space before scrolling when it improves scanning. Show
+  all relevant content when the terminal can fit it cleanly, but
+  width-constrained document overlays may keep a stable viewport instead
+  of expanding into a tall sheet. Show scroll indicators only when
+  content is hidden.
 - Match scrolling to the surface. Document-like content should scroll by
-  rendered line; selection-style movement belongs to actual selectable rows.
-- Do not repeat controls between body, hotbar, footer, and chrome. Chrome should
-  add only information not already carried by the active surface, except when
-  the visible chrome belongs to the underlying screen and remains useful for
-  mode safety.
-- Prefer readable key notation. Use symbols where they reduce noise, such as
-  `↑/↓` and `←/→`, and split overloaded bindings when they represent different
-  actions.
-- Protect keys, action text, object labels, and status text from wrapping and
-  truncation. At narrow widths, fall back to shorter labels or fewer columns
-  before allowing awkward wrapping.
-- Choose column count from content shape, not width alone. A two-column layout
-  should activate only when both columns fit, the gap is readable, vertical
-  scrolling is materially reduced, and the result still scans top-to-bottom.
-- Test layout as data. Unit tests should cover representative sizes and assert
-  width bounds, scroll indicators, column switching, readable compact layouts,
-  and consistent alignment.
-- Use PNG or terminal visual proof for polish and gestalt. Mechanical failures
-  such as overflow, stale scroll indicators, bad column switching, and unwanted
-  truncation belong in tests.
+  rendered line; selection-style movement belongs to actual selectable
+  rows.
+- Do not repeat controls between body, hotbar, footer, and chrome.
+  Chrome should add only information not already carried by the active
+  surface, except when the visible chrome belongs to the underlying
+  screen and remains useful for mode safety.
+- Prefer readable key notation. Use symbols where they reduce noise,
+  such as `↑/↓` and `←/→`, and split overloaded bindings when they
+  represent different actions.
+- Protect keys, action text, object labels, and status text from
+  wrapping and truncation. At narrow widths, fall back to shorter labels
+  or fewer columns before allowing awkward wrapping.
+- Choose column count from content shape, not width alone. A two-column
+  layout should activate only when both columns fit, the gap is readable,
+  vertical scrolling is materially reduced, and the result still scans
+  top-to-bottom.
+- Test layout as data. Unit tests should cover representative sizes and
+  assert width bounds, scroll indicators, column switching, readable
+  compact layouts, and consistent alignment.
+- Use PNG or terminal visual proof for polish and gestalt. Mechanical
+  failures such as overflow, stale scroll indicators, bad column
+  switching, and unwanted truncation belong in tests.
 
 ## Commit & Pull Request Guidelines
 
