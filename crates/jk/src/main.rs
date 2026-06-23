@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
-use jk_cli::{JjDiff, JjLog, JjLogCommand};
+use jk_cli::{DiffFormat, DiffQuery, JjDiff, JjLog, JjLogCommand};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogView};
 
@@ -56,9 +56,61 @@ struct LogArgs {
 /// Options for the explicit `jk diff` command.
 #[derive(Debug, Parser)]
 struct DiffArgs {
+    /// Compatibility sugar for `jk diff -r REV`.
+    #[arg(value_name = "REV", conflicts_with_all = ["revision", "from", "to"])]
+    compatibility_revision: Option<String>,
+
     /// Revision to diff against its parent.
-    #[arg(default_value = "@")]
-    revision: String,
+    #[arg(short = 'r', long = "revision", value_name = "REV", conflicts_with_all = ["from", "to"])]
+    revision: Option<String>,
+
+    /// Starting revision for a two-revision diff.
+    #[arg(
+        long,
+        value_name = "FROM",
+        requires = "to",
+        conflicts_with = "revision"
+    )]
+    from: Option<String>,
+
+    /// Ending revision for a two-revision diff.
+    #[arg(
+        long,
+        value_name = "TO",
+        requires = "from",
+        conflicts_with = "revision"
+    )]
+    to: Option<String>,
+
+    /// Render `jj diff --stat`.
+    #[arg(long)]
+    stat: bool,
+}
+
+impl DiffArgs {
+    fn query(&self) -> DiffQuery {
+        let format = if self.stat {
+            DiffFormat::Stat
+        } else {
+            DiffFormat::Patch
+        };
+
+        if let (Some(from), Some(to)) = (&self.from, &self.to) {
+            return DiffQuery::FromTo {
+                from: from.clone(),
+                to: to.clone(),
+                format,
+            };
+        }
+
+        let rev = self
+            .revision
+            .as_ref()
+            .or(self.compatibility_revision.as_ref())
+            .cloned()
+            .unwrap_or_else(|| "@".to_owned());
+        DiffQuery::Revision { rev, format }
+    }
 }
 
 fn main() -> Result<()> {
@@ -68,16 +120,17 @@ fn main() -> Result<()> {
     let source = log_source(&args);
     let diff_source = diff_source(&args);
     let app = if let Some(Command::Diff(diff_args)) = &args.command {
-        let snapshot = diff_source.load(&diff_args.revision);
+        let query = diff_args.query();
+        let snapshot = diff_source.load_query(&query);
         let diff = match snapshot {
             Ok(snapshot) => DiffView::new(snapshot),
             Err(error) => DiffView::from_error(
-                diff_args.revision.clone(),
-                JjDiff::title(&diff_args.revision),
+                query.target_label(),
+                diff_source.spec_for(&query).title().to_owned(),
                 error.to_string(),
             ),
         };
-        AppView::Diff(diff)
+        AppView::Diff { view: diff, query }
     } else {
         let entries = source.load()?;
         AppView::Log(LogView::new(entries))
@@ -120,7 +173,7 @@ fn diff_source(args: &Args) -> JjDiff {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum AppView {
     Log(LogView),
-    Diff(DiffView),
+    Diff { view: DiffView, query: DiffQuery },
 }
 
 /// Application state owned by the terminal loop.
@@ -219,12 +272,12 @@ fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result
             let mode = state.modes.active().cloned();
             terminal.draw(|frame| match state.views.active_mut() {
                 AppView::Log(log) => log.render(frame),
-                AppView::Diff(diff) => match &mode {
+                AppView::Diff { view, .. } => match &mode {
                     Some(InputMode::DiffSearch { query }) => {
                         let status = format!("/{query}");
-                        diff.render_with_status(frame, &status);
+                        view.render_with_status(frame, &status);
                     }
-                    None => diff.render(frame),
+                    None => view.render(frame),
                 },
             })?;
             needs_redraw = false;
@@ -243,7 +296,9 @@ fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result
                             handle_back(&mut state);
                             needs_redraw = true;
                         }
-                        AppKey::StartSearch if matches!(state.views.active(), AppView::Diff(_)) => {
+                        AppKey::StartSearch
+                            if matches!(state.views.active(), AppView::Diff { .. }) =>
+                        {
                             state.modes.push(InputMode::DiffSearch {
                                 query: String::new(),
                             });
@@ -333,8 +388,8 @@ fn handle_input_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
 
 /// Applies a search-only diff action when the active view supports it.
 fn apply_diff_search_action(state: &mut AppState, action: DiffAction) {
-    if let AppView::Diff(diff) = state.views.active_mut() {
-        let _ = diff.apply(action);
+    if let AppView::Diff { view, .. } = state.views.active_mut() {
+        let _ = view.apply(action);
     }
 }
 
@@ -356,7 +411,7 @@ fn apply_action(
 ) -> AppLoop {
     let transition = match state.views.active_mut() {
         AppView::Log(log) => apply_log_action(log, source, diff_source, action),
-        AppView::Diff(diff) => apply_diff_action(diff, diff_source, action),
+        AppView::Diff { view, query } => apply_diff_action(view, query, diff_source, action),
     };
 
     match transition {
@@ -395,10 +450,14 @@ fn apply_log_action(
             return AppTransition::Continue;
         };
 
-        match diff_source.load(&change_id) {
+        let query = DiffQuery::Revision {
+            rev: change_id.clone(),
+            format: DiffFormat::Patch,
+        };
+        match diff_source.load_query(&query) {
             Ok(snapshot) => {
                 let diff = DiffView::new(snapshot);
-                return AppTransition::Push(AppView::Diff(diff));
+                return AppTransition::Push(AppView::Diff { view: diff, query });
             }
             Err(error) => log.show_error(error.to_string()),
         }
@@ -410,6 +469,7 @@ fn apply_log_action(
 /// Applies an action while the diff view is active.
 fn apply_diff_action(
     diff: &mut DiffView,
+    query: &DiffQuery,
     diff_source: &JjDiff,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
@@ -440,7 +500,7 @@ fn apply_diff_action(
     };
 
     match diff.apply(diff_action) {
-        DiffActionResult::Refresh => refresh_diff(diff, diff_source),
+        DiffActionResult::Refresh => refresh_diff(diff, query, diff_source),
         DiffActionResult::ReturnToLog => return AppTransition::PopView,
         DiffActionResult::Quit => return AppTransition::Quit,
         _ => {}
@@ -474,9 +534,8 @@ fn refresh_log(app: &mut LogView, source: &JjLog) {
 }
 
 /// Reloads the active diff without replacing the view on failure.
-fn refresh_diff(app: &mut DiffView, source: &JjDiff) {
-    let change_id = app.change_id().to_owned();
-    match source.load(&change_id) {
+fn refresh_diff(app: &mut DiffView, query: &DiffQuery, source: &JjDiff) {
+    match source.load_query(query) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
@@ -511,7 +570,7 @@ mod tests {
 
     #[test]
     fn view_stack_keeps_root_when_popped() {
-        let root = AppView::Diff(diff_view("aaa"));
+        let root = diff_app_view("aaa");
         let mut stack = ViewStack::new(root.clone());
 
         assert!(!stack.pop());
@@ -525,7 +584,7 @@ mod tests {
         let previous_log = log.clone();
         let mut stack = ViewStack::new(AppView::Log(log));
 
-        stack.push(AppView::Diff(diff_view("bbb")));
+        stack.push(diff_app_view("bbb"));
 
         assert!(stack.pop());
         assert_eq!(stack.active(), &AppView::Log(previous_log));
@@ -534,7 +593,7 @@ mod tests {
     #[test]
     fn mode_stack_closes_search_before_popping_view() {
         let mut state = AppState::new(AppView::Log(LogView::default()));
-        state.views.push(AppView::Diff(diff_view("aaa")));
+        state.views.push(diff_app_view("aaa"));
         state.modes.push(InputMode::DiffSearch {
             query: "alpha".to_owned(),
         });
@@ -542,13 +601,13 @@ mod tests {
         handle_back(&mut state);
 
         assert_eq!(state.modes.active(), None);
-        assert!(matches!(state.views.active(), AppView::Diff(_)));
+        assert!(matches!(state.views.active(), AppView::Diff { .. }));
         assert_eq!(state.views.views.len(), 2);
     }
 
     #[test]
     fn mode_stack_submit_search_restores_normal_mode() {
-        let mut state = AppState::new(AppView::Diff(diff_view("aaa")));
+        let mut state = AppState::new(diff_app_view("aaa"));
         state.modes.push(InputMode::DiffSearch {
             query: "alpha".to_owned(),
         });
@@ -562,7 +621,107 @@ mod tests {
 
         assert_eq!(result, InputModeResult::Handled);
         assert_eq!(state.modes.active(), None);
-        assert_eq!(state.views.active(), &AppView::Diff(expected));
+        assert_eq!(
+            state.views.active(),
+            &AppView::Diff {
+                view: expected,
+                query: diff_query("aaa")
+            }
+        );
+    }
+
+    #[test]
+    fn diff_args_default_to_revision_at() {
+        let args = Args::try_parse_from(["jk", "diff"]).expect("valid diff args");
+        let Some(Command::Diff(diff_args)) = args.command else {
+            panic!("expected diff command");
+        };
+
+        assert_eq!(
+            diff_args.query(),
+            DiffQuery::Revision {
+                rev: "@".to_owned(),
+                format: DiffFormat::Patch,
+            }
+        );
+    }
+
+    #[test]
+    fn diff_args_keep_positional_revision_as_sugar() {
+        let args =
+            Args::try_parse_from(["jk", "diff", "abc123", "--stat"]).expect("valid diff args");
+        let Some(Command::Diff(diff_args)) = args.command else {
+            panic!("expected diff command");
+        };
+
+        assert_eq!(
+            diff_args.query(),
+            DiffQuery::Revision {
+                rev: "abc123".to_owned(),
+                format: DiffFormat::Stat,
+            }
+        );
+    }
+
+    #[test]
+    fn diff_args_resolve_explicit_revision_query() {
+        let args = Args::try_parse_from(["jk", "diff", "-r", "abc123"]).expect("valid diff args");
+        let Some(Command::Diff(diff_args)) = args.command else {
+            panic!("expected diff command");
+        };
+
+        assert_eq!(
+            diff_args.query(),
+            DiffQuery::Revision {
+                rev: "abc123".to_owned(),
+                format: DiffFormat::Patch,
+            }
+        );
+    }
+
+    #[test]
+    fn diff_args_resolve_from_to_query() {
+        let args = Args::try_parse_from(["jk", "diff", "--from", "main", "--to", "@"])
+            .expect("valid diff args");
+        let Some(Command::Diff(diff_args)) = args.command else {
+            panic!("expected diff command");
+        };
+
+        assert_eq!(
+            diff_args.query(),
+            DiffQuery::FromTo {
+                from: "main".to_owned(),
+                to: "@".to_owned(),
+                format: DiffFormat::Patch,
+            }
+        );
+    }
+
+    #[test]
+    fn diff_args_reject_mixed_revision_and_from_to() {
+        assert!(
+            Args::try_parse_from(["jk", "diff", "-r", "@", "--from", "main", "--to", "@"]).is_err()
+        );
+    }
+
+    #[test]
+    fn diff_args_require_from_and_to_together() {
+        assert!(Args::try_parse_from(["jk", "diff", "--from", "main"]).is_err());
+        assert!(Args::try_parse_from(["jk", "diff", "--to", "@"]).is_err());
+    }
+
+    fn diff_app_view(change_id: &str) -> AppView {
+        AppView::Diff {
+            view: diff_view(change_id),
+            query: diff_query(change_id),
+        }
+    }
+
+    fn diff_query(change_id: &str) -> DiffQuery {
+        DiffQuery::Revision {
+            rev: change_id.to_owned(),
+            format: DiffFormat::Patch,
+        }
     }
 
     fn diff_view(change_id: &str) -> DiffView {

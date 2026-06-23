@@ -15,5 +15,5 @@ mod command;
 pub mod diff;
 pub mod log;
 
-pub use diff::{JjDiff, JjDiffError};
+pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
 pub use log::{JjLog, JjLogCommand, JjLogError};
