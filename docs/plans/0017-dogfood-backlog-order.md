@@ -1,6 +1,6 @@
 # Dogfood Backlog Order
 
-This note records the current implementation spike ordering for dogfoodable progress. It is intentionally
+This note records the current dogfood work ordering for dogfoodable progress. It is intentionally
 more execution-oriented than the product plan: finish the tight recovery and command surfaces first,
 then broaden into mutation flows, selectors, run options, and generated help.
 
@@ -35,6 +35,11 @@ then broaden into mutation flows, selectors, run options, and generated help.
    in multi-file diffs.
 1. Done: add diff file list overlay. Pressing `f` from a diff shows files in the current diff,
    preserves the active file as the selected row, and jumps to the chosen file on Enter.
+1. Done: polish selector menus and help ordering. View menus now wrap at the edges, View Options
+   opens on the active diff format, and generated help reads in task-first order instead of raw
+   registry order.
+1. Stabilize the current dogfood surface for release. Audit stack descriptions, code shape, docs,
+   README/crate README, Betamax media, and website handoff before starting rebase-specific work.
 
 ## First Useful Mutation Sprint
 
@@ -45,10 +50,14 @@ then broaden into mutation flows, selectors, run options, and generated help.
    for `jj new`; ordered marks become parents when present, otherwise the selected revision is the
    parent. Enter runs it, refreshes the log, records history with the resulting operation id, and
    exposes recovery actions.
-1. Add `jj edit` preview flow: move working copy to selected change, with warning when the action
-   may surprise.
-1. Add inline describe polish: multiline/editor describe, better prompt editing, and clearer
-   before/after description display.
+1. Done: add `jj edit` preview flow. Pressing `e` on the selected log revision opens a
+   local-rewrite command preview for `jj edit REV`; Enter runs it, refreshes the log, records
+   history with the resulting operation id, and exposes recovery actions.
+1. Done: add inline describe prompt prefill and clear. Pressing `m` opens the prompt with the
+   selected revision's current full description, and `Ctrl-u` clears the prompt before preview.
+1. Add remaining describe polish: multiline/editor describe and clearer before/after description
+   display.
+1. Release the stabilized dogfood milestone before starting rebase-specific behavior.
 1. Add minimal rebase preview: resolve source/destination from marks plus cursor and show exact
    `jj rebase` command before running.
 1. Add rebase destination search: search/filter the log while choosing a destination.
@@ -105,7 +114,7 @@ then broaden into mutation flows, selectors, run options, and generated help.
 - Treat items 13-22 as the first useful mutation sprint.
 - Treat items 23-30 as the point where roadmap foundation needs to catch up before broadening
   further.
-- For the near-term implementation spike, favor direct implementation in the orchestration thread
-  for small app wiring, crash fixes, and live `cargo run` feedback.
+- For the near-term dogfood work, favor direct implementation in the orchestration thread for small
+  app wiring, crash fixes, and live `cargo run` feedback.
 - Use subagents only for independent, file-scoped chunks large enough to amortize context setup.
 - Reserve Betamax GIF work for milestone user-visible flows rather than every incremental patch.

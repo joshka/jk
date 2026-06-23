@@ -2,7 +2,7 @@
 
 Status: draft/spec
 
-Owner: implementation spike
+Owner: current dogfood workspace pass
 
 Scope: first command-history implementation slice after Workspaces
 
@@ -332,7 +332,7 @@ Persist by default:
 
 - recent command records in process memory;
 - bounded stdout/stderr snippets in process memory;
-- Betamax/test artifacts under `target/jk-artifacts` when validation asks for them.
+- Betamax/test artifacts under `target/dogfood-artifacts` when validation asks for them.
 
 Do not persist by default:
 
@@ -350,7 +350,7 @@ Future cross-session history can use the product-plan location:
 $XDG_STATE_HOME/jk/command-log
 ```
 
-That is deliberately out of scope here. This spike should make the in-memory model and UI stable
+That is deliberately out of scope here. This pass should make the in-memory model and UI stable
 before choosing file format, migration, retention limits, or user config keys.
 
 ### Redaction
@@ -401,7 +401,7 @@ First-slice app runs should use `SummaryOnly`. Betamax and explicit debug paths 
 under:
 
 ```text
-target/jk-artifacts/command-history/
+target/dogfood-artifacts/command-history/
 ```
 
 Artifact paths must stay local, ignored, and reproducible. Do not add committed media or committed
@@ -603,7 +603,7 @@ mutation history. Keep fixture setup isolated from the developer's real checkout
 
 ## Betamax Evidence
 
-Add Betamax evidence under `target/jk-artifacts`. The goal is to prove visible behavior and local
+Add Betamax evidence under `target/dogfood-artifacts`. The goal is to prove visible behavior and local
 artifact boundaries, not to commit generated output.
 
 Suggested tape:
@@ -626,10 +626,10 @@ Suggested journey:
 Suggested local artifacts:
 
 ```text
-target/jk-artifacts/command-history/history-screen.txt
-target/jk-artifacts/command-history/history-details.txt
-target/jk-artifacts/command-history/records.json
-target/jk-artifacts/command-history/redaction.txt
+target/dogfood-artifacts/command-history/history-screen.txt
+target/dogfood-artifacts/command-history/history-details.txt
+target/dogfood-artifacts/command-history/records.json
+target/dogfood-artifacts/command-history/redaction.txt
 ```
 
 The `records.json` artifact should contain redacted records only. If full output artifacts are
@@ -652,7 +652,7 @@ This plan is ready for implementation when the next slice can be described as:
 - Existing command behavior stays materially unchanged.
 - Tests cover the model, runner recording, UI entry point, redaction, retention, and workspace
   update-stale behavior.
-- Betamax artifacts under `target/jk-artifacts` prove the user-visible journey.
+- Betamax artifacts under `target/dogfood-artifacts` prove the user-visible journey.
 
 ## Follow-Up Slices
 

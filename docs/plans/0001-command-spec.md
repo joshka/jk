@@ -1,7 +1,7 @@
 # Command Spec Foundation
 
 Status: draft  
-Owner: implementation spike  
+Owner: current dogfood workspace pass  
 Scope: first foundation implementation chunk
 
 ## Problem

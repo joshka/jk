@@ -1,5 +1,7 @@
 set shell := ["bash", "-uc"]
 
+betamax := env_var_or_default("BETAMAX", "betamax")
+
 default:
     @just --list
 
@@ -30,16 +32,19 @@ betamax: betamax-log betamax-diff
 readme-media: readme-log-media readme-diff-media
 
 readme-log-media:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/readme-log.tape
+    {{betamax}} run tapes/readme-log.tape
 
 readme-diff-media:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/readme-diff.tape
+    {{betamax}} run tapes/readme-diff.tape
 
 betamax-log:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/jk-log.tape
+    {{betamax}} run tapes/jk-log.tape
 
 betamax-diff:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run tapes/jk-diff.tape
+    {{betamax}} run tapes/jk-diff.tape
+
+betamax-release-smoke:
+    {{betamax}} run tapes/release-smoke.tape
 
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings

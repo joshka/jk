@@ -27,7 +27,7 @@ as a separate button with a separate form. The CLI is organized around **reusabl
 - config/template languages: revsets, filesets, templates, string patterns, conditional config,
   template aliases, revset aliases.
 
-Therefore, the project plan should treat `jk` as a **flag-family workbench**, not a command-by-command
+Therefore, the project plan should treat `jk` as a **flag-family TUI**, not a command-by-command
 TUI. The UI should expose common flag families as reusable overlays and role pickers, and every
 workflow should still be able to fall back to `:` command mode.
 
@@ -1417,7 +1417,7 @@ Important config implication:
 Priorities:
 
 - **P0**: must be part of the obvious daily driver.
-- **P1**: important for a serious jj terminal workbench.
+- **P1**: important for a serious jj terminal UI.
 - **P2**: useful but specialized or advanced.
 - **P3**: command-mode only unless usage demands a focused UI.
 
@@ -1684,7 +1684,7 @@ These should be resolved by implementation experiments:
 
 The complete jj CLI surface does not invalidate the golden plan. It sharpens it.
 
-`jk` should become a jj-native workbench by building reusable UI primitives for jj's reusable flag
+`jk` should become a jj-native TUI by building reusable UI primitives for jj's reusable flag
 families:
 
 ```text

@@ -36,13 +36,13 @@ Useful source links for `jj` compatibility and ecosystem context:
 
 ## 0. Executive thesis
 
-`jk` should become the terminal workbench that feels like the interactive form of `jj` itself.
+`jk` should become the terminal UI that feels like the interactive form of `jj` itself.
 
 The product should not be positioned as "a lazygit for jj" and should not be constrained by the
 narrow first-screen framing. The default screen can remain the revision graph because that is where
 many jj workflows begin, but the durable positioning is broader:
 
-> `jk` is a jj-native terminal workbench. It follows Jujutsu's command model and configuration, then
+> `jk` is a jj-native terminal UI. It follows Jujutsu's command model and configuration, then
 > adds fast navigation, selection, previews, safe mutations, operation recovery, command history,
 > and command mode.
 
@@ -184,7 +184,7 @@ Change for `jk`:
 
 Language / stack: Tauri + Svelte/TypeScript UI, Rust backend and CLI.
 
-GitButler's TUI is especially useful as a terminal-workbench reference. It has a full workspace TUI,
+GitButler's TUI is especially useful as a terminal-TUI reference. It has a full workspace TUI,
 focused diff TUI, stage/hunk picker, command mode, generated help, hotbar, marked commits,
 inline/editor rewording, external commands, undo/redo, and operation recovery.
 
@@ -397,6 +397,10 @@ movement uses `[ ]` and `{ }`.
 `?` opens generated contextual help. The help content and hotbar are generated from the active
 keymap and view state. If a keybinding changes, help changes automatically.
 
+Help rows should be ordered for the reader: primary view actions first, then mutation, recovery, and
+command actions, then view/refresh controls, navigation, and close/help commands. The order should
+not merely mirror implementation or dispatch registration order.
+
 Help should also become searchable. The help surface and command palette are related but distinct:
 
 - `?` explains what is currently possible.
@@ -417,12 +421,13 @@ All rewrite/destructive/network actions should follow:
 6. Refresh state after success.
 7. Show result, command history entry, and operation-recovery actions.
 
-Current implementation status: selected-revision `jj abandon REV` and parented `jj new` have the
-first mutation previews. Pressing `a` on the log previews `jj abandon REV`; pressing `n` previews
-`jj new PARENT...`, using ordered marks as parents when present and otherwise using the selected
-revision. Enter runs the command, successful runs refresh the graph, command history records the
-resulting operation id, and the recovery footer surfaces undo/redo/operation/history actions. The
-direct `a` binding is a dogfood shortcut until the long-term action-menu prefix exists.
+Current implementation status: selected-revision `jj abandon REV`, parented `jj new`, and
+selected-revision `jj edit REV` have the first mutation previews. Pressing `a` on the log previews
+`jj abandon REV`; pressing `n` previews `jj new PARENT...`, using ordered marks as parents when
+present and otherwise using the selected revision; pressing `e` previews `jj edit REV`. Enter runs
+the command, successful runs refresh the graph, command history records the resulting operation id,
+and the recovery footer surfaces undo/redo/operation/history actions. The direct `a` binding is a
+dogfood shortcut until the long-term action-menu prefix exists.
 
 ### 3.6 Recovery is first-class
 
@@ -638,7 +643,7 @@ pickers.
 Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` rather than stealing
 `n/N`.
 
-### 5.3 Revision graph / main workbench
+### 5.3 Revision graph / main TUI
 
 | Key     | Meaning                                                                                  |
 | ------- | ---------------------------------------------------------------------------------------- |
@@ -674,9 +679,12 @@ Current implementation note: before this prefix menu exists, `a` directly previe
 `jj abandon REV` for the selected log revision. Keep that implementation path command-spec based so
 it can move under `a a` later without rewriting the mutation runner.
 
-Current implementation note: `n` directly previews `jj new PARENT...` from the log. Ordered marks become
-parents when present; otherwise the selected revision is the parent. Search-next remains scoped to
-diff and rendered inspection views.
+Current implementation note: `n` directly previews `jj new PARENT...` from the log. Ordered marks
+become parents when present; otherwise the selected revision is the parent. Search-next remains
+scoped to diff and rendered inspection views.
+
+Current implementation note: `e` directly previews `jj edit REV` from the log. The same key still
+reopens the command prompt when a command-output view is active.
 
 | Key | jj command family               | Notes                                                      |
 | --- | ------------------------------- | ---------------------------------------------------------- |
@@ -809,7 +817,8 @@ jj workspace root
 jj workspace update-stale
 ```
 
-The screen should answer:
+The current implementation covers list, selected-workspace log, selected-workspace status,
+selected-workspace diff, refresh, and update-stale. The screen should answer:
 
 ```text
 What workspaces exist?
@@ -861,7 +870,7 @@ Rules:
 Use a view stack, not hard-coded `H/L` return paths.
 
 ```text
-Workbench / graph
+Main graph
   -> Show/details
   -> Diff
   -> Status
@@ -894,7 +903,7 @@ Navigation contract:
 
 | jj command                          | jk screen/action      | Priority | Notes                                                                              |
 | ----------------------------------- | --------------------- | -------- | ---------------------------------------------------------------------------------- |
-| `jj log`                            | Workbench graph       | P0       | Default screen. Honor `ui.default-command`, `revsets.log`, templates, graph style. |
+| `jj log`                            | Log graph             | P0       | Default screen. Honor `ui.default-command`, `revsets.log`, templates, graph style. |
 | `jj diff`                           | `d`, Diff screen      | P0       | Support `-r`, `--from`, `--to`, filesets, display modes.                           |
 | `jj show`                           | `Enter`, Show/details | P0       | Metadata + diff; View Options.                                                     |
 | `jj status`                         | `s`, Status screen    | P0       | Working copy, conflicts, bookmarks, file list.                                     |
@@ -1184,9 +1193,9 @@ Diff view:
 
 - Preserve selected file/hunk across refresh if path/header still exists.
 - Sticky current-file header.
-- File picker overlay for large diffs. The current implementation spike includes the first `f`
-  file selector for jumping within an active diff; the later target is searchable and shared with
-  the broader fileset selector model.
+- File picker overlay for large diffs. The current implementation includes the first `f` file
+  selector for jumping within an active diff; the later target is searchable and shared with the
+  broader fileset selector model.
 - Search highlights and next/previous match navigation.
 - Next/previous file navigation without reopening the picker.
 - Toggle between patch, stat, summary, name-only, and file-only details.
@@ -1296,8 +1305,14 @@ Prompt keys:
 
 - `Enter`: run `jj describe -m <message> <rev>`.
 - `Ctrl-e`: open editor with current text as seed if supported.
+- `Ctrl-u`: clear the current inline prompt text.
 - `Esc`: cancel.
 - `Ctrl+s`: save when multiline editor is active.
+
+Current implementation status: `m` opens the inline prompt prefilled with the selected revision's full
+description, and `Ctrl-u` clears the prefilled text before preview. The prompt still submits through
+command preview, command history, operation-id capture, log refresh, and recovery footer. It does
+not yet support multiline editing, editor handoff, or a before/after review panel.
 
 `M` opens configured editor directly:
 
@@ -1317,9 +1332,9 @@ Role inference:
 - Else cursor is parent.
 - If cursor is absent: default jj behavior.
 
-Current implementation status: direct `n` implements the marks-or-cursor parent rule and routes through
-command preview, command history, operation-id capture, log refresh, and recovery footer. It does
-not yet support inline messages or the later role-resolver overlay.
+Current implementation status: direct `n` implements the marks-or-cursor parent rule and routes
+through command preview, command history, operation-id capture, log refresh, and recovery footer. It
+does not yet support inline messages or the later role-resolver overlay.
 
 `N`: create new change with inline message.
 
@@ -1332,6 +1347,10 @@ jj edit <rev>
 ```
 
 If revision is immutable or hidden, require stronger preview or route to action menu variant.
+
+Current implementation status: direct `e` implements the selected-revision preview path and routes
+through command preview, command history, operation-id capture, log refresh, and recovery footer. It
+does not yet add immutable-specific warning copy or the stronger `a E` ignore-immutable variant.
 
 ### 9.6 Squash/split/restore/absorb
 
@@ -1678,11 +1697,15 @@ just betamax-log
 just betamax-diff
 ```
 
-The README also says visual README media is generated with `just readme-media`, and generated
-screenshots/GIFs live in the separate
+The README also says visual README media is generated with `just readme-media`. For unreleased
+local work, generated media should stay under `target/dogfood-artifacts/`. Public README and
+crates.io media is published later from the separate
 [`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository served from
-`https://www.joshka.net/jk-screenshots/`. That setup should grow from "README media helpers" into
-core project infrastructure.
+`https://www.joshka.net/jk-screenshots/`. Website-specific media can live in `jk-website` when the
+site is the only consumer. Keeping generated images and GIFs out of the main source repository is a
+jj ergonomics decision as much as a repository-size decision: Git LFS-heavy media churn is easier to
+manage in a purpose-built media or website repository. That setup should grow from "README media
+helpers" into core project infrastructure.
 
 Every meaningful `jk` workflow should eventually have two Betamax tapes:
 
@@ -1740,7 +1763,13 @@ tapes/
 ```
 
 Validation tapes should be short, deterministic, and assertion-heavy. Media tapes can be slower and
-more readable.
+more readable. Review-media tapes should include readable dwell and, where useful, Betamax
+presentation affordances such as keyboard overlays and captions. For `jk`, captions should read as
+presentation metadata on the surrounding frame, not as terminal content, and must never cover the
+TUI hotbar, footer, prompts, status text, or keyboard overlay. Captions and keyboard overlays should
+occupy separate visual regions so they explain the action without competing with each other. Until
+Betamax can guarantee that layout, `jk` media tapes should prefer keyboard overlays and avoid
+captions.
 
 Expand Betamax coverage for:
 
@@ -1923,10 +1952,10 @@ Every UI-changing PR should attach Betamax artifacts or link CI artifacts.
 Recommended CI artifacts:
 
 ```text
-target/betamax/jk-validation/*.json
-target/betamax/jk-validation/*.png
-target/betamax/jk-media/*.gif
-target/betamax/jk-media/*.mp4, optional
+target/dogfood-artifacts/betamax/validation/*.json
+target/dogfood-artifacts/betamax/validation/*.png
+target/dogfood-artifacts/betamax/media/*.gif
+target/dogfood-artifacts/betamax/media/*.mp4, optional
 ```
 
 PR template addition:
@@ -1958,29 +1987,26 @@ just release-check
 Suggested `justfile` additions:
 
 ```make
+betamax := env_var_or_default("BETAMAX", "betamax")
+
 betamax-validation:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/validation/log-navigation.tape
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/validation/diff-selected-revision.tape
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/validation/command-mode.tape
+    {{betamax}} run tapes/validation/log-navigation.tape
+    {{betamax}} run tapes/validation/diff-selected-revision.tape
+    {{betamax}} run tapes/validation/command-mode.tape
 
 betamax-media:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/media/readme-overview.tape
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/media/docs-rebase-preview.tape
+    {{betamax}} run tapes/media/readme-overview.tape
+    {{betamax}} run tapes/media/docs-rebase-preview.tape
 
 betamax-update:
     just betamax-validation
     just betamax-media
 ```
 
-The exact command can evolve once Betamax is installed through Homebrew or `cargo-binstall` in CI
-rather than run from a sibling checkout. Betamax currently supports installation through Homebrew
-and `cargo-binstall`. Local development can continue to run tapes through the Betamax checkout,
-including basic smoke experiments with:
+Use the installed `betamax` binary by default, and override `BETAMAX` when a local source checkout
+or wrapper command is needed. Betamax currently supports installation through Homebrew and
+`cargo-binstall`. Local development can still run basic smoke experiments from a Betamax checkout
+with:
 
 ```sh
 cargo run -- run examples/basic.tape
@@ -2003,6 +2029,7 @@ theme pinning for deterministic screenshots
 font/layout stability across CI platforms
 easy per-tape environment setup
 first-class failed-checkpoint screenshot capture
+caption and keyboard-overlay layout that avoids terminal content
 ```
 
 Likely `jk` feature pressure from Betamax:
@@ -2331,10 +2358,14 @@ For each release:
 - Keymap docs regenerated.
 - CLI help regenerated.
 - README updated if status changed.
-- Website workflow screenshots/GIFs updated when UX changes.
+- Website workflow screenshots/GIFs updated when UX changes and only after the behavior is released
+  or release-gated.
 - Betamax validation tapes pass for changed workflows.
 - Betamax media smoke passes for README/site/release demos affected by the change.
-- CHANGELOG describes user-visible changes, keymap changes, config changes, and safety changes.
+- CHANGELOG is written for readers, grouped by workflow or user outcome, and describes
+  user-visible changes, keymap changes, config changes, safety changes, and known limitations.
+- Release notes are LLM-assisted or human-written from a feature audit, not generated from commit
+  messages. Commit history is evidence, not the release-note structure.
 - Release notes include install commands and known limitations.
 - Smoke install via cargo, cargo-binstall, and Homebrew when applicable.
 
@@ -2553,7 +2584,7 @@ for future Codex work.
 ### 24.1 Revised positioning
 
 ```text
-jk is a jj-native terminal workbench: focused screens, jj-shaped commands,
+jk is a jj-native terminal UI: focused screens, jj-shaped commands,
 config-faithful rendering, safe previews, operation recovery, and first-class
 workspaces.
 ```
@@ -2571,7 +2602,7 @@ jk is interactive jj, not a Git dashboard for jj.
 - Note prior-art implementation languages because they show which architecture and ecosystem
   choices each project validates.
 - Treat workspaces as early core scope for daily jj users, not an advanced feature.
-- Treat `jk` as a flag-family workbench: build shared selectors, `V` View Options, Run Options, and
+- Treat `jk` as a flag-family TUI: build shared selectors, `V` View Options, Run Options, and
   generated command/flag manifests before expanding one-off command forms.
 - Reserve standalone `v` for `jj evolog` and use `V` for display, graph, diff, and template
   options.
