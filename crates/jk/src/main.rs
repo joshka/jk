@@ -538,6 +538,7 @@ enum AppView {
     },
     CommandOutput {
         view: RenderedView,
+        input: String,
     },
     OperationLog {
         view: OperationLogView,
@@ -914,7 +915,7 @@ fn run_terminal(
                     _ => view.render(frame),
                 },
                 AppView::CommandHistoryDetails { view }
-                | AppView::CommandOutput { view }
+                | AppView::CommandOutput { view, .. }
                 | AppView::WorkspaceStatus { view, .. }
                 | AppView::WorkspaceDiff { view, .. }
                 | AppView::OperationShow { view, .. }
@@ -1054,6 +1055,10 @@ fn run_terminal(
                         }
                         AppKey::StartCommandMode => {
                             open_jj_command_mode(&mut state);
+                            needs_redraw = true;
+                        }
+                        AppKey::EditCommandOutput => {
+                            edit_command_output(&mut state);
                             needs_redraw = true;
                         }
                         AppKey::StartSearch
@@ -1498,10 +1503,20 @@ fn handle_jj_command_mode(
 }
 
 fn open_jj_command_mode(state: &mut AppState) {
-    state.modes.push(InputMode::JjCommand {
-        input: String::new(),
-        error: None,
-    });
+    open_jj_command_mode_with_input(state, String::new());
+}
+
+fn open_jj_command_mode_with_input(state: &mut AppState, input: String) {
+    state
+        .modes
+        .push(InputMode::JjCommand { input, error: None });
+}
+
+fn edit_command_output(state: &mut AppState) {
+    let AppView::CommandOutput { input, .. } = state.views.active() else {
+        return;
+    };
+    open_jj_command_mode_with_input(state, input.clone());
 }
 
 fn submit_jj_command_mode(state: &mut AppState, repository: Option<&Path>) {
@@ -1555,6 +1570,7 @@ fn run_jj_command_mode_with_runner<R: JjCommandRunner>(
     let snapshot = command_mode_snapshot(&command_line, result.as_ref());
     state.views.push(AppView::CommandOutput {
         view: RenderedView::new(snapshot),
+        input: input.trim().to_owned(),
     });
     Ok(())
 }
@@ -1687,6 +1703,7 @@ fn command_mode_rendered(
             push_command_stream(&mut rendered, "Stderr", &[]);
         }
     }
+    rendered.push_str("\nActions: e edit/retry command   : run another jj command\n");
     rendered
 }
 
@@ -2277,7 +2294,7 @@ fn apply_search_submit(state: &mut AppState, action: SearchSubmit) {
         | (AppView::WorkspaceDiff { view, .. }, SearchSubmit::Inspection(query))
         | (AppView::OperationShow { view, .. }, SearchSubmit::Inspection(query))
         | (AppView::OperationDiff { view, .. }, SearchSubmit::Inspection(query))
-        | (AppView::CommandOutput { view }, SearchSubmit::Inspection(query))
+        | (AppView::CommandOutput { view, .. }, SearchSubmit::Inspection(query))
         | (AppView::CommandHistoryDetails { view }, SearchSubmit::Inspection(query)) => {
             let _ = view.apply(RenderedAction::Search(query));
         }
@@ -2320,7 +2337,7 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
         | AppView::WorkspaceDiff { view, .. }
         | AppView::OperationShow { view, .. }
         | AppView::OperationDiff { view, .. }
-        | AppView::CommandOutput { view }
+        | AppView::CommandOutput { view, .. }
         | AppView::CommandHistoryDetails { view } => {
             let action = match direction {
                 SearchDirection::Next => RenderedAction::SearchNext,
@@ -2376,9 +2393,8 @@ fn apply_action(
                 apply_workspaces_action(view, history, workspaces_source, action)
             }
             AppView::CommandHistory { view } => apply_command_history_action(view, history, action),
-            AppView::CommandHistoryDetails { view } | AppView::CommandOutput { view } => {
-                apply_static_rendered_action(view, action)
-            }
+            AppView::CommandHistoryDetails { view } => apply_static_rendered_action(view, action),
+            AppView::CommandOutput { view, .. } => apply_static_rendered_action(view, action),
             AppView::OperationLog { view } => {
                 apply_operation_log_action(view, history, operation_source, action)
             }
@@ -4741,6 +4757,36 @@ mod tests {
         assert_eq!(record.source.action, SourceAction::UserJjCommand);
         assert_eq!(record.source.key.as_deref(), Some(":"));
         assert_eq!(record.execution_mode, jk_core::ExecutionMode::CommandMode);
+    }
+
+    #[test]
+    fn command_output_edit_reopens_prompt_with_previous_input() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        run_jj_command_mode_with_runner(
+            &mut state,
+            None,
+            "jj log -r @",
+            SequencedRunner::successes(vec![output(0, "rendered log\n", "")]),
+        )
+        .expect("command mode runs");
+        edit_command_output(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::JjCommand {
+                input: "jj log -r @".to_owned(),
+                error: None,
+            })
+        );
+    }
+
+    #[test]
+    fn command_output_body_shows_edit_retry_hint() {
+        let result = output(0, "clean\n", "");
+        let rendered = command_mode_rendered("jj status", Ok(&result));
+
+        assert!(rendered.contains("Actions: e edit/retry command"));
     }
 
     #[test]

@@ -21,8 +21,9 @@ then broaden into mutation flows, selectors, run options, and generated help.
    stdout/stderr summary, status, duration, and operation id.
 1. Done: add the `:` command mode MVP. It runs jj commands from an overlay, captures output in a
    rendered view, records history, and preserves failed-command stderr.
-1. Add command-mode follow-ups: retry/edit from output, success refresh policy, and richer prompt
-   editing after the MVP proves the command/result loop.
+1. Partly done: add command-mode follow-ups. Command output can now reopen the `:` prompt with the
+   previous command for edit/retry; success refresh policy, richer prompt editing, and history recall
+   remain follow-up work.
 1. Add `!` external command MVP: run non-shell external commands safely, with explicit argv handling
    and output capture.
 1. Add diff View Options quick wins: `V` should toggle stat, summary, name-only, git format, and

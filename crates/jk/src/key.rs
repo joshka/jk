@@ -49,6 +49,9 @@ pub enum AppKey {
     /// Start the `:` prompt for an arbitrary jj command.
     StartCommandMode,
 
+    /// Reopen the `:` prompt with the current command output input.
+    EditCommandOutput,
+
     /// Close the active mode or return to the previous view.
     Back,
 
@@ -146,6 +149,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'V' => Some(AppKey::OpenViewOptions),
         'W' => Some(AppKey::OpenWorkspaces),
         'C' => Some(AppKey::OpenCommandHistory),
+        'e' => Some(AppKey::EditCommandOutput),
         'o' => Some(AppKey::OpenOperationLog),
         'y' => Some(AppKey::CopyCommand),
         'u' => Some(AppKey::StartUndo),
@@ -284,6 +288,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)),
             AppKey::CopyCommand
+        );
+    }
+
+    #[test]
+    fn lowercase_e_edits_command_output() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE)),
+            AppKey::EditCommandOutput
         );
     }
 
