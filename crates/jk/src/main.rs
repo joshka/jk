@@ -77,10 +77,7 @@ fn main() -> Result<()> {
                 error.to_string(),
             ),
         };
-        AppView::Diff {
-            log: None,
-            diff: Box::new(diff),
-        }
+        AppView::Diff(diff)
     } else {
         let entries = source.load()?;
         AppView::Log(LogView::new(entries))
@@ -120,13 +117,87 @@ fn diff_source(args: &Args) -> JjDiff {
 }
 
 /// Active top-level application view.
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum AppView {
     Log(LogView),
-    Diff {
-        log: Option<LogView>,
-        diff: Box<DiffView>,
-    },
+    Diff(DiffView),
+}
+
+/// Application state owned by the terminal loop.
+#[derive(Debug)]
+struct AppState {
+    views: ViewStack,
+    modes: ModeStack,
+}
+
+impl AppState {
+    fn new(root: AppView) -> Self {
+        Self {
+            views: ViewStack::new(root),
+            modes: ModeStack::default(),
+        }
+    }
+}
+
+/// Non-empty stack of top-level views.
+#[derive(Debug)]
+struct ViewStack {
+    views: Vec<AppView>,
+}
+
+impl ViewStack {
+    fn new(root: AppView) -> Self {
+        Self { views: vec![root] }
+    }
+
+    fn active(&self) -> &AppView {
+        self.views
+            .last()
+            .expect("view stack always keeps one root view")
+    }
+
+    fn active_mut(&mut self) -> &mut AppView {
+        self.views
+            .last_mut()
+            .expect("view stack always keeps one root view")
+    }
+
+    fn push(&mut self, view: AppView) {
+        self.views.push(view);
+    }
+
+    fn pop(&mut self) -> bool {
+        if self.views.len() == 1 {
+            return false;
+        }
+
+        self.views.pop();
+        true
+    }
+}
+
+/// Stack of transient prompt-like modes.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ModeStack {
+    modes: Vec<InputMode>,
+}
+
+impl ModeStack {
+    fn active(&self) -> Option<&InputMode> {
+        self.modes.last()
+    }
+
+    fn active_mut(&mut self) -> Option<&mut InputMode> {
+        self.modes.last_mut()
+    }
+
+    fn push(&mut self, mode: InputMode) {
+        self.modes.push(mode);
+    }
+
+    fn pop(&mut self) -> Option<InputMode> {
+        self.modes.pop()
+    }
 }
 
 /// Owns the terminal event loop for the current jj-native application.
@@ -134,25 +205,26 @@ enum AppView {
 /// The view remains responsible for state transitions and rendering. This loop only translates
 /// terminal events, performs I/O requested by the view, and redraws when input or terminal resize
 /// events can change the screen.
-fn run_terminal(mut app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result<()> {
+fn run_terminal(app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Result<()> {
     // jj should keep configured colors even when the parent process was run by an agent or tool
     // that exports NO_COLOR.
     force_color_output(true);
     let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
     let _terminal_restore = TerminalRestore;
     let mut needs_redraw = true;
-    let mut input_mode = InputMode::Normal;
+    let mut state = AppState::new(app);
 
     loop {
         if needs_redraw {
-            terminal.draw(|frame| match &mut app {
+            let mode = state.modes.active().cloned();
+            terminal.draw(|frame| match state.views.active_mut() {
                 AppView::Log(log) => log.render(frame),
-                AppView::Diff { diff, .. } => match &input_mode {
-                    InputMode::Normal => diff.render(frame),
-                    InputMode::DiffSearch { query } => {
+                AppView::Diff(diff) => match &mode {
+                    Some(InputMode::DiffSearch { query }) => {
                         let status = format!("/{query}");
                         diff.render_with_status(frame, &status);
                     }
+                    None => diff.render(frame),
                 },
             })?;
             needs_redraw = false;
@@ -160,25 +232,29 @@ fn run_terminal(mut app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Re
 
         match event::read()? {
             Event::Key(key) => {
-                if handle_input_mode(&mut app, &mut input_mode, key) == InputModeResult::Handled {
+                if handle_input_mode(&mut state, key) == InputModeResult::Handled {
                     needs_redraw = true;
                     continue;
                 }
 
                 let AppKey::Action(action) = AppKey::from_crossterm(key) else {
                     match AppKey::from_crossterm(key) {
-                        AppKey::StartSearch if matches!(app, AppView::Diff { .. }) => {
-                            input_mode = InputMode::DiffSearch {
+                        AppKey::Back => {
+                            handle_back(&mut state);
+                            needs_redraw = true;
+                        }
+                        AppKey::StartSearch if matches!(state.views.active(), AppView::Diff(_)) => {
+                            state.modes.push(InputMode::DiffSearch {
                                 query: String::new(),
-                            };
+                            });
                             needs_redraw = true;
                         }
                         AppKey::SearchNext => {
-                            apply_diff_search_action(&mut app, DiffAction::SearchNext);
+                            apply_diff_search_action(&mut state, DiffAction::SearchNext);
                             needs_redraw = true;
                         }
                         AppKey::SearchPrevious => {
-                            apply_diff_search_action(&mut app, DiffAction::SearchPrevious);
+                            apply_diff_search_action(&mut state, DiffAction::SearchPrevious);
                             needs_redraw = true;
                         }
                         _ => {}
@@ -186,7 +262,7 @@ fn run_terminal(mut app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Re
                     continue;
                 };
 
-                if apply_action(&mut app, &mut source, diff_source, action) == AppLoop::Quit {
+                if apply_action(&mut state, &mut source, diff_source, action) == AppLoop::Quit {
                     break;
                 }
                 needs_redraw = true;
@@ -204,7 +280,6 @@ fn run_terminal(mut app: AppView, mut source: JjLog, diff_source: &JjDiff) -> Re
 /// Transient input modes owned by the terminal loop.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum InputMode {
-    Normal,
     DiffSearch { query: String },
 }
 
@@ -216,12 +291,8 @@ enum InputModeResult {
 }
 
 /// Handles key input while a prompt-like mode is active.
-fn handle_input_mode(
-    app: &mut AppView,
-    input_mode: &mut InputMode,
-    key: KeyEvent,
-) -> InputModeResult {
-    let InputMode::DiffSearch { query } = input_mode else {
+fn handle_input_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
+    let Some(InputMode::DiffSearch { query }) = state.modes.active_mut() else {
         return InputModeResult::Unhandled;
     };
 
@@ -229,22 +300,23 @@ fn handle_input_mode(
         KeyEvent {
             code: KeyCode::Esc, ..
         } => {
-            *input_mode = InputMode::Normal;
+            state.modes.pop();
             InputModeResult::Handled
         }
         KeyEvent {
             code: KeyCode::Enter,
             ..
         } => {
-            apply_diff_search_action(app, DiffAction::Search(query.clone()));
-            *input_mode = InputMode::Normal;
+            let query = query.clone();
+            apply_diff_search_action(state, DiffAction::Search(query));
+            state.modes.pop();
             InputModeResult::Handled
         }
         KeyEvent {
             code: KeyCode::Backspace,
             ..
         } => {
-            query.pop();
+            state.modes.pop();
             InputModeResult::Handled
         }
         KeyEvent {
@@ -260,45 +332,41 @@ fn handle_input_mode(
 }
 
 /// Applies a search-only diff action when the active view supports it.
-fn apply_diff_search_action(app: &mut AppView, action: DiffAction) {
-    if let AppView::Diff { diff, .. } = app {
+fn apply_diff_search_action(state: &mut AppState, action: DiffAction) {
+    if let AppView::Diff(diff) = state.views.active_mut() {
         let _ = diff.apply(action);
     }
 }
 
+/// Closes the active mode, or returns to the previous view when possible.
+fn handle_back(state: &mut AppState) {
+    if state.modes.pop().is_some() {
+        return;
+    }
+
+    state.views.pop();
+}
+
 /// Applies an action to the active view and performs any requested I/O.
 fn apply_action(
-    app: &mut AppView,
+    state: &mut AppState,
     source: &mut JjLog,
     diff_source: &JjDiff,
     action: jk_tui::log_view::LogAction,
 ) -> AppLoop {
-    let transition = match app {
+    let transition = match state.views.active_mut() {
         AppView::Log(log) => apply_log_action(log, source, diff_source, action),
-        AppView::Diff { diff, .. } => apply_diff_action(diff, diff_source, action),
+        AppView::Diff(diff) => apply_diff_action(diff, diff_source, action),
     };
 
     match transition {
         AppTransition::Continue => AppLoop::Continue,
-        AppTransition::OpenDiff(diff) => {
-            let previous = std::mem::replace(app, AppView::Log(LogView::default()));
-            if let AppView::Log(log) = previous {
-                *app = AppView::Diff {
-                    log: Some(log),
-                    diff,
-                };
-            }
+        AppTransition::Push(view) => {
+            state.views.push(view);
             AppLoop::Continue
         }
-        AppTransition::ReturnToLog => {
-            let previous = std::mem::replace(app, AppView::Log(LogView::default()));
-            if let AppView::Diff { log, diff } = previous {
-                if let Some(log) = log {
-                    *app = AppView::Log(log);
-                } else {
-                    *app = AppView::Diff { log: None, diff };
-                }
-            }
+        AppTransition::PopView => {
+            state.views.pop();
             AppLoop::Continue
         }
         AppTransition::Quit => AppLoop::Quit,
@@ -330,7 +398,7 @@ fn apply_log_action(
         match diff_source.load(&change_id) {
             Ok(snapshot) => {
                 let diff = DiffView::new(snapshot);
-                return AppTransition::OpenDiff(Box::new(diff));
+                return AppTransition::Push(AppView::Diff(diff));
             }
             Err(error) => log.show_error(error.to_string()),
         }
@@ -373,7 +441,7 @@ fn apply_diff_action(
 
     match diff.apply(diff_action) {
         DiffActionResult::Refresh => refresh_diff(diff, diff_source),
-        DiffActionResult::ReturnToLog => return AppTransition::ReturnToLog,
+        DiffActionResult::ReturnToLog => return AppTransition::PopView,
         DiffActionResult::Quit => return AppTransition::Quit,
         _ => {}
     }
@@ -392,8 +460,8 @@ enum AppLoop {
 #[derive(Debug)]
 enum AppTransition {
     Continue,
-    OpenDiff(Box<DiffView>),
-    ReturnToLog,
+    Push(AppView),
+    PopView,
     Quit,
 }
 
@@ -432,5 +500,76 @@ struct TerminalRestore;
 impl Drop for TerminalRestore {
     fn drop(&mut self) {
         ratatui::restore();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    use super::*;
+
+    #[test]
+    fn view_stack_keeps_root_when_popped() {
+        let root = AppView::Diff(diff_view("aaa"));
+        let mut stack = ViewStack::new(root.clone());
+
+        assert!(!stack.pop());
+        assert_eq!(stack.active(), &root);
+    }
+
+    #[test]
+    fn view_stack_returns_to_previous_log_state() {
+        let mut log = LogView::default();
+        log.show_error("preserved log state");
+        let previous_log = log.clone();
+        let mut stack = ViewStack::new(AppView::Log(log));
+
+        stack.push(AppView::Diff(diff_view("bbb")));
+
+        assert!(stack.pop());
+        assert_eq!(stack.active(), &AppView::Log(previous_log));
+    }
+
+    #[test]
+    fn mode_stack_closes_search_before_popping_view() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.views.push(AppView::Diff(diff_view("aaa")));
+        state.modes.push(InputMode::DiffSearch {
+            query: "alpha".to_owned(),
+        });
+
+        handle_back(&mut state);
+
+        assert_eq!(state.modes.active(), None);
+        assert!(matches!(state.views.active(), AppView::Diff(_)));
+        assert_eq!(state.views.views.len(), 2);
+    }
+
+    #[test]
+    fn mode_stack_submit_search_restores_normal_mode() {
+        let mut state = AppState::new(AppView::Diff(diff_view("aaa")));
+        state.modes.push(InputMode::DiffSearch {
+            query: "alpha".to_owned(),
+        });
+        let mut expected = diff_view("aaa");
+        let _ = expected.apply(DiffAction::Search("alpha".to_owned()));
+
+        let result = handle_input_mode(
+            &mut state,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(state.modes.active(), None);
+        assert_eq!(state.views.active(), &AppView::Diff(expected));
+    }
+
+    fn diff_view(change_id: &str) -> DiffView {
+        DiffView::from_error(
+            change_id,
+            format!("jj diff -r {change_id}"),
+            "synthetic diff fixture".to_owned(),
+        )
     }
 }

@@ -13,6 +13,9 @@ pub enum AppKey {
     /// Dispatch this action to the active view.
     Action(LogAction),
 
+    /// Close the active mode or return to the previous view.
+    Back,
+
     /// Start a search prompt in views that support search.
     StartSearch,
 
@@ -40,6 +43,10 @@ impl AppKey {
         }
 
         match key {
+            KeyEvent {
+                code: KeyCode::Backspace,
+                ..
+            } => Self::Back,
             KeyEvent {
                 code: KeyCode::Char('q') | KeyCode::Esc,
                 ..
@@ -207,6 +214,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE)),
             AppKey::SearchPrevious
+        );
+    }
+
+    #[test]
+    fn backspace_maps_to_back() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)),
+            AppKey::Back
         );
     }
 
