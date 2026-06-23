@@ -404,6 +404,7 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::OpenShow => "show".to_owned(),
         SourceAction::OpenStatus => "status".to_owned(),
         SourceAction::OpenEvolog => "evolog".to_owned(),
+        SourceAction::DescribeRevision => "describe".to_owned(),
         SourceAction::WorkspaceList => "list".to_owned(),
         SourceAction::WorkspaceStatus => "status".to_owned(),
         SourceAction::WorkspaceDiff => "diff".to_owned(),

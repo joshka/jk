@@ -40,7 +40,7 @@ impl CommandPreviewView {
         let text = self.body_text();
         let panel_width = PANEL_WIDTH.min(area.width);
         let content_width = panel_width.saturating_sub(2).max(1);
-        let panel = centered_panel(area, panel_height(&text, content_width).saturating_add(1));
+        let panel = centered_panel(area, panel_height(&text, content_width).saturating_add(3));
         frame.render_widget(Clear, panel);
 
         let block = Block::bordered()
@@ -174,7 +174,7 @@ fn execution_label(mode: ExecutionMode) -> &'static str {
 
 fn refresh_label(refresh_plan: RefreshPlan) -> &'static str {
     match refresh_plan {
-        RefreshPlan::None => "none",
+        RefreshPlan::None => "app-controlled refresh",
         RefreshPlan::ReRunSpec => "re-run current command",
         _ => "unknown",
     }

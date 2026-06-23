@@ -12,6 +12,7 @@
 
 mod command;
 
+pub mod describe;
 pub mod diff;
 pub mod evolog;
 pub mod log;
@@ -20,6 +21,7 @@ pub mod status;
 pub mod workspaces;
 
 pub use command::{JjCommandRunner, RecordingJjCommandRunner, SystemJjCommandRunner};
+pub use describe::{DescribeQuery, JjDescribe};
 pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
 pub use evolog::{EvologQuery, JjEvolog, JjEvologError};
 pub use log::{JjLog, JjLogCommand, JjLogError, LogTemplateSelection};

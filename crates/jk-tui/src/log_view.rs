@@ -455,7 +455,7 @@ mod tests {
     fn help_action_shows_log_specific_keys() {
         let mut view = LogView::new(snapshot(["aaa"]));
         let _ = view.apply(LogAction::ToggleHelp);
-        let backend = TestBackend::new(72, 23);
+        let backend = TestBackend::new(72, 24);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -467,6 +467,7 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Log keys"));
         assert!(rendered.contains("d                    open selected-change diff"));
+        assert!(rendered.contains("m                    describe selected revision"));
         assert!(rendered.contains("s                    open repository status"));
         assert!(rendered.contains("?, q, Esc            close help"));
     }

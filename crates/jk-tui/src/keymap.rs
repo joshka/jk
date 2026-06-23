@@ -30,6 +30,7 @@ enum ActionId {
     Collapse,
     OpenShow,
     OpenDiff,
+    OpenDescribe,
     OpenEvolog,
     OpenStatus,
     OpenCommandHistory,
@@ -63,6 +64,7 @@ impl ActionId {
             Self::Collapse => "Collapse change",
             Self::OpenShow => "Open show",
             Self::OpenDiff => "Open diff",
+            Self::OpenDescribe => "Describe revision",
             Self::OpenEvolog => "Open evolog",
             Self::OpenStatus => "Open status",
             Self::OpenCommandHistory => "Open command history",
@@ -92,6 +94,8 @@ pub enum CommandFamily {
     JjLog,
     /// Commands and actions related to `jj diff`.
     JjDiff,
+    /// Commands and actions related to `jj describe`.
+    JjDescribe,
     /// Commands and actions related to `jj evolog`.
     JjEvolog,
     /// Commands and actions related to `jj show`.
@@ -129,6 +133,7 @@ impl CommandFamily {
         match self {
             Self::JjLog => "jj log",
             Self::JjDiff => "jj diff",
+            Self::JjDescribe => "jj describe",
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
@@ -237,6 +242,10 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff")
         .with_family(CommandFamily::JjDiff)
         .with_hotbar(5, "d diff"),
+    KeyBinding::new(ActionId::OpenDescribe, "m", "describe selected revision")
+        .with_family(CommandFamily::JjDescribe)
+        .with_aliases(&["message", "description", "mutation", "preview"])
+        .with_hotbar(6, "m describe"),
     KeyBinding::new(ActionId::OpenEvolog, "v", "open selected-change evolog")
         .with_family(CommandFamily::JjEvolog)
         .with_aliases(&[
@@ -246,17 +255,17 @@ const LOG_BINDINGS: &[KeyBinding] = &[
             "version",
             "selected change",
         ])
-        .with_hotbar(6, "v evolog"),
+        .with_hotbar(7, "v evolog"),
     KeyBinding::new(ActionId::OpenStatus, "s", "open repository status")
         .with_family(CommandFamily::JjStatus)
-        .with_hotbar(7, "s status"),
+        .with_hotbar(8, "s status"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
-        .with_hotbar(8, "V options"),
+        .with_hotbar(13, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
@@ -269,7 +278,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(12, "q quit")
+        .with_hotbar(14, "q quit")
         .hotbar_only(),
 ];
 
@@ -736,7 +745,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  v evolog  s status  V options  space mark  c clear  j/k move  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  c clear  j/k move  V options  q quit"
         );
     }
 
@@ -789,6 +798,7 @@ mod tests {
         assert!(status.contains("q quit"));
         assert!(status.contains("enter show"));
         assert!(status.contains("d diff"));
+        assert!(status.contains("m describe"));
         assert!(status.contains("v evolog"));
         assert!(status.contains("s status"));
         assert!(status.contains("..."));
@@ -802,7 +812,7 @@ mod tests {
 
         assert_eq!(
             status,
-            "? help  H home  L log  r refresh  enter show  d diff  v evolog  ...  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  ...  q quit"
         );
     }
 
@@ -868,6 +878,7 @@ mod tests {
                 "right, l             expand selected change",
                 "left, h              collapse selected change",
                 "d                    open selected-change diff",
+                "m                    describe selected revision",
                 "v                    open selected-change evolog",
                 "s                    open repository status",
                 "C                    open command history",

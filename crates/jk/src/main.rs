@@ -11,16 +11,17 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
-    DiffFormat, DiffQuery, EvologQuery, JjCommandRunner, JjDiff, JjEvolog, JjLog, JjLogCommand,
-    JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, RecordingJjCommandRunner, ShowQuery,
-    StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot,
-    WorkspaceSummary,
+    DescribeQuery, DiffFormat, DiffQuery, EvologQuery, JjCommandRunner, JjDescribe, JjDiff,
+    JjEvolog, JjLog, JjLogCommand, JjShow, JjStatus, JjWorkspaces, LogTemplateSelection,
+    RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
+    WorkspaceInspectionQuery, WorkspaceListSnapshot, WorkspaceSummary,
 };
-use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
+use jk_core::{CommandHistory, CommandPreview, CommandSource, SourceAction, SourceView};
 use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
 use jk_tui::command_history_view::{
     CommandHistoryAction, CommandHistoryActionResult, CommandHistorySnapshot, CommandHistoryView,
 };
+use jk_tui::command_preview_view::CommandPreviewView;
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogAction, LogView};
 use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
@@ -175,6 +176,7 @@ fn main() -> Result<()> {
     let evolog_source = evolog_source(&args);
     let show_source = show_source(&args);
     let status_source = status_source(&args);
+    let describe_source = describe_source(&args);
     let workspaces_source = workspaces_source(&args);
     let mut history = CommandHistory::default();
     let app = match &args.command {
@@ -207,6 +209,7 @@ fn main() -> Result<()> {
         &evolog_source,
         &show_source,
         &status_source,
+        &describe_source,
         &workspaces_source,
         history,
     )?;
@@ -280,6 +283,16 @@ fn evolog_source(args: &Args) -> JjEvolog {
 /// Builds the status source for repository inspection.
 fn status_source(args: &Args) -> JjStatus {
     let source = JjStatus::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Builds the describe source for selected-change mutation preview.
+fn describe_source(args: &Args) -> JjDescribe {
+    let source = JjDescribe::default();
     if let Some(repository) = &args.repository {
         source.with_repository(repository)
     } else {
@@ -527,6 +540,7 @@ fn run_terminal(
     evolog_source: &JjEvolog,
     show_source: &JjShow,
     status_source: &JjStatus,
+    describe_source: &JjDescribe,
     workspaces_source: &JjWorkspaces,
     history: CommandHistory,
 ) -> Result<()> {
@@ -558,6 +572,15 @@ fn run_terminal(
                     }) => {
                         let lines = discovery_lines(*context, query, *selected);
                         log.render_with_selector(frame, "Command discovery", &lines);
+                    }
+                    Some(InputMode::DescribeMessage { rev, message }) => {
+                        log.render(frame);
+                        let lines = describe_message_lines(rev, message);
+                        render_mode_overlay(frame, "Describe revision", &lines);
+                    }
+                    Some(InputMode::CommandPreview { preview }) => {
+                        log.render(frame);
+                        CommandPreviewView::new(preview.clone()).render(frame);
                     }
                     _ => log.render(frame),
                 },
@@ -693,7 +716,9 @@ fn run_terminal(
 
         match event::read()? {
             Event::Key(key) => {
-                if handle_input_mode(&mut state, &mut source, key) == InputModeResult::Handled {
+                if handle_input_mode(&mut state, &mut source, describe_source, key)
+                    == InputModeResult::Handled
+                {
                     needs_redraw = true;
                     continue;
                 }
@@ -744,6 +769,10 @@ fn run_terminal(
                         }
                         AppKey::UpdateSelectedWorkspaceStale => {
                             update_selected_workspace_stale(&mut state, workspaces_source);
+                            needs_redraw = true;
+                        }
+                        AppKey::StartDescribe => {
+                            open_describe_message(&mut state);
                             needs_redraw = true;
                         }
                         AppKey::OpenViewOptions => {
@@ -850,6 +879,13 @@ enum InputMode {
         query: String,
         selected: usize,
     },
+    DescribeMessage {
+        rev: String,
+        message: String,
+    },
+    CommandPreview {
+        preview: CommandPreview,
+    },
     LogTemplate {
         options: Vec<LogTemplateSelection>,
         selected: usize,
@@ -864,7 +900,12 @@ enum InputModeResult {
 }
 
 /// Handles key input while a prompt-like mode is active.
-fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) -> InputModeResult {
+fn handle_input_mode(
+    state: &mut AppState,
+    source: &mut JjLog,
+    describe_source: &JjDescribe,
+    key: KeyEvent,
+) -> InputModeResult {
     if matches!(state.modes.active(), Some(InputMode::ViewOptions { .. })) {
         return handle_view_options_mode(state, source, key);
     }
@@ -876,6 +917,9 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
         Some(InputMode::CommandDiscovery { .. })
     ) {
         return handle_command_discovery_mode(state, key);
+    }
+    if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
+        return handle_command_preview_mode(state, source, key);
     }
 
     let Some(mode) = state.modes.active_mut() else {
@@ -896,8 +940,20 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
             let action = match mode {
                 InputMode::DiffSearch { query } => SearchSubmit::Diff(query.clone()),
                 InputMode::InspectionSearch { query } => SearchSubmit::Inspection(query.clone()),
+                InputMode::DescribeMessage { rev, message } => {
+                    if message.trim().is_empty() {
+                        return InputModeResult::Handled;
+                    }
+                    let preview = describe_source
+                        .spec_for(&DescribeQuery::new(rev.clone(), message.clone()))
+                        .command_preview();
+                    state.modes.pop();
+                    state.modes.push(InputMode::CommandPreview { preview });
+                    return InputModeResult::Handled;
+                }
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
+                InputMode::CommandPreview { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
             state.modes.pop();
@@ -908,6 +964,12 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
             code: KeyCode::Backspace,
             ..
         } => {
+            if let InputMode::DescribeMessage { message, .. } = mode
+                && !message.is_empty()
+            {
+                message.pop();
+                return InputModeResult::Handled;
+            }
             state.modes.pop();
             InputModeResult::Handled
         }
@@ -920,8 +982,12 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
                 InputMode::DiffSearch { query } | InputMode::InspectionSearch { query } => {
                     query.push(character);
                 }
+                InputMode::DescribeMessage { message, .. } => {
+                    message.push(character);
+                }
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
+                InputMode::CommandPreview { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
             InputModeResult::Handled
@@ -1015,6 +1081,114 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
         }
         _ => InputModeResult::Handled,
     }
+}
+
+fn handle_command_preview_mode(
+    state: &mut AppState,
+    source: &mut JjLog,
+    key: KeyEvent,
+) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc | KeyCode::Backspace,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('q'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            let Some(InputMode::CommandPreview { preview }) = state.modes.pop() else {
+                return InputModeResult::Handled;
+            };
+            confirm_command_preview(state, source, preview);
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+fn open_describe_message(state: &mut AppState) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    let Some(rev) = log.selected_change_id().map(ToOwned::to_owned) else {
+        log.show_error("No revision selected");
+        return;
+    };
+
+    state.modes.push(InputMode::DescribeMessage {
+        rev,
+        message: String::new(),
+    });
+}
+
+fn describe_message_lines(rev: &str, message: &str) -> Vec<String> {
+    vec![
+        format!("Revision: {rev}"),
+        format!("Message: {message}"),
+        String::new(),
+        "type message   enter preview   backspace edit   esc cancel".to_owned(),
+    ]
+}
+
+fn confirm_command_preview(state: &mut AppState, source: &mut JjLog, preview: CommandPreview) {
+    confirm_command_preview_with_runner(state, source, preview, SystemJjCommandRunner);
+}
+
+fn confirm_command_preview_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    source: &mut JjLog,
+    preview: CommandPreview,
+    runner: R,
+) {
+    let command_source =
+        CommandSource::new(SourceView::Log, SourceAction::DescribeRevision).with_key("m");
+    let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);
+    match runner.run(&preview.spec) {
+        Ok(output) if output.status.success() => {
+            if let AppView::Log(log) = state.views.active_mut() {
+                refresh_log(
+                    log,
+                    &mut state.history,
+                    source,
+                    CommandSource::new(SourceView::Log, SourceAction::Refresh),
+                );
+            }
+        }
+        Ok(output) => {
+            let message = command_failure_message("jj describe", &output.stderr, &output.stdout);
+            if let AppView::Log(log) = state.views.active_mut() {
+                log.show_error(message);
+            }
+        }
+        Err(error) => {
+            if let AppView::Log(log) = state.views.active_mut() {
+                log.show_error(format!("failed to run jj describe: {error}"));
+            }
+        }
+    }
+}
+
+fn command_failure_message(command: &str, stderr: &[u8], stdout: &[u8]) -> String {
+    let stderr = String::from_utf8_lossy(stderr).trim().to_owned();
+    if !stderr.is_empty() {
+        return format!("{command} failed: {stderr}");
+    }
+
+    let stdout = String::from_utf8_lossy(stdout).trim().to_owned();
+    if !stdout.is_empty() {
+        return format!("{command} failed: {stdout}");
+    }
+
+    format!("{command} failed")
 }
 
 fn handle_view_options_mode(
@@ -2927,6 +3101,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDescribe::default(),
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -2970,6 +3145,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDescribe::default(),
             KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE),
         );
 
@@ -3020,6 +3196,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDescribe::default(),
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -3041,11 +3218,117 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDescribe::default(),
             KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
         );
 
         assert_eq!(result, InputModeResult::Handled);
         assert_eq!(state.modes.active(), None);
+    }
+
+    #[test]
+    fn describe_message_opens_for_selected_revision() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        open_describe_message(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::DescribeMessage {
+                rev: "abc123".to_owned(),
+                message: String::new(),
+            })
+        );
+    }
+
+    #[test]
+    fn describe_message_enter_opens_command_preview() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        state.modes.push(InputMode::DescribeMessage {
+            rev: "abc123".to_owned(),
+            message: "New description".to_owned(),
+        });
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            &JjDescribe::default(),
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        let Some(InputMode::CommandPreview { preview }) = state.modes.active() else {
+            panic!("expected command preview mode");
+        };
+        assert_eq!(preview.spec.argv()[0].to_string_lossy(), "describe");
+        assert_eq!(
+            preview.command_line,
+            "jj --no-pager --color always describe -m 'New description' abc123"
+        );
+        assert_eq!(preview.safety, jk_core::SafetyClass::LocalRewrite);
+    }
+
+    #[test]
+    fn describe_message_enter_ignores_empty_message() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        state.modes.push(InputMode::DescribeMessage {
+            rev: "abc123".to_owned(),
+            message: "   ".to_owned(),
+        });
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            &JjDescribe::default(),
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::DescribeMessage {
+                rev: "abc123".to_owned(),
+                message: "   ".to_owned(),
+            })
+        );
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn confirming_describe_preview_records_mutation_before_refresh() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let preview = JjDescribe::default()
+            .spec_for(&DescribeQuery::new("abc123", "New description"))
+            .command_preview();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "Working copy now at: abc123\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        confirm_command_preview_with_runner(&mut state, &mut source, preview, runner);
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert_eq!(records.len(), 3);
+        assert_eq!(
+            records[0].command.spec_preview,
+            "jj describe -m 'New description' abc123"
+        );
+        assert_eq!(records[0].command.title, "jj describe abc123");
+        assert_eq!(records[0].source.view, SourceView::Log);
+        assert_eq!(records[0].source.action, SourceAction::DescribeRevision);
+        assert_eq!(records[0].source.key.as_deref(), Some("m"));
+        assert_eq!(records[0].safety, jk_core::SafetyClass::LocalRewrite);
+        assert_eq!(
+            records[0].execution_mode,
+            jk_core::ExecutionMode::ConfirmMutation
+        );
+        assert_eq!(records[0].refresh, jk_core::RefreshPlan::None);
+        assert_eq!(records[1].source.action, SourceAction::Refresh);
+        assert_eq!(records[2].source.action, SourceAction::Refresh);
     }
 
     #[test]
@@ -3075,6 +3358,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDescribe::default(),
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -3102,6 +3386,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDescribe::default(),
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
 
@@ -3122,6 +3407,7 @@ mod tests {
         let result = handle_input_mode(
             &mut state,
             &mut source,
+            &JjDescribe::default(),
             KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
         );
 
@@ -3425,6 +3711,19 @@ mod tests {
             format!("jj diff -r {change_id}"),
             "synthetic diff fixture".to_owned(),
         )
+    }
+
+    fn log_app_view(change_id: &str) -> AppView {
+        AppView::Log(LogView::new(
+            jk_core::LogSnapshot::new(
+                format!("@  {change_id} {change_id} summary\n"),
+                vec![
+                    jk_core::LogEntry::new(change_id, "commit", format!("{change_id} summary"))
+                        .with_rendered_line(0),
+                ],
+            )
+            .with_title("jj log"),
+        ))
     }
 
     fn workspace_app_view() -> WorkspacesView {

@@ -45,6 +45,8 @@ pub enum CommandFamily {
     JjShow,
     /// `jj status`.
     JjStatus,
+    /// `jj describe`.
+    JjDescribe,
     /// `jj evolog`.
     JjEvolog,
     /// `jj workspace ...`.
@@ -69,6 +71,7 @@ impl CommandFamily {
             "diff" => Self::JjDiff,
             "show" => Self::JjShow,
             "status" => Self::JjStatus,
+            "describe" => Self::JjDescribe,
             "evolog" => Self::JjEvolog,
             "workspace" => Self::JjWorkspace,
             "op" => Self::JjOperation,
@@ -149,6 +152,8 @@ pub enum SourceAction {
     OpenStatus,
     /// Open an evolog view.
     OpenEvolog,
+    /// Describe the selected revision.
+    DescribeRevision,
     /// List workspaces.
     WorkspaceList,
     /// Show selected workspace status.

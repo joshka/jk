@@ -31,6 +31,9 @@ pub enum AppKey {
     /// Update stale metadata for the selected workspace.
     UpdateSelectedWorkspaceStale,
 
+    /// Start an inline describe mutation for the selected revision.
+    StartDescribe,
+
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
@@ -131,6 +134,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'W' => Some(AppKey::OpenWorkspaces),
         'C' => Some(AppKey::OpenCommandHistory),
         'u' => Some(AppKey::UpdateSelectedWorkspaceStale),
+        'm' => Some(AppKey::StartDescribe),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
@@ -264,6 +268,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE)),
             AppKey::OpenEvolog
+        );
+    }
+
+    #[test]
+    fn lowercase_m_starts_describe() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE)),
+            AppKey::StartDescribe
         );
     }
 
