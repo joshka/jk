@@ -43,9 +43,9 @@ Make inspection workflows match jj's command model.
 - Add a reusable `V` View Options overlay for patch, stat, summary, name-only, templates, graph
   options, and related diff formats.
 - Add standalone `v` for selected-change `evolog` after the shared inspection source model exists.
-- Add first-class diff search, file-list navigation, and two-revision comparison. The `vibe` spike
-  now has the first diff file selector (`f`) for jumping within the active diff; searchable file
-  lists and range comparison still need follow-up work.
+- Add first-class diff search, file-list navigation, and two-revision comparison. The current
+  implementation has the first diff file selector (`f`) for jumping within the active diff;
+  searchable file lists and range comparison still need follow-up work.
 - Add docs and [Betamax](https://www.joshka.net/betamax/) tapes for log, diff, show, and status
   flows.
 
@@ -67,10 +67,10 @@ Introduce mutating workflows only through command preview and recovery.
 
 - Add a reusable Run Options drawer for global options and advanced safety toggles before mutating
   wizards depend on them.
-- Add inline and editor describe flows. The `vibe` spike now prefills the inline `m` prompt from
-  the selected revision's full description and supports `Ctrl-u` clear before preview; editor
+- Add inline and editor describe flows. The current implementation prefills the inline `m` prompt
+  from the selected revision's full description and supports `Ctrl-u` clear before preview; editor
   describe and before/after review remain follow-up work.
-- Add new, commit, edit, rebase, and abandon flows. The `vibe` spike now has direct
+- Add new, commit, edit, rebase, and abandon flows. The current implementation has direct
   selected-revision `a` -> `jj abandon REV`, `n` -> `jj new PARENT...`, and
   `e` -> `jj edit REV` previews. `jj new` already uses ordered marks as parents when present and
   falls back to the selected revision; the durable action-menu shape still belongs with the broader
@@ -241,9 +241,9 @@ Make diff inspection useful for large changes without forcing users into another
 
 - Scope: file list, sticky revision/file context, diff search, next/previous file actions,
   two-revision diffs, horizontal overflow controls, edge-case fixtures, and file-only/details mode.
-- Current `vibe` status: diff views support `[ ]` file movement, `{ }` hunk movement, search,
-  horizontal scroll, sticky/current-file context, diff format View Options, and an `f` file selector
-  that jumps to the chosen file in the active diff.
+- Current implementation status: diff views support `[ ]` file movement, `{ }` hunk movement,
+  search, horizontal scroll, sticky/current-file context, diff format View Options, and an `f` file
+  selector that jumps to the chosen file in the active diff.
 - Acceptance: users can search within a diff, jump between files, inspect name-only/stat/detail
   variants, compare two selected revisions with the shown jj command, recover from empty or failed
   diff loads without leaving the TUI, and use a searchable file list once the shared file selector

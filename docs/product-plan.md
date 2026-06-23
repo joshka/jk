@@ -421,7 +421,7 @@ All rewrite/destructive/network actions should follow:
 6. Refresh state after success.
 7. Show result, command history entry, and operation-recovery actions.
 
-Current `vibe` spike status: selected-revision `jj abandon REV`, parented `jj new`, and
+Current implementation status: selected-revision `jj abandon REV`, parented `jj new`, and
 selected-revision `jj edit REV` have the first mutation previews. Pressing `a` on the log previews
 `jj abandon REV`; pressing `n` previews `jj new PARENT...`, using ordered marks as parents when
 present and otherwise using the selected revision; pressing `e` previews `jj edit REV`. Enter runs
@@ -675,16 +675,16 @@ Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` r
 
 The `a` prefix opens a visible overlay. Keys are active only while the overlay is open.
 
-Current `vibe` note: before this prefix menu exists, `a` directly previews `jj abandon REV` for the
-selected log revision. Keep that implementation path command-spec based so it can move under
-`a a` later without rewriting the mutation runner.
+Current implementation note: before this prefix menu exists, `a` directly previews
+`jj abandon REV` for the selected log revision. Keep that implementation path command-spec based so
+it can move under `a a` later without rewriting the mutation runner.
 
-Current `vibe` note: `n` directly previews `jj new PARENT...` from the log. Ordered marks become
-parents when present; otherwise the selected revision is the parent. Search-next remains scoped to
-diff and rendered inspection views.
+Current implementation note: `n` directly previews `jj new PARENT...` from the log. Ordered marks
+become parents when present; otherwise the selected revision is the parent. Search-next remains
+scoped to diff and rendered inspection views.
 
-Current `vibe` note: `e` directly previews `jj edit REV` from the log. The same key still reopens
-the command prompt when a command-output view is active.
+Current implementation note: `e` directly previews `jj edit REV` from the log. The same key still
+reopens the command prompt when a command-output view is active.
 
 | Key | jj command family               | Notes                                                      |
 | --- | ------------------------------- | ---------------------------------------------------------- |
@@ -1192,7 +1192,7 @@ Diff view:
 
 - Preserve selected file/hunk across refresh if path/header still exists.
 - Sticky current-file header.
-- File picker overlay for large diffs. The current `vibe` spike includes the first `f` file
+- File picker overlay for large diffs. The current implementation includes the first `f` file
   selector for jumping within an active diff; the later target is searchable and shared with the
   broader fileset selector model.
 - Search highlights and next/previous match navigation.
@@ -1308,7 +1308,7 @@ Prompt keys:
 - `Esc`: cancel.
 - `Ctrl+s`: save when multiline editor is active.
 
-Current `vibe` status: `m` opens the inline prompt prefilled with the selected revision's full
+Current implementation status: `m` opens the inline prompt prefilled with the selected revision's full
 description, and `Ctrl-u` clears the prefilled text before preview. The prompt still submits through
 command preview, command history, operation-id capture, log refresh, and recovery footer. It does
 not yet support multiline editing, editor handoff, or a before/after review panel.
@@ -1331,9 +1331,9 @@ Role inference:
 - Else cursor is parent.
 - If cursor is absent: default jj behavior.
 
-Current `vibe` status: direct `n` implements the marks-or-cursor parent rule and routes through
-command preview, command history, operation-id capture, log refresh, and recovery footer. It does
-not yet support inline messages or the later role-resolver overlay.
+Current implementation status: direct `n` implements the marks-or-cursor parent rule and routes
+through command preview, command history, operation-id capture, log refresh, and recovery footer. It
+does not yet support inline messages or the later role-resolver overlay.
 
 `N`: create new change with inline message.
 
@@ -1347,9 +1347,9 @@ jj edit <rev>
 
 If revision is immutable or hidden, require stronger preview or route to action menu variant.
 
-Current `vibe` status: direct `e` implements the selected-revision preview path and routes through
-command preview, command history, operation-id capture, log refresh, and recovery footer. It does
-not yet add immutable-specific warning copy or the stronger `a E` ignore-immutable variant.
+Current implementation status: direct `e` implements the selected-revision preview path and routes
+through command preview, command history, operation-id capture, log refresh, and recovery footer. It
+does not yet add immutable-specific warning copy or the stronger `a E` ignore-immutable variant.
 
 ### 9.6 Squash/split/restore/absorb
 
@@ -2349,10 +2349,14 @@ For each release:
 - Keymap docs regenerated.
 - CLI help regenerated.
 - README updated if status changed.
-- Website workflow screenshots/GIFs updated when UX changes.
+- Website workflow screenshots/GIFs updated when UX changes and only after the behavior is released
+  or release-gated.
 - Betamax validation tapes pass for changed workflows.
 - Betamax media smoke passes for README/site/release demos affected by the change.
-- CHANGELOG describes user-visible changes, keymap changes, config changes, and safety changes.
+- CHANGELOG is written for readers, grouped by workflow or user outcome, and describes
+  user-visible changes, keymap changes, config changes, safety changes, and known limitations.
+- Release notes are LLM-assisted or human-written from a feature audit, not generated from commit
+  messages. Commit history is evidence, not the release-note structure.
 - Release notes include install commands and known limitations.
 - Smoke install via cargo, cargo-binstall, and Homebrew when applicable.
 

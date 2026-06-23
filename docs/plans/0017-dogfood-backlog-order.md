@@ -38,6 +38,8 @@ then broaden into mutation flows, selectors, run options, and generated help.
 1. Done: polish selector menus and help ordering. View menus now wrap at the edges, View Options
    opens on the active diff format, and generated help reads in task-first order instead of raw
    registry order.
+1. Stabilize the current dogfood surface for release. Audit stack descriptions, code shape, docs,
+   README/crate README, Betamax media, and website handoff before starting rebase-specific work.
 
 ## First Useful Mutation Sprint
 
@@ -55,6 +57,7 @@ then broaden into mutation flows, selectors, run options, and generated help.
    selected revision's current full description, and `Ctrl-u` clears the prompt before preview.
 1. Add remaining describe polish: multiline/editor describe and clearer before/after description
    display.
+1. Release the stabilized dogfood milestone before starting rebase-specific behavior.
 1. Add minimal rebase preview: resolve source/destination from marks plus cursor and show exact
    `jj rebase` command before running.
 1. Add rebase destination search: search/filter the log while choosing a destination.
