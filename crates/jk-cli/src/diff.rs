@@ -153,7 +153,7 @@ impl JjDiff {
     }
 
     fn run(spec: &JjCommandSpec) -> Result<String, JjDiffError> {
-        let output = run_jj_spec(spec, "always")?;
+        let output = run_jj_spec(spec)?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
@@ -164,24 +164,18 @@ impl JjDiff {
 
     #[cfg(test)]
     fn diff_command(&self, change_id: &str) -> Command {
-        build_jj_command(
-            &self.spec_for(&DiffQuery::Revision {
-                rev: change_id.to_owned(),
-                format: DiffFormat::Patch,
-            }),
-            "always",
-        )
+        build_jj_command(&self.spec_for(&DiffQuery::Revision {
+            rev: change_id.to_owned(),
+            format: DiffFormat::Patch,
+        }))
     }
 
     #[cfg(test)]
     fn stats_command(&self, change_id: &str) -> Command {
-        build_jj_command(
-            &self.spec_for(&DiffQuery::Revision {
-                rev: change_id.to_owned(),
-                format: DiffFormat::Stat,
-            }),
-            "always",
-        )
+        build_jj_command(&self.spec_for(&DiffQuery::Revision {
+            rev: change_id.to_owned(),
+            format: DiffFormat::Stat,
+        }))
     }
 
     fn spec<'a>(&self, argv: impl IntoIterator<Item = &'a str>) -> JjCommandSpec {
@@ -308,6 +302,31 @@ mod tests {
 
         assert_eq!(argv, ["diff", "-r", "abc123"]);
         assert_eq!(spec.title(), "jj diff -r abc123");
+    }
+
+    #[test]
+    fn revision_query_renders_repository_before_diff() {
+        let command = JjDiff::default()
+            .with_repository("/tmp/repo")
+            .diff_command("abc123");
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            args,
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/repo",
+                "diff",
+                "-r",
+                "abc123"
+            ]
+        );
     }
 
     #[test]

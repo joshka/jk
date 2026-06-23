@@ -5,9 +5,9 @@ use std::process::{Command, Output, Stdio};
 
 use jk_core::JjCommandSpec;
 
-/// Runs a typed `jj` command spec with the color policy required by the caller.
-pub(crate) fn run_jj_spec(spec: &JjCommandSpec, color: &str) -> std::io::Result<Output> {
-    let mut command = build_jj_command(spec, color);
+/// Runs a typed `jj` command spec.
+pub(crate) fn run_jj_spec(spec: &JjCommandSpec) -> std::io::Result<Output> {
+    let mut command = build_jj_command(spec);
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
     if spec.stdin().is_some() {
@@ -24,19 +24,15 @@ pub(crate) fn run_jj_spec(spec: &JjCommandSpec, color: &str) -> std::io::Result<
 }
 
 /// Builds the process command for a typed `jj` command spec.
-pub(crate) fn build_jj_command(spec: &JjCommandSpec, color: &str) -> Command {
+pub(crate) fn build_jj_command(spec: &JjCommandSpec) -> Command {
     let mut command = Command::new("jj");
-    command.args(["--no-pager", "--color", color]);
+    command.args(spec.global_argv());
     command.env_remove("NO_COLOR");
     command.env_remove("CLICOLOR");
     command.env_remove("CLICOLOR_FORCE");
 
     if let Some(cwd) = spec.cwd() {
         command.current_dir(cwd);
-    }
-
-    if let Some(repository) = spec.repository() {
-        command.arg("--repository").arg(repository);
     }
 
     command.args(spec.argv());
@@ -49,7 +45,7 @@ mod tests {
 
     #[test]
     fn command_adapter_forces_color_and_cleans_color_env() {
-        let command = build_jj_command(&JjCommandSpec::render_read_only(["log"]), "always");
+        let command = build_jj_command(&JjCommandSpec::render_read_only(["log"]));
         let args = command
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
@@ -70,23 +66,54 @@ mod tests {
     fn command_adapter_includes_repository_before_spec_argv() {
         let spec =
             JjCommandSpec::render_read_only(["diff", "-r", "@"]).with_repository("/tmp/repository");
-        let command = build_jj_command(&spec, "always");
+        let command = build_jj_command(&spec);
         let args = command
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
 
-        assert!(
-            args.windows(2)
-                .any(|args| args == ["--repository", "/tmp/repository"])
+        assert_eq!(
+            args,
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/repository",
+                "diff",
+                "-r",
+                "@"
+            ]
         );
-        assert!(args.windows(3).any(|args| args == ["diff", "-r", "@"]));
+        assert_eq!(
+            args.iter()
+                .filter(|arg| arg.as_str() == "--repository")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn command_adapter_uses_spec_rendered_process_argv() {
+        let spec = JjCommandSpec::render_read_only(["status"]).with_repository("/tmp/repository");
+        let command = build_jj_command(&spec);
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        let spec_args = spec
+            .process_argv()
+            .into_iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(args, spec_args);
     }
 
     #[test]
     fn command_adapter_captures_stdout() {
         let spec = JjCommandSpec::render_read_only(["--version"]);
-        let output = run_jj_spec(&spec, "always").expect("jj --version should run");
+        let output = run_jj_spec(&spec).expect("jj --version should run");
 
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("jj "));

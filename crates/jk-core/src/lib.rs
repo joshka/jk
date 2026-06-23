@@ -6,7 +6,11 @@
 
 mod command;
 
-pub use command::{ExecutionMode, JjCommandSpec, RefreshPlan, SafetyClass};
+pub use command::{
+    ColorPolicy, ConfigOverlay, ExecutionMode, GlobalOptions, ImmutabilityPolicy, JjCommandSpec,
+    OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, PagerPolicy, RefreshPlan,
+    SafetyClass, WorkingCopyPolicy,
+};
 
 /// A rendered `jj` log view plus semantic records for navigation.
 ///

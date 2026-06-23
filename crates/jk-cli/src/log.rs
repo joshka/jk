@@ -194,7 +194,7 @@ impl JjLog {
     }
 
     fn run(&self, mode: DefaultCommandMode, spec: &JjCommandSpec) -> Result<String, JjLogError> {
-        let output = run_jj_spec(spec, "always")?;
+        let output = run_jj_spec(spec)?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
@@ -213,7 +213,7 @@ impl JjLog {
 
     #[cfg(test)]
     fn command(&self, mode: DefaultCommandMode, command_args: &[String]) -> Command {
-        build_jj_command(&self.command_spec(mode, command_args), "always")
+        build_jj_command(&self.command_spec(mode, command_args))
     }
 
     fn command_spec(&self, mode: DefaultCommandMode, command_args: &[String]) -> JjCommandSpec {
@@ -425,6 +425,31 @@ mod tests {
 
         assert!(args.iter().any(|arg| arg == "log"));
         assert!(args.windows(2).any(|args| args == ["-n", "3"]));
+    }
+
+    #[test]
+    fn explicit_log_command_renders_repository_before_log() {
+        let source = JjLog::default()
+            .with_command(JjLogCommand::Log)
+            .with_repository("/tmp/repo");
+        let command_args = source.command_args();
+        let command = source.command(DefaultCommandMode::Rendered, &command_args);
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            args,
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/repo",
+                "log"
+            ]
+        );
     }
 
     #[test]

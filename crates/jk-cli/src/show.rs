@@ -86,7 +86,7 @@ impl JjShow {
     }
 
     fn run(spec: &JjCommandSpec) -> Result<String, JjShowError> {
-        let output = run_jj_spec(spec, "always")?;
+        let output = run_jj_spec(spec)?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
@@ -132,10 +132,10 @@ mod tests {
     }
 
     #[test]
-    fn command_adds_repository_and_color_flags_outside_spec() {
+    fn command_renders_repository_before_show() {
         let source = JjShow::default().with_repository("/tmp/repo");
         let spec = source.spec_for(&ShowQuery::new(vec!["abc123".to_owned()]));
-        let command = build_jj_command(&spec, "always");
+        let command = build_jj_command(&spec);
 
         let args = command
             .get_args()
