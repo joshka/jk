@@ -1,10 +1,15 @@
 //! Log-like `jj` command integration.
 
 use std::path::PathBuf;
+#[cfg(test)]
 use std::process::Command;
 
-use jk_core::LogSnapshot;
+use jk_core::{JjCommandSpec, LogSnapshot};
 use thiserror::Error;
+
+#[cfg(test)]
+use crate::command::build_jj_command;
+use crate::command::run_jj_spec;
 
 mod rendered;
 mod semantic;
@@ -105,7 +110,7 @@ impl JjLog {
     }
 
     fn run(&self, mode: DefaultCommandMode, command_args: &[String]) -> Result<String, JjLogError> {
-        let output = self.command(mode, command_args).output()?;
+        let output = run_jj_spec(&self.command_spec(mode, command_args), "always")?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
@@ -122,26 +127,28 @@ impl JjLog {
         }
     }
 
+    #[cfg(test)]
     fn command(&self, mode: DefaultCommandMode, command_args: &[String]) -> Command {
-        let mut command = Command::new("jj");
-        command.args(["--no-pager", "--color", "always"]);
-        command.env_remove("NO_COLOR");
-        command.env_remove("CLICOLOR");
-        command.env_remove("CLICOLOR_FORCE");
+        build_jj_command(&self.command_spec(mode, command_args), "always")
+    }
 
-        if let Some(repository) = &self.repository {
-            command.arg("--repository").arg(repository);
-        }
-
-        command.args(command_args);
+    fn command_spec(&self, mode: DefaultCommandMode, command_args: &[String]) -> JjCommandSpec {
+        let mut argv = command_args.to_vec();
         if let Some(limit) = self.limit {
-            command.args(["-n", &limit.to_string()]);
+            argv.push("-n".to_owned());
+            argv.push(limit.to_string());
         }
         if mode == DefaultCommandMode::Json {
-            command.args(["-T", LOG_TEMPLATE]);
+            argv.push("-T".to_owned());
+            argv.push(LOG_TEMPLATE.to_owned());
         }
 
-        command
+        let spec = JjCommandSpec::render_read_only(argv).with_title(command_title(command_args));
+        if let Some(repository) = &self.repository {
+            spec.with_repository(repository)
+        } else {
+            spec
+        }
     }
 
     fn command_args(&self) -> Vec<String> {

@@ -73,7 +73,7 @@ fn main() -> Result<()> {
             Ok(snapshot) => DiffView::new(snapshot),
             Err(error) => DiffView::from_error(
                 diff_args.revision.clone(),
-                format!("jj diff -r {}", diff_args.revision),
+                JjDiff::title(&diff_args.revision),
                 error.to_string(),
             ),
         };

@@ -10,6 +10,8 @@
 //! rendered-output-first boundary for selected-change inspection. This is a temporary integration
 //! boundary until `jj-cli` / `jj-lib` can provide both pieces without parsing command output.
 
+mod command;
+
 pub mod diff;
 pub mod log;
 

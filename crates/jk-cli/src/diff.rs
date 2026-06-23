@@ -1,10 +1,15 @@
 //! Selected-change `jj diff` command integration.
 
 use std::path::PathBuf;
+#[cfg(test)]
 use std::process::Command;
 
-use jk_core::{DiffFileStat, DiffSnapshot};
+use jk_core::{DiffFileStat, DiffSnapshot, JjCommandSpec};
 use thiserror::Error;
+
+#[cfg(test)]
+use crate::command::build_jj_command;
+use crate::command::run_jj_spec;
 
 const DIFF_COMMAND: &str = "diff";
 
@@ -32,17 +37,24 @@ impl JjDiff {
     ///
     /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
     pub fn load(&self, change_id: &str) -> Result<DiffSnapshot, JjDiffError> {
-        let rendered = Self::run(self.diff_command(change_id))?;
-        let stats = Self::run(self.stats_command(change_id))?;
+        let spec = self.diff_spec(change_id);
+        let rendered = Self::run(&spec)?;
+        let stats = Self::run(&self.stats_spec(change_id))?;
         let file_stats = parse_stats_lines(&stats);
 
         Ok(DiffSnapshot::new(change_id, rendered)
             .with_file_stats(file_stats)
-            .with_title(command_title(change_id)))
+            .with_title(spec.title()))
     }
 
-    fn run(mut command: Command) -> Result<String, JjDiffError> {
-        let output = command.output()?;
+    /// Returns the title used for the selected-change diff command.
+    #[must_use]
+    pub fn title(change_id: &str) -> String {
+        command_title(change_id)
+    }
+
+    fn run(spec: &JjCommandSpec) -> Result<String, JjDiffError> {
+        let output = run_jj_spec(spec, "always")?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
@@ -51,37 +63,34 @@ impl JjDiff {
         }
     }
 
+    #[cfg(test)]
     fn diff_command(&self, change_id: &str) -> Command {
-        let mut command = self.base_command("always");
-        command.command.args([DIFF_COMMAND, "-r", change_id]);
-        command.command
+        build_jj_command(&self.diff_spec(change_id), "always")
     }
 
+    #[cfg(test)]
     fn stats_command(&self, change_id: &str) -> Command {
-        let mut command = self.base_command("always");
-        command
-            .command
-            .args([DIFF_COMMAND, "-r", change_id, "--stat"]);
-        command.command
+        build_jj_command(&self.stats_spec(change_id), "always")
     }
 
-    fn base_command(&self, color: &str) -> JjCommand {
-        let mut command = Command::new("jj");
-        command.args(["--no-pager", "--color", color]);
-        command.env_remove("NO_COLOR");
-        command.env_remove("CLICOLOR");
-        command.env_remove("CLICOLOR_FORCE");
+    fn diff_spec(&self, change_id: &str) -> JjCommandSpec {
+        self.spec([DIFF_COMMAND, "-r", change_id])
+            .with_title(command_title(change_id))
+    }
 
+    fn stats_spec(&self, change_id: &str) -> JjCommandSpec {
+        self.spec([DIFF_COMMAND, "-r", change_id, "--stat"])
+            .with_title(format!("{} --stat", command_title(change_id)))
+    }
+
+    fn spec<'a>(&self, argv: impl IntoIterator<Item = &'a str>) -> JjCommandSpec {
+        let spec = JjCommandSpec::render_read_only(argv);
         if let Some(repository) = &self.repository {
-            command.arg("--repository").arg(repository);
+            spec.with_repository(repository)
+        } else {
+            spec
         }
-
-        JjCommand { command }
     }
-}
-
-struct JjCommand {
-    command: Command,
 }
 
 /// Builds the title-bar command label for a selected-change diff.
