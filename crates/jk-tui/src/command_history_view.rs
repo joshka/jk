@@ -72,6 +72,8 @@ impl CommandHistorySnapshot {
 pub struct CommandHistoryRow {
     /// Stable record id from the current in-memory history.
     pub id: u64,
+    /// Stable operation id reported by `jj`, when available for this command.
+    pub operation_id: Option<String>,
     /// Compact status marker.
     pub status: String,
     /// Source view and action that triggered the command.
@@ -94,11 +96,19 @@ impl CommandHistoryRow {
     ) -> Self {
         Self {
             id,
+            operation_id: None,
             status: status.into(),
             source: source.into(),
             command: command.into(),
             summary: summary.into(),
         }
+    }
+
+    /// Attaches the operation id reported by `jj`, when available.
+    #[must_use]
+    pub fn with_operation_id(mut self, operation_id: Option<String>) -> Self {
+        self.operation_id = operation_id;
+        self
     }
 
     /// Maps a retained command record into a display row.
@@ -111,17 +121,25 @@ impl CommandHistoryRow {
             command_label(record),
             result_summary(record),
         )
+        .with_operation_id(record.operation_id.clone())
     }
 }
 
 /// The effect requested after applying an input action to the history view.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum CommandHistoryActionResult {
     /// Continue running the application.
     Continue,
     /// Rebuild the snapshot from current in-memory history.
     Refresh,
+    /// Open the recorded operation for the selected command.
+    OpenOperation {
+        /// Stable operation id selected for `jj op show` or an equivalent operation route.
+        operation_id: String,
+    },
+    /// Open the operation log fallback when the selected command has no operation id.
+    OpenOperationLog,
     /// Return to the previous view.
     ReturnBack,
     /// Exit the application.
@@ -146,6 +164,8 @@ pub enum CommandHistoryAction {
     Last,
     /// Refresh the snapshot from the current history.
     Refresh,
+    /// Open the recorded operation, or the operation log fallback when no id is available.
+    OpenOperation,
     /// Toggle mode-specific help.
     ToggleHelp,
     /// Return to the previous view.
@@ -224,6 +244,17 @@ impl CommandHistoryView {
                 CommandHistoryActionResult::Continue
             }
             CommandHistoryAction::Refresh => CommandHistoryActionResult::Refresh,
+            CommandHistoryAction::OpenOperation => {
+                self.selected_row()
+                    .map_or(CommandHistoryActionResult::Continue, |row| {
+                        row.operation_id.as_ref().map_or(
+                            CommandHistoryActionResult::OpenOperationLog,
+                            |operation_id| CommandHistoryActionResult::OpenOperation {
+                                operation_id: operation_id.clone(),
+                            },
+                        )
+                    })
+            }
             CommandHistoryAction::ToggleHelp => {
                 self.help_visible = !self.help_visible;
                 CommandHistoryActionResult::Continue
@@ -531,6 +562,11 @@ mod tests {
         assert_eq!(snapshot.rows()[0].status, "fail");
         assert_eq!(snapshot.rows()[0].source, "log status");
         assert_eq!(snapshot.rows()[0].summary, "exit 1: workspace is stale");
+        assert_eq!(
+            snapshot.rows()[0].operation_id.as_deref(),
+            Some("op-status")
+        );
+        assert_eq!(snapshot.rows()[1].operation_id, None);
     }
 
     #[test]
@@ -562,6 +598,44 @@ mod tests {
         assert_eq!(
             view.apply(CommandHistoryAction::Quit),
             CommandHistoryActionResult::Quit
+        );
+    }
+
+    #[test]
+    fn open_operation_result_carries_selected_operation_id() {
+        let mut view = CommandHistoryView::new(CommandHistorySnapshot::new(vec![
+            CommandHistoryRow::new(1, "ok", "log load", "jj log", "")
+                .with_operation_id(Some("op-log".to_owned())),
+        ]));
+
+        assert_eq!(
+            view.apply(CommandHistoryAction::OpenOperation),
+            CommandHistoryActionResult::OpenOperation {
+                operation_id: "op-log".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn open_operation_falls_back_to_operation_log_without_id() {
+        let mut view =
+            CommandHistoryView::new(CommandHistorySnapshot::new(vec![CommandHistoryRow::new(
+                1, "ok", "log load", "jj log", "",
+            )]));
+
+        assert_eq!(
+            view.apply(CommandHistoryAction::OpenOperation),
+            CommandHistoryActionResult::OpenOperationLog
+        );
+    }
+
+    #[test]
+    fn open_operation_without_selected_row_is_noop() {
+        let mut view = CommandHistoryView::new(CommandHistorySnapshot::new(Vec::new()));
+
+        assert_eq!(
+            view.apply(CommandHistoryAction::OpenOperation),
+            CommandHistoryActionResult::Continue
         );
     }
 
@@ -617,6 +691,7 @@ mod tests {
             0,
             "\u{1b}[1m\u{1b}[38;5;2m@\u{1b}[0m current\n",
             "",
+            None,
         );
 
         let snapshot = CommandHistorySnapshot::from_records(history.records());
@@ -634,6 +709,7 @@ mod tests {
             0,
             "log output\n",
             "",
+            None,
         );
         append_record(
             &mut history,
@@ -643,6 +719,7 @@ mod tests {
             1,
             "",
             "workspace is stale\nmore detail\n",
+            Some("op-status"),
         );
         history
     }
@@ -655,15 +732,17 @@ mod tests {
         code: i32,
         stdout: &str,
         stderr: &str,
+        operation_id: Option<&str>,
     ) {
         let start = CommandRecordStart::from_spec(&spec, jk_core::CommandSource::new(view, action))
             .with_started_at(SystemTime::UNIX_EPOCH);
-        let finish = CommandRecordFinish::from_exit_code(
+        let mut finish = CommandRecordFinish::from_exit_code(
             code,
             stdout,
             stderr,
             SystemTime::UNIX_EPOCH + Duration::from_millis(1),
         );
+        finish.operation_id = operation_id.map(str::to_owned);
         history.append(start, finish);
     }
 

@@ -4,10 +4,11 @@
 //! events and backend-neutral TUI actions. The product behavior is intentionally delegated to
 //! `jk-cli` and `jk-tui` so the binary stays a thin orchestration layer.
 
+use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use color_eyre::Result;
+use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
@@ -639,10 +640,14 @@ fn run_terminal(
     workspaces_source: &JjWorkspaces,
     history: CommandHistory,
 ) -> Result<()> {
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return Err(eyre!("jk requires an interactive terminal"));
+    }
+
     // jj should keep configured colors even when the parent process was run by an agent or tool
     // that exports NO_COLOR.
     force_color_output(true);
-    let mut terminal = ratatui::try_init().inspect_err(|_| ratatui::restore())?;
+    let mut terminal = ratatui::try_init()?;
     let _terminal_restore = TerminalRestore;
     let mut needs_redraw = true;
     let mut state = AppState::with_history(app, history);
@@ -885,7 +890,11 @@ fn run_terminal(
                             needs_redraw = true;
                         }
                         AppKey::OpenOperationLog => {
-                            open_operation_log(&mut state, operation_source);
+                            if matches!(state.views.active(), AppView::CommandHistory { .. }) {
+                                open_command_history_operation(&mut state, operation_source);
+                            } else {
+                                open_operation_log(&mut state, operation_source);
+                            }
                             needs_redraw = true;
                         }
                         AppKey::UpdateSelectedWorkspaceStale => {
@@ -1994,6 +2003,7 @@ fn push_selected_operation_show(state: &mut AppState, operation_source: &JjOpera
         &mut state.history,
         operation_source,
         query,
+        SourceView::OperationLog,
         SourceAction::OperationShow,
         OperationRenderedKind::Show,
     );
@@ -2025,7 +2035,76 @@ fn command_history_snapshot(history: &CommandHistory) -> CommandHistorySnapshot 
     CommandHistorySnapshot::from_records(history.records())
 }
 
+fn open_command_history_operation(state: &mut AppState, operation_source: &JjOperation) {
+    open_command_history_operation_with_runner(state, operation_source, SystemJjCommandRunner);
+}
+
+fn open_command_history_operation_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    operation_source: &JjOperation,
+    runner: R,
+) {
+    let action = {
+        let AppView::CommandHistory { view } = state.views.active_mut() else {
+            return;
+        };
+        view.apply(CommandHistoryAction::OpenOperation)
+    };
+
+    match action {
+        CommandHistoryActionResult::OpenOperation { operation_id } => {
+            let query = OperationQuery::show(operation_id);
+            let transition = operation_rendered_transition_with_runner(
+                &mut state.history,
+                operation_source,
+                query,
+                SourceView::CommandHistory,
+                SourceAction::OperationShow,
+                OperationRenderedKind::Show,
+                runner,
+            );
+            if let AppTransition::Push(view) = transition {
+                state.views.push(view);
+            }
+        }
+        CommandHistoryActionResult::OpenOperationLog => {
+            open_operation_log_from_with_runner(
+                state,
+                operation_source,
+                CommandSource::new(SourceView::CommandHistory, SourceAction::OperationLog),
+                runner,
+            );
+        }
+        CommandHistoryActionResult::Continue
+        | CommandHistoryActionResult::Refresh
+        | CommandHistoryActionResult::ReturnBack
+        | CommandHistoryActionResult::Quit => {}
+        _ => {}
+    }
+}
+
 fn open_operation_log(state: &mut AppState, operation_source: &JjOperation) {
+    open_operation_log_from(
+        state,
+        operation_source,
+        CommandSource::new(SourceView::Log, SourceAction::OperationLog),
+    );
+}
+
+fn open_operation_log_from(
+    state: &mut AppState,
+    operation_source: &JjOperation,
+    source: CommandSource,
+) {
+    open_operation_log_from_with_runner(state, operation_source, source, SystemJjCommandRunner);
+}
+
+fn open_operation_log_from_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    operation_source: &JjOperation,
+    source: CommandSource,
+    runner: R,
+) {
     if matches!(state.views.active(), AppView::OperationLog { .. }) {
         let AppState { views, history, .. } = state;
         if let AppView::OperationLog { view } = views.active_mut() {
@@ -2034,10 +2113,7 @@ fn open_operation_log(state: &mut AppState, operation_source: &JjOperation) {
         return;
     }
 
-    let mut runner = recording_runner(
-        &mut state.history,
-        CommandSource::new(SourceView::Log, SourceAction::OperationLog),
-    );
+    let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, source);
     let query = OperationQuery::log();
     match operation_source.load_query_with_runner(&query, &mut runner) {
         Ok(snapshot) => {
@@ -2357,6 +2433,7 @@ fn apply_operation_log_action(
                 history,
                 operation_source,
                 query,
+                SourceView::OperationLog,
                 SourceAction::OperationShow,
                 OperationRenderedKind::Show,
             );
@@ -2367,6 +2444,7 @@ fn apply_operation_log_action(
                 history,
                 operation_source,
                 query,
+                SourceView::OperationLog,
                 SourceAction::OperationDiff,
                 OperationRenderedKind::Diff,
             );
@@ -2810,13 +2888,32 @@ fn operation_rendered_transition(
     history: &mut CommandHistory,
     source: &JjOperation,
     query: OperationQuery,
+    source_view: SourceView,
     action: SourceAction,
     kind: OperationRenderedKind,
 ) -> AppTransition {
-    let mut runner = recording_runner(
+    operation_rendered_transition_with_runner(
         history,
-        CommandSource::new(SourceView::OperationLog, action),
-    );
+        source,
+        query,
+        source_view,
+        action,
+        kind,
+        SystemJjCommandRunner,
+    )
+}
+
+fn operation_rendered_transition_with_runner<R: JjCommandRunner>(
+    history: &mut CommandHistory,
+    source: &JjOperation,
+    query: OperationQuery,
+    source_view: SourceView,
+    action: SourceAction,
+    kind: OperationRenderedKind,
+    runner: R,
+) -> AppTransition {
+    let mut runner =
+        RecordingJjCommandRunner::new(runner, history, CommandSource::new(source_view, action));
     match source.load_query_with_runner(&query, &mut runner) {
         Ok(snapshot) => {
             let view = RenderedView::new(snapshot);
@@ -3103,6 +3200,77 @@ mod tests {
         open_view_options(&mut state);
 
         assert_eq!(state.modes.active(), None);
+    }
+
+    #[test]
+    fn command_history_operation_with_id_opens_operation_show() {
+        let mut history = CommandHistory::new(4);
+        append_history_record_with_operation_id(
+            &mut history,
+            jk_core::JjCommandSpec::render_read_only(["describe", "-m", "message", "@"]),
+            SourceView::Log,
+            SourceAction::DescribeRevision,
+            Some("abc123op"),
+        );
+        let mut state = AppState::with_history(
+            AppView::CommandHistory {
+                view: CommandHistoryView::new(command_history_snapshot(&history)),
+            },
+            history,
+        );
+        let source = JjOperation::default();
+
+        open_command_history_operation_with_runner(
+            &mut state,
+            &source,
+            SequencedRunner::successes(vec![output(0, "operation details\n", "")]),
+        );
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::OperationShow {
+                query: OperationQuery::Show { operation },
+                ..
+            } if operation == "abc123op"
+        ));
+        let newest = state.command_history().records().last().expect("record");
+        assert_eq!(newest.source.view, SourceView::CommandHistory);
+        assert_eq!(newest.source.action, SourceAction::OperationShow);
+        assert_eq!(newest.command.title, "jj op show abc123op");
+    }
+
+    #[test]
+    fn command_history_operation_without_id_opens_operation_log() {
+        let mut history = CommandHistory::new(4);
+        append_history_record(
+            &mut history,
+            jk_core::JjCommandSpec::render_read_only(["log"]),
+            SourceView::Log,
+            SourceAction::InitialLoad,
+        );
+        let mut state = AppState::with_history(
+            AppView::CommandHistory {
+                view: CommandHistoryView::new(command_history_snapshot(&history)),
+            },
+            history,
+        );
+        let source = JjOperation::default();
+
+        open_command_history_operation_with_runner(
+            &mut state,
+            &source,
+            SequencedRunner::successes(vec![output(
+                0,
+                "@ abc123def456 user@example.test now\n│  current operation\n",
+                "",
+            )]),
+        );
+
+        assert!(matches!(state.views.active(), AppView::OperationLog { .. }));
+        let newest = state.command_history().records().last().expect("record");
+        assert_eq!(newest.source.view, SourceView::CommandHistory);
+        assert_eq!(newest.source.action, SourceAction::OperationLog);
+        assert_eq!(newest.command.title, "jj op log");
     }
 
     #[test]
@@ -4121,14 +4289,25 @@ mod tests {
         view: SourceView,
         action: SourceAction,
     ) {
+        append_history_record_with_operation_id(history, spec, view, action, None);
+    }
+
+    fn append_history_record_with_operation_id(
+        history: &mut CommandHistory,
+        spec: jk_core::JjCommandSpec,
+        view: SourceView,
+        action: SourceAction,
+        operation_id: Option<&str>,
+    ) {
         let start = jk_core::CommandRecordStart::from_spec(&spec, CommandSource::new(view, action))
             .with_started_at(std::time::SystemTime::UNIX_EPOCH);
-        let finish = jk_core::CommandRecordFinish::from_exit_code(
+        let mut finish = jk_core::CommandRecordFinish::from_exit_code(
             0,
             "",
             "",
             std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(1),
         );
+        finish.operation_id = operation_id.map(str::to_owned);
         history.append(start, finish);
     }
 
