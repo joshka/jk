@@ -2,7 +2,7 @@ use std::ffi::OsString;
 
 use super::REDACTED;
 
-pub(crate) fn redact_argv(argv: Vec<OsString>) -> Vec<OsString> {
+pub fn redact_argv(argv: Vec<OsString>) -> Vec<OsString> {
     argv.into_iter()
         .map(|arg| {
             let Some(arg) = arg.to_str() else {
@@ -94,10 +94,10 @@ fn find_value_end(text: &str, value_start: usize) -> usize {
         })
         .unwrap_or(text.len());
 
-    if let Some(quote) = saw_quote {
-        if text[value_end..].starts_with(quote) {
-            return value_end + quote.len_utf8();
-        }
+    if let Some(quote) = saw_quote
+        && text[value_end..].starts_with(quote)
+    {
+        return value_end + quote.len_utf8();
     }
     value_end
 }

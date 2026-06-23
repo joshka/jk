@@ -231,18 +231,18 @@ impl OperationLogView {
                 OperationLogActionResult::Continue
             }
             OperationLogAction::Refresh => OperationLogActionResult::Refresh,
-            OperationLogAction::OpenShow => self
-                .selected_operation_id()
-                .map(|operation_id| OperationLogActionResult::OperationShow {
+            OperationLogAction::OpenShow => self.selected_operation_id().map_or(
+                OperationLogActionResult::Continue,
+                |operation_id| OperationLogActionResult::OperationShow {
                     operation_id: operation_id.to_owned(),
-                })
-                .unwrap_or(OperationLogActionResult::Continue),
-            OperationLogAction::OpenDiff => self
-                .selected_operation_id()
-                .map(|operation_id| OperationLogActionResult::OperationDiff {
+                },
+            ),
+            OperationLogAction::OpenDiff => self.selected_operation_id().map_or(
+                OperationLogActionResult::Continue,
+                |operation_id| OperationLogActionResult::OperationDiff {
                     operation_id: operation_id.to_owned(),
-                })
-                .unwrap_or(OperationLogActionResult::Continue),
+                },
+            ),
             OperationLogAction::ToggleHelp => {
                 self.help_visible = !self.help_visible;
                 OperationLogActionResult::Continue
@@ -268,7 +268,7 @@ impl OperationLogView {
         self.render_area(frame, area, Some(status));
     }
 
-    fn select_previous(&mut self) {
+    const fn select_previous(&mut self) {
         let Some(selected) = self.selected else {
             return;
         };
@@ -283,7 +283,7 @@ impl OperationLogView {
         self.selected = Some(selected.saturating_add(1).min(last));
     }
 
-    fn page_previous(&mut self) {
+    const fn page_previous(&mut self) {
         let Some(selected) = self.selected else {
             return;
         };
@@ -573,7 +573,7 @@ mod tests {
         assert!(rendered.contains("Operation Log keys"));
         assert!(rendered.contains("enter"));
         assert!(rendered.contains("open selected operation show"));
-        assert!(rendered.contains("d"));
+        assert!(rendered.contains('d'));
         assert!(rendered.contains("open selected operation diff"));
     }
 

@@ -21,7 +21,7 @@ pub struct CommandPreviewView {
 impl CommandPreviewView {
     /// Creates a view for a pending command preview.
     #[must_use]
-    pub fn new(preview: CommandPreview) -> Self {
+    pub const fn new(preview: CommandPreview) -> Self {
         Self {
             preview,
             status: None,
@@ -120,14 +120,13 @@ impl CommandPreviewView {
             )),
         ];
 
+        lines.push(Line::from(""));
         if self.preview.warnings.is_empty() {
-            lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "No warnings for this command.",
                 Style::new().fg(Color::Green),
             )));
         } else {
-            lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "Warnings",
                 Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
@@ -178,7 +177,7 @@ fn warning_line(warning: &CommandPreviewWarning) -> Line<'_> {
     ])
 }
 
-fn safety_label(safety: SafetyClass) -> &'static str {
+const fn safety_label(safety: SafetyClass) -> &'static str {
     match safety {
         SafetyClass::ReadOnly => "read-only",
         SafetyClass::LocalMetadata => "local metadata",
@@ -191,7 +190,7 @@ fn safety_label(safety: SafetyClass) -> &'static str {
     }
 }
 
-fn execution_label(mode: ExecutionMode) -> &'static str {
+const fn execution_label(mode: ExecutionMode) -> &'static str {
     match mode {
         ExecutionMode::RenderReadOnly => "render read-only",
         ExecutionMode::ConfirmMutation => "confirm mutation",
@@ -202,7 +201,7 @@ fn execution_label(mode: ExecutionMode) -> &'static str {
     }
 }
 
-fn refresh_label(refresh_plan: RefreshPlan) -> &'static str {
+const fn refresh_label(refresh_plan: RefreshPlan) -> &'static str {
     match refresh_plan {
         RefreshPlan::None => "app-controlled refresh",
         RefreshPlan::ReRunSpec => "re-run current command",
@@ -254,7 +253,7 @@ fn panel_height(text: &Text<'_>, content_width: u16) -> u16 {
         .iter()
         .map(|line| line.width().div_ceil(content_width).max(1))
         .sum::<usize>();
-    text_height.saturating_add(2) as u16
+    text_height.saturating_add(2).try_into().unwrap_or(u16::MAX)
 }
 
 #[cfg(test)]
@@ -299,7 +298,7 @@ mod tests {
         assert!(rendered.contains("Ignores the current working-copy snapshot."));
         assert!(rendered.contains("enter"));
         assert!(rendered.contains("run"));
-        assert!(rendered.contains("y"));
+        assert!(rendered.contains('y'));
         assert!(rendered.contains("copy"));
         assert!(rendered.contains("esc"));
         assert!(rendered.contains("cancel"));

@@ -129,6 +129,8 @@ pub enum WorkspacesActionResult {
     Continue,
     /// Refresh the workspace list from the data source.
     Refresh,
+    /// Open log for the selected workspace.
+    OpenLog,
     /// Open status for the selected workspace.
     OpenStatus,
     /// Open diff for the selected workspace.
@@ -161,6 +163,8 @@ pub enum WorkspacesAction {
     Last,
     /// Refresh the workspace list.
     Refresh,
+    /// Open log for the selected workspace.
+    OpenLog,
     /// Open status for the selected workspace.
     OpenStatus,
     /// Open diff for the selected workspace.
@@ -277,18 +281,20 @@ impl WorkspacesView {
                 WorkspacesActionResult::Continue
             }
             WorkspacesAction::Refresh => WorkspacesActionResult::Refresh,
+            WorkspacesAction::OpenLog if self.selected.is_some() => WorkspacesActionResult::OpenLog,
             WorkspacesAction::OpenStatus if self.selected.is_some() => {
                 WorkspacesActionResult::OpenStatus
             }
-            WorkspacesAction::OpenStatus => WorkspacesActionResult::Continue,
             WorkspacesAction::OpenDiff if self.selected.is_some() => {
                 WorkspacesActionResult::OpenDiff
             }
-            WorkspacesAction::OpenDiff => WorkspacesActionResult::Continue,
             WorkspacesAction::UpdateStale if self.selected.is_some() => {
                 WorkspacesActionResult::UpdateStale
             }
-            WorkspacesAction::UpdateStale => WorkspacesActionResult::Continue,
+            WorkspacesAction::OpenLog
+            | WorkspacesAction::OpenStatus
+            | WorkspacesAction::OpenDiff
+            | WorkspacesAction::UpdateStale => WorkspacesActionResult::Continue,
             WorkspacesAction::ToggleHelp => {
                 self.help_visible = !self.help_visible;
                 WorkspacesActionResult::Continue
@@ -315,7 +321,7 @@ impl WorkspacesView {
         self.render_area(frame, area, Some(status));
     }
 
-    fn select_previous(&mut self) {
+    const fn select_previous(&mut self) {
         let Some(selected) = self.selected else {
             return;
         };
@@ -455,18 +461,18 @@ mod tests {
     fn selection_starts_on_current_workspace() {
         let view = WorkspacesView::new(snapshot([
             row("default", false),
-            row("vibe", true),
+            row("dogfood", true),
             row("docs", false),
         ]));
 
-        assert_eq!(view.selected_workspace_name(), Some("vibe"));
+        assert_eq!(view.selected_workspace_name(), Some("dogfood"));
     }
 
     #[test]
     fn refresh_preserves_selected_workspace_by_name() {
         let mut view = WorkspacesView::new(snapshot([
             row("default", true),
-            row("vibe", false),
+            row("dogfood", false),
             row("docs", false),
         ]));
         let _ = view.apply(WorkspacesAction::Next);
@@ -474,17 +480,17 @@ mod tests {
         view.refresh(snapshot([
             row("default", true),
             row("other", false),
-            row("vibe", false),
+            row("dogfood", false),
         ]));
 
-        assert_eq!(view.selected_workspace_name(), Some("vibe"));
+        assert_eq!(view.selected_workspace_name(), Some("dogfood"));
     }
 
     #[test]
     fn refresh_falls_back_to_current_then_clamps() {
         let mut view = WorkspacesView::new(snapshot([
             row("default", true),
-            row("vibe", false),
+            row("dogfood", false),
             row("docs", false),
         ]));
         let _ = view.apply(WorkspacesAction::Next);
@@ -495,7 +501,7 @@ mod tests {
 
         let mut view = WorkspacesView::new(snapshot([
             row("default", false),
-            row("vibe", false),
+            row("dogfood", false),
             row("docs", false),
         ]));
         let _ = view.apply(WorkspacesAction::Next);
@@ -521,6 +527,10 @@ mod tests {
         );
         assert_eq!(
             view.apply(WorkspacesAction::OpenStatus),
+            WorkspacesActionResult::Continue
+        );
+        assert_eq!(
+            view.apply(WorkspacesAction::OpenLog),
             WorkspacesActionResult::Continue
         );
         assert_eq!(
@@ -582,6 +592,10 @@ mod tests {
         assert_eq!(
             view.apply(WorkspacesAction::OpenStatus),
             WorkspacesActionResult::OpenStatus
+        );
+        assert_eq!(
+            view.apply(WorkspacesAction::OpenLog),
+            WorkspacesActionResult::OpenLog
         );
         assert_eq!(
             view.apply(WorkspacesAction::OpenDiff),

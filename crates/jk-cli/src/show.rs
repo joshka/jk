@@ -18,7 +18,7 @@ pub struct ShowQuery {
 impl ShowQuery {
     /// Creates a `jj show` query for one or more revisions.
     #[must_use]
-    pub fn new(revs: Vec<String>) -> Self {
+    pub const fn new(revs: Vec<String>) -> Self {
         Self { revs }
     }
 

@@ -1,11 +1,10 @@
 use std::time::{Duration, SystemTime};
 
-use crate::{ExecutionMode, JjCommandSpec, RefreshPlan, SafetyClass};
-
 use super::{
     CommandExecutionContext, CommandIdentity, CommandRecordId, CommandResultSummary, CommandSource,
     DEFAULT_STREAM_LIMIT, ExitStatusSummary, OutputRetention, StreamSummary,
 };
+use crate::{ExecutionMode, JjCommandSpec, RefreshPlan, SafetyClass};
 
 /// One retained command-history record.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -139,7 +138,7 @@ pub struct CommandRecordFinish {
 impl CommandRecordFinish {
     /// Creates finish data for a process result.
     #[must_use]
-    pub fn from_result(
+    pub const fn from_result(
         result: CommandResultSummary,
         operation_id: Option<String>,
         ended_at: SystemTime,

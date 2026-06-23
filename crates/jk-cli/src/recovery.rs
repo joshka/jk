@@ -15,14 +15,14 @@ pub enum RecoveryCommand {
 }
 
 impl RecoveryCommand {
-    fn argv(self) -> [&'static str; 1] {
+    const fn argv(self) -> [&'static str; 1] {
         match self {
             Self::Undo => [UNDO_COMMAND],
             Self::Redo => [REDO_COMMAND],
         }
     }
 
-    fn title(self) -> &'static str {
+    const fn title(self) -> &'static str {
         match self {
             Self::Undo => "jj undo",
             Self::Redo => "jj redo",

@@ -6,7 +6,7 @@
 mod history;
 mod identity;
 mod record;
-pub(crate) mod redaction;
+pub mod redaction;
 mod result;
 
 pub use history::{CommandHistory, CommandRecordId, PendingCommandRecord};

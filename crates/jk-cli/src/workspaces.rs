@@ -78,6 +78,8 @@ impl WorkspaceInspectionQuery {
 /// Selected-workspace inspection command that failed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WorkspaceInspectionCommand {
+    /// `jj log`.
+    Log,
     /// `jj status`.
     Status,
     /// `jj diff`.
@@ -87,6 +89,7 @@ pub enum WorkspaceInspectionCommand {
 impl std::fmt::Display for WorkspaceInspectionCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Log => f.write_str("jj log"),
             Self::Status => f.write_str("jj status"),
             Self::Diff => f.write_str("jj diff"),
         }
@@ -156,6 +159,33 @@ impl JjWorkspaces {
         query: &WorkspaceInspectionQuery,
     ) -> Result<InspectionSnapshot, JjWorkspacesError> {
         self.load_status_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Loads rendered `jj log` output scoped to a selected workspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_log(
+        &self,
+        query: &WorkspaceInspectionQuery,
+    ) -> Result<InspectionSnapshot, JjWorkspacesError> {
+        self.load_log_with_runner(query, &mut SystemJjCommandRunner)
+    }
+
+    /// Loads rendered `jj log` output scoped to a selected workspace using the provided runner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_log_with_runner(
+        &self,
+        query: &WorkspaceInspectionQuery,
+        runner: &mut impl JjCommandRunner,
+    ) -> Result<InspectionSnapshot, JjWorkspacesError> {
+        let spec = self.log_spec(query);
+        let rendered = Self::run_inspection(runner, &spec, WorkspaceInspectionCommand::Log)?;
+        Ok(InspectionSnapshot::new(query.target_label(), rendered).with_title(spec.title()))
     }
 
     /// Loads rendered `jj status` output scoped to a selected workspace using the provided runner.
@@ -265,6 +295,15 @@ impl JjWorkspaces {
     pub fn status_spec(&self, query: &WorkspaceInspectionQuery) -> JjCommandSpec {
         let title = format!("jj -R {} status", query.workspace_root().display());
         JjCommandSpec::render_read_only(["status"])
+            .with_repository(query.workspace_root())
+            .with_title(title)
+    }
+
+    /// Returns the `jj log` command spec scoped to `query`.
+    #[must_use]
+    pub fn log_spec(&self, query: &WorkspaceInspectionQuery) -> JjCommandSpec {
+        let title = format!("jj -R {} log", query.workspace_root().display());
+        JjCommandSpec::render_read_only(["log"])
             .with_repository(query.workspace_root())
             .with_title(title)
     }
@@ -466,6 +505,8 @@ fn command_error_summary(stderr: &str, stdout: &str, status: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
+
     use super::*;
     use crate::command::build_jj_command;
 
@@ -540,8 +581,25 @@ mod tests {
     }
 
     #[test]
-    fn status_and_diff_specs_render_repository_before_command() {
+    fn log_status_and_diff_specs_render_repository_before_command() {
         let query = WorkspaceInspectionQuery::new("/tmp/workspace");
+
+        let log = build_jj_command(&JjWorkspaces::default().log_spec(&query));
+        let log_args = log
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            log_args,
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/workspace",
+                "log"
+            ]
+        );
 
         let status = build_jj_command(&JjWorkspaces::default().status_spec(&query));
         let status_args = status

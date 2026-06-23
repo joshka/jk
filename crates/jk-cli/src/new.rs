@@ -21,7 +21,7 @@ impl NewQuery {
 
     /// Returns whether no explicit parent revisions were provided.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.parents.is_empty()
     }
 

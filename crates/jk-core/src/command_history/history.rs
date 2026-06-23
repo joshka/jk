@@ -25,7 +25,7 @@ pub struct CommandHistory {
 impl CommandHistory {
     /// Creates an empty command history with a maximum record count.
     #[must_use]
-    pub fn new(limit: usize) -> Self {
+    pub const fn new(limit: usize) -> Self {
         Self {
             records: VecDeque::new(),
             limit,
@@ -78,11 +78,12 @@ impl CommandHistory {
     }
 
     /// Returns retained records from oldest to newest.
+    #[must_use]
     pub fn records(&self) -> impl DoubleEndedIterator<Item = &CommandRecord> {
         self.records.iter()
     }
 
-    fn allocate_id(&mut self) -> CommandRecordId {
+    const fn allocate_id(&mut self) -> CommandRecordId {
         let id = CommandRecordId(self.next_id);
         self.next_id += 1;
         id

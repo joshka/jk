@@ -189,16 +189,19 @@ impl LogView {
     }
 
     /// Returns whether the log has ordered revision marks.
+    #[must_use]
     pub fn has_marks(&self) -> bool {
         self.state.has_marks()
     }
 
     /// Returns marked change ids in insertion order.
+    #[must_use]
     pub fn marked_change_ids(&self) -> &[String] {
         self.state.marked_change_ids()
     }
 
     /// Returns the selected change's zero-based mark index, if marked.
+    #[must_use]
     pub fn selected_mark_index(&self) -> Option<usize> {
         self.state.selected_mark_index()
     }
@@ -647,7 +650,7 @@ mod tests {
 
         let buffer = terminal.backend().buffer();
         assert!(buffer_line(buffer, 1).ends_with("[1]"));
-        assert!(!buffer_line(buffer, 2).contains("["));
+        assert!(!buffer_line(buffer, 2).contains('['));
         assert!(buffer_line(buffer, 3).ends_with("[2]"));
     }
 

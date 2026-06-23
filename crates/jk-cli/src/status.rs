@@ -18,7 +18,7 @@ pub struct StatusQuery {
 impl StatusQuery {
     /// Creates a `jj status` query with optional filesets.
     #[must_use]
-    pub fn new(filesets: Vec<String>) -> Self {
+    pub const fn new(filesets: Vec<String>) -> Self {
         Self { filesets }
     }
 

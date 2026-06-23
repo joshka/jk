@@ -131,7 +131,7 @@ impl LogState {
     }
 
     /// Scrolls one rendered line toward newer changes without changing selection.
-    pub fn scroll_previous_line(&mut self) {
+    pub const fn scroll_previous_line(&mut self) {
         self.follow_selection = false;
         self.scroll_offset = self.scroll_offset.saturating_sub(1);
     }

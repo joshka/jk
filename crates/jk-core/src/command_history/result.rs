@@ -166,7 +166,7 @@ impl StreamSummary {
         }
     }
 
-    fn with_byte_len(mut self, byte_len: usize) -> Self {
+    const fn with_byte_len(mut self, byte_len: usize) -> Self {
         self.byte_len = byte_len;
         self
     }

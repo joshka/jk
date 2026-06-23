@@ -150,6 +150,8 @@ pub enum JjOperationError {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
+
     use std::io;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;

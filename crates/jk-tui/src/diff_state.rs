@@ -952,6 +952,8 @@ fn selected_match_at_or_after(matches: &[usize], scroll_offset: usize) -> Option
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
+
     use super::*;
 
     #[test]

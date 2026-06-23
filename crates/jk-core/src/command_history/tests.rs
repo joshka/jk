@@ -30,6 +30,13 @@ fn start_from_spec(spec: &JjCommandSpec, source: CommandSource) -> CommandRecord
     CommandRecordStart::from_spec(spec, source).with_started_at(started_at())
 }
 
+fn first_record(history: &CommandHistory) -> &CommandRecord {
+    history
+        .records()
+        .next()
+        .unwrap_or_else(|| panic!("expected record"))
+}
+
 #[test]
 fn starting_and_finishing_record_stores_completed_result() {
     let spec = JjCommandSpec::render_read_only(["status"]);
@@ -45,7 +52,7 @@ fn starting_and_finishing_record_stores_completed_result() {
         CommandRecordFinish::from_exit_code(0, "clean\n", "", finish_at()),
     ));
 
-    let record = history.records().next().expect("record");
+    let record = first_record(&history);
     assert_eq!(record.id, pending_id);
     assert_eq!(record.result.exit_status, Some(ExitStatusSummary::code(0)));
     assert_eq!(record.result.stdout.snippet, "clean\n");
@@ -219,6 +226,19 @@ fn source_action_is_independent_from_command_family() {
 }
 
 #[test]
+fn workspace_log_source_action_preserves_log_family() {
+    let spec = JjCommandSpec::render_read_only(["log"]);
+    let start = CommandRecordStart::from_spec(
+        &spec,
+        source(SourceView::Workspaces, SourceAction::WorkspaceLog),
+    );
+
+    assert_eq!(start.command.command_family, CommandFamily::JjLog);
+    assert_eq!(start.source.view, SourceView::Workspaces);
+    assert_eq!(start.source.action, SourceAction::WorkspaceLog);
+}
+
+#[test]
 fn new_specs_use_new_family_and_typed_source_action() {
     let spec = JjCommandSpec::confirm_mutation(["new", "abc123"], SafetyClass::LocalRewrite);
     let start =
@@ -306,7 +326,7 @@ fn spawn_error_has_no_exit_code() {
         CommandRecordFinish::from_spawn_error("failed to spawn jj", "", "", finish_at()),
     ));
 
-    let record = history.records().next().expect("record");
+    let record = first_record(&history);
     assert_eq!(record.result.exit_status, None);
     assert_eq!(
         record.result.spawn_error.as_deref(),
@@ -332,7 +352,7 @@ fn finish_keeps_first_result() {
         CommandRecordFinish::from_exit_code(1, "second", "", finish_at()),
     ));
 
-    let record = history.records().next().expect("record");
+    let record = first_record(&history);
     assert_eq!(record.result.exit_status, Some(ExitStatusSummary::code(0)));
     assert_eq!(record.result.stdout.snippet, "first");
 }
@@ -350,7 +370,7 @@ fn finish_applies_record_retention_limits() {
         CommandRecordFinish::from_exit_code(1, "abcdef", "wxyz", finish_at()),
     ));
 
-    let record = history.records().next().expect("record");
+    let record = first_record(&history);
     assert_eq!(record.result.stdout.snippet, "abc");
     assert!(record.result.stdout.truncated);
     assert_eq!(record.result.stderr.snippet, "wx");

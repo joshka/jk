@@ -32,6 +32,7 @@ enum ActionId {
     Collapse,
     OpenShow,
     OpenDiff,
+    OpenLog,
     OpenDescribe,
     OpenEvolog,
     OpenStatus,
@@ -77,6 +78,7 @@ impl ActionId {
             Self::Collapse => "Collapse change",
             Self::OpenShow => "Open show",
             Self::OpenDiff => "Open diff",
+            Self::OpenLog => "Open log",
             Self::OpenDescribe => "Describe revision",
             Self::OpenEvolog => "Open evolog",
             Self::OpenStatus => "Open status",
@@ -442,6 +444,10 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
 ];
 
 const WORKSPACES_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(ActionId::OpenLog, "l", "open selected workspace log")
+        .with_family(CommandFamily::JjLog)
+        .with_aliases(&["log", "workspace", "selected"])
+        .with_hotbar(3, "l log"),
     KeyBinding::new(
         ActionId::OpenStatus,
         "enter, s",
@@ -449,11 +455,11 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::JjStatus)
     .with_aliases(&["status", "workspace", "selected"])
-    .with_hotbar(3, "s status"),
+    .with_hotbar(4, "s status"),
     KeyBinding::new(ActionId::OpenDiff, "d", "open selected workspace diff")
         .with_family(CommandFamily::JjDiff)
         .with_aliases(&["diff", "workspace", "selected"])
-        .with_hotbar(4, "d diff"),
+        .with_hotbar(5, "d diff"),
     KeyBinding::new(
         ActionId::UpdateStale,
         "u",
@@ -461,7 +467,7 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::JjWorkspace)
     .with_aliases(&["update", "stale", "workspace", "selected", "refresh"])
-    .with_hotbar(6, "u update-stale"),
+    .with_hotbar(7, "u update-stale"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
@@ -471,7 +477,7 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
-        .with_hotbar(7, "V options"),
+        .with_hotbar(8, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh workspaces")
         .with_family(CommandFamily::Refresh)
         .with_aliases(&["reload", "workspace"])
@@ -489,13 +495,13 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::Navigation)
     .with_aliases(&["back", "return", "previous"])
-    .with_hotbar(8, "Esc back"),
+    .with_hotbar(9, "Esc back"),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(9, "q quit")
+        .with_hotbar(10, "q quit")
         .hotbar_only(),
 ];
 
@@ -930,7 +936,7 @@ mod tests {
     fn workspaces_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Workspaces),
-            "? help  r refresh  s status  d diff  j/k move  u update-stale  V options  Esc back  q quit"
+            "? help  r refresh  l log  s status  d diff  j/k move  u update-stale  V options  Esc back  q quit"
         );
     }
 
@@ -1106,6 +1112,7 @@ mod tests {
         assert_eq!(
             help_lines(BindingContext::Workspaces),
             vec![
+                "l                    open selected workspace log",
                 "enter, s             open selected workspace status",
                 "d                    open selected workspace diff",
                 "u                    update selected stale workspace",
@@ -1234,6 +1241,11 @@ mod tests {
 
     #[test]
     fn workspaces_discovery_finds_workspace_actions() {
+        let log_rows = filter_discovery_rows(BindingContext::Workspaces, "workspace log");
+        assert_eq!(log_rows.len(), 1);
+        assert_eq!(log_rows[0].keys, "l");
+        assert_eq!(log_rows[0].command_family_label(), Some("jj log"));
+
         let status_rows = filter_discovery_rows(BindingContext::Workspaces, "workspace status");
         assert_eq!(status_rows.len(), 1);
         assert_eq!(status_rows[0].keys, "enter, s");

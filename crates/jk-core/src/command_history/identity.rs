@@ -142,6 +142,8 @@ pub enum SourceView {
     Evolog,
     /// Workspaces list.
     Workspaces,
+    /// Selected workspace log view.
+    WorkspaceLog,
     /// Selected workspace status view.
     WorkspaceStatus,
     /// Selected workspace diff view.
@@ -186,6 +188,8 @@ pub enum SourceAction {
     WorkspaceList,
     /// Show selected workspace status.
     WorkspaceStatus,
+    /// Show selected workspace log.
+    WorkspaceLog,
     /// Show selected workspace diff.
     WorkspaceDiff,
     /// Run selected workspace update-stale.

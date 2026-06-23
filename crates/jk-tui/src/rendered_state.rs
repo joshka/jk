@@ -76,7 +76,7 @@ impl RenderedState {
     }
 
     /// Scrolls one visible line toward the start of the output.
-    pub fn scroll_previous_line(&mut self) {
+    pub const fn scroll_previous_line(&mut self) {
         self.scroll_offset = self.scroll_offset.saturating_sub(1);
     }
 
@@ -87,7 +87,7 @@ impl RenderedState {
     }
 
     /// Scrolls one viewport toward the start of the output.
-    pub fn select_page_previous(&mut self) {
+    pub const fn select_page_previous(&mut self) {
         self.scroll_offset = self.scroll_offset.saturating_sub(self.viewport_height);
     }
 
@@ -98,7 +98,7 @@ impl RenderedState {
     }
 
     /// Moves to the first rendered line.
-    pub fn select_first(&mut self) {
+    pub const fn select_first(&mut self) {
         self.scroll_offset = 0;
     }
 
@@ -153,15 +153,17 @@ impl RenderedState {
     /// Returns status-line text for the current search, if any.
     pub fn search_status(&self) -> Option<String> {
         let search = self.search.as_ref()?;
-        match search.selected {
-            Some(selected) => Some(format!(
-                "/{}  {}/{}",
-                search.query,
-                selected + 1,
-                search.matches.len()
-            )),
-            None => Some(format!("/{}  no matches", search.query)),
-        }
+        Some(search.selected.map_or_else(
+            || format!("/{}  no matches", search.query),
+            |selected| {
+                format!(
+                    "/{}  {}/{}",
+                    search.query,
+                    selected + 1,
+                    search.matches.len()
+                )
+            },
+        ))
     }
 
     fn refresh_search_matches(&mut self) {

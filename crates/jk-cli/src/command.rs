@@ -15,9 +15,9 @@ const HISTORY_STREAM_LIMIT: usize = 8 * 1024;
 
 /// Runs typed `jj` command specs.
 ///
-/// Loaders may call [`JjCommandRunner::run`] more than once for a single user action when they
-/// need both rendered output and secondary metadata. Implementations should therefore avoid
-/// assuming one-shot use unless the caller documents that restriction explicitly.
+/// Loaders may call [`JjCommandRunner::run`] more than once for a single user action when they need
+/// both rendered output and secondary metadata. Implementations should therefore avoid assuming
+/// one-shot use unless the caller documents that restriction explicitly.
 pub trait JjCommandRunner {
     /// Runs a typed `jj` command spec.
     ///
@@ -59,7 +59,7 @@ impl<'a, R> RecordingJjCommandRunner<'a, R> {
     /// Creates a recording runner for commands from one source action.
     ///
     /// Every invocation records the same source metadata alongside the command spec.
-    pub fn new(inner: R, history: &'a mut CommandHistory, source: CommandSource) -> Self {
+    pub const fn new(inner: R, history: &'a mut CommandHistory, source: CommandSource) -> Self {
         Self {
             inner,
             history,
@@ -96,7 +96,13 @@ where
     /// context advances in a bounded before/after probe.
     ///
     /// The operation probes are intentionally not recorded in command history. Callers should use
-    /// this only after user confirmation, and ordinary read-only specs fall back to [`run`].
+    /// this only after user confirmation, and ordinary read-only specs fall back to
+    /// [`JjCommandRunner::run`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying I/O error when the mutation command or operation probe cannot be
+    /// spawned, written to, or waited on.
     pub fn run_confirmed_mutation(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
         if !should_probe_resulting_operation(spec) {
             return self.run(spec);
@@ -114,14 +120,12 @@ where
             }
         };
 
-        if let (Ok(output), Some(before_operation_id)) = (&result, before_operation_id) {
-            if output.status.success() {
-                if let Ok(after_operation_id) = current_operation_id(&mut self.inner, spec) {
-                    if after_operation_id != before_operation_id {
-                        finish.operation_id = Some(after_operation_id);
-                    }
-                }
-            }
+        if let (Ok(output), Some(before_operation_id)) = (&result, before_operation_id)
+            && output.status.success()
+            && let Ok(after_operation_id) = current_operation_id(&mut self.inner, spec)
+            && after_operation_id != before_operation_id
+        {
+            finish.operation_id = Some(after_operation_id);
         }
 
         self.history.finish(&pending, finish);
@@ -129,7 +133,7 @@ where
     }
 }
 
-fn should_probe_resulting_operation(spec: &JjCommandSpec) -> bool {
+const fn should_probe_resulting_operation(spec: &JjCommandSpec) -> bool {
     matches!(spec.mode(), ExecutionMode::ConfirmMutation)
         && matches!(
             spec.safety(),
@@ -193,7 +197,10 @@ fn run_system_jj_spec(spec: &JjCommandSpec) -> std::io::Result<Output> {
 
     let mut child = command.spawn()?;
     if let Some(stdin) = spec.stdin() {
-        let child_stdin = child.stdin.as_mut().expect("stdin was configured as piped");
+        let child_stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other("stdin was not piped"))?;
         child_stdin.write_all(stdin.as_bytes())?;
     }
 
@@ -217,17 +224,19 @@ fn finish_from_output(output: &Output, ended_at: SystemTime) -> CommandRecordFin
 fn exit_status_summary(status: std::process::ExitStatus) -> ExitStatusSummary {
     use std::os::unix::process::ExitStatusExt;
 
-    if let Some(code) = status.code() {
-        ExitStatusSummary::code(code)
-    } else if let Some(signal) = status.signal() {
-        ExitStatusSummary::signal(signal)
-    } else {
-        ExitStatusSummary {
-            code: None,
-            signal: None,
-            success: status.success(),
-        }
-    }
+    status.code().map_or_else(
+        || {
+            status.signal().map_or_else(
+                || ExitStatusSummary {
+                    code: None,
+                    signal: None,
+                    success: status.success(),
+                },
+                ExitStatusSummary::signal,
+            )
+        },
+        ExitStatusSummary::code,
+    )
 }
 
 #[cfg(not(unix))]
@@ -240,7 +249,7 @@ fn exit_status_summary(status: std::process::ExitStatus) -> ExitStatusSummary {
 }
 
 /// Builds the process command for a typed `jj` command spec.
-pub(crate) fn build_jj_command(spec: &JjCommandSpec) -> Command {
+pub fn build_jj_command(spec: &JjCommandSpec) -> Command {
     let mut command = Command::new("jj");
     command.args(spec.global_argv());
     command.env_remove("NO_COLOR");
@@ -257,12 +266,15 @@ pub(crate) fn build_jj_command(spec: &JjCommandSpec) -> Command {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    #![allow(clippy::expect_used)]
+
     use std::io;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
 
     use jk_core::{SafetyClass, SourceAction, SourceView};
+
+    use super::*;
 
     fn strings(argv: impl IntoIterator<Item = std::ffi::OsString>) -> Vec<String> {
         argv.into_iter()

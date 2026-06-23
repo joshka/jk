@@ -268,6 +268,7 @@ impl CommandHistoryDetails {
 /// The effect requested after applying an input action to the history view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
 pub enum CommandHistoryActionResult {
     /// Continue running the application.
     Continue,
@@ -436,12 +437,14 @@ impl CommandHistoryView {
                         )
                     })
             }
-            CommandHistoryAction::OpenDetails => self
-                .selected_row()
-                .map(|row| CommandHistoryActionResult::OpenDetails {
-                    details: row.details.clone(),
-                })
-                .unwrap_or(CommandHistoryActionResult::Continue),
+            CommandHistoryAction::OpenDetails => {
+                self.selected_row()
+                    .map_or(CommandHistoryActionResult::Continue, |row| {
+                        CommandHistoryActionResult::OpenDetails {
+                            details: row.details.clone(),
+                        }
+                    })
+            }
             CommandHistoryAction::CopyCommand => self
                 .selected_row()
                 .and_then(|row| {
@@ -479,7 +482,7 @@ impl CommandHistoryView {
         self.render_area(frame, area, Some(status));
     }
 
-    fn select_previous(&mut self) {
+    const fn select_previous(&mut self) {
         let Some(selected) = self.selected else {
             return;
         };
@@ -494,7 +497,7 @@ impl CommandHistoryView {
         self.selected = Some(selected.saturating_add(1).min(last));
     }
 
-    fn page_previous(&mut self) {
+    const fn page_previous(&mut self) {
         let Some(selected) = self.selected else {
             return;
         };
@@ -599,7 +602,7 @@ fn status_color(status: &str) -> Color {
     }
 }
 
-fn status_marker(record: &CommandRecord) -> &'static str {
+const fn status_marker(record: &CommandRecord) -> &'static str {
     if record.result.spawn_error.is_some() {
         return "err";
     }
@@ -622,6 +625,7 @@ fn view_label(view: SourceView) -> String {
         SourceView::Status => "status".to_owned(),
         SourceView::Evolog => "evolog".to_owned(),
         SourceView::Workspaces => "workspaces".to_owned(),
+        SourceView::WorkspaceLog => "workspace log".to_owned(),
         SourceView::WorkspaceStatus => "workspace status".to_owned(),
         SourceView::WorkspaceDiff => "workspace diff".to_owned(),
         SourceView::CommandHistory => "history".to_owned(),
@@ -637,14 +641,13 @@ fn action_label(action: SourceAction) -> String {
     match action {
         SourceAction::InitialLoad => "load".to_owned(),
         SourceAction::Refresh => "refresh".to_owned(),
-        SourceAction::OpenDiff => "diff".to_owned(),
+        SourceAction::OpenDiff | SourceAction::WorkspaceDiff => "diff".to_owned(),
         SourceAction::OpenShow => "show".to_owned(),
-        SourceAction::OpenStatus => "status".to_owned(),
+        SourceAction::OpenStatus | SourceAction::WorkspaceStatus => "status".to_owned(),
         SourceAction::OpenEvolog => "evolog".to_owned(),
         SourceAction::DescribeRevision => "describe".to_owned(),
         SourceAction::WorkspaceList => "list".to_owned(),
-        SourceAction::WorkspaceStatus => "status".to_owned(),
-        SourceAction::WorkspaceDiff => "diff".to_owned(),
+        SourceAction::WorkspaceLog => "log".to_owned(),
         SourceAction::WorkspaceUpdateStale => "update-stale".to_owned(),
         SourceAction::OperationLog => "op log".to_owned(),
         SourceAction::OperationShow => "op show".to_owned(),
@@ -690,13 +693,10 @@ fn result_summary(record: &CommandRecord) -> String {
 }
 
 fn exit_label(code: Option<i32>, signal: Option<i32>) -> String {
-    if let Some(code) = code {
-        format!("exit {code}")
-    } else if let Some(signal) = signal {
-        format!("signal {signal}")
-    } else {
-        "failed".to_owned()
-    }
+    code.map_or_else(
+        || signal.map_or_else(|| "failed".to_owned(), |signal| format!("signal {signal}")),
+        |code| format!("exit {code}"),
+    )
 }
 
 fn stream_snippet(stream: &StreamSummary) -> Option<String> {
@@ -764,7 +764,7 @@ fn push_stream_section(rendered: &mut String, label: &str, stream: &StreamSummar
     }
 }
 
-fn command_or_title<'a>(command_line: &'a str, title: &'a str) -> &'a str {
+const fn command_or_title<'a>(command_line: &'a str, title: &'a str) -> &'a str {
     if command_line.is_empty() {
         title
     } else {
@@ -772,7 +772,7 @@ fn command_or_title<'a>(command_line: &'a str, title: &'a str) -> &'a str {
     }
 }
 
-fn fallback<'a>(value: &'a str, fallback: &'a str) -> &'a str {
+const fn fallback<'a>(value: &'a str, fallback: &'a str) -> &'a str {
     if value.is_empty() { fallback } else { value }
 }
 
@@ -813,6 +813,8 @@ fn clamp_scroll(scroll_offset: usize, len: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used, clippy::too_many_arguments)]
+
     use std::time::{Duration, SystemTime};
 
     use jk_core::{CommandRecordFinish, CommandRecordStart, JjCommandSpec};
@@ -1057,7 +1059,7 @@ mod tests {
         let mut history = jk_core::CommandHistory::new(8);
         append_record(
             &mut history,
-            JjCommandSpec::render_read_only(["log"]),
+            &JjCommandSpec::render_read_only(["log"]),
             SourceView::Log,
             SourceAction::InitialLoad,
             0,
@@ -1075,7 +1077,7 @@ mod tests {
         let mut history = jk_core::CommandHistory::new(8);
         append_record(
             &mut history,
-            JjCommandSpec::render_read_only(["log"]),
+            &JjCommandSpec::render_read_only(["log"]),
             SourceView::Log,
             SourceAction::InitialLoad,
             0,
@@ -1085,7 +1087,7 @@ mod tests {
         );
         append_record(
             &mut history,
-            JjCommandSpec::render_read_only(["status"]),
+            &JjCommandSpec::render_read_only(["status"]),
             SourceView::Log,
             SourceAction::OpenStatus,
             1,
@@ -1098,7 +1100,7 @@ mod tests {
 
     fn append_record(
         history: &mut jk_core::CommandHistory,
-        spec: JjCommandSpec,
+        spec: &JjCommandSpec,
         view: SourceView,
         action: SourceAction,
         code: i32,
@@ -1106,7 +1108,7 @@ mod tests {
         stderr: &str,
         operation_id: Option<&str>,
     ) {
-        let start = CommandRecordStart::from_spec(&spec, jk_core::CommandSource::new(view, action))
+        let start = CommandRecordStart::from_spec(spec, jk_core::CommandSource::new(view, action))
             .with_started_at(SystemTime::UNIX_EPOCH);
         let mut finish = CommandRecordFinish::from_exit_code(
             code,

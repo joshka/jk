@@ -396,11 +396,11 @@ impl GlobalOptions {
         }
 
         match (&self.working_copy, &self.operation) {
-            (WorkingCopyPolicy::SnapshotAndUpdate, _) => {}
             (WorkingCopyPolicy::Ignore, OperationLoadPolicy::Latest) => {
                 argv.push("--ignore-working-copy".into());
             }
-            (WorkingCopyPolicy::Ignore, OperationLoadPolicy::AtOperation(_)) => {}
+            (WorkingCopyPolicy::SnapshotAndUpdate, _)
+            | (WorkingCopyPolicy::Ignore, OperationLoadPolicy::AtOperation(_)) => {}
         }
 
         match &self.operation {
@@ -502,7 +502,7 @@ pub struct OutputPolicy {
 }
 
 impl OutputPolicy {
-    fn push_argv(&self, argv: &mut Vec<OsString>) {
+    fn push_argv(self, argv: &mut Vec<OsString>) {
         match self.pager {
             PagerPolicy::Disable => argv.push("--no-pager".into()),
             PagerPolicy::Inherit => {}
@@ -636,7 +636,7 @@ pub enum RefreshPlan {
     ReRunSpec,
 }
 
-pub(crate) fn preview_argv(argv: &[OsString]) -> String {
+pub fn preview_argv(argv: &[OsString]) -> String {
     let mut preview = String::from("jj");
     for arg in argv {
         preview.push(' ');

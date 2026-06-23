@@ -196,8 +196,8 @@ impl JjLog {
     ) -> Result<LogSnapshot, JjLogError> {
         let command_args = self.command_args();
         let rendered_spec = self.command_spec(DefaultCommandMode::Rendered, &command_args);
-        let rendered = self.run(runner, DefaultCommandMode::Rendered, &rendered_spec)?;
-        let semantic = self.run(
+        let rendered = Self::run(runner, DefaultCommandMode::Rendered, &rendered_spec)?;
+        let semantic = Self::run(
             runner,
             DefaultCommandMode::Json,
             &self.command_spec(DefaultCommandMode::Json, &command_args),
@@ -209,7 +209,6 @@ impl JjLog {
     }
 
     fn run(
-        &self,
         runner: &mut impl JjCommandRunner,
         mode: DefaultCommandMode,
         spec: &JjCommandSpec,
@@ -283,7 +282,7 @@ impl JjLog {
 impl LogTemplateSelection {
     /// Returns the short label used in interactive template selectors.
     #[must_use]
-    pub fn label(&self) -> &str {
+    pub const fn label(&self) -> &str {
         match self {
             Self::Configured => "configured",
             Self::Comfortable => "comfortable",

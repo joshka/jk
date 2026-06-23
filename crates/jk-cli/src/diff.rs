@@ -165,7 +165,7 @@ impl JjDiff {
             stats_output = Self::run(runner, &self.spec_for(&query.with_format(DiffFormat::Stat)))?;
             &stats_output
         };
-        let file_stats = parse_stats_lines(&stats);
+        let file_stats = parse_stats_lines(stats);
 
         Ok(DiffSnapshot::new(query.target_label(), rendered)
             .with_file_stats(file_stats)
