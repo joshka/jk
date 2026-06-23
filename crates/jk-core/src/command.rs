@@ -7,6 +7,8 @@
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
+use crate::command_history::redaction::redact_argv;
+
 /// A typed description of one `jj` command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjCommandSpec {
@@ -36,6 +38,17 @@ impl JjCommandSpec {
             safety: SafetyClass::ReadOnly,
             refresh_plan: RefreshPlan::ReRunSpec,
         }
+    }
+
+    /// Creates a `jj` command spec that must be previewed before mutation execution.
+    #[must_use]
+    pub fn confirm_mutation(
+        argv: impl IntoIterator<Item = impl Into<OsString>>,
+        safety: SafetyClass,
+    ) -> Self {
+        Self::render_read_only(argv)
+            .with_mode(ExecutionMode::ConfirmMutation)
+            .with_safety(safety)
     }
 
     /// Sets the process working directory metadata.
@@ -150,6 +163,18 @@ impl JjCommandSpec {
         preview_argv(&self.argv)
     }
 
+    /// Returns a display-only process preview with global options before command arguments.
+    #[must_use]
+    pub fn process_preview(&self) -> String {
+        preview_argv(&self.process_argv())
+    }
+
+    /// Returns a command preview suitable for confirmation UI.
+    #[must_use]
+    pub fn command_preview(&self) -> CommandPreview {
+        CommandPreview::from_spec(self)
+    }
+
     /// Returns the execution mode.
     #[must_use]
     pub const fn mode(&self) -> ExecutionMode {
@@ -166,6 +191,116 @@ impl JjCommandSpec {
     #[must_use]
     pub const fn refresh_plan(&self) -> RefreshPlan {
         self.refresh_plan
+    }
+}
+
+/// Command data shown before a command is allowed to run.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommandPreview {
+    /// The executable spec that confirmation should run.
+    pub spec: JjCommandSpec,
+    /// Short command title used by the source view.
+    pub title: String,
+    /// Full `jj` command line, including global options in process order.
+    pub command_line: String,
+    /// Execution mode that determines the confirmation behavior.
+    pub execution_mode: ExecutionMode,
+    /// Safety classification shown to the user.
+    pub safety: SafetyClass,
+    /// Refresh policy requested after a successful command.
+    pub refresh_plan: RefreshPlan,
+    /// User-visible warnings inferred from the command spec.
+    pub warnings: Vec<CommandPreviewWarning>,
+}
+
+impl CommandPreview {
+    /// Builds a preview from the same command spec that execution will receive.
+    #[must_use]
+    pub fn from_spec(spec: &JjCommandSpec) -> Self {
+        Self {
+            spec: spec.clone(),
+            title: spec.title().to_owned(),
+            command_line: preview_argv(&redact_argv(spec.process_argv())),
+            execution_mode: spec.mode(),
+            safety: spec.safety(),
+            refresh_plan: spec.refresh_plan(),
+            warnings: CommandPreviewWarning::from_spec(spec),
+        }
+    }
+
+    /// Returns whether the preview represents a command that needs confirmation.
+    #[must_use]
+    pub const fn requires_confirmation(&self) -> bool {
+        matches!(
+            self.execution_mode,
+            ExecutionMode::ConfirmMutation
+                | ExecutionMode::ConfirmExternalTool
+                | ExecutionMode::DryRunThenConfirm
+        )
+    }
+}
+
+/// Warning shown beside a command preview when flags or safety class deserve attention.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum CommandPreviewWarning {
+    /// The command changes repository-local metadata.
+    LocalMetadata,
+    /// The command rewrites local history.
+    LocalRewrite,
+    /// The command is destructive in the local repository.
+    DestructiveLocal,
+    /// The command writes to a network service or remote.
+    NetworkWrite,
+    /// The command launches an external tool.
+    ExternalCommand,
+    /// The command ignores the current working-copy snapshot.
+    IgnoresWorkingCopy,
+    /// The command inspects or operates at a specific operation.
+    AtOperation(String),
+    /// The command creates an operation but does not integrate it.
+    DoesNotIntegrateOperation,
+    /// The command may rewrite immutable commits.
+    IgnoresImmutableCommits,
+}
+
+impl CommandPreviewWarning {
+    fn from_spec(spec: &JjCommandSpec) -> Vec<Self> {
+        let mut warnings = Vec::new();
+        match spec.safety() {
+            SafetyClass::ReadOnly | SafetyClass::NetworkRead => {}
+            SafetyClass::LocalMetadata => warnings.push(Self::LocalMetadata),
+            SafetyClass::LocalRewrite => warnings.push(Self::LocalRewrite),
+            SafetyClass::DestructiveLocal => warnings.push(Self::DestructiveLocal),
+            SafetyClass::NetworkWrite => warnings.push(Self::NetworkWrite),
+            SafetyClass::ExternalCommand => warnings.push(Self::ExternalCommand),
+        }
+
+        match &spec.global_options.working_copy {
+            WorkingCopyPolicy::SnapshotAndUpdate => {}
+            WorkingCopyPolicy::Ignore => warnings.push(Self::IgnoresWorkingCopy),
+        }
+
+        match &spec.global_options.operation {
+            OperationLoadPolicy::Latest => {}
+            OperationLoadPolicy::AtOperation(operation) => {
+                warnings.push(Self::AtOperation(operation.clone()));
+            }
+        }
+
+        match spec.global_options.operation_integration {
+            OperationIntegrationPolicy::Integrate => {}
+            OperationIntegrationPolicy::DoNotIntegrate => {
+                warnings.push(Self::DoesNotIntegrateOperation);
+            }
+        }
+
+        match spec.global_options.immutability {
+            ImmutabilityPolicy::Enforce => {}
+            ImmutabilityPolicy::Ignore => warnings.push(Self::IgnoresImmutableCommits),
+        }
+
+        warnings
     }
 }
 
@@ -703,6 +838,105 @@ mod tests {
         let spec = JjCommandSpec::render_read_only(["log", "-r", "`echo nope`"]);
 
         assert_eq!(spec.preview(), "jj log -r '`echo nope`'");
+    }
+
+    #[test]
+    fn process_preview_includes_global_options_before_command_argv() {
+        let spec =
+            JjCommandSpec::render_read_only(["status"]).with_repository("/tmp/repo with spaces");
+
+        assert_eq!(
+            spec.process_preview(),
+            "jj --no-pager --color always --repository '/tmp/repo with spaces' status"
+        );
+        assert_eq!(spec.preview(), "jj status");
+    }
+
+    #[test]
+    fn confirm_mutation_sets_preview_policy() {
+        let spec = JjCommandSpec::confirm_mutation(
+            ["workspace", "update-stale"],
+            SafetyClass::LocalMetadata,
+        );
+
+        assert_eq!(spec.mode(), ExecutionMode::ConfirmMutation);
+        assert_eq!(spec.safety(), SafetyClass::LocalMetadata);
+        assert_eq!(spec.refresh_plan(), RefreshPlan::ReRunSpec);
+    }
+
+    #[test]
+    fn command_preview_uses_process_command_line_and_short_title() {
+        let global_options = GlobalOptions::default()
+            .with_repository("/tmp/repo")
+            .with_working_copy(WorkingCopyPolicy::Ignore);
+        let spec = JjCommandSpec::confirm_mutation(["new", "@"], SafetyClass::LocalRewrite)
+            .with_global_options(global_options)
+            .with_title("new change after @");
+
+        let preview = spec.command_preview();
+
+        assert_eq!(preview.spec, spec);
+        assert_eq!(preview.title, "new change after @");
+        assert_eq!(
+            preview.command_line,
+            "jj --no-pager --color always --repository /tmp/repo --ignore-working-copy new @"
+        );
+        assert_eq!(preview.execution_mode, ExecutionMode::ConfirmMutation);
+        assert_eq!(preview.safety, SafetyClass::LocalRewrite);
+        assert_eq!(preview.refresh_plan, RefreshPlan::ReRunSpec);
+        assert!(preview.requires_confirmation());
+        assert_eq!(
+            preview.warnings,
+            vec![
+                CommandPreviewWarning::LocalRewrite,
+                CommandPreviewWarning::IgnoresWorkingCopy
+            ]
+        );
+    }
+
+    #[test]
+    fn command_preview_redacts_secret_looking_global_options() {
+        let global_options = GlobalOptions::default().with_config_overlay(ConfigOverlay::Inline {
+            name_value: "auth.token=abc123".to_owned(),
+        });
+        let spec = JjCommandSpec::confirm_mutation(
+            ["describe", "-m", "safe", "@"],
+            SafetyClass::LocalRewrite,
+        )
+        .with_global_options(global_options);
+
+        let preview = spec.command_preview();
+
+        assert_eq!(
+            preview.command_line,
+            "jj --no-pager --color always --config 'auth.token=<redacted>' describe -m safe @"
+        );
+        assert_eq!(preview.spec.process_argv(), spec.process_argv());
+    }
+
+    #[test]
+    fn command_preview_warns_for_advanced_global_safety_flags() {
+        let global_options = GlobalOptions::default()
+            .with_operation(OperationLoadPolicy::AtOperation("abc123".to_owned()))
+            .with_operation_integration(OperationIntegrationPolicy::DoNotIntegrate)
+            .with_immutability(ImmutabilityPolicy::Ignore);
+        let spec = JjCommandSpec::confirm_mutation(
+            ["rebase", "-b", "@", "-d", "main"],
+            SafetyClass::LocalRewrite,
+        )
+        .with_global_options(global_options);
+
+        let preview = spec.command_preview();
+
+        assert_eq!(
+            preview.warnings,
+            vec![
+                CommandPreviewWarning::LocalRewrite,
+                CommandPreviewWarning::AtOperation("abc123".to_owned()),
+                CommandPreviewWarning::DoesNotIntegrateOperation,
+                CommandPreviewWarning::IgnoresImmutableCommits
+            ]
+        );
     }
 
     #[test]

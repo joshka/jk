@@ -2,7 +2,7 @@ use std::ffi::OsString;
 
 use super::REDACTED;
 
-pub(super) fn redact_argv(argv: Vec<OsString>) -> Vec<OsString> {
+pub(crate) fn redact_argv(argv: Vec<OsString>) -> Vec<OsString> {
     argv.into_iter()
         .map(|arg| {
             let Some(arg) = arg.to_str() else {

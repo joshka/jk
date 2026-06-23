@@ -6,6 +6,7 @@
 //! intact while adding title/status chrome and selected-row highlighting.
 
 pub mod command_history_view;
+pub mod command_preview_view;
 pub mod diff_view;
 pub mod log_view;
 pub mod rendered_view;
