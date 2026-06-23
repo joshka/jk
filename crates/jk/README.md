@@ -67,3 +67,9 @@ Near-term work preserves jj-rendered output while adding command-shaped inspecti
 `status`, command mode, command history, workspaces, command previews, and operation recovery.
 
 See the repository README for the current status and development workflow.
+
+## License
+
+`jk` is dual-licensed under either
+[MIT](https://github.com/joshka/jk/blob/main/LICENSE-MIT) or
+[Apache-2.0](https://github.com/joshka/jk/blob/main/LICENSE-APACHE).
