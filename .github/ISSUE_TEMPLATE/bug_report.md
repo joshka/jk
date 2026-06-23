@@ -6,6 +6,9 @@ labels: bug
 assignees: ""
 ---
 
+`jk` is early and moving quickly. Please use this template for actionable bugs in behavior that
+exists today. Broader workflow ideas are usually better as product-direction feedback.
+
 ## Summary
 
 Describe what happened and what you expected instead.
