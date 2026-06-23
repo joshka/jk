@@ -52,6 +52,9 @@ pub enum AppKey {
     /// Reopen the `:` prompt with the current command output input.
     EditCommandOutput,
 
+    /// Open the current diff file list.
+    OpenDiffFileList,
+
     /// Close the active mode or return to the previous view.
     Back,
 
@@ -150,6 +153,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'W' => Some(AppKey::OpenWorkspaces),
         'C' => Some(AppKey::OpenCommandHistory),
         'e' => Some(AppKey::EditCommandOutput),
+        'f' => Some(AppKey::OpenDiffFileList),
         'o' => Some(AppKey::OpenOperationLog),
         'y' => Some(AppKey::CopyCommand),
         'u' => Some(AppKey::StartUndo),
@@ -296,6 +300,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE)),
             AppKey::EditCommandOutput
+        );
+    }
+
+    #[test]
+    fn lowercase_f_opens_diff_file_list() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::NONE)),
+            AppKey::OpenDiffFileList
         );
     }
 

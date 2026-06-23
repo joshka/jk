@@ -806,6 +806,10 @@ fn run_terminal(
                         );
                         view.render_with_overlay(frame, "View Options", &lines);
                     }
+                    Some(InputMode::DiffFileList { selected }) => {
+                        let lines = diff_file_list_lines(view, *selected);
+                        view.render_with_overlay(frame, "Diff files", &lines);
+                    }
                     Some(InputMode::DiffSearch { query }) => {
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
@@ -1108,6 +1112,10 @@ fn run_terminal(
                             edit_command_output(&mut state);
                             needs_redraw = true;
                         }
+                        AppKey::OpenDiffFileList => {
+                            open_diff_file_list(&mut state);
+                            needs_redraw = true;
+                        }
                         AppKey::StartSearch
                             if matches!(
                                 state.views.active(),
@@ -1216,6 +1224,9 @@ enum InputMode {
         context: BindingContext,
         selected: usize,
     },
+    DiffFileList {
+        selected: usize,
+    },
     DiffSearch {
         query: String,
     },
@@ -1262,6 +1273,9 @@ fn handle_input_mode(
 ) -> InputModeResult {
     if matches!(state.modes.active(), Some(InputMode::ViewOptions { .. })) {
         return handle_view_options_mode(state, source, diff_source, key);
+    }
+    if matches!(state.modes.active(), Some(InputMode::DiffFileList { .. })) {
+        return handle_diff_file_list_mode(state, key);
     }
     if matches!(state.modes.active(), Some(InputMode::LogTemplate { .. })) {
         return handle_template_mode(state, source, key);
@@ -1311,6 +1325,7 @@ fn handle_input_mode(
                     return InputModeResult::Handled;
                 }
                 InputMode::ViewOptions { .. } => unreachable!(),
+                InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::CommandPreview { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
@@ -1346,6 +1361,7 @@ fn handle_input_mode(
                     message.push(character);
                 }
                 InputMode::ViewOptions { .. } => unreachable!(),
+                InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::CommandPreview { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
@@ -2017,6 +2033,128 @@ fn handle_view_options_mode(
         }
         _ => InputModeResult::Handled,
     }
+}
+
+fn handle_diff_file_list_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc | KeyCode::Backspace,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('q'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Up, ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('k'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            move_diff_file_list_selection(state, FileListMove::Previous);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            move_diff_file_list_selection(state, FileListMove::Next);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            apply_diff_file_list_selection(state);
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum FileListMove {
+    Previous,
+    Next,
+}
+
+fn open_diff_file_list(state: &mut AppState) {
+    let AppView::Diff { view, .. } = state.views.active() else {
+        return;
+    };
+    let selected = view.selected_file_index().unwrap_or_default();
+    state.modes.push(InputMode::DiffFileList { selected });
+}
+
+fn move_diff_file_list_selection(state: &mut AppState, direction: FileListMove) {
+    let row_count = active_diff_file_count(state);
+    let Some(InputMode::DiffFileList { selected }) = state.modes.active_mut() else {
+        return;
+    };
+    if row_count == 0 {
+        *selected = 0;
+        return;
+    }
+
+    match direction {
+        FileListMove::Previous => *selected = selected.saturating_sub(1),
+        FileListMove::Next => *selected = (*selected + 1).min(row_count - 1),
+    }
+}
+
+fn active_diff_file_count(state: &AppState) -> usize {
+    match state.views.active() {
+        AppView::Diff { view, .. } => view.file_count(),
+        _ => 0,
+    }
+}
+
+fn apply_diff_file_list_selection(state: &mut AppState) {
+    let selected = match state.modes.active() {
+        Some(InputMode::DiffFileList { selected }) => *selected,
+        _ => return,
+    };
+    state.modes.pop();
+
+    let AppView::Diff { view, .. } = state.views.active_mut() else {
+        return;
+    };
+    view.select_file_index(selected);
+}
+
+fn diff_file_list_lines(view: &DiffView, selected: usize) -> Vec<String> {
+    let paths = view.file_paths();
+    if paths.is_empty() {
+        return vec![
+            "No files in this diff.".to_owned(),
+            String::new(),
+            "esc close".to_owned(),
+        ];
+    }
+
+    paths
+        .iter()
+        .enumerate()
+        .map(|(index, path)| {
+            let marker = if index == selected { ">" } else { " " };
+            format!("{marker} {:>2}/{} {path}", index + 1, paths.len())
+        })
+        .chain(std::iter::once(String::new()))
+        .chain(std::iter::once(
+            "j/k or arrows move   enter jump   esc close".to_owned(),
+        ))
+        .collect()
 }
 
 fn apply_diff_format_option(state: &mut AppState, diff_source: &JjDiff, format: DiffFormat) {
@@ -4989,6 +5127,74 @@ mod tests {
     }
 
     #[test]
+    fn diff_file_list_opens_with_current_file_selected() {
+        let mut view = real_diff_view("aaa");
+        view.select_file_index(1);
+        let mut state = AppState::new(AppView::Diff {
+            view,
+            query: diff_query("aaa"),
+        });
+
+        open_diff_file_list(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::DiffFileList { selected: 1 })
+        );
+    }
+
+    #[test]
+    fn diff_file_list_enter_jumps_to_selected_file() {
+        let mut state = AppState::new(AppView::Diff {
+            view: real_diff_view("aaa"),
+            query: diff_query("aaa"),
+        });
+        state.modes.push(InputMode::DiffFileList { selected: 0 });
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            &JjDiff::default(),
+            &JjDescribe::default(),
+            None,
+            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+        );
+        assert_eq!(result, InputModeResult::Handled);
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            &JjDiff::default(),
+            &JjDescribe::default(),
+            None,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(state.modes.active(), None);
+        let AppView::Diff { view, .. } = state.views.active() else {
+            panic!("expected diff view");
+        };
+        assert_eq!(view.selected_file_index(), Some(1));
+    }
+
+    #[test]
+    fn diff_file_list_lines_mark_selected_path() {
+        let view = real_diff_view("aaa");
+
+        assert_eq!(
+            diff_file_list_lines(&view, 1),
+            vec![
+                "   1/2 src/a.rs",
+                ">  2/2 src/b.rs",
+                "",
+                "j/k or arrows move   enter jump   esc close",
+            ]
+        );
+    }
+
+    #[test]
     fn view_options_enter_opens_log_template_selector() {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.modes.push(InputMode::ViewOptions {
@@ -5436,6 +5642,16 @@ mod tests {
             change_id,
             format!("jj diff -r {change_id}"),
             "synthetic diff fixture".to_owned(),
+        )
+    }
+
+    fn real_diff_view(change_id: &str) -> DiffView {
+        DiffView::new(
+            jk_core::DiffSnapshot::new(
+                change_id,
+                "Modified regular file src/a.rs:\n a\nModified regular file src/b.rs:\n b\n",
+            )
+            .with_title(format!("jj diff -r {change_id}")),
         )
     }
 

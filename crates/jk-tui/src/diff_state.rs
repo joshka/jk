@@ -9,7 +9,7 @@ use crate::chrome::title_or_default;
 
 const HORIZONTAL_SCROLL_STEP: usize = 8;
 const DIFF_HORIZONTAL_STATUS: &str = "</> horizontal scroll";
-const DIFF_FILE_STATUS_HINT: &str = "  [/] file  { } hunk  ? help";
+const DIFF_FILE_STATUS_HINT: &str = "  f files  [/] file  { } hunk  ? help";
 
 /// Semantic state behind a rendered selected-change diff.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -106,6 +106,29 @@ impl DiffState {
     /// Returns the first rendered column currently visible in the viewport.
     pub const fn horizontal_offset(&self) -> usize {
         self.horizontal_offset
+    }
+
+    /// Returns the number of file sections in this diff.
+    pub const fn file_count(&self) -> usize {
+        self.sections.len()
+    }
+
+    /// Returns the currently selected file section index.
+    pub const fn selected_file_index(&self) -> Option<usize> {
+        self.selected
+    }
+
+    /// Returns the file paths discovered in this diff.
+    pub fn file_paths(&self) -> Vec<&str> {
+        self.sections
+            .iter()
+            .map(|section| section.path.as_str())
+            .collect()
+    }
+
+    /// Selects a file section by index.
+    pub fn select_file_index(&mut self, index: usize) {
+        self.select_index(index);
     }
 
     /// Scrolls one visible line toward the start of the diff.
@@ -960,6 +983,33 @@ mod tests {
     }
 
     #[test]
+    fn file_paths_expose_jumpable_diff_files() {
+        let state = DiffState::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n a\nAdded regular file src/b.rs:\n b\n",
+        ));
+
+        assert_eq!(state.file_count(), 2);
+        assert_eq!(state.file_paths(), vec!["src/a.rs", "src/b.rs"]);
+        assert_eq!(state.selected_file_index(), Some(0));
+    }
+
+    #[test]
+    fn selecting_file_index_jumps_to_section() {
+        let mut state = DiffState::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n a\nModified regular file src/b.rs:\n b\n",
+        ));
+        state.keep_selected_in_view(2);
+
+        state.select_file_index(1);
+
+        assert_eq!(state.scroll_offset(), 2);
+        assert_eq!(state.selected_file_index(), Some(1));
+        assert_eq!(state.selected_visible_line(), Some(2));
+    }
+
+    #[test]
     fn refresh_drops_collapsed_paths_that_disappear() {
         let mut state = DiffState::new(snapshot(
             "aaa",
@@ -1183,14 +1233,14 @@ mod tests {
 
         assert_eq!(
             state.current_file_status(80),
-            Some("file 1/2 src/a.rs  [/] file  { } hunk  ? help".to_owned())
+            Some("file 1/2 src/a.rs  f files  [/] file  { } hunk  ? help".to_owned())
         );
 
         state.select_next_file();
 
         assert_eq!(
             state.current_file_status(80),
-            Some("file 2/2 src/b.rs  [/] file  { } hunk  ? help".to_owned())
+            Some("file 2/2 src/b.rs  f files  [/] file  { } hunk  ? help".to_owned())
         );
     }
 

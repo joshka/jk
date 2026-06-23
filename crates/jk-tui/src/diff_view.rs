@@ -155,6 +155,29 @@ impl DiffView {
         self.status_message = None;
     }
 
+    /// Returns the number of file sections available for navigation.
+    #[must_use]
+    pub const fn file_count(&self) -> usize {
+        self.state.file_count()
+    }
+
+    /// Returns the file paths available for navigation.
+    #[must_use]
+    pub fn file_paths(&self) -> Vec<&str> {
+        self.state.file_paths()
+    }
+
+    /// Returns the currently selected file section index.
+    #[must_use]
+    pub const fn selected_file_index(&self) -> Option<usize> {
+        self.state.selected_file_index()
+    }
+
+    /// Jumps to a file section by index.
+    pub fn select_file_index(&mut self, index: usize) {
+        self.state.select_file_index(index);
+    }
+
     /// Shows a refresh or integration error without replacing the current diff.
     pub fn show_error(&mut self, error: impl Into<String>) {
         self.status_message = Some(error.into());
@@ -528,9 +551,8 @@ mod tests {
         let draw_result = terminal.draw(|frame| view.render(frame));
         assert!(draw_result.is_ok());
 
-        assert!(
-            buffer_line(terminal.backend().buffer(), 4).contains("file 1/2 src/a.rs  [/] file")
-        );
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("file 1/2 src/a.rs"));
+        assert!(buffer_line(terminal.backend().buffer(), 4).contains("f files"));
     }
 
     #[test]
@@ -548,8 +570,25 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Diff keys"));
+        assert!(rendered.contains("f                    open file list"));
         assert!(rendered.contains("[ / ]                previous/next file"));
         assert!(rendered.contains("/, n, N              search, next, previous"));
+    }
+
+    #[test]
+    fn exposes_file_list_navigation_state() {
+        let mut view = DiffView::new(snapshot(
+            "aaa",
+            "Modified regular file src/a.rs:\n a\nModified regular file src/b.rs:\n b\n",
+        ));
+
+        assert_eq!(view.file_count(), 2);
+        assert_eq!(view.file_paths(), vec!["src/a.rs", "src/b.rs"]);
+        assert_eq!(view.selected_file_index(), Some(0));
+
+        view.select_file_index(1);
+
+        assert_eq!(view.selected_file_index(), Some(1));
     }
 
     #[test]

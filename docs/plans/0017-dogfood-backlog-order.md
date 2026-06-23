@@ -30,10 +30,11 @@ then broaden into mutation flows, selectors, run options, and generated help.
    summary, stat, types, name-only, git, or color-words output, matching the supported local
    `jj diff` flags.
 1. Partly done: make rich diff navigation solid. Diff already supports `[ ]` file movement, `{ }`
-   hunk movement, search, horizontal scroll, sticky headers, and now a current-file status line;
-   remaining polish includes file list jump, broader view options, and any dogfood issues found in
-   multi-file diffs.
-1. Add diff file list overlay: show files in the current diff and jump to selected file.
+   hunk movement, search, horizontal scroll, sticky headers, a current-file status line, and a file
+   list jump overlay; remaining polish includes broader view options and any dogfood issues found
+   in multi-file diffs.
+1. Done: add diff file list overlay. Pressing `f` from a diff shows files in the current diff,
+   preserves the active file as the selected row, and jumps to the chosen file on Enter.
 
 ## First Useful Mutation Sprint
 

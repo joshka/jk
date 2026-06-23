@@ -43,7 +43,9 @@ Make inspection workflows match jj's command model.
 - Add a reusable `V` View Options overlay for patch, stat, summary, name-only, templates, graph
   options, and related diff formats.
 - Add standalone `v` for selected-change `evolog` after the shared inspection source model exists.
-- Add first-class diff search, file-list navigation, and two-revision comparison.
+- Add first-class diff search, file-list navigation, and two-revision comparison. The `vibe` spike
+  now has the first diff file selector (`f`) for jumping within the active diff; searchable file
+  lists and range comparison still need follow-up work.
 - Add docs and [Betamax](https://www.joshka.net/betamax/) tapes for log, diff, show, and status
   flows.
 
@@ -233,9 +235,13 @@ Make diff inspection useful for large changes without forcing users into another
 
 - Scope: file list, sticky revision/file context, diff search, next/previous file actions,
   two-revision diffs, horizontal overflow controls, edge-case fixtures, and file-only/details mode.
+- Current `vibe` status: diff views support `[ ]` file movement, `{ }` hunk movement, search,
+  horizontal scroll, sticky/current-file context, diff format View Options, and an `f` file selector
+  that jumps to the chosen file in the active diff.
 - Acceptance: users can search within a diff, jump between files, inspect name-only/stat/detail
-  variants, compare two selected revisions with the shown jj command, and recover from empty or
-  failed diff loads without leaving the TUI.
+  variants, compare two selected revisions with the shown jj command, recover from empty or failed
+  diff loads without leaving the TUI, and use a searchable file list once the shared file selector
+  model exists.
 - Tests: diff navigation state tests, command resolver tests, large-diff fixture, and Betamax
   rich-diff tape.
 

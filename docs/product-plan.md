@@ -1169,7 +1169,9 @@ Diff view:
 
 - Preserve selected file/hunk across refresh if path/header still exists.
 - Sticky current-file header.
-- File picker overlay for large diffs.
+- File picker overlay for large diffs. The current `vibe` spike includes the first `f` file
+  selector for jumping within an active diff; the later target is searchable and shared with the
+  broader fileset selector model.
 - Search highlights and next/previous match navigation.
 - Next/previous file navigation without reopening the picker.
 - Toggle between patch, stat, summary, name-only, and file-only details.
@@ -1197,6 +1199,7 @@ rendering when selection changes, cancel it or mark it stale before starting the
 
 Diff follow-up work should keep these details visible as separate reviewable slices:
 
+- searchable file-list filtering once the shared fileset/file selector exists;
 - horizontal overflow controls for wide diffs, with status text showing the shifted column;
 - empty-diff and failed-load states that stay retryable inside the TUI instead of exiting before the
   user can recover;
@@ -2291,7 +2294,7 @@ After 1.0:
 | Version | Theme                       | Must-have deliverables                                                                     |
 | ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
 | 0.3     | Foundation                  | CommandSpec, view stack, generated help/hotbar, line scrolling, mark model.                |
-| 0.4     | jj-shaped inspection        | `jk diff -r/--from/--to`, show, status, View Options, diff search, evolog.                 |
+| 0.4     | jj-shaped inspection        | `jk diff -r/--from/--to`, show, status, View Options, diff search/file jump, evolog.       |
 | 0.5     | Command mode and workspaces | `:`, `!`, searchable help, command output, rerun/copy, external runner, `W` workspace.     |
 | 0.6     | Safe mutation core          | describe inline/editor, new, commit, edit, rebase picker, abandon, undo/redo, op log.      |
 | 0.7     | Content workflows           | squash, split, restore, diffedit, absorb; file selection; initial hunk path via jj editor. |
@@ -2492,6 +2495,8 @@ Start here.
 - `Enter` opens `jj show <rev>`.
 - `s` opens `jj status`.
 - Reuse diff navigation where possible.
+- Keep current diff navigation discoverable: `[ ]` for files, `{ }` for hunks, `f` for file list,
+  `/` for search, and `V` for format options.
 
 ### Step 9: Add command history and `:`
 

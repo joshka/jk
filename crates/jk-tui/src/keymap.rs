@@ -47,6 +47,7 @@ enum ActionId {
     ViewOptions,
     Refresh,
     SwitchLogCommand,
+    OpenFileList,
     File,
     Hunk,
     FoldFile,
@@ -88,6 +89,7 @@ impl ActionId {
             Self::ViewOptions => "View options",
             Self::Refresh => "Refresh",
             Self::SwitchLogCommand => "Switch log command",
+            Self::OpenFileList => "Open file list",
             Self::File => "Move file",
             Self::Hunk => "Move hunk",
             Self::FoldFile => "Fold file",
@@ -330,6 +332,10 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(5, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
         .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::OpenFileList, "f", "open file list")
+        .with_family(CommandFamily::File)
+        .with_aliases(&["files", "paths", "jump", "file list"])
+        .with_hotbar(4, "f files"),
     KeyBinding::new(ActionId::File, "[ / ]", "previous/next file").with_family(CommandFamily::File),
     KeyBinding::new(ActionId::Hunk, "{ / }", "previous/next hunk").with_family(CommandFamily::Hunk),
     KeyBinding::new(ActionId::FoldFile, "h / l", "fold/unfold current file")
@@ -868,7 +874,7 @@ mod tests {
     fn diff_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Diff),
-            "? help  V options  r refresh  j/k line  space/b page  q quit"
+            "? help  V options  r refresh  j/k line  f files  space/b page  q quit"
         );
     }
 
@@ -1027,6 +1033,7 @@ mod tests {
                 "Ctrl-j/k             scroll one line",
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
+                "f                    open file list",
                 "[ / ]                previous/next file",
                 "{ / }                previous/next hunk",
                 "h / l                fold/unfold current file",
