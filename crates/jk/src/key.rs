@@ -13,6 +13,54 @@ pub enum AppKey {
     /// Dispatch this action to the active view.
     Action(LogAction),
 
+    /// Open the selected revision show/details view.
+    OpenShow,
+
+    /// Open the selected revision evolution log.
+    OpenEvolog,
+
+    /// Open repository status.
+    OpenStatus,
+
+    /// Open the workspace list.
+    OpenWorkspaces,
+
+    /// Open the command-history list.
+    OpenCommandHistory,
+
+    /// Open the operation log list.
+    OpenOperationLog,
+
+    /// Copy the current command line.
+    CopyCommand,
+
+    /// Preview and run `jj undo`.
+    StartUndo,
+
+    /// Preview and run `jj redo`.
+    StartRedo,
+
+    /// Start an inline describe mutation for the selected revision.
+    StartDescribe,
+
+    /// Preview abandoning the selected revision.
+    StartAbandon,
+
+    /// Open view-scoped display and template options.
+    OpenViewOptions,
+
+    /// Start the `:` prompt for an arbitrary jj command.
+    StartCommandMode,
+
+    /// Preview `jj edit` from the log or reopen command-output input.
+    EditCommandOutput,
+
+    /// Open the current diff file list.
+    OpenDiffFileList,
+
+    /// Close the active mode or return to the previous view.
+    Back,
+
     /// Start a search prompt in views that support search.
     StartSearch,
 
@@ -41,11 +89,19 @@ impl AppKey {
 
         match key {
             KeyEvent {
+                code: KeyCode::Backspace,
+                ..
+            } => Self::Back,
+            KeyEvent {
                 code: KeyCode::Char('q') | KeyCode::Esc,
                 ..
             } => Self::Action(LogAction::Quit),
             KeyEvent {
-                code: KeyCode::Right | KeyCode::Enter,
+                code: KeyCode::Enter,
+                ..
+            } => Self::OpenShow,
+            KeyEvent {
+                code: KeyCode::Right,
                 ..
             } => Self::Action(LogAction::ToggleExpanded),
             KeyEvent {
@@ -67,11 +123,11 @@ impl AppKey {
             KeyEvent {
                 code: KeyCode::PageDown,
                 ..
-            }
-            | KeyEvent {
+            } => Self::Action(LogAction::PageNext),
+            KeyEvent {
                 code: KeyCode::Char(' '),
                 ..
-            } => Self::Action(LogAction::PageNext),
+            } => Self::Action(LogAction::ToggleMark),
             KeyEvent {
                 code: KeyCode::Home,
                 ..
@@ -92,11 +148,26 @@ impl AppKey {
 const fn action_for_character_key(character: char) -> Option<AppKey> {
     match character {
         'q' => Some(AppKey::Action(LogAction::Quit)),
+        ':' => Some(AppKey::StartCommandMode),
         'r' => Some(AppKey::Action(LogAction::Refresh)),
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
+        'V' => Some(AppKey::OpenViewOptions),
+        'W' => Some(AppKey::OpenWorkspaces),
+        'C' => Some(AppKey::OpenCommandHistory),
+        'e' => Some(AppKey::EditCommandOutput),
+        'f' => Some(AppKey::OpenDiffFileList),
+        'o' => Some(AppKey::OpenOperationLog),
+        'y' => Some(AppKey::CopyCommand),
+        'u' => Some(AppKey::StartUndo),
+        'U' => Some(AppKey::StartRedo),
+        'm' => Some(AppKey::StartDescribe),
+        'a' => Some(AppKey::StartAbandon),
+        'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
+        'c' => Some(AppKey::Action(LogAction::ClearMarks)),
+        's' => Some(AppKey::OpenStatus),
         '?' => Some(AppKey::Action(LogAction::ToggleHelp)),
         '/' => Some(AppKey::StartSearch),
         'n' => Some(AppKey::SearchNext),
@@ -124,6 +195,8 @@ const fn action_for_control_key(code: KeyCode) -> AppKey {
     match code {
         KeyCode::Char('b') => AppKey::Action(LogAction::PagePrevious),
         KeyCode::Char('f') => AppKey::Action(LogAction::PageNext),
+        KeyCode::Char('k') => AppKey::Action(LogAction::ScrollPreviousLine),
+        KeyCode::Char('j') => AppKey::Action(LogAction::ScrollNextLine),
         KeyCode::Left => AppKey::Action(LogAction::FoldAll),
         KeyCode::Right => AppKey::Action(LogAction::UnfoldAll),
         _ => AppKey::Ignore,
@@ -135,10 +208,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn enter_toggles_expanded_details() {
+    fn enter_opens_show_details() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
-            AppKey::Action(LogAction::ToggleExpanded)
+            AppKey::OpenShow
         );
     }
 
@@ -179,10 +252,138 @@ mod tests {
     }
 
     #[test]
+    fn uppercase_v_opens_view_options() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::NONE)),
+            AppKey::OpenViewOptions
+        );
+    }
+
+    #[test]
+    fn colon_starts_command_mode() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::NONE)),
+            AppKey::StartCommandMode
+        );
+    }
+
+    #[test]
+    fn uppercase_w_opens_workspaces() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::NONE)),
+            AppKey::OpenWorkspaces
+        );
+    }
+
+    #[test]
+    fn uppercase_c_opens_command_history() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('C'), KeyModifiers::NONE)),
+            AppKey::OpenCommandHistory
+        );
+    }
+
+    #[test]
+    fn lowercase_o_opens_operation_log() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE)),
+            AppKey::OpenOperationLog
+        );
+    }
+
+    #[test]
+    fn lowercase_y_copies_command() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)),
+            AppKey::CopyCommand
+        );
+    }
+
+    #[test]
+    fn lowercase_e_starts_edit_or_command_output_retry() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE)),
+            AppKey::EditCommandOutput
+        );
+    }
+
+    #[test]
+    fn lowercase_f_opens_diff_file_list() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::NONE)),
+            AppKey::OpenDiffFileList
+        );
+    }
+
+    #[test]
+    fn lowercase_u_starts_undo_preview() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE)),
+            AppKey::StartUndo
+        );
+    }
+
+    #[test]
+    fn uppercase_u_starts_redo_preview() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('U'), KeyModifiers::NONE)),
+            AppKey::StartRedo
+        );
+    }
+
+    #[test]
+    fn uppercase_t_is_unbound_after_view_options_migration() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('T'), KeyModifiers::NONE)),
+            AppKey::Ignore
+        );
+    }
+
+    #[test]
+    fn lowercase_v_opens_evolog() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE)),
+            AppKey::OpenEvolog
+        );
+    }
+
+    #[test]
+    fn lowercase_m_starts_describe() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE)),
+            AppKey::StartDescribe
+        );
+    }
+
+    #[test]
+    fn lowercase_a_starts_abandon_preview() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE)),
+            AppKey::StartAbandon
+        );
+    }
+
+    #[test]
     fn lowercase_d_opens_selected_diff() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::OpenDiff)
+        );
+    }
+
+    #[test]
+    fn lowercase_c_clears_log_marks() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ClearMarks)
+        );
+    }
+
+    #[test]
+    fn lowercase_s_opens_status() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
+            AppKey::OpenStatus
         );
     }
 
@@ -207,6 +408,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE)),
             AppKey::SearchPrevious
+        );
+    }
+
+    #[test]
+    fn backspace_maps_to_back() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)),
+            AppKey::Back
         );
     }
 
@@ -293,12 +502,16 @@ mod tests {
             AppKey::Action(LogAction::PageNext)
         );
         assert_eq!(
-            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)),
-            AppKey::Action(LogAction::PageNext)
-        );
-        assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::SHIFT)),
             AppKey::Action(LogAction::PagePrevious)
+        );
+    }
+
+    #[test]
+    fn space_toggles_log_mark() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::ToggleMark)
         );
     }
 
@@ -319,6 +532,18 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::Last)
+        );
+    }
+
+    #[test]
+    fn control_j_and_k_scroll_log_by_line() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::ScrollNextLine)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::ScrollPreviousLine)
         );
     }
 }
