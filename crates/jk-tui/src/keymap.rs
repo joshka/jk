@@ -41,6 +41,7 @@ enum ActionId {
     OpenCommandDetails,
     CopyCommand,
     CommandMode,
+    NewChange,
     Abandon,
     Undo,
     Redo,
@@ -84,6 +85,7 @@ impl ActionId {
             Self::OpenCommandDetails => "Open command details",
             Self::CopyCommand => "Copy command",
             Self::CommandMode => "Run jj command",
+            Self::NewChange => "New change",
             Self::Abandon => "Abandon revision",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
@@ -116,6 +118,8 @@ pub enum CommandFamily {
     JjDiff,
     /// Commands and actions related to `jj describe`.
     JjDescribe,
+    /// Commands and actions related to `jj new`.
+    JjNew,
     /// Commands and actions related to `jj evolog`.
     JjEvolog,
     /// Commands and actions related to `jj show`.
@@ -158,6 +162,7 @@ impl CommandFamily {
             Self::JjLog => "jj log",
             Self::JjDiff => "jj diff",
             Self::JjDescribe => "jj describe",
+            Self::JjNew => "jj new",
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
@@ -289,10 +294,14 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["operation", "op log", "undo", "redo", "recovery"])
         .with_hotbar(9, "o ops"),
+    KeyBinding::new(ActionId::NewChange, "n", "preview jj new")
+        .with_family(CommandFamily::JjNew)
+        .with_aliases(&["new", "change", "parent", "mutation", "preview"])
+        .with_hotbar(12, "n new"),
     KeyBinding::new(ActionId::Abandon, "a", "preview jj abandon")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["abandon", "delete", "destructive", "mutation", "preview"])
-        .with_hotbar(12, "a abandon"),
+        .with_hotbar(13, "a abandon"),
     KeyBinding::new(ActionId::Undo, "u", "preview jj undo")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["undo", "operation", "recovery"])
@@ -872,7 +881,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  a abandon  V options  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  n new  a abandon  V options  q quit"
         );
     }
 
@@ -938,6 +947,7 @@ mod tests {
         assert!(status.contains("s status"));
         assert!(status.contains("..."));
         assert!(!status.contains("space mark"));
+        assert!(!status.contains("n new"));
         assert!(!status.contains("a abandon"));
         assert!(!status.contains("j/k move"));
     }
@@ -1019,6 +1029,7 @@ mod tests {
                 "v                    open selected-change evolog",
                 "s                    open repository status",
                 "o                    open operation log",
+                "n                    preview jj new",
                 "a                    preview jj abandon",
                 "u                    preview jj undo",
                 "U                    preview jj redo",

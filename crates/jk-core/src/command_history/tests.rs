@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 use super::*;
 use crate::{
     ConfigOverlay, ExecutionMode, GlobalOptions, JjCommandSpec, OutputPolicy, PagerPolicy,
+    SafetyClass,
 };
 
 fn strings(argv: &[OsString]) -> Vec<String> {
@@ -215,6 +216,17 @@ fn source_action_is_independent_from_command_family() {
     assert_eq!(start.command.command_family, CommandFamily::JjStatus);
     assert_eq!(start.source.view, SourceView::Workspaces);
     assert_eq!(start.source.action, SourceAction::WorkspaceStatus);
+}
+
+#[test]
+fn new_specs_use_new_family_and_typed_source_action() {
+    let spec = JjCommandSpec::confirm_mutation(["new", "abc123"], SafetyClass::LocalRewrite);
+    let start =
+        CommandRecordStart::from_spec(&spec, source(SourceView::Log, SourceAction::NewRevision));
+
+    assert_eq!(start.command.command_family, CommandFamily::JjNew);
+    assert_eq!(start.source.view, SourceView::Log);
+    assert_eq!(start.source.action, SourceAction::NewRevision);
 }
 
 #[test]

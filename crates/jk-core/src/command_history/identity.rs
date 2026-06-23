@@ -53,6 +53,8 @@ pub enum CommandFamily {
     JjStatus,
     /// `jj describe`.
     JjDescribe,
+    /// `jj new`.
+    JjNew,
     /// `jj evolog`.
     JjEvolog,
     /// `jj workspace ...`.
@@ -82,6 +84,7 @@ impl CommandFamily {
             "show" => Self::JjShow,
             "status" => Self::JjStatus,
             "describe" => Self::JjDescribe,
+            "new" => Self::JjNew,
             "evolog" => Self::JjEvolog,
             "workspace" => Self::JjWorkspace,
             "op" => Self::JjOperation,
@@ -172,6 +175,8 @@ pub enum SourceAction {
     DescribeRevision,
     /// Abandon the selected revision.
     AbandonRevision,
+    /// Create a new change from the selected revision.
+    NewRevision,
     /// List workspaces.
     WorkspaceList,
     /// Show selected workspace status.

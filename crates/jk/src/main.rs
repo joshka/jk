@@ -14,10 +14,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
     AbandonQuery, DescribeQuery, DiffFormat, DiffQuery, EvologQuery, JjAbandon, JjCommandRunner,
-    JjDescribe, JjDiff, JjEvolog, JjLog, JjLogCommand, JjOperation, JjRecovery, JjShow, JjStatus,
-    JjWorkspaces, LogTemplateSelection, OperationQuery, RecordingJjCommandRunner, RecoveryCommand,
-    ShowQuery, StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot,
-    WorkspaceSummary,
+    JjDescribe, JjDiff, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery, JjShow,
+    JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
+    RecordingJjCommandRunner, RecoveryCommand, ShowQuery, StatusQuery, SystemJjCommandRunner,
+    WorkspaceInspectionQuery, WorkspaceListSnapshot, WorkspaceSummary,
 };
 use jk_core::{
     CommandHistory, CommandPreview, CommandSource, ExecutionMode, InspectionSnapshot,
@@ -224,6 +224,7 @@ fn main() -> Result<()> {
     let status_source = status_source(&args);
     let describe_source = describe_source(&args);
     let abandon_source = abandon_source(&args);
+    let new_source = new_source(&args);
     let operation_source = operation_source(&args);
     let recovery_source = recovery_source(&args);
     let workspaces_source = workspaces_source(&args);
@@ -260,6 +261,7 @@ fn main() -> Result<()> {
         &status_source,
         &describe_source,
         &abandon_source,
+        &new_source,
         &operation_source,
         &recovery_source,
         &workspaces_source,
@@ -356,6 +358,16 @@ fn describe_source(args: &Args) -> JjDescribe {
 /// Builds the abandon source for selected-change mutation preview.
 fn abandon_source(args: &Args) -> JjAbandon {
     let source = JjAbandon::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Builds the new source for selected-change mutation preview.
+fn new_source(args: &Args) -> JjNew {
+    let source = JjNew::default();
     if let Some(repository) = &args.repository {
         source.with_repository(repository)
     } else {
@@ -665,6 +677,16 @@ impl PendingCommandPreview {
         }
     }
 
+    fn new_change(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::NewRevision,
+            source_key: "n",
+            failure_label: "jj new",
+            copy_status: None,
+        }
+    }
+
     fn undo(preview: CommandPreview) -> Self {
         Self {
             preview,
@@ -761,6 +783,7 @@ fn run_terminal(
     status_source: &JjStatus,
     describe_source: &JjDescribe,
     abandon_source: &JjAbandon,
+    new_source: &JjNew,
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
@@ -1197,6 +1220,10 @@ fn run_terminal(
                                 | AppView::CommandHistory { .. } => unreachable!(),
                             };
                             state.modes.push(mode);
+                            needs_redraw = true;
+                        }
+                        AppKey::SearchNext if matches!(state.views.active(), AppView::Log(_)) => {
+                            open_new_preview(&mut state, new_source);
                             needs_redraw = true;
                         }
                         AppKey::SearchNext => {
@@ -1852,6 +1879,35 @@ fn open_abandon_preview(state: &mut AppState, abandon_source: &JjAbandon) {
     state.modes.push(InputMode::CommandPreview {
         pending: PendingCommandPreview::abandon(preview),
     });
+}
+
+fn open_new_preview(state: &mut AppState, new_source: &JjNew) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    let parents = selected_new_parents(log);
+    if parents.is_empty() {
+        log.show_error("No parent revision selected");
+        return;
+    }
+
+    let preview = new_source
+        .spec_for(&NewQuery::new(parents))
+        .command_preview();
+    state.modes.push(InputMode::CommandPreview {
+        pending: PendingCommandPreview::new_change(preview),
+    });
+}
+
+fn selected_new_parents(log: &LogView) -> Vec<String> {
+    if log.has_marks() {
+        return log.marked_change_ids().to_vec();
+    }
+
+    log.selected_change_id()
+        .map(ToOwned::to_owned)
+        .into_iter()
+        .collect()
 }
 
 fn describe_message_lines(rev: &str, message: &str) -> Vec<String> {
@@ -4894,6 +4950,51 @@ mod tests {
     }
 
     #[test]
+    fn new_preview_uses_selected_revision_as_parent() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        open_new_preview(&mut state, &JjNew::default());
+
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+            panic!("expected new command preview");
+        };
+        assert_eq!(pending.source_action, SourceAction::NewRevision);
+        assert_eq!(pending.source_key, "n");
+        assert_eq!(pending.failure_label, "jj new");
+        assert_eq!(
+            pending.preview.command_line,
+            "jj --no-pager --color always new abc123"
+        );
+        assert_eq!(pending.preview.safety, SafetyClass::LocalRewrite);
+        assert_eq!(
+            pending.preview.warnings,
+            vec![jk_core::CommandPreviewWarning::LocalRewrite]
+        );
+    }
+
+    #[test]
+    fn new_preview_uses_ordered_marks_as_parents() {
+        let mut state = AppState::new(log_app_view_with_changes(["aaa", "bbb", "ccc"]));
+        let AppView::Log(log) = state.views.active_mut() else {
+            panic!("expected log");
+        };
+        let _ = log.apply(LogAction::ToggleMark);
+        let _ = log.apply(LogAction::Next);
+        let _ = log.apply(LogAction::Next);
+        let _ = log.apply(LogAction::ToggleMark);
+
+        open_new_preview(&mut state, &JjNew::default());
+
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+            panic!("expected new command preview");
+        };
+        assert_eq!(
+            pending.preview.command_line,
+            "jj --no-pager --color always new aaa ccc"
+        );
+    }
+
+    #[test]
     fn confirming_describe_preview_records_mutation_before_refresh() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
@@ -4967,6 +5068,42 @@ mod tests {
         assert_eq!(records[0].source.action, SourceAction::AbandonRevision);
         assert_eq!(records[0].source.key.as_deref(), Some("a"));
         assert_eq!(records[0].safety, SafetyClass::DestructiveLocal);
+        assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
+        assert_eq!(records[1].source.action, SourceAction::Refresh);
+        assert_eq!(records[2].source.action, SourceAction::Refresh);
+        assert!(active_log_status(&mut state).contains(POST_MUTATION_RECOVERY_STATUS));
+    }
+
+    #[test]
+    fn confirming_new_preview_records_local_rewrite_mutation() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let preview = JjNew::default()
+            .spec_for(&NewQuery::new(["abc123"]))
+            .command_preview();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "Working copy now at: def456\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        confirm_command_preview_with_runner(
+            &mut state,
+            &mut source,
+            PendingCommandPreview::new_change(preview),
+            runner,
+        );
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].command.spec_preview, "jj new abc123");
+        assert_eq!(records[0].command.title, "jj new abc123");
+        assert_eq!(records[0].source.view, SourceView::Log);
+        assert_eq!(records[0].source.action, SourceAction::NewRevision);
+        assert_eq!(records[0].source.key.as_deref(), Some("n"));
+        assert_eq!(records[0].safety, SafetyClass::LocalRewrite);
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);
         assert_eq!(records[2].source.action, SourceAction::Refresh);
@@ -5759,15 +5896,28 @@ mod tests {
     }
 
     fn log_app_view(change_id: &str) -> AppView {
+        log_app_view_with_changes([change_id])
+    }
+
+    fn log_app_view_with_changes<const N: usize>(change_ids: [&str; N]) -> AppView {
+        let rendered = change_ids
+            .iter()
+            .enumerate()
+            .map(|(index, change_id)| {
+                let marker = if index == 0 { "@" } else { "○" };
+                format!("{marker}  {change_id} {change_id} summary\n")
+            })
+            .collect::<String>();
+        let entries = change_ids
+            .iter()
+            .enumerate()
+            .map(|(index, change_id)| {
+                jk_core::LogEntry::new(*change_id, "commit", format!("{change_id} summary"))
+                    .with_rendered_line(index)
+            })
+            .collect();
         AppView::Log(LogView::new(
-            jk_core::LogSnapshot::new(
-                format!("@  {change_id} {change_id} summary\n"),
-                vec![
-                    jk_core::LogEntry::new(change_id, "commit", format!("{change_id} summary"))
-                        .with_rendered_line(0),
-                ],
-            )
-            .with_title("jj log"),
+            jk_core::LogSnapshot::new(rendered, entries).with_title("jj log"),
         ))
     }
 

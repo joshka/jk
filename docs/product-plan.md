@@ -417,11 +417,12 @@ All rewrite/destructive/network actions should follow:
 6. Refresh state after success.
 7. Show result, command history entry, and operation-recovery actions.
 
-Current `vibe` spike status: selected-revision `jj abandon REV` has the first destructive mutation
-preview. Pressing `a` on the log opens a command preview, Enter runs the command, successful runs
-refresh the graph, command history records the resulting operation id, and the recovery footer
-surfaces undo/redo/operation/history actions. This direct `a` binding is a dogfood shortcut until
-the long-term action-menu prefix exists.
+Current `vibe` spike status: selected-revision `jj abandon REV` and parented `jj new` have the
+first mutation previews. Pressing `a` on the log previews `jj abandon REV`; pressing `n` previews
+`jj new PARENT...`, using ordered marks as parents when present and otherwise using the selected
+revision. Enter runs the command, successful runs refresh the graph, command history records the
+resulting operation id, and the recovery footer surfaces undo/redo/operation/history actions. The
+direct `a` binding is a dogfood shortcut until the long-term action-menu prefix exists.
 
 ### 3.6 Recovery is first-class
 
@@ -672,6 +673,10 @@ The `a` prefix opens a visible overlay. Keys are active only while the overlay i
 Current `vibe` note: before this prefix menu exists, `a` directly previews `jj abandon REV` for the
 selected log revision. Keep that implementation path command-spec based so it can move under
 `a a` later without rewriting the mutation runner.
+
+Current `vibe` note: `n` directly previews `jj new PARENT...` from the log. Ordered marks become
+parents when present; otherwise the selected revision is the parent. Search-next remains scoped to
+diff and rendered inspection views.
 
 | Key | jj command family               | Notes                                                      |
 | --- | ------------------------------- | ---------------------------------------------------------- |
@@ -1311,6 +1316,10 @@ Role inference:
 - If marks exist: marks are parents.
 - Else cursor is parent.
 - If cursor is absent: default jj behavior.
+
+Current `vibe` status: direct `n` implements the marks-or-cursor parent rule and routes through
+command preview, command history, operation-id capture, log refresh, and recovery footer. It does
+not yet support inline messages or the later role-resolver overlay.
 
 `N`: create new change with inline message.
 
