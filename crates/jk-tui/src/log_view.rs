@@ -10,7 +10,8 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{LOG_STATUS, ViewChrome, render_help_overlay};
+use crate::chrome::{ViewChrome, render_help_overlay};
+use crate::keymap::{BindingContext, help_lines, help_title, hotbar};
 use crate::log_state::LogState;
 use crate::rendered_log::{ExpandedDetails, RenderedLog, rendered_text};
 use crate::selected_row::paint_selected_row;
@@ -244,8 +245,11 @@ impl LogView {
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
 
-        let status = self.status_message.as_deref().unwrap_or(LOG_STATUS);
-        let chrome = ViewChrome::new(self.state.title(), status);
+        let status = self
+            .status_message
+            .clone()
+            .unwrap_or_else(|| hotbar(BindingContext::Log));
+        let chrome = ViewChrome::new(self.state.title(), &status);
         chrome.render(frame, areas);
 
         let expanded_details = self
@@ -266,22 +270,15 @@ impl LogView {
         }
 
         if self.help_visible {
-            render_help_overlay(frame, areas.content, "Log keys", LOG_HELP);
+            render_help_overlay(
+                frame,
+                areas.content,
+                help_title(BindingContext::Log),
+                &help_lines(BindingContext::Log),
+            );
         }
     }
 }
-
-const LOG_HELP: &[&str] = &[
-    "j/k or arrows        move selection",
-    "space / b, Ctrl-f/b  page down/up",
-    "g/G or Home/End      jump to top/bottom",
-    "enter, right, l      expand selected change",
-    "left, h              collapse selected change",
-    "d                    open selected-change diff",
-    "r                    refresh",
-    "H / L                home command / jj log",
-    "?, q, Esc            close help",
-];
 
 #[cfg(test)]
 mod tests {

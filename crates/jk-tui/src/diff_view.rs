@@ -5,8 +5,9 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{DIFF_STATUS, ViewChrome, render_help_overlay};
+use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::diff_state::DiffState;
+use crate::keymap::{BindingContext, help_lines, help_title, hotbar};
 use crate::rendered_log::rendered_text;
 use crate::selected_row::paint_subtle_selected_row;
 
@@ -292,11 +293,12 @@ impl DiffView {
 
         let search_status = self.state.search_status();
         let horizontal_status = self.state.horizontal_status();
+        let fallback_status = hotbar(BindingContext::Diff);
         let status = status_override
             .or(self.status_message.as_deref())
             .or(search_status.as_deref())
             .or(horizontal_status.as_deref())
-            .unwrap_or(DIFF_STATUS);
+            .unwrap_or(&fallback_status);
         let chrome = ViewChrome::new(self.state.title(), status);
         chrome.render(frame, areas);
 
@@ -322,7 +324,12 @@ impl DiffView {
         }
 
         if self.help_visible {
-            render_help_overlay(frame, areas.content, "Diff keys", DIFF_HELP);
+            render_help_overlay(
+                frame,
+                areas.content,
+                help_title(BindingContext::Diff),
+                &help_lines(BindingContext::Diff),
+            );
         }
     }
 
@@ -344,22 +351,6 @@ impl DiffView {
         )
     }
 }
-
-const DIFF_HELP: &[&str] = &[
-    "j/k or arrows        scroll one line",
-    "space / b, Ctrl-f/b  page down/up",
-    "g/G or Home/End      jump to top/bottom",
-    "[ / ]                previous/next file",
-    "{ / }                previous/next hunk",
-    "h / l                fold/unfold current file",
-    "Ctrl-left/right      fold/unfold all files",
-    "- / +                fold/unfold current hunk",
-    "< / >                horizontal scroll",
-    "/, n, N              search, next, previous",
-    "r                    refresh",
-    "H / L                return to log",
-    "?, q, Esc            close help",
-];
 
 /// Returns the portion of a content area left after a sticky file header row.
 const fn area_below_sticky_header(area: Rect) -> Rect {

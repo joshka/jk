@@ -8,15 +8,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
-/// Default log-view status text shown when there is no transient error.
-pub const LOG_STATUS: &str =
-    "? help  H home  L log  d diff  r refresh  j/k move  space/b page  q quit";
-
-/// Default diff-view status text shown when there is no transient error.
-pub const DIFF_STATUS: &str = "? help  r refresh  j/k line  space/b page  q quit";
-
 /// Renders a small mode-specific help overlay centered in the content area.
-pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[&str]) {
+pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[String]) {
     if area.is_empty() {
         return;
     }
@@ -30,7 +23,7 @@ pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines
             Style::new().add_modifier(Modifier::BOLD),
         )))
         .chain(std::iter::once(Line::from("")))
-        .chain(lines.iter().copied().map(Line::from))
+        .chain(lines.iter().map(|line| Line::from(line.as_str())))
         .collect::<Vec<_>>(),
     );
     let paragraph = Paragraph::new(text)

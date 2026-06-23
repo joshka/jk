@@ -11,6 +11,7 @@ pub mod log_view;
 mod ansi_text;
 mod chrome;
 mod diff_state;
+mod keymap;
 mod log_state;
 mod rendered_log;
 mod selected_row;
