@@ -19,6 +19,7 @@ pub struct LogState {
     expanded_change_id: Option<String>,
     scroll_offset: usize,
     viewport_height: usize,
+    follow_selection: bool,
 }
 
 impl LogState {
@@ -34,6 +35,7 @@ impl LogState {
             expanded_change_id: None,
             scroll_offset: 0,
             viewport_height: 10,
+            follow_selection: true,
         }
     }
 
@@ -86,6 +88,19 @@ impl LogState {
     /// Returns the first rendered line currently visible in the viewport.
     pub const fn scroll_offset(&self) -> usize {
         self.scroll_offset
+    }
+
+    /// Scrolls one rendered line toward newer changes without changing selection.
+    pub fn scroll_previous_line(&mut self) {
+        self.follow_selection = false;
+        self.scroll_offset = self.scroll_offset.saturating_sub(1);
+    }
+
+    /// Scrolls one rendered line toward older changes without changing selection.
+    pub fn scroll_next_line(&mut self) {
+        self.follow_selection = false;
+        self.scroll_offset = self.scroll_offset.saturating_add(1);
+        self.clamp_scroll_offset();
     }
 
     /// Returns whether the selected change currently owns inline details.
@@ -183,6 +198,10 @@ impl LogState {
     /// Updates viewport height and scrolls enough to keep selection visible.
     pub fn keep_selected_in_view(&mut self, height: usize) {
         self.viewport_height = height.max(1);
+        if !self.follow_selection {
+            self.clamp_scroll_offset();
+            return;
+        }
 
         let Some(selected_line) = self.selected_rendered_line() else {
             self.scroll_offset = 0;
@@ -195,8 +214,11 @@ impl LogState {
         }
 
         let last_visible = self.scroll_offset + height.saturating_sub(1);
-        if selected_line > last_visible {
-            self.scroll_offset = selected_line + 1 - height;
+        let selected_end_line = self.selected_entry_end_line().unwrap_or(selected_line);
+        if selected_end_line > last_visible {
+            let scroll_for_entry_end = selected_end_line + 1 - height;
+            self.scroll_offset = scroll_for_entry_end.min(selected_line);
+            self.clamp_scroll_offset();
         }
     }
 
@@ -230,6 +252,15 @@ impl LogState {
         self.selected_entry().map(LogEntry::rendered_line)
     }
 
+    /// Returns the final rendered line that belongs to the selected entry.
+    fn selected_entry_end_line(&self) -> Option<usize> {
+        let selected = self.selected?;
+        self.entries
+            .get(selected + 1)
+            .map(|entry| entry.rendered_line().saturating_sub(1))
+            .or_else(|| last_entry_line(&self.rendered))
+    }
+
     /// Scrolls upward when selection moves above the current viewport.
     fn keep_selected_visible(&mut self) {
         let Some(selected_line) = self.selected_rendered_line() else {
@@ -250,6 +281,7 @@ impl LogState {
 
         let was_expanded = self.selected_is_expanded();
         self.selected = Some(index);
+        self.follow_selection = true;
         self.apply_expansion_to_selected(was_expanded);
         self.keep_selected_visible();
     }
@@ -271,12 +303,7 @@ impl LogState {
             return;
         }
 
-        let max_scroll_offset = self
-            .rendered
-            .lines()
-            .count()
-            .saturating_sub(1)
-            .min(self.entries.last().map_or(0, LogEntry::rendered_line));
+        let max_scroll_offset = self.rendered.lines().count().saturating_sub(1);
         self.scroll_offset = self.scroll_offset.min(max_scroll_offset);
     }
 }
@@ -425,6 +452,81 @@ mod tests {
         state.keep_selected_in_view(2);
 
         assert_eq!(state.scroll_offset(), 3);
+    }
+
+    #[test]
+    fn selected_multiline_entry_keeps_whole_message_visible_when_it_fits() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  second body\n│  more body\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(5),
+            ],
+        ));
+
+        state.select_next();
+        state.keep_selected_in_view(3);
+
+        assert_eq!(state.scroll_offset(), 2);
+    }
+
+    #[test]
+    fn selected_tall_entry_keeps_commit_row_and_body_visible() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  line one\n│  line two\n│  line three\n│  line four\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(7),
+            ],
+        ));
+
+        state.select_next();
+        state.keep_selected_in_view(3);
+
+        assert_eq!(state.scroll_offset(), 2);
+    }
+
+    #[test]
+    fn line_scroll_moves_view_without_changing_selection() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  second body\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(4),
+            ],
+        ));
+
+        state.scroll_next_line();
+        state.scroll_next_line();
+        state.scroll_previous_line();
+        state.keep_selected_in_view(2);
+
+        assert_eq!(state.scroll_offset(), 1);
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("aaa"));
+    }
+
+    #[test]
+    fn selection_movement_resumes_following_selection_after_line_scroll() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n│  first body\n○  bbb second\n│  second body\n◆  ccc third\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(4),
+            ],
+        ));
+
+        state.scroll_next_line();
+        state.scroll_next_line();
+        state.keep_selected_in_view(2);
+        state.select_next();
+        state.keep_selected_in_view(2);
+
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("bbb"));
+        assert_eq!(state.scroll_offset(), 2);
     }
 
     #[test]

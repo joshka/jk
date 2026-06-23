@@ -14,6 +14,7 @@ pub(crate) enum BindingContext {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ActionId {
     Move,
+    LineScroll,
     Page,
     FirstLast,
     Expand,
@@ -21,6 +22,7 @@ enum ActionId {
     OpenShow,
     OpenDiff,
     OpenStatus,
+    SwitchTemplate,
     Refresh,
     SwitchLogCommand,
     File,
@@ -74,9 +76,10 @@ impl KeyBinding {
 }
 
 const LOG_BINDINGS: &[KeyBinding] = &[
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection").with_hotbar(7, "j/k move"),
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection").with_hotbar(8, "j/k move"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line"),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
-        .with_hotbar(8, "space/b page"),
+        .with_hotbar(9, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom"),
     KeyBinding::new(ActionId::OpenShow, "enter", "open selected-change show")
         .with_hotbar(4, "enter show"),
@@ -84,17 +87,20 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Collapse, "left, h", "collapse selected change"),
     KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff").with_hotbar(5, "d diff"),
     KeyBinding::new(ActionId::OpenStatus, "s", "open repository status").with_hotbar(6, "s status"),
+    KeyBinding::new(ActionId::SwitchTemplate, "T", "switch log template")
+        .with_hotbar(7, "T template"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh").with_hotbar(3, "r refresh"),
     KeyBinding::new(ActionId::SwitchLogCommand, "H / L", "home command / jj log")
         .with_hotbar(2, "H home  L log"),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help").with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
-        .with_hotbar(9, "q quit")
+        .with_hotbar(10, "q quit")
         .hotbar_only(),
 ];
 
 const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line").with_hotbar(3, "j/k line"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line"),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
         .with_hotbar(4, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom"),
@@ -119,6 +125,7 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
 
 const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line").with_hotbar(3, "j/k line"),
+    KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line"),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
         .with_hotbar(4, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom"),
@@ -179,7 +186,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  s status  j/k move  space/b page  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  s status  T template  j/k move  space/b page  q quit"
         );
     }
 
@@ -205,6 +212,7 @@ mod tests {
             help_lines(BindingContext::Log),
             vec![
                 "j/k or arrows        move selection",
+                "Ctrl-j/k             scroll one line",
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
                 "enter                open selected-change show",
@@ -212,6 +220,7 @@ mod tests {
                 "left, h              collapse selected change",
                 "d                    open selected-change diff",
                 "s                    open repository status",
+                "T                    switch log template",
                 "r                    refresh",
                 "H / L                home command / jj log",
                 "?, q, Esc            close help",
@@ -225,6 +234,7 @@ mod tests {
             help_lines(BindingContext::Diff),
             vec![
                 "j/k or arrows        scroll one line",
+                "Ctrl-j/k             scroll one line",
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
                 "[ / ]                previous/next file",
@@ -247,6 +257,7 @@ mod tests {
             help_lines(BindingContext::Inspection),
             vec![
                 "j/k or arrows        scroll one line",
+                "Ctrl-j/k             scroll one line",
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
                 "/, n, N              search, next, previous",

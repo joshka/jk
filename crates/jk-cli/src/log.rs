@@ -18,6 +18,13 @@ use rendered::assign_rendered_lines;
 use semantic::{LOG_TEMPLATE, parse_log_json_lines};
 
 const LOG_COMMAND: &str = "log";
+const COMFORTABLE_LOG_TEMPLATE: &str = "builtin_log_comfortable";
+const COMPACT_LOG_TEMPLATE: &str = "builtin_log_compact";
+const FULL_DESCRIPTION_LOG_TEMPLATE: &str = "builtin_log_compact_full_description";
+const DETAILED_LOG_TEMPLATE: &str = "builtin_log_detailed";
+const ONELINE_LOG_TEMPLATE: &str = "builtin_log_oneline";
+const REDACTED_LOG_TEMPLATE: &str = "builtin_log_redacted";
+const TEMPLATE_TITLE_LIMIT: usize = 48;
 
 /// Loads a log-like view from the local `jj` command.
 ///
@@ -42,6 +49,8 @@ pub struct JjLog {
     repository: Option<PathBuf>,
     command: JjLogCommand,
     limit: Option<usize>,
+    template: LogTemplateSelection,
+    custom_template: Option<String>,
 }
 
 impl Default for JjLog {
@@ -50,6 +59,8 @@ impl Default for JjLog {
             repository: None,
             command: JjLogCommand::ConfiguredDefault,
             limit: None,
+            template: LogTemplateSelection::Configured,
+            custom_template: None,
         }
     }
 }
@@ -63,6 +74,35 @@ pub enum JjLogCommand {
 
     /// Run jj's explicit `log` command.
     Log,
+}
+
+/// Rendered `jj log` template selection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum LogTemplateSelection {
+    /// Let `jj` use the configured rendered template.
+    Configured,
+
+    /// Use jj's built-in comfortable log template.
+    Comfortable,
+
+    /// Use jj's built-in compact log template.
+    Compact,
+
+    /// Use jj's built-in compact template with full descriptions.
+    CompactFullDescription,
+
+    /// Use jk's built-in detailed rendered log template.
+    Detailed,
+
+    /// Use jj's built-in one-line log template.
+    Oneline,
+
+    /// Use jj's redacted log template.
+    Redacted,
+
+    /// Use a caller-provided rendered `jj` template.
+    Custom(String),
 }
 
 impl JjLog {
@@ -85,6 +125,46 @@ impl JjLog {
     pub const fn with_limit(mut self, limit: Option<usize>) -> Self {
         self.limit = limit;
         self
+    }
+
+    /// Sets the rendered log template selection.
+    #[must_use]
+    pub fn with_template(mut self, template: LogTemplateSelection) -> Self {
+        if let LogTemplateSelection::Custom(custom) = &template {
+            self.custom_template = Some(custom.clone());
+        }
+        self.template = template;
+        self
+    }
+
+    /// Clears the rendered log template selection.
+    #[must_use]
+    pub fn with_configured_template(self) -> Self {
+        self.with_template(LogTemplateSelection::Configured)
+    }
+
+    /// Returns the current rendered log template selection.
+    #[must_use]
+    pub const fn template(&self) -> &LogTemplateSelection {
+        &self.template
+    }
+
+    /// Returns selectable rendered log templates for the current source.
+    #[must_use]
+    pub fn template_options(&self) -> Vec<LogTemplateSelection> {
+        let mut options = vec![
+            LogTemplateSelection::Configured,
+            LogTemplateSelection::Comfortable,
+            LogTemplateSelection::Compact,
+            LogTemplateSelection::CompactFullDescription,
+            LogTemplateSelection::Detailed,
+            LogTemplateSelection::Oneline,
+            LogTemplateSelection::Redacted,
+        ];
+        if let Some(custom) = &self.custom_template {
+            options.push(LogTemplateSelection::Custom(custom.clone()));
+        }
+        options
     }
 
     /// Loads a rendered log snapshot and semantic entries from `jj`.
@@ -145,9 +225,13 @@ impl JjLog {
         if mode == DefaultCommandMode::Json {
             argv.push("-T".to_owned());
             argv.push(LOG_TEMPLATE.to_owned());
+        } else if let Some(template) = self.rendered_template() {
+            argv.push("-T".to_owned());
+            argv.push(template.to_owned());
         }
 
-        let spec = JjCommandSpec::render_read_only(argv).with_title(command_title(command_args));
+        let spec = JjCommandSpec::render_read_only(argv)
+            .with_title(command_title(command_args, &self.template));
         if let Some(repository) = &self.repository {
             spec.with_repository(repository)
         } else {
@@ -161,15 +245,83 @@ impl JjLog {
             JjLogCommand::Log => vec![LOG_COMMAND.to_owned()],
         }
     }
+
+    fn rendered_template(&self) -> Option<&str> {
+        match &self.template {
+            LogTemplateSelection::Configured => None,
+            LogTemplateSelection::Comfortable => Some(COMFORTABLE_LOG_TEMPLATE),
+            LogTemplateSelection::Compact => Some(COMPACT_LOG_TEMPLATE),
+            LogTemplateSelection::CompactFullDescription => Some(FULL_DESCRIPTION_LOG_TEMPLATE),
+            LogTemplateSelection::Detailed => Some(DETAILED_LOG_TEMPLATE),
+            LogTemplateSelection::Oneline => Some(ONELINE_LOG_TEMPLATE),
+            LogTemplateSelection::Redacted => Some(REDACTED_LOG_TEMPLATE),
+            LogTemplateSelection::Custom(template) => Some(template),
+        }
+    }
+}
+
+impl LogTemplateSelection {
+    /// Returns the short label used in interactive template selectors.
+    #[must_use]
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Configured => "configured",
+            Self::Comfortable => "comfortable",
+            Self::Compact => "compact",
+            Self::CompactFullDescription => "full description",
+            Self::Detailed => "detailed",
+            Self::Oneline => "oneline",
+            Self::Redacted => "redacted",
+            Self::Custom(_) => "custom",
+        }
+    }
+
+    /// Returns the template string passed to `jj -T` for display.
+    #[must_use]
+    pub fn template_name(&self) -> Option<&str> {
+        match self {
+            Self::Configured => None,
+            Self::Comfortable => Some(COMFORTABLE_LOG_TEMPLATE),
+            Self::Compact => Some(COMPACT_LOG_TEMPLATE),
+            Self::CompactFullDescription => Some(FULL_DESCRIPTION_LOG_TEMPLATE),
+            Self::Detailed => Some(DETAILED_LOG_TEMPLATE),
+            Self::Oneline => Some(ONELINE_LOG_TEMPLATE),
+            Self::Redacted => Some(REDACTED_LOG_TEMPLATE),
+            Self::Custom(template) => Some(template),
+        }
+    }
 }
 
 /// Builds the title-bar command label from the jj command arguments.
-fn command_title(command_args: &[String]) -> String {
+fn command_title(command_args: &[String], template: &LogTemplateSelection) -> String {
     let mut title = String::from("jj");
     for arg in command_args {
         title.push(' ');
         title.push_str(arg);
     }
+    match template {
+        LogTemplateSelection::Configured => {}
+        template => {
+            title.push_str(" -T ");
+            title.push_str(&template_title(
+                template.template_name().unwrap_or_default(),
+            ));
+        }
+    }
+    title
+}
+
+fn template_title(template: &str) -> String {
+    let compact = template.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.chars().count() <= TEMPLATE_TITLE_LIMIT {
+        return compact;
+    }
+
+    let mut title = compact
+        .chars()
+        .take(TEMPLATE_TITLE_LIMIT.saturating_sub(3))
+        .collect::<String>();
+    title.push_str("...");
     title
 }
 
@@ -289,13 +441,123 @@ mod tests {
         assert!(!args.iter().any(|arg| arg == "log"));
         assert!(args.windows(2).any(|args| args == ["-n", "3"]));
         assert!(args.windows(2).any(|args| args == ["-T", LOG_TEMPLATE]));
-        assert_eq!(command_title(&command_args), "jj");
+        assert_eq!(
+            command_title(&command_args, &LogTemplateSelection::Configured),
+            "jj"
+        );
     }
 
     #[test]
     fn command_title_names_jj_command_context() {
         let command_args = vec!["log".to_owned(), "-r".to_owned(), "@".to_owned()];
 
-        assert_eq!(command_title(&command_args), "jj log -r @");
+        assert_eq!(
+            command_title(&command_args, &LogTemplateSelection::Configured),
+            "jj log -r @"
+        );
+    }
+
+    #[test]
+    fn command_title_shows_compact_custom_template() {
+        let command_args = vec!["log".to_owned()];
+
+        assert_eq!(
+            command_title(
+                &command_args,
+                &LogTemplateSelection::Custom("builtin_log_compact_full_description".to_owned())
+            ),
+            "jj log -T builtin_log_compact_full_description"
+        );
+    }
+
+    #[test]
+    fn custom_template_only_affects_rendered_command() {
+        let source = JjLog::default()
+            .with_command(JjLogCommand::Log)
+            .with_template(LogTemplateSelection::Custom("description".to_owned()));
+        let command_args = source.command_args();
+        let rendered = source.command(DefaultCommandMode::Rendered, &command_args);
+        let semantic = source.command(DefaultCommandMode::Json, &command_args);
+        let rendered_args = rendered
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        let semantic_args = semantic
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert!(
+            rendered_args
+                .windows(2)
+                .any(|args| args == ["-T", "description"])
+        );
+        assert!(
+            !semantic_args
+                .windows(2)
+                .any(|args| args == ["-T", "description"])
+        );
+        assert!(
+            semantic_args
+                .windows(2)
+                .any(|args| args == ["-T", LOG_TEMPLATE])
+        );
+    }
+
+    #[test]
+    fn detailed_template_uses_native_jj_template_name() {
+        let source = JjLog::default()
+            .with_command(JjLogCommand::Log)
+            .with_template(LogTemplateSelection::Detailed);
+        let command_args = source.command_args();
+        let command = source.command(DefaultCommandMode::Rendered, &command_args);
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert!(
+            args.windows(2)
+                .any(|args| args == ["-T", DETAILED_LOG_TEMPLATE])
+        );
+    }
+
+    #[test]
+    fn selector_options_include_jj_log_presets() {
+        let source = JjLog::default();
+
+        assert_eq!(
+            source.template_options(),
+            vec![
+                LogTemplateSelection::Configured,
+                LogTemplateSelection::Comfortable,
+                LogTemplateSelection::Compact,
+                LogTemplateSelection::CompactFullDescription,
+                LogTemplateSelection::Detailed,
+                LogTemplateSelection::Oneline,
+                LogTemplateSelection::Redacted,
+            ]
+        );
+    }
+
+    #[test]
+    fn template_options_include_startup_custom_template() {
+        let source = JjLog::default()
+            .with_command(JjLogCommand::Log)
+            .with_template(LogTemplateSelection::Custom("description".to_owned()));
+
+        assert_eq!(
+            source.template_options(),
+            vec![
+                LogTemplateSelection::Configured,
+                LogTemplateSelection::Comfortable,
+                LogTemplateSelection::Compact,
+                LogTemplateSelection::CompactFullDescription,
+                LogTemplateSelection::Detailed,
+                LogTemplateSelection::Oneline,
+                LogTemplateSelection::Redacted,
+                LogTemplateSelection::Custom("description".to_owned())
+            ]
+        );
     }
 }

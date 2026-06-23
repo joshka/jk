@@ -18,6 +18,6 @@ pub mod show;
 pub mod status;
 
 pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
-pub use log::{JjLog, JjLogCommand, JjLogError};
+pub use log::{JjLog, JjLogCommand, JjLogError, LogTemplateSelection};
 pub use show::{JjShow, JjShowError, ShowQuery};
 pub use status::{JjStatus, JjStatusError, StatusQuery};

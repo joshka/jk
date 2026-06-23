@@ -32,6 +32,9 @@ pub enum ActionResult {
     /// Switch to the explicit `jj log` view.
     SwitchLog,
 
+    /// Switch the rendered log template selection.
+    SwitchTemplate,
+
     /// Open the selected change's diff.
     OpenDiff,
 
@@ -51,6 +54,12 @@ pub enum LogAction {
 
     /// Move to the next visible change.
     Next,
+
+    /// Scroll one rendered line toward newer changes.
+    ScrollPreviousLine,
+
+    /// Scroll one rendered line toward older changes.
+    ScrollNextLine,
 
     /// Move one visible page toward older changes.
     PagePrevious,
@@ -108,6 +117,9 @@ pub enum LogAction {
 
     /// Switch to the explicit `jj log` view.
     Log,
+
+    /// Switch the rendered log template selection.
+    SwitchTemplate,
 
     /// Open the selected change's diff.
     OpenDiff,
@@ -178,6 +190,14 @@ impl LogView {
                 self.state.select_next();
                 ActionResult::Continue
             }
+            LogAction::ScrollPreviousLine => {
+                self.state.scroll_previous_line();
+                ActionResult::Continue
+            }
+            LogAction::ScrollNextLine => {
+                self.state.scroll_next_line();
+                ActionResult::Continue
+            }
             LogAction::PagePrevious => {
                 self.state.select_page_previous();
                 ActionResult::Continue
@@ -215,6 +235,7 @@ impl LogView {
             LogAction::Refresh => ActionResult::Refresh,
             LogAction::Home => ActionResult::SwitchHome,
             LogAction::Log => ActionResult::SwitchLog,
+            LogAction::SwitchTemplate => ActionResult::SwitchTemplate,
             LogAction::OpenDiff => {
                 if self.selected_change_id().is_some() {
                     ActionResult::OpenDiff
@@ -237,17 +258,31 @@ impl LogView {
     /// Renders the log view.
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
-        self.render_area(frame, area);
+        self.render_area(frame, area, None);
     }
 
-    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect) {
+    /// Renders the log view with a caller-owned status line.
+    pub fn render_with_status(&mut self, frame: &mut Frame<'_>, status: &str) {
+        let area = frame.area();
+        self.render_area(frame, area, Some(status));
+    }
+
+    /// Renders the log view with a centered selector overlay.
+    pub fn render_with_selector(&mut self, frame: &mut Frame<'_>, title: &str, lines: &[String]) {
+        let area = frame.area();
+        self.render_area(frame, area, None);
+        let areas = ViewChrome::layout(area);
+        render_help_overlay(frame, areas.content, title, lines);
+    }
+
+    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status: Option<&str>) {
         let areas = ViewChrome::layout(area);
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
 
-        let status = self
-            .status_message
-            .clone()
+        let status = status
+            .map(ToOwned::to_owned)
+            .or_else(|| self.status_message.clone())
             .unwrap_or_else(|| hotbar(BindingContext::Log));
         let chrome = ViewChrome::new(self.state.title(), &status);
         chrome.render(frame, areas);
@@ -347,7 +382,7 @@ mod tests {
     fn help_action_shows_log_specific_keys() {
         let mut view = LogView::new(snapshot(["aaa"]));
         let _ = view.apply(LogAction::ToggleHelp);
-        let backend = TestBackend::new(72, 18);
+        let backend = TestBackend::new(72, 22);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},

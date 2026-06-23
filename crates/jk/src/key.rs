@@ -112,6 +112,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'r' => Some(AppKey::Action(LogAction::Refresh)),
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
+        'T' => Some(AppKey::Action(LogAction::SwitchTemplate)),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
         's' => Some(AppKey::OpenStatus),
@@ -142,6 +143,8 @@ const fn action_for_control_key(code: KeyCode) -> AppKey {
     match code {
         KeyCode::Char('b') => AppKey::Action(LogAction::PagePrevious),
         KeyCode::Char('f') => AppKey::Action(LogAction::PageNext),
+        KeyCode::Char('k') => AppKey::Action(LogAction::ScrollPreviousLine),
+        KeyCode::Char('j') => AppKey::Action(LogAction::ScrollNextLine),
         KeyCode::Left => AppKey::Action(LogAction::FoldAll),
         KeyCode::Right => AppKey::Action(LogAction::UnfoldAll),
         _ => AppKey::Ignore,
@@ -193,6 +196,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('L'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::Log)
+        );
+    }
+
+    #[test]
+    fn uppercase_t_switches_log_template() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('T'), KeyModifiers::NONE)),
+            AppKey::Action(LogAction::SwitchTemplate)
         );
     }
 
@@ -353,6 +364,18 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::NONE)),
             AppKey::Action(LogAction::Last)
+        );
+    }
+
+    #[test]
+    fn control_j_and_k_scroll_log_by_line() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::ScrollNextLine)
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL)),
+            AppKey::Action(LogAction::ScrollPreviousLine)
         );
     }
 }
