@@ -6,6 +6,13 @@ Owner: `vibe-log-template-selection` workspace spike
 
 Scope: first log template chooser and startup-template implementation chunk
 
+Planning update: the [CLI surface addendum](cli-surface-addendum.md) keeps this startup-template
+work, but changes the long-term in-app key shape. `T` is reserved for the tags screen, standalone
+`v` is reserved for `evolog`, and template switching should become a log-specific branch of the
+reusable `V` View Options overlay. The current vibe implementation has a temporary standalone `T`
+popup because View Options did not exist yet; migrate that popup under `V` before turning the slice
+into review-ready product work.
+
 ## Problem
 
 `jk` currently has two log display mechanisms that solve different problems:
@@ -22,7 +29,7 @@ across the list.
 
 - Add `jk log -T TEMPLATE` as startup behavior for the rendered log pass.
 - Preserve the semantic JSON pass used for navigation, selection, and inline expansion.
-- Add a small in-app chooser for log templates.
+- Add log template choices under the reusable `V` View Options overlay once that overlay exists.
 - Provide configured/default plus the working built-in jj log templates that are useful as full log
   views.
 - Use `jj` templates for rendered log output, not locally rendered summaries.
@@ -106,7 +113,8 @@ Bare `jk` compatibility:
 
 ## In-App Chooser
 
-Use a small popup selector similar to the help overlay, not a status-bar cycle:
+Use the reusable View Options overlay, not a status-bar cycle or a permanent standalone log-only
+key:
 
 - `Configured`: no rendered `-T`, current default for `jk log`;
 - `Comfortable`: `builtin_log_comfortable`;
@@ -119,23 +127,25 @@ Use a small popup selector similar to the help overlay, not a status-bar cycle:
 
 Interaction:
 
-- `T`: open the template selector while the log is active;
+- `V`: open View Options while the log is active;
+- choose the Template row to enter the log-template selector;
 - `j/k` or up/down arrows: move the highlighted template row;
 - Enter: apply the highlighted template and close the selector;
 - Esc, Backspace, or `q`: close the selector without changing the template.
 
 Collision notes:
 
-- `T` is currently free in the binary keymap and mirrors `jk log -T`;
-- lowercase `t` is also free, but it is more likely to collide with future marks, tree controls, or
-  command-mode text entry habits;
-- keep `T` as "open template chooser" even if the selector later grows into command-mode or
-  searchable picker behavior.
+- `T` is reserved for the tags screen in the harmonized keymap;
+- lowercase `v` is reserved for standalone `jj evolog`;
+- keep templates under `V` so log templates, graph/list flags, and diff display flags share one
+  View Options model.
+- the current vibe `T` popup is acceptable only as a temporary precursor to `V` while this remains a
+  local spike.
 
 Visible help/hotbar:
 
-- add a log-only binding row in `crates/jk-tui/src/keymap.rs`;
-- keep the hotbar label short, for example `T template`;
+- add or reuse the common `V options` binding row in `crates/jk-tui/src/keymap.rs`;
+- the overlay can show a log-only `Template` row when the active view supports log templates;
 - do not expose the binding in diff/show/status contexts.
 
 ## Multi-Line Template Navigation
@@ -203,7 +213,7 @@ Acceptance:
 - selection and scroll are preserved by change id when possible.
 - failures leave the previous rendered log visible with an error status.
 
-### Chunk 3: keymap and visible help
+### Chunk 3: View Options integration and visible help
 
 Files:
 
@@ -213,9 +223,10 @@ Files:
 
 Acceptance:
 
-- `T` maps to a log-template action only while log is active.
-- log help and hotbar show the template action.
-- diff, show, and status do not treat `T` as a return-to-log or mutation action.
+- `V` opens View Options while log is active.
+- the log View Options overlay includes a Template row.
+- diff, show, status, and operation views keep using `V` for their own view options.
+- `T` remains available for the tags screen.
 - existing `H` and `L` source switching remains predictable.
 
 ## Tests
@@ -227,8 +238,8 @@ Required unit tests:
 - `Detailed` builds a native jj template argument on the rendered pass.
 - bare configured default uses no rendered `-T`.
 - `jk log -T TEMPLATE` parses into explicit log startup state.
-- `T` maps to the new template action.
-- log help and hotbar include `T template`.
+- `V` maps to View Options while log is active.
+- log help and hotbar include `V options`.
 - refresh after a template switch preserves selected change id.
 - rendered-line alignment still works when a rendered template inserts body lines between commits.
 - page and up/down movement use updated rendered-line positions after switching templates.
@@ -258,7 +269,7 @@ Implementation should collect assertion-first TUI evidence:
 - `jk log -T <template>` starts with the expected rendered message/body detail visible;
 - up/down navigation highlights the correct commit rows in the custom template view;
 - `Ctrl-j/k` scrolls the rendered log by line without changing the selected change;
-- pressing `T` opens the popup selector with built-in jj log templates and the startup custom
+- pressing `V` opens View Options with built-in jj log templates and the startup custom
   template when present;
 - applying a selector choice switches templates and keeps navigation usable;
 - `r` refreshes the active template selection;

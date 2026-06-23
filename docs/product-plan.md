@@ -23,6 +23,10 @@ When current `jj` behavior matters, verify against the installed `jj help <COMMA
 user's configured `jj` version. External docs and prior-art READMEs are useful references, but `jk`
 compatibility work should not outrank the local `jj` command surface.
 
+The standalone [CLI surface addendum](plans/cli-surface-addendum.md) is the command/flag audit for
+`jj 0.42.0`. It sharpens this plan without replacing it: use the addendum for reusable flag-family
+primitives, `v`/`V` key assignments, selector coverage, and command-family priority updates.
+
 Useful source links for `jj` compatibility and ecosystem context:
 
 - [Jujutsu CLI reference](https://docs.jj-vcs.dev/latest/cli-reference/);
@@ -598,6 +602,7 @@ configuration may remap it later.
 | `u`         | Undo, preview/confirm unless configured otherwise.                          |
 | `U`         | Redo, preview/confirm unless configured otherwise.                          |
 | `Tab`       | Cycle focused regions within the active screen, if that screen has regions. |
+| `V`         | Reusable View Options overlay for display, diff, graph, and template flags. |
 | `h/l`       | Collapse/open or fold/unfold where sensible.                                |
 | `Ctrl-c`    | Emergency quit; restore terminal.                                           |
 
@@ -634,7 +639,7 @@ Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` r
 | `p`     | Open/toggle temporary preview or detail view for selected object.                        |
 | `d`     | Diff selected/marked revisions.                                                          |
 | `S`     | Stat view for selected/marked revisions.                                                 |
-| `v`     | View-format menu: patch/stat/summary/types/name-only/git/color-words/context/whitespace. |
+| `v`     | Evolution log for selected revision: `jj evolog`.                                        |
 | `s`     | Status screen.                                                                           |
 | `f`     | Revset/filter input with completion.                                                     |
 | `n`     | New change from cursor/marks: `jj new ...`.                                              |
@@ -651,7 +656,7 @@ Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` r
 | `W`     | Workspaces screen.                                                                       |
 | `F`     | Fetch screen/default fetch.                                                              |
 | `P`     | Push screen, dry-run first.                                                              |
-| `V`     | Evolution log for selected revision: `jj evolog`.                                        |
+| `V`     | View Options overlay for graph/list, template, patch, stat, and diff display flags.      |
 | `@`     | Jump to working-copy commit.                                                             |
 
 ### 5.4 Action menu from revision graph
@@ -693,7 +698,7 @@ The `a` prefix opens a visible overlay. Keys are active only while the overlay i
 | `/`, `Ctrl-n`, `Ctrl-p`                     | Search.                                                                |
 | `Space`                                     | Mark/unmark file or hunk when focus is on a selectable section.        |
 | `f`                                         | File picker/jump overlay.                                              |
-| `v`                                         | View-format menu.                                                      |
+| `V`                                         | View Options overlay.                                                  |
 | `S`                                         | Toggle/open stat view.                                                 |
 | `o`                                         | Open full diff for current file/path from a focused summary or picker. |
 | `O`                                         | Open selected file in external editor.                                 |
@@ -722,6 +727,7 @@ The `a` prefix opens a visible overlay. Keys are active only while the overlay i
 | `Enter` | `jj op show <op>`.                                                             |
 | `d`     | `jj op diff` for selected operation.                                           |
 | `S`     | Stat operation diff/show.                                                      |
+| `V`     | View Options overlay.                                                          |
 | `l`     | Open revision graph at operation: `jj --at-op=<op> log --ignore-working-copy`. |
 | `s`     | Status at operation.                                                           |
 | `r`     | `jj op restore <op>`, confirmed.                                               |
@@ -875,68 +881,68 @@ Navigation contract:
 | ----------------------------------- | --------------------- | -------- | ---------------------------------------------------------------------------------- |
 | `jj log`                            | Workbench graph       | P0       | Default screen. Honor `ui.default-command`, `revsets.log`, templates, graph style. |
 | `jj diff`                           | `d`, Diff screen      | P0       | Support `-r`, `--from`, `--to`, filesets, display modes.                           |
-| `jj show`                           | `Enter`, Show/details | P0       | Metadata + diff; view-format menu.                                                 |
-| `jj status`                         | `s`, Status screen    | P1       | Working copy, conflicts, bookmarks, file list.                                     |
-| `jj interdiff`                      | `a?` or view menu     | P2       | Useful for comparing evolution of a change; marks map to from/to.                  |
-| `jj evolog`                         | `V`                   | P2       | Evolution history; useful for split/divergence.                                    |
-| `jj file list/show/annotate/search` | File/detail screens   | P3       | Add after file model matures.                                                      |
+| `jj show`                           | `Enter`, Show/details | P0       | Metadata + diff; View Options.                                                     |
+| `jj status`                         | `s`, Status screen    | P0       | Working copy, conflicts, bookmarks, file list.                                     |
+| `jj interdiff`                      | `I` later or evolog   | P1       | Useful for comparing evolution of a change; marks map to from/to.                  |
+| `jj evolog`                         | `v`                   | P1       | Evolution history; useful for split/divergence.                                    |
+| `jj file list/show/annotate/search` | File/detail screens   | P1       | Add after the file model and selectors are stable.                                 |
 
 ### 7.2 Revision and history edit commands
 
 | jj command            | jk action                   | Priority | Notes                                               |
 | --------------------- | --------------------------- | -------- | --------------------------------------------------- |
-| `jj describe`         | `m/M`                       | P1       | Inline and editor flows.                            |
-| `jj metaedit`         | `a m`                       | P3       | Advanced metadata.                                  |
-| `jj new`              | `n/N`                       | P1       | From cursor/marks as parents; with/without message. |
-| `jj commit`           | `c` where `@`/status valid  | P1       | Working-copy flow.                                  |
-| `jj edit`             | `e`                         | P1       | Direct but clear; `a E` for ignore immutable.       |
-| `jj rebase`           | `R`                         | P1       | Visual role picker.                                 |
-| `jj abandon`          | `a a`                       | P1       | Destructive confirmation and operation recovery.    |
+| `jj describe`         | `m/M`                       | P0       | Inline and editor flows.                            |
+| `jj metaedit`         | `a m`                       | P2       | Advanced metadata.                                  |
+| `jj new`              | `n/N`                       | P0       | From cursor/marks as parents; with/without message. |
+| `jj commit`           | `c` where `@`/status valid  | P0       | Working-copy flow.                                  |
+| `jj edit`             | `e`                         | P0/P1    | Direct but clear; `a E` for ignore immutable.       |
+| `jj rebase`           | `R`                         | P0       | Visual role picker.                                 |
+| `jj abandon`          | `a a`                       | P0/P1    | Destructive confirmation and operation recovery.    |
 | `jj revert`           | `a v`                       | P2       | Destination picker.                                 |
-| `jj duplicate`        | `a D`                       | P3       | Preserve command preview.                           |
-| `jj parallelize`      | `a p`                       | P3       | Stack cleanup.                                      |
-| `jj simplify-parents` | `a P`                       | P3       | Stack cleanup.                                      |
-| `jj prev/next`        | command mode or future goto | P4       | Lower priority; conflicts with app navigation.      |
+| `jj duplicate`        | `a D`                       | P2       | Preserve command preview.                           |
+| `jj parallelize`      | `a p`                       | P2       | Stack cleanup.                                      |
+| `jj simplify-parents` | `a P`                       | P2       | Stack cleanup.                                      |
+| `jj prev/next`        | command mode or future goto | P3       | Lower priority; conflicts with app navigation.      |
 
 ### 7.3 Content movement and file/hunk commands
 
 | jj command                    | jk action                | Priority | Notes                                                         |
 | ----------------------------- | ------------------------ | -------- | ------------------------------------------------------------- |
-| `jj squash`                   | `a s`                    | P2       | Revision, file, and later hunk-aware.                         |
-| `jj split`                    | `a S`                    | P2       | Start with diff editor; later non-interactive file/hunk flow. |
-| `jj restore`                  | `a r`                    | P2       | Revision/file/hunk-aware; confirm.                            |
-| `jj diffedit`                 | `a d`                    | P2       | External diff editor flow.                                    |
-| `jj absorb`                   | `a b`                    | P2       | Post-op `jj op show -p` review.                               |
-| `jj fix`                      | `a f`                    | P3       | Integrate with config-defined fix tools.                      |
-| `jj resolve`                  | `a R`                    | P2       | Conflict list and external merge-tool flow.                   |
-| `jj file track/untrack/chmod` | status/files action menu | P3       | Scoped to file screens.                                       |
+| `jj squash`                   | `a s`                    | P0       | Revision, file, and later hunk-aware.                         |
+| `jj split`                    | `a S`                    | P0       | Start with diff editor; later non-interactive file/hunk flow. |
+| `jj restore`                  | `a r`                    | P0       | Revision/file/hunk-aware; confirm.                            |
+| `jj diffedit`                 | `a d`                    | P1       | External diff editor flow.                                    |
+| `jj absorb`                   | `a b`                    | P1       | Post-op `jj op show -p` review.                               |
+| `jj fix`                      | `a f`                    | P1       | Integrate with config-defined fix tools.                      |
+| `jj resolve`                  | `a R`                    | P1       | Conflict list and external merge-tool flow.                   |
+| `jj file track/untrack/chmod` | status/files action menu | P1       | Scoped to file screens.                                       |
 
 ### 7.4 Operation log commands
 
 | jj command                | jk action         | Priority | Notes                   |
 | ------------------------- | ----------------- | -------- | ----------------------- |
-| `jj op log`               | `o`               | P1       | First-class screen.     |
-| `jj op show`              | `Enter` in op log | P1       | Show operation changes. |
-| `jj op diff`              | `d` in op log     | P1       | Compare operations.     |
-| `jj op restore`           | `r` in op log     | P1       | Strong confirmation.    |
-| `jj op revert`            | `v` in op log     | P1       | Strong confirmation.    |
-| `jj undo`                 | `u`               | P1       | Preview/confirm.        |
-| `jj redo`                 | `U`               | P1       | Preview/confirm.        |
-| `jj op abandon/integrate` | op action menu    | P4       | Advanced maintenance.   |
+| `jj op log`               | `o`               | P0       | First-class screen.     |
+| `jj op show`              | `Enter` in op log | P0       | Show operation changes. |
+| `jj op diff`              | `d` in op log     | P0       | Compare operations.     |
+| `jj op restore`           | `r` in op log     | P0/P1    | Strong confirmation.    |
+| `jj op revert`            | `v` in op log     | P0/P1    | Strong confirmation.    |
+| `jj undo`                 | `u`               | P0       | Preview/confirm.        |
+| `jj redo`                 | `U`               | P0       | Preview/confirm.        |
+| `jj op abandon/integrate` | op action menu    | P2       | Advanced maintenance.   |
 
 ### 7.5 Bookmarks, tags, Git
 
 | jj command                                       | jk screen/action          | Priority | Notes                                   |
 | ------------------------------------------------ | ------------------------- | -------- | --------------------------------------- |
-| `jj bookmark list`                               | `B`                       | P2       | Local/remote/tracking/conflict state.   |
-| `jj bookmark create/set/move/advance`            | Bookmark screen           | P2       | Role picker for target revision.        |
-| `jj bookmark delete/forget/rename/track/untrack` | Bookmark screen           | P2       | Scoped keys.                            |
-| `jj tag list/set/delete`                         | `T`                       | P3       | Similar to bookmarks.                   |
-| `jj git fetch`                                   | `F`                       | P2       | Default direct, chooser when ambiguous. |
-| `jj git push`                                    | `P`                       | P2       | Dry-run first.                          |
-| `jj git remote list/add/remove/rename/set-url`   | Git remote screen         | P3       | Remote setup and repair.                |
-| `jj git import/export`                           | Git action menu           | P3       | Useful in colocated repos.              |
-| `jj git clone/init`                              | Welcome/onboarding screen | P4       | Good later; not core 1.0.               |
+| `jj bookmark list`                               | `B`                       | P0       | Local/remote/tracking/conflict state.   |
+| `jj bookmark create/set/move/advance`            | Bookmark screen           | P0       | Role picker for target revision.        |
+| `jj bookmark delete/forget/rename/track/untrack` | Bookmark screen           | P0       | Scoped keys.                            |
+| `jj tag list/set/delete`                         | `T`                       | P1       | Similar to bookmarks.                   |
+| `jj git fetch`                                   | `F`                       | P0       | Default direct, chooser when ambiguous. |
+| `jj git push`                                    | `P`                       | P0       | Dry-run first.                          |
+| `jj git remote list/add/remove/rename/set-url`   | Git remote screen         | P1       | Remote setup and repair.                |
+| `jj git import/export`                           | Git action menu           | P1/P2    | Useful in colocated repos.              |
+| `jj git clone/init`                              | Welcome/onboarding screen | P1/P2    | Useful outside existing repositories.   |
 
 ### 7.6 Workspaces, sparse, config, signing, bisect, Gerrit
 
@@ -946,13 +952,13 @@ remain command-mode-first until the core workflows are mature.
 
 | Family           | Roadmap                                                               |
 | ---------------- | --------------------------------------------------------------------- |
-| `jj workspace`   | P1 dedicated workspace screen with list/add/forget/root/update-stale. |
-| `jj sparse`      | P4 sparse screen; command mode first.                                 |
-| `jj config`      | P3 config inspection, P4 config editor integration.                   |
-| `jj sign/unsign` | P4 action menu.                                                       |
-| `jj bisect`      | P4 workflow screen.                                                   |
-| `jj gerrit`      | P4 optional integration; command mode first.                          |
-| forge/tickets/AI | P5+; not part of core jj-native promise.                              |
+| `jj workspace`   | P0 dedicated workspace screen with list/add/forget/root/update-stale. |
+| `jj sparse`      | P2 sparse screen; command mode first.                                 |
+| `jj config`      | P2 config inspection, P3 config editor integration.                   |
+| `jj sign/unsign` | P3 action menu.                                                       |
+| `jj bisect`      | P3 workflow screen.                                                   |
+| `jj gerrit`      | P3 optional integration; command mode first.                          |
+| forge/tickets/AI | P3+; not part of core jj-native promise.                              |
 
 ## 8. Architecture plan
 
@@ -1157,7 +1163,7 @@ From graph:
 - `d` with one mark and cursor: `jj diff --from <mark> --to <cursor>`.
 - `d` with two marks: `jj diff --from <mark0> --to <mark1>`.
 - `S` uses same resolver plus `--stat`.
-- `v` opens view-format menu.
+- `V` opens View Options.
 
 Diff view:
 
@@ -2285,7 +2291,7 @@ After 1.0:
 | Version | Theme                       | Must-have deliverables                                                                     |
 | ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
 | 0.3     | Foundation                  | CommandSpec, view stack, generated help/hotbar, line scrolling, mark model.                |
-| 0.4     | jj-shaped inspection        | `jk diff -r/--from/--to`, show, status, view-format menu, diff search, command history.    |
+| 0.4     | jj-shaped inspection        | `jk diff -r/--from/--to`, show, status, View Options, diff search, evolog.                 |
 | 0.5     | Command mode and workspaces | `:`, `!`, searchable help, command output, rerun/copy, external runner, `W` workspace.     |
 | 0.6     | Safe mutation core          | describe inline/editor, new, commit, edit, rebase picker, abandon, undo/redo, op log.      |
 | 0.7     | Content workflows           | squash, split, restore, diffedit, absorb; file selection; initial hunk path via jj editor. |
@@ -2541,6 +2547,10 @@ jk is interactive jj, not a Git dashboard for jj.
 - Note prior-art implementation languages because they show which architecture and ecosystem
   choices each project validates.
 - Treat workspaces as early core scope for daily jj users, not an advanced feature.
+- Treat `jk` as a flag-family workbench: build shared selectors, `V` View Options, Run Options, and
+  generated command/flag manifests before expanding one-off command forms.
+- Reserve standalone `v` for `jj evolog` and use `V` for display, graph, diff, and template
+  options.
 
 ### 24.3 Betamax product-spine rule
 

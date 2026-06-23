@@ -42,6 +42,7 @@ specs, view stack ownership, titles, search, folding, refresh, and visible prove
 - Do not implement hunk staging, split, restore, diffedit, or absorb.
 - Do not add a provider crate or broad command-runner abstraction in this bucket.
 - Do not make `jk diff` parse every future `jj diff` flag in the first chunk.
+- Do not add one-off display toggles that bypass the reusable `V` View Options overlay.
 
 ## Current Dependencies
 
@@ -309,7 +310,7 @@ Suggested implementation steps:
 1. Store the selected root diff query in `main.rs` so refresh does not degrade to `jj diff -r`.
 1. Leave `DiffView` rendering unchanged.
 
-Stop there. Do not add `show`, `status`, marks, view-format menus, or file-list navigation in the
+Stop there. Do not add `show`, `status`, marks, View Options, or file-list navigation in the
 first review unit.
 
 ## Tests
@@ -365,7 +366,8 @@ wait until the command shape is stable enough for README or website examples.
 
 ## Follow-Up Chunks
 
-- Add patch, stat, summary, and name-only format toggles from the active diff query.
+- Add patch, stat, summary, name-only, and template display controls through the reusable `V` View
+  Options overlay.
 - Add file-list navigation as a focused overlay or direct view, not a permanent pane.
 - Add richer current-revision/current-file context in the title or status line.
 - Add two-revision comparison from ordered marks after the mark model lands.
