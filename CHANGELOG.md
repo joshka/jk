@@ -5,39 +5,7 @@ Entries are grouped by user workflow and release impact instead of following the
 
 ## Unreleased
 
-## Other
-
-
-- Strengthen product plan and positioning ([#36](https://github.com/joshka/jk/pull/36))
-
-- Link license files in README
-
-- Implement current jk TUI snapshot
-
-- Prepare release docs and media
-
-
-## Other
-
-
-- Strengthen product plan and positioning ([#36](https://github.com/joshka/jk/pull/36))
-
-- Implement current jk TUI snapshot
-
-
-## Other
-
-
-- Strengthen product plan and positioning ([#36](https://github.com/joshka/jk/pull/36))
-
-- Implement current jk TUI snapshot
-
-
-## Other
-
-
-- Implement current jk TUI snapshot
-
+## 0.2.6 - 2026-06-23
 
 This release candidate turns `jk` from a log/diff inspection helper into a dogfoodable jj TUI.
 The release cutoff is the current inspection, command, history, recovery, workspace, and diff-review
