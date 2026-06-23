@@ -2,8 +2,9 @@
 
 `jk` is a jj-native terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
 
-It keeps a `jj` log-like view open today, lets you refresh in place, and adds interactive navigation
-for reviewing change descriptions and selected-change diffs.
+It keeps `jj` output as the source of truth and adds an interactive jj TUI around it: inspect
+changes, run safe command previews, review command history, and recover through operation views
+without losing terminal context.
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
@@ -32,24 +33,38 @@ cargo install jk --locked
 
 ## Current Status
 
-The supported surface includes:
+`jk` currently focuses on the daily inspect-and-recover loop:
 
-- log view backed by `jj`;
-- manual refresh;
-- movement by change, page, and edge;
-- inline expansion of the selected change description;
-- selected-change diff inspection from the log or with `jk diff [REVISION]`;
-- diff search, file/hunk navigation, horizontal scrolling, and folding;
-- mode-specific help overlays;
-- retryable empty/error states for selected diffs.
+- inspect changes through log, show, diff, evolog, and status views;
+- review diffs with file/hunk navigation, folding, search, and View Options;
+- run direct `jj` commands from `:` command mode with captured output;
+- preview local mutations before describe, abandon, new, edit, undo, and redo;
+- inspect Command History, Operation Log, and sibling jj workspaces, including workspace-scoped
+  log/status/diff views.
+
+Current limitations:
+
+- command history is in-memory for the current `jk` session;
+- rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
+- direct `a`, `n`, and `e` mutation keys are dogfood shortcuts until the broader action menu exists.
+
+Use `?` inside the TUI for full screen-specific key help. The repository's
+[Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) guide has
+task-oriented examples for the current jk surface.
 
 ## Commands
 
 ```sh
 jk
 jk log
+jk log -T builtin_log_compact_full_description
 jk diff
-jk diff <revision>
+jk diff -r <revision>
+jk diff --from <revision> --to <revision>
+jk diff --stat
+jk show <revision>
+jk status
+jk workspaces
 jk -R /path/to/repo -n 20
 ```
 
@@ -63,8 +78,8 @@ The detailed roadmap lives in the repository docs:
 - [product plan](https://github.com/joshka/jk/blob/main/docs/product-plan.md);
 - [issue-sized roadmap](https://github.com/joshka/jk/blob/main/docs/roadmap.md).
 
-Near-term work preserves jj-rendered output while adding command-shaped inspection, `show`,
-`status`, command mode, command history, workspaces, command previews, and operation recovery.
+Near-term work stabilizes this dogfoodable jk TUI for release before adding rebase-specific
+behavior.
 
 See the repository README for the current status and development workflow.
 

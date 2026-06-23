@@ -2,14 +2,14 @@
 
 Status: draft
 
-Owner: implementation spike
+Owner: `dogfood-log-template-selection` workspace pass
 
 Scope: first log template chooser and startup-template implementation chunk
 
 Planning update: the [CLI surface addendum](cli-surface-addendum.md) keeps this startup-template
 work, but changes the long-term in-app key shape. `T` is reserved for the tags screen, standalone
 `v` is reserved for `evolog`, and template switching should become a log-specific branch of the
-reusable `V` View Options overlay. The current implementation has a temporary standalone `T`
+reusable `V` View Options overlay. The current dogfood implementation has a temporary standalone `T`
 popup because View Options did not exist yet; migrate that popup under `V` before turning the slice
 into review-ready product work.
 
@@ -139,8 +139,8 @@ Collision notes:
 - lowercase `v` is reserved for standalone `jj evolog`;
 - keep templates under `V` so log templates, graph/list flags, and diff display flags share one
   View Options model.
-- the current `T` popup is acceptable only as a temporary precursor to `V` while this remains a
-  local spike.
+- the current dogfood `T` popup is acceptable only as a temporary precursor to `V` while this
+  remains local dogfood work.
 
 Visible help/hotbar:
 

@@ -10,7 +10,7 @@ around reusable flag families instead of one-off command forms.
 
 ## North Star
 
-`jk` is a jj-native terminal workbench: focused screens, jj-shaped commands, config-faithful
+`jk` is a jj-native terminal UI: focused screens, jj-shaped commands, config-faithful
 rendering, safe previews, operation recovery, and first-class workspaces.
 
 The product test is simple: `jk` should feel like interactive jj, not a Git dashboard for jj.
@@ -44,14 +44,14 @@ Make inspection workflows match jj's command model.
   options, and related diff formats.
 - Add standalone `v` for selected-change `evolog` after the shared inspection source model exists.
 - Add first-class diff search, file-list navigation, and two-revision comparison. The current
-  implementation spike now has the first diff file selector (`f`) for jumping within the active
-  diff; searchable file lists and range comparison still need follow-up work.
+  implementation has the first diff file selector (`f`) for jumping within the active diff;
+  searchable file lists and range comparison still need follow-up work.
 - Add docs and [Betamax](https://www.joshka.net/betamax/) tapes for log, diff, show, and status
   flows.
 
 ### 0.5 Command Mode And Workspaces
 
-Add the two features that turn `jk` from an inspection helper into a daily workbench.
+Add the two features that turn `jk` from an inspection helper into a daily jj TUI.
 
 - Add `:` jj command mode with optional `jj` prefix.
 - Add `!` external command mode without shell interpretation by default.
@@ -67,11 +67,14 @@ Introduce mutating workflows only through command preview and recovery.
 
 - Add a reusable Run Options drawer for global options and advanced safety toggles before mutating
   wizards depend on them.
-- Add inline and editor describe flows.
-- Add new, commit, edit, rebase, and abandon flows. The current implementation spike now has direct
-  selected-revision `a` -> `jj abandon REV` and `n` -> `jj new PARENT...` previews. `jj new`
-  already uses ordered marks as parents when present and falls back to the selected revision; the
-  durable action-menu shape still belongs with the broader mutation selector work.
+- Add inline and editor describe flows. The current implementation prefills the inline `m` prompt
+  from the selected revision's full description and supports `Ctrl-u` clear before preview; editor
+  describe and before/after review remain follow-up work.
+- Add new, commit, edit, rebase, and abandon flows. The current implementation has direct
+  selected-revision `a` -> `jj abandon REV`, `n` -> `jj new PARENT...`, and
+  `e` -> `jj edit REV` previews. `jj new` already uses ordered marks as parents when present and
+  falls back to the selected revision; the durable action-menu shape still belongs with the broader
+  mutation selector work.
 - Add rebase destination search and command preview before any graph mutation.
 - Add undo/redo and operation log entry points.
 - Log every mutation in command history.
@@ -125,8 +128,10 @@ Reusable primitives come before broad workflow coverage:
   `--config-file`.
 - Shared selector models must exist before command families grow bespoke prompts for revsets,
   filesets, operations, bookmarks, tags, remotes, or workspaces.
-- Workspaces stay early core scope. They land before broad history-editing polish because
-  multi-workspace state changes how log, status, diff, operation, and sparse workflows are shown.
+- Workspaces stay early core scope. The current implementation covers workspace list,
+  selected-workspace log/status/diff, and stale-workspace updates before broad history-editing
+  polish because multi-workspace state changes how log, status, diff, operation, and sparse
+  workflows are shown.
 - Betamax validation should be organized by flag families as well as command journeys, so one tape
   can prove shared behavior such as `-R` propagation, View Options formats, Run Options safety, or
   selector resolution across multiple commands.
@@ -238,9 +243,9 @@ Make diff inspection useful for large changes without forcing users into another
 
 - Scope: file list, sticky revision/file context, diff search, next/previous file actions,
   two-revision diffs, horizontal overflow controls, edge-case fixtures, and file-only/details mode.
-- Current implementation status: diff views support `[ ]` file movement, `{ }` hunk movement, search,
-  horizontal scroll, sticky/current-file context, diff format View Options, and an `f` file selector
-  that jumps to the chosen file in the active diff.
+- Current implementation status: diff views support `[ ]` file movement, `{ }` hunk movement,
+  search, horizontal scroll, sticky/current-file context, diff format View Options, and an `f` file
+  selector that jumps to the chosen file in the active diff.
 - Acceptance: users can search within a diff, jump between files, inspect name-only/stat/detail
   variants, compare two selected revisions with the shown jj command, recover from empty or failed
   diff loads without leaving the TUI, and use a searchable file list once the shared file selector
@@ -412,10 +417,9 @@ Every major workflow issue should include:
 
 ## Website And Release Visibility
 
-Product-visible `jk` changes should trigger a pass through the companion
-[`jk-website`](https://github.com/joshka/jk-website) repository when they change install
-instructions, released features, key workflows, screenshots, GIFs, command examples, or
-README/crates.io positioning.
+Product-visible `jk` changes should trigger a website pass in `/Users/joshka/local/jk-website`
+when they change install instructions, released features, key workflows, screenshots, GIFs, command
+examples, or README/crates.io positioning.
 
 README, crates.io, website, and release-note media should come from
 [Betamax](https://www.joshka.net/betamax/) tapes. Store generated README and crates.io media in the

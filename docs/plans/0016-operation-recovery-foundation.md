@@ -2,7 +2,7 @@
 
 Status: draft/spec
 
-Owner: implementation spike
+Owner: current dogfood workspace pass
 
 Scope: bounded operation-recovery foundation after the first safe mutation flow
 
@@ -343,7 +343,7 @@ Betamax evidence should live under local ignored artifacts:
 
 ```text
 tapes/validation/operation-recovery-foundation.tape
-target/jk-artifacts/operation-recovery/
+target/dogfood-artifacts/operation-recovery/
 ```
 
 - Open operation log: `op-log.txt` proves `o` opens a focused Operation Log screen from a fixture.
@@ -404,7 +404,7 @@ This slice is ready when:
 - generated help and hotbar text include only actions that are actually enabled;
 - tests cover command-spec ordering, safety classification, selector routing, disabled recovery
   keys, command-history operation routing, and operation time-travel labels;
-- Betamax artifacts under `target/jk-artifacts/operation-recovery/` prove the read-only op-log
+- Betamax artifacts under `target/dogfood-artifacts/operation-recovery/` prove the read-only op-log
   journey and any enabled confirmation journey.
 
 ## Dependency Order

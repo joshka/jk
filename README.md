@@ -8,23 +8,6 @@ keep context open while an editor, shell, or coding agent changes the repository
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
-## Project Status
-
-`jk` is early, useful for a narrow inspection loop, and moving quickly.
-
-Today it is mostly a refreshable `jj log` / `jj diff` workflow: keep context open while an editor,
-IDE, or coding agent changes the repository, refresh in place, and inspect selected changes without
-losing your place.
-
-The longer-term direction is broader. `jk` should accept the command shapes and flags you would
-normally pass to `jj`, preserve your jj config, and add interaction where it helps: selected
-objects, prompts, confirmation for risky changes, command output, refresh, and operation recovery.
-
-This is not ready for broad adoption yet. Feedback is most useful when it is about product
-direction, current inspection workflows, visual and accessibility problems, large graphs, multiple
-workspaces, narrow terminal splits, or how close a TUI should stay to jj's command and config
-model.
-
 ## Installation
 
 Install with Homebrew:
@@ -48,96 +31,84 @@ Or build from the crates.io source package:
 cargo install jk --locked
 ```
 
-## What Works Today
+## Current Status
 
-`jk` currently focuses on the inspection loop:
+`jk` now covers the daily inspection and recovery loop:
 
 ```text
-log -> details -> diff -> back -> refresh
+log -> inspect -> preview command -> run -> history -> operation recovery
 ```
 
-The supported surface includes:
+The useful current workflows are:
 
-- a full-screen log view backed by `jj`;
-- explicit `jk log` and default-command `jk` entry points;
-- manual refresh without leaving the TUI;
-- movement by change, page, and edge;
-- inline expansion of the selected change description;
-- selected-change diff inspection with `jk diff [REVISION]` or `d` from the log;
-- return from diff to log without losing log selection;
-- line, page, file, hunk, and horizontal movement in the diff view;
-- file folding, fold-all/unfold-all, and hunk folding;
-- sticky current-file context with diff stat suffix and `[file x/y]`;
-- diff search with `/`, `n`, and `N`;
-- retryable empty/error states for selected diffs;
-- mode-specific help overlays with `?`;
-- [Betamax](https://www.joshka.net/betamax/) visual tapes for the log and diff workflows.
+- inspect selected changes with `show`, `diff`, `evolog`, and `status`;
+- review diffs with file/hunk movement, folding, search, file list, and View Options;
+- run direct `jj` commands from `:` command mode and keep captured output in the TUI;
+- preview local mutations before running describe, abandon, new, edit, undo, and redo;
+- use Command History and Operation Log to inspect what ran and recover through `jj op` views;
+- inspect sibling jj workspaces, including workspace-scoped log/status/diff views, without leaving
+  the TUI.
 
 The current implementation intentionally treats rendered `jj` output as the source of truth. The
-TUI parses only enough structure to support navigation, search, sticky headers, and folding.
+TUI parses only enough structure to support navigation, search, sticky headers, folding, command
+recording, and recovery-oriented links.
 
-## Diff Review
+Use `?` inside `jk` for the full key list for the active screen. For task-oriented examples, see
+[Using jk](docs/usage.md).
 
-The diff view preserves `jj diff` output while adding review controls around it.
+Current limitations:
+
+- command history is in-memory for the current `jk` session;
+- rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
+- direct `a`, `n`, and `e` bindings are dogfood shortcuts until the broader action menu exists.
+
+## First Useful Paths
+
+Start with `jk` or `jk log`, then use:
+
+- `Enter`, `d`, `v`, and `s` to inspect the selected change;
+- `:` to run a direct `jj` command without dropping TUI context;
+- `m`, `a`, `n`, `e`, `u`, or `U` to preview a local mutation before it runs;
+- `C` and `o` to inspect Command History and Operation Log;
+- `W` to inspect other jj workspaces.
 
 ![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff-v3.gif)
-
-Useful bindings in the diff view:
-
-| Key                           | Action                       |
-| ----------------------------- | ---------------------------- |
-| `j` / `k`                     | scroll one line              |
-| `Space` / `b`                 | page down / page up          |
-| `g` / `G`                     | jump to top / bottom         |
-| `[` / `]`                     | previous / next file         |
-| `{` / `}`                     | previous / next hunk         |
-| `h` / `l`                     | fold / unfold current file   |
-| `Ctrl-Left` / `Ctrl-Right`    | fold / unfold all files      |
-| `-` / `+`                     | fold / unfold current hunk   |
-| `<` / `>`                     | horizontal scroll            |
-| `/`, `n`, `N`                 | search, next match, previous |
-| `r`                           | refresh                      |
-| `H` / `L`                     | return to the log            |
-| `?`                           | show mode-specific help      |
-| `q` / `Esc`                   | close help, then quit        |
 
 ## Commands
 
 ```sh
 jk
 jk log
+jk log -T builtin_log_compact_full_description
 jk diff
-jk diff <revision>
+jk diff -r <revision>
+jk diff --from <revision> --to <revision>
+jk diff --stat
+jk diff --summary
+jk show <revision>
+jk status
+jk status <fileset>
+jk workspaces
 jk -R /path/to/repo -n 20
-jk log --repository /path/to/repo --limit 20
+jk -R /path/to/repo log --limit 20
 ```
 
 Bare `jk` follows `jj`'s configured `ui.default-command` when that command is log-like enough for
 the semantic navigation pass. Use `jk log` when you want the explicit log command path.
 
-## Current Focus
+## Roadmap
 
 The detailed product and engineering plan lives in
 [docs/product-plan.md](docs/product-plan.md). The shorter
 [docs/roadmap.md](docs/roadmap.md) turns that plan into issue-sized milestones.
 
-The active planning and dogfood work is concentrated around the 0.3 to 0.6 foundations:
+The current stabilization direction is:
 
-- keep `jj` output and config fidelity at the center: revsets, templates, graph style, colors, and
-  diff output should still matter;
-- build the command-spec, global-options, view-stack, mode-stack, keymap, and task foundations that
-  make later workflows reviewable;
-- improve inspection around `log`, `diff`, `show`, `status`, `evolog`, View Options, and file
-  navigation without turning the default screen into a dashboard;
-- dogfood command history, `:` command mode, workspace views, operation recovery, and safe mutation
-  previews before presenting them as stable user workflows;
-- replace rough UI experiments, including selection and highlight behavior, with more readable and
-  accessible defaults;
+- stabilize the current jk surface before starting rebase;
+- keep README, crate README, changelog, website, and media aligned with released behavior;
+- keep mutating workflows behind command previews, command history, and operation recovery;
 - make [Betamax](https://www.joshka.net/betamax/) tapes the source for regression tests,
   README/site media, and release demos.
-
-Some of that work exists only in local dogfood spikes today. The README describes the released
-surface first; the planning docs describe the direction.
 
 ## Development
 
@@ -157,9 +128,11 @@ Visual README media is generated with:
 just readme-media
 ```
 
-The generated screenshots and GIFs live in the separate
-[`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository and are served from
-`https://www.joshka.net/jk-screenshots/`.
+By default this local development task writes to `target/dogfood-artifacts/readme-media/`. Public
+README, crates.io, and release-note media is published later from the separate
+[`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository and served from
+`https://www.joshka.net/jk-screenshots/`. Keeping generated media out of this source repo avoids
+making jj handle Git LFS-heavy screenshot and GIF churn.
 
 ## Crates
 
@@ -171,8 +144,3 @@ The workspace is split into narrow crates:
 - `jk-tui`: Ratatui state, rendering, and input actions.
 
 Those boundaries keep `jj` presentation decisions at the edge while the TUI owns interaction state.
-
-## License
-
-`jk` is dual-licensed under either [MIT](LICENSE-MIT) or
-[Apache-2.0](LICENSE-APACHE).

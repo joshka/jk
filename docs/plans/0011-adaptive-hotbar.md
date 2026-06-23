@@ -1,8 +1,8 @@
 # Adaptive Hotbar Slice
 
-Status: implemented in the current implementation spike
+Status: implemented in the current dogfood work
 
-Owner: implementation spike
+Owner: current dogfood workspace pass
 
 Scope: first width-aware hotbar/status implementation chunk
 
@@ -45,7 +45,7 @@ letting Ratatui clip a long string.
 
 ## Context
 
-This plan assumes the current implementation workspace state:
+This plan assumes the current dogfood workspace state:
 
 1. `crates/jk-tui/src/keymap.rs` owns `BindingContext`, hotbar labels, `hotbar_rank`, generated
    help rows, and searchable discovery rows.
