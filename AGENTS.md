@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Rust 2024 workspace for `jk`, a log-first terminal UI for
+This is a Rust 2024 workspace for `jk`, a jj-native terminal UI for
 Jujutsu. The root `Cargo.toml` is workspace-only. The publishable
 crates live under `crates/`:
 
