@@ -42,6 +42,7 @@ enum ActionId {
     CopyCommand,
     CommandMode,
     NewChange,
+    EditChange,
     Abandon,
     Undo,
     Redo,
@@ -86,6 +87,7 @@ impl ActionId {
             Self::CopyCommand => "Copy command",
             Self::CommandMode => "Run jj command",
             Self::NewChange => "New change",
+            Self::EditChange => "Edit change",
             Self::Abandon => "Abandon revision",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
@@ -120,6 +122,8 @@ pub enum CommandFamily {
     JjDescribe,
     /// Commands and actions related to `jj new`.
     JjNew,
+    /// Commands and actions related to `jj edit`.
+    JjEdit,
     /// Commands and actions related to `jj evolog`.
     JjEvolog,
     /// Commands and actions related to `jj show`.
@@ -163,6 +167,7 @@ impl CommandFamily {
             Self::JjDiff => "jj diff",
             Self::JjDescribe => "jj describe",
             Self::JjNew => "jj new",
+            Self::JjEdit => "jj edit",
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
@@ -298,6 +303,10 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::JjNew)
         .with_aliases(&["new", "change", "parent", "mutation", "preview"])
         .with_hotbar(12, "n new"),
+    KeyBinding::new(ActionId::EditChange, "e", "preview jj edit")
+        .with_family(CommandFamily::JjEdit)
+        .with_aliases(&["edit", "checkout", "working copy", "mutation", "preview"])
+        .with_hotbar(14, "e edit"),
     KeyBinding::new(ActionId::Abandon, "a", "preview jj abandon")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["abandon", "delete", "destructive", "mutation", "preview"])
@@ -319,7 +328,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
-        .with_hotbar(14, "V options"),
+        .with_hotbar(15, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
@@ -332,7 +341,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(15, "q quit")
+        .with_hotbar(16, "q quit")
         .hotbar_only(),
 ];
 
@@ -881,7 +890,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  n new  a abandon  V options  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  n new  a abandon  e edit  V options  q quit"
         );
     }
 
@@ -949,6 +958,7 @@ mod tests {
         assert!(!status.contains("space mark"));
         assert!(!status.contains("n new"));
         assert!(!status.contains("a abandon"));
+        assert!(!status.contains("e edit"));
         assert!(!status.contains("j/k move"));
     }
 
@@ -1030,6 +1040,7 @@ mod tests {
                 "s                    open repository status",
                 "o                    open operation log",
                 "n                    preview jj new",
+                "e                    preview jj edit",
                 "a                    preview jj abandon",
                 "u                    preview jj undo",
                 "U                    preview jj redo",

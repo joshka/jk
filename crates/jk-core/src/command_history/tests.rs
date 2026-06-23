@@ -230,6 +230,17 @@ fn new_specs_use_new_family_and_typed_source_action() {
 }
 
 #[test]
+fn edit_specs_use_edit_family_and_typed_source_action() {
+    let spec = JjCommandSpec::confirm_mutation(["edit", "abc123"], SafetyClass::LocalRewrite);
+    let start =
+        CommandRecordStart::from_spec(&spec, source(SourceView::Log, SourceAction::EditRevision));
+
+    assert_eq!(start.command.command_family, CommandFamily::JjEdit);
+    assert_eq!(start.source.view, SourceView::Log);
+    assert_eq!(start.source.action, SourceAction::EditRevision);
+}
+
+#[test]
 fn operation_specs_use_operation_family_and_typed_source_actions() {
     let cases = [
         (

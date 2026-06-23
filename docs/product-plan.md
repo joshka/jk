@@ -417,12 +417,13 @@ All rewrite/destructive/network actions should follow:
 6. Refresh state after success.
 7. Show result, command history entry, and operation-recovery actions.
 
-Current `vibe` spike status: selected-revision `jj abandon REV` and parented `jj new` have the
-first mutation previews. Pressing `a` on the log previews `jj abandon REV`; pressing `n` previews
-`jj new PARENT...`, using ordered marks as parents when present and otherwise using the selected
-revision. Enter runs the command, successful runs refresh the graph, command history records the
-resulting operation id, and the recovery footer surfaces undo/redo/operation/history actions. The
-direct `a` binding is a dogfood shortcut until the long-term action-menu prefix exists.
+Current `vibe` spike status: selected-revision `jj abandon REV`, parented `jj new`, and
+selected-revision `jj edit REV` have the first mutation previews. Pressing `a` on the log previews
+`jj abandon REV`; pressing `n` previews `jj new PARENT...`, using ordered marks as parents when
+present and otherwise using the selected revision; pressing `e` previews `jj edit REV`. Enter runs
+the command, successful runs refresh the graph, command history records the resulting operation id,
+and the recovery footer surfaces undo/redo/operation/history actions. The direct `a` binding is a
+dogfood shortcut until the long-term action-menu prefix exists.
 
 ### 3.6 Recovery is first-class
 
@@ -677,6 +678,9 @@ selected log revision. Keep that implementation path command-spec based so it ca
 Current `vibe` note: `n` directly previews `jj new PARENT...` from the log. Ordered marks become
 parents when present; otherwise the selected revision is the parent. Search-next remains scoped to
 diff and rendered inspection views.
+
+Current `vibe` note: `e` directly previews `jj edit REV` from the log. The same key still reopens
+the command prompt when a command-output view is active.
 
 | Key | jj command family               | Notes                                                      |
 | --- | ------------------------------- | ---------------------------------------------------------- |
@@ -1332,6 +1336,10 @@ jj edit <rev>
 ```
 
 If revision is immutable or hidden, require stronger preview or route to action menu variant.
+
+Current `vibe` status: direct `e` implements the selected-revision preview path and routes through
+command preview, command history, operation-id capture, log refresh, and recovery footer. It does
+not yet add immutable-specific warning copy or the stronger `a E` ignore-immutable variant.
 
 ### 9.6 Squash/split/restore/absorb
 

@@ -13,9 +13,9 @@ use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
-    AbandonQuery, DescribeQuery, DiffFormat, DiffQuery, EvologQuery, JjAbandon, JjCommandRunner,
-    JjDescribe, JjDiff, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery, JjShow,
-    JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
+    AbandonQuery, DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon,
+    JjCommandRunner, JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation,
+    JjRecovery, JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
     RecordingJjCommandRunner, RecoveryCommand, ShowQuery, StatusQuery, SystemJjCommandRunner,
     WorkspaceInspectionQuery, WorkspaceListSnapshot, WorkspaceSummary,
 };
@@ -225,6 +225,7 @@ fn main() -> Result<()> {
     let describe_source = describe_source(&args);
     let abandon_source = abandon_source(&args);
     let new_source = new_source(&args);
+    let edit_source = edit_source(&args);
     let operation_source = operation_source(&args);
     let recovery_source = recovery_source(&args);
     let workspaces_source = workspaces_source(&args);
@@ -262,6 +263,7 @@ fn main() -> Result<()> {
         &describe_source,
         &abandon_source,
         &new_source,
+        &edit_source,
         &operation_source,
         &recovery_source,
         &workspaces_source,
@@ -368,6 +370,16 @@ fn abandon_source(args: &Args) -> JjAbandon {
 /// Builds the new source for selected-change mutation preview.
 fn new_source(args: &Args) -> JjNew {
     let source = JjNew::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Builds the edit source for selected-change mutation preview.
+fn edit_source(args: &Args) -> JjEdit {
+    let source = JjEdit::default();
     if let Some(repository) = &args.repository {
         source.with_repository(repository)
     } else {
@@ -687,6 +699,16 @@ impl PendingCommandPreview {
         }
     }
 
+    fn edit(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::EditRevision,
+            source_key: "e",
+            failure_label: "jj edit",
+            copy_status: None,
+        }
+    }
+
     fn undo(preview: CommandPreview) -> Self {
         Self {
             preview,
@@ -784,6 +806,7 @@ fn run_terminal(
     describe_source: &JjDescribe,
     abandon_source: &JjAbandon,
     new_source: &JjNew,
+    edit_source: &JjEdit,
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
@@ -1159,7 +1182,11 @@ fn run_terminal(
                             needs_redraw = true;
                         }
                         AppKey::EditCommandOutput => {
-                            edit_command_output(&mut state);
+                            if matches!(state.views.active(), AppView::Log(_)) {
+                                open_edit_preview(&mut state, edit_source);
+                            } else {
+                                edit_command_output(&mut state);
+                            }
                             needs_redraw = true;
                         }
                         AppKey::OpenDiffFileList => {
@@ -1908,6 +1935,21 @@ fn selected_new_parents(log: &LogView) -> Vec<String> {
         .map(ToOwned::to_owned)
         .into_iter()
         .collect()
+}
+
+fn open_edit_preview(state: &mut AppState, edit_source: &JjEdit) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    let Some(rev) = log.selected_change_id().map(ToOwned::to_owned) else {
+        log.show_error("No revision selected");
+        return;
+    };
+
+    let preview = edit_source.spec_for(&EditQuery::new(rev)).command_preview();
+    state.modes.push(InputMode::CommandPreview {
+        pending: PendingCommandPreview::edit(preview),
+    });
 }
 
 fn describe_message_lines(rev: &str, message: &str) -> Vec<String> {
@@ -4995,6 +5037,29 @@ mod tests {
     }
 
     #[test]
+    fn edit_preview_uses_selected_revision() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        open_edit_preview(&mut state, &JjEdit::default());
+
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+            panic!("expected edit command preview");
+        };
+        assert_eq!(pending.source_action, SourceAction::EditRevision);
+        assert_eq!(pending.source_key, "e");
+        assert_eq!(pending.failure_label, "jj edit");
+        assert_eq!(
+            pending.preview.command_line,
+            "jj --no-pager --color always edit abc123"
+        );
+        assert_eq!(pending.preview.safety, SafetyClass::LocalRewrite);
+        assert_eq!(
+            pending.preview.warnings,
+            vec![jk_core::CommandPreviewWarning::LocalRewrite]
+        );
+    }
+
+    #[test]
     fn confirming_describe_preview_records_mutation_before_refresh() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
@@ -5103,6 +5168,42 @@ mod tests {
         assert_eq!(records[0].source.view, SourceView::Log);
         assert_eq!(records[0].source.action, SourceAction::NewRevision);
         assert_eq!(records[0].source.key.as_deref(), Some("n"));
+        assert_eq!(records[0].safety, SafetyClass::LocalRewrite);
+        assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
+        assert_eq!(records[1].source.action, SourceAction::Refresh);
+        assert_eq!(records[2].source.action, SourceAction::Refresh);
+        assert!(active_log_status(&mut state).contains(POST_MUTATION_RECOVERY_STATUS));
+    }
+
+    #[test]
+    fn confirming_edit_preview_records_local_rewrite_mutation() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let preview = JjEdit::default()
+            .spec_for(&EditQuery::new("abc123"))
+            .command_preview();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "Working copy now at: abc123\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        confirm_command_preview_with_runner(
+            &mut state,
+            &mut source,
+            PendingCommandPreview::edit(preview),
+            runner,
+        );
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].command.spec_preview, "jj edit abc123");
+        assert_eq!(records[0].command.title, "jj edit abc123");
+        assert_eq!(records[0].source.view, SourceView::Log);
+        assert_eq!(records[0].source.action, SourceAction::EditRevision);
+        assert_eq!(records[0].source.key.as_deref(), Some("e"));
         assert_eq!(records[0].safety, SafetyClass::LocalRewrite);
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);

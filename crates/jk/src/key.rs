@@ -52,7 +52,7 @@ pub enum AppKey {
     /// Start the `:` prompt for an arbitrary jj command.
     StartCommandMode,
 
-    /// Reopen the `:` prompt with the current command output input.
+    /// Preview `jj edit` from the log or reopen command-output input.
     EditCommandOutput,
 
     /// Open the current diff file list.
@@ -300,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn lowercase_e_edits_command_output() {
+    fn lowercase_e_starts_edit_or_command_output_retry() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE)),
             AppKey::EditCommandOutput

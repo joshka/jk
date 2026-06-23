@@ -45,8 +45,9 @@ then broaden into mutation flows, selectors, run options, and generated help.
    for `jj new`; ordered marks become parents when present, otherwise the selected revision is the
    parent. Enter runs it, refreshes the log, records history with the resulting operation id, and
    exposes recovery actions.
-1. Add `jj edit` preview flow: move working copy to selected change, with warning when the action
-   may surprise.
+1. Done: add `jj edit` preview flow. Pressing `e` on the selected log revision opens a
+   local-rewrite command preview for `jj edit REV`; Enter runs it, refreshes the log, records
+   history with the resulting operation id, and exposes recovery actions.
 1. Add inline describe polish: multiline/editor describe, better prompt editing, and clearer
    before/after description display.
 1. Add minimal rebase preview: resolve source/destination from marks plus cursor and show exact

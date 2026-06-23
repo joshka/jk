@@ -481,7 +481,7 @@ mod tests {
     fn help_action_shows_log_specific_keys() {
         let mut view = LogView::new(snapshot(["aaa"]));
         let _ = view.apply(LogAction::ToggleHelp);
-        let backend = TestBackend::new(72, 30);
+        let backend = TestBackend::new(72, 32);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -495,6 +495,8 @@ mod tests {
         assert!(rendered.contains("d                    open selected-change diff"));
         assert!(rendered.contains("m                    describe selected revision"));
         assert!(rendered.contains("s                    open repository status"));
+        assert!(rendered.contains("n                    preview jj new"));
+        assert!(rendered.contains("e                    preview jj edit"));
         assert!(rendered.contains("a                    preview jj abandon"));
         assert!(rendered.contains("u                    preview jj undo"));
         assert!(rendered.contains("U                    preview jj redo"));
