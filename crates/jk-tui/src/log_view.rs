@@ -594,13 +594,20 @@ mod tests {
         assert_eq!(cell.bg, Color::Rgb(82, 196, 192));
         assert_eq!(
             terminal.backend().buffer()[(23, 1)].bg,
-            Color::Rgb(12, 32, 38)
+            Color::Rgb(82, 196, 192)
         );
         assert_eq!(
-            terminal.backend().buffer()[(35, 1)].bg,
-            Color::Rgb(12, 32, 38)
+            terminal.backend().buffer()[(23, 1)].fg,
+            Color::Rgb(15, 20, 31)
         );
-        assert_eq!(terminal.backend().buffer()[(36, 1)].bg, Color::Reset);
+        assert_eq!(
+            terminal.backend().buffer()[(36, 1)].bg,
+            Color::Rgb(82, 196, 192)
+        );
+        assert_eq!(
+            terminal.backend().buffer()[(36, 1)].fg,
+            Color::Rgb(15, 20, 31)
+        );
         assert!(cell.modifier.contains(ratatui::prelude::Modifier::BOLD));
     }
 
@@ -627,9 +634,10 @@ mod tests {
         assert_eq!(buffer[(0, 1)].bg, Color::Reset);
         assert_eq!(buffer[(0, 2)].bg, Color::Rgb(82, 196, 192));
         assert_eq!(buffer[(0, 2)].fg, Color::Rgb(15, 20, 31));
-        assert_eq!(buffer[(23, 2)].bg, Color::Rgb(12, 32, 38));
-        assert_eq!(buffer[(35, 2)].bg, Color::Rgb(12, 32, 38));
-        assert_eq!(buffer[(36, 2)].bg, Color::Reset);
+        assert_eq!(buffer[(23, 2)].bg, Color::Rgb(82, 196, 192));
+        assert_eq!(buffer[(23, 2)].fg, Color::Rgb(15, 20, 31));
+        assert_eq!(buffer[(36, 2)].bg, Color::Rgb(82, 196, 192));
+        assert_eq!(buffer[(36, 2)].fg, Color::Rgb(15, 20, 31));
     }
 
     #[test]
