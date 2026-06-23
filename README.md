@@ -144,3 +144,8 @@ The workspace is split into narrow crates:
 - `jk-tui`: Ratatui state, rendering, and input actions.
 
 Those boundaries keep `jj` presentation decisions at the edge while the TUI owns interaction state.
+
+## License
+
+`jk` is dual-licensed under either [MIT](LICENSE-MIT) or
+[Apache-2.0](LICENSE-APACHE).
