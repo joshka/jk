@@ -2,9 +2,8 @@ use std::ffi::OsString;
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-use crate::{ConfigOverlay, GlobalOptions, JjCommandSpec, OutputPolicy, PagerPolicy};
-
 use super::*;
+use crate::{ConfigOverlay, GlobalOptions, JjCommandSpec, OutputPolicy, PagerPolicy};
 
 fn strings(argv: &[OsString]) -> Vec<String> {
     argv.iter()
@@ -202,6 +201,35 @@ fn source_action_is_independent_from_command_family() {
 }
 
 #[test]
+fn operation_specs_use_operation_family_and_typed_source_actions() {
+    let cases = [
+        (
+            JjCommandSpec::render_read_only(["op", "log"]),
+            SourceView::OperationLog,
+            SourceAction::OperationLog,
+        ),
+        (
+            JjCommandSpec::render_read_only(["op", "show", "abc123"]),
+            SourceView::OperationShow,
+            SourceAction::OperationShow,
+        ),
+        (
+            JjCommandSpec::render_read_only(["op", "diff", "abc123"]),
+            SourceView::OperationDiff,
+            SourceAction::OperationDiff,
+        ),
+    ];
+
+    for (spec, view, action) in cases {
+        let start = CommandRecordStart::from_spec(&spec, source(view.clone(), action.clone()));
+
+        assert_eq!(start.command.command_family, CommandFamily::JjOperation);
+        assert_eq!(start.source.view, view);
+        assert_eq!(start.source.action, action);
+    }
+}
+
+#[test]
 fn finish_records_duration() {
     let spec = JjCommandSpec::render_read_only(["diff"]);
     let mut history = CommandHistory::new(1);
@@ -322,6 +350,14 @@ fn stream_summary_does_not_redact_key_as_substring() {
     let summary = StreamSummary::from_text("monkey=value\napi-key=abc123\n", 1024);
 
     assert_eq!(summary.snippet, "monkey=value\napi-key=<redacted>\n");
+    assert!(summary.redacted);
+}
+
+#[test]
+fn stream_summary_redaction_handles_non_ascii_graph_prefixes() {
+    let summary = StreamSummary::from_text("│  config.token=abc123\n", 1024);
+
+    assert_eq!(summary.snippet, "│  config.token=<redacted>\n");
     assert!(summary.redacted);
 }
 

@@ -44,10 +44,16 @@ fn find_secret_assignment(text: &str) -> Option<(usize, usize, bool)> {
         }
 
         let key_start = text[..index]
-            .rfind(|character: char| {
-                !(character.is_ascii_alphanumeric() || "_-. ".contains(character))
+            .char_indices()
+            .rev()
+            .find_map(|(position, character)| {
+                if character.is_ascii_alphanumeric() || "_-. ".contains(character) {
+                    None
+                } else {
+                    Some(position + character.len_utf8())
+                }
             })
-            .map_or(0, |position| position + 1);
+            .unwrap_or(0);
         let key = text[key_start..index].trim();
         if is_secret_key(key) {
             return Some((

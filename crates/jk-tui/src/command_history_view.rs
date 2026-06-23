@@ -391,6 +391,9 @@ fn view_label(view: SourceView) -> String {
         SourceView::WorkspaceStatus => "workspace status".to_owned(),
         SourceView::WorkspaceDiff => "workspace diff".to_owned(),
         SourceView::CommandHistory => "history".to_owned(),
+        SourceView::OperationLog => "operation log".to_owned(),
+        SourceView::OperationShow => "operation show".to_owned(),
+        SourceView::OperationDiff => "operation diff".to_owned(),
         SourceView::Other(label) => label,
         _ => "unknown".to_owned(),
     }
@@ -409,6 +412,9 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::WorkspaceStatus => "status".to_owned(),
         SourceAction::WorkspaceDiff => "diff".to_owned(),
         SourceAction::WorkspaceUpdateStale => "update-stale".to_owned(),
+        SourceAction::OperationLog => "op log".to_owned(),
+        SourceAction::OperationShow => "op show".to_owned(),
+        SourceAction::OperationDiff => "op diff".to_owned(),
         SourceAction::Other(label) => label,
         _ => "unknown".to_owned(),
     }

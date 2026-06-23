@@ -16,6 +16,7 @@ pub mod describe;
 pub mod diff;
 pub mod evolog;
 pub mod log;
+pub mod operation;
 pub mod show;
 pub mod status;
 pub mod workspaces;
@@ -25,6 +26,7 @@ pub use describe::{DescribeQuery, JjDescribe};
 pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
 pub use evolog::{EvologQuery, JjEvolog, JjEvologError};
 pub use log::{JjLog, JjLogCommand, JjLogError, LogTemplateSelection};
+pub use operation::{JjOperation, JjOperationError, OperationQuery};
 pub use show::{JjShow, JjShowError, ShowQuery};
 pub use status::{JjStatus, JjStatusError, StatusQuery};
 pub use workspaces::{

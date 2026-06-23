@@ -1,9 +1,8 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use crate::{GlobalOptions, JjCommandSpec};
-
 use super::redaction::{redact_argv, redact_text};
+use crate::{GlobalOptions, JjCommandSpec};
 
 /// Command data captured from a typed command spec.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -132,6 +131,12 @@ pub enum SourceView {
     WorkspaceDiff,
     /// Command history view.
     CommandHistory,
+    /// Operation log view.
+    OperationLog,
+    /// Operation show view.
+    OperationShow,
+    /// Operation diff view.
+    OperationDiff,
     /// A source view not yet modeled.
     Other(String),
 }
@@ -162,6 +167,12 @@ pub enum SourceAction {
     WorkspaceDiff,
     /// Run selected workspace update-stale.
     WorkspaceUpdateStale,
+    /// List repository operations.
+    OperationLog,
+    /// Show a selected operation.
+    OperationShow,
+    /// Diff a selected operation.
+    OperationDiff,
     /// A source action not yet modeled.
     Other(String),
 }
