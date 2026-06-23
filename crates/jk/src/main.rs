@@ -118,7 +118,8 @@ use workspaces::{workspace_action_for_log_action, workspace_inspection_action_fo
 fn main() -> Result<()> {
     color_eyre::install()?;
     tracing_subscriber::fmt::init();
-    let args = Args::parse();
+    let mut args = Args::parse();
+    args.resolve_container_repository();
     let source = args.log_source();
     let diff_source = args.diff_source();
     let evolog_source = args.evolog_source();

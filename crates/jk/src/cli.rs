@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::process::Command as ProcessCommand;
 
 use clap::{Parser, Subcommand};
 use jk_cli::{
@@ -25,6 +26,15 @@ pub struct Args {
 }
 
 impl Args {
+    /// Resolves an omitted repository argument when started from a no-working-copy repo container.
+    pub(crate) fn resolve_container_repository(&mut self) {
+        if self.repository.is_some() {
+            return;
+        }
+
+        self.repository = resolve_container_repository();
+    }
+
     /// Builds the log source that matches the requested command-line view.
     ///
     /// Bare `jk` intentionally starts from jj's configured default command, while `jk log` forces
@@ -124,6 +134,92 @@ impl Args {
     }
 }
 
+/// Resolves a no-working-copy repo container to a child workspace repository.
+fn resolve_container_repository() -> Option<PathBuf> {
+    if !current_workspace_has_no_working_copy() {
+        return None;
+    }
+
+    let repo_root = jj_output(&["root"])?;
+    let repo_root = PathBuf::from(repo_root.trim());
+    let workspaces = workspace_candidates()?;
+
+    select_workspace_root(&repo_root, &workspaces)
+}
+
+/// Checks whether jj sees the current directory as a repo without a working-copy commit.
+fn current_workspace_has_no_working_copy() -> bool {
+    let Some(status) = jj_output(&["status"]) else {
+        return false;
+    };
+
+    status.lines().any(|line| line.trim() == "No working copy")
+}
+
+/// Runs a read-only jj query used before the TUI chooses its repository target.
+fn jj_output(args: &[&str]) -> Option<String> {
+    let output = ProcessCommand::new("jj")
+        .args(["--ignore-working-copy", "--no-pager", "--color", "never"])
+        .args(args)
+        .output()
+        .ok()?;
+
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Loads known jj workspace names and roots.
+fn workspace_candidates() -> Option<Vec<WorkspaceCandidate>> {
+    let output = jj_output(&[
+        "workspace",
+        "list",
+        "-T",
+        r#"self.name() ++ "\t" ++ self.root() ++ "\n""#,
+    ])?;
+
+    Some(parse_workspace_candidates(&output))
+}
+
+/// Parses `jj workspace list` rows produced by [`workspace_candidates`].
+fn parse_workspace_candidates(output: &str) -> Vec<WorkspaceCandidate> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let (name, root) = line.split_once('\t')?;
+            Some(WorkspaceCandidate {
+                name: name.to_owned(),
+                root: PathBuf::from(root),
+            })
+        })
+        .collect()
+}
+
+/// Selects the child workspace that should stand in for a repo container.
+fn select_workspace_root(repo_root: &Path, workspaces: &[WorkspaceCandidate]) -> Option<PathBuf> {
+    workspaces
+        .iter()
+        .filter(|workspace| workspace.root != repo_root && workspace.root.starts_with(repo_root))
+        .find(|workspace| workspace.name == "default")
+        .or_else(|| {
+            workspaces
+                .iter()
+                .filter(|workspace| {
+                    workspace.root != repo_root && workspace.root.starts_with(repo_root)
+                })
+                .min_by(|left, right| left.name.cmp(&right.name))
+        })
+        .map(|workspace| workspace.root.clone())
+}
+
+/// Workspace row returned by `jj workspace list`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct WorkspaceCandidate {
+    name: String,
+    root: PathBuf,
+}
+
 trait WithRepository: Sized {
     fn with_repository(self, repository: &Path) -> Self;
 }
@@ -154,6 +250,85 @@ impl_with_repository!(
     JjStatus,
     JjWorkspaces,
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_workspace_candidates_from_jj_template_rows() {
+        let candidates = parse_workspace_candidates(
+            "/bad row\n\
+             cli\t/Users/joshka/local/jk/cli\n\
+             default\t/Users/joshka/local/jk/default\n",
+        );
+
+        assert_eq!(
+            candidates,
+            vec![
+                WorkspaceCandidate {
+                    name: "cli".to_owned(),
+                    root: PathBuf::from("/Users/joshka/local/jk/cli"),
+                },
+                WorkspaceCandidate {
+                    name: "default".to_owned(),
+                    root: PathBuf::from("/Users/joshka/local/jk/default"),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn selects_default_child_workspace_for_container_root() {
+        let repo_root = Path::new("/Users/joshka/local/jk");
+        let workspaces = vec![
+            WorkspaceCandidate {
+                name: "cli".to_owned(),
+                root: repo_root.join("cli"),
+            },
+            WorkspaceCandidate {
+                name: "default".to_owned(),
+                root: repo_root.join("default"),
+            },
+        ];
+
+        let selected = select_workspace_root(repo_root, &workspaces);
+
+        assert_eq!(selected, Some(repo_root.join("default")));
+    }
+
+    #[test]
+    fn ignores_container_root_workspace_when_selecting_child() {
+        let repo_root = Path::new("/Users/joshka/local/jk");
+        let workspaces = vec![
+            WorkspaceCandidate {
+                name: "container".to_owned(),
+                root: repo_root.to_path_buf(),
+            },
+            WorkspaceCandidate {
+                name: "spike".to_owned(),
+                root: repo_root.join("spike"),
+            },
+        ];
+
+        let selected = select_workspace_root(repo_root, &workspaces);
+
+        assert_eq!(selected, Some(repo_root.join("spike")));
+    }
+
+    #[test]
+    fn does_not_select_workspace_outside_container_root() {
+        let repo_root = Path::new("/Users/joshka/local/jk");
+        let workspaces = vec![WorkspaceCandidate {
+            name: "other".to_owned(),
+            root: PathBuf::from("/Users/joshka/local/jk-other"),
+        }];
+
+        let selected = select_workspace_root(repo_root, &workspaces);
+
+        assert_eq!(selected, None);
+    }
+}
 
 /// Top-level view commands supported by the binary.
 #[derive(Debug, Subcommand)]
