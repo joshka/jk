@@ -101,16 +101,20 @@ impl JjLog {
     /// records.
     pub fn load(&self) -> Result<LogSnapshot, JjLogError> {
         let command_args = self.command_args();
-        let rendered = self.run(DefaultCommandMode::Rendered, &command_args)?;
-        let semantic = self.run(DefaultCommandMode::Json, &command_args)?;
+        let rendered_spec = self.command_spec(DefaultCommandMode::Rendered, &command_args);
+        let rendered = self.run(DefaultCommandMode::Rendered, &rendered_spec)?;
+        let semantic = self.run(
+            DefaultCommandMode::Json,
+            &self.command_spec(DefaultCommandMode::Json, &command_args),
+        )?;
         let entries = parse_log_json_lines(&semantic)?;
         let entries = assign_rendered_lines(entries, &rendered)?;
 
-        Ok(LogSnapshot::new(rendered, entries).with_title(command_title(&command_args)))
+        Ok(LogSnapshot::new(rendered, entries).with_title(rendered_spec.title()))
     }
 
-    fn run(&self, mode: DefaultCommandMode, command_args: &[String]) -> Result<String, JjLogError> {
-        let output = run_jj_spec(&self.command_spec(mode, command_args), "always")?;
+    fn run(&self, mode: DefaultCommandMode, spec: &JjCommandSpec) -> Result<String, JjLogError> {
+        let output = run_jj_spec(spec, "always")?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
@@ -118,7 +122,7 @@ impl JjLog {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
             if mode == DefaultCommandMode::Json {
                 Err(JjLogError::UnsupportedSemanticCommand {
-                    command: command_title(command_args),
+                    command: spec.title().to_owned(),
                     stderr,
                 })
             } else {
