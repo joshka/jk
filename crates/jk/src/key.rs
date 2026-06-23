@@ -16,6 +16,9 @@ pub enum AppKey {
     /// Open the selected revision show/details view.
     OpenShow,
 
+    /// Open the selected revision evolution log.
+    OpenEvolog,
+
     /// Open repository status.
     OpenStatus,
 
@@ -116,6 +119,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
         'V' => Some(AppKey::OpenViewOptions),
+        'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
         'c' => Some(AppKey::Action(LogAction::ClearMarks)),
@@ -220,10 +224,10 @@ mod tests {
     }
 
     #[test]
-    fn lowercase_v_remains_reserved_for_evolog() {
+    fn lowercase_v_opens_evolog() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE)),
-            AppKey::Ignore
+            AppKey::OpenEvolog
         );
     }
 

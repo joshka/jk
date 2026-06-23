@@ -26,6 +26,7 @@ enum ActionId {
     Collapse,
     OpenShow,
     OpenDiff,
+    OpenEvolog,
     OpenStatus,
     ViewOptions,
     Refresh,
@@ -55,6 +56,7 @@ impl ActionId {
             Self::Collapse => "Collapse change",
             Self::OpenShow => "Open show",
             Self::OpenDiff => "Open diff",
+            Self::OpenEvolog => "Open evolog",
             Self::OpenStatus => "Open status",
             Self::ViewOptions => "View options",
             Self::Refresh => "Refresh",
@@ -80,6 +82,8 @@ pub enum CommandFamily {
     JjLog,
     /// Commands and actions related to `jj diff`.
     JjDiff,
+    /// Commands and actions related to `jj evolog`.
+    JjEvolog,
     /// Commands and actions related to `jj show`.
     JjShow,
     /// Commands and actions related to `jj status`.
@@ -111,6 +115,7 @@ impl CommandFamily {
         match self {
             Self::JjLog => "jj log",
             Self::JjDiff => "jj diff",
+            Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
             Self::Search => "search",
@@ -185,13 +190,13 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "current row"])
-        .with_hotbar(10, "j/k move"),
+        .with_hotbar(11, "j/k move"),
     KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::Mark, "space", "mark/unmark selected revision")
         .with_family(CommandFamily::Mark)
         .with_aliases(&["selected", "revision", "toggle"])
-        .with_hotbar(8, "space mark"),
+        .with_hotbar(9, "space mark"),
     KeyBinding::new(
         ActionId::ClearMarks,
         "c",
@@ -199,7 +204,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::Mark)
     .with_aliases(&["clear", "unmark", "selected", "revision"])
-    .with_hotbar(9, "c clear"),
+    .with_hotbar(10, "c clear"),
     KeyBinding::new(ActionId::Page, "b, Ctrl-f/b, PgUp/Dn", "page down/up")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["page", "pagedown", "pageup"]),
@@ -216,13 +221,23 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenDiff, "d", "open selected-change diff")
         .with_family(CommandFamily::JjDiff)
         .with_hotbar(5, "d diff"),
+    KeyBinding::new(ActionId::OpenEvolog, "v", "open selected-change evolog")
+        .with_family(CommandFamily::JjEvolog)
+        .with_aliases(&[
+            "evolution",
+            "history",
+            "change",
+            "version",
+            "selected change",
+        ])
+        .with_hotbar(6, "v evolog"),
     KeyBinding::new(ActionId::OpenStatus, "s", "open repository status")
         .with_family(CommandFamily::JjStatus)
-        .with_hotbar(6, "s status"),
+        .with_hotbar(7, "s status"),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
-        .with_hotbar(7, "V options"),
+        .with_hotbar(8, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
@@ -235,7 +250,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(11, "q quit")
+        .with_hotbar(12, "q quit")
         .hotbar_only(),
 ];
 
@@ -484,7 +499,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  s status  V options  space mark  c clear  j/k move  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  v evolog  s status  V options  space mark  c clear  j/k move  q quit"
         );
     }
 
@@ -519,6 +534,7 @@ mod tests {
                 "right, l             expand selected change",
                 "left, h              collapse selected change",
                 "d                    open selected-change diff",
+                "v                    open selected-change evolog",
                 "s                    open repository status",
                 "V                    open view options",
                 "r                    refresh",
@@ -617,6 +633,27 @@ mod tests {
         let clear_rows = filter_discovery_rows(BindingContext::Log, "clear marks");
         assert_eq!(clear_rows.len(), 1);
         assert_eq!(clear_rows[0].keys, "c");
+    }
+
+    #[test]
+    fn log_discovery_finds_evolog_binding() {
+        for query in [
+            "v",
+            "evolog",
+            "jj evolog",
+            "evolution history",
+            "selected change",
+        ] {
+            let rows = filter_discovery_rows(BindingContext::Log, query);
+            let evolog_row = rows
+                .iter()
+                .find(|row| row.keys == "v")
+                .copied()
+                .unwrap_or_else(|| panic!("missing evolog row for query {query:?}"));
+
+            assert_eq!(evolog_row.action, "Open evolog");
+            assert_eq!(evolog_row.command_family_label(), Some("jj evolog"));
+        }
     }
 
     #[test]

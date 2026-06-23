@@ -110,9 +110,8 @@ pub enum JjShowError {
 
 #[cfg(test)]
 mod tests {
-    use crate::command::build_jj_command;
-
     use super::*;
+    use crate::command::build_jj_command;
 
     #[test]
     fn spec_uses_jj_show_with_revisions() {

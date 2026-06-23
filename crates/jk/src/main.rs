@@ -11,8 +11,8 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
-    DiffFormat, DiffQuery, JjDiff, JjLog, JjLogCommand, JjShow, JjStatus, LogTemplateSelection,
-    ShowQuery, StatusQuery,
+    DiffFormat, DiffQuery, EvologQuery, JjDiff, JjEvolog, JjLog, JjLogCommand, JjShow, JjStatus,
+    LogTemplateSelection, ShowQuery, StatusQuery,
 };
 use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
@@ -162,6 +162,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let source = log_source(&args);
     let diff_source = diff_source(&args);
+    let evolog_source = evolog_source(&args);
     let show_source = show_source(&args);
     let status_source = status_source(&args);
     let app = match &args.command {
@@ -183,7 +184,14 @@ fn main() -> Result<()> {
         }
     };
 
-    run_terminal(app, source, &diff_source, &show_source, &status_source)?;
+    run_terminal(
+        app,
+        source,
+        &diff_source,
+        &evolog_source,
+        &show_source,
+        &status_source,
+    )?;
     Ok(())
 }
 
@@ -234,6 +242,16 @@ fn diff_source(args: &Args) -> JjDiff {
 /// Builds the show source for selected-change inspection.
 fn show_source(args: &Args) -> JjShow {
     let source = JjShow::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Builds the evolog source for selected-change inspection.
+fn evolog_source(args: &Args) -> JjEvolog {
+    let source = JjEvolog::default();
     if let Some(repository) = &args.repository {
         source.with_repository(repository)
     } else {
@@ -304,6 +322,10 @@ enum AppView {
     Show {
         view: RenderedView,
         query: ShowQuery,
+    },
+    Evolog {
+        view: RenderedView,
+        query: EvologQuery,
     },
     Status {
         view: RenderedView,
@@ -397,6 +419,7 @@ fn run_terminal(
     app: AppView,
     mut source: JjLog,
     diff_source: &JjDiff,
+    evolog_source: &JjEvolog,
     show_source: &JjShow,
     status_source: &JjStatus,
 ) -> Result<()> {
@@ -469,6 +492,25 @@ fn run_terminal(
                     }
                     _ => view.render(frame),
                 },
+                AppView::Evolog { view, .. } => match &mode {
+                    Some(InputMode::ViewOptions { context, selected }) => {
+                        let lines = view_options_lines(*context, *selected, source.template());
+                        view.render_with_overlay(frame, "View Options", &lines);
+                    }
+                    Some(InputMode::InspectionSearch { query }) => {
+                        let status = format!("/{query}");
+                        view.render_with_status(frame, &status);
+                    }
+                    Some(InputMode::CommandDiscovery {
+                        context,
+                        query,
+                        selected,
+                    }) => {
+                        let lines = discovery_lines(*context, query, *selected);
+                        view.render_with_overlay(frame, "Command discovery", &lines);
+                    }
+                    _ => view.render(frame),
+                },
                 AppView::Status { view, .. } => match &mode {
                     Some(InputMode::ViewOptions { context, selected }) => {
                         let lines = view_options_lines(*context, *selected, source.template());
@@ -510,6 +552,10 @@ fn run_terminal(
                             push_selected_show(&mut state, show_source);
                             needs_redraw = true;
                         }
+                        AppKey::OpenEvolog => {
+                            push_selected_evolog(&mut state, evolog_source);
+                            needs_redraw = true;
+                        }
                         AppKey::OpenStatus => {
                             push_status(&mut state, status_source);
                             needs_redraw = true;
@@ -523,6 +569,7 @@ fn run_terminal(
                                 state.views.active(),
                                 AppView::Diff { .. }
                                     | AppView::Show { .. }
+                                    | AppView::Evolog { .. }
                                     | AppView::Status { .. }
                             ) =>
                         {
@@ -531,6 +578,9 @@ fn run_terminal(
                                     query: String::new(),
                                 },
                                 AppView::Show { .. } => InputMode::InspectionSearch {
+                                    query: String::new(),
+                                },
+                                AppView::Evolog { .. } => InputMode::InspectionSearch {
                                     query: String::new(),
                                 },
                                 AppView::Status { .. } => InputMode::InspectionSearch {
@@ -564,6 +614,7 @@ fn run_terminal(
                     &mut state,
                     &mut source,
                     diff_source,
+                    evolog_source,
                     show_source,
                     status_source,
                     action,
@@ -844,7 +895,9 @@ fn active_binding_context(state: &AppState) -> BindingContext {
     match state.views.active() {
         AppView::Log(_) => BindingContext::Log,
         AppView::Diff { .. } => BindingContext::Diff,
-        AppView::Show { .. } | AppView::Status { .. } => BindingContext::Inspection,
+        AppView::Show { .. } | AppView::Evolog { .. } | AppView::Status { .. } => {
+            BindingContext::Inspection
+        }
     }
 }
 
@@ -1066,6 +1119,9 @@ fn apply_search_submit(state: &mut AppState, action: SearchSubmit) {
         (AppView::Show { view, .. }, SearchSubmit::Inspection(query)) => {
             let _ = view.apply(RenderedAction::Search(query));
         }
+        (AppView::Evolog { view, .. }, SearchSubmit::Inspection(query)) => {
+            let _ = view.apply(RenderedAction::Search(query));
+        }
         (AppView::Status { view, .. }, SearchSubmit::Inspection(query)) => {
             let _ = view.apply(RenderedAction::Search(query));
         }
@@ -1084,6 +1140,13 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
             let _ = view.apply(action);
         }
         AppView::Show { view, .. } => {
+            let action = match direction {
+                SearchDirection::Next => RenderedAction::SearchNext,
+                SearchDirection::Previous => RenderedAction::SearchPrevious,
+            };
+            let _ = view.apply(action);
+        }
+        AppView::Evolog { view, .. } => {
             let action = match direction {
                 SearchDirection::Next => RenderedAction::SearchNext,
                 SearchDirection::Previous => RenderedAction::SearchPrevious,
@@ -1115,6 +1178,7 @@ fn apply_action(
     state: &mut AppState,
     source: &mut JjLog,
     diff_source: &JjDiff,
+    evolog_source: &JjEvolog,
     show_source: &JjShow,
     status_source: &JjStatus,
     action: jk_tui::log_view::LogAction,
@@ -1123,6 +1187,7 @@ fn apply_action(
         AppView::Log(log) => apply_log_action(log, source, diff_source, action),
         AppView::Diff { view, query } => apply_diff_action(view, query, diff_source, action),
         AppView::Show { view, query } => apply_show_action(view, query, show_source, action),
+        AppView::Evolog { view, query } => apply_evolog_action(view, query, evolog_source, action),
         AppView::Status { view, query } => apply_status_action(view, query, status_source, action),
     };
 
@@ -1196,6 +1261,36 @@ fn push_selected_show(state: &mut AppState, show_source: &JjShow) {
         }
         Err(error) => log.show_error(error.to_string()),
     }
+}
+
+fn push_selected_evolog(state: &mut AppState, evolog_source: &JjEvolog) {
+    let change_id = {
+        let AppView::Log(log) = state.views.active_mut() else {
+            return;
+        };
+        let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
+            return;
+        };
+        change_id
+    };
+
+    let query = EvologQuery::from(change_id);
+    match evolog_source.load_query(&query) {
+        Ok(snapshot) => push_evolog_view(state, query, RenderedView::new(snapshot)),
+        Err(error) => {
+            if let AppView::Log(log) = state.views.active_mut() {
+                log.show_error(error.to_string());
+            }
+        }
+    }
+}
+
+fn push_evolog_view(state: &mut AppState, query: EvologQuery, view: RenderedView) {
+    if !matches!(state.views.active(), AppView::Log(_)) {
+        return;
+    }
+
+    state.views.push(AppView::Evolog { view, query });
 }
 
 fn push_status(state: &mut AppState, status_source: &JjStatus) {
@@ -1300,6 +1395,40 @@ fn apply_show_action(
     AppTransition::Continue
 }
 
+/// Applies an action while an evolution-log view is active.
+fn apply_evolog_action(
+    view: &mut RenderedView,
+    query: &EvologQuery,
+    evolog_source: &JjEvolog,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let rendered_action = match action {
+        jk_tui::log_view::LogAction::Previous => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::Next => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::ScrollPreviousLine => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::ScrollNextLine => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::PagePrevious => RenderedAction::PagePrevious,
+        jk_tui::log_view::LogAction::PageNext => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ToggleMark => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ClearMarks => RenderedAction::Ignore,
+        jk_tui::log_view::LogAction::First => RenderedAction::First,
+        jk_tui::log_view::LogAction::Last => RenderedAction::Last,
+        jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
+        jk_tui::log_view::LogAction::Refresh => RenderedAction::Refresh,
+        jk_tui::log_view::LogAction::Quit => RenderedAction::Quit,
+        _ => RenderedAction::ReturnToLog,
+    };
+
+    match view.apply(rendered_action) {
+        RenderedActionResult::Refresh => refresh_evolog(view, query, evolog_source),
+        RenderedActionResult::ReturnToLog => return AppTransition::PopView,
+        RenderedActionResult::Quit => return AppTransition::Quit,
+        _ => {}
+    }
+
+    AppTransition::Continue
+}
+
 /// Applies an action while a repository status view is active.
 fn apply_status_action(
     view: &mut RenderedView,
@@ -1368,6 +1497,14 @@ fn refresh_diff(app: &mut DiffView, query: &DiffQuery, source: &JjDiff) {
 
 /// Reloads the active show/details view without replacing it on failure.
 fn refresh_show(app: &mut RenderedView, query: &ShowQuery, source: &JjShow) {
+    match source.load_query(query) {
+        Ok(snapshot) => app.refresh(snapshot),
+        Err(error) => app.show_error(error.to_string()),
+    }
+}
+
+/// Reloads the active evolog view without replacing it on failure.
+fn refresh_evolog(app: &mut RenderedView, query: &EvologQuery, source: &JjEvolog) {
     match source.load_query(query) {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
@@ -1472,6 +1609,46 @@ mod tests {
 
         assert!(stack.pop());
         assert_eq!(stack.active(), &AppView::Log(previous_log));
+    }
+
+    #[test]
+    fn loaded_evolog_pushes_from_log() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let query = EvologQuery::from("aaa".to_owned());
+        let view = RenderedView::from_error("aaa", "jj evolog -r aaa", "fixture".to_owned());
+
+        push_evolog_view(&mut state, query.clone(), view.clone());
+
+        assert_eq!(state.views.views.len(), 2);
+        assert_eq!(state.views.active(), &AppView::Evolog { view, query });
+    }
+
+    #[test]
+    fn loaded_evolog_is_ignored_outside_log() {
+        let root = diff_app_view("aaa");
+        let mut state = AppState::new(root.clone());
+        let query = EvologQuery::from("aaa".to_owned());
+        let view = RenderedView::from_error("aaa", "jj evolog -r aaa", "fixture".to_owned());
+
+        push_evolog_view(&mut state, query, view);
+
+        assert_eq!(state.views.views.len(), 1);
+        assert_eq!(state.views.active(), &root);
+    }
+
+    #[test]
+    fn back_from_evolog_returns_to_preserved_log() {
+        let mut log = LogView::default();
+        log.show_error("preserved log state");
+        let expected_log = log.clone();
+        let mut state = AppState::new(AppView::Log(log));
+        let query = EvologQuery::from("aaa".to_owned());
+        let view = RenderedView::from_error("aaa", "jj evolog -r aaa", "fixture".to_owned());
+        push_evolog_view(&mut state, query, view);
+
+        handle_back(&mut state);
+
+        assert_eq!(state.views.active(), &AppView::Log(expected_log));
     }
 
     #[test]
@@ -1781,6 +1958,29 @@ mod tests {
         assert!(matches!(page_transition, AppTransition::Continue));
         assert_eq!(mark_show, page_show);
 
+        let evolog_query = EvologQuery::from("aaa".to_owned());
+        let evolog_source = JjEvolog::default();
+        let mut mark_evolog =
+            RenderedView::from_error("aaa", "jj evolog -r aaa", "fixture".to_owned());
+        let mut page_evolog = mark_evolog.clone();
+
+        let mark_transition = apply_evolog_action(
+            &mut mark_evolog,
+            &evolog_query,
+            &evolog_source,
+            LogAction::ToggleMark,
+        );
+        let page_transition = apply_evolog_action(
+            &mut page_evolog,
+            &evolog_query,
+            &evolog_source,
+            LogAction::PageNext,
+        );
+
+        assert!(matches!(mark_transition, AppTransition::Continue));
+        assert!(matches!(page_transition, AppTransition::Continue));
+        assert_eq!(mark_evolog, page_evolog);
+
         let status_query = StatusQuery::default();
         let status_source = JjStatus::default();
         let mut mark_status = RenderedView::from_error("status", "jj status", "fixture".to_owned());
@@ -1818,6 +2018,11 @@ mod tests {
                 format: DiffFormat::Patch,
             }
         );
+    }
+
+    #[test]
+    fn evolog_is_not_a_root_cli_command() {
+        assert!(Args::try_parse_from(["jk", "evolog", "-r", "abc123"]).is_err());
     }
 
     #[test]
