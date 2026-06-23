@@ -112,7 +112,7 @@ jj op show OPERATION
 Operation Diff:
 
 ```text
-jj op diff OPERATION
+jj op diff --operation OPERATION
 ```
 
 Requirements:
@@ -348,7 +348,8 @@ target/vibe-artifacts/operation-recovery/
 
 - Open operation log: `op-log.txt` proves `o` opens a focused Operation Log screen from a fixture.
 - Inspect operation: `op-show.txt` proves `Enter` opens `jj op show OPERATION` as a child view.
-- Diff operation: `op-diff.txt` proves `d` opens `jj op diff OPERATION` as a child view.
+- Diff operation: `op-diff.txt` proves `d` opens `jj op diff --operation OPERATION` as a child
+  view.
 - Mutation footer: `post-mutation-footer.txt` proves confirmed describe shows `u`, `U`, `o`, and
   the history route.
 - History to operation: `history-op-link.txt` proves a history row with an operation id opens that

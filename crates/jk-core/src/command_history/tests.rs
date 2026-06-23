@@ -214,7 +214,7 @@ fn operation_specs_use_operation_family_and_typed_source_actions() {
             SourceAction::OperationShow,
         ),
         (
-            JjCommandSpec::render_read_only(["op", "diff", "abc123"]),
+            JjCommandSpec::render_read_only(["op", "diff", "--operation", "abc123"]),
             SourceView::OperationDiff,
             SourceAction::OperationDiff,
         ),

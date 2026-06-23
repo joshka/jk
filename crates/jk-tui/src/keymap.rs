@@ -16,6 +16,8 @@ pub enum BindingContext {
     Workspaces,
     /// The command-history list view.
     CommandHistory,
+    /// The operation log list view.
+    OperationLog,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33,6 +35,7 @@ enum ActionId {
     OpenDescribe,
     OpenEvolog,
     OpenStatus,
+    OpenOperationLog,
     OpenCommandHistory,
     UpdateStale,
     ViewOptions,
@@ -67,6 +70,7 @@ impl ActionId {
             Self::OpenDescribe => "Describe revision",
             Self::OpenEvolog => "Open evolog",
             Self::OpenStatus => "Open status",
+            Self::OpenOperationLog => "Open operation log",
             Self::OpenCommandHistory => "Open command history",
             Self::UpdateStale => "Update stale",
             Self::ViewOptions => "View options",
@@ -104,6 +108,8 @@ pub enum CommandFamily {
     JjStatus,
     /// Commands and actions related to `jj workspace`.
     JjWorkspace,
+    /// Commands and actions related to `jj operation`.
+    JjOperation,
     /// Command history and transcripts.
     History,
     /// In-view output search.
@@ -138,6 +144,7 @@ impl CommandFamily {
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
             Self::JjWorkspace => "jj workspace",
+            Self::JjOperation => "jj operation",
             Self::History => "history",
             Self::Search => "search",
             Self::Refresh => "refresh",
@@ -259,6 +266,10 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenStatus, "s", "open repository status")
         .with_family(CommandFamily::JjStatus)
         .with_hotbar(8, "s status"),
+    KeyBinding::new(ActionId::OpenOperationLog, "o", "open operation log")
+        .with_family(CommandFamily::JjOperation)
+        .with_aliases(&["operation", "op log", "undo", "redo", "recovery"])
+        .with_hotbar(9, "o ops"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "open command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
@@ -457,6 +468,46 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
         .hotbar_only(),
 ];
 
+const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["selection", "operation", "current row"])
+        .with_hotbar(4, "j/k move"),
+    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["page", "pagedown", "pageup"])
+        .with_hotbar(5, "space/b page"),
+    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::OpenShow, "enter", "open selected operation show")
+        .with_family(CommandFamily::JjOperation)
+        .with_aliases(&["show", "details", "inspect", "operation"])
+        .with_hotbar(2, "enter show"),
+    KeyBinding::new(ActionId::OpenDiff, "d", "open selected operation diff")
+        .with_family(CommandFamily::JjOperation)
+        .with_aliases(&["diff", "operation", "selected"])
+        .with_hotbar(3, "d diff"),
+    KeyBinding::new(ActionId::Refresh, "r", "refresh operation log")
+        .with_family(CommandFamily::Refresh)
+        .with_aliases(&["reload", "operation"])
+        .with_hotbar(6, "r refresh"),
+    KeyBinding::new(
+        ActionId::ReturnBack,
+        "Backspace, Esc",
+        "return to previous view",
+    )
+    .with_family(CommandFamily::Navigation)
+    .with_aliases(&["back", "return", "previous"])
+    .with_hotbar(7, "Esc back"),
+    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+        .with_family(CommandFamily::Help)
+        .with_hotbar(1, "? help"),
+    KeyBinding::new(ActionId::Quit, "q", "quit")
+        .with_family(CommandFamily::Quit)
+        .with_hotbar(8, "q quit")
+        .hotbar_only(),
+];
+
 /// Returns hotbar text for the current binding context.
 pub fn hotbar(context: BindingContext) -> String {
     hotbar_items(context)
@@ -596,6 +647,7 @@ pub const fn help_title(context: BindingContext) -> &'static str {
         BindingContext::Inspection => "Inspection keys",
         BindingContext::Workspaces => "Workspaces keys",
         BindingContext::CommandHistory => "Command History keys",
+        BindingContext::OperationLog => "Operation Log keys",
     }
 }
 
@@ -724,6 +776,7 @@ const fn bindings(context: BindingContext) -> &'static [KeyBinding] {
         BindingContext::Inspection => INSPECTION_BINDINGS,
         BindingContext::Workspaces => WORKSPACES_BINDINGS,
         BindingContext::CommandHistory => COMMAND_HISTORY_BINDINGS,
+        BindingContext::OperationLog => OPERATION_LOG_BINDINGS,
     }
 }
 
@@ -734,6 +787,7 @@ const fn context_label(context: BindingContext) -> &'static str {
         BindingContext::Inspection => "inspection",
         BindingContext::Workspaces => "workspaces",
         BindingContext::CommandHistory => "history",
+        BindingContext::OperationLog => "operation log",
     }
 }
 
@@ -745,7 +799,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  c clear  j/k move  V options  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  j/k move  V options  q quit"
         );
     }
 
@@ -770,6 +824,14 @@ mod tests {
         assert_eq!(
             hotbar(BindingContext::CommandHistory),
             "? help  j/k move  space/b page  r refresh  Esc back  q quit"
+        );
+    }
+
+    #[test]
+    fn operation_log_hotbar_matches_current_status_text() {
+        assert_eq!(
+            hotbar(BindingContext::OperationLog),
+            "? help  enter show  d diff  j/k move  space/b page  r refresh  Esc back  q quit"
         );
     }
 
@@ -852,6 +914,7 @@ mod tests {
             BindingContext::Inspection,
             BindingContext::Workspaces,
             BindingContext::CommandHistory,
+            BindingContext::OperationLog,
         ] {
             for width in 0..=140 {
                 let status = adaptive_hotbar(context, width);
@@ -881,6 +944,7 @@ mod tests {
                 "m                    describe selected revision",
                 "v                    open selected-change evolog",
                 "s                    open repository status",
+                "o                    open operation log",
                 "C                    open command history",
                 "V                    open view options",
                 "r                    refresh",
@@ -970,6 +1034,23 @@ mod tests {
     }
 
     #[test]
+    fn operation_log_help_lines_match_current_overlay() {
+        assert_eq!(
+            help_lines(BindingContext::OperationLog),
+            vec![
+                "j/k or arrows        move selection",
+                "space / b, Ctrl-f/b  page down/up",
+                "g/G or Home/End      jump to top/bottom",
+                "enter                open selected operation show",
+                "d                    open selected operation diff",
+                "r                    refresh operation log",
+                "Backspace, Esc       return to previous view",
+                "?, q, Esc            close help",
+            ]
+        );
+    }
+
+    #[test]
     fn hotbar_bindings_have_help() {
         for context in [
             BindingContext::Log,
@@ -977,6 +1058,7 @@ mod tests {
             BindingContext::Inspection,
             BindingContext::Workspaces,
             BindingContext::CommandHistory,
+            BindingContext::OperationLog,
         ] {
             for binding in bindings(context) {
                 if binding.hotbar.is_some() {
@@ -1073,6 +1155,24 @@ mod tests {
             assert_eq!(rows[0].keys, "C");
             assert_eq!(rows[0].command_family_label(), Some("history"));
         }
+    }
+
+    #[test]
+    fn operation_log_discovery_finds_show_diff_and_refresh() {
+        let show_rows = filter_discovery_rows(BindingContext::OperationLog, "operation show");
+        assert_eq!(show_rows.len(), 1);
+        assert_eq!(show_rows[0].keys, "enter");
+        assert_eq!(show_rows[0].command_family_label(), Some("jj operation"));
+
+        let diff_rows = filter_discovery_rows(BindingContext::OperationLog, "operation diff");
+        assert_eq!(diff_rows.len(), 1);
+        assert_eq!(diff_rows[0].keys, "d");
+        assert_eq!(diff_rows[0].command_family_label(), Some("jj operation"));
+
+        let refresh_rows = filter_discovery_rows(BindingContext::OperationLog, "operation reload");
+        assert_eq!(refresh_rows.len(), 1);
+        assert_eq!(refresh_rows[0].keys, "r");
+        assert_eq!(refresh_rows[0].command_family_label(), Some("refresh"));
     }
 
     #[test]

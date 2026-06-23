@@ -20,7 +20,7 @@ pub enum OperationQuery {
         /// Operation to inspect.
         operation: String,
     },
-    /// Render `jj op diff OPERATION`.
+    /// Render `jj op diff --operation OPERATION`.
     Diff {
         /// Operation to diff.
         operation: String,
@@ -42,7 +42,7 @@ impl OperationQuery {
         }
     }
 
-    /// Creates a `jj op diff OPERATION` query.
+    /// Creates a `jj op diff --operation OPERATION` query.
     #[must_use]
     pub fn diff(operation: impl Into<String>) -> Self {
         Self::Diff {
@@ -114,7 +114,9 @@ impl JjOperation {
         let argv = match query {
             OperationQuery::Log => vec![OP_COMMAND, LOG_COMMAND],
             OperationQuery::Show { operation } => vec![OP_COMMAND, SHOW_COMMAND, operation],
-            OperationQuery::Diff { operation } => vec![OP_COMMAND, DIFF_COMMAND, operation],
+            OperationQuery::Diff { operation } => {
+                vec![OP_COMMAND, DIFF_COMMAND, "--operation", operation]
+            }
         };
 
         JjCommandSpec::render_read_only(argv).with_global_options(self.global_options.clone())
@@ -192,8 +194,11 @@ mod tests {
     fn op_diff_builds_read_only_render_spec() {
         let spec = JjOperation::default().spec_for(&OperationQuery::diff("abc123"));
 
-        assert_eq!(strings(spec.argv().to_vec()), vec!["op", "diff", "abc123"]);
-        assert_eq!(spec.title(), "jj op diff abc123");
+        assert_eq!(
+            strings(spec.argv().to_vec()),
+            vec!["op", "diff", "--operation", "abc123"]
+        );
+        assert_eq!(spec.title(), "jj op diff --operation abc123");
         assert_eq!(spec.safety(), SafetyClass::ReadOnly);
         assert_eq!(spec.mode(), ExecutionMode::RenderReadOnly);
         assert_eq!(spec.refresh_plan(), RefreshPlan::ReRunSpec);
@@ -229,6 +234,7 @@ mod tests {
                 "ui.color=always",
                 "op",
                 "diff",
+                "--operation",
                 "abc123",
             ]
         );
