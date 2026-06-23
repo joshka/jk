@@ -12,12 +12,17 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
     DiffFormat, DiffQuery, EvologQuery, JjDiff, JjEvolog, JjLog, JjLogCommand, JjShow, JjStatus,
-    LogTemplateSelection, ShowQuery, StatusQuery,
+    JjWorkspaces, LogTemplateSelection, ShowQuery, StatusQuery, WorkspaceInspectionQuery,
+    WorkspaceListSnapshot, WorkspaceSummary,
 };
 use jk_tui::command_discovery::{BindingContext, discovery_lines, filtered_discovery_len};
 use jk_tui::diff_view::{DiffAction, DiffActionResult, DiffView};
 use jk_tui::log_view::{ActionResult, LogAction, LogView};
 use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
+use jk_tui::workspaces_view::{
+    WorkspaceViewRow, WorkspaceViewSnapshot, WorkspacesAction, WorkspacesActionResult,
+    WorkspacesView,
+};
 
 mod key;
 
@@ -165,6 +170,7 @@ fn main() -> Result<()> {
     let evolog_source = evolog_source(&args);
     let show_source = show_source(&args);
     let status_source = status_source(&args);
+    let workspaces_source = workspaces_source(&args);
     let app = match &args.command {
         Some(Command::Diff(diff_args)) => {
             let query = diff_args.query();
@@ -191,6 +197,7 @@ fn main() -> Result<()> {
         &evolog_source,
         &show_source,
         &status_source,
+        &workspaces_source,
     )?;
     Ok(())
 }
@@ -269,6 +276,16 @@ fn status_source(args: &Args) -> JjStatus {
     }
 }
 
+/// Builds the workspace source for workspace list and selected-workspace inspection.
+fn workspaces_source(args: &Args) -> JjWorkspaces {
+    let source = JjWorkspaces::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
 fn root_diff_view(diff_source: &JjDiff, query: DiffQuery) -> AppView {
     let snapshot = diff_source.load_query(&query);
     let diff = match snapshot {
@@ -311,6 +328,34 @@ fn root_status_view(status_source: &JjStatus, query: StatusQuery) -> AppView {
     }
 }
 
+fn workspace_view_snapshot(snapshot: WorkspaceListSnapshot) -> WorkspaceViewSnapshot {
+    let rows = snapshot
+        .workspaces
+        .into_iter()
+        .map(workspace_view_row)
+        .collect();
+    WorkspaceViewSnapshot::new(rows).with_title(snapshot.title)
+}
+
+fn workspace_view_row(workspace: WorkspaceSummary) -> WorkspaceViewRow {
+    let root_display = workspace
+        .root
+        .as_ref()
+        .map(|root| root.display().to_string())
+        .unwrap_or_else(|| "(no root)".to_owned());
+    let mut row = WorkspaceViewRow::new(workspace.name, root_display, workspace.current);
+    if let Some(root) = workspace.root {
+        row = row.with_root(root);
+    }
+    if let Some(change_id) = workspace.change_id {
+        row = row.with_change_id(change_id);
+    }
+    if let Some(commit_id) = workspace.commit_id {
+        row = row.with_commit_id(commit_id);
+    }
+    row
+}
+
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum AppView {
@@ -330,6 +375,17 @@ enum AppView {
     Status {
         view: RenderedView,
         query: StatusQuery,
+    },
+    Workspaces {
+        view: WorkspacesView,
+    },
+    WorkspaceStatus {
+        view: RenderedView,
+        query: WorkspaceInspectionQuery,
+    },
+    WorkspaceDiff {
+        view: RenderedView,
+        query: WorkspaceInspectionQuery,
     },
 }
 
@@ -422,6 +478,7 @@ fn run_terminal(
     evolog_source: &JjEvolog,
     show_source: &JjShow,
     status_source: &JjStatus,
+    workspaces_source: &JjWorkspaces,
 ) -> Result<()> {
     // jj should keep configured colors even when the parent process was run by an agent or tool
     // that exports NO_COLOR.
@@ -530,6 +587,44 @@ fn run_terminal(
                     }
                     _ => view.render(frame),
                 },
+                AppView::Workspaces { view } => match &mode {
+                    Some(InputMode::ViewOptions { context, selected }) => {
+                        let lines = view_options_lines(*context, *selected, source.template());
+                        view.render(frame);
+                        render_mode_overlay(frame, "View Options", &lines);
+                    }
+                    Some(InputMode::CommandDiscovery {
+                        context,
+                        query,
+                        selected,
+                    }) => {
+                        let lines = discovery_lines(*context, query, *selected);
+                        view.render(frame);
+                        render_mode_overlay(frame, "Command discovery", &lines);
+                    }
+                    _ => view.render(frame),
+                },
+                AppView::WorkspaceStatus { view, .. } | AppView::WorkspaceDiff { view, .. } => {
+                    match &mode {
+                        Some(InputMode::ViewOptions { context, selected }) => {
+                            let lines = view_options_lines(*context, *selected, source.template());
+                            view.render_with_overlay(frame, "View Options", &lines);
+                        }
+                        Some(InputMode::InspectionSearch { query }) => {
+                            let status = format!("/{query}");
+                            view.render_with_status(frame, &status);
+                        }
+                        Some(InputMode::CommandDiscovery {
+                            context,
+                            query,
+                            selected,
+                        }) => {
+                            let lines = discovery_lines(*context, query, *selected);
+                            view.render_with_overlay(frame, "Command discovery", &lines);
+                        }
+                        _ => view.render(frame),
+                    }
+                }
             })?;
             needs_redraw = false;
         }
@@ -542,6 +637,13 @@ fn run_terminal(
                 }
 
                 let app_key = AppKey::from_crossterm(key);
+                if matches!(state.views.active(), AppView::Workspaces { .. })
+                    && matches!(key.code, KeyCode::Esc)
+                {
+                    handle_back(&mut state);
+                    needs_redraw = true;
+                    continue;
+                }
                 let AppKey::Action(action) = app_key else {
                     match app_key {
                         AppKey::Back => {
@@ -549,7 +651,11 @@ fn run_terminal(
                             needs_redraw = true;
                         }
                         AppKey::OpenShow => {
-                            push_selected_show(&mut state, show_source);
+                            if matches!(state.views.active(), AppView::Workspaces { .. }) {
+                                push_selected_workspace_status(&mut state, workspaces_source);
+                            } else {
+                                push_selected_show(&mut state, show_source);
+                            }
                             needs_redraw = true;
                         }
                         AppKey::OpenEvolog => {
@@ -557,7 +663,15 @@ fn run_terminal(
                             needs_redraw = true;
                         }
                         AppKey::OpenStatus => {
-                            push_status(&mut state, status_source);
+                            if matches!(state.views.active(), AppView::Workspaces { .. }) {
+                                push_selected_workspace_status(&mut state, workspaces_source);
+                            } else {
+                                push_status(&mut state, status_source);
+                            }
+                            needs_redraw = true;
+                        }
+                        AppKey::OpenWorkspaces => {
+                            open_workspaces(&mut state, workspaces_source);
                             needs_redraw = true;
                         }
                         AppKey::OpenViewOptions => {
@@ -571,6 +685,8 @@ fn run_terminal(
                                     | AppView::Show { .. }
                                     | AppView::Evolog { .. }
                                     | AppView::Status { .. }
+                                    | AppView::WorkspaceStatus { .. }
+                                    | AppView::WorkspaceDiff { .. }
                             ) =>
                         {
                             let mode = match state.views.active() {
@@ -586,7 +702,13 @@ fn run_terminal(
                                 AppView::Status { .. } => InputMode::InspectionSearch {
                                     query: String::new(),
                                 },
-                                AppView::Log(_) => unreachable!(),
+                                AppView::WorkspaceStatus { .. } => InputMode::InspectionSearch {
+                                    query: String::new(),
+                                },
+                                AppView::WorkspaceDiff { .. } => InputMode::InspectionSearch {
+                                    query: String::new(),
+                                },
+                                AppView::Log(_) | AppView::Workspaces { .. } => unreachable!(),
                             };
                             state.modes.push(mode);
                             needs_redraw = true;
@@ -617,6 +739,7 @@ fn run_terminal(
                     evolog_source,
                     show_source,
                     status_source,
+                    workspaces_source,
                     action,
                 ) == AppLoop::Quit
                 {
@@ -895,10 +1018,57 @@ fn active_binding_context(state: &AppState) -> BindingContext {
     match state.views.active() {
         AppView::Log(_) => BindingContext::Log,
         AppView::Diff { .. } => BindingContext::Diff,
-        AppView::Show { .. } | AppView::Evolog { .. } | AppView::Status { .. } => {
-            BindingContext::Inspection
-        }
+        AppView::Show { .. }
+        | AppView::Evolog { .. }
+        | AppView::Status { .. }
+        | AppView::WorkspaceStatus { .. }
+        | AppView::WorkspaceDiff { .. } => BindingContext::Inspection,
+        AppView::Workspaces { .. } => BindingContext::Workspaces,
     }
+}
+
+fn render_mode_overlay(frame: &mut ratatui::Frame<'_>, title: &str, lines: &[String]) {
+    use ratatui::layout::Rect;
+    use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
+    use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+
+    let area = frame.area();
+    if area.is_empty() {
+        return;
+    }
+
+    let content = Rect {
+        x: area.x,
+        y: area.y.saturating_add(1),
+        width: area.width,
+        height: area.height.saturating_sub(2),
+    };
+    let width = 72_u16.min(content.width);
+    let height = u16::try_from(lines.len().saturating_add(4))
+        .unwrap_or(u16::MAX)
+        .min(content.height);
+    let overlay = Rect {
+        x: content.x + content.width.saturating_sub(width) / 2,
+        y: content.y + content.height.saturating_sub(height) / 2,
+        width,
+        height,
+    };
+    frame.render_widget(Clear, overlay);
+
+    let text = Text::from(
+        std::iter::once(Line::from(Span::styled(
+            title,
+            Style::new().add_modifier(Modifier::BOLD),
+        )))
+        .chain(std::iter::once(Line::from("")))
+        .chain(lines.iter().map(|line| Line::from(line.as_str())))
+        .collect::<Vec<_>>(),
+    );
+    let paragraph = Paragraph::new(text)
+        .block(Block::bordered())
+        .style(Style::new().fg(Color::White).bg(Color::Black))
+        .wrap(Wrap { trim: false });
+    frame.render_widget(paragraph, overlay);
 }
 
 #[derive(Clone, Copy)]
@@ -1132,6 +1302,10 @@ fn apply_search_submit(state: &mut AppState, action: SearchSubmit) {
         (AppView::Status { view, .. }, SearchSubmit::Inspection(query)) => {
             let _ = view.apply(RenderedAction::Search(query));
         }
+        (AppView::WorkspaceStatus { view, .. }, SearchSubmit::Inspection(query))
+        | (AppView::WorkspaceDiff { view, .. }, SearchSubmit::Inspection(query)) => {
+            let _ = view.apply(RenderedAction::Search(query));
+        }
         _ => {}
     }
 }
@@ -1167,7 +1341,14 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
             };
             let _ = view.apply(action);
         }
-        AppView::Log(_) => {}
+        AppView::WorkspaceStatus { view, .. } | AppView::WorkspaceDiff { view, .. } => {
+            let action = match direction {
+                SearchDirection::Next => RenderedAction::SearchNext,
+                SearchDirection::Previous => RenderedAction::SearchPrevious,
+            };
+            let _ = view.apply(action);
+        }
+        AppView::Log(_) | AppView::Workspaces { .. } => {}
     }
 }
 
@@ -1188,6 +1369,7 @@ fn apply_action(
     evolog_source: &JjEvolog,
     show_source: &JjShow,
     status_source: &JjStatus,
+    workspaces_source: &JjWorkspaces,
     action: jk_tui::log_view::LogAction,
 ) -> AppLoop {
     let transition = match state.views.active_mut() {
@@ -1196,6 +1378,21 @@ fn apply_action(
         AppView::Show { view, query } => apply_show_action(view, query, show_source, action),
         AppView::Evolog { view, query } => apply_evolog_action(view, query, evolog_source, action),
         AppView::Status { view, query } => apply_status_action(view, query, status_source, action),
+        AppView::Workspaces { view } => apply_workspaces_action(view, workspaces_source, action),
+        AppView::WorkspaceStatus { view, query } => apply_workspace_inspection_action(
+            view,
+            query,
+            workspaces_source,
+            WorkspaceInspectionKind::Status,
+            action,
+        ),
+        AppView::WorkspaceDiff { view, query } => apply_workspace_inspection_action(
+            view,
+            query,
+            workspaces_source,
+            WorkspaceInspectionKind::Diff,
+            action,
+        ),
     };
 
     match transition {
@@ -1206,6 +1403,18 @@ fn apply_action(
         }
         AppTransition::PopView => {
             state.views.pop();
+            AppLoop::Continue
+        }
+        AppTransition::PushSelectedWorkspaceStatus => {
+            push_selected_workspace_status(state, workspaces_source);
+            AppLoop::Continue
+        }
+        AppTransition::PushSelectedWorkspaceDiff => {
+            push_selected_workspace_diff(state, workspaces_source);
+            AppLoop::Continue
+        }
+        AppTransition::OpenViewOptions => {
+            open_view_options(state);
             AppLoop::Continue
         }
         AppTransition::Quit => AppLoop::Quit,
@@ -1319,6 +1528,165 @@ fn push_status(state: &mut AppState, status_source: &JjStatus) {
             }
         }
     }
+}
+
+fn push_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
+    let view = match workspaces_source.load_list() {
+        Ok(snapshot) => WorkspacesView::new(workspace_view_snapshot(snapshot)),
+        Err(error) => {
+            let mut view = WorkspacesView::new(WorkspaceViewSnapshot::new(Vec::new()));
+            view.show_error(error.to_string());
+            view
+        }
+    };
+    push_workspace_view(state, view);
+}
+
+fn open_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
+    if let AppView::Workspaces { view } = state.views.active_mut() {
+        refresh_workspaces(view, workspaces_source);
+    } else {
+        push_workspaces(state, workspaces_source);
+    }
+}
+
+fn push_workspace_view(state: &mut AppState, view: WorkspacesView) {
+    state.views.push(AppView::Workspaces { view });
+}
+
+fn push_selected_workspace_status(state: &mut AppState, workspaces_source: &JjWorkspaces) {
+    push_selected_workspace_inspection(state, workspaces_source, WorkspaceInspectionKind::Status);
+}
+
+fn push_selected_workspace_diff(state: &mut AppState, workspaces_source: &JjWorkspaces) {
+    push_selected_workspace_inspection(state, workspaces_source, WorkspaceInspectionKind::Diff);
+}
+
+fn push_selected_workspace_inspection(
+    state: &mut AppState,
+    workspaces_source: &JjWorkspaces,
+    kind: WorkspaceInspectionKind,
+) {
+    let query = {
+        let AppView::Workspaces { view } = state.views.active_mut() else {
+            return;
+        };
+        let Some(row) = view.selected_row() else {
+            return;
+        };
+        let Some(root) = row.root().map(ToOwned::to_owned) else {
+            view.show_error(format!("workspace `{}` has no root", row.name));
+            return;
+        };
+        WorkspaceInspectionQuery::new(root)
+    };
+
+    let snapshot = match kind {
+        WorkspaceInspectionKind::Status => workspaces_source.load_status(&query),
+        WorkspaceInspectionKind::Diff => workspaces_source.load_diff(&query),
+    };
+    match snapshot {
+        Ok(snapshot) => {
+            let view = RenderedView::new(snapshot);
+            let app_view = match kind {
+                WorkspaceInspectionKind::Status => AppView::WorkspaceStatus { view, query },
+                WorkspaceInspectionKind::Diff => AppView::WorkspaceDiff { view, query },
+            };
+            state.views.push(app_view);
+        }
+        Err(error) => {
+            if let AppView::Workspaces { view } = state.views.active_mut() {
+                view.show_error(error.to_string());
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WorkspaceInspectionKind {
+    Status,
+    Diff,
+}
+
+/// Applies an action while the workspace list is active.
+fn apply_workspaces_action(
+    view: &mut WorkspacesView,
+    workspaces_source: &JjWorkspaces,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let workspaces_action = match action {
+        jk_tui::log_view::LogAction::Previous => WorkspacesAction::Previous,
+        jk_tui::log_view::LogAction::Next => WorkspacesAction::Next,
+        jk_tui::log_view::LogAction::ScrollPreviousLine => WorkspacesAction::ScrollPreviousLine,
+        jk_tui::log_view::LogAction::ScrollNextLine => WorkspacesAction::ScrollNextLine,
+        jk_tui::log_view::LogAction::PagePrevious => WorkspacesAction::Previous,
+        jk_tui::log_view::LogAction::PageNext => WorkspacesAction::Next,
+        jk_tui::log_view::LogAction::First => WorkspacesAction::First,
+        jk_tui::log_view::LogAction::Last => WorkspacesAction::Last,
+        jk_tui::log_view::LogAction::Refresh => WorkspacesAction::Refresh,
+        jk_tui::log_view::LogAction::OpenDiff => WorkspacesAction::OpenDiff,
+        jk_tui::log_view::LogAction::ToggleHelp => WorkspacesAction::ToggleHelp,
+        jk_tui::log_view::LogAction::Quit => WorkspacesAction::Quit,
+        jk_tui::log_view::LogAction::Home
+        | jk_tui::log_view::LogAction::Log
+        | jk_tui::log_view::LogAction::CollapseExpanded => WorkspacesAction::ReturnBack,
+        _ => WorkspacesAction::ReturnBack,
+    };
+
+    match view.apply(workspaces_action) {
+        WorkspacesActionResult::Refresh => refresh_workspaces(view, workspaces_source),
+        WorkspacesActionResult::OpenStatus => {
+            return AppTransition::PushSelectedWorkspaceStatus;
+        }
+        WorkspacesActionResult::OpenDiff => {
+            return AppTransition::PushSelectedWorkspaceDiff;
+        }
+        WorkspacesActionResult::ReturnBack => return AppTransition::PopView,
+        WorkspacesActionResult::ViewOptions => return AppTransition::OpenViewOptions,
+        WorkspacesActionResult::Quit => return AppTransition::Quit,
+        WorkspacesActionResult::Continue => {}
+        _ => {}
+    }
+
+    AppTransition::Continue
+}
+
+/// Applies an action while selected-workspace status or diff is active.
+fn apply_workspace_inspection_action(
+    view: &mut RenderedView,
+    query: &WorkspaceInspectionQuery,
+    workspaces_source: &JjWorkspaces,
+    kind: WorkspaceInspectionKind,
+    action: jk_tui::log_view::LogAction,
+) -> AppTransition {
+    let rendered_action = match action {
+        jk_tui::log_view::LogAction::Previous => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::Next => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::ScrollPreviousLine => RenderedAction::ScrollPrevious,
+        jk_tui::log_view::LogAction::ScrollNextLine => RenderedAction::ScrollNext,
+        jk_tui::log_view::LogAction::PagePrevious => RenderedAction::PagePrevious,
+        jk_tui::log_view::LogAction::PageNext => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ToggleMark => RenderedAction::PageNext,
+        jk_tui::log_view::LogAction::ClearMarks => RenderedAction::Ignore,
+        jk_tui::log_view::LogAction::First => RenderedAction::First,
+        jk_tui::log_view::LogAction::Last => RenderedAction::Last,
+        jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
+        jk_tui::log_view::LogAction::Refresh => RenderedAction::Refresh,
+        jk_tui::log_view::LogAction::Quit => RenderedAction::Quit,
+        _ => RenderedAction::ReturnToLog,
+    };
+
+    match view.apply(rendered_action) {
+        RenderedActionResult::Refresh => {
+            refresh_workspace_inspection(view, query, workspaces_source, kind);
+        }
+        RenderedActionResult::ReturnToLog => return AppTransition::PopView,
+        RenderedActionResult::Quit => return AppTransition::Quit,
+        RenderedActionResult::Continue => {}
+        _ => {}
+    }
+
+    AppTransition::Continue
 }
 
 /// Applies an action while the diff view is active.
@@ -1483,6 +1851,9 @@ enum AppTransition {
     Continue,
     Push(AppView),
     PopView,
+    PushSelectedWorkspaceStatus,
+    PushSelectedWorkspaceDiff,
+    OpenViewOptions,
     Quit,
 }
 
@@ -1521,6 +1892,31 @@ fn refresh_evolog(app: &mut RenderedView, query: &EvologQuery, source: &JjEvolog
 /// Reloads the active status view without replacing it on failure.
 fn refresh_status(app: &mut RenderedView, query: &StatusQuery, source: &JjStatus) {
     match source.load_query(query) {
+        Ok(snapshot) => app.refresh(snapshot),
+        Err(error) => app.show_error(error.to_string()),
+    }
+}
+
+/// Reloads the workspace list without replacing the view on failure.
+fn refresh_workspaces(app: &mut WorkspacesView, source: &JjWorkspaces) {
+    match source.load_list() {
+        Ok(snapshot) => app.refresh(workspace_view_snapshot(snapshot)),
+        Err(error) => app.show_error(error.to_string()),
+    }
+}
+
+/// Reloads a selected-workspace inspection view without changing its workspace root.
+fn refresh_workspace_inspection(
+    app: &mut RenderedView,
+    query: &WorkspaceInspectionQuery,
+    source: &JjWorkspaces,
+    kind: WorkspaceInspectionKind,
+) {
+    let snapshot = match kind {
+        WorkspaceInspectionKind::Status => source.load_status(query),
+        WorkspaceInspectionKind::Diff => source.load_diff(query),
+    };
+    match snapshot {
         Ok(snapshot) => app.refresh(snapshot),
         Err(error) => app.show_error(error.to_string()),
     }
@@ -1656,6 +2052,140 @@ mod tests {
         handle_back(&mut state);
 
         assert_eq!(state.views.active(), &AppView::Log(expected_log));
+    }
+
+    #[test]
+    fn workspace_snapshot_mapping_preserves_row_fields() {
+        let snapshot = WorkspaceListSnapshot {
+            title: "jj workspace list".to_owned(),
+            workspaces: vec![WorkspaceSummary {
+                name: "vibe".to_owned(),
+                root: Some(PathBuf::from("/repo/vibe")),
+                current: true,
+                change_id: Some("abc123".to_owned()),
+                commit_id: Some("def456".to_owned()),
+            }],
+        };
+
+        let snapshot = workspace_view_snapshot(snapshot);
+
+        assert_eq!(snapshot.title(), "jj workspace list");
+        assert_eq!(
+            snapshot.rows(),
+            &[WorkspaceViewRow::new("vibe", "/repo/vibe", true)
+                .with_root("/repo/vibe")
+                .with_change_id("abc123")
+                .with_commit_id("def456")]
+        );
+    }
+
+    #[test]
+    fn loaded_workspace_pushes_view() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let view = workspace_app_view();
+
+        push_workspace_view(&mut state, view.clone());
+
+        assert_eq!(state.views.views.len(), 2);
+        assert_eq!(state.views.active(), &AppView::Workspaces { view });
+    }
+
+    #[test]
+    fn w_on_active_workspace_list_does_not_stack_another_list() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        push_workspace_view(&mut state, workspace_app_view());
+        let expected_depth = state.views.views.len();
+
+        open_workspaces(
+            &mut state,
+            &JjWorkspaces::default().with_repository("/definitely/not-a-jj-repo"),
+        );
+
+        assert_eq!(state.views.views.len(), expected_depth);
+        assert!(matches!(state.views.active(), AppView::Workspaces { .. }));
+    }
+
+    #[test]
+    fn workspace_missing_root_status_shows_error_without_pushing() {
+        let mut state = AppState::new(AppView::Workspaces {
+            view: WorkspacesView::new(WorkspaceViewSnapshot::new(vec![WorkspaceViewRow::new(
+                "detached",
+                "(no root)",
+                true,
+            )])),
+        });
+        let source = JjWorkspaces::default();
+        let mut expected =
+            WorkspacesView::new(WorkspaceViewSnapshot::new(vec![WorkspaceViewRow::new(
+                "detached",
+                "(no root)",
+                true,
+            )]));
+        expected.show_error("workspace `detached` has no root");
+
+        push_selected_workspace_status(&mut state, &source);
+
+        assert_eq!(state.views.views.len(), 1);
+        assert_eq!(
+            state.views.active(),
+            &AppView::Workspaces { view: expected }
+        );
+    }
+
+    #[test]
+    fn workspace_missing_root_diff_shows_error_without_pushing() {
+        let mut state = AppState::new(AppView::Workspaces {
+            view: WorkspacesView::new(WorkspaceViewSnapshot::new(vec![WorkspaceViewRow::new(
+                "detached",
+                "(no root)",
+                true,
+            )])),
+        });
+        let source = JjWorkspaces::default();
+        let mut expected =
+            WorkspacesView::new(WorkspaceViewSnapshot::new(vec![WorkspaceViewRow::new(
+                "detached",
+                "(no root)",
+                true,
+            )]));
+        expected.show_error("workspace `detached` has no root");
+
+        push_selected_workspace_diff(&mut state, &source);
+
+        assert_eq!(state.views.views.len(), 1);
+        assert_eq!(
+            state.views.active(),
+            &AppView::Workspaces { view: expected }
+        );
+    }
+
+    #[test]
+    fn back_from_workspace_status_returns_to_workspaces() {
+        let workspace_view = workspace_app_view();
+        let expected = workspace_view.clone();
+        let mut state = AppState::new(AppView::Workspaces {
+            view: workspace_view,
+        });
+        state.views.push(AppView::WorkspaceStatus {
+            view: RenderedView::from_error("/repo/vibe", "jj status", "fixture".to_owned()),
+            query: WorkspaceInspectionQuery::new("/repo/vibe"),
+        });
+
+        handle_back(&mut state);
+
+        assert_eq!(
+            state.views.active(),
+            &AppView::Workspaces { view: expected }
+        );
+    }
+
+    #[test]
+    fn active_binding_context_reports_workspaces() {
+        let state = AppState::new(AppView::Workspaces {
+            view: workspace_app_view(),
+        });
+
+        assert_eq!(active_binding_context(&state), BindingContext::Workspaces);
     }
 
     #[test]
@@ -2131,6 +2661,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn workspace_source_defaults_to_cwd_discovery() {
+        let args = Args::try_parse_from(["jk"]).expect("valid args");
+        let source = workspaces_source(&args);
+        let spec = source.list_spec();
+
+        assert_eq!(spec.repository(), None);
+    }
+
     fn diff_app_view(change_id: &str) -> AppView {
         AppView::Diff {
             view: diff_view(change_id),
@@ -2151,5 +2690,12 @@ mod tests {
             format!("jj diff -r {change_id}"),
             "synthetic diff fixture".to_owned(),
         )
+    }
+
+    fn workspace_app_view() -> WorkspacesView {
+        WorkspacesView::new(WorkspaceViewSnapshot::new(vec![
+            WorkspaceViewRow::new("default", "/repo/default", false).with_root("/repo/default"),
+            WorkspaceViewRow::new("vibe", "/repo/vibe", true).with_root("/repo/vibe"),
+        ]))
     }
 }

@@ -22,6 +22,9 @@ pub enum AppKey {
     /// Open repository status.
     OpenStatus,
 
+    /// Open the workspace list.
+    OpenWorkspaces,
+
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
@@ -119,6 +122,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
         'V' => Some(AppKey::OpenViewOptions),
+        'W' => Some(AppKey::OpenWorkspaces),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
@@ -212,6 +216,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::NONE)),
             AppKey::OpenViewOptions
+        );
+    }
+
+    #[test]
+    fn uppercase_w_opens_workspaces() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::NONE)),
+            AppKey::OpenWorkspaces
         );
     }
 

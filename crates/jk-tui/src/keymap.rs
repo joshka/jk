@@ -296,7 +296,7 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
-    KeyBinding::new(ActionId::ReturnToLog, "H / L", "return to log")
+    KeyBinding::new(ActionId::ReturnToLog, "H / L", "go back")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
@@ -329,7 +329,7 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
-    KeyBinding::new(ActionId::ReturnToLog, "H / L", "return to log")
+    KeyBinding::new(ActionId::ReturnToLog, "H / L", "go back")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
@@ -821,7 +821,7 @@ mod tests {
                 "/, n, N              search, next, previous",
                 "V                    open view options",
                 "r                    refresh",
-                "H / L                return to log",
+                "H / L                go back",
                 "?, q, Esc            close help",
             ]
         );
@@ -839,7 +839,7 @@ mod tests {
                 "/, n, N              search, next, previous",
                 "V                    open view options",
                 "r                    refresh",
-                "H / L                return to log",
+                "H / L                go back",
                 "?, q, Esc            close help",
             ]
         );

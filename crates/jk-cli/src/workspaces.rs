@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use jk_core::JjCommandSpec;
+use jk_core::{ColorPolicy, GlobalOptions, InspectionSnapshot, JjCommandSpec, OutputPolicy};
 use thiserror::Error;
 
 use crate::command::run_jj_spec;
@@ -53,6 +53,30 @@ impl WorkspaceInspectionQuery {
     pub fn workspace_root(&self) -> &Path {
         &self.workspace_root
     }
+
+    /// Returns a compact target label for error and empty-output states.
+    #[must_use]
+    pub fn target_label(&self) -> String {
+        self.workspace_root.display().to_string()
+    }
+}
+
+/// Selected-workspace inspection command that failed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WorkspaceInspectionCommand {
+    /// `jj status`.
+    Status,
+    /// `jj diff`.
+    Diff,
+}
+
+impl std::fmt::Display for WorkspaceInspectionCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Status => f.write_str("jj status"),
+            Self::Diff => f.write_str("jj diff"),
+        }
+    }
 }
 
 /// Loads workspace data from `jj`.
@@ -65,7 +89,7 @@ impl JjWorkspaces {
     /// Sets the repository path passed to `jj --repository`.
     #[must_use]
     pub fn with_repository(mut self, repository: impl Into<PathBuf>) -> Self {
-        self.repository = Some(repository.into());
+        self.repository = Some(normalized_path(&repository.into()));
         self
     }
 
@@ -84,39 +108,92 @@ impl JjWorkspaces {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let workspaces = self.parse_list(&stdout)?;
+        let current_root = self
+            .load_current_root()
+            .ok()
+            .or_else(|| self.repository.clone());
+        let workspaces = parse_workspace_list(&stdout, current_root.as_deref())?;
         Ok(WorkspaceListSnapshot {
             workspaces,
             title: spec.title().to_owned(),
         })
     }
 
+    /// Loads rendered `jj status` output scoped to a selected workspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_status(
+        &self,
+        query: &WorkspaceInspectionQuery,
+    ) -> Result<InspectionSnapshot, JjWorkspacesError> {
+        let spec = self.status_spec(query);
+        let rendered = Self::run_inspection(&spec, WorkspaceInspectionCommand::Status)?;
+        Ok(InspectionSnapshot::new(query.target_label(), rendered).with_title(spec.title()))
+    }
+
+    /// Loads rendered `jj diff` output scoped to a selected workspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn load_diff(
+        &self,
+        query: &WorkspaceInspectionQuery,
+    ) -> Result<InspectionSnapshot, JjWorkspacesError> {
+        let spec = self.diff_spec(query);
+        let rendered = Self::run_inspection(&spec, WorkspaceInspectionCommand::Diff)?;
+        Ok(InspectionSnapshot::new(query.target_label(), rendered).with_title(spec.title()))
+    }
+
     /// Returns the `jj workspace list` command spec.
     #[must_use]
     pub fn list_spec(&self) -> JjCommandSpec {
+        let output = OutputPolicy {
+            color: ColorPolicy::Never,
+            ..OutputPolicy::default()
+        };
         let spec = JjCommandSpec::render_read_only([
             "workspace",
             "list",
             "--template",
             WORKSPACE_LIST_TEMPLATE,
-        ]);
+        ])
+        .with_global_options(GlobalOptions::default().with_output(output))
+        .with_title("jj workspace list");
         self.with_repository_if_configured(spec)
     }
 
     /// Returns the `jj status` command spec scoped to `query`.
     #[must_use]
     pub fn status_spec(&self, query: &WorkspaceInspectionQuery) -> JjCommandSpec {
-        JjCommandSpec::render_read_only(["status"]).with_repository(query.workspace_root())
+        let title = format!("jj -R {} status", query.workspace_root().display());
+        JjCommandSpec::render_read_only(["status"])
+            .with_repository(query.workspace_root())
+            .with_title(title)
     }
 
     /// Returns the `jj diff` command spec scoped to `query`.
     #[must_use]
     pub fn diff_spec(&self, query: &WorkspaceInspectionQuery) -> JjCommandSpec {
-        JjCommandSpec::render_read_only(["diff"]).with_repository(query.workspace_root())
+        let title = format!("jj -R {} diff", query.workspace_root().display());
+        JjCommandSpec::render_read_only(["diff"])
+            .with_repository(query.workspace_root())
+            .with_title(title)
     }
 
-    fn parse_list(&self, stdout: &str) -> Result<Vec<WorkspaceSummary>, JjWorkspacesError> {
-        Ok(parse_workspace_list(stdout, self.repository.as_deref())?)
+    /// Returns the `jj root` command spec used for current-workspace selection.
+    #[must_use]
+    pub fn root_spec(&self) -> JjCommandSpec {
+        let output = OutputPolicy {
+            color: ColorPolicy::Never,
+            ..OutputPolicy::default()
+        };
+        let spec = JjCommandSpec::render_read_only(["root"])
+            .with_global_options(GlobalOptions::default().with_output(output))
+            .with_title("jj root");
+        self.with_repository_if_configured(spec)
     }
 
     fn with_repository_if_configured(&self, spec: JjCommandSpec) -> JjCommandSpec {
@@ -126,18 +203,51 @@ impl JjWorkspaces {
             spec
         }
     }
+
+    fn run_inspection(
+        spec: &JjCommandSpec,
+        command: WorkspaceInspectionCommand,
+    ) -> Result<String, JjWorkspacesError> {
+        let output = run_jj_spec(spec)?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            Err(JjWorkspacesError::InspectionCommandFailed { command, stderr })
+        }
+    }
+
+    fn load_current_root(&self) -> Result<PathBuf, JjWorkspacesError> {
+        let output = run_jj_spec(&self.root_spec())?;
+        if output.status.success() {
+            let root = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            Ok(normalized_path(Path::new(&root)))
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            Err(JjWorkspacesError::CommandFailed(stderr))
+        }
+    }
 }
 
 /// Error returned while loading workspace data from `jj`.
 #[derive(Debug, Error)]
 pub enum JjWorkspacesError {
     /// The `jj` process could not be started or read.
-    #[error("failed to run jj workspace list: {0}")]
+    #[error("failed to run jj workspace command: {0}")]
     Io(#[from] std::io::Error),
 
     /// `jj workspace list` exited unsuccessfully.
     #[error("jj workspace list failed: {0}")]
     CommandFailed(String),
+
+    /// Selected-workspace inspection exited unsuccessfully.
+    #[error("{command} failed: {stderr}")]
+    InspectionCommandFailed {
+        /// The failed `jj` command.
+        command: WorkspaceInspectionCommand,
+        /// Trimmed stderr from `jj`.
+        stderr: String,
+    },
 
     /// `jj workspace list` returned output that did not match the machine template.
     #[error("failed to parse jj workspace list output: {0}")]
@@ -238,7 +348,7 @@ mod tests {
             vec![
                 "--no-pager",
                 "--color",
-                "always",
+                "never",
                 "--repository",
                 "/tmp/repo",
                 "workspace",
@@ -246,6 +356,44 @@ mod tests {
                 "--template",
                 WORKSPACE_LIST_TEMPLATE
             ]
+        );
+    }
+
+    #[test]
+    fn list_spec_canonicalizes_relative_repository() {
+        let source = JjWorkspaces::default().with_repository(".");
+        let spec = source.list_spec();
+        let current_dir = std::env::current_dir().expect("current directory should exist");
+
+        assert_eq!(spec.repository(), Some(current_dir.as_path()));
+    }
+
+    #[test]
+    fn list_spec_without_repository_uses_cwd_discovery() {
+        let spec = JjWorkspaces::default().list_spec();
+
+        assert_eq!(spec.repository(), None);
+        assert_eq!(
+            strings(&spec.process_argv()),
+            vec![
+                "--no-pager",
+                "--color",
+                "never",
+                "workspace",
+                "list",
+                "--template",
+                WORKSPACE_LIST_TEMPLATE
+            ]
+        );
+    }
+
+    #[test]
+    fn root_spec_uses_plain_jj_root_for_current_selection() {
+        let spec = JjWorkspaces::default().root_spec();
+
+        assert_eq!(
+            strings(&spec.process_argv()),
+            vec!["--no-pager", "--color", "never", "root"]
         );
     }
 
@@ -334,10 +482,10 @@ mod tests {
                 .expect("current directory should exist")
                 .display()
         );
-        let source = JjWorkspaces::default()
-            .with_repository(std::env::current_dir().expect("current directory should exist"));
+        let current_dir = std::env::current_dir().expect("current directory should exist");
 
-        let workspaces = source.parse_list(&stdout).expect("rows should parse");
+        let workspaces =
+            parse_workspace_list(&stdout, Some(&current_dir)).expect("rows should parse");
 
         assert!(workspaces[0].current);
         assert!(!workspaces[1].current);

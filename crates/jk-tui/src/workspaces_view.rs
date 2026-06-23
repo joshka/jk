@@ -153,6 +153,10 @@ pub enum WorkspacesAction {
     ScrollPreviousLine,
     /// Scroll one rendered line later.
     ScrollNextLine,
+    /// Move to the first workspace.
+    First,
+    /// Move to the last workspace.
+    Last,
     /// Refresh the workspace list.
     Refresh,
     /// Open status for the selected workspace.
@@ -249,6 +253,18 @@ impl WorkspacesView {
                     self.scroll_offset.saturating_add(1),
                     self.snapshot.rows.len(),
                 );
+                WorkspacesActionResult::Continue
+            }
+            WorkspacesAction::First => {
+                if !self.snapshot.rows.is_empty() {
+                    self.selected = Some(0);
+                }
+                WorkspacesActionResult::Continue
+            }
+            WorkspacesAction::Last => {
+                if !self.snapshot.rows.is_empty() {
+                    self.selected = Some(self.snapshot.rows.len() - 1);
+                }
                 WorkspacesActionResult::Continue
             }
             WorkspacesAction::Refresh => WorkspacesActionResult::Refresh,
@@ -532,6 +548,16 @@ mod tests {
             view.apply(WorkspacesAction::ScrollNextLine),
             WorkspacesActionResult::Continue
         );
+        assert_eq!(
+            view.apply(WorkspacesAction::First),
+            WorkspacesActionResult::Continue
+        );
+        assert_eq!(view.selected_workspace_name(), Some("default"));
+        assert_eq!(
+            view.apply(WorkspacesAction::Last),
+            WorkspacesActionResult::Continue
+        );
+        assert_eq!(view.selected_workspace_name(), Some("default"));
         assert_eq!(
             view.apply(WorkspacesAction::Refresh),
             WorkspacesActionResult::Refresh
