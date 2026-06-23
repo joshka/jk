@@ -352,6 +352,25 @@ impl CommandHistoryView {
         }
     }
 
+    /// Creates a command-history view focused on the newest row with a recorded operation id.
+    ///
+    /// Confirmed mutations are often followed by automatic refresh records. Focusing the newest
+    /// operation row keeps the immediate recovery route on the mutation instead of the refresh.
+    #[must_use]
+    pub fn new_focused_on_latest_operation(snapshot: CommandHistorySnapshot) -> Self {
+        let mut view = Self::new(snapshot);
+        if let Some(index) = view
+            .snapshot
+            .rows
+            .iter()
+            .position(|row| row.operation_id.is_some())
+        {
+            view.selected = Some(index);
+            view.scroll_offset = index;
+        }
+        view
+    }
+
     /// Replaces rows after a refresh.
     pub fn refresh(&mut self, snapshot: CommandHistorySnapshot) {
         let previous_selected = self.selected;
@@ -858,6 +877,31 @@ mod tests {
             view.apply(CommandHistoryAction::Quit),
             CommandHistoryActionResult::Quit
         );
+    }
+
+    #[test]
+    fn focused_constructor_selects_newest_operation_row() {
+        let view =
+            CommandHistoryView::new_focused_on_latest_operation(CommandHistorySnapshot::new(vec![
+                CommandHistoryRow::new(3, "ok", "log refresh", "jj log", ""),
+                CommandHistoryRow::new(2, "ok", "log describe", "jj describe @", "")
+                    .with_operation_id(Some("op2".to_owned())),
+                CommandHistoryRow::new(1, "ok", "log load", "jj log", "")
+                    .with_operation_id(Some("op1".to_owned())),
+            ]));
+
+        assert_eq!(view.selected_row().map(|row| row.id), Some(2));
+    }
+
+    #[test]
+    fn focused_constructor_keeps_newest_row_without_operation_ids() {
+        let view =
+            CommandHistoryView::new_focused_on_latest_operation(CommandHistorySnapshot::new(vec![
+                CommandHistoryRow::new(2, "ok", "log refresh", "jj log", ""),
+                CommandHistoryRow::new(1, "ok", "log load", "jj log", ""),
+            ]));
+
+        assert_eq!(view.selected_row().map(|row| row.id), Some(2));
     }
 
     #[test]

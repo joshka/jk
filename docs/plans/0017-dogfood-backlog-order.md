@@ -6,20 +6,21 @@ then broaden into mutation flows, selectors, run options, and generated help.
 
 ## Next Dogfood Sprint
 
-1. Finish mutation-to-operation linking: confirmed mutations in Command History should open the
-   exact resulting `jj op show` with `o`, not fall back to op log.
-1. Add `u` undo preview: pressing `u` shows `jj undo` in command preview, runs only on confirm,
-   refreshes, and records history.
-1. Add `U` redo preview: same shape as undo, with `jj redo`, so recovery feels complete
-   immediately.
-1. Add post-mutation recovery footer: after a mutation succeeds, make `u undo`, `U redo`,
-   `o operation`, and `C history` visible.
-1. Add copy command from preview/history: let users copy the exact `jj ...` command that ran or will
-   run.
-1. Add Command History output/details view: Enter on a history row should show full argv,
+1. Done: finish mutation-to-operation linking. Confirmed mutations in Command History now focus the
+   newest recorded operation row when Command History opens, so `o` opens the exact resulting
+   `jj op show` instead of landing on a later refresh row and falling back to `jj op log`.
+1. Done: add `u` undo preview. Pressing `u` shows `jj undo` in command preview, runs only on
+   confirm, refreshes, records history, and exposes the recovery footer after success.
+1. Done: add `U` redo preview. Pressing `U` shows `jj redo` in the same confirmation flow, so undo
+   and redo use one recovery interaction model.
+1. Done: add post-mutation recovery footer. After a mutation succeeds, the log footer makes
+   `u undo`, `U redo`, `o operation`, and `C history` visible.
+1. Done: add copy command from preview/history. Users can copy the exact redacted `jj ...` command
+   that will run from preview or that already ran from Command History.
+1. Done: add Command History output/details view. Enter on a history row shows full argv,
    stdout/stderr summary, status, duration, and operation id.
-1. Done in the `:` command mode MVP: run jj commands from an overlay, capture output in a rendered
-   view, record history, and preserve failed-command stderr.
+1. Done: add the `:` command mode MVP. It runs jj commands from an overlay, captures output in a
+   rendered view, records history, and preserves failed-command stderr.
 1. Add command-mode follow-ups: retry/edit from output, success refresh policy, and richer prompt
    editing after the MVP proves the command/result loop.
 1. Add `!` external command MVP: run non-shell external commands safely, with explicit argv handling

@@ -2597,7 +2597,7 @@ fn open_command_history(state: &mut AppState) {
         return;
     }
 
-    let view = CommandHistoryView::new(snapshot);
+    let view = CommandHistoryView::new_focused_on_latest_operation(snapshot);
     state.views.push(AppView::CommandHistory { view });
 }
 
@@ -4589,6 +4589,43 @@ mod tests {
         assert_eq!(records[1].source.action, SourceAction::Refresh);
         assert_eq!(records[2].source.action, SourceAction::Refresh);
         assert!(active_log_status(&mut state).contains(POST_MUTATION_RECOVERY_STATUS));
+    }
+
+    #[test]
+    fn command_history_after_confirmed_mutation_opens_resulting_operation() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let preview = JjDescribe::default()
+            .spec_for(&DescribeQuery::new("abc123", "New description"))
+            .command_preview();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "Working copy now at: abc123\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        confirm_command_preview_with_runner(
+            &mut state,
+            &mut source,
+            PendingCommandPreview::describe(preview),
+            runner,
+        );
+        open_command_history(&mut state);
+        open_command_history_operation_with_runner(
+            &mut state,
+            &JjOperation::default(),
+            SequencedRunner::successes(vec![output(0, "operation details\n", "")]),
+        );
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::OperationShow {
+                query: OperationQuery::Show { operation },
+                ..
+            } if operation == "222222222222"
+        ));
     }
 
     #[test]
