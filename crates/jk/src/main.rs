@@ -674,6 +674,10 @@ fn run_terminal(
                             open_workspaces(&mut state, workspaces_source);
                             needs_redraw = true;
                         }
+                        AppKey::UpdateSelectedWorkspaceStale => {
+                            update_selected_workspace_stale(&mut state, workspaces_source);
+                            needs_redraw = true;
+                        }
                         AppKey::OpenViewOptions => {
                             open_view_options(&mut state);
                             needs_redraw = true;
@@ -1602,6 +1606,87 @@ fn push_selected_workspace_inspection(
     }
 }
 
+fn update_selected_workspace_stale(state: &mut AppState, workspaces_source: &JjWorkspaces) {
+    let (workspace_name, query) = {
+        let AppView::Workspaces { view } = state.views.active_mut() else {
+            return;
+        };
+        let Some(row) = view.selected_row() else {
+            view.show_status("No workspace selected");
+            return;
+        };
+        let workspace_name = row.name.clone();
+        let Some(root) = row.root().map(ToOwned::to_owned) else {
+            view.show_error(format!("workspace `{}` has no root", row.name));
+            return;
+        };
+        (workspace_name, WorkspaceInspectionQuery::new(root))
+    };
+
+    match workspaces_source.update_stale(&query) {
+        Ok(outcome) => {
+            let success = update_stale_success_message(
+                &workspace_name,
+                &outcome.title,
+                &outcome.stderr,
+                &outcome.stdout,
+            );
+            if let AppView::Workspaces { view } = state.views.active_mut() {
+                match workspaces_source.load_list() {
+                    Ok(snapshot) => {
+                        view.refresh(workspace_view_snapshot(snapshot));
+                        view.show_status(success);
+                    }
+                    Err(error) => {
+                        view.show_status(format!("{success}; refresh failed: {error}"));
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            if let AppView::Workspaces { view } = state.views.active_mut() {
+                view.show_error(error.to_string());
+            }
+        }
+    }
+}
+
+fn update_stale_success_message(
+    workspace_name: &str,
+    command: &str,
+    stderr: &str,
+    stdout: &str,
+) -> String {
+    let command = compact_update_stale_command(command);
+    let output = compact_command_output(stderr).or_else(|| compact_command_output(stdout));
+    match output {
+        Some(output) => format!("updated {workspace_name} via {command}: {output}"),
+        None => format!("updated {workspace_name} via {command}"),
+    }
+}
+
+fn compact_update_stale_command(command: &str) -> &str {
+    command
+        .strip_prefix("jj -R ")
+        .and_then(|command| command.split_once(" workspace update-stale"))
+        .map_or(command, |_| "workspace update-stale")
+}
+
+fn compact_command_output(output: &str) -> Option<String> {
+    let first_line = output.lines().find(|line| !line.trim().is_empty())?.trim();
+    const MAX_STATUS_CHARS: usize = 120;
+    if first_line.chars().count() <= MAX_STATUS_CHARS {
+        Some(first_line.to_owned())
+    } else {
+        let mut summary = first_line
+            .chars()
+            .take(MAX_STATUS_CHARS.saturating_sub(3))
+            .collect::<String>();
+        summary.push_str("...");
+        Some(summary)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WorkspaceInspectionKind {
     Status,
@@ -2156,6 +2241,79 @@ mod tests {
         assert_eq!(
             state.views.active(),
             &AppView::Workspaces { view: expected }
+        );
+    }
+
+    #[test]
+    fn workspace_missing_root_update_stale_shows_error_without_pushing() {
+        let mut state = AppState::new(AppView::Workspaces {
+            view: WorkspacesView::new(WorkspaceViewSnapshot::new(vec![WorkspaceViewRow::new(
+                "detached",
+                "(no root)",
+                true,
+            )])),
+        });
+        let source = JjWorkspaces::default();
+        let mut expected =
+            WorkspacesView::new(WorkspaceViewSnapshot::new(vec![WorkspaceViewRow::new(
+                "detached",
+                "(no root)",
+                true,
+            )]));
+        expected.show_error("workspace `detached` has no root");
+
+        update_selected_workspace_stale(&mut state, &source);
+
+        assert_eq!(state.views.views.len(), 1);
+        assert_eq!(
+            state.views.active(),
+            &AppView::Workspaces { view: expected }
+        );
+    }
+
+    #[test]
+    fn workspace_update_stale_without_selection_keeps_list_visible() {
+        let mut state = AppState::new(AppView::Workspaces {
+            view: WorkspacesView::new(WorkspaceViewSnapshot::new(Vec::new())),
+        });
+        let source = JjWorkspaces::default();
+        let mut expected = WorkspacesView::new(WorkspaceViewSnapshot::new(Vec::new()));
+        expected.show_status("No workspace selected");
+
+        update_selected_workspace_stale(&mut state, &source);
+
+        assert_eq!(state.views.views.len(), 1);
+        assert_eq!(
+            state.views.active(),
+            &AppView::Workspaces { view: expected }
+        );
+    }
+
+    #[test]
+    fn workspace_update_stale_success_message_prefers_stderr_then_stdout() {
+        assert_eq!(
+            update_stale_success_message(
+                "vibe",
+                "jj -R /repo/vibe workspace update-stale",
+                "warning line",
+                "stdout line",
+            ),
+            "updated vibe via workspace update-stale: warning line"
+        );
+
+        assert_eq!(
+            update_stale_success_message(
+                "vibe",
+                "jj -R /repo/vibe workspace update-stale",
+                "",
+                "stdout line",
+            ),
+            "updated vibe via workspace update-stale: stdout line"
+        );
+
+        assert_eq!(
+            update_stale_success_message("vibe", "jj workspace update-stale", "", ""),
+            "updated vibe via jj workspace update-stale"
         );
     }
 

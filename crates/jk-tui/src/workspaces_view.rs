@@ -133,6 +133,8 @@ pub enum WorkspacesActionResult {
     OpenStatus,
     /// Open diff for the selected workspace.
     OpenDiff,
+    /// Update stale metadata for the selected workspace.
+    UpdateStale,
     /// Return to the previous view.
     ReturnBack,
     /// Open the view-options surface.
@@ -163,6 +165,8 @@ pub enum WorkspacesAction {
     OpenStatus,
     /// Open diff for the selected workspace.
     OpenDiff,
+    /// Update stale metadata for the selected workspace.
+    UpdateStale,
     /// Toggle mode-specific help.
     ToggleHelp,
     /// Return to the previous view.
@@ -217,6 +221,11 @@ impl WorkspacesView {
     /// Shows a refresh or integration error without replacing the current rows.
     pub fn show_error(&mut self, error: impl Into<String>) {
         self.status_message = Some(error.into());
+    }
+
+    /// Shows a short status message without replacing the current rows.
+    pub fn show_status(&mut self, status: impl Into<String>) {
+        self.status_message = Some(status.into());
     }
 
     /// Returns the selected row, if any.
@@ -276,6 +285,10 @@ impl WorkspacesView {
                 WorkspacesActionResult::OpenDiff
             }
             WorkspacesAction::OpenDiff => WorkspacesActionResult::Continue,
+            WorkspacesAction::UpdateStale if self.selected.is_some() => {
+                WorkspacesActionResult::UpdateStale
+            }
+            WorkspacesAction::UpdateStale => WorkspacesActionResult::Continue,
             WorkspacesAction::ToggleHelp => {
                 self.help_visible = !self.help_visible;
                 WorkspacesActionResult::Continue
@@ -514,6 +527,10 @@ mod tests {
             view.apply(WorkspacesAction::OpenDiff),
             WorkspacesActionResult::Continue
         );
+        assert_eq!(
+            view.apply(WorkspacesAction::UpdateStale),
+            WorkspacesActionResult::Continue
+        );
 
         let backend = TestBackend::new(48, 6);
         let mut terminal = match Terminal::new(backend) {
@@ -569,6 +586,10 @@ mod tests {
         assert_eq!(
             view.apply(WorkspacesAction::OpenDiff),
             WorkspacesActionResult::OpenDiff
+        );
+        assert_eq!(
+            view.apply(WorkspacesAction::UpdateStale),
+            WorkspacesActionResult::UpdateStale
         );
         assert_eq!(
             view.apply(WorkspacesAction::ViewOptions),
@@ -640,6 +661,7 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Workspaces keys"));
         assert!(rendered.contains("enter, s             open selected workspace status"));
+        assert!(rendered.contains("u                    update selected stale workspace"));
     }
 
     fn snapshot<const N: usize>(rows: [WorkspaceViewRow; N]) -> WorkspaceViewSnapshot {

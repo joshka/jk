@@ -2,7 +2,10 @@
 
 use std::path::{Path, PathBuf};
 
-use jk_core::{ColorPolicy, GlobalOptions, InspectionSnapshot, JjCommandSpec, OutputPolicy};
+use jk_core::{
+    ColorPolicy, ExecutionMode, GlobalOptions, InspectionSnapshot, JjCommandSpec, OutputPolicy,
+    RefreshPlan, SafetyClass,
+};
 use thiserror::Error;
 
 use crate::command::run_jj_spec;
@@ -31,6 +34,17 @@ pub struct WorkspaceSummary {
     pub change_id: Option<String>,
     /// Short target commit id.
     pub commit_id: Option<String>,
+}
+
+/// Output from a selected-workspace stale metadata update.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WorkspaceUpdateStaleOutcome {
+    /// Display title for the command that ran.
+    pub title: String,
+    /// Trimmed stdout emitted by `jj`.
+    pub stdout: String,
+    /// Trimmed stderr emitted by `jj`.
+    pub stderr: String,
 }
 
 /// Query for rendering an inspection command in a selected workspace.
@@ -147,6 +161,35 @@ impl JjWorkspaces {
         Ok(InspectionSnapshot::new(query.target_label(), rendered).with_title(spec.title()))
     }
 
+    /// Runs `jj workspace update-stale` scoped to a selected workspace root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `jj` cannot be executed or exits unsuccessfully.
+    pub fn update_stale(
+        &self,
+        query: &WorkspaceInspectionQuery,
+    ) -> Result<WorkspaceUpdateStaleOutcome, JjWorkspacesError> {
+        let spec = self.update_stale_spec(query);
+        let output = run_jj_spec(&spec)?;
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        if output.status.success() {
+            Ok(WorkspaceUpdateStaleOutcome {
+                title: spec.title().to_owned(),
+                stdout,
+                stderr,
+            })
+        } else {
+            Err(JjWorkspacesError::UpdateStaleCommandFailed {
+                command: spec.title().to_owned(),
+                stderr,
+                stdout,
+                status: output.status.to_string(),
+            })
+        }
+    }
+
     /// Returns the `jj workspace list` command spec.
     #[must_use]
     pub fn list_spec(&self) -> JjCommandSpec {
@@ -181,6 +224,26 @@ impl JjWorkspaces {
         JjCommandSpec::render_read_only(["diff"])
             .with_repository(query.workspace_root())
             .with_title(title)
+    }
+
+    /// Returns the `jj workspace update-stale` command spec scoped to `query`.
+    #[must_use]
+    pub fn update_stale_spec(&self, query: &WorkspaceInspectionQuery) -> JjCommandSpec {
+        let output = OutputPolicy {
+            color: ColorPolicy::Never,
+            ..OutputPolicy::default()
+        };
+        let title = format!(
+            "jj -R {} workspace update-stale",
+            query.workspace_root().display()
+        );
+        JjCommandSpec::render_read_only(["workspace", "update-stale"])
+            .with_global_options(GlobalOptions::default().with_output(output))
+            .with_repository(query.workspace_root())
+            .with_title(title)
+            .with_mode(ExecutionMode::ConfirmMutation)
+            .with_safety(SafetyClass::LocalMetadata)
+            .with_refresh_plan(RefreshPlan::None)
     }
 
     /// Returns the `jj root` command spec used for current-workspace selection.
@@ -247,6 +310,19 @@ pub enum JjWorkspacesError {
         command: WorkspaceInspectionCommand,
         /// Trimmed stderr from `jj`.
         stderr: String,
+    },
+
+    /// Selected-workspace stale metadata update exited unsuccessfully.
+    #[error("{command} failed: {}", command_error_summary(stderr, stdout, status))]
+    UpdateStaleCommandFailed {
+        /// Display title for the failed command.
+        command: String,
+        /// Trimmed stderr from `jj`.
+        stderr: String,
+        /// Trimmed stdout from `jj`.
+        stdout: String,
+        /// Process exit status.
+        status: String,
     },
 
     /// `jj workspace list` returned output that did not match the machine template.
@@ -320,6 +396,16 @@ fn optional_string(value: &str) -> Option<String> {
 
 fn normalized_path(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn command_error_summary(stderr: &str, stdout: &str, status: &str) -> String {
+    if !stderr.is_empty() {
+        stderr.to_owned()
+    } else if !stdout.is_empty() {
+        stdout.to_owned()
+    } else {
+        status.to_owned()
+    }
 }
 
 #[cfg(test)]
@@ -434,6 +520,36 @@ mod tests {
                 "diff"
             ]
         );
+    }
+
+    #[test]
+    fn update_stale_spec_scopes_command_to_selected_workspace() {
+        use jk_core::{ExecutionMode, SafetyClass};
+
+        let query = WorkspaceInspectionQuery::new("/tmp/workspace");
+        let spec = JjWorkspaces::default().update_stale_spec(&query);
+        let command = build_jj_command(&spec);
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            args,
+            vec![
+                "--no-pager",
+                "--color",
+                "never",
+                "--repository",
+                "/tmp/workspace",
+                "workspace",
+                "update-stale"
+            ]
+        );
+        assert_eq!(spec.title(), "jj -R /tmp/workspace workspace update-stale");
+        assert_eq!(spec.repository(), Some(Path::new("/tmp/workspace")));
+        assert_eq!(spec.mode(), ExecutionMode::ConfirmMutation);
+        assert_eq!(spec.safety(), SafetyClass::LocalMetadata);
     }
 
     #[test]

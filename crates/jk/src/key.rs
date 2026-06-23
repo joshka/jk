@@ -25,6 +25,9 @@ pub enum AppKey {
     /// Open the workspace list.
     OpenWorkspaces,
 
+    /// Update stale metadata for the selected workspace.
+    UpdateSelectedWorkspaceStale,
+
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
@@ -123,6 +126,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'L' => Some(AppKey::Action(LogAction::Log)),
         'V' => Some(AppKey::OpenViewOptions),
         'W' => Some(AppKey::OpenWorkspaces),
+        'u' => Some(AppKey::UpdateSelectedWorkspaceStale),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
@@ -224,6 +228,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::NONE)),
             AppKey::OpenWorkspaces
+        );
+    }
+
+    #[test]
+    fn lowercase_u_requests_selected_workspace_stale_update() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE)),
+            AppKey::UpdateSelectedWorkspaceStale
         );
     }
 
