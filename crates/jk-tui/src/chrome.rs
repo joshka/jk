@@ -112,3 +112,10 @@ pub struct ChromeAreas {
     title: Rect,
     status: Rect,
 }
+
+impl ChromeAreas {
+    /// Returns the width available to the one-line status row.
+    pub const fn status_width(self) -> u16 {
+        self.status.width
+    }
+}

@@ -6,7 +6,7 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Paragraph;
 
 use crate::chrome::{ViewChrome, render_help_overlay};
-use crate::keymap::{BindingContext, help_lines, help_title, hotbar};
+use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::rendered_log::rendered_text;
 use crate::rendered_state::RenderedState;
 
@@ -184,7 +184,7 @@ impl RenderedView {
             .set_viewport_height(usize::from(areas.content.height));
 
         let search_status = self.state.search_status();
-        let fallback_status = hotbar(BindingContext::Inspection);
+        let fallback_status = adaptive_hotbar(BindingContext::Inspection, areas.status_width());
         let status = status_override
             .or(self.status_message.as_deref())
             .or(search_status.as_deref())

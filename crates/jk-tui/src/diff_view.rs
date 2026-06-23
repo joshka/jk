@@ -7,7 +7,7 @@ use ratatui::widgets::Paragraph;
 
 use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::diff_state::DiffState;
-use crate::keymap::{BindingContext, help_lines, help_title, hotbar};
+use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::rendered_log::rendered_text;
 use crate::selected_row::paint_subtle_selected_row;
 
@@ -301,7 +301,7 @@ impl DiffView {
 
         let search_status = self.state.search_status();
         let horizontal_status = self.state.horizontal_status();
-        let fallback_status = hotbar(BindingContext::Diff);
+        let fallback_status = adaptive_hotbar(BindingContext::Diff, areas.status_width());
         let status = status_override
             .or(self.status_message.as_deref())
             .or(search_status.as_deref())

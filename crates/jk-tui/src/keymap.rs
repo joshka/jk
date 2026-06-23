@@ -336,16 +336,133 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
 
 /// Returns hotbar text for the current binding context.
 pub fn hotbar(context: BindingContext) -> String {
-    let mut hotbar = bindings(context)
-        .iter()
-        .filter_map(|binding| binding.hotbar_rank.zip(binding.hotbar))
-        .collect::<Vec<_>>();
-    hotbar.sort_by_key(|(rank, _)| *rank);
-    hotbar
+    hotbar_items(context)
         .into_iter()
-        .map(|(_, label)| label)
+        .map(|item| item.label)
         .collect::<Vec<_>>()
         .join("  ")
+}
+
+/// Returns hotbar text that fits the available row width.
+pub fn adaptive_hotbar(context: BindingContext, width: u16) -> String {
+    let full_hotbar = hotbar(context);
+    let width = usize::from(width);
+    if width == 0 {
+        return String::new();
+    }
+    if visible_width(&full_hotbar) <= width {
+        return full_hotbar;
+    }
+
+    let help = pinned_label(context, CommandFamily::Help).unwrap_or("?");
+    let quit = pinned_label(context, CommandFamily::Quit).unwrap_or("q");
+
+    let optional = hotbar_items(context)
+        .into_iter()
+        .filter(|item| {
+            !matches!(
+                item.command_family,
+                Some(CommandFamily::Help | CommandFamily::Quit)
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut selected = Vec::new();
+    for index in 0..optional.len() {
+        selected.push(optional[index].label);
+        let omitted = optional.len().saturating_sub(selected.len());
+        let candidate = narrowed_hotbar(help, &selected, omitted, quit);
+        if visible_width(&candidate) > width {
+            selected.pop();
+            break;
+        }
+    }
+
+    let omitted = optional.len().saturating_sub(selected.len());
+    let candidate = narrowed_hotbar(help, &selected, omitted, quit);
+    if visible_width(&candidate) <= width {
+        return candidate;
+    }
+
+    let candidate = narrowed_hotbar(help, &[], optional.len(), quit);
+    if visible_width(&candidate) <= width {
+        return candidate;
+    }
+
+    let candidate = join_hotbar_labels(&["?", "...", "q"]);
+    if omitted > 0 && visible_width(&candidate) <= width {
+        return candidate;
+    }
+
+    let candidate = join_hotbar_labels(&["?", "q"]);
+    if visible_width(&candidate) <= width {
+        return candidate;
+    }
+
+    if width >= visible_width("? q") {
+        return "? q".to_owned();
+    }
+
+    fit_label(help, width)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct HotbarItem {
+    label: &'static str,
+    command_family: Option<CommandFamily>,
+}
+
+fn hotbar_items(context: BindingContext) -> Vec<HotbarItem> {
+    let mut hotbar = bindings(context)
+        .iter()
+        .filter_map(|binding| {
+            let label = binding.hotbar?;
+            let rank = binding.hotbar_rank?;
+            Some((rank, binding.command_family, label))
+        })
+        .collect::<Vec<_>>();
+    hotbar.sort_by_key(|(rank, _, _)| *rank);
+    hotbar
+        .into_iter()
+        .map(|(_, command_family, label)| HotbarItem {
+            label,
+            command_family,
+        })
+        .collect()
+}
+
+fn pinned_label(context: BindingContext, family: CommandFamily) -> Option<&'static str> {
+    hotbar_items(context)
+        .into_iter()
+        .find(|item| item.command_family == Some(family))
+        .map(|item| item.label)
+}
+
+fn narrowed_hotbar(
+    help: &'static str,
+    selected: &[&'static str],
+    omitted: usize,
+    quit: &'static str,
+) -> String {
+    let mut labels = Vec::with_capacity(selected.len().saturating_add(3));
+    labels.push(help);
+    labels.extend_from_slice(selected);
+    if omitted > 0 {
+        labels.push("...");
+    }
+    labels.push(quit);
+    join_hotbar_labels(&labels)
+}
+
+fn join_hotbar_labels(labels: &[&str]) -> String {
+    labels.join("  ")
+}
+
+fn visible_width(text: &str) -> usize {
+    text.chars().count()
+}
+
+fn fit_label(label: &str, width: usize) -> String {
+    label.chars().take(width).collect()
 }
 
 /// Returns the help overlay title for the current binding context.
@@ -517,6 +634,85 @@ mod tests {
             hotbar(BindingContext::Inspection),
             "? help  V options  r refresh  j/k line  space/b page  q quit"
         );
+    }
+
+    #[test]
+    fn adaptive_log_hotbar_keeps_full_text_when_it_fits() {
+        assert_eq!(
+            adaptive_hotbar(BindingContext::Log, 200),
+            hotbar(BindingContext::Log)
+        );
+    }
+
+    #[test]
+    fn adaptive_log_hotbar_keeps_primary_commands_at_betamax_width() {
+        let status = adaptive_hotbar(BindingContext::Log, 104);
+
+        assert!(status.chars().count() <= 104);
+        assert!(status.contains("? help"));
+        assert!(status.contains("q quit"));
+        assert!(status.contains("enter show"));
+        assert!(status.contains("d diff"));
+        assert!(status.contains("v evolog"));
+        assert!(status.contains("s status"));
+        assert!(status.contains("..."));
+        assert!(!status.contains("space mark"));
+        assert!(!status.contains("j/k move"));
+    }
+
+    #[test]
+    fn adaptive_log_hotbar_preserves_rank_order() {
+        let status = adaptive_hotbar(BindingContext::Log, 75);
+
+        assert_eq!(
+            status,
+            "? help  H home  L log  r refresh  enter show  d diff  v evolog  ...  q quit"
+        );
+    }
+
+    #[test]
+    fn adaptive_hotbar_prefers_help_at_tiny_width() {
+        assert_eq!(adaptive_hotbar(BindingContext::Log, 9), "?  ...  q");
+        assert_eq!(adaptive_hotbar(BindingContext::Log, 4), "?  q");
+        assert_eq!(adaptive_hotbar(BindingContext::Log, 3), "? q");
+        assert_eq!(adaptive_hotbar(BindingContext::Log, 1), "?");
+        assert_eq!(adaptive_hotbar(BindingContext::Log, 0), "");
+    }
+
+    #[test]
+    fn adaptive_diff_hotbar_keeps_action_affordances() {
+        let status = adaptive_hotbar(BindingContext::Diff, 51);
+
+        assert!(status.chars().count() <= 51);
+        assert_eq!(
+            status,
+            "? help  V options  r refresh  j/k line  ...  q quit"
+        );
+    }
+
+    #[test]
+    fn adaptive_inspection_hotbar_matches_diff_policy() {
+        let status = adaptive_hotbar(BindingContext::Inspection, 41);
+
+        assert!(status.chars().count() <= 41);
+        assert_eq!(status, "? help  V options  r refresh  ...  q quit");
+    }
+
+    #[test]
+    fn adaptive_hotbars_never_exceed_requested_width() {
+        for context in [
+            BindingContext::Log,
+            BindingContext::Diff,
+            BindingContext::Inspection,
+        ] {
+            for width in 0..=140 {
+                let status = adaptive_hotbar(context, width);
+                assert!(
+                    status.chars().count() <= usize::from(width),
+                    "{context:?} width {width}: {status}"
+                );
+            }
+        }
     }
 
     #[test]

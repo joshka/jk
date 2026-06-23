@@ -12,7 +12,7 @@ use ratatui::prelude::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 
 use crate::chrome::{ViewChrome, render_help_overlay};
-use crate::keymap::{BindingContext, help_lines, help_title, hotbar};
+use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::log_state::LogState;
 use crate::rendered_log::{ExpandedDetails, RenderedLog, rendered_text};
 use crate::selected_row::paint_selected_row;
@@ -306,7 +306,7 @@ impl LogView {
         let status = status
             .map(ToOwned::to_owned)
             .or_else(|| self.status_message.clone())
-            .unwrap_or_else(|| hotbar(BindingContext::Log));
+            .unwrap_or_else(|| adaptive_hotbar(BindingContext::Log, areas.status_width()));
         let chrome = ViewChrome::new(self.state.title(), &status);
         chrome.render(frame, areas);
 
