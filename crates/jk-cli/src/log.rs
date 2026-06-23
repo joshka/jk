@@ -4,7 +4,7 @@ use std::path::PathBuf;
 #[cfg(test)]
 use std::process::Command;
 
-use jk_core::{JjCommandSpec, LogSnapshot};
+use jk_core::{GlobalOptions, JjCommandSpec, LogSnapshot, WorkingCopyPolicy};
 use thiserror::Error;
 
 #[cfg(test)]
@@ -249,7 +249,9 @@ impl JjLog {
             argv.push(template.to_owned());
         }
 
+        let global_options = GlobalOptions::default().with_working_copy(WorkingCopyPolicy::Ignore);
         let spec = JjCommandSpec::render_read_only(argv)
+            .with_global_options(global_options)
             .with_title(command_title(command_args, &self.template));
         if let Some(repository) = &self.repository {
             spec.with_repository(repository)
@@ -466,6 +468,7 @@ mod tests {
                 "always",
                 "--repository",
                 "/tmp/repo",
+                "--ignore-working-copy",
                 "log"
             ]
         );
@@ -483,6 +486,7 @@ mod tests {
 
         assert!(command_args.is_empty());
         assert!(!args.iter().any(|arg| arg == "log"));
+        assert!(args.iter().any(|arg| arg == "--ignore-working-copy"));
         assert!(args.windows(2).any(|args| args == ["-n", "3"]));
         assert!(args.windows(2).any(|args| args == ["-T", LOG_TEMPLATE]));
         assert_eq!(
