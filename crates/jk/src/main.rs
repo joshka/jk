@@ -413,6 +413,10 @@ fn run_terminal(
             let mode = state.modes.active().cloned();
             terminal.draw(|frame| match state.views.active_mut() {
                 AppView::Log(log) => match &mode {
+                    Some(InputMode::ViewOptions { context, selected }) => {
+                        let lines = view_options_lines(*context, *selected, source.template());
+                        log.render_with_selector(frame, "View Options", &lines);
+                    }
                     Some(InputMode::LogTemplate { options, selected }) => {
                         let lines = template_selector_lines(options, *selected);
                         log.render_with_selector(frame, "Log template", &lines);
@@ -428,6 +432,10 @@ fn run_terminal(
                     _ => log.render(frame),
                 },
                 AppView::Diff { view, .. } => match &mode {
+                    Some(InputMode::ViewOptions { context, selected }) => {
+                        let lines = view_options_lines(*context, *selected, source.template());
+                        view.render_with_overlay(frame, "View Options", &lines);
+                    }
                     Some(InputMode::DiffSearch { query }) => {
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
@@ -443,6 +451,10 @@ fn run_terminal(
                     _ => view.render(frame),
                 },
                 AppView::Show { view, .. } => match &mode {
+                    Some(InputMode::ViewOptions { context, selected }) => {
+                        let lines = view_options_lines(*context, *selected, source.template());
+                        view.render_with_overlay(frame, "View Options", &lines);
+                    }
                     Some(InputMode::InspectionSearch { query }) => {
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
@@ -458,6 +470,10 @@ fn run_terminal(
                     _ => view.render(frame),
                 },
                 AppView::Status { view, .. } => match &mode {
+                    Some(InputMode::ViewOptions { context, selected }) => {
+                        let lines = view_options_lines(*context, *selected, source.template());
+                        view.render_with_overlay(frame, "View Options", &lines);
+                    }
                     Some(InputMode::InspectionSearch { query }) => {
                         let status = format!("/{query}");
                         view.render_with_status(frame, &status);
@@ -496,6 +512,10 @@ fn run_terminal(
                         }
                         AppKey::OpenStatus => {
                             push_status(&mut state, status_source);
+                            needs_redraw = true;
+                        }
+                        AppKey::OpenViewOptions => {
+                            open_view_options(&mut state);
                             needs_redraw = true;
                         }
                         AppKey::StartSearch
@@ -566,6 +586,10 @@ fn run_terminal(
 /// Transient input modes owned by the terminal loop.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum InputMode {
+    ViewOptions {
+        context: BindingContext,
+        selected: usize,
+    },
     DiffSearch {
         query: String,
     },
@@ -592,6 +616,9 @@ enum InputModeResult {
 
 /// Handles key input while a prompt-like mode is active.
 fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) -> InputModeResult {
+    if matches!(state.modes.active(), Some(InputMode::ViewOptions { .. })) {
+        return handle_view_options_mode(state, source, key);
+    }
     if matches!(state.modes.active(), Some(InputMode::LogTemplate { .. })) {
         return handle_template_mode(state, source, key);
     }
@@ -620,6 +647,7 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
             let action = match mode {
                 InputMode::DiffSearch { query } => SearchSubmit::Diff(query.clone()),
                 InputMode::InspectionSearch { query } => SearchSubmit::Inspection(query.clone()),
+                InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
@@ -643,6 +671,7 @@ fn handle_input_mode(state: &mut AppState, source: &mut JjLog, key: KeyEvent) ->
                 InputMode::DiffSearch { query } | InputMode::InspectionSearch { query } => {
                     query.push(character);
                 }
+                InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
@@ -739,17 +768,84 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
     }
 }
 
+fn handle_view_options_mode(
+    state: &mut AppState,
+    source: &JjLog,
+    key: KeyEvent,
+) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc | KeyCode::Backspace,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('q'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Up, ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('k'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            move_view_options_selection(state, ViewOptionsMove::Previous);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Down,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('j'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            move_view_options_selection(state, ViewOptionsMove::Next);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            let selected = selected_view_option(state);
+            state.modes.pop();
+            if selected == Some(ViewOptionRow::LogTemplate) {
+                open_template_selector(&mut state.modes, source);
+            }
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
 fn open_command_discovery(state: &mut AppState) {
-    let context = match state.views.active() {
-        AppView::Log(_) => BindingContext::Log,
-        AppView::Diff { .. } => BindingContext::Diff,
-        AppView::Show { .. } | AppView::Status { .. } => BindingContext::Inspection,
-    };
+    let context = active_binding_context(state);
     state.modes.push(InputMode::CommandDiscovery {
         context,
         query: String::new(),
         selected: 0,
     });
+}
+
+fn open_view_options(state: &mut AppState) {
+    state.modes.push(InputMode::ViewOptions {
+        context: active_binding_context(state),
+        selected: 0,
+    });
+}
+
+fn active_binding_context(state: &AppState) -> BindingContext {
+    match state.views.active() {
+        AppView::Log(_) => BindingContext::Log,
+        AppView::Diff { .. } => BindingContext::Diff,
+        AppView::Show { .. } | AppView::Status { .. } => BindingContext::Inspection,
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -785,6 +881,70 @@ fn clamp_command_discovery_selection(context: BindingContext, query: &str, selec
         *selected = 0;
     } else {
         *selected = (*selected).min(row_count - 1);
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ViewOptionsMove {
+    Previous,
+    Next,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ViewOptionRow {
+    LogTemplate,
+    Placeholder,
+}
+
+fn move_view_options_selection(state: &mut AppState, direction: ViewOptionsMove) {
+    let Some(InputMode::ViewOptions { context, selected }) = state.modes.active_mut() else {
+        return;
+    };
+    let row_count = view_option_rows(*context).len();
+    if row_count == 0 {
+        *selected = 0;
+        return;
+    }
+
+    match direction {
+        ViewOptionsMove::Previous => *selected = selected.saturating_sub(1),
+        ViewOptionsMove::Next => *selected = (*selected + 1).min(row_count - 1),
+    }
+}
+
+fn selected_view_option(state: &AppState) -> Option<ViewOptionRow> {
+    let Some(InputMode::ViewOptions { context, selected }) = state.modes.active() else {
+        return None;
+    };
+    view_option_rows(*context).get(*selected).copied()
+}
+
+fn view_option_rows(context: BindingContext) -> &'static [ViewOptionRow] {
+    match context {
+        BindingContext::Log => &[ViewOptionRow::LogTemplate],
+        BindingContext::Diff | BindingContext::Inspection => &[ViewOptionRow::Placeholder],
+    }
+}
+
+fn view_options_lines(
+    context: BindingContext,
+    selected: usize,
+    template: &LogTemplateSelection,
+) -> Vec<String> {
+    match context {
+        BindingContext::Log => {
+            let marker = if selected == 0 { ">" } else { " " };
+            vec![
+                format!("{marker} {:<18} {}", "Template", template.label()),
+                String::new(),
+                "j/k or arrows move   enter open   esc close".to_owned(),
+            ]
+        }
+        BindingContext::Diff | BindingContext::Inspection => vec![
+            "No view options in this slice.".to_owned(),
+            String::new(),
+            "esc close".to_owned(),
+        ],
     }
 }
 
@@ -976,10 +1136,6 @@ fn apply_action(
             state.views.pop();
             AppLoop::Continue
         }
-        AppTransition::OpenTemplateSelector => {
-            open_template_selector(&mut state.modes, source);
-            AppLoop::Continue
-        }
         AppTransition::Quit => AppLoop::Quit,
     }
 }
@@ -997,7 +1153,6 @@ fn apply_log_action(
             switch_log_command(log, source, JjLogCommand::ConfiguredDefault);
         }
         ActionResult::SwitchLog => switch_log_command(log, source, JjLogCommand::Log),
-        ActionResult::SwitchTemplate => return AppTransition::OpenTemplateSelector,
         ActionResult::Quit => return AppTransition::Quit,
         _ => {}
     }
@@ -1097,7 +1252,6 @@ fn apply_diff_action(
         jk_tui::log_view::LogAction::UnfoldAll => DiffAction::UnfoldAll,
         jk_tui::log_view::LogAction::Refresh => DiffAction::Refresh,
         jk_tui::log_view::LogAction::OpenDiff => DiffAction::Ignore,
-        jk_tui::log_view::LogAction::SwitchTemplate => DiffAction::Ignore,
         jk_tui::log_view::LogAction::Quit => DiffAction::Quit,
         _ => DiffAction::ReturnToLog,
     };
@@ -1132,7 +1286,6 @@ fn apply_show_action(
         jk_tui::log_view::LogAction::Last => RenderedAction::Last,
         jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
         jk_tui::log_view::LogAction::Refresh => RenderedAction::Refresh,
-        jk_tui::log_view::LogAction::SwitchTemplate => RenderedAction::Ignore,
         jk_tui::log_view::LogAction::Quit => RenderedAction::Quit,
         _ => RenderedAction::ReturnToLog,
     };
@@ -1167,7 +1320,6 @@ fn apply_status_action(
         jk_tui::log_view::LogAction::Last => RenderedAction::Last,
         jk_tui::log_view::LogAction::ToggleHelp => RenderedAction::ToggleHelp,
         jk_tui::log_view::LogAction::Refresh => RenderedAction::Refresh,
-        jk_tui::log_view::LogAction::SwitchTemplate => RenderedAction::Ignore,
         jk_tui::log_view::LogAction::Quit => RenderedAction::Quit,
         _ => RenderedAction::ReturnToLog,
     };
@@ -1195,7 +1347,6 @@ enum AppTransition {
     Continue,
     Push(AppView),
     PopView,
-    OpenTemplateSelector,
     Quit,
 }
 
@@ -1261,9 +1412,10 @@ fn apply_log_template_selection(
     source: &mut JjLog,
     template: LogTemplateSelection,
 ) {
-    let AppView::Log(log) = state.views.active_mut() else {
+    if !matches!(state.views.active(), AppView::Log(_)) {
         return;
-    };
+    }
+
     let next_source = source
         .clone()
         .with_command(JjLogCommand::Log)
@@ -1271,9 +1423,17 @@ fn apply_log_template_selection(
     match next_source.load() {
         Ok(snapshot) => {
             *source = next_source;
-            log.refresh(snapshot);
+            if let AppView::Log(log) = state.views.active_mut() {
+                log.refresh(snapshot);
+            }
         }
-        Err(error) => log.show_error(error.to_string()),
+        Err(error) => show_log_template_load_error(state, error.to_string()),
+    }
+}
+
+fn show_log_template_load_error(state: &mut AppState, error: String) {
+    if let AppView::Log(log) = state.views.active_mut() {
+        log.show_error(error);
     }
 }
 
@@ -1461,6 +1621,123 @@ mod tests {
 
         assert_eq!(result, InputModeResult::Handled);
         assert_eq!(state.modes.active(), None);
+    }
+
+    #[test]
+    fn view_options_opens_for_active_context() {
+        let mut state = AppState::new(diff_app_view("aaa"));
+
+        open_view_options(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ViewOptions {
+                context: BindingContext::Diff,
+                selected: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn view_options_enter_opens_log_template_selector() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::ViewOptions {
+            context: BindingContext::Log,
+            selected: 0,
+        });
+        let mut source = JjLog::default().with_template(LogTemplateSelection::Detailed);
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        let options = source.template_options();
+        let selected = options
+            .iter()
+            .position(|template| template == source.template())
+            .unwrap_or_default();
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::LogTemplate { options, selected })
+        );
+    }
+
+    #[test]
+    fn view_options_placeholder_enter_closes_non_log_overlay() {
+        let mut state = AppState::new(diff_app_view("aaa"));
+        state.modes.push(InputMode::ViewOptions {
+            context: BindingContext::Diff,
+            selected: 0,
+        });
+        let mut source = JjLog::default();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(state.modes.active(), None);
+    }
+
+    #[test]
+    fn view_options_close_without_changing_source() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::ViewOptions {
+            context: BindingContext::Log,
+            selected: 0,
+        });
+        let mut source = JjLog::default().with_template(LogTemplateSelection::Compact);
+        let expected = source.template().clone();
+
+        let result = handle_input_mode(
+            &mut state,
+            &mut source,
+            KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
+        );
+
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(state.modes.active(), None);
+        assert_eq!(source.template(), &expected);
+    }
+
+    #[test]
+    fn view_options_lines_show_template_or_placeholder() {
+        assert_eq!(
+            view_options_lines(
+                BindingContext::Log,
+                0,
+                &LogTemplateSelection::CompactFullDescription,
+            ),
+            vec![
+                "> Template           full description",
+                "",
+                "j/k or arrows move   enter open   esc close",
+            ]
+        );
+        assert_eq!(
+            view_options_lines(BindingContext::Diff, 0, &LogTemplateSelection::Configured),
+            vec!["No view options in this slice.", "", "esc close"]
+        );
+    }
+
+    #[test]
+    fn template_selection_failure_preserves_previous_log_and_source() {
+        let previous_log = LogView::default();
+        let mut state = AppState::new(AppView::Log(previous_log.clone()));
+        let source = JjLog::default().with_template(LogTemplateSelection::Detailed);
+        let expected_template = source.template().clone();
+
+        show_log_template_load_error(&mut state, "template reload failed".to_owned());
+
+        let mut expected_log = previous_log;
+        expected_log.show_error("template reload failed");
+        assert_eq!(source.template(), &expected_template);
+        assert_eq!(state.views.active(), &AppView::Log(expected_log));
     }
 
     #[test]

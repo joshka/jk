@@ -19,6 +19,9 @@ pub enum AppKey {
     /// Open repository status.
     OpenStatus,
 
+    /// Open view-scoped display and template options.
+    OpenViewOptions,
+
     /// Close the active mode or return to the previous view.
     Back,
 
@@ -112,7 +115,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'r' => Some(AppKey::Action(LogAction::Refresh)),
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
-        'T' => Some(AppKey::Action(LogAction::SwitchTemplate)),
+        'V' => Some(AppKey::OpenViewOptions),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
         'c' => Some(AppKey::Action(LogAction::ClearMarks)),
@@ -201,10 +204,26 @@ mod tests {
     }
 
     #[test]
-    fn uppercase_t_switches_log_template() {
+    fn uppercase_v_opens_view_options() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('V'), KeyModifiers::NONE)),
+            AppKey::OpenViewOptions
+        );
+    }
+
+    #[test]
+    fn uppercase_t_is_unbound_after_view_options_migration() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('T'), KeyModifiers::NONE)),
-            AppKey::Action(LogAction::SwitchTemplate)
+            AppKey::Ignore
+        );
+    }
+
+    #[test]
+    fn lowercase_v_remains_reserved_for_evolog() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE)),
+            AppKey::Ignore
         );
     }
 

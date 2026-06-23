@@ -27,7 +27,7 @@ enum ActionId {
     OpenShow,
     OpenDiff,
     OpenStatus,
-    SwitchTemplate,
+    ViewOptions,
     Refresh,
     SwitchLogCommand,
     File,
@@ -56,7 +56,7 @@ impl ActionId {
             Self::OpenShow => "Open show",
             Self::OpenDiff => "Open diff",
             Self::OpenStatus => "Open status",
-            Self::SwitchTemplate => "Switch log template",
+            Self::ViewOptions => "View options",
             Self::Refresh => "Refresh",
             Self::SwitchLogCommand => "Switch log command",
             Self::File => "Move file",
@@ -98,6 +98,8 @@ pub enum CommandFamily {
     File,
     /// Diff hunk movement.
     Hunk,
+    /// View-scoped display and template options.
+    ViewOptions,
     /// Help and discovery controls.
     Help,
     /// Quitting the application.
@@ -118,6 +120,7 @@ impl CommandFamily {
             Self::Fold => "fold",
             Self::File => "file",
             Self::Hunk => "hunk",
+            Self::ViewOptions => "view options",
             Self::Help => "help",
             Self::Quit => "quit",
         }
@@ -216,10 +219,10 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::OpenStatus, "s", "open repository status")
         .with_family(CommandFamily::JjStatus)
         .with_hotbar(6, "s status"),
-    KeyBinding::new(ActionId::SwitchTemplate, "T", "switch log template")
-        .with_family(CommandFamily::JjLog)
-        .with_aliases(&["template"])
-        .with_hotbar(7, "T template"),
+    KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
+        .with_family(CommandFamily::ViewOptions)
+        .with_aliases(&["view", "options", "template", "jj log"])
+        .with_hotbar(7, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
@@ -239,12 +242,12 @@ const LOG_BINDINGS: &[KeyBinding] = &[
 const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
         .with_family(CommandFamily::Navigation)
-        .with_hotbar(3, "j/k line"),
+        .with_hotbar(4, "j/k line"),
     KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
         .with_family(CommandFamily::Navigation)
-        .with_hotbar(4, "space/b page"),
+        .with_hotbar(5, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::File, "[ / ]", "previous/next file").with_family(CommandFamily::File),
@@ -264,9 +267,13 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Search, "/, n, N", "search, next, previous")
         .with_family(CommandFamily::Search)
         .with_aliases(&["find", "filter"]),
+    KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
+        .with_family(CommandFamily::ViewOptions)
+        .with_aliases(&["view", "options", "display"])
+        .with_hotbar(2, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
-        .with_hotbar(2, "r refresh"),
+        .with_hotbar(3, "r refresh"),
     KeyBinding::new(ActionId::ReturnToLog, "H / L", "return to log")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
@@ -275,27 +282,31 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(5, "q quit")
+        .with_hotbar(6, "q quit")
         .hotbar_only(),
 ];
 
 const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
         .with_family(CommandFamily::Navigation)
-        .with_hotbar(3, "j/k line"),
+        .with_hotbar(4, "j/k line"),
     KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
         .with_family(CommandFamily::Navigation)
-        .with_hotbar(4, "space/b page"),
+        .with_hotbar(5, "space/b page"),
     KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::Search, "/, n, N", "search, next, previous")
         .with_family(CommandFamily::Search)
         .with_aliases(&["find", "filter", "details", "status"]),
+    KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
+        .with_family(CommandFamily::ViewOptions)
+        .with_aliases(&["view", "options", "display"])
+        .with_hotbar(2, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
-        .with_hotbar(2, "r refresh"),
+        .with_hotbar(3, "r refresh"),
     KeyBinding::new(ActionId::ReturnToLog, "H / L", "return to log")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
@@ -304,7 +315,7 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(5, "q quit")
+        .with_hotbar(6, "q quit")
         .hotbar_only(),
 ];
 
@@ -473,7 +484,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  s status  T template  space mark  c clear  j/k move  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  s status  V options  space mark  c clear  j/k move  q quit"
         );
     }
 
@@ -481,7 +492,7 @@ mod tests {
     fn diff_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Diff),
-            "? help  r refresh  j/k line  space/b page  q quit"
+            "? help  V options  r refresh  j/k line  space/b page  q quit"
         );
     }
 
@@ -489,7 +500,7 @@ mod tests {
     fn inspection_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Inspection),
-            "? help  r refresh  j/k line  space/b page  q quit"
+            "? help  V options  r refresh  j/k line  space/b page  q quit"
         );
     }
 
@@ -509,7 +520,7 @@ mod tests {
                 "left, h              collapse selected change",
                 "d                    open selected-change diff",
                 "s                    open repository status",
-                "T                    switch log template",
+                "V                    open view options",
                 "r                    refresh",
                 "H / L                home command / jj log",
                 "?, q, Esc            close help",
@@ -533,6 +544,7 @@ mod tests {
                 "- / +                fold/unfold current hunk",
                 "< / >                horizontal scroll",
                 "/, n, N              search, next, previous",
+                "V                    open view options",
                 "r                    refresh",
                 "H / L                return to log",
                 "?, q, Esc            close help",
@@ -550,6 +562,7 @@ mod tests {
                 "space / b, Ctrl-f/b  page down/up",
                 "g/G or Home/End      jump to top/bottom",
                 "/, n, N              search, next, previous",
+                "V                    open view options",
                 "r                    refresh",
                 "H / L                return to log",
                 "?, q, Esc            close help",
@@ -582,12 +595,16 @@ mod tests {
     }
 
     #[test]
-    fn discovery_filter_searches_context_family_and_aliases() {
+    fn discovery_filter_searches_view_options_aliases() {
         let rows = filter_discovery_rows(BindingContext::Log, "template log");
 
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].keys, "T");
-        assert_eq!(rows[0].command_family_label(), Some("jj log"));
+        assert_eq!(rows[0].keys, "V");
+        assert_eq!(rows[0].command_family_label(), Some("view options"));
+
+        let rows = filter_discovery_rows(BindingContext::Log, "view options");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].keys, "V");
     }
 
     #[test]

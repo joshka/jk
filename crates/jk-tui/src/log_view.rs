@@ -33,9 +33,6 @@ pub enum ActionResult {
     /// Switch to the explicit `jj log` view.
     SwitchLog,
 
-    /// Switch the rendered log template selection.
-    SwitchTemplate,
-
     /// Open the selected change's diff.
     OpenDiff,
 
@@ -124,9 +121,6 @@ pub enum LogAction {
 
     /// Switch to the explicit `jj log` view.
     Log,
-
-    /// Switch the rendered log template selection.
-    SwitchTemplate,
 
     /// Open the selected change's diff.
     OpenDiff,
@@ -265,7 +259,6 @@ impl LogView {
             LogAction::Refresh => ActionResult::Refresh,
             LogAction::Home => ActionResult::SwitchHome,
             LogAction::Log => ActionResult::SwitchLog,
-            LogAction::SwitchTemplate => ActionResult::SwitchTemplate,
             LogAction::OpenDiff => {
                 if self.selected_change_id().is_some() {
                     ActionResult::OpenDiff
