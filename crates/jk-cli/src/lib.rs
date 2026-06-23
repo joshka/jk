@@ -12,6 +12,7 @@
 
 mod command;
 
+pub mod abandon;
 pub mod describe;
 pub mod diff;
 pub mod evolog;
@@ -22,6 +23,7 @@ pub mod show;
 pub mod status;
 pub mod workspaces;
 
+pub use abandon::{AbandonQuery, JjAbandon};
 pub use command::{JjCommandRunner, RecordingJjCommandRunner, SystemJjCommandRunner};
 pub use describe::{DescribeQuery, JjDescribe};
 pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};

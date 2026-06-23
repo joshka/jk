@@ -43,6 +43,9 @@ pub enum AppKey {
     /// Start an inline describe mutation for the selected revision.
     StartDescribe,
 
+    /// Preview abandoning the selected revision.
+    StartAbandon,
+
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
@@ -159,6 +162,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'u' => Some(AppKey::StartUndo),
         'U' => Some(AppKey::StartRedo),
         'm' => Some(AppKey::StartDescribe),
+        'a' => Some(AppKey::StartAbandon),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
@@ -348,6 +352,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE)),
             AppKey::StartDescribe
+        );
+    }
+
+    #[test]
+    fn lowercase_a_starts_abandon_preview() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE)),
+            AppKey::StartAbandon
         );
     }
 

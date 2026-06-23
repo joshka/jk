@@ -68,7 +68,9 @@ Introduce mutating workflows only through command preview and recovery.
 - Add a reusable Run Options drawer for global options and advanced safety toggles before mutating
   wizards depend on them.
 - Add inline and editor describe flows.
-- Add new, commit, edit, rebase, and abandon flows.
+- Add new, commit, edit, rebase, and abandon flows. The `vibe` spike now has the first direct
+  selected-revision `a` -> `jj abandon REV` preview; the durable action-menu shape still belongs
+  with the broader mutation selector work.
 - Add rebase destination search and command preview before any graph mutation.
 - Add undo/redo and operation log entry points.
 - Log every mutation in command history.

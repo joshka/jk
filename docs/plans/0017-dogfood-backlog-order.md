@@ -38,8 +38,9 @@ then broaden into mutation flows, selectors, run options, and generated help.
 
 ## First Useful Mutation Sprint
 
-1. Add `jj abandon` preview flow: a high-value simple mutation using selected revision, command
-   preview, confirm, refresh, and recovery.
+1. Done: add `jj abandon` preview flow. Pressing `a` on the selected log revision opens a
+   destructive command preview for `jj abandon REV`; Enter runs it, refreshes the log, records
+   history with the resulting operation id, and exposes recovery actions.
 1. Add `jj new` preview flow: create a new change from selected context with clear preview and
    recovery.
 1. Add `jj edit` preview flow: move working copy to selected change, with warning when the action

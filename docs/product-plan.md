@@ -417,6 +417,12 @@ All rewrite/destructive/network actions should follow:
 6. Refresh state after success.
 7. Show result, command history entry, and operation-recovery actions.
 
+Current `vibe` spike status: selected-revision `jj abandon REV` has the first destructive mutation
+preview. Pressing `a` on the log opens a command preview, Enter runs the command, successful runs
+refresh the graph, command history records the resulting operation id, and the recovery footer
+surfaces undo/redo/operation/history actions. This direct `a` binding is a dogfood shortcut until
+the long-term action-menu prefix exists.
+
 ### 3.6 Recovery is first-class
 
 After every mutation:
@@ -663,6 +669,10 @@ Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` r
 
 The `a` prefix opens a visible overlay. Keys are active only while the overlay is open.
 
+Current `vibe` note: before this prefix menu exists, `a` directly previews `jj abandon REV` for the
+selected log revision. Keep that implementation path command-spec based so it can move under
+`a a` later without rewriting the mutation runner.
+
 | Key | jj command family               | Notes                                                      |
 | --- | ------------------------------- | ---------------------------------------------------------- |
 | `a` | `jj abandon`                    | Confirm; explain descendant behavior.                      |
@@ -897,7 +907,7 @@ Navigation contract:
 | `jj commit`           | `c` where `@`/status valid  | P0       | Working-copy flow.                                  |
 | `jj edit`             | `e`                         | P0/P1    | Direct but clear; `a E` for ignore immutable.       |
 | `jj rebase`           | `R`                         | P0       | Visual role picker.                                 |
-| `jj abandon`          | `a a`                       | P0/P1    | Destructive confirmation and operation recovery.    |
+| `jj abandon`          | `a` now, `a a` later        | P0/P1    | Destructive preview and operation recovery.         |
 | `jj revert`           | `a v`                       | P2       | Destination picker.                                 |
 | `jj duplicate`        | `a D`                       | P2       | Preserve command preview.                           |
 | `jj parallelize`      | `a p`                       | P2       | Stack cleanup.                                      |

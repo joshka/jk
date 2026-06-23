@@ -41,6 +41,7 @@ enum ActionId {
     OpenCommandDetails,
     CopyCommand,
     CommandMode,
+    Abandon,
     Undo,
     Redo,
     UpdateStale,
@@ -83,6 +84,7 @@ impl ActionId {
             Self::OpenCommandDetails => "Open command details",
             Self::CopyCommand => "Copy command",
             Self::CommandMode => "Run jj command",
+            Self::Abandon => "Abandon revision",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
@@ -287,6 +289,10 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["operation", "op log", "undo", "redo", "recovery"])
         .with_hotbar(9, "o ops"),
+    KeyBinding::new(ActionId::Abandon, "a", "preview jj abandon")
+        .with_family(CommandFamily::JjOperation)
+        .with_aliases(&["abandon", "delete", "destructive", "mutation", "preview"])
+        .with_hotbar(12, "a abandon"),
     KeyBinding::new(ActionId::Undo, "u", "preview jj undo")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["undo", "operation", "recovery"])
@@ -304,7 +310,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
-        .with_hotbar(13, "V options"),
+        .with_hotbar(14, "V options"),
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
@@ -317,7 +323,7 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(14, "q quit")
+        .with_hotbar(15, "q quit")
         .hotbar_only(),
 ];
 
@@ -866,7 +872,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  V options  q quit"
+            "? help  H home  L log  r refresh  enter show  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  a abandon  V options  q quit"
         );
     }
 
@@ -932,6 +938,7 @@ mod tests {
         assert!(status.contains("s status"));
         assert!(status.contains("..."));
         assert!(!status.contains("space mark"));
+        assert!(!status.contains("a abandon"));
         assert!(!status.contains("j/k move"));
     }
 
@@ -1012,6 +1019,7 @@ mod tests {
                 "v                    open selected-change evolog",
                 "s                    open repository status",
                 "o                    open operation log",
+                "a                    preview jj abandon",
                 "u                    preview jj undo",
                 "U                    preview jj redo",
                 "C                    open command history",

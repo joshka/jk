@@ -170,6 +170,8 @@ pub enum SourceAction {
     OpenEvolog,
     /// Describe the selected revision.
     DescribeRevision,
+    /// Abandon the selected revision.
+    AbandonRevision,
     /// List workspaces.
     WorkspaceList,
     /// Show selected workspace status.

@@ -13,10 +13,10 @@ use color_eyre::{Result, eyre::eyre};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 use jk_cli::{
-    DescribeQuery, DiffFormat, DiffQuery, EvologQuery, JjCommandRunner, JjDescribe, JjDiff,
-    JjEvolog, JjLog, JjLogCommand, JjOperation, JjRecovery, JjShow, JjStatus, JjWorkspaces,
-    LogTemplateSelection, OperationQuery, RecordingJjCommandRunner, RecoveryCommand, ShowQuery,
-    StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot,
+    AbandonQuery, DescribeQuery, DiffFormat, DiffQuery, EvologQuery, JjAbandon, JjCommandRunner,
+    JjDescribe, JjDiff, JjEvolog, JjLog, JjLogCommand, JjOperation, JjRecovery, JjShow, JjStatus,
+    JjWorkspaces, LogTemplateSelection, OperationQuery, RecordingJjCommandRunner, RecoveryCommand,
+    ShowQuery, StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery, WorkspaceListSnapshot,
     WorkspaceSummary,
 };
 use jk_core::{
@@ -223,6 +223,7 @@ fn main() -> Result<()> {
     let show_source = show_source(&args);
     let status_source = status_source(&args);
     let describe_source = describe_source(&args);
+    let abandon_source = abandon_source(&args);
     let operation_source = operation_source(&args);
     let recovery_source = recovery_source(&args);
     let workspaces_source = workspaces_source(&args);
@@ -258,6 +259,7 @@ fn main() -> Result<()> {
         &show_source,
         &status_source,
         &describe_source,
+        &abandon_source,
         &operation_source,
         &recovery_source,
         &workspaces_source,
@@ -344,6 +346,16 @@ fn status_source(args: &Args) -> JjStatus {
 /// Builds the describe source for selected-change mutation preview.
 fn describe_source(args: &Args) -> JjDescribe {
     let source = JjDescribe::default();
+    if let Some(repository) = &args.repository {
+        source.with_repository(repository)
+    } else {
+        source
+    }
+}
+
+/// Builds the abandon source for selected-change mutation preview.
+fn abandon_source(args: &Args) -> JjAbandon {
+    let source = JjAbandon::default();
     if let Some(repository) = &args.repository {
         source.with_repository(repository)
     } else {
@@ -643,6 +655,16 @@ impl PendingCommandPreview {
         }
     }
 
+    fn abandon(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::AbandonRevision,
+            source_key: "a",
+            failure_label: "jj abandon",
+            copy_status: None,
+        }
+    }
+
     fn undo(preview: CommandPreview) -> Self {
         Self {
             preview,
@@ -738,6 +760,7 @@ fn run_terminal(
     show_source: &JjShow,
     status_source: &JjStatus,
     describe_source: &JjDescribe,
+    abandon_source: &JjAbandon,
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
@@ -1096,6 +1119,10 @@ fn run_terminal(
                         }
                         AppKey::StartDescribe => {
                             open_describe_message(&mut state);
+                            needs_redraw = true;
+                        }
+                        AppKey::StartAbandon => {
+                            open_abandon_preview(&mut state, abandon_source);
                             needs_redraw = true;
                         }
                         AppKey::OpenViewOptions => {
@@ -1807,6 +1834,23 @@ fn open_describe_message(state: &mut AppState) {
     state.modes.push(InputMode::DescribeMessage {
         rev,
         message: String::new(),
+    });
+}
+
+fn open_abandon_preview(state: &mut AppState, abandon_source: &JjAbandon) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    let Some(rev) = log.selected_change_id().map(ToOwned::to_owned) else {
+        log.show_error("No revision selected");
+        return;
+    };
+
+    let preview = abandon_source
+        .spec_for(&AbandonQuery::new(rev))
+        .command_preview();
+    state.modes.push(InputMode::CommandPreview {
+        pending: PendingCommandPreview::abandon(preview),
     });
 }
 
@@ -4827,6 +4871,29 @@ mod tests {
     }
 
     #[test]
+    fn abandon_preview_uses_selected_revision() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        open_abandon_preview(&mut state, &JjAbandon::default());
+
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+            panic!("expected abandon command preview");
+        };
+        assert_eq!(pending.source_action, SourceAction::AbandonRevision);
+        assert_eq!(pending.source_key, "a");
+        assert_eq!(pending.failure_label, "jj abandon");
+        assert_eq!(
+            pending.preview.command_line,
+            "jj --no-pager --color always abandon abc123"
+        );
+        assert_eq!(pending.preview.safety, SafetyClass::DestructiveLocal);
+        assert_eq!(
+            pending.preview.warnings,
+            vec![jk_core::CommandPreviewWarning::DestructiveLocal]
+        );
+    }
+
+    #[test]
     fn confirming_describe_preview_records_mutation_before_refresh() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
@@ -4865,6 +4932,42 @@ mod tests {
         );
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[0].refresh, jk_core::RefreshPlan::None);
+        assert_eq!(records[1].source.action, SourceAction::Refresh);
+        assert_eq!(records[2].source.action, SourceAction::Refresh);
+        assert!(active_log_status(&mut state).contains(POST_MUTATION_RECOVERY_STATUS));
+    }
+
+    #[test]
+    fn confirming_abandon_preview_records_destructive_mutation() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let preview = JjAbandon::default()
+            .spec_for(&AbandonQuery::new("abc123"))
+            .command_preview();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "Abandoned 1 commits.\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        confirm_command_preview_with_runner(
+            &mut state,
+            &mut source,
+            PendingCommandPreview::abandon(preview),
+            runner,
+        );
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].command.spec_preview, "jj abandon abc123");
+        assert_eq!(records[0].command.title, "jj abandon abc123");
+        assert_eq!(records[0].source.view, SourceView::Log);
+        assert_eq!(records[0].source.action, SourceAction::AbandonRevision);
+        assert_eq!(records[0].source.key.as_deref(), Some("a"));
+        assert_eq!(records[0].safety, SafetyClass::DestructiveLocal);
+        assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);
         assert_eq!(records[2].source.action, SourceAction::Refresh);
         assert!(active_log_status(&mut state).contains(POST_MUTATION_RECOVERY_STATUS));
