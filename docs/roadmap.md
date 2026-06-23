@@ -4,6 +4,10 @@ This is the execution map for the deeper [product plan](product-plan.md). Keep t
 enough to drive issues, PRs, and release planning. Use the product plan for product principles,
 keymap rationale, architecture details, docs/site strategy, and release policy.
 
+The standalone [CLI surface addendum](plans/cli-surface-addendum.md) is the compatibility audit for
+`jj 0.42.0` command families and flags. Do not inline it here; use it to keep this roadmap ordered
+around reusable flag families instead of one-off command forms.
+
 ## North Star
 
 `jk` is a jj-native terminal workbench: focused screens, jj-shaped commands, config-faithful
@@ -17,11 +21,15 @@ The product test is simple: `jk` should feel like interactive jj, not a Git dash
 
 Build the architecture needed before the keymap and workflows grow.
 
-- Add `JjCommandSpec`, execution mode, safety class, and refresh plan.
+- Add `JjCommandSpec`, `GlobalOptions`, execution mode, safety class, and refresh plan.
 - Replace hard-coded return paths with a view stack and mode stack.
 - Move keybindings toward data-backed bindings that generate help and hotbar text.
 - Add independent viewport scrolling and ordered marks.
+- Reserve `V` for reusable View Options and standalone `v` for `evolog` before adding more
+  display shortcuts.
 - Add the cancellable task model needed for slow previews and refreshes.
+- Start a generated command/flag manifest from installed `jj help` or `jj util markdown-help`
+  output, and treat it as compatibility input rather than runtime UI.
 - Expand [Betamax](https://www.joshka.net/betamax/) validation coverage for current log and diff
   workflows.
 
@@ -32,8 +40,12 @@ Make inspection workflows match jj's command model.
 - Support canonical `jk diff -r REV`, `jk diff --from A --to B`, and stat variants.
 - Resolve `d` and `S` from cursor plus ordered marks.
 - Add selected-change `show` and repository `status` screens.
-- Add view-format choices for patch, stat, summary, name-only, and related diff formats.
-- Add first-class diff search, file-list navigation, and two-revision comparison.
+- Add a reusable `V` View Options overlay for patch, stat, summary, name-only, templates, graph
+  options, and related diff formats.
+- Add standalone `v` for selected-change `evolog` after the shared inspection source model exists.
+- Add first-class diff search, file-list navigation, and two-revision comparison. The current
+  implementation spike now has the first diff file selector (`f`) for jumping within the active
+  diff; searchable file lists and range comparison still need follow-up work.
 - Add docs and [Betamax](https://www.joshka.net/betamax/) tapes for log, diff, show, and status
   flows.
 
@@ -53,8 +65,13 @@ Add the two features that turn `jk` from an inspection helper into a daily workb
 
 Introduce mutating workflows only through command preview and recovery.
 
+- Add a reusable Run Options drawer for global options and advanced safety toggles before mutating
+  wizards depend on them.
 - Add inline and editor describe flows.
-- Add new, commit, edit, rebase, and abandon flows.
+- Add new, commit, edit, rebase, and abandon flows. The current implementation spike now has direct
+  selected-revision `a` -> `jj abandon REV` and `n` -> `jj new PARENT...` previews. `jj new`
+  already uses ordered marks as parents when present and falls back to the selected revision; the
+  durable action-menu shape still belongs with the broader mutation selector work.
 - Add rebase destination search and command preview before any graph mutation.
 - Add undo/redo and operation log entry points.
 - Log every mutation in command history.
@@ -64,6 +81,8 @@ Introduce mutating workflows only through command preview and recovery.
 
 Bring file and hunk workflows into the same command-shaped model.
 
+- Add shared selector models for revisions, filesets, operations, bookmarks, tags, remotes, and
+  workspaces before expanding content command forms.
 - Add squash, split, restore, diffedit, and absorb flows.
 - Support file selection first, then hunk-aware paths where jj/editor support is strong enough.
 - Add conflict and resolve affordances after the file model is stable.
@@ -93,6 +112,39 @@ Stabilize the default user experience.
 - Complete README, docs, website, generated media, release notes, and install paths.
 - Keep release gates boring: Rust checks, markdown, config-fidelity tests, and Betamax suites.
 
+## Dependency Order
+
+Reusable primitives come before broad workflow coverage:
+
+- Command specs must carry `GlobalOptions` and command/flag metadata before mutation previews,
+  command history, or command-mode output try to format commands independently.
+- `V` View Options must exist before adding separate display toggles for log, diff, show, evolog,
+  operation log, or templates.
+- Run Options must exist before exposing advanced safety flags such as `--ignore-working-copy`,
+  `--at-operation`, `--no-integrate-operation`, `--ignore-immutable`, `--config`, and
+  `--config-file`.
+- Shared selector models must exist before command families grow bespoke prompts for revsets,
+  filesets, operations, bookmarks, tags, remotes, or workspaces.
+- Workspaces stay early core scope. They land before broad history-editing polish because
+  multi-workspace state changes how log, status, diff, operation, and sparse workflows are shown.
+- Betamax validation should be organized by flag families as well as command journeys, so one tape
+  can prove shared behavior such as `-R` propagation, View Options formats, Run Options safety, or
+  selector resolution across multiple commands.
+
+## Command Family Priorities
+
+These priorities summarize direct `jk` surface area. Lower-priority families should still work
+through `:` command mode once command mode exists.
+
+- P0: `log`, `diff`, `show`, `status`, `describe`, `new`, `commit`, `edit`, `rebase`,
+  `squash`, `split`, `restore`, operation log/show/diff, undo/redo, bookmarks, `git fetch`,
+  `git push`, and workspaces.
+- P1: `evolog`, `interdiff`, file list/show/annotate/search, `diffedit`, `absorb`, `fix`,
+  `resolve`, tags, git remotes, and git import/export/clone/init.
+- P2: `metaedit`, `revert`, `duplicate`, `parallelize`, `simplify-parents`, sparse, config
+  inspection, and operation abandon/integrate.
+- P3: sign/unsign, bisect, Gerrit, config editing, and forge/ticket/AI integrations.
+
 ## Issue Candidates
 
 ### Add CommandSpec And Preview Scaffold
@@ -100,8 +152,18 @@ Stabilize the default user experience.
 Create the shared command model that every jj-shaped action will use.
 
 - Scope: `jk-core`, `jk-cli`, and current log/diff command construction.
-- Acceptance: commands can render argv and preview text without shell quoting mistakes.
-- Tests: command string/argv unit tests and one integration fixture.
+- Acceptance: commands can render argv and preview text without shell quoting mistakes, preserve
+  `GlobalOptions`, and keep global flags before the jj command family.
+- Tests: command string/argv unit tests, global-option ordering tests, and one integration fixture.
+
+### Generate jj Command And Flag Manifest
+
+Use installed jj help output as compatibility input for planning, tests, and future manifests.
+
+- Scope: `jj help` or `jj util markdown-help` export, generated snapshots, and compatibility checks.
+- Acceptance: supported command specs reference flags present in the manifest, and drift errors name
+  the command family and flag.
+- Tests: manifest parser fixtures and one generated-help snapshot.
 
 ### Introduce ViewStack And ModeStack
 
@@ -152,15 +214,37 @@ Align inspection commands with jj's canonical argument shapes.
 - Acceptance: marks plus cursor resolve to clear `jj diff`, `jj show`, and `jj status` commands.
 - Tests: command resolver tests, fixture integration tests, and Betamax inspection tapes.
 
+### Add Reusable View Options Overlay
+
+Expose display and template flags as reusable view state instead of per-command popups.
+
+- Scope: `V` overlay, diff/display format state, graph/list state, template choices, and command
+  spec regeneration.
+- Acceptance: log, diff, show, status, evolog, and operation views can share display options without
+  taking standalone command keys.
+- Tests: view-option state tests, command-spec regeneration tests, and Betamax view-options tapes.
+
+### Add Selected-change Evolog
+
+Make change evolution visible without stealing display-option keys.
+
+- Scope: standalone `v`, `jj evolog -r`, evolog view state, and follow-up interdiff affordances.
+- Acceptance: `v` opens evolution history for the selected change, while `V` remains View Options.
+- Tests: evolog command tests and Betamax evolog tape.
+
 ### Add Rich Diff And File Navigation
 
 Make diff inspection useful for large changes without forcing users into another tool.
 
 - Scope: file list, sticky revision/file context, diff search, next/previous file actions,
   two-revision diffs, horizontal overflow controls, edge-case fixtures, and file-only/details mode.
+- Current implementation status: diff views support `[ ]` file movement, `{ }` hunk movement, search,
+  horizontal scroll, sticky/current-file context, diff format View Options, and an `f` file selector
+  that jumps to the chosen file in the active diff.
 - Acceptance: users can search within a diff, jump between files, inspect name-only/stat/detail
-  variants, compare two selected revisions with the shown jj command, and recover from empty or
-  failed diff loads without leaving the TUI.
+  variants, compare two selected revisions with the shown jj command, recover from empty or failed
+  diff loads without leaving the TUI, and use a searchable file list once the shared file selector
+  model exists.
 - Tests: diff navigation state tests, command resolver tests, large-diff fixture, and Betamax
   rich-diff tape.
 
@@ -201,6 +285,25 @@ Make workspaces visible early because they are a normal daily jj workflow.
 - Acceptance: users can list workspaces, identify the current workspace, inspect status/diff, and
   update stale workspaces.
 - Tests: multi-workspace fixture, command resolver tests, and `docs-workspaces` media tape.
+
+### Add Run Options Drawer
+
+Expose global execution context and advanced safety flags consistently.
+
+- Scope: repository, working-copy policy, operation time travel, operation integration,
+  immutability override, config overlays, and output policy.
+- Acceptance: previews show global flags in jj syntax, remote/network commands do not silently use
+  local-operation simulation, and time-travel screens clearly show working-copy policy.
+- Tests: command-spec tests for global flag ordering and Betamax run-options tape.
+
+### Add Shared Selector Models
+
+Prevent command-family forms from inventing one-off selectors.
+
+- Scope: revision, fileset, operation, bookmark, tag, remote, and workspace selector state.
+- Acceptance: role pickers and command previews reuse selector output across inspection, mutation,
+  refs, remotes, and workspace workflows.
+- Tests: selector resolution tests and Betamax selector-family tapes.
 
 ### Add Operation Log And Recovery
 
@@ -248,9 +351,11 @@ Make release infrastructure match the project plan before relying on it.
 
 Promote [Betamax](https://www.joshka.net/betamax/) from media helper to project infrastructure.
 
-- Scope: `tapes/validation`, `tapes/media`, fixture scripts, and `just` recipes.
+- Scope: `tapes/validation`, `tapes/media`, flag-family matrix, fixture scripts, and `just`
+  recipes.
 - Acceptance: validation tapes run in CI-friendly form, media tapes produce reviewable artifacts.
-- Tests: `just betamax-validation` and `just betamax-media-smoke`.
+- Tests: `just betamax-validation`, `just betamax-media-smoke`, and family tapes for global options,
+  selectors, view options, run options, workspaces, and push safety.
 
 ### Build Betamax-driven Docs
 
@@ -296,7 +401,9 @@ Capture durable decisions before the code grows around them.
 Every major workflow issue should include:
 
 - jj command or command family involved;
+- relevant flag families;
 - object roles and how cursor plus marks resolve them;
+- selector models used;
 - proposed keys and scope;
 - prior-art or community-demand signal, when relevant;
 - preview behavior;
@@ -305,9 +412,10 @@ Every major workflow issue should include:
 
 ## Website And Release Visibility
 
-Product-visible `jk` changes should trigger a website pass in `/Users/joshka/local/jk-website`
-when they change install instructions, released features, key workflows, screenshots, GIFs, command
-examples, or README/crates.io positioning.
+Product-visible `jk` changes should trigger a pass through the companion
+[`jk-website`](https://github.com/joshka/jk-website) repository when they change install
+instructions, released features, key workflows, screenshots, GIFs, command examples, or
+README/crates.io positioning.
 
 README, crates.io, website, and release-note media should come from
 [Betamax](https://www.joshka.net/betamax/) tapes. Store generated README and crates.io media in the
