@@ -2,7 +2,7 @@
 
 Status: draft
 
-Owner: `vibe-ordered-revision-marks` workspace spike
+Owner: `dogfood-ordered-revision-marks` workspace pass
 
 Scope: first ordered revision mark implementation chunk
 

@@ -2,7 +2,7 @@
 
 Status: draft/spec
 
-Owner: `vibe` workspace spike
+Owner: current dogfood workspace pass
 
 Scope: first mutation-preview implementation slice after Command History
 
@@ -197,10 +197,10 @@ Add Betamax evidence under local artifacts, not committed generated media:
 
 ```text
 tapes/validation/safe-mutation-preview-foundation.tape
-target/vibe-artifacts/safe-mutation-preview/preview-cancel.txt
-target/vibe-artifacts/safe-mutation-preview/preview-confirm.txt
-target/vibe-artifacts/safe-mutation-preview/history-after-confirm.txt
-target/vibe-artifacts/safe-mutation-preview/failure-output.txt
+target/dogfood-artifacts/safe-mutation-preview/preview-cancel.txt
+target/dogfood-artifacts/safe-mutation-preview/preview-confirm.txt
+target/dogfood-artifacts/safe-mutation-preview/history-after-confirm.txt
+target/dogfood-artifacts/safe-mutation-preview/failure-output.txt
 ```
 
 The tape should use an isolated fixture repository and prove this journey:
@@ -251,7 +251,7 @@ This implementation slice is ready when:
 - advanced unsafe options are absent unless already present in the typed spec from a future source;
 - tests cover preview state, cancellation, confirmation, runner recording, refresh behavior,
   global-option ordering, and failure output;
-- Betamax artifacts under `target/vibe-artifacts` prove the cancel, confirm, refresh, and history
+- Betamax artifacts under `target/dogfood-artifacts` prove the cancel, confirm, refresh, and history
   journey.
 
 ## Dependency Order

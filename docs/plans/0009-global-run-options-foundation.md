@@ -1,8 +1,8 @@
 # Global Run Options Foundation
 
-Status: first foundation chunk implemented in the `vibe` spike
+Status: first foundation chunk implemented in the current dogfood work
 
-Owner: `vibe-global-run-options` workspace spike
+Owner: `dogfood-global-run-options` workspace pass
 
 Scope: smallest foundation slice after `0008-view-options-overlay.md`
 

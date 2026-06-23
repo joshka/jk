@@ -128,8 +128,10 @@ Reusable primitives come before broad workflow coverage:
   `--config-file`.
 - Shared selector models must exist before command families grow bespoke prompts for revsets,
   filesets, operations, bookmarks, tags, remotes, or workspaces.
-- Workspaces stay early core scope. They land before broad history-editing polish because
-  multi-workspace state changes how log, status, diff, operation, and sparse workflows are shown.
+- Workspaces stay early core scope. The current implementation covers workspace list,
+  selected-workspace log/status/diff, and stale-workspace updates before broad history-editing
+  polish because multi-workspace state changes how log, status, diff, operation, and sparse
+  workflows are shown.
 - Betamax validation should be organized by flag families as well as command journeys, so one tape
   can prove shared behavior such as `-R` propagation, View Options formats, Run Options safety, or
   selector resolution across multiple commands.

@@ -1,8 +1,8 @@
 # View Options Overlay
 
-Status: implemented in the `vibe` spike
+Status: implemented in the current dogfood work
 
-Owner: `vibe-view-options-overlay` workspace spike
+Owner: `dogfood-view-options-overlay` workspace pass
 
 Scope: first reusable View Options overlay chunk, centered on moving log template selection under
 `V`
@@ -53,7 +53,7 @@ existing log-template selector from a `Template` row inside that overlay.
 
 ## Pre-Slice State
 
-This plan was written from the pre-slice `vibe` workspace state:
+This plan was written from the pre-slice current dogfood workspace state:
 
 1. `crates/jk-cli/src/log.rs` already owns `LogTemplateSelection`, built-in template aliases,
    startup custom templates, and `JjLog::template_options`.

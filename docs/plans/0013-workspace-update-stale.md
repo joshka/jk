@@ -2,7 +2,7 @@
 
 Status: draft/spec
 
-Owner: `vibe` workspace spike
+Owner: current dogfood workspace pass
 
 Scope: second workspace implementation slice
 
@@ -218,7 +218,7 @@ If the update-stale command succeeds but list refresh fails:
 Example:
 
 ```text
-updated vibe; refresh failed: jj workspace list failed: ...
+updated dogfood; refresh failed: jj workspace list failed: ...
 ```
 
 If stale-state display is available by implementation time, the refreshed row should no longer show
@@ -247,7 +247,7 @@ a one-line summary. A future command-output/history screen can expose the full c
 
 ## Betamax Evidence
 
-Add Betamax evidence under `target/vibe-artifacts` for the full Workspaces stale-update journey.
+Add Betamax evidence under `target/dogfood-artifacts` for the full Workspaces stale-update journey.
 The evidence should prove the user-visible behavior, not just unit-level command construction.
 
 Suggested tape:
@@ -377,7 +377,7 @@ This plan is ready for implementation when the next slice can be described as:
 - `s` and `d` continue to inspect the selected workspace after the update.
 - generated help, hotbar, and searchable discovery include the `u` action.
 - tests cover command shape, view state, app wiring, and stale-workspace fixture behavior.
-- Betamax artifacts prove the stale update journey under `target/vibe-artifacts`.
+- Betamax artifacts prove the stale update journey under `target/dogfood-artifacts`.
 
 ## Deferred Follow-Up
 

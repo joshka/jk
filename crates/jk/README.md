@@ -33,26 +33,24 @@ cargo install jk --locked
 
 ## Current Status
 
-The supported surface includes:
+`jk` currently focuses on the daily inspect-and-recover loop:
 
-- log view backed by `jj`;
-- manual refresh and movement by change, line, page, and edge;
-- ordered revision marks;
-- inline expansion of the selected change description;
-- selected-change show, diff, evolog, and repository status inspection;
-- root `jk diff`, `jk show`, and `jk status` entry points;
-- diff search, file/hunk navigation, horizontal scrolling, folding, file list, and View Options;
-- `:` command mode for direct `jj` commands with captured output;
-- in-memory Command History with copy, details, and operation links;
-- Workspaces and Operation Log screens;
-- command previews for describe, abandon, new, edit, undo, and redo;
-- generated help and searchable command discovery.
+- inspect changes through log, show, diff, evolog, and status views;
+- review diffs with file/hunk navigation, folding, search, and View Options;
+- run direct `jj` commands from `:` command mode with captured output;
+- preview local mutations before describe, abandon, new, edit, undo, and redo;
+- inspect Command History, Operation Log, and sibling jj workspaces, including workspace-scoped
+  log/status/diff views.
 
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
 - rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
 - direct `a`, `n`, and `e` mutation keys are dogfood shortcuts until the broader action menu exists.
+
+Use `?` inside the TUI for full screen-specific key help. The repository's
+[Workbench Workflows](https://github.com/joshka/jk/blob/main/docs/workbench.md) guide has
+task-oriented examples for the current workbench surface.
 
 ## Commands
 
@@ -66,6 +64,7 @@ jk diff --from <revision> --to <revision>
 jk diff --stat
 jk show <revision>
 jk status
+jk workspaces
 jk -R /path/to/repo -n 20
 ```
 

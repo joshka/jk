@@ -2,7 +2,7 @@
 
 Status: draft
 
-Owner: `vibe-inspection-spec` workspace spike
+Owner: `dogfood-inspection-spec` workspace pass
 
 Scope: first `jj`-shaped inspection roadmap bucket after foundation
 

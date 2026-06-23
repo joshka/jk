@@ -2,7 +2,7 @@
 
 Status: draft
 
-Owner: `vibe` workspace spike
+Owner: current dogfood workspace pass
 
 Scope: first selected-change evolution-log implementation slice
 
@@ -54,7 +54,7 @@ jj evolog -r abc123
 
 ## Context
 
-This slice follows the foundations already present in the `vibe` workspace:
+This slice follows the foundations already present in the current dogfood workspace:
 
 1. `JjCommandSpec` and `GlobalOptions` are implemented in `jk-core`.
 1. `JjShow` and `JjStatus` prove the `InspectionSnapshot` source pattern.

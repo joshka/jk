@@ -817,7 +817,8 @@ jj workspace root
 jj workspace update-stale
 ```
 
-The screen should answer:
+The current implementation covers list, selected-workspace log, selected-workspace status,
+selected-workspace diff, refresh, and update-stale. The screen should answer:
 
 ```text
 What workspaces exist?
@@ -1696,11 +1697,15 @@ just betamax-log
 just betamax-diff
 ```
 
-The README also says visual README media is generated with `just readme-media`, and generated
-screenshots/GIFs live in the separate
+The README also says visual README media is generated with `just readme-media`. For unreleased
+local work, generated media should stay under `target/dogfood-artifacts/`. Public README and
+crates.io media is published later from the separate
 [`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository served from
-`https://www.joshka.net/jk-screenshots/`. That setup should grow from "README media helpers" into
-core project infrastructure.
+`https://www.joshka.net/jk-screenshots/`. Website-specific media can live in `jk-website` when the
+site is the only consumer. Keeping generated images and GIFs out of the main source repository is a
+jj ergonomics decision as much as a repository-size decision: Git LFS-heavy media churn is easier to
+manage in a purpose-built media or website repository. That setup should grow from "README media
+helpers" into core project infrastructure.
 
 Every meaningful `jk` workflow should eventually have two Betamax tapes:
 
@@ -1758,7 +1763,13 @@ tapes/
 ```
 
 Validation tapes should be short, deterministic, and assertion-heavy. Media tapes can be slower and
-more readable.
+more readable. Review-media tapes should include readable dwell and, where useful, Betamax
+presentation affordances such as keyboard overlays and captions. For `jk`, captions should read as
+presentation metadata on the surrounding frame, not as terminal content, and must never cover the
+TUI hotbar, footer, prompts, status text, or keyboard overlay. Captions and keyboard overlays should
+occupy separate visual regions so they explain the action without competing with each other. Until
+Betamax can guarantee that layout, `jk` media tapes should prefer keyboard overlays and avoid
+captions.
 
 Expand Betamax coverage for:
 
@@ -1941,10 +1952,10 @@ Every UI-changing PR should attach Betamax artifacts or link CI artifacts.
 Recommended CI artifacts:
 
 ```text
-target/betamax/jk-validation/*.json
-target/betamax/jk-validation/*.png
-target/betamax/jk-media/*.gif
-target/betamax/jk-media/*.mp4, optional
+target/dogfood-artifacts/betamax/validation/*.json
+target/dogfood-artifacts/betamax/validation/*.png
+target/dogfood-artifacts/betamax/media/*.gif
+target/dogfood-artifacts/betamax/media/*.mp4, optional
 ```
 
 PR template addition:
@@ -1976,29 +1987,26 @@ just release-check
 Suggested `justfile` additions:
 
 ```make
+betamax := env_var_or_default("BETAMAX", "betamax")
+
 betamax-validation:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/validation/log-navigation.tape
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/validation/diff-selected-revision.tape
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/validation/command-mode.tape
+    {{betamax}} run tapes/validation/log-navigation.tape
+    {{betamax}} run tapes/validation/diff-selected-revision.tape
+    {{betamax}} run tapes/validation/command-mode.tape
 
 betamax-media:
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/media/readme-overview.tape
-    cargo run --manifest-path ../../betamax/Cargo.toml -p betamax -- run \
-        tapes/media/docs-rebase-preview.tape
+    {{betamax}} run tapes/media/readme-overview.tape
+    {{betamax}} run tapes/media/docs-rebase-preview.tape
 
 betamax-update:
     just betamax-validation
     just betamax-media
 ```
 
-The exact command can evolve once Betamax is installed through Homebrew or `cargo-binstall` in CI
-rather than run from a sibling checkout. Betamax currently supports installation through Homebrew
-and `cargo-binstall`. Local development can continue to run tapes through the Betamax checkout,
-including basic smoke experiments with:
+Use the installed `betamax` binary by default, and override `BETAMAX` when a local source checkout
+or wrapper command is needed. Betamax currently supports installation through Homebrew and
+`cargo-binstall`. Local development can still run basic smoke experiments from a Betamax checkout
+with:
 
 ```sh
 cargo run -- run examples/basic.tape
@@ -2021,6 +2029,7 @@ theme pinning for deterministic screenshots
 font/layout stability across CI platforms
 easy per-tape environment setup
 first-class failed-checkpoint screenshot capture
+caption and keyboard-overlay layout that avoids terminal content
 ```
 
 Likely `jk` feature pressure from Betamax:

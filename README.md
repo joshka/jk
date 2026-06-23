@@ -39,36 +39,22 @@ cargo install jk --locked
 log -> inspect -> preview command -> run -> history -> operation recovery
 ```
 
-The supported surface includes:
+The useful current workflows are:
 
-- a full-screen log view backed by `jj`;
-- explicit `jk log` and default-command `jk` entry points;
-- manual refresh without leaving the TUI;
-- movement by change, line, page, and edge;
-- ordered revision marks for multi-revision workflows;
-- inline expansion of the selected change description;
-- selected-change `show`, `diff`, `evolog`, and repository `status` inspection;
-- root `jk diff`, `jk show`, and `jk status` entry points;
-- return from inspection views without losing log selection;
-- `:` command mode for direct `jj` commands with captured output;
-- in-memory Command History with argv, output, status, duration, copy, and operation links;
-- Operation Log, operation show, and operation diff views for recovery-oriented inspection;
-- Workspaces screen with workspace status, diff, refresh, and stale-workspace update;
-- command previews for describe, abandon, new, edit, undo, and redo;
-- post-mutation recovery footer with undo, redo, operation, and history entry points;
-- line, page, file, hunk, and horizontal movement in the diff view;
-- file folding, fold-all/unfold-all, and hunk folding;
-- sticky current-file context with diff stat suffix and `[file x/y]`;
-- diff search with `/`, `n`, and `N`;
-- diff View Options for patch, summary, stat, types, name-only, git, and color-words output;
-- file list overlay for jumping within the active diff;
-- generated help and searchable command discovery with `?`;
-- retryable empty/error states for selected diffs;
-- [Betamax](https://www.joshka.net/betamax/) visual tapes for the log and diff workflows.
+- inspect selected changes with `show`, `diff`, `evolog`, and `status`;
+- review diffs with file/hunk movement, folding, search, file list, and View Options;
+- run direct `jj` commands from `:` command mode and keep captured output in the TUI;
+- preview local mutations before running describe, abandon, new, edit, undo, and redo;
+- use Command History and Operation Log to inspect what ran and recover through `jj op` views;
+- inspect sibling jj workspaces, including workspace-scoped log/status/diff views, without leaving
+  the TUI.
 
 The current implementation intentionally treats rendered `jj` output as the source of truth. The
 TUI parses only enough structure to support navigation, search, sticky headers, folding, command
 recording, and recovery-oriented links.
+
+Use `?` inside `jk` for the full key list for the active screen. For task-oriented examples, see
+[Workbench Workflows](docs/workbench.md).
 
 Current limitations:
 
@@ -78,58 +64,17 @@ Current limitations:
 - public README and website media still need a release-media refresh for the broader workbench
   surface.
 
-## Diff Review
+## First Useful Paths
 
-The diff view preserves `jj diff` output while adding review controls around it.
+Start with `jk` or `jk log`, then use:
+
+- `Enter`, `d`, `v`, and `s` to inspect the selected change;
+- `:` to run a direct `jj` command without dropping TUI context;
+- `m`, `a`, `n`, `e`, `u`, or `U` to preview a local mutation before it runs;
+- `C` and `o` to inspect Command History and Operation Log;
+- `W` to inspect other jj workspaces.
 
 ![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff-v3.gif)
-
-Useful bindings in the diff view:
-
-| Key                           | Action                       |
-| ----------------------------- | ---------------------------- |
-| `j` / `k`                     | scroll one line              |
-| `Space` / `b`                 | page down / page up          |
-| `g` / `G`                     | jump to top / bottom         |
-| `f`                           | open file list               |
-| `[` / `]`                     | previous / next file         |
-| `{` / `}`                     | previous / next hunk         |
-| `h` / `l`                     | fold / unfold current file   |
-| `Ctrl-Left` / `Ctrl-Right`    | fold / unfold all files      |
-| `-` / `+`                     | fold / unfold current hunk   |
-| `<` / `>`                     | horizontal scroll            |
-| `/`, `n`, `N`                 | search, next match, previous |
-| `V`                           | choose diff output format    |
-| `r`                           | refresh                      |
-| `H` / `L`                     | return to the log            |
-| `?`                           | show mode-specific help      |
-| `q` / `Esc`                   | close help, then quit        |
-
-## Safe Command Loop
-
-Mutating workflows run through command preview. The preview shows the exact `jj` command before it
-runs, supports copy with `y`, cancels with `Esc`, and records the result in Command History after
-confirmation.
-
-Useful log bindings:
-
-| Key       | Action                                                |
-| --------- | ----------------------------------------------------- |
-| `Enter`   | show selected revision                                |
-| `d`       | diff selected revision                                |
-| `v`       | show selected revision's evolog                       |
-| `s`       | show repository status                                |
-| `m`       | preview `jj describe` for the selected revision       |
-| `a`       | preview `jj abandon REV`                              |
-| `n`       | preview `jj new`; marked revisions become parents     |
-| `e`       | preview `jj edit REV`                                 |
-| `u` / `U` | preview undo / redo                                   |
-| `o`       | open operation log                                    |
-| `C`       | open Command History                                  |
-| `W`       | open Workspaces                                       |
-| `:`       | run a direct `jj` command and capture output          |
-| `V`       | open View Options                                     |
-| `?`       | open generated help and searchable command discovery  |
 
 ## Commands
 
@@ -145,8 +90,9 @@ jk diff --summary
 jk show <revision>
 jk status
 jk status <fileset>
+jk workspaces
 jk -R /path/to/repo -n 20
-jk log --repository /path/to/repo --limit 20
+jk -R /path/to/repo log --limit 20
 ```
 
 Bare `jk` follows `jj`'s configured `ui.default-command` when that command is log-like enough for
@@ -161,8 +107,7 @@ The detailed product and engineering plan lives in
 The current stabilization direction is:
 
 - stabilize the current workbench surface before starting rebase;
-- scrub the implementation history and release notes into product-facing language;
-- update README, crate README, changelog, website, and media so they agree about released behavior;
+- keep README, crate README, changelog, website, and media aligned with released behavior;
 - keep mutating workflows behind command previews, command history, and operation recovery;
 - make [Betamax](https://www.joshka.net/betamax/) tapes the source for regression tests,
   README/site media, and release demos.
@@ -185,9 +130,11 @@ Visual README media is generated with:
 just readme-media
 ```
 
-The generated screenshots and GIFs live in the separate
-[`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository and are served from
-`https://www.joshka.net/jk-screenshots/`.
+By default this local development task writes to `target/dogfood-artifacts/readme-media/`. Public
+README, crates.io, and release-note media is published later from the separate
+[`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository and served from
+`https://www.joshka.net/jk-screenshots/`. Keeping generated media out of this source repo avoids
+making jj handle Git LFS-heavy screenshot and GIF churn.
 
 ## Crates
 

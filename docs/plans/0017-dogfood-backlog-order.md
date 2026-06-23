@@ -1,6 +1,6 @@
 # Dogfood Backlog Order
 
-This note records the current `vibe` spike ordering for dogfoodable progress. It is intentionally
+This note records the current dogfood work ordering for dogfoodable progress. It is intentionally
 more execution-oriented than the product plan: finish the tight recovery and command surfaces first,
 then broaden into mutation flows, selectors, run options, and generated help.
 
@@ -114,7 +114,7 @@ then broaden into mutation flows, selectors, run options, and generated help.
 - Treat items 13-22 as the first useful mutation sprint.
 - Treat items 23-30 as the point where roadmap foundation needs to catch up before broadening
   further.
-- For the near-term `vibe` spike, favor direct implementation in the orchestration thread for small
+- For the near-term dogfood work, favor direct implementation in the orchestration thread for small
   app wiring, crash fixes, and live `cargo run` feedback.
 - Use subagents only for independent, file-scoped chunks large enough to amortize context setup.
 - Reserve Betamax GIF work for milestone user-visible flows rather than every incremental patch.

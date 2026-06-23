@@ -2,7 +2,7 @@
 
 Status: draft
 
-Owner: `vibe-searchable-command-discovery` workspace spike
+Owner: `dogfood-searchable-command-discovery` workspace pass
 
 Scope: first searchable help and command-discovery implementation chunk
 
@@ -46,7 +46,7 @@ not replace the future `:` command mode.
 
 ## Current Dependencies
 
-This plan assumes the current spike state rather than only the earlier written plans:
+This plan assumes the current dogfood state state rather than only the earlier written plans:
 
 1. `0001-command-spec.md`: `JjCommandSpec` exists for read-only `jj` command metadata.
 1. `0002-keymap-help-data.md`: `crates/jk-tui/src/keymap.rs` owns generated help and hotbar
@@ -54,7 +54,7 @@ This plan assumes the current spike state rather than only the earlier written p
 1. `0003-view-stack-foundation.md`: `crates/jk/src/main.rs` owns `ViewStack`, `ModeStack`, and
    transient input modes.
 1. `0004-inspection-foundation.md`: diff/show/status query sources and pushed inspection views
-   exist in the current spike.
+   exist in the current dogfood state.
 1. `0005-log-template-selection.md`: the log template popup selector provides a nearby overlay and
    selection precedent.
 

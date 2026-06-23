@@ -1,7 +1,7 @@
 # View Stack Foundation
 
 Status: draft  
-Owner: `vibe-view-stack` workspace spike  
+Owner: `dogfood-view-stack` workspace pass  
 Scope: first view-stack/mode-stack implementation chunk
 
 ## Problem

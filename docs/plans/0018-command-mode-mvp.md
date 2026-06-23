@@ -24,7 +24,7 @@ typed jj command, capture output, record history, and keep failures inspectable.
 - Do not add persistent command history.
 - Do not add retry/edit/rerun from the output view yet.
 - Do not add a Run Options drawer or advanced safety policy for arbitrary typed commands yet.
-- Do not update the website or public docs during the local `vibe` spike.
+- Do not update the website or public docs during the local dogfood work.
 
 ## Interaction
 
@@ -107,9 +107,9 @@ Unit coverage:
 
 Betamax coverage:
 
-- `target/vibe-artifacts/command-mode.tape`;
-- `target/vibe-artifacts/command-mode.gif`;
-- prompt, success, and failure screenshots under `target/vibe-artifacts/`.
+- `target/dogfood-artifacts/command-mode.tape`;
+- `target/dogfood-artifacts/command-mode.gif`;
+- prompt, success, and failure screenshots under `target/dogfood-artifacts/`.
 
 ## Follow-Ups
 

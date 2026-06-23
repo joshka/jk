@@ -2,7 +2,7 @@
 
 Status: draft/spec
 
-Owner: `vibe` workspace spike
+Owner: current dogfood workspace pass
 
 Scope: first early workspace implementation slice
 
@@ -56,7 +56,7 @@ The CLI surface addendum assigns scoped workspace keys:
 - `o`: operation log;
 - `V`: view/sparse options.
 
-This slice assumes the current `vibe` foundation:
+This slice assumes the current dogfood foundation:
 
 1. `JjCommandSpec` and `GlobalOptions` exist in `jk-core`.
 1. Read-only inspection providers exist for status, diff, show, and evolog.
@@ -103,7 +103,7 @@ The implementation order should be:
 - Open selected-workspace status and diff as ordinary rendered inspection child views.
 - Preserve workspace selection across refreshes when the selected workspace still exists.
 - Provide generated help, searchable discovery, and an adaptive hotbar for workspace actions.
-- Add tests and Betamax evidence under `target/vibe-artifacts`.
+- Add tests and Betamax evidence under `target/dogfood-artifacts`.
 
 ## Non-Goals
 
@@ -406,7 +406,7 @@ facts scannable:
 Use concise markers and avoid dense prose in row text. A possible row shape:
 
 ```text
-> * vibe       current   /Users/joshka/local/jk/vibe
+> * dogfood       current   /Users/joshka/local/jk/dogfood
     default   stale     /Users/joshka/local/jk/default
 ```
 
@@ -546,17 +546,17 @@ the fixture.
 
 ## Betamax Evidence Plan
 
-Store first-slice evidence under `target/vibe-artifacts/` so the spike has durable local proof
+Store first-slice evidence under `target/dogfood-artifacts/` so the pass has durable local proof
 without committing generated media to the repo.
 
 Suggested artifacts:
 
 ```text
-target/vibe-artifacts/workspaces-list.txt
-target/vibe-artifacts/workspaces-status.txt
-target/vibe-artifacts/workspaces-diff.txt
-target/vibe-artifacts/workspaces-help.txt
-target/vibe-artifacts/workspaces-empty-or-error.txt
+target/dogfood-artifacts/workspaces-list.txt
+target/dogfood-artifacts/workspaces-status.txt
+target/dogfood-artifacts/workspaces-diff.txt
+target/dogfood-artifacts/workspaces-help.txt
+target/dogfood-artifacts/workspaces-empty-or-error.txt
 ```
 
 Suggested tapes:

@@ -1,7 +1,7 @@
 # Keymap Help Data Foundation
 
 Status: draft  
-Owner: `vibe` workspace spike  
+Owner: current dogfood workspace pass  
 Scope: first keymap/help implementation chunk
 
 ## Problem

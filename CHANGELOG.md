@@ -54,8 +54,8 @@ surface. Rebase and larger action menus remain intentionally deferred.
 
 ### Workspaces And Operations
 
-- Add a Workspaces screen with list, refresh, selected-workspace status, selected-workspace diff,
-  and stale-workspace update paths.
+- Add a Workspaces screen with list, refresh, selected-workspace log, selected-workspace status,
+  selected-workspace diff, and stale-workspace update paths.
 - Add Operation Log, operation show, and operation diff views so recent repository state changes are
   inspectable from inside the TUI.
 - Keep workspace and operation inspection on the same rendered-output model as show, status, and
