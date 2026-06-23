@@ -15,19 +15,30 @@ const MIN_PANEL_HEIGHT: u16 = 8;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandPreviewView {
     preview: CommandPreview,
+    status: Option<String>,
 }
 
 impl CommandPreviewView {
     /// Creates a view for a pending command preview.
     #[must_use]
-    pub const fn new(preview: CommandPreview) -> Self {
-        Self { preview }
+    pub fn new(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            status: None,
+        }
     }
 
     /// Returns the preview being rendered.
     #[must_use]
     pub const fn preview(&self) -> &CommandPreview {
         &self.preview
+    }
+
+    /// Sets a temporary footer status message.
+    #[must_use]
+    pub fn with_status(mut self, status: Option<String>) -> Self {
+        self.status = status;
+        self
     }
 
     /// Renders the command preview without executing anything.
@@ -72,7 +83,8 @@ impl CommandPreviewView {
             frame.render_widget(paragraph, body_area);
         }
         frame.render_widget(
-            Paragraph::new(footer_line()).style(Style::new().fg(Color::White).bg(Color::Black)),
+            Paragraph::new(footer_line(self.status.as_deref()))
+                .style(Style::new().fg(Color::White).bg(Color::Black)),
             footer_area,
         );
     }
@@ -127,11 +139,29 @@ impl CommandPreviewView {
     }
 }
 
-fn footer_line() -> Line<'static> {
+fn footer_line(status: Option<&str>) -> Line<'static> {
+    if let Some(status) = status {
+        return Line::from(vec![
+            Span::styled(
+                status.to_owned(),
+                Style::new().fg(Color::Green).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("    "),
+            Span::styled("enter run", Style::new().fg(Color::Green)),
+            Span::raw("    "),
+            Span::styled("esc cancel", Style::new().fg(Color::Red)),
+        ]);
+    }
+
     Line::from(vec![
         Span::styled(
             "enter run",
             Style::new().fg(Color::Green).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw("    "),
+        Span::styled(
+            "y copy",
+            Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
         ),
         Span::raw("    "),
         Span::styled(
@@ -269,6 +299,8 @@ mod tests {
         assert!(rendered.contains("Ignores the current working-copy snapshot."));
         assert!(rendered.contains("enter"));
         assert!(rendered.contains("run"));
+        assert!(rendered.contains("y"));
+        assert!(rendered.contains("copy"));
         assert!(rendered.contains("esc"));
         assert!(rendered.contains("cancel"));
     }
@@ -296,7 +328,29 @@ mod tests {
         assert!(rendered.contains("Safety: read-only"));
         assert!(rendered.contains("No warnings for this command."));
         assert!(rendered.contains("enter run"));
+        assert!(rendered.contains("y copy"));
         assert!(rendered.contains("esc cancel"));
+    }
+
+    #[test]
+    fn command_preview_status_replaces_copy_hint() {
+        let preview = JjCommandSpec::render_read_only(["undo"])
+            .with_title("Undo latest operation")
+            .command_preview();
+        let view = CommandPreviewView::new(preview).with_status(Some("copied command".to_owned()));
+        let backend = TestBackend::new(80, 14);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("copied command"));
+        assert!(rendered.contains("enter run"));
+        assert!(!rendered.contains("y copy"));
     }
 
     fn buffer_to_string(buffer: &ratatui::buffer::Buffer) -> String {

@@ -4,7 +4,7 @@
 //! events and backend-neutral TUI actions. The product behavior is intentionally delegated to
 //! `jk-cli` and `jk-tui` so the binary stays a thin orchestration layer.
 
-use std::io::{self, IsTerminal};
+use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -583,6 +583,7 @@ struct PendingCommandPreview {
     source_action: SourceAction,
     source_key: &'static str,
     failure_label: &'static str,
+    copy_status: Option<String>,
 }
 
 impl PendingCommandPreview {
@@ -592,6 +593,7 @@ impl PendingCommandPreview {
             source_action: SourceAction::DescribeRevision,
             source_key: "m",
             failure_label: "jj describe",
+            copy_status: None,
         }
     }
 
@@ -601,6 +603,7 @@ impl PendingCommandPreview {
             source_action: SourceAction::Undo,
             source_key: "u",
             failure_label: "jj undo",
+            copy_status: None,
         }
     }
 
@@ -610,6 +613,7 @@ impl PendingCommandPreview {
             source_action: SourceAction::Redo,
             source_key: "U",
             failure_label: "jj redo",
+            copy_status: None,
         }
     }
 }
@@ -733,7 +737,9 @@ fn run_terminal(
                     }
                     Some(InputMode::CommandPreview { pending }) => {
                         log.render(frame);
-                        CommandPreviewView::new(pending.preview.clone()).render(frame);
+                        CommandPreviewView::new(pending.preview.clone())
+                            .with_status(pending.copy_status.clone())
+                            .render(frame);
                     }
                     _ => log.render(frame),
                 },
@@ -948,6 +954,10 @@ fn run_terminal(
                             } else {
                                 open_operation_log(&mut state, operation_source);
                             }
+                            needs_redraw = true;
+                        }
+                        AppKey::CopyCommand => {
+                            copy_selected_command(&mut state);
                             needs_redraw = true;
                         }
                         AppKey::StartUndo => {
@@ -1323,6 +1333,14 @@ fn handle_command_preview_mode(
             confirm_command_preview(state, source, pending);
             InputModeResult::Handled
         }
+        KeyEvent {
+            code: KeyCode::Char('y'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            copy_pending_command(state);
+            InputModeResult::Handled
+        }
         _ => InputModeResult::Handled,
     }
 }
@@ -1426,6 +1444,82 @@ fn command_failure_message(command: &str, stderr: &[u8], stdout: &[u8]) -> Strin
     }
 
     format!("{command} failed")
+}
+
+fn copy_pending_command(state: &mut AppState) {
+    let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() else {
+        return;
+    };
+    let status = copy_command_line(&pending.preview.command_line);
+    pending.copy_status = Some(status);
+}
+
+fn copy_selected_command(state: &mut AppState) {
+    let Some(action) = selected_command_copy_action(state) else {
+        return;
+    };
+
+    let status = match action {
+        CommandHistoryActionResult::CopyCommand { command_line } => {
+            copy_command_line(&command_line)
+        }
+        _ => return,
+    };
+    if let AppView::CommandHistory { view } = state.views.active_mut() {
+        view.show_status(status);
+    }
+}
+
+fn selected_command_copy_action(state: &mut AppState) -> Option<CommandHistoryActionResult> {
+    let AppView::CommandHistory { view } = state.views.active_mut() else {
+        return None;
+    };
+    Some(view.apply(CommandHistoryAction::CopyCommand))
+}
+
+fn copy_command_line(command_line: &str) -> String {
+    match write_terminal_clipboard(command_line) {
+        Ok(()) => "copied command".to_owned(),
+        Err(error) => format!("copy failed: {error}"),
+    }
+}
+
+fn write_terminal_clipboard(text: &str) -> io::Result<()> {
+    let sequence = osc52_sequence(text);
+    let mut stdout = io::stdout();
+    stdout.write_all(sequence.as_bytes())?;
+    stdout.flush()
+}
+
+fn osc52_sequence(text: &str) -> String {
+    format!("\u{1b}]52;c;{}\u{7}", base64_encode(text.as_bytes()))
+}
+
+fn base64_encode(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
+
+    for chunk in bytes.chunks(3) {
+        let first = chunk[0];
+        let second = *chunk.get(1).unwrap_or(&0);
+        let third = *chunk.get(2).unwrap_or(&0);
+        let value = (u32::from(first) << 16) | (u32::from(second) << 8) | u32::from(third);
+
+        encoded.push(TABLE[((value >> 18) & 0x3f) as usize] as char);
+        encoded.push(TABLE[((value >> 12) & 0x3f) as usize] as char);
+        if chunk.len() > 1 {
+            encoded.push(TABLE[((value >> 6) & 0x3f) as usize] as char);
+        } else {
+            encoded.push('=');
+        }
+        if chunk.len() > 2 {
+            encoded.push(TABLE[(value & 0x3f) as usize] as char);
+        } else {
+            encoded.push('=');
+        }
+    }
+
+    encoded
 }
 
 fn handle_view_options_mode(
@@ -3160,6 +3254,19 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use super::*;
+
+    #[test]
+    fn base64_encode_handles_padding() {
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_encode(b"j"), "ag==");
+        assert_eq!(base64_encode(b"jj"), "amo=");
+        assert_eq!(base64_encode(b"jj undo"), "amogdW5kbw==");
+    }
+
+    #[test]
+    fn osc52_sequence_wraps_encoded_clipboard_payload() {
+        assert_eq!(osc52_sequence("jj undo"), "\u{1b}]52;c;amogdW5kbw==\u{7}");
+    }
 
     #[test]
     fn view_stack_keeps_root_when_popped() {

@@ -636,7 +636,7 @@ pub enum RefreshPlan {
     ReRunSpec,
 }
 
-fn preview_argv(argv: &[OsString]) -> String {
+pub(crate) fn preview_argv(argv: &[OsString]) -> String {
     let mut preview = String::from("jj");
     for arg in argv {
         preview.push(' ');

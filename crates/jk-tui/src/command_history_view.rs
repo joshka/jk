@@ -80,6 +80,8 @@ pub struct CommandHistoryRow {
     pub source: String,
     /// Command title or preview.
     pub command: String,
+    /// Exact redacted process command line suitable for copying.
+    pub command_line: String,
     /// Compact output or failure summary.
     pub summary: String,
 }
@@ -100,6 +102,7 @@ impl CommandHistoryRow {
             status: status.into(),
             source: source.into(),
             command: command.into(),
+            command_line: String::new(),
             summary: summary.into(),
         }
     }
@@ -108,6 +111,13 @@ impl CommandHistoryRow {
     #[must_use]
     pub fn with_operation_id(mut self, operation_id: Option<String>) -> Self {
         self.operation_id = operation_id;
+        self
+    }
+
+    /// Attaches the exact command line represented by this row.
+    #[must_use]
+    pub fn with_command_line(mut self, command_line: impl Into<String>) -> Self {
+        self.command_line = command_line.into();
         self
     }
 
@@ -121,6 +131,7 @@ impl CommandHistoryRow {
             command_label(record),
             result_summary(record),
         )
+        .with_command_line(record.command.process_preview())
         .with_operation_id(record.operation_id.clone())
     }
 }
@@ -140,6 +151,11 @@ pub enum CommandHistoryActionResult {
     },
     /// Open the operation log fallback when the selected command has no operation id.
     OpenOperationLog,
+    /// Copy the selected command line.
+    CopyCommand {
+        /// Exact redacted process command line selected for copying.
+        command_line: String,
+    },
     /// Return to the previous view.
     ReturnBack,
     /// Exit the application.
@@ -166,6 +182,8 @@ pub enum CommandHistoryAction {
     Refresh,
     /// Open the recorded operation, or the operation log fallback when no id is available.
     OpenOperation,
+    /// Copy the selected command line.
+    CopyCommand,
     /// Toggle mode-specific help.
     ToggleHelp,
     /// Return to the previous view.
@@ -181,6 +199,7 @@ pub struct CommandHistoryView {
     selected: Option<usize>,
     scroll_offset: usize,
     help_visible: bool,
+    status_message: Option<String>,
 }
 
 impl CommandHistoryView {
@@ -193,6 +212,7 @@ impl CommandHistoryView {
             selected,
             scroll_offset: 0,
             help_visible: false,
+            status_message: None,
         }
     }
 
@@ -202,6 +222,7 @@ impl CommandHistoryView {
         self.snapshot = snapshot;
         self.selected = clamp_index(previous_selected.or(Some(0)), self.snapshot.rows.len());
         self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rows.len());
+        self.status_message = None;
     }
 
     /// Returns the selected row, if any.
@@ -209,6 +230,11 @@ impl CommandHistoryView {
     pub fn selected_row(&self) -> Option<&CommandHistoryRow> {
         self.selected
             .and_then(|index| self.snapshot.rows.get(index))
+    }
+
+    /// Shows a temporary status message in the command-history footer.
+    pub fn show_status(&mut self, message: impl Into<String>) {
+        self.status_message = Some(message.into());
     }
 
     /// Applies a single input action.
@@ -255,6 +281,18 @@ impl CommandHistoryView {
                         )
                     })
             }
+            CommandHistoryAction::CopyCommand => self
+                .selected_row()
+                .and_then(|row| {
+                    if row.command_line.is_empty() {
+                        None
+                    } else {
+                        Some(CommandHistoryActionResult::CopyCommand {
+                            command_line: row.command_line.clone(),
+                        })
+                    }
+                })
+                .unwrap_or(CommandHistoryActionResult::Continue),
             CommandHistoryAction::ToggleHelp => {
                 self.help_visible = !self.help_visible;
                 CommandHistoryActionResult::Continue
@@ -330,7 +368,11 @@ impl CommandHistoryView {
         self.keep_selected_in_view(usize::from(areas.content.height));
 
         let fallback_status = adaptive_hotbar(BindingContext::CommandHistory, areas.status_width());
-        let status = status_override.unwrap_or(&fallback_status);
+        let status = self
+            .status_message
+            .as_deref()
+            .or(status_override)
+            .unwrap_or(&fallback_status);
         let chrome = ViewChrome::new(self.snapshot.title(), status);
         chrome.render(frame, areas);
 
@@ -565,6 +607,10 @@ mod tests {
         assert_eq!(snapshot.rows()[0].source, "log status");
         assert_eq!(snapshot.rows()[0].summary, "exit 1: workspace is stale");
         assert_eq!(
+            snapshot.rows()[0].command_line,
+            "jj --no-pager --color always status"
+        );
+        assert_eq!(
             snapshot.rows()[0].operation_id.as_deref(),
             Some("op-status")
         );
@@ -642,6 +688,21 @@ mod tests {
     }
 
     #[test]
+    fn copy_command_result_carries_selected_command_line() {
+        let mut view = CommandHistoryView::new(CommandHistorySnapshot::new(vec![
+            CommandHistoryRow::new(1, "ok", "log load", "jj log", "")
+                .with_command_line("jj --no-pager --color always log"),
+        ]));
+
+        assert_eq!(
+            view.apply(CommandHistoryAction::CopyCommand),
+            CommandHistoryActionResult::CopyCommand {
+                command_line: "jj --no-pager --color always log".to_owned()
+            }
+        );
+    }
+
+    #[test]
     fn basic_render_contains_title_status_source_command_and_summary() {
         let mut view = CommandHistoryView::new(CommandHistorySnapshot::from_records(
             history_with_records().records(),
@@ -663,6 +724,26 @@ mod tests {
         assert!(rendered.contains("ok   log load"));
         assert!(rendered.contains("jj log"));
         assert!(rendered.contains("Esc back"));
+    }
+
+    #[test]
+    fn render_with_status_shows_copy_feedback() {
+        let mut view =
+            CommandHistoryView::new(CommandHistorySnapshot::new(vec![CommandHistoryRow::new(
+                1, "ok", "log load", "jj log", "",
+            )]));
+        view.show_status("copied command");
+        let backend = TestBackend::new(72, 4);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("copied command"));
     }
 
     #[test]

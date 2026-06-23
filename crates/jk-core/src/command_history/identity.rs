@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use super::redaction::{redact_argv, redact_text};
+use crate::command::preview_argv;
 use crate::{GlobalOptions, JjCommandSpec};
 
 /// Command data captured from a typed command spec.
@@ -27,6 +28,12 @@ impl CommandIdentity {
             command_family: CommandFamily::from_spec(spec),
             title: redact_text(spec.title()).0,
         }
+    }
+
+    /// Returns the exact redacted process command line captured for this command.
+    #[must_use]
+    pub fn process_preview(&self) -> String {
+        preview_argv(&self.argv)
     }
 }
 

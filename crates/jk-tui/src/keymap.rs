@@ -38,6 +38,7 @@ enum ActionId {
     OpenOperation,
     OpenOperationLog,
     OpenCommandHistory,
+    CopyCommand,
     Undo,
     Redo,
     UpdateStale,
@@ -76,6 +77,7 @@ impl ActionId {
             Self::OpenOperation => "Open operation",
             Self::OpenOperationLog => "Open operation log",
             Self::OpenCommandHistory => "Open command history",
+            Self::CopyCommand => "Copy command",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
@@ -470,6 +472,10 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     .with_family(CommandFamily::JjOperation)
     .with_aliases(&["operation", "op log", "recovery", "selected command"])
     .with_hotbar(5, "o operation"),
+    KeyBinding::new(ActionId::CopyCommand, "y", "copy selected command")
+        .with_family(CommandFamily::History)
+        .with_aliases(&["copy", "clipboard", "command", "argv"])
+        .with_hotbar(6, "y copy"),
     KeyBinding::new(ActionId::OpenCommandHistory, "C", "refresh command history")
         .with_family(CommandFamily::History)
         .with_aliases(&["commands", "history", "recent"]),
@@ -480,13 +486,13 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     )
     .with_family(CommandFamily::Navigation)
     .with_aliases(&["back", "return", "previous"])
-    .with_hotbar(6, "Esc back"),
+    .with_hotbar(7, "Esc back"),
     KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
         .with_family(CommandFamily::Quit)
-        .with_hotbar(7, "q quit")
+        .with_hotbar(8, "q quit")
         .hotbar_only(),
 ];
 
@@ -845,7 +851,7 @@ mod tests {
     fn command_history_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::CommandHistory),
-            "? help  j/k move  space/b page  r refresh  o operation  Esc back  q quit"
+            "? help  j/k move  space/b page  r refresh  o operation  y copy  Esc back  q quit"
         );
     }
 
@@ -1051,6 +1057,7 @@ mod tests {
                 "g/G or Home/End      jump to top/bottom",
                 "r                    refresh history",
                 "o                    open operation or operation log",
+                "y                    copy selected command",
                 "C                    refresh command history",
                 "Backspace, Esc       return to previous view",
                 "?, q, Esc            close help",

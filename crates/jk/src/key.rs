@@ -31,6 +31,9 @@ pub enum AppKey {
     /// Open the operation log list.
     OpenOperationLog,
 
+    /// Copy the current command line.
+    CopyCommand,
+
     /// Preview and run `jj undo`.
     StartUndo,
 
@@ -140,6 +143,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'W' => Some(AppKey::OpenWorkspaces),
         'C' => Some(AppKey::OpenCommandHistory),
         'o' => Some(AppKey::OpenOperationLog),
+        'y' => Some(AppKey::CopyCommand),
         'u' => Some(AppKey::StartUndo),
         'U' => Some(AppKey::StartRedo),
         'm' => Some(AppKey::StartDescribe),
@@ -260,6 +264,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE)),
             AppKey::OpenOperationLog
+        );
+    }
+
+    #[test]
+    fn lowercase_y_copies_command() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)),
+            AppKey::CopyCommand
         );
     }
 
