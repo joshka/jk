@@ -1,16 +1,18 @@
 use jk_tui::operation_log_view::{OperationLogRow, OperationLogSnapshot};
 
 pub fn operation_log_snapshot(title: &str, rendered: &str) -> OperationLogSnapshot {
-    let rows = operation_log_rows(rendered);
-    OperationLogSnapshot::new(rows).with_title(title)
+    let rendered_lines = rendered.lines().map(str::to_owned).collect::<Vec<_>>();
+    let rows = operation_log_rows(&rendered_lines);
+    OperationLogSnapshot::from_rendered(rows, rendered_lines).with_title(title)
 }
 
-fn operation_log_rows(rendered: &str) -> Vec<OperationLogRow> {
+fn operation_log_rows(rendered_lines: &[String]) -> Vec<OperationLogRow> {
     let mut rows = Vec::new();
-    for line in rendered.lines().map(strip_ansi) {
-        if let Some(row) = parse_operation_row(&line) {
+    for (rendered_line, line) in rendered_lines.iter().enumerate() {
+        let plain_line = strip_ansi(line);
+        if let Some(row) = parse_operation_row(&plain_line, rendered_line) {
             rows.push(row);
-        } else if let Some(title) = parse_operation_title_line(&line)
+        } else if let Some(title) = parse_operation_title_line(&plain_line)
             && let Some(row) = rows.last_mut()
             && row.title.trim().is_empty()
         {
@@ -20,19 +22,22 @@ fn operation_log_rows(rendered: &str) -> Vec<OperationLogRow> {
     rows
 }
 
-fn parse_operation_row(line: &str) -> Option<OperationLogRow> {
+fn parse_operation_row(line: &str, rendered_line: usize) -> Option<OperationLogRow> {
     let mut fields = line.split_whitespace();
     let marker = fields.next()?;
     let operation_id = fields.next()?;
     if !is_operation_marker(marker) || !looks_like_operation_id(operation_id) {
         return None;
     }
-    Some(OperationLogRow::new(
-        operation_id,
-        operation_id.chars().take(12).collect::<String>(),
-        String::new(),
-        marker == "@",
-    ))
+    Some(
+        OperationLogRow::new(
+            operation_id,
+            operation_id.chars().take(12).collect::<String>(),
+            String::new(),
+            marker == "@",
+        )
+        .with_rendered_line(rendered_line),
+    )
 }
 
 fn parse_operation_title_line(line: &str) -> Option<&str> {
@@ -83,13 +88,24 @@ mod tests {
         let snapshot = operation_log_snapshot("jj op log", rendered);
 
         assert_eq!(snapshot.title(), "jj op log");
+        assert_eq!(
+            snapshot.rendered_lines(),
+            [
+                "@ abcdef1234567890 user@example.test now",
+                "│  latest operation",
+                "○ 0123456789abcdef user@example.test earlier",
+                "│  previous operation",
+            ]
+        );
         assert_eq!(snapshot.rows().len(), 2);
         assert_eq!(snapshot.rows()[0].operation_id, "abcdef1234567890");
         assert_eq!(snapshot.rows()[0].display_id, "abcdef123456");
         assert_eq!(snapshot.rows()[0].title, "latest operation");
         assert!(snapshot.rows()[0].current);
+        assert_eq!(snapshot.rows()[0].rendered_line, 0);
         assert_eq!(snapshot.rows()[1].operation_id, "0123456789abcdef");
         assert_eq!(snapshot.rows()[1].title, "previous operation");
+        assert_eq!(snapshot.rows()[1].rendered_line, 2);
         assert!(!snapshot.rows()[1].current);
     }
 
@@ -101,6 +117,13 @@ mod tests {
         let snapshot = operation_log_snapshot("jj op log", rendered);
 
         assert_eq!(snapshot.rows().len(), 1);
+        assert_eq!(
+            snapshot.rendered_lines(),
+            [
+                "\u{1b}[32m@ abcdef1234567890 user@example.test now\u{1b}[0m",
+                "│  colored current operation",
+            ]
+        );
         assert_eq!(snapshot.rows()[0].operation_id, "abcdef1234567890");
         assert_eq!(snapshot.rows()[0].title, "colored current operation");
         assert!(snapshot.rows()[0].current);
