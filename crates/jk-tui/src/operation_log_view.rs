@@ -11,6 +11,7 @@ use ratatui::widgets::Paragraph;
 
 use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
+use crate::rendered_log::rendered_text;
 use crate::selected_row::paint_subtle_selected_row;
 
 const DEFAULT_TITLE: &str = "jj op log";
@@ -19,15 +20,38 @@ const DEFAULT_TITLE: &str = "jj op log";
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct OperationLogSnapshot {
     title: String,
+    rendered_lines: Vec<String>,
     rows: Vec<OperationLogRow>,
 }
 
 impl OperationLogSnapshot {
     /// Creates an operation-log snapshot from display rows.
     #[must_use]
-    pub fn new(rows: Vec<OperationLogRow>) -> Self {
+    pub fn new(mut rows: Vec<OperationLogRow>) -> Self {
+        let rendered_lines = rows
+            .iter_mut()
+            .enumerate()
+            .map(|(index, row)| {
+                row.rendered_line = index;
+                operation_line_text(row)
+            })
+            .collect();
         Self {
             title: DEFAULT_TITLE.to_owned(),
+            rendered_lines,
+            rows,
+        }
+    }
+
+    /// Creates an operation-log snapshot from rendered `jj op log` output and parsed rows.
+    #[must_use]
+    pub fn from_rendered(
+        rows: Vec<OperationLogRow>,
+        rendered_lines: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self {
+            title: DEFAULT_TITLE.to_owned(),
+            rendered_lines: rendered_lines.into_iter().map(Into::into).collect(),
             rows,
         }
     }
@@ -49,6 +73,12 @@ impl OperationLogSnapshot {
     #[must_use]
     pub fn rows(&self) -> &[OperationLogRow] {
         &self.rows
+    }
+
+    /// Returns the rendered operation log lines in display order.
+    #[must_use]
+    pub fn rendered_lines(&self) -> &[String] {
+        &self.rendered_lines
     }
 
     fn current_index(&self) -> Option<usize> {
@@ -73,6 +103,8 @@ pub struct OperationLogRow {
     pub title: String,
     /// Whether this row is the current operation.
     pub current: bool,
+    /// Rendered line containing the operation node in the snapshot output.
+    pub rendered_line: usize,
 }
 
 impl OperationLogRow {
@@ -89,7 +121,15 @@ impl OperationLogRow {
             display_id: display_id.into(),
             title: title.into(),
             current,
+            rendered_line: 0,
         }
+    }
+
+    /// Sets the rendered line containing this operation's graph node.
+    #[must_use]
+    pub const fn with_rendered_line(mut self, rendered_line: usize) -> Self {
+        self.rendered_line = rendered_line;
+        self
     }
 }
 
@@ -299,17 +339,17 @@ impl OperationLogView {
     }
 
     fn keep_selected_in_view(&mut self, height: usize) {
-        self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rows.len());
-        let Some(selected) = self.selected else {
+        self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rendered_lines.len());
+        let Some(selected_line) = self.selected_rendered_line() else {
             return;
         };
         if height == 0 {
             return;
         }
-        if selected < self.scroll_offset {
-            self.scroll_offset = selected;
-        } else if selected >= self.scroll_offset.saturating_add(height) {
-            self.scroll_offset = selected.saturating_add(1).saturating_sub(height);
+        if selected_line < self.scroll_offset {
+            self.scroll_offset = selected_line;
+        } else if selected_line >= self.scroll_offset.saturating_add(height) {
+            self.scroll_offset = selected_line.saturating_add(1).saturating_sub(height);
         }
     }
 
@@ -325,8 +365,8 @@ impl OperationLogView {
         let paragraph = Paragraph::new(self.visible_text());
         frame.render_widget(paragraph, areas.content);
 
-        if let Some(selected) = self.selected {
-            paint_subtle_selected_row(frame, areas.content, selected, self.scroll_offset);
+        if let Some(selected_line) = self.selected_rendered_line() {
+            paint_subtle_selected_row(frame, areas.content, selected_line, self.scroll_offset);
         }
 
         if self.help_visible {
@@ -340,7 +380,7 @@ impl OperationLogView {
     }
 
     fn visible_text(&self) -> Text<'_> {
-        if self.snapshot.rows.is_empty() {
+        if self.snapshot.rendered_lines.is_empty() {
             return Text::from(vec![
                 Line::from(Span::styled(
                     "No operations found.",
@@ -353,30 +393,23 @@ impl OperationLogView {
 
         let rows = self
             .snapshot
-            .rows
+            .rendered_lines
             .iter()
             .skip(self.scroll_offset)
-            .map(operation_line)
-            .collect::<Vec<_>>();
-        Text::from(rows)
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join("\n");
+        rendered_text(&rows)
+    }
+
+    fn selected_rendered_line(&self) -> Option<usize> {
+        self.selected_row().map(|row| row.rendered_line)
     }
 }
 
-fn operation_line(row: &OperationLogRow) -> Line<'_> {
+fn operation_line_text(row: &OperationLogRow) -> String {
     let marker = if row.current { "*" } else { " " };
-    Line::from(vec![
-        Span::styled(
-            marker,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" "),
-        Span::styled(
-            format!("{:<12}", row.display_id),
-            Style::new().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" "),
-        Span::raw(operation_title(row)),
-    ])
+    format!("{marker} {:<12} {}", row.display_id, operation_title(row))
 }
 
 fn operation_title(row: &OperationLogRow) -> &str {
@@ -532,11 +565,22 @@ mod tests {
     }
 
     #[test]
-    fn basic_render_contains_title_hotbar_marker_id_and_title() {
-        let mut view = OperationLogView::new(snapshot([
-            row("op1-full", "op1", "initial checkout", false),
-            row("op2-full", "op2", "describe change", true),
-        ]));
+    fn basic_render_contains_title_hotbar_and_jj_operation_log_lines() {
+        let mut view = OperationLogView::new(
+            OperationLogSnapshot::from_rendered(
+                vec![
+                    row("op1-full", "op1", "initial checkout", false).with_rendered_line(0),
+                    row("op2-full", "op2", "describe change", true).with_rendered_line(2),
+                ],
+                [
+                    "○ op1 user@example.test earlier",
+                    "│  initial checkout",
+                    "@ op2 user@example.test now",
+                    "│  describe change",
+                ],
+            )
+            .with_title("jj op log"),
+        );
         let backend = TestBackend::new(88, 6);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
@@ -548,11 +592,40 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("jk jj op log"));
-        assert!(rendered.contains("* op2"));
+        assert!(rendered.contains("@ op2"));
         assert!(rendered.contains("describe change"));
         assert!(rendered.contains("enter show"));
         assert!(rendered.contains("d diff"));
         assert!(rendered.contains("Esc back"));
+    }
+
+    #[test]
+    fn renders_jj_ansi_styles_as_tui_styles() {
+        let mut view = OperationLogView::new(
+            OperationLogSnapshot::from_rendered(
+                vec![
+                    row("op1-full", "op1", "initial checkout", true).with_rendered_line(0),
+                    row("op2-full", "op2", "describe change", false).with_rendered_line(1),
+                ],
+                [
+                    "@ op1 user@example.test now",
+                    "\u{1b}[38;5;2m○\u{1b}[0m op2 user@example.test earlier",
+                ],
+            )
+            .with_title("jj op log"),
+        );
+        let backend = TestBackend::new(88, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let cell = &terminal.backend().buffer()[(0, 2)];
+        assert_eq!(cell.symbol(), "○");
+        assert_ne!(cell.fg, Color::Reset);
     }
 
     #[test]
