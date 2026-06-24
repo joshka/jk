@@ -5,37 +5,28 @@ Entries are grouped by user workflow and release impact instead of following the
 
 ## Unreleased
 
-## Other
+## 0.2.7 - 2026-06-24
 
+This patch release tightens log graph behavior and workspace discovery after the dogfoodable 0.2.6
+release candidate.
 
-- Handle jk from no-working-copy containers ([#49](https://github.com/joshka/jk/pull/49))
+### Log Graph Rendering
 
-- Shorten revision IDs in log navigation ([#52](https://github.com/joshka/jk/pull/52))
+- Fix inline expanded details so they do not draw vertical continuation lanes through commit nodes.
+- Preserve connector lanes for graph rows that attach upward to nodes, including `├───╯` shapes.
+- Fix graph expansion links and elision drill-in column matching so hidden-revision navigation
+  follows the selected graph lane.
+- Shorten revision ids shown by log navigation actions.
 
+### Workspace Discovery
 
-## Other
+- Handle `jk` started from jj no-working-copy container roots by selecting the active child
+  workspace instead of failing at the container root.
+- Handle stale jj working copies more gracefully when discovering and refreshing workspaces.
 
+### Visual Polish
 
-- Simplify selected row highlight
-
-- Fix log graph expansion links ([#51](https://github.com/joshka/jk/pull/51))
-
-- Shorten revision IDs in log navigation ([#52](https://github.com/joshka/jk/pull/52))
-
-- Fix elision drill-in graph column matching ([#53](https://github.com/joshka/jk/pull/53))
-
-- Fix expanded graph prefixes
-
-
-## Other
-
-
-- Handle stale jj working copies ([#50](https://github.com/joshka/jk/pull/50))
-
-- Shorten revision IDs in log navigation ([#52](https://github.com/joshka/jk/pull/52))
-
-# Changelog
-
+- Simplify selected-row highlighting so graph rows stay easier to scan.
 
 ## 0.2.6 - 2026-06-23
 
