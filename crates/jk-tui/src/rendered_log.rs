@@ -57,11 +57,8 @@ impl<'a> RenderedLog<'a> {
             return line;
         }
 
-        let inserted_lines = self
-            .body
-            .lines()
-            .nth(details.after_line)
-            .map(expanded_prefix)
+        let lines = self.body.split_inclusive('\n').collect::<Vec<_>>();
+        let inserted_lines = expanded_prefix_at_line(&lines, details.after_line)
             .map(|prefix| expanded_details_line_count(details.text, &prefix, width))
             .unwrap_or_default();
         line + inserted_lines
@@ -74,10 +71,12 @@ impl<'a> RenderedLog<'a> {
             return;
         };
 
-        for (line_index, line) in self.body.split_inclusive('\n').enumerate() {
+        let lines = self.body.split_inclusive('\n').collect::<Vec<_>>();
+        for (line_index, line) in lines.iter().enumerate() {
             rendered.push_str(line);
             if line_index == details.after_line {
-                let prefix = expanded_prefix(line);
+                let prefix = expanded_prefix_at_line(&lines, line_index)
+                    .unwrap_or_else(|| DEFAULT_EXPANDED_PREFIX.to_owned());
                 if !line.ends_with('\n') {
                     rendered.push('\n');
                 }
@@ -149,18 +148,71 @@ fn wrap_options(width: usize) -> Options<'static> {
 }
 
 /// Chooses the graph prefix that should continue into inserted detail lines.
-fn expanded_prefix(line: &str) -> String {
-    let line = strip_ansi(line);
-    if let Some(prefix) = commit_continuation_prefix(&line) {
-        return format!("{prefix}  ");
-    }
+fn expanded_prefix_at_line(lines: &[&str], line_index: usize) -> Option<String> {
+    let line = lines.get(line_index)?;
+    let next_graph_line = lines
+        .iter()
+        .skip(line_index + 1)
+        .copied()
+        .find(|line| !strip_ansi(line).trim().is_empty());
+    Some(expanded_prefix(line, next_graph_line))
+}
 
-    let prefix = body_continuation_prefix(&line);
+/// Chooses the graph prefix that should continue into inserted detail lines.
+fn expanded_prefix(line: &str, next_line: Option<&str>) -> String {
+    let prefix = continuation_prefix(line);
+    let prefix = next_line.map(continuation_prefix).map_or_else(
+        || prefix.clone(),
+        |next_prefix| merge_continuation_prefixes(&prefix, &next_prefix),
+    );
+    let prefix = normalize_continuation_prefix(&prefix);
     if prefix.is_empty() {
         DEFAULT_EXPANDED_PREFIX.to_owned()
     } else {
         prefix
     }
+}
+
+/// Builds the graph continuation prefix implied by one rendered line.
+fn continuation_prefix(line: &str) -> String {
+    let line = strip_ansi(line);
+    commit_continuation_prefix(&line).map_or_else(
+        || body_continuation_prefix(&line),
+        |prefix| format!("{prefix}  "),
+    )
+}
+
+/// Combines continuation prefixes from surrounding graph lines.
+fn merge_continuation_prefixes(previous: &str, next: &str) -> String {
+    let width = previous.chars().count().max(next.chars().count());
+    let mut merged = String::new();
+    let previous = previous.chars().chain(std::iter::repeat(' ')).take(width);
+    let next = next.chars().chain(std::iter::repeat(' ')).take(width);
+    for (previous, next) in previous.zip(next) {
+        merged.push(if previous == '│' || next == '│' {
+            '│'
+        } else {
+            ' '
+        });
+    }
+    merged
+}
+
+/// Keeps only the continuation lanes plus the usual spacing before detail text.
+fn normalize_continuation_prefix(prefix: &str) -> String {
+    let Some(last_lane) = prefix
+        .chars()
+        .enumerate()
+        .filter_map(|(index, character)| (character == '│').then_some(index))
+        .last()
+    else {
+        return String::new();
+    };
+    prefix
+        .chars()
+        .take(last_lane + 1)
+        .chain([' ', ' '])
+        .collect()
 }
 
 /// Builds a continuation prefix from a commit row.
@@ -265,6 +317,79 @@ mod tests {
         assert_eq!(
             rendered,
             "│ ○  aaa\n│ │  first\n│ │  \n│ │  body\n│ │  \n│ ○  bbb\n"
+        );
+    }
+
+    #[test]
+    fn expanded_details_link_next_graph_item_after_connector_line() {
+        let rendered = RenderedLog::new("│ │ ○  aaa\n│ ├─╯  first\n│ ◆  bbb\n")
+            .with_expanded_details(Some(ExpandedDetails::new(1, "body")))
+            .render_with_width(80);
+
+        assert_eq!(
+            rendered,
+            "│ │ ○  aaa\n│ ├─╯  first\n│ │  \n│ │  body\n│ │  \n│ ◆  bbb\n"
+        );
+    }
+
+    #[test]
+    fn expanded_details_link_parallel_graph_item_after_connector_line() {
+        let rendered = RenderedLog::new("│ ◆  aaa\n├─╯  first\n│ ○  bbb\n")
+            .with_expanded_details(Some(ExpandedDetails::new(1, "body")))
+            .render_with_width(80);
+
+        assert_eq!(
+            rendered,
+            "│ ◆  aaa\n├─╯  first\n│ │  \n│ │  body\n│ │  \n│ ○  bbb\n"
+        );
+    }
+
+    #[test]
+    fn expanded_details_keep_connector_separator_after_details() {
+        let rendered = RenderedLog::new("│ ◆  aaa\n├─╯  first\n│ ○  bbb\n")
+            .with_expanded_details(Some(ExpandedDetails::new(0, "body")))
+            .render_with_width(80);
+
+        assert_eq!(
+            rendered,
+            "│ ◆  aaa\n│ │  \n│ │  body\n│ │  \n├─╯  first\n│ ○  bbb\n"
+        );
+    }
+
+    #[test]
+    fn expanded_details_keep_elision_separator_after_details() {
+        let rendered = RenderedLog::new("│ ◆  aaa\n│ │  first\n~\n│ ○  bbb\n")
+            .with_expanded_details(Some(ExpandedDetails::new(1, "body")))
+            .render_with_width(80);
+
+        assert_eq!(
+            rendered,
+            "│ ◆  aaa\n│ │  first\n│ │  \n│ │  body\n│ │  \n~\n│ ○  bbb\n"
+        );
+    }
+
+    #[test]
+    fn expanded_details_keep_parallel_elision_separator_after_details() {
+        let rendered =
+            RenderedLog::new("│ ◆  aaa\n│ │  first\n│ ~  (elided revisions)\n│ │ ○  bbb\n")
+                .with_expanded_details(Some(ExpandedDetails::new(1, "body")))
+                .render_with_width(80);
+
+        assert_eq!(
+            rendered,
+            "│ ◆  aaa\n│ │  first\n│ │  \n│ │  body\n│ │  \n│ ~  (elided revisions)\n│ │ ○  bbb\n"
+        );
+    }
+
+    #[test]
+    fn expanded_details_keep_elision_separator_and_blank_after_details() {
+        let rendered = RenderedLog::new("◆  aaa\n│  first\n~\n\n○  bbb\n")
+            .with_expanded_details(Some(ExpandedDetails::new(1, "body")))
+            .render_with_width(80);
+
+        assert_eq!(
+            rendered,
+            "◆  aaa\n│  first\n│  \n│  body\n│  \n~\n\n○  bbb\n"
         );
     }
 

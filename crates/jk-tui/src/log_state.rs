@@ -327,10 +327,7 @@ impl LogState {
             return None;
         }
 
-        self.entries
-            .get(selected + 1)
-            .map(|entry| entry.rendered_line().saturating_sub(1))
-            .or_else(|| last_entry_line(&self.rendered))
+        self.entry_content_end_line(selected)
     }
 
     /// Returns the selected entry's rendered line.
@@ -341,12 +338,40 @@ impl LogState {
     /// Returns the final rendered line that belongs to the selected entry.
     fn selected_entry_end_line(&self) -> Option<usize> {
         let selected = self.selected?;
-        self.entries
-            .get(selected + 1)
-            .map(|entry| entry.rendered_line().saturating_sub(1))
-            .or_else(|| last_entry_line(&self.rendered))
+        self.entry_content_end_line(selected)
     }
 
+    /// Returns the last rendered line that is content for the entry.
+    fn entry_content_end_line(&self, entry_index: usize) -> Option<usize> {
+        let start = self.entries.get(entry_index)?.rendered_line();
+        let end = self
+            .entries
+            .get(entry_index + 1)
+            .map_or_else(|| self.rendered.lines().count(), LogEntry::rendered_line);
+        content_end_line(&self.rendered, start, end)
+    }
+}
+
+/// Finds the final rendered line that belongs to a visible log entry.
+fn content_end_line(rendered: &str, start: usize, end: usize) -> Option<usize> {
+    rendered
+        .lines()
+        .enumerate()
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .filter(|(_, line)| !is_separator_line(line))
+        .map(|(index, _)| index)
+        .last()
+}
+
+/// Returns whether a rendered line is a separator after an entry instead of entry content.
+fn is_separator_line(line: &str) -> bool {
+    strip_ansi(line).trim().is_empty()
+        || is_graph_elision_line(line)
+        || is_graph_connector_line(line)
+}
+
+impl LogState {
     /// Scrolls upward when selection moves above the current viewport.
     fn keep_selected_visible(&mut self) {
         let Some(selected_line) = self.selected_rendered_line() else {
@@ -394,20 +419,45 @@ impl LogState {
     }
 }
 
-/// Finds the final rendered line that belongs to a visible log entry.
-fn last_entry_line(rendered: &str) -> Option<usize> {
-    let mut last_entry_line = None;
-    for (index, line) in rendered.lines().enumerate() {
-        if !is_graph_elision_line(line) {
-            last_entry_line = Some(index);
-        }
-    }
-    last_entry_line
-}
-
 /// Returns whether a rendered line is jj's hidden-revision graph elision.
 fn is_graph_elision_line(line: &str) -> bool {
-    strip_ansi(line).trim() == "~"
+    strip_ansi(line)
+        .trim_start()
+        .chars()
+        .find(|character| !is_graph_prefix(*character))
+        == Some('~')
+}
+
+/// Returns whether a rendered line is a graph connector tail after an entry.
+fn is_graph_connector_line(line: &str) -> bool {
+    let line = strip_ansi(line);
+    let mut seen_graph = false;
+    let mut has_connector = false;
+
+    for character in line.trim_end().chars() {
+        if is_graph_prefix(character) {
+            seen_graph = true;
+            has_connector |= is_graph_connector(character);
+            continue;
+        }
+
+        break;
+    }
+
+    seen_graph && has_connector
+}
+
+/// Returns whether a character can appear before jj's elision marker in a graph line.
+const fn is_graph_prefix(character: char) -> bool {
+    matches!(
+        character,
+        ' ' | '│' | '─' | '├' | '╭' | '╮' | '╯' | '╰' | '╲' | '╱'
+    )
+}
+
+/// Returns whether a graph-prefix character joins or closes lanes.
+const fn is_graph_connector(character: char) -> bool {
+    matches!(character, '─' | '├' | '╭' | '╮' | '╯' | '╰' | '╲' | '╱')
 }
 
 /// Returns whether an entry has detail text worth expanding inline.
@@ -886,6 +936,58 @@ mod tests {
         state.toggle_expanded();
 
         assert_eq!(state.expanded_insertion_line(), Some(1));
+    }
+
+    #[test]
+    fn expanded_insertion_line_keeps_elision_separator_after_expansion() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "◆  aaa\n│  first\n~\n\n○  bbb\n│  second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first\n\nbody")
+                    .with_details("body")
+                    .with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(4),
+            ],
+        ));
+
+        state.toggle_expanded();
+
+        assert_eq!(state.expanded_insertion_line(), Some(1));
+    }
+
+    #[test]
+    fn expanded_insertion_line_keeps_parallel_elision_separator_after_expansion() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "│ ◆  aaa\n│ │  first\n│ ~  (elided revisions)\n│ │ ○  bbb\n│ ├─╯  second\n│ ◆  ccc\n",
+            vec![
+                LogEntry::new("aaa", "111", "first\n\nbody")
+                    .with_details("body")
+                    .with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(3),
+                LogEntry::new("ccc", "333", "third").with_rendered_line(5),
+            ],
+        ));
+
+        state.toggle_expanded();
+
+        assert_eq!(state.expanded_insertion_line(), Some(1));
+    }
+
+    #[test]
+    fn expanded_insertion_line_keeps_connector_separator_after_expansion() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "│ ◆  aaa\n├─╯  first\n│ ○  bbb\n│ │  second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first\n\nbody")
+                    .with_details("body")
+                    .with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+            ],
+        ));
+
+        state.toggle_expanded();
+
+        assert_eq!(state.expanded_insertion_line(), Some(0));
     }
 
     fn snapshot<const N: usize>(change_ids: [&str; N]) -> LogSnapshot {
