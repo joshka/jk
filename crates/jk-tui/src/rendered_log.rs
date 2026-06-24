@@ -165,7 +165,6 @@ fn expanded_prefix(line: &str, next_line: Option<&str>) -> String {
         || prefix.clone(),
         |next_prefix| merge_continuation_prefixes(&prefix, &next_prefix),
     );
-    let prefix = normalize_continuation_prefix(&prefix);
     if prefix.is_empty() {
         DEFAULT_EXPANDED_PREFIX.to_owned()
     } else {
@@ -176,10 +175,10 @@ fn expanded_prefix(line: &str, next_line: Option<&str>) -> String {
 /// Builds the graph continuation prefix implied by one rendered line.
 fn continuation_prefix(line: &str) -> String {
     let line = strip_ansi(line);
-    commit_continuation_prefix(&line).map_or_else(
-        || body_continuation_prefix(&line),
-        |prefix| format!("{prefix}  "),
-    )
+    commit_continuation_prefix(&line).unwrap_or_else(|| {
+        let prefix = body_continuation_prefix(&line);
+        normalize_continuation_prefix(&prefix)
+    })
 }
 
 /// Combines continuation prefixes from surrounding graph lines.
@@ -198,7 +197,7 @@ fn merge_continuation_prefixes(previous: &str, next: &str) -> String {
     merged
 }
 
-/// Keeps only the continuation lanes plus the usual spacing before detail text.
+/// Keeps continuation lanes plus the usual spacing before detail text.
 fn normalize_continuation_prefix(prefix: &str) -> String {
     let Some(last_lane) = prefix
         .chars()
@@ -208,6 +207,7 @@ fn normalize_continuation_prefix(prefix: &str) -> String {
     else {
         return String::new();
     };
+
     prefix
         .chars()
         .take(last_lane + 1)
@@ -219,11 +219,14 @@ fn normalize_continuation_prefix(prefix: &str) -> String {
 fn commit_continuation_prefix(line: &str) -> Option<String> {
     let mut prefix = String::new();
     let mut seen_graph = false;
+    let mut seen_marker = false;
 
     for character in line.trim_end_matches('\n').chars() {
         if is_commit_marker(character) {
-            prefix.push('│');
-            return Some(prefix);
+            prefix.push(' ');
+            seen_graph = true;
+            seen_marker = true;
+            continue;
         }
 
         if is_graph_character(character) {
@@ -240,7 +243,16 @@ fn commit_continuation_prefix(line: &str) -> Option<String> {
         break;
     }
 
-    None
+    if !seen_marker || !prefix.chars().any(|character| character == '│') {
+        return None;
+    }
+
+    Some(
+        prefix
+            .chars()
+            .map(|character| if character == '│' { '│' } else { ' ' })
+            .collect(),
+    )
 }
 
 /// Builds a continuation prefix from a non-commit graph body line.
@@ -282,7 +294,7 @@ const fn is_graph_character(character: char) -> bool {
 /// Returns the vertical continuation character for an existing graph segment.
 const fn continuation_for_graph_character(character: char) -> char {
     match character {
-        '│' => '│',
+        '│' | '├' | '╯' => '│',
         _ => ' ',
     }
 }
@@ -321,6 +333,15 @@ mod tests {
     }
 
     #[test]
+    fn expanded_details_do_not_continue_line_through_side_node() {
+        let rendered = RenderedLog::new("│ ○  aaa\n│ ○  bbb\n")
+            .with_expanded_details(Some(ExpandedDetails::new(0, "body")))
+            .render_with_width(80);
+
+        assert_eq!(rendered, "│ ○  aaa\n│    \n│    body\n│    \n│ ○  bbb\n");
+    }
+
+    #[test]
     fn expanded_details_link_next_graph_item_after_connector_line() {
         let rendered = RenderedLog::new("│ │ ○  aaa\n│ ├─╯  first\n│ ◆  bbb\n")
             .with_expanded_details(Some(ExpandedDetails::new(1, "body")))
@@ -328,7 +349,7 @@ mod tests {
 
         assert_eq!(
             rendered,
-            "│ │ ○  aaa\n│ ├─╯  first\n│ │  \n│ │  body\n│ │  \n│ ◆  bbb\n"
+            "│ │ ○  aaa\n│ ├─╯  first\n│ │ │  \n│ │ │  body\n│ │ │  \n│ ◆  bbb\n"
         );
     }
 
@@ -353,6 +374,18 @@ mod tests {
         assert_eq!(
             rendered,
             "│ ◆  aaa\n│ │  \n│ │  body\n│ │  \n├─╯  first\n│ ○  bbb\n"
+        );
+    }
+
+    #[test]
+    fn expanded_details_link_connector_end_to_node_above() {
+        let rendered = RenderedLog::new("│ │ ○  aaa\n├───╯  first\n")
+            .with_expanded_details(Some(ExpandedDetails::new(0, "body")))
+            .render_with_width(80);
+
+        assert_eq!(
+            rendered,
+            "│ │ ○  aaa\n│ │ │  \n│ │ │  body\n│ │ │  \n├───╯  first\n"
         );
     }
 
@@ -401,7 +434,7 @@ mod tests {
 
         assert_eq!(
             rendered,
-            "│ ○  aaa\n│ │  \n│ │  one two\n│ │  three\n│ │  four\n│ │  five\n│ │  \n"
+            "│ ○  aaa\n│    \n│    one two\n│    three\n│    four\n│    five\n│    \n"
         );
     }
 
