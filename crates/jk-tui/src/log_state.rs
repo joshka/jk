@@ -202,17 +202,17 @@ impl LogState {
                 let after = self.entries.get(after)?;
                 Some(format!(
                     "{}::{}",
-                    revision_id_prefix(after.change_id()),
-                    revision_id_prefix(before.change_id())
+                    revision_id_prefix(after.commit_id()),
+                    revision_id_prefix(before.commit_id())
                 ))
             }
             (Some(before), None) => {
                 let before = self.entries.get(before)?;
-                Some(format!("::{}", revision_id_prefix(before.change_id())))
+                Some(format!("::{}", revision_id_prefix(before.commit_id())))
             }
             (None, Some(after)) => {
                 let after = self.entries.get(after)?;
-                Some(format!("{}::", revision_id_prefix(after.change_id())))
+                Some(format!("{}::", revision_id_prefix(after.commit_id())))
             }
             (None, None) => None,
         }?;
@@ -220,7 +220,7 @@ impl LogState {
         let visible_entries = self
             .entries
             .iter()
-            .map(|entry| revision_id_prefix(entry.change_id()))
+            .map(|entry| revision_id_prefix(entry.commit_id()))
             .collect::<Vec<_>>()
             .join(" | ");
         if visible_entries.is_empty() {
@@ -590,29 +590,76 @@ fn first_selection(entries: &[LogEntry], elisions: &[LogElision]) -> Option<LogS
 }
 
 fn log_elisions(rendered: &str, entries: &[LogEntry]) -> Vec<LogElision> {
+    let rendered_lines = rendered.lines().collect::<Vec<_>>();
+    let entry_columns = entries
+        .iter()
+        .map(|entry| {
+            rendered_lines
+                .get(entry.rendered_line())
+                .and_then(|line| graph_node_column(line))
+        })
+        .collect::<Vec<_>>();
+
     rendered
         .lines()
         .enumerate()
         .filter(|(_, line)| is_graph_elision_line(line))
-        .map(|(rendered_line, _)| LogElision {
-            rendered_line,
-            before_entry: entries
+        .map(|(rendered_line, line)| {
+            let elision_column = graph_elision_column(line);
+            let same_column = |entry_index: usize| {
+                elision_column.is_none() || entry_columns.get(entry_index) == Some(&elision_column)
+            };
+            let before_entry = entries
                 .iter()
-                .rposition(|entry| entry.rendered_line() < rendered_line),
-            after_entry: entries
+                .enumerate()
+                .rposition(|(index, entry)| {
+                    entry.rendered_line() < rendered_line && same_column(index)
+                })
+                .or_else(|| {
+                    entries
+                        .iter()
+                        .rposition(|entry| entry.rendered_line() < rendered_line)
+                });
+            let after_entry = entries
                 .iter()
-                .position(|entry| entry.rendered_line() > rendered_line),
+                .enumerate()
+                .position(|(index, entry)| {
+                    entry.rendered_line() > rendered_line && same_column(index)
+                })
+                .or_else(|| {
+                    entries
+                        .iter()
+                        .position(|entry| entry.rendered_line() > rendered_line)
+                });
+            LogElision {
+                rendered_line,
+                before_entry,
+                after_entry,
+            }
         })
         .collect()
 }
 
 /// Returns whether a rendered line is jj's hidden-revision graph elision.
 fn is_graph_elision_line(line: &str) -> bool {
+    graph_elision_column(line).is_some()
+}
+
+/// Returns the zero-based graph column for jj's hidden-revision elision marker.
+fn graph_elision_column(line: &str) -> Option<usize> {
     strip_ansi(line)
-        .trim_start()
         .chars()
-        .find(|character| !is_graph_prefix(*character))
-        == Some('~')
+        .enumerate()
+        .find_map(|(index, character)| (!is_graph_prefix(character)).then_some((index, character)))
+        .and_then(|(index, character)| (character == '~').then_some(index))
+}
+
+/// Returns the zero-based graph column for a rendered commit node.
+fn graph_node_column(line: &str) -> Option<usize> {
+    strip_ansi(line)
+        .chars()
+        .enumerate()
+        .find_map(|(index, character)| is_graph_node(character).then_some(index))
 }
 
 /// Returns whether a rendered line is a graph connector tail after an entry.
@@ -640,6 +687,11 @@ const fn is_graph_prefix(character: char) -> bool {
         character,
         ' ' | '│' | '─' | '├' | '╭' | '╮' | '╯' | '╰' | '╲' | '╱'
     )
+}
+
+/// Returns whether a graph character marks a rendered commit row.
+const fn is_graph_node(character: char) -> bool {
+    matches!(character, '@' | '○' | '◆' | '×' | '◇')
 }
 
 /// Returns whether a graph-prefix character joins or closes lanes.
@@ -1013,7 +1065,7 @@ mod tests {
         assert_eq!(state.selected_rendered_line(), Some(1));
         assert_eq!(
             state.selected_elision_revset(),
-            Some("(bbb::aaa) | aaa | bbb".to_owned())
+            Some("(222::111) | 111 | 222".to_owned())
         );
     }
 
@@ -1031,12 +1083,12 @@ mod tests {
 
         assert_eq!(
             state.selected_elision_revset(),
-            Some("(root::current) | current | root".to_owned())
+            Some("(000::111) | 111 | 000".to_owned())
         );
     }
 
     #[test]
-    fn graph_elision_revset_uses_short_change_ids() {
+    fn graph_elision_revset_uses_short_commit_ids() {
         let mut state = LogState::new(LogSnapshot::new(
             "@  abcdefghijklmnop current\n~  (elided revisions)\n◆  zyxwvutsrqponmlk root\n",
             vec![
@@ -1050,7 +1102,44 @@ mod tests {
 
         assert_eq!(
             state.selected_elision_revset(),
-            Some("(zyxwvuts::abcdefgh) | abcdefgh | zyxwvuts".to_owned())
+            Some("(00001111::11112222) | 11112222 | 00001111".to_owned())
+        );
+    }
+
+    #[test]
+    fn graph_elision_revset_avoids_divergent_change_ids() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  nvuwzuzn current\n~  (elided revisions)\n◆  nvuwzuzn root\n",
+            vec![
+                LogEntry::new("nvuwzuzn", "aaaabbbbccccdddd", "current").with_rendered_line(0),
+                LogEntry::new("nvuwzuzn", "1111222233334444", "root").with_rendered_line(2),
+            ],
+        ));
+
+        state.select_next();
+
+        assert_eq!(
+            state.selected_elision_revset(),
+            Some("(11112222::aaaabbbb) | aaaabbbb | 11112222".to_owned())
+        );
+    }
+
+    #[test]
+    fn graph_elision_boundaries_follow_the_elision_column() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "◆  main\n~  (elided revisions)\n│ ○  side\n╭─┤  merge edge\n◆ │  base\n",
+            vec![
+                LogEntry::new("main", "mmmmmmmm", "main").with_rendered_line(0),
+                LogEntry::new("side", "ssssssss", "side").with_rendered_line(2),
+                LogEntry::new("base", "bbbbbbbb", "base").with_rendered_line(4),
+            ],
+        ));
+
+        state.select_next();
+
+        assert_eq!(
+            state.selected_elision_revset(),
+            Some("(bbbbbbbb::mmmmmmmm) | mmmmmmmm | ssssssss | bbbbbbbb".to_owned())
         );
     }
 
@@ -1070,7 +1159,7 @@ mod tests {
 
         assert_eq!(
             state.selected_elision_revset(),
-            Some("(::aaa) | aaa".to_owned())
+            Some("(::111) | 111".to_owned())
         );
     }
 
@@ -1091,7 +1180,7 @@ mod tests {
 
         assert_eq!(
             state.selected_elision_revset(),
-            Some("(::main) | current | parent | main".to_owned())
+            Some("(::111) | 333 | 222 | 111".to_owned())
         );
     }
 
