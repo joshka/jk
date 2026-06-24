@@ -5,6 +5,38 @@ Entries are grouped by user workflow and release impact instead of following the
 
 ## Unreleased
 
+## Other
+
+
+- Handle jk from no-working-copy containers ([#49](https://github.com/joshka/jk/pull/49))
+
+- Shorten revision IDs in log navigation ([#52](https://github.com/joshka/jk/pull/52))
+
+
+## Other
+
+
+- Simplify selected row highlight
+
+- Fix log graph expansion links ([#51](https://github.com/joshka/jk/pull/51))
+
+- Shorten revision IDs in log navigation ([#52](https://github.com/joshka/jk/pull/52))
+
+- Fix elision drill-in graph column matching ([#53](https://github.com/joshka/jk/pull/53))
+
+- Fix expanded graph prefixes
+
+
+## Other
+
+
+- Handle stale jj working copies ([#50](https://github.com/joshka/jk/pull/50))
+
+- Shorten revision IDs in log navigation ([#52](https://github.com/joshka/jk/pull/52))
+
+# Changelog
+
+
 ## 0.2.6 - 2026-06-23
 
 This release candidate turns `jk` from a log/diff inspection helper into a dogfoodable jj TUI.
