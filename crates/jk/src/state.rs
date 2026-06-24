@@ -1,5 +1,5 @@
 use jk_cli::{
-    DiffQuery, EvologQuery, LogTemplateSelection, OperationQuery, ShowQuery, StatusQuery,
+    DiffQuery, EvologQuery, JjLog, LogTemplateSelection, OperationQuery, ShowQuery, StatusQuery,
     WorkspaceInspectionQuery,
 };
 use jk_core::CommandHistory;
@@ -77,6 +77,7 @@ pub struct AppState {
     pub(crate) views: ViewStack,
     pub(crate) modes: ModeStack,
     pub(crate) history: CommandHistory,
+    log_source_stack: Vec<JjLog>,
 }
 
 impl AppState {
@@ -90,12 +91,36 @@ impl AppState {
             views: ViewStack::new(root),
             modes: ModeStack::default(),
             history,
+            log_source_stack: Vec::new(),
         }
     }
 
     #[cfg(test)]
     pub(crate) const fn command_history(&self) -> &CommandHistory {
         &self.history
+    }
+
+    pub(crate) fn push_log_source(&mut self, source: JjLog) {
+        self.log_source_stack.push(source);
+    }
+
+    pub(crate) fn can_pop_log_drill(&self) -> bool {
+        self.views.active_is_log_with_log_parent() && !self.log_source_stack.is_empty()
+    }
+
+    pub(crate) fn pop_log_drill(&mut self, source: &mut JjLog) -> bool {
+        if !self.can_pop_log_drill() {
+            return false;
+        }
+        let Some(previous_source) = self.log_source_stack.pop() else {
+            return false;
+        };
+        if !self.views.pop() {
+            self.log_source_stack.push(previous_source);
+            return false;
+        }
+        *source = previous_source;
+        true
     }
 }
 
@@ -135,6 +160,17 @@ impl ViewStack {
 
         self.views.pop();
         true
+    }
+
+    fn active_is_log_with_log_parent(&self) -> bool {
+        if self.views.len() < 2 {
+            return false;
+        }
+        matches!(self.views.last(), Some(AppView::Log(_)))
+            && matches!(
+                self.views.get(self.views.len().saturating_sub(2)),
+                Some(AppView::Log(_))
+            )
     }
 
     #[cfg(test)]

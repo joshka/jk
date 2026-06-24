@@ -9,6 +9,8 @@ use jk_core::{LogEntry, LogSnapshot};
 use crate::ansi_text::strip_ansi;
 use crate::chrome::title_or_default;
 
+const REVSET_ID_PREFIX_LEN: usize = 8;
+
 /// Ordered revision marks keyed by stable change id.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct OrderedRevisionMarks {
@@ -52,7 +54,8 @@ pub struct LogState {
     title: String,
     rendered: String,
     entries: Vec<LogEntry>,
-    selected: Option<usize>,
+    elisions: Vec<LogElision>,
+    selected: Option<LogSelection>,
     expanded_change_id: Option<String>,
     scroll_offset: usize,
     viewport_height: usize,
@@ -60,15 +63,30 @@ pub struct LogState {
     marks: OrderedRevisionMarks,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LogSelection {
+    Entry(usize),
+    Elision(usize),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct LogElision {
+    rendered_line: usize,
+    before_entry: Option<usize>,
+    after_entry: Option<usize>,
+}
+
 impl LogState {
     /// Creates state from a freshly loaded log snapshot.
     pub fn new(snapshot: LogSnapshot) -> Self {
         let (title, rendered, entries) = snapshot.into_parts();
-        let selected = (!entries.is_empty()).then_some(0);
+        let elisions = log_elisions(&rendered, &entries);
+        let selected = first_selection(&entries, &elisions);
         Self {
             title: title_or_default(title),
             rendered,
             entries,
+            elisions,
             selected,
             expanded_change_id: None,
             scroll_offset: 0,
@@ -89,13 +107,15 @@ impl LogState {
         self.rendered = rendered;
         self.entries = entries;
         self.marks.retain_visible(&self.entries);
+        self.elisions = log_elisions(&self.rendered, &self.entries);
         self.selected = selected_change_id
             .and_then(|change_id| {
                 self.entries
                     .iter()
                     .position(|entry| entry.change_id() == change_id)
+                    .map(LogSelection::Entry)
             })
-            .or_else(|| (!self.entries.is_empty()).then_some(0));
+            .or_else(|| first_selection(&self.entries, &self.elisions));
 
         if let Some(expanded_change_id) = &self.expanded_change_id {
             let expanded_still_exists_with_details = self
@@ -122,7 +142,92 @@ impl LogState {
 
     /// Returns the currently selected semantic entry.
     pub fn selected_entry(&self) -> Option<&LogEntry> {
-        self.selected.and_then(|index| self.entries.get(index))
+        let LogSelection::Entry(index) = self.selected? else {
+            return None;
+        };
+        self.entries.get(index)
+    }
+
+    /// Returns the selected entry's revision identifier for follow-up commands.
+    #[must_use]
+    pub fn selected_revision_id(&self) -> Option<&str> {
+        self.selected_entry()
+            .map(|entry| revision_id_prefix(entry.change_id()))
+    }
+
+    /// Returns the visible change before the selected graph elision.
+    #[must_use]
+    pub fn selected_elision_before_change_id(&self) -> Option<&str> {
+        let LogSelection::Elision(index) = self.selected? else {
+            return None;
+        };
+        let elision = self.elisions.get(index)?;
+        let before = elision.before_entry?;
+        self.entries.get(before).map(LogEntry::change_id)
+    }
+
+    /// Selects the first entry rendered after the given visible change.
+    #[must_use]
+    pub fn select_first_entry_after_change_id(&mut self, change_id: &str) -> bool {
+        let Some(index) = self
+            .entries
+            .iter()
+            .position(|entry| entry.change_id() == change_id)
+        else {
+            return false;
+        };
+        let Some(next_index) = index.checked_add(1) else {
+            return false;
+        };
+        if next_index >= self.entries.len() {
+            return false;
+        }
+        self.selected = Some(LogSelection::Entry(next_index));
+        self.follow_selection = true;
+        self.expanded_change_id = None;
+        self.keep_selected_visible();
+        true
+    }
+
+    /// Returns the revset that should reveal the selected graph elision.
+    #[must_use]
+    pub fn selected_elision_revset(&self) -> Option<String> {
+        let LogSelection::Elision(index) = self.selected? else {
+            return None;
+        };
+        let elision = self.elisions.get(index)?;
+        let reveal_revset = match (elision.before_entry, elision.after_entry) {
+            (Some(before), Some(after)) => {
+                let before = self.entries.get(before)?;
+                let after = self.entries.get(after)?;
+                Some(format!(
+                    "{}::{}",
+                    revision_id_prefix(after.change_id()),
+                    revision_id_prefix(before.change_id())
+                ))
+            }
+            (Some(before), None) => {
+                let before = self.entries.get(before)?;
+                Some(format!("::{}", revision_id_prefix(before.change_id())))
+            }
+            (None, Some(after)) => {
+                let after = self.entries.get(after)?;
+                Some(format!("{}::", revision_id_prefix(after.change_id())))
+            }
+            (None, None) => None,
+        }?;
+
+        let visible_entries = self
+            .entries
+            .iter()
+            .map(|entry| revision_id_prefix(entry.change_id()))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        if visible_entries.is_empty() {
+            Some(reveal_revset)
+        } else {
+            Some(format!("({reveal_revset}) | {visible_entries}"))
+        }
     }
 
     /// Returns the first rendered line currently visible in the viewport.
@@ -157,7 +262,10 @@ impl LogState {
             return;
         };
 
-        self.select_index(selected.saturating_sub(1));
+        let Some(index) = self.selectable_index(selected) else {
+            return;
+        };
+        self.select_selectable_index(index.saturating_sub(1));
     }
 
     /// Moves selection to the next semantic entry.
@@ -166,8 +274,11 @@ impl LogState {
             return;
         };
 
-        let last_index = self.entries.len().saturating_sub(1);
-        self.select_index((selected + 1).min(last_index));
+        let Some(index) = self.selectable_index(selected) else {
+            return;
+        };
+        let last_index = self.selectable_len().saturating_sub(1);
+        self.select_selectable_index((index + 1).min(last_index));
     }
 
     /// Moves selection one viewport toward newer visible rendered lines.
@@ -178,11 +289,11 @@ impl LogState {
 
         let target_line = selected_line.saturating_sub(self.viewport_height);
         let target_index = self
-            .entries
+            .selectables()
             .iter()
-            .rposition(|entry| entry.rendered_line() <= target_line)
+            .rposition(|selection| self.selection_rendered_line(*selection) <= target_line)
             .unwrap_or(0);
-        self.select_index(target_index);
+        self.select_selectable_index(target_index);
     }
 
     /// Moves selection one viewport toward older visible rendered lines.
@@ -192,26 +303,27 @@ impl LogState {
         };
 
         let target_line = selected_line.saturating_add(self.viewport_height);
-        let last_index = self.entries.len().saturating_sub(1);
-        let target_index = self
-            .entries
+        let selectables = self.selectables();
+        let last_index = selectables.len().saturating_sub(1);
+        let target_index = selectables
             .iter()
-            .position(|entry| entry.rendered_line() >= target_line)
+            .position(|selection| self.selection_rendered_line(*selection) >= target_line)
             .unwrap_or(last_index);
-        self.select_index(target_index);
+        self.select_selectable_index(target_index);
     }
 
     /// Moves selection to the first semantic entry.
     pub fn select_first(&mut self) {
-        if !self.entries.is_empty() {
-            self.select_index(0);
+        if self.selectable_len() > 0 {
+            self.select_selectable_index(0);
         }
     }
 
     /// Moves selection to the last semantic entry.
     pub fn select_last(&mut self) {
-        if !self.entries.is_empty() {
-            self.select_index(self.entries.len() - 1);
+        let selectable_len = self.selectable_len();
+        if selectable_len > 0 {
+            self.select_selectable_index(selectable_len - 1);
         }
     }
 
@@ -260,6 +372,15 @@ impl LogState {
     /// Returns marked change ids in insertion order.
     pub fn marked_change_ids(&self) -> &[String] {
         self.marks.change_ids()
+    }
+
+    /// Returns marked revision identifiers shortened for follow-up commands.
+    pub fn marked_revision_ids(&self) -> Vec<String> {
+        self.marks
+            .change_ids()
+            .iter()
+            .map(|change_id| revision_id_prefix(change_id).to_owned())
+            .collect()
     }
 
     /// Returns the selected change's zero-based mark index, if marked.
@@ -322,7 +443,9 @@ impl LogState {
 
     /// Returns the rendered line after which inline details should be inserted.
     pub fn expanded_insertion_line(&self) -> Option<usize> {
-        let selected = self.selected?;
+        let LogSelection::Entry(selected) = self.selected? else {
+            return None;
+        };
         if !self.selected_is_expanded() {
             return None;
         }
@@ -332,12 +455,15 @@ impl LogState {
 
     /// Returns the selected entry's rendered line.
     pub fn selected_rendered_line(&self) -> Option<usize> {
-        self.selected_entry().map(LogEntry::rendered_line)
+        self.selected
+            .map(|selection| self.selection_rendered_line(selection))
     }
 
     /// Returns the final rendered line that belongs to the selected entry.
     fn selected_entry_end_line(&self) -> Option<usize> {
-        let selected = self.selected?;
+        let LogSelection::Entry(selected) = self.selected? else {
+            return None;
+        };
         self.entry_content_end_line(selected)
     }
 
@@ -350,28 +476,7 @@ impl LogState {
             .map_or_else(|| self.rendered.lines().count(), LogEntry::rendered_line);
         content_end_line(&self.rendered, start, end)
     }
-}
 
-/// Finds the final rendered line that belongs to a visible log entry.
-fn content_end_line(rendered: &str, start: usize, end: usize) -> Option<usize> {
-    rendered
-        .lines()
-        .enumerate()
-        .skip(start)
-        .take(end.saturating_sub(start))
-        .filter(|(_, line)| !is_separator_line(line))
-        .map(|(index, _)| index)
-        .last()
-}
-
-/// Returns whether a rendered line is a separator after an entry instead of entry content.
-fn is_separator_line(line: &str) -> bool {
-    strip_ansi(line).trim().is_empty()
-        || is_graph_elision_line(line)
-        || is_graph_connector_line(line)
-}
-
-impl LogState {
     /// Scrolls upward when selection moves above the current viewport.
     fn keep_selected_visible(&mut self) {
         let Some(selected_line) = self.selected_rendered_line() else {
@@ -385,13 +490,13 @@ impl LogState {
     }
 
     /// Selects an entry and carries expansion forward when movement expects it.
-    fn select_index(&mut self, index: usize) {
-        let Some(_) = self.entries.get(index) else {
+    fn select_selectable_index(&mut self, index: usize) {
+        let Some(selection) = self.selectables().get(index).copied() else {
             return;
         };
 
         let was_expanded = self.selected_is_expanded();
-        self.selected = Some(index);
+        self.selected = Some(selection);
         self.follow_selection = true;
         self.apply_expansion_to_selected(was_expanded);
         self.keep_selected_visible();
@@ -417,6 +522,88 @@ impl LogState {
         let max_scroll_offset = self.rendered.lines().count().saturating_sub(1);
         self.scroll_offset = self.scroll_offset.min(max_scroll_offset);
     }
+
+    fn selectables(&self) -> Vec<LogSelection> {
+        let mut selections = Vec::with_capacity(self.entries.len() + self.elisions.len());
+        selections.extend((0..self.entries.len()).map(LogSelection::Entry));
+        selections.extend((0..self.elisions.len()).map(LogSelection::Elision));
+        selections.sort_by_key(|selection| self.selection_rendered_line(*selection));
+        selections
+    }
+
+    const fn selectable_len(&self) -> usize {
+        self.entries.len() + self.elisions.len()
+    }
+
+    fn selectable_index(&self, selected: LogSelection) -> Option<usize> {
+        self.selectables()
+            .iter()
+            .position(|selection| *selection == selected)
+    }
+
+    fn selection_rendered_line(&self, selection: LogSelection) -> usize {
+        match selection {
+            LogSelection::Entry(index) => self.entries[index].rendered_line(),
+            LogSelection::Elision(index) => self.elisions[index].rendered_line,
+        }
+    }
+}
+
+fn revision_id_prefix(id: &str) -> &str {
+    id.char_indices()
+        .nth(REVSET_ID_PREFIX_LEN)
+        .map_or(id, |(index, _)| &id[..index])
+}
+
+/// Finds the final rendered line that belongs to a visible log entry.
+fn content_end_line(rendered: &str, start: usize, end: usize) -> Option<usize> {
+    rendered
+        .lines()
+        .enumerate()
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .filter(|(_, line)| !is_separator_line(line))
+        .map(|(index, _)| index)
+        .last()
+}
+
+/// Returns whether a rendered line is a separator after an entry instead of entry content.
+fn is_separator_line(line: &str) -> bool {
+    strip_ansi(line).trim().is_empty()
+        || is_graph_elision_line(line)
+        || is_graph_connector_line(line)
+}
+
+fn first_selection(entries: &[LogEntry], elisions: &[LogElision]) -> Option<LogSelection> {
+    let first_entry = entries
+        .first()
+        .map(|entry| (entry.rendered_line(), LogSelection::Entry(0)));
+    let first_elision = elisions
+        .first()
+        .map(|elision| (elision.rendered_line, LogSelection::Elision(0)));
+
+    [first_entry, first_elision]
+        .into_iter()
+        .flatten()
+        .min_by_key(|(line, _)| *line)
+        .map(|(_, selection)| selection)
+}
+
+fn log_elisions(rendered: &str, entries: &[LogEntry]) -> Vec<LogElision> {
+    rendered
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| is_graph_elision_line(line))
+        .map(|(rendered_line, _)| LogElision {
+            rendered_line,
+            before_entry: entries
+                .iter()
+                .rposition(|entry| entry.rendered_line() < rendered_line),
+            after_entry: entries
+                .iter()
+                .position(|entry| entry.rendered_line() > rendered_line),
+        })
+        .collect()
 }
 
 /// Returns whether a rendered line is jj's hidden-revision graph elision.
@@ -487,6 +674,17 @@ mod tests {
         state.refresh(snapshot(["ccc", "ddd"]));
 
         assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("ccc"));
+    }
+
+    #[test]
+    fn selected_revision_id_uses_short_change_id() {
+        let state = LogState::new(snapshot(["abcdefghijklmnop"]));
+
+        assert_eq!(state.selected_revision_id(), Some("abcdefgh"));
+        assert_eq!(
+            state.selected_entry().map(LogEntry::change_id),
+            Some("abcdefghijklmnop")
+        );
     }
 
     #[test]
@@ -617,6 +815,26 @@ mod tests {
         assert_eq!(state.marked_change_ids(), ["aaa", "ccc"]);
         assert_eq!(state.mark_index_for_change_id("aaa"), Some(0));
         assert_eq!(state.mark_index_for_change_id("ccc"), Some(1));
+    }
+
+    #[test]
+    fn marked_revision_ids_use_short_change_ids() {
+        let mut state = LogState::new(snapshot([
+            "abcdefghijklmnop",
+            "bbbbbbbbcccccccc",
+            "zyxwvutsrqponmlk",
+        ]));
+
+        state.toggle_selected_mark();
+        state.select_next();
+        state.select_next();
+        state.toggle_selected_mark();
+
+        assert_eq!(
+            state.marked_change_ids(),
+            ["abcdefghijklmnop", "zyxwvutsrqponmlk"]
+        );
+        assert_eq!(state.marked_revision_ids(), ["abcdefgh", "zyxwvuts"]);
     }
 
     #[test]
@@ -771,11 +989,147 @@ mod tests {
         let mut state = LogState::new(snapshot(["aaa", "bbb"]));
 
         state.select_previous();
-        assert_eq!(state.selected, Some(0));
+        assert_eq!(state.selected, Some(LogSelection::Entry(0)));
 
         state.select_next();
         state.select_next();
-        assert_eq!(state.selected, Some(1));
+        assert_eq!(state.selected, Some(LogSelection::Entry(1)));
+    }
+
+    #[test]
+    fn movement_can_select_graph_elision() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n~  (elided revisions)\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+            ],
+        ));
+
+        state.select_next();
+
+        assert_eq!(state.selected, Some(LogSelection::Elision(0)));
+        assert_eq!(state.selected_entry(), None);
+        assert_eq!(state.selected_rendered_line(), Some(1));
+        assert_eq!(
+            state.selected_elision_revset(),
+            Some("(bbb::aaa) | aaa | bbb".to_owned())
+        );
+    }
+
+    #[test]
+    fn graph_elision_revset_includes_visible_boundaries() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  current\n~  (elided revisions)\n◆  root\n",
+            vec![
+                LogEntry::new("current", "111", "current").with_rendered_line(0),
+                LogEntry::new("root", "000", "root").with_rendered_line(2),
+            ],
+        ));
+
+        state.select_next();
+
+        assert_eq!(
+            state.selected_elision_revset(),
+            Some("(root::current) | current | root".to_owned())
+        );
+    }
+
+    #[test]
+    fn graph_elision_revset_uses_short_change_ids() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  abcdefghijklmnop current\n~  (elided revisions)\n◆  zyxwvutsrqponmlk root\n",
+            vec![
+                LogEntry::new("abcdefghijklmnop", "1111222233334444", "current")
+                    .with_rendered_line(0),
+                LogEntry::new("zyxwvutsrqponmlk", "0000111122223333", "root").with_rendered_line(2),
+            ],
+        ));
+
+        state.select_next();
+
+        assert_eq!(
+            state.selected_elision_revset(),
+            Some("(zyxwvuts::abcdefgh) | abcdefgh | zyxwvuts".to_owned())
+        );
+    }
+
+    #[test]
+    fn revision_id_prefix_keeps_short_ids() {
+        assert_eq!(revision_id_prefix("abc123"), "abc123");
+    }
+
+    #[test]
+    fn trailing_graph_elision_drills_into_ancestors_with_visible_context() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  aaa first\n~  (elided revisions)\n",
+            vec![LogEntry::new("aaa", "111", "first").with_rendered_line(0)],
+        ));
+
+        state.select_next();
+
+        assert_eq!(
+            state.selected_elision_revset(),
+            Some("(::aaa) | aaa".to_owned())
+        );
+    }
+
+    #[test]
+    fn trailing_graph_elision_keeps_visible_stack_context() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  current\n○  parent\n◆  main\n~  (elided revisions)\n",
+            vec![
+                LogEntry::new("current", "333", "current").with_rendered_line(0),
+                LogEntry::new("parent", "222", "parent").with_rendered_line(1),
+                LogEntry::new("main", "111", "main").with_rendered_line(2),
+            ],
+        ));
+
+        state.select_next();
+        state.select_next();
+        state.select_next();
+
+        assert_eq!(
+            state.selected_elision_revset(),
+            Some("(::main) | current | parent | main".to_owned())
+        );
+    }
+
+    #[test]
+    fn can_select_first_revealed_entry_after_elision_boundary() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  current\n○  parent\n◆  main\n○  hidden\n◆  root\n",
+            vec![
+                LogEntry::new("current", "333", "current").with_rendered_line(0),
+                LogEntry::new("parent", "222", "parent").with_rendered_line(1),
+                LogEntry::new("main", "111", "main").with_rendered_line(2),
+                LogEntry::new("hidden", "999", "hidden").with_rendered_line(3),
+                LogEntry::new("root", "000", "root").with_rendered_line(4),
+            ],
+        ));
+
+        assert!(state.select_first_entry_after_change_id("main"));
+
+        assert_eq!(
+            state.selected_entry().map(LogEntry::change_id),
+            Some("hidden")
+        );
+        assert_eq!(state.selected_rendered_line(), Some(3));
+    }
+
+    #[test]
+    fn selecting_after_final_entry_reports_no_target() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  current\n",
+            vec![LogEntry::new("current", "333", "current").with_rendered_line(0)],
+        ));
+
+        assert!(!state.select_first_entry_after_change_id("current"));
+
+        assert_eq!(
+            state.selected_entry().map(LogEntry::change_id),
+            Some("current")
+        );
     }
 
     #[test]
@@ -925,7 +1279,7 @@ mod tests {
     #[test]
     fn expanded_insertion_line_skips_trailing_graph_elision() {
         let mut state = LogState::new(LogSnapshot::new(
-            "@  aaa\n│  first\n\u{1b}[38;5;8m~\u{1b}[0m\n",
+            "@  aaa\n│  first\n\u{1b}[38;5;8m~  (elided revisions)\u{1b}[0m\n",
             vec![
                 LogEntry::new("aaa", "111", "first\n\nbody")
                     .with_details("body")

@@ -646,7 +646,7 @@ fn open_describe_message(state: &mut AppState) {
     let AppView::Log(log) = state.views.active_mut() else {
         return;
     };
-    let Some(rev) = log.selected_change_id().map(ToOwned::to_owned) else {
+    let Some(rev) = log.selected_revision_id().map(ToOwned::to_owned) else {
         log.show_error("No revision selected");
         return;
     };
@@ -661,7 +661,7 @@ fn open_abandon_preview(state: &mut AppState, abandon_source: &JjAbandon) {
     let AppView::Log(log) = state.views.active_mut() else {
         return;
     };
-    let Some(rev) = log.selected_change_id().map(ToOwned::to_owned) else {
+    let Some(rev) = log.selected_revision_id().map(ToOwned::to_owned) else {
         log.show_error("No revision selected");
         return;
     };
@@ -696,7 +696,7 @@ fn open_edit_preview(state: &mut AppState, edit_source: &JjEdit) {
     let AppView::Log(log) = state.views.active_mut() else {
         return;
     };
-    let Some(rev) = log.selected_change_id().map(ToOwned::to_owned) else {
+    let Some(rev) = log.selected_revision_id().map(ToOwned::to_owned) else {
         log.show_error("No revision selected");
         return;
     };
@@ -1179,12 +1179,23 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
 }
 
 /// Closes the active mode, or returns to the previous view when possible.
-fn handle_back(state: &mut AppState) {
+#[cfg(test)]
+pub(crate) fn handle_back(state: &mut AppState) {
     if state.modes.pop().is_some() {
         return;
     }
 
     state.views.pop();
+}
+
+pub(crate) fn handle_back_with_log_source(state: &mut AppState, source: &mut JjLog) {
+    if state.modes.pop().is_some() {
+        return;
+    }
+
+    if !state.pop_log_drill(source) {
+        state.views.pop();
+    }
 }
 
 /// Applies an action to the active view and performs any requested I/O.
@@ -1273,6 +1284,14 @@ fn apply_action(
             state.views.push(view);
             AppLoop::Continue
         }
+        AppTransition::PushLog {
+            view,
+            previous_source,
+        } => {
+            state.push_log_source(previous_source);
+            state.views.push(AppView::Log(view));
+            AppLoop::Continue
+        }
         AppTransition::PopView => {
             state.views.pop();
             AppLoop::Continue
@@ -1318,12 +1337,13 @@ fn apply_log_action(
             switch_log_command(log, history, source, JjLogCommand::ConfiguredDefault);
         }
         ActionResult::SwitchLog => switch_log_command(log, history, source, JjLogCommand::Log),
+        ActionResult::DrillElision => return drill_log_elision(log, history, source),
         ActionResult::Quit => return AppTransition::Quit,
         _ => {}
     }
 
     if action == jk_tui::log_view::LogAction::OpenDiff {
-        let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
+        let Some(change_id) = log.selected_revision_id().map(ToOwned::to_owned) else {
             return AppTransition::Continue;
         };
 
@@ -1352,7 +1372,7 @@ fn push_selected_show(state: &mut AppState, show_source: &JjShow) {
         let AppView::Log(log) = state.views.active_mut() else {
             return;
         };
-        let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
+        let Some(change_id) = log.selected_revision_id().map(ToOwned::to_owned) else {
             return;
         };
         change_id
@@ -1383,7 +1403,7 @@ fn push_selected_evolog(state: &mut AppState, evolog_source: &JjEvolog) {
         let AppView::Log(log) = state.views.active_mut() else {
             return;
         };
-        let Some(change_id) = log.selected_change_id().map(ToOwned::to_owned) else {
+        let Some(change_id) = log.selected_revision_id().map(ToOwned::to_owned) else {
             return;
         };
         change_id
@@ -1786,6 +1806,10 @@ enum AppLoop {
 pub(crate) enum AppTransition {
     Continue,
     Push(AppView),
+    PushLog {
+        view: LogView,
+        previous_source: JjLog,
+    },
     PopView,
     PushSelectedWorkspaceStatus,
     PushSelectedWorkspaceLog,
@@ -1801,6 +1825,43 @@ fn open_template_selector(modes: &mut ModeStack, source: &JjLog) {
         .position(|template| template == source.template())
         .unwrap_or(0);
     modes.push(InputMode::LogTemplate { options, selected });
+}
+
+/// Pushes a narrower log view that reveals the selected graph elision.
+fn drill_log_elision(
+    app: &mut LogView,
+    history: &mut CommandHistory,
+    source: &mut JjLog,
+) -> AppTransition {
+    let Some(revset) = app.selected_elision_revset() else {
+        return AppTransition::Continue;
+    };
+    let elision_before_change_id = app
+        .selected_elision_before_change_id()
+        .map(ToOwned::to_owned);
+    let previous_source = source.clone();
+    let next_source = source.clone().with_revset(revset);
+    let mut runner = recording_runner(
+        history,
+        CommandSource::new(SourceView::Log, SourceAction::Refresh),
+    );
+    match next_source.load_with_runner(&mut runner) {
+        Ok(snapshot) => {
+            let mut view = LogView::new(snapshot);
+            if let Some(change_id) = elision_before_change_id {
+                let _ = view.select_first_entry_after_change_id(&change_id);
+            }
+            *source = next_source;
+            AppTransition::PushLog {
+                view,
+                previous_source,
+            }
+        }
+        Err(error) => {
+            app.show_error(error.to_string());
+            AppTransition::Continue
+        }
+    }
 }
 
 /// Restores terminal mode even when the event loop returns through an error.
@@ -2187,6 +2248,40 @@ mod tests {
 
         assert!(stack.pop());
         assert_eq!(stack.active(), &AppView::Log(previous_log));
+    }
+
+    #[test]
+    fn back_from_drilled_log_restores_previous_log_source() {
+        let mut previous_log = LogView::default();
+        previous_log.show_status("previous log");
+        let mut state = AppState::new(AppView::Log(previous_log.clone()));
+        let previous_source = JjLog::default().with_template(LogTemplateSelection::Detailed);
+        state.push_log_source(previous_source.clone());
+        state.views.push(AppView::Log(LogView::default()));
+        let mut source = JjLog::default().with_template(LogTemplateSelection::Compact);
+
+        handle_back_with_log_source(&mut state, &mut source);
+
+        assert_eq!(state.views.len(), 1);
+        assert_eq!(state.views.active(), &AppView::Log(previous_log));
+        assert_eq!(source.template(), previous_source.template());
+    }
+
+    #[test]
+    fn left_from_drilled_log_restores_previous_log_source() {
+        let mut previous_log = LogView::default();
+        previous_log.show_status("previous log");
+        let mut state = AppState::new(AppView::Log(previous_log.clone()));
+        let previous_source = JjLog::default().with_template(LogTemplateSelection::Detailed);
+        state.push_log_source(previous_source.clone());
+        state.views.push(AppView::Log(LogView::default()));
+        let mut source = JjLog::default().with_template(LogTemplateSelection::Compact);
+
+        assert!(state.pop_log_drill(&mut source));
+
+        assert_eq!(state.views.len(), 1);
+        assert_eq!(state.views.active(), &AppView::Log(previous_log));
+        assert_eq!(source.template(), previous_source.template());
     }
 
     #[test]
@@ -2614,15 +2709,15 @@ mod tests {
 
     #[test]
     fn describe_message_opens_for_selected_revision() {
-        let mut state = AppState::new(log_app_view("abc123"));
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
         open_describe_message(&mut state);
 
         assert_eq!(
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
-                rev: "abc123".to_owned(),
-                message: "abc123 summary".to_owned(),
+                rev: "abcdefgh".to_owned(),
+                message: "abcdefghijklmnop summary".to_owned(),
             })
         );
     }
@@ -2734,7 +2829,7 @@ mod tests {
 
     #[test]
     fn abandon_preview_uses_selected_revision() {
-        let mut state = AppState::new(log_app_view("abc123"));
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
         open_abandon_preview(&mut state, &JjAbandon::default());
 
@@ -2746,7 +2841,7 @@ mod tests {
         assert_eq!(pending.failure_label, "jj abandon");
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always abandon abc123"
+            "jj --no-pager --color always abandon abcdefgh"
         );
         assert_eq!(
             pending.preview.safety,
@@ -2760,7 +2855,7 @@ mod tests {
 
     #[test]
     fn new_preview_uses_selected_revision_as_parent() {
-        let mut state = AppState::new(log_app_view("abc123"));
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
         open_new_preview(&mut state, &JjNew::default());
 
@@ -2772,7 +2867,7 @@ mod tests {
         assert_eq!(pending.failure_label, "jj new");
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always new abc123"
+            "jj --no-pager --color always new abcdefgh"
         );
         assert_eq!(pending.preview.safety, jk_core::SafetyClass::LocalRewrite);
         assert_eq!(
@@ -2783,7 +2878,11 @@ mod tests {
 
     #[test]
     fn new_preview_uses_ordered_marks_as_parents() {
-        let mut state = AppState::new(log_app_view_with_changes(["aaa", "bbb", "ccc"]));
+        let mut state = AppState::new(log_app_view_with_changes([
+            "abcdefghijklmnop",
+            "bbbbbbbbcccccccc",
+            "zyxwvutsrqponmlk",
+        ]));
         let AppView::Log(log) = state.views.active_mut() else {
             panic!("expected log");
         };
@@ -2799,13 +2898,13 @@ mod tests {
         };
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always new aaa ccc"
+            "jj --no-pager --color always new abcdefgh zyxwvuts"
         );
     }
 
     #[test]
     fn edit_preview_uses_selected_revision() {
-        let mut state = AppState::new(log_app_view("abc123"));
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
         open_edit_preview(&mut state, &JjEdit::default());
 
@@ -2817,7 +2916,7 @@ mod tests {
         assert_eq!(pending.failure_label, "jj edit");
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always edit abc123"
+            "jj --no-pager --color always edit abcdefgh"
         );
         assert_eq!(pending.preview.safety, jk_core::SafetyClass::LocalRewrite);
         assert_eq!(

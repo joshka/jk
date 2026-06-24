@@ -51,6 +51,7 @@ pub struct JjLog {
     limit: Option<usize>,
     template: LogTemplateSelection,
     custom_template: Option<String>,
+    revset: Option<String>,
 }
 
 impl Default for JjLog {
@@ -61,6 +62,7 @@ impl Default for JjLog {
             limit: None,
             template: LogTemplateSelection::Configured,
             custom_template: None,
+            revset: None,
         }
     }
 }
@@ -167,6 +169,14 @@ impl JjLog {
         options
     }
 
+    /// Sets the revset passed to `jj log -r`.
+    #[must_use]
+    pub fn with_revset(mut self, revset: impl Into<String>) -> Self {
+        self.command = JjLogCommand::Log;
+        self.revset = Some(revset.into());
+        self
+    }
+
     /// Loads a rendered log snapshot and semantic entries from `jj`.
     ///
     /// This method executes `jj` twice: once for the user's rendered log output and once with a
@@ -261,10 +271,20 @@ impl JjLog {
     }
 
     fn command_args(&self) -> Vec<String> {
-        match self.command {
+        let mut args = match self.command {
             JjLogCommand::ConfiguredDefault => Vec::new(),
             JjLogCommand::Log => vec![LOG_COMMAND.to_owned()],
+        };
+
+        if let Some(revset) = &self.revset {
+            if args.is_empty() {
+                args.push(LOG_COMMAND.to_owned());
+            }
+            args.push("-r".to_owned());
+            args.push(revset.to_owned());
         }
+
+        args
     }
 
     fn rendered_template(&self) -> Option<&str> {
@@ -606,6 +626,23 @@ mod tests {
                 LogTemplateSelection::Redacted,
                 LogTemplateSelection::Custom("description".to_owned())
             ]
+        );
+    }
+
+    #[test]
+    fn revset_forces_explicit_log_command() {
+        let source = JjLog::default().with_revset("older::newer");
+        let command_args = source.command_args();
+        let command = source.command(DefaultCommandMode::Rendered, &command_args);
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(command_args, ["log", "-r", "older::newer"]);
+        assert!(
+            args.windows(3)
+                .any(|args| args == ["log", "-r", "older::newer"])
         );
     }
 }

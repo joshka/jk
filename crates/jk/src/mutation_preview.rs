@@ -74,10 +74,10 @@ impl PendingCommandPreview {
 
 pub fn selected_new_parents(log: &LogView) -> Vec<String> {
     if log.has_marks() {
-        return log.marked_change_ids().to_vec();
+        return log.marked_revision_ids();
     }
 
-    log.selected_change_id()
+    log.selected_revision_id()
         .map(ToOwned::to_owned)
         .into_iter()
         .collect()
@@ -108,7 +108,8 @@ pub fn command_failure_message(command: &str, stderr: &[u8], stdout: &[u8]) -> S
 
 #[cfg(test)]
 mod tests {
-    use jk_core::JjCommandSpec;
+    use jk_core::{JjCommandSpec, LogEntry, LogSnapshot};
+    use jk_tui::log_view::LogAction;
 
     use super::*;
 
@@ -149,6 +150,24 @@ mod tests {
     }
 
     #[test]
+    fn selected_new_parents_use_short_selected_revision() {
+        let log = log_view(["abcdefghijklmnop", "zyxwvutsrqponmlk"]);
+
+        assert_eq!(selected_new_parents(&log), ["abcdefgh"]);
+    }
+
+    #[test]
+    fn selected_new_parents_use_short_marked_revisions() {
+        let mut log = log_view(["abcdefghijklmnop", "bbbbbbbbcccccccc", "zyxwvutsrqponmlk"]);
+        let _ = log.apply(LogAction::ToggleMark);
+        let _ = log.apply(LogAction::Next);
+        let _ = log.apply(LogAction::Next);
+        let _ = log.apply(LogAction::ToggleMark);
+
+        assert_eq!(selected_new_parents(&log), ["abcdefgh", "zyxwvuts"]);
+    }
+
+    #[test]
     fn failure_message_prefers_stderr_then_stdout() {
         assert_eq!(
             command_failure_message("jj abandon", b"bad rev\n", b"ignored\n"),
@@ -162,5 +181,24 @@ mod tests {
             command_failure_message("jj edit", b"", b""),
             "jj edit failed"
         );
+    }
+
+    fn log_view<const N: usize>(change_ids: [&str; N]) -> LogView {
+        let rendered = change_ids
+            .iter()
+            .enumerate()
+            .map(|(index, change_id)| {
+                let marker = if index == 0 { "@" } else { "○" };
+                format!("{marker}  {change_id} summary\n")
+            })
+            .collect::<String>();
+        let entries = change_ids
+            .iter()
+            .enumerate()
+            .map(|(index, change_id)| {
+                LogEntry::new(*change_id, "commit", "summary").with_rendered_line(index)
+            })
+            .collect();
+        LogView::new(LogSnapshot::new(rendered, entries))
     }
 }
