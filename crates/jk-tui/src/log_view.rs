@@ -477,7 +477,7 @@ mod tests {
         );
         assert_eq!(
             view.selected_elision_revset(),
-            Some("(bbb::aaa) | aaa | bbb".to_owned())
+            Some("(222::111) | 111 | 222".to_owned())
         );
     }
 
