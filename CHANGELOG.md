@@ -5,6 +5,29 @@ Entries are grouped by user workflow and release impact instead of following the
 
 ## Unreleased
 
+## 0.2.7 - 2026-06-24
+
+This patch release tightens log graph behavior and workspace discovery after the dogfoodable 0.2.6
+release candidate.
+
+### Log Graph Rendering
+
+- Fix inline expanded details so they do not draw vertical continuation lanes through commit nodes.
+- Preserve connector lanes for graph rows that attach upward to nodes, including `├───╯` shapes.
+- Fix graph expansion links and elision drill-in column matching so hidden-revision navigation
+  follows the selected graph lane.
+- Shorten revision ids shown by log navigation actions.
+
+### Workspace Discovery
+
+- Handle `jk` started from jj no-working-copy container roots by selecting the active child
+  workspace instead of failing at the container root.
+- Handle stale jj working copies more gracefully when discovering and refreshing workspaces.
+
+### Visual Polish
+
+- Simplify selected-row highlighting so graph rows stay easier to scan.
+
 ## 0.2.6 - 2026-06-23
 
 This release candidate turns `jk` from a log/diff inspection helper into a dogfoodable jj TUI.
