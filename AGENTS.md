@@ -73,6 +73,54 @@ behavior, such as `refresh_keeps_selected_change_when_still_visible`.
 Run focused tests while editing and `just release-check` before
 release-oriented changes.
 
+## TUI App Layout Guidelines
+
+Default to user comprehension over implementation structure. Screens, overlays,
+hotbars, menus, previews, and other discretionary layout should read like
+user-facing product surfaces, not debug views of internal enums or dispatch
+order.
+
+- Group actions and information by user task, not implementation type. Prefer
+  broad groups such as Open and inspect, Move and find, Change actions, History
+  and recovery, and Session.
+- Keep labels concrete without repeating the same idea twice. Use a command
+  name when the command is the clearest label, or use an action label when the
+  action is clearer; avoid command-plus-parenthetical forms that restate each
+  other.
+- Align columns globally within a surface. Key, action, object, status, and
+  command columns should share column stops rather than jittering per section.
+- Avoid accidental horizontal spread. Multi-column layouts are useful only when
+  related columns remain visually connected by a deliberate gap.
+- Size overlays and modals to rendered content with minimal padding. Avoid fixed
+  large dialog dimensions when the content is smaller. Scrollable document
+  overlays should size from the full rendered document, not from the current
+  scroll slice, so the box does not resize while scrolling.
+- Use available space before scrolling when it improves scanning. Show all
+  relevant content when the terminal can fit it cleanly, but width-constrained
+  document overlays may keep a stable viewport instead of expanding into a tall
+  sheet. Show scroll indicators only when content is hidden.
+- Match scrolling to the surface. Document-like content should scroll by
+  rendered line; selection-style movement belongs to actual selectable rows.
+- Do not repeat controls between body, hotbar, footer, and chrome. Chrome should
+  add only information not already carried by the active surface, except when
+  the visible chrome belongs to the underlying screen and remains useful for
+  mode safety.
+- Prefer readable key notation. Use symbols where they reduce noise, such as
+  `↑/↓` and `←/→`, and split overloaded bindings when they represent different
+  actions.
+- Protect keys, action text, object labels, and status text from wrapping and
+  truncation. At narrow widths, fall back to shorter labels or fewer columns
+  before allowing awkward wrapping.
+- Choose column count from content shape, not width alone. A two-column layout
+  should activate only when both columns fit, the gap is readable, vertical
+  scrolling is materially reduced, and the result still scans top-to-bottom.
+- Test layout as data. Unit tests should cover representative sizes and assert
+  width bounds, scroll indicators, column switching, readable compact layouts,
+  and consistent alignment.
+- Use PNG or terminal visual proof for polish and gestalt. Mechanical failures
+  such as overflow, stale scroll indicators, bad column switching, and unwanted
+  truncation belong in tests.
+
 ## Commit & Pull Request Guidelines
 
 Use plain imperative commit summaries, not conventional commits. Keep

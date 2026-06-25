@@ -307,9 +307,10 @@ Signals to incorporate:
   obvious default recommendation because newcomers ask which TUI to use. Others worry that a blessed
   UI would narrow experimentation. `jk` should win by being clearly jj-native, well documented, and
   demonstrably safer rather than by claiming official status.
-- **Command discovery needs to be searchable.** `?` should not only be a static help sheet. Users
-  ask for a command palette or filterable command list that can find actions by name, key, and jj
-  command shape. `:` remains command entry; searchable help is a separate discovery surface.
+- **Command discovery needs both scan and search paths.** `?` should be a strong contextual
+  reference for the current screen. Users also ask for command-palette or suggestion-style search
+  that can find actions by name, key, and jj command shape. `:` remains command entry; command-mode
+  suggestions are the searchable discovery surface.
 - **Revision navigation needs more than cursor movement.** Long histories and rebase targets far
   away from the cursor need `/` search, jump-to-revision, quick filters, and a way to return to the
   previous filter or default revset without losing context.
@@ -401,13 +402,17 @@ Help rows should be ordered for the reader: primary view actions first, then mut
 command actions, then view/refresh controls, navigation, and close/help commands. The order should
 not merely mirror implementation or dispatch registration order.
 
-Help should also become searchable. The help surface and command palette are related but distinct:
+Help should be a contextual reference, not a command palette. The help surface and command mode are
+related but distinct:
 
 - `?` explains what is currently possible.
-- typing inside help filters by action name, key, screen, and jj command family.
+- Help groups the most useful contextual commands so they can be read at a glance.
 - `:` runs jj commands.
-- command-mode suggestions may reuse the same action registry, but should not replace searchable
-  help.
+- command-mode suggestions may reuse the same action registry, but should not replace help.
+
+Help inherits the app layout rules in section 3.8. The help-specific priority is: when `?` opens,
+the first read should be "what can I do here?" Search and filtering should stay in surfaces where
+they are part of the underlying task, not in the Help overlay itself.
 
 ### 3.5 Safe mutation loop
 
@@ -448,6 +453,61 @@ workflows. Collision-heavy jj verbs live in a visible action menu.
 `jk` should be a view-stack / focused-workflow TUI, not a permanent pane grid. The active screen
 owns the interaction model. Secondary information appears as inline expansion, modal preview,
 full-screen details, or temporary overlays when useful.
+
+#### App layout philosophy
+
+All discretionary layout should optimize for the shape of the user's task, not for the shape of the
+implementation. Screens, overlays, menus, previews, hotbars, and footers should read as product
+surfaces rather than projections of internal enums, dispatch order, or data structures.
+
+Group actions and information by user-facing task language. Good default groups are Open and
+inspect, Move and find, Change actions, History and recovery, and Session. Avoid narrow buckets such
+as Commands, Views, Mutations, or Primary actions unless they map directly to how users think in the
+current screen.
+
+Labels should be concrete and non-redundant. Use a command name when the command is the clearest
+label, or use an action label when the action is clearer. Avoid command-plus-parenthetical forms
+that restate the same idea twice.
+
+Columns should align globally within a surface. Key, action, object, status, and command columns
+should share column stops across sections; per-section alignment creates jitter and makes scanning
+harder. Multi-column layouts should be deliberate, not an automatic way to consume horizontal space.
+They are appropriate only when both columns fit without truncation, the gap remains readable,
+vertical scrolling is materially reduced, and the result still scans naturally from top to bottom.
+
+Overlays and modals should hug their rendered content with minimal padding. They should not use a
+fixed large width or height when the content is smaller. Scrollable document overlays should size
+from the full rendered document, not from the current scroll slice, so the box does not resize while
+scrolling.
+
+Use available space before scrolling when it improves scanning: if the terminal can cleanly show all
+relevant content, show it, and render scroll indicators only when content is actually hidden.
+Width-constrained document overlays may keep a stable viewport instead of expanding into a tall
+sheet, because consistent position and predictable scrolling can be more readable than using every
+available row.
+
+Scrolling should match the surface. Document-like content should move by rendered line. Selection
+movement belongs to selectable rows. Chrome should avoid repetition: if a control is already visible
+in the body, the hotbar or footer should not repeat the same instruction unless repetition is needed
+for mode safety.
+
+Key notation should optimize for reading speed. Prefer symbols where they reduce noise, such as
+`↑/↓` and `←/→`. Split overloaded bindings when they describe different actions:
+
+```text
+PgDn, Ctrl-f -> page down
+PgUp, Ctrl-b -> page up
+Home, g -> jump to top
+End, G -> jump to bottom
+```
+
+Keys, action text, object labels, and status text should not be truncated. At narrow widths, fall
+back to shorter labels or fewer columns before allowing awkward wraps. Tests should treat layout as
+data by covering representative width and height combinations, asserting that lines fit, scroll
+indicators appear only when needed, wide layouts use columns only when beneficial, compact layouts
+stay readable, and columns align consistently. PNGs and Betamax captures are still useful for polish
+and gestalt, but unit tests should catch mechanical failures such as overflow, stale scroll
+indicators, bad column switching, and unwanted truncation.
 
 Preferred product language:
 
@@ -2272,9 +2332,9 @@ Website assets:
 - Static screenshots for key screens, generated from Betamax media tapes.
 - Copyable command examples.
 - A "learn jj by using jk" section showing command previews.
-- Short demos that make demand-backed differentiators obvious: searchable help, far-away rebase
-  target search, visual rebase preview, workspace inspection, op-log recovery, and rich diff/file
-  navigation.
+- Short demos that make demand-backed differentiators obvious: contextual help, command discovery,
+  far-away rebase target search, visual rebase preview, workspace inspection, op-log recovery, and
+  rich diff/file navigation.
 
 ### 16.5 Docs generation
 
@@ -2341,7 +2401,7 @@ After 1.0:
 | ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
 | 0.3     | Foundation                  | CommandSpec, view stack, generated help/hotbar, line scrolling, mark model.                |
 | 0.4     | jj-shaped inspection        | `jk diff -r/--from/--to`, show, status, View Options, diff search/file jump, evolog.       |
-| 0.5     | Command mode and workspaces | `:`, `!`, searchable help, command output, rerun/copy, external runner, `W` workspace.     |
+| 0.5     | Command mode and workspaces | `:`, `!`, command discovery, command output, rerun/copy, external runner, `W` workspace.   |
 | 0.6     | Safe mutation core          | describe inline/editor, new, commit, edit, rebase picker, abandon, undo/redo, op log.      |
 | 0.7     | Content workflows           | squash, split, restore, diffedit, absorb; file selection; initial hunk path via jj editor. |
 | 0.8     | Refs and remotes            | bookmarks, tags, fetch, push dry-run, remote management.                                   |
@@ -2475,8 +2535,8 @@ Compatibility notes:
 - The default keymap feels coherent and does not rely on remembering arbitrary uppercase/lowercase
   collisions.
 - `?` and the hotbar make the app self-teaching.
-- Help and command discovery are searchable enough that users can find actions without reading a
-  manual first.
+- Help is scannable enough for the current screen, and command discovery is searchable enough that
+  users can find actions without reading a manual first.
 - The command history teaches users the jj commands behind actions.
 - Mutations are safer than shell usage because preview and recovery are built in.
 - jj config-heavy users feel respected, not forced into a separate visual grammar.
@@ -2623,7 +2683,8 @@ as user problems and workflow requirements:
 - people want an obvious jj TUI recommendation, but `jk` should earn that through quality rather
   than relying on blessed-tool language;
 - users respond strongly to TUIs that teach the underlying jj command instead of hiding it;
-- searchable command discovery, graph search, filter backtracking, rich diff/file navigation,
-  rebase preview, workspaces, and operation recovery should stay visible in issues and demos;
+- contextual help, searchable command discovery, graph search, filter backtracking, rich diff/file
+  navigation, rebase preview, workspaces, and operation recovery should stay visible in issues and
+  demos;
 - large-repo and large-diff responsiveness should be validated early, not left as late polish;
 - prior-art comparison should remain respectful, factual, and useful for design decisions.
