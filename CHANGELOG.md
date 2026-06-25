@@ -5,6 +5,26 @@ Entries are grouped by user workflow and release impact instead of following the
 
 ## Unreleased
 
+## Other
+
+
+- Render op log like jj ([#55](https://github.com/joshka/jk/pull/55))
+
+- Improve contextual help overlays ([#56](https://github.com/joshka/jk/pull/56))
+
+
+## Other
+
+
+- Render op log like jj ([#55](https://github.com/joshka/jk/pull/55))
+
+- Improve contextual help overlays ([#56](https://github.com/joshka/jk/pull/56))
+
+# Changelog
+
+# Changelog
+
+
 ## 0.2.7 - 2026-06-24
 
 This patch release tightens log graph behavior and workspace discovery after the dogfoodable 0.2.6
