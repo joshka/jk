@@ -1,5 +1,5 @@
 use jk_cli::{DiffFormat, LogTemplateSelection};
-use jk_tui::command_discovery::{BindingContext, filtered_discovery_len};
+use jk_tui::command_discovery::BindingContext;
 use jk_tui::diff_view::DiffView;
 
 #[derive(Clone, Copy)]
@@ -34,19 +34,6 @@ pub fn wrapped_selection(selected: usize, row_count: usize, direction: MenuDirec
     match direction {
         MenuDirection::Previous => selected.checked_sub(1).unwrap_or(row_count - 1),
         MenuDirection::Next => (selected + 1) % row_count,
-    }
-}
-
-pub fn clamp_command_discovery_selection(
-    context: BindingContext,
-    query: &str,
-    selected: &mut usize,
-) {
-    let row_count = filtered_discovery_len(context, query);
-    if row_count == 0 {
-        *selected = 0;
-    } else {
-        *selected = (*selected).min(row_count - 1);
     }
 }
 

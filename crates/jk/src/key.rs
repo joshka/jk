@@ -172,7 +172,6 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         '/' => Some(AppKey::StartSearch),
         'n' => Some(AppKey::SearchNext),
         'N' => Some(AppKey::SearchPrevious),
-        'b' => Some(AppKey::Action(LogAction::PagePrevious)),
         'k' => Some(AppKey::Action(LogAction::Previous)),
         'j' => Some(AppKey::Action(LogAction::Next)),
         'g' => Some(AppKey::Action(LogAction::First)),
@@ -495,7 +494,7 @@ mod tests {
         );
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)),
-            AppKey::Action(LogAction::PagePrevious)
+            AppKey::Ignore
         );
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)),

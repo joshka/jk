@@ -559,7 +559,7 @@ mod tests {
     fn help_action_shows_diff_specific_keys() {
         let mut view = DiffView::new(snapshot("aaa", "Modified regular file src/a.rs:\n alpha\n"));
         let _ = view.apply(DiffAction::ToggleHelp);
-        let backend = TestBackend::new(72, 18);
+        let backend = TestBackend::new(72, 32);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -570,9 +570,11 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Diff keys"));
-        assert!(rendered.contains("f                    open file list"));
-        assert!(rendered.contains("[ / ]                previous/next file"));
-        assert!(rendered.contains("/, n, N              search, next, previous"));
+        assert!(rendered.contains("Open and inspect:"));
+        assert!(rendered.contains("open file list"));
+        assert!(rendered.contains("previous/next file"));
+        assert!(rendered.contains("Move and find:"));
+        assert!(rendered.contains("search, next, previous"));
     }
 
     #[test]

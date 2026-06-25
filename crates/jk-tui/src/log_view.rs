@@ -557,7 +557,7 @@ mod tests {
     fn help_action_shows_log_specific_keys() {
         let mut view = LogView::new(snapshot(["aaa"]));
         let _ = view.apply(LogAction::ToggleHelp);
-        let backend = TestBackend::new(72, 32);
+        let backend = TestBackend::new(72, 56);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -568,16 +568,17 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Log keys"));
-        assert!(rendered.contains("d                    open selected-change diff"));
-        assert!(rendered.contains("m                    describe selected revision"));
-        assert!(rendered.contains("s                    open repository status"));
-        assert!(rendered.contains("n                    preview jj new"));
-        assert!(rendered.contains("e                    preview jj edit"));
-        assert!(rendered.contains("a                    preview jj abandon"));
-        assert!(rendered.contains("u                    preview jj undo"));
-        assert!(rendered.contains("U                    preview jj redo"));
-        assert!(rendered.contains("right, l             expand change / drill into ~"));
-        assert!(rendered.contains("?, q, Esc            close help"));
+        assert!(rendered.contains("Contextual help for the current screen."));
+        assert!(rendered.contains("Open and inspect:"));
+        assert!(rendered.contains("open selected-change diff"));
+        assert!(rendered.contains("Change actions:"));
+        assert!(rendered.contains("describe selected revision"));
+        assert!(rendered.contains("preview jj abandon"));
+        assert!(rendered.contains("expand change / drill into ~"));
+        assert!(rendered.contains("History and recovery:"));
+        assert!(rendered.contains("preview jj undo"));
+        assert!(rendered.contains("Session:"));
+        assert!(rendered.contains("close help"));
     }
 
     #[test]

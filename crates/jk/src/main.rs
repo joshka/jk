@@ -30,7 +30,7 @@ use jk_cli::{
     WorkspaceInspectionQuery,
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
-use jk_tui::command_discovery::{BindingContext, filtered_discovery_len};
+use jk_tui::command_discovery::{BindingContext, discovery_scroll_limit};
 use jk_tui::command_history_view::{CommandHistoryAction, CommandHistoryActionResult};
 #[cfg(test)]
 use jk_tui::command_history_view::{CommandHistorySnapshot, CommandHistoryView};
@@ -77,10 +77,7 @@ pub(crate) use command_history::{
 };
 use command_mode::{command_mode_snapshot, command_mode_spec, parse_jj_command_args};
 use key::AppKey;
-use menus::{
-    MenuDirection, ViewOptionRow, clamp_command_discovery_selection, view_option_rows,
-    wrapped_selection,
-};
+use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
 #[cfg(test)]
 use menus::{diff_file_list_lines, view_options_lines};
 use mutation_preview::{PendingCommandPreview, selected_new_parents};
@@ -397,27 +394,7 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
             code: KeyCode::Backspace,
             ..
         } => {
-            let should_close = match state.modes.active_mut() {
-                Some(InputMode::CommandDiscovery {
-                    query, selected, ..
-                }) if query.is_empty() => {
-                    *selected = 0;
-                    true
-                }
-                Some(InputMode::CommandDiscovery {
-                    context,
-                    query,
-                    selected,
-                }) => {
-                    query.pop();
-                    clamp_command_discovery_selection(*context, query, selected);
-                    false
-                }
-                _ => false,
-            };
-            if should_close {
-                state.modes.pop();
-            }
+            state.modes.pop();
             InputModeResult::Handled
         }
         KeyEvent {
@@ -428,7 +405,7 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
             modifiers: KeyModifiers::NONE,
             ..
         } => {
-            move_command_discovery_selection(state, MenuDirection::Previous);
+            move_command_discovery_scroll(state, MenuDirection::Previous);
             InputModeResult::Handled
         }
         KeyEvent {
@@ -440,23 +417,14 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
             modifiers: KeyModifiers::NONE,
             ..
         } => {
-            move_command_discovery_selection(state, MenuDirection::Next);
+            move_command_discovery_scroll(state, MenuDirection::Next);
             InputModeResult::Handled
         }
         KeyEvent {
-            code: KeyCode::Char(character),
+            code: KeyCode::Char(_),
             modifiers,
             ..
         } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
-            if let Some(InputMode::CommandDiscovery {
-                context,
-                query,
-                selected,
-            }) = state.modes.active_mut()
-            {
-                query.push(character);
-                clamp_command_discovery_selection(*context, query, selected);
-            }
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
@@ -929,7 +897,7 @@ fn open_command_discovery(state: &mut AppState) {
     state.modes.push(InputMode::CommandDiscovery {
         context,
         query: String::new(),
-        selected: 0,
+        scroll_offset: 0,
     });
 }
 
@@ -974,22 +942,20 @@ fn active_binding_context(state: &AppState) -> BindingContext {
     }
 }
 
-fn move_command_discovery_selection(state: &mut AppState, direction: MenuDirection) {
+fn move_command_discovery_scroll(state: &mut AppState, direction: MenuDirection) {
     let Some(InputMode::CommandDiscovery {
         context,
         query,
-        selected,
+        scroll_offset,
     }) = state.modes.active_mut()
     else {
         return;
     };
-    let row_count = filtered_discovery_len(*context, query);
-    if row_count == 0 {
-        *selected = 0;
-        return;
-    }
-
-    *selected = wrapped_selection(*selected, row_count, direction);
+    let max_scroll = discovery_scroll_limit(*context, query);
+    *scroll_offset = match direction {
+        MenuDirection::Previous => scroll_offset.saturating_sub(1),
+        MenuDirection::Next => scroll_offset.saturating_add(1).min(max_scroll),
+    };
 }
 
 fn move_view_options_selection(state: &mut AppState, direction: MenuDirection) {
@@ -2591,18 +2557,18 @@ mod tests {
             Some(&InputMode::CommandDiscovery {
                 context: BindingContext::Diff,
                 query: String::new(),
-                selected: 0,
+                scroll_offset: 0,
             })
         );
     }
 
     #[test]
-    fn command_discovery_filters_and_clamps_selection() {
+    fn command_discovery_ignores_typed_text() {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.modes.push(InputMode::CommandDiscovery {
             context: BindingContext::Log,
-            query: "jj sho".to_owned(),
-            selected: 12,
+            query: String::new(),
+            scroll_offset: 12,
         });
         let mut source = JjLog::default();
 
@@ -2620,41 +2586,54 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::CommandDiscovery {
                 context: BindingContext::Log,
-                query: "jj show".to_owned(),
-                selected: 0,
+                query: String::new(),
+                scroll_offset: 12,
             })
         );
     }
 
     #[test]
-    fn command_discovery_navigation_wraps_between_edges() {
+    fn command_discovery_navigation_scrolls_without_wrapping() {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.modes.push(InputMode::CommandDiscovery {
             context: BindingContext::Log,
             query: String::new(),
-            selected: 0,
+            scroll_offset: 0,
         });
-        let row_count = filtered_discovery_len(BindingContext::Log, "");
+        let max_scroll = discovery_scroll_limit(BindingContext::Log, "");
 
-        move_command_discovery_selection(&mut state, MenuDirection::Previous);
+        move_command_discovery_scroll(&mut state, MenuDirection::Previous);
 
         assert_eq!(
             state.modes.active(),
             Some(&InputMode::CommandDiscovery {
                 context: BindingContext::Log,
                 query: String::new(),
-                selected: row_count - 1,
+                scroll_offset: 0,
             })
         );
 
-        move_command_discovery_selection(&mut state, MenuDirection::Next);
+        move_command_discovery_scroll(&mut state, MenuDirection::Next);
 
         assert_eq!(
             state.modes.active(),
             Some(&InputMode::CommandDiscovery {
                 context: BindingContext::Log,
                 query: String::new(),
-                selected: 0,
+                scroll_offset: 1,
+            })
+        );
+
+        for _ in 0..100 {
+            move_command_discovery_scroll(&mut state, MenuDirection::Next);
+        }
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::CommandDiscovery {
+                context: BindingContext::Log,
+                query: String::new(),
+                scroll_offset: max_scroll,
             })
         );
     }
@@ -2666,7 +2645,7 @@ mod tests {
         state.modes.push(InputMode::CommandDiscovery {
             context: BindingContext::Diff,
             query: "refresh".to_owned(),
-            selected: 0,
+            scroll_offset: 0,
         });
         let mut source = JjLog::default();
 
@@ -2690,7 +2669,7 @@ mod tests {
         state.modes.push(InputMode::CommandDiscovery {
             context: BindingContext::Log,
             query: String::new(),
-            selected: 0,
+            scroll_offset: 0,
         });
         let mut source = JjLog::default();
 

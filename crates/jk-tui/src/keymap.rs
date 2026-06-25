@@ -24,8 +24,10 @@ pub enum BindingContext {
 enum ActionId {
     Move,
     LineScroll,
-    Page,
-    FirstLast,
+    PageDown,
+    PageUp,
+    JumpTop,
+    JumpBottom,
     Mark,
     ClearMarks,
     Expand,
@@ -65,13 +67,84 @@ enum ActionId {
     Quit,
 }
 
+const fn default_help_group(action: ActionId) -> HelpGroup {
+    match action {
+        ActionId::Move
+        | ActionId::LineScroll
+        | ActionId::PageDown
+        | ActionId::PageUp
+        | ActionId::JumpTop
+        | ActionId::JumpBottom
+        | ActionId::Expand
+        | ActionId::Collapse
+        | ActionId::HorizontalScroll
+        | ActionId::Search
+        | ActionId::ReturnToLog
+        | ActionId::ReturnBack => HelpGroup::Navigation,
+        ActionId::OpenShow
+        | ActionId::OpenDiff
+        | ActionId::OpenLog
+        | ActionId::OpenEvolog
+        | ActionId::OpenStatus
+        | ActionId::SwitchLogCommand
+        | ActionId::ViewOptions
+        | ActionId::OpenFileList
+        | ActionId::File
+        | ActionId::Hunk
+        | ActionId::FoldFile
+        | ActionId::FoldAll
+        | ActionId::FoldHunk => HelpGroup::Views,
+        ActionId::OpenDescribe
+        | ActionId::NewChange
+        | ActionId::EditChange
+        | ActionId::Abandon
+        | ActionId::Mark
+        | ActionId::ClearMarks => HelpGroup::Mutations,
+        ActionId::OpenCommandHistory
+        | ActionId::OpenCommandDetails
+        | ActionId::CopyCommand
+        | ActionId::OpenOperation
+        | ActionId::OpenOperationLog
+        | ActionId::Undo
+        | ActionId::Redo => HelpGroup::Recovery,
+        ActionId::CommandMode
+        | ActionId::Refresh
+        | ActionId::UpdateStale
+        | ActionId::CloseHelp
+        | ActionId::Quit => HelpGroup::Session,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HelpGroup {
+    Navigation,
+    Views,
+    Mutations,
+    Recovery,
+    Session,
+}
+
+impl HelpGroup {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Navigation => "Move and find",
+            Self::Views => "Open and inspect",
+            Self::Mutations => "Change actions",
+            Self::Recovery => "History and recovery",
+            Self::Session => "Session",
+        }
+    }
+}
+
 impl ActionId {
     const fn label(self) -> &'static str {
         match self {
             Self::Move => "Move selection",
             Self::LineScroll => "Scroll line",
-            Self::Page => "Page",
-            Self::FirstLast => "Jump to edge",
+            Self::PageDown => "Page down",
+            Self::PageUp => "Page up",
+            Self::JumpTop => "Jump to top",
+            Self::JumpBottom => "Jump to bottom",
             Self::Mark => "Mark revision",
             Self::ClearMarks => "Clear marks",
             Self::Expand => "Expand change",
@@ -108,12 +181,12 @@ impl ActionId {
             Self::ReturnToLog => "Return to log",
             Self::ReturnBack => "Return back",
             Self::CloseHelp => "Close help",
-            Self::Quit => "Quit",
+            Self::Quit => "Quit / exit",
         }
     }
 }
 
-/// Command or interaction family used by searchable discovery.
+/// Command or interaction family used by contextual help.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CommandFamily {
     /// Commands and actions related to `jj log`.
@@ -156,7 +229,7 @@ pub enum CommandFamily {
     ViewOptions,
     /// User-entered `jj` command mode.
     CommandMode,
-    /// Help and discovery controls.
+    /// Help controls.
     Help,
     /// Quitting the application.
     Quit,
@@ -196,6 +269,7 @@ struct KeyBinding {
     action: ActionId,
     keys: &'static str,
     help: &'static str,
+    help_group: HelpGroup,
     command_family: Option<CommandFamily>,
     aliases: &'static [&'static str],
     hotbar: Option<&'static str>,
@@ -210,6 +284,7 @@ impl KeyBinding {
             action,
             keys,
             help,
+            help_group: default_help_group(action),
             command_family: None,
             aliases: &[],
             hotbar: None,
@@ -240,8 +315,8 @@ impl KeyBinding {
         self
     }
 
-    fn help_line(self) -> String {
-        format!("{:<21}{}", self.keys, self.help)
+    fn help_line(self, key_width: usize) -> String {
+        format!("  {:<key_width$} {}", self.keys, self.help)
     }
 }
 
@@ -323,22 +398,27 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["home", "current screen"])
         .with_hotbar(2, "H home  L log"),
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+    KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "current row"])
         .with_hotbar(13, "j/k move"),
     KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Page, "b, Ctrl-f/b, PgUp/Dn", "page down/up")
+    KeyBinding::new(ActionId::PageDown, "PgDn, Ctrl-f", "page down")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["page", "pagedown", "pageup"]),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+    KeyBinding::new(ActionId::PageUp, "PgUp, Ctrl-b", "page up")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["page", "pagedown", "pageup"]),
+    KeyBinding::new(ActionId::JumpTop, "Home, g", "jump to top")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Expand, "right, l", "expand change / drill into ~")
+    KeyBinding::new(ActionId::JumpBottom, "End, G", "jump to bottom")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Collapse, "left, h", "collapse selected change")
+    KeyBinding::new(ActionId::Expand, "→, l", "expand change / drill into ~")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+    KeyBinding::new(ActionId::Collapse, "←, h", "collapse selected change")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::CloseHelp, "?, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
@@ -382,20 +462,24 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
+    KeyBinding::new(ActionId::Move, "↑/↓, j/k", "scroll one line")
         .with_family(CommandFamily::Navigation)
         .with_hotbar(4, "j/k line"),
     KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+    KeyBinding::new(ActionId::PageDown, "Space, PgDn, Ctrl-f", "page down")
         .with_family(CommandFamily::Navigation)
-        .with_hotbar(6, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_hotbar(6, "space page"),
+    KeyBinding::new(ActionId::PageUp, "PgUp, Ctrl-b", "page up")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::JumpTop, "Home, g", "jump to top")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::JumpBottom, "End, G", "jump to bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::ReturnToLog, "H / L", "go back")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
-    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+    KeyBinding::new(ActionId::CloseHelp, "?, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
@@ -421,20 +505,24 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::Refresh, "r", "refresh")
         .with_family(CommandFamily::Refresh)
         .with_hotbar(3, "r refresh"),
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "scroll one line")
+    KeyBinding::new(ActionId::Move, "↑/↓, j/k", "scroll one line")
         .with_family(CommandFamily::Navigation)
         .with_hotbar(4, "j/k line"),
     KeyBinding::new(ActionId::LineScroll, "Ctrl-j/k", "scroll one line")
         .with_family(CommandFamily::Navigation),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+    KeyBinding::new(ActionId::PageDown, "Space, PgDn, Ctrl-f", "page down")
         .with_family(CommandFamily::Navigation)
-        .with_hotbar(5, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_hotbar(5, "space page"),
+    KeyBinding::new(ActionId::PageUp, "PgUp, Ctrl-b", "page up")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::JumpTop, "Home, g", "jump to top")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::JumpBottom, "End, G", "jump to bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(ActionId::ReturnToLog, "H / L", "go back")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["back"]),
-    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+    KeyBinding::new(ActionId::CloseHelp, "?, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
@@ -482,7 +570,7 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::Refresh)
         .with_aliases(&["reload", "workspace"])
         .with_hotbar(2, "r refresh"),
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+    KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "workspace", "current row"])
         .with_hotbar(5, "j/k move"),
@@ -496,7 +584,7 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     .with_family(CommandFamily::Navigation)
     .with_aliases(&["back", "return", "previous"])
     .with_hotbar(9, "Esc back"),
-    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+    KeyBinding::new(ActionId::CloseHelp, "?, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
@@ -535,15 +623,20 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+    KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "command", "current row"])
         .with_hotbar(3, "j/k move"),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+    KeyBinding::new(ActionId::PageDown, "Space, PgDn, Ctrl-f", "page down")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["page", "pagedown", "pageup"])
-        .with_hotbar(4, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_hotbar(4, "space page"),
+    KeyBinding::new(ActionId::PageUp, "PgUp, Ctrl-b", "page up")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["page", "pagedown", "pageup"]),
+    KeyBinding::new(ActionId::JumpTop, "Home, g", "jump to top")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::JumpBottom, "End, G", "jump to bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(
         ActionId::ReturnBack,
@@ -553,7 +646,7 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     .with_family(CommandFamily::Navigation)
     .with_aliases(&["back", "return", "previous"])
     .with_hotbar(8, "Esc back"),
-    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+    KeyBinding::new(ActionId::CloseHelp, "?, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
@@ -578,15 +671,20 @@ const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
-    KeyBinding::new(ActionId::Move, "j/k or arrows", "move selection")
+    KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "operation", "current row"])
         .with_hotbar(4, "j/k move"),
-    KeyBinding::new(ActionId::Page, "space / b, Ctrl-f/b", "page down/up")
+    KeyBinding::new(ActionId::PageDown, "Space, PgDn, Ctrl-f", "page down")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["page", "pagedown", "pageup"])
-        .with_hotbar(5, "space/b page"),
-    KeyBinding::new(ActionId::FirstLast, "g/G or Home/End", "jump to top/bottom")
+        .with_hotbar(5, "space page"),
+    KeyBinding::new(ActionId::PageUp, "PgUp, Ctrl-b", "page up")
+        .with_family(CommandFamily::Navigation)
+        .with_aliases(&["page", "pagedown", "pageup"]),
+    KeyBinding::new(ActionId::JumpTop, "Home, g", "jump to top")
+        .with_family(CommandFamily::Navigation),
+    KeyBinding::new(ActionId::JumpBottom, "End, G", "jump to bottom")
         .with_family(CommandFamily::Navigation),
     KeyBinding::new(
         ActionId::ReturnBack,
@@ -596,7 +694,7 @@ const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
     .with_family(CommandFamily::Navigation)
     .with_aliases(&["back", "return", "previous"])
     .with_hotbar(7, "Esc back"),
-    KeyBinding::new(ActionId::CloseHelp, "?, q, Esc", "close help")
+    KeyBinding::new(ActionId::CloseHelp, "?, Esc", "close help")
         .with_family(CommandFamily::Help)
         .with_hotbar(1, "? help"),
     KeyBinding::new(ActionId::Quit, "q", "quit")
@@ -750,58 +848,78 @@ pub const fn help_title(context: BindingContext) -> &'static str {
 
 /// Returns generated help lines for the current binding context.
 pub fn help_lines(context: BindingContext) -> Vec<String> {
-    bindings(context)
+    let visible = bindings(context)
         .iter()
         .filter(|binding| binding.show_in_help)
-        .map(|binding| binding.help_line())
-        .collect()
+        .copied()
+        .collect::<Vec<_>>();
+    let key_width = visible
+        .iter()
+        .map(|binding| visible_width(binding.keys))
+        .max()
+        .unwrap_or(0);
+    let mut lines = vec![
+        "Contextual help for the current screen.".to_owned(),
+        String::new(),
+    ];
+
+    let mut first_group = true;
+    for group in help_groups_for_context(context) {
+        let group_bindings = visible
+            .iter()
+            .filter(|binding| binding.help_group == *group)
+            .collect::<Vec<_>>();
+        if group_bindings.is_empty() {
+            continue;
+        }
+
+        if !first_group {
+            lines.push(String::new());
+        }
+        first_group = false;
+        lines.push(format!("{}:", group.label()));
+        lines.extend(
+            group_bindings
+                .into_iter()
+                .map(|binding| binding.help_line(key_width)),
+        );
+    }
+
+    lines
 }
 
-/// A searchable command-discovery row derived from visible keymap metadata.
+/// A contextual help row derived from visible keymap metadata.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DiscoveryRow {
+    action_id: ActionId,
     /// Key text shown in the first column.
     pub keys: &'static str,
     /// Short action label shown in the second column.
     pub action: &'static str,
-    /// Help text used for filtering and future detail displays.
+    /// Help text used for legacy help and future detail displays.
     pub help: &'static str,
     /// Screen context where the row applies.
     pub context: BindingContext,
     /// Optional command or interaction family.
     pub command_family: Option<CommandFamily>,
+    help_group: HelpGroup,
     aliases: &'static [&'static str],
 }
 
 impl DiscoveryRow {
-    /// Returns the context label used for rendering and filtering.
+    /// Returns the context label used for rendering.
     #[must_use]
     pub const fn context_label(self) -> &'static str {
         context_label(self.context)
     }
 
-    /// Returns the command family label used for rendering and filtering.
+    /// Returns the command family label used for rendering.
     #[must_use]
     pub const fn command_family_label(self) -> Option<&'static str> {
         match self.command_family {
             Some(family) => Some(family.label()),
             None => None,
         }
-    }
-
-    fn matches_token(self, token: &str) -> bool {
-        let token = token.to_lowercase();
-        self.keys.to_lowercase().contains(&token)
-            || self.action.to_lowercase().contains(&token)
-            || self.help.to_lowercase().contains(&token)
-            || self.context_label().to_lowercase().contains(&token)
-            || self
-                .command_family_label()
-                .is_some_and(|family| family.to_lowercase().contains(&token))
-            || self
-                .aliases
-                .iter()
-                .any(|alias| alias.to_lowercase().contains(&token))
     }
 }
 
@@ -812,58 +930,298 @@ pub fn discovery_rows(context: BindingContext) -> Vec<DiscoveryRow> {
         .iter()
         .filter(|binding| binding.show_in_discovery)
         .map(|binding| DiscoveryRow {
+            action_id: binding.action,
             keys: binding.keys,
             action: binding.action.label(),
             help: binding.help,
             context,
             command_family: binding.command_family,
+            help_group: binding.help_group,
             aliases: binding.aliases,
         })
         .collect()
 }
 
-/// Returns context rows whose searchable fields match every query token.
+/// Number of command rows shown in the discovery popup before scrolling.
+pub const DISCOVERY_VISIBLE_ROWS: usize = 12;
+
+const DISCOVERY_DEFAULT_WIDTH: usize = 80;
+const DISCOVERY_COLUMN_GUTTER: usize = 6;
+const DISCOVERY_TWO_COLUMN_WIDTH: usize = 80;
+const DISCOVERY_WIDE_VISIBLE_ROWS: usize = 34;
+
+/// Formats command-discovery popup lines for the current context and scroll offset.
 #[must_use]
-pub fn filter_discovery_rows(context: BindingContext, query: &str) -> Vec<DiscoveryRow> {
-    let tokens = query.split_whitespace().collect::<Vec<_>>();
-    discovery_rows(context)
-        .into_iter()
-        .filter(|row| tokens.iter().all(|token| row.matches_token(token)))
-        .collect()
+pub fn discovery_lines(context: BindingContext, _query: &str, scroll_offset: usize) -> Vec<String> {
+    discovery_lines_for_width(context, "", scroll_offset, DISCOVERY_DEFAULT_WIDTH)
 }
 
-/// Formats command-discovery popup lines for the current query and selected row.
+/// Formats command-discovery popup lines for the current context, scroll offset, and width.
 #[must_use]
-pub fn discovery_lines(context: BindingContext, query: &str, selected: usize) -> Vec<String> {
-    let rows = filter_discovery_rows(context, query);
-    let selected = selected.min(rows.len().saturating_sub(1));
-    let mut lines = vec![format!("? {query}")];
+pub fn discovery_lines_for_width(
+    context: BindingContext,
+    _query: &str,
+    scroll_offset: usize,
+    width: usize,
+) -> Vec<String> {
+    discovery_lines_for_width_and_rows(
+        context,
+        "",
+        scroll_offset,
+        width,
+        default_discovery_visible_rows(width),
+    )
+}
 
-    if rows.is_empty() {
-        lines.push("  no matching commands".to_owned());
-    } else {
-        lines.extend(rows.into_iter().enumerate().map(|(index, row)| {
-            let marker = if index == selected { ">" } else { " " };
-            let family = row.command_family_label().unwrap_or("");
-            format!(
-                "{marker} {:<18} {:<24} {:<10} {}",
-                row.keys,
-                row.action,
-                row.context_label(),
-                family
-            )
-        }));
-    }
-
-    lines.push(String::new());
-    lines.push("type to filter   j/k or arrows move   enter/esc close".to_owned());
+/// Formats command-discovery popup lines for the current context, width, and body-row budget.
+#[must_use]
+pub fn discovery_lines_for_width_and_rows(
+    context: BindingContext,
+    _query: &str,
+    scroll_offset: usize,
+    width: usize,
+    visible_rows: usize,
+) -> Vec<String> {
+    let rows = discovery_rows(context);
+    let body_lines = discovery_body_lines(context, &rows, width);
+    let body_line_count = body_lines.len();
+    let visible_body_lines = discovery_visible_body_lines(visible_rows);
+    let (start, end) = visible_discovery_range(body_line_count, scroll_offset, visible_body_lines);
+    let mut lines = body_lines[start..end].to_vec();
+    lines.extend(discovery_footer_lines(width, start, end, body_line_count));
     lines
 }
 
-/// Returns the number of visible discovery rows for clamping selection state.
+fn discovery_body_lines(
+    context: BindingContext,
+    rows: &[DiscoveryRow],
+    width: usize,
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    let spaced_groups = discovery_uses_group_spacing(width);
+    let key_width = discovery_key_width_for_width(rows, width);
+    let column_width = discovery_global_column_width(rows, key_width);
+    let column_count = discovery_column_count(width, column_width);
+    for group in help_groups_for_context(context) {
+        let group_rows = rows
+            .iter()
+            .filter(|row| row.help_group == *group)
+            .copied()
+            .collect::<Vec<_>>();
+        if group_rows.is_empty() {
+            continue;
+        }
+
+        if spaced_groups && !lines.is_empty() {
+            lines.push(String::new());
+        }
+        lines.push(format!("{}:", group.label()));
+        lines.extend(
+            group_rows.chunks(column_count).map(|chunk| {
+                discovery_row_line(chunk, column_count, column_width, key_width, width)
+            }),
+        );
+    }
+    lines
+}
+
+const fn discovery_uses_group_spacing(width: usize) -> bool {
+    width >= 120
+}
+
+const fn discovery_column_count(width: usize, column_width: usize) -> usize {
+    if width >= DISCOVERY_TWO_COLUMN_WIDTH
+        && column_width
+            .saturating_mul(2)
+            .saturating_add(DISCOVERY_COLUMN_GUTTER)
+            <= width
+    {
+        2
+    } else {
+        1
+    }
+}
+
+fn discovery_global_column_width(rows: &[DiscoveryRow], key_width: usize) -> usize {
+    rows.iter()
+        .map(|row| discovery_cell_width(*row, key_width))
+        .max()
+        .unwrap_or(0)
+}
+
+fn discovery_row_line(
+    rows: &[DiscoveryRow],
+    column_count: usize,
+    column_width: usize,
+    key_width: usize,
+    width: usize,
+) -> String {
+    rows.iter()
+        .enumerate()
+        .map(|(index, row)| {
+            let cell = discovery_cell(*row, key_width, width);
+            if index + 1 == column_count || index + 1 == rows.len() {
+                cell
+            } else {
+                format!("{cell:<column_width$}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(&" ".repeat(DISCOVERY_COLUMN_GUTTER))
+}
+
+fn discovery_cell(row: DiscoveryRow, key_width: usize, width: usize) -> String {
+    let full_action = discovery_action_label(row);
+    let compact_action = row.action.to_owned();
+    let full = discovery_cell_with_action(row, key_width, &full_action);
+    if visible_width(&full) <= width {
+        return full;
+    }
+
+    discovery_cell_with_action(row, key_width, &compact_action)
+}
+
+fn discovery_cell_with_action(row: DiscoveryRow, key_width: usize, action: &str) -> String {
+    format!("  {:<key_width$}  {action}", row.keys)
+}
+
+fn discovery_key_width(rows: &[DiscoveryRow]) -> usize {
+    rows.iter()
+        .map(|row| visible_width(row.keys))
+        .max()
+        .unwrap_or(0)
+}
+
+fn discovery_key_width_for_width(rows: &[DiscoveryRow], width: usize) -> usize {
+    let key_width = discovery_key_width(rows);
+    if width >= DISCOVERY_TWO_COLUMN_WIDTH {
+        return key_width;
+    }
+
+    key_width.min(12)
+}
+
+fn discovery_cell_width(row: DiscoveryRow, key_width: usize) -> usize {
+    4_usize
+        .saturating_add(key_width)
+        .saturating_add(visible_width(&discovery_action_label(row)))
+}
+
+fn discovery_action_label(row: DiscoveryRow) -> String {
+    // Prefer one clear label per row. A concrete jj command teaches the command shape better than
+    // repeating it as `jj describe (Describe revision)`; app-only actions keep the human action
+    // label.
+    discovery_command_display_label(row)
+        .map_or_else(|| row.action.to_owned(), std::borrow::ToOwned::to_owned)
+}
+
+fn discovery_command_display_label(row: DiscoveryRow) -> Option<&'static str> {
+    match (row.command_family, row.action_id) {
+        (Some(CommandFamily::JjOperation), ActionId::OpenOperationLog) => Some("jj op log"),
+        (Some(CommandFamily::JjOperation), ActionId::OpenShow) => Some("jj op show"),
+        (Some(CommandFamily::JjOperation), ActionId::OpenDiff) => Some("jj op diff"),
+        (Some(CommandFamily::JjOperation), ActionId::Undo) => Some("jj undo"),
+        (Some(CommandFamily::JjOperation), ActionId::Redo) => Some("jj redo"),
+        (Some(CommandFamily::JjOperation), ActionId::Abandon) => Some("jj abandon"),
+        (Some(CommandFamily::JjOperation) | None, _) => None,
+        (Some(family), _) => {
+            let label = family.label();
+            if label.starts_with("jj ") {
+                Some(label)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn discovery_footer_lines(width: usize, start: usize, end: usize, row_count: usize) -> Vec<String> {
+    let position = discovery_position_line(start, end, row_count);
+    if row_count <= end.saturating_sub(start) {
+        return Vec::new();
+    }
+
+    let scroll_controls = "j/k scroll";
+    let full = format!("{position}   {scroll_controls}");
+    if visible_width(&full) <= width {
+        return vec![full];
+    }
+
+    vec![position, scroll_controls.to_owned()]
+}
+
+fn visible_discovery_range(
+    row_count: usize,
+    selected: usize,
+    visible_rows: usize,
+) -> (usize, usize) {
+    if row_count <= visible_rows {
+        return (0, row_count);
+    }
+
+    let start = selected.min(discovery_scroll_limit_for_len(row_count, visible_rows));
+    (start, start + visible_rows)
+}
+
+fn discovery_position_line(start: usize, end: usize, row_count: usize) -> String {
+    let more_above = start > 0;
+    let more_below = end < row_count;
+    let affordance = match (more_above, more_below) {
+        (true, true) => "more above/below",
+        (true, false) => "more above",
+        (false, true) => "more below",
+        (false, false) => "",
+    };
+    if affordance.is_empty() {
+        format!(
+            "showing lines {}-{} of {}",
+            start.saturating_add(1),
+            end,
+            row_count
+        )
+    } else {
+        format!(
+            "showing lines {}-{} of {}  {affordance}",
+            start.saturating_add(1),
+            end,
+            row_count
+        )
+    }
+}
+
+/// Returns the number of visible help rows for clamping scroll state.
 #[must_use]
-pub fn filtered_discovery_len(context: BindingContext, query: &str) -> usize {
-    filter_discovery_rows(context, query).len()
+pub fn discovery_len(context: BindingContext, query: &str) -> usize {
+    let _ = query;
+    discovery_rows(context).len()
+}
+
+/// Returns the highest scroll offset for the contextual help overlay.
+#[must_use]
+pub fn discovery_scroll_limit(context: BindingContext, query: &str) -> usize {
+    let _ = query;
+    let rows = discovery_rows(context);
+    let body_line_count = discovery_body_lines(context, &rows, 40).len();
+    discovery_scroll_limit_for_len(
+        body_line_count,
+        discovery_visible_body_lines(DISCOVERY_VISIBLE_ROWS),
+    )
+}
+
+const fn default_discovery_visible_rows(width: usize) -> usize {
+    if width >= DISCOVERY_TWO_COLUMN_WIDTH {
+        DISCOVERY_WIDE_VISIBLE_ROWS
+    } else {
+        DISCOVERY_VISIBLE_ROWS
+    }
+}
+
+const fn discovery_visible_body_lines(visible_rows: usize) -> usize {
+    visible_rows
+}
+
+const fn discovery_scroll_limit_for_len(row_count: usize, visible_rows: usize) -> usize {
+    row_count.saturating_sub(visible_rows)
 }
 
 const fn bindings(context: BindingContext) -> &'static [KeyBinding] {
@@ -888,9 +1246,50 @@ const fn context_label(context: BindingContext) -> &'static str {
     }
 }
 
+const fn help_groups_for_context(context: BindingContext) -> &'static [HelpGroup] {
+    match context {
+        BindingContext::Log => &[
+            HelpGroup::Views,
+            HelpGroup::Navigation,
+            HelpGroup::Mutations,
+            HelpGroup::Recovery,
+            HelpGroup::Session,
+        ],
+        BindingContext::Diff
+        | BindingContext::Inspection
+        | BindingContext::Workspaces
+        | BindingContext::OperationLog => &[
+            HelpGroup::Views,
+            HelpGroup::Navigation,
+            HelpGroup::Recovery,
+            HelpGroup::Session,
+        ],
+        BindingContext::CommandHistory => &[
+            HelpGroup::Recovery,
+            HelpGroup::Navigation,
+            HelpGroup::Session,
+        ],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_help_header(lines: &[String]) {
+        assert_eq!(lines[0], "Contextual help for the current screen.");
+    }
+
+    fn assert_ordered_lines(lines: &[String], expected: &[&str]) {
+        let mut start = 0;
+        for expected_line in expected {
+            let relative_index = lines[start..]
+                .iter()
+                .position(|line| line == expected_line)
+                .unwrap_or_else(|| panic!("missing ordered line {expected_line:?} in {lines:?}"));
+            start += relative_index + 1;
+        }
+    }
 
     #[test]
     fn log_hotbar_matches_current_status_text() {
@@ -904,7 +1303,7 @@ mod tests {
     fn diff_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Diff),
-            "? help  V options  r refresh  j/k line  f files  space/b page  q quit"
+            "? help  V options  r refresh  j/k line  f files  space page  q quit"
         );
     }
 
@@ -912,7 +1311,7 @@ mod tests {
     fn inspection_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Inspection),
-            "? help  V options  r refresh  j/k line  space/b page  q quit"
+            "? help  V options  r refresh  j/k line  space page  q quit"
         );
     }
 
@@ -920,7 +1319,7 @@ mod tests {
     fn command_history_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::CommandHistory),
-            "? help  enter details  j/k move  space/b page  r refresh  o operation  y copy  Esc back  q quit"
+            "? help  enter details  j/k move  space page  r refresh  o operation  y copy  Esc back  q quit"
         );
     }
 
@@ -928,7 +1327,7 @@ mod tests {
     fn operation_log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::OperationLog),
-            "? help  enter show  d diff  j/k move  space/b page  r refresh  Esc back  q quit"
+            "? help  enter show  d diff  j/k move  space page  r refresh  Esc back  q quit"
         );
     }
 
@@ -1027,142 +1426,126 @@ mod tests {
     }
 
     #[test]
-    fn log_help_lines_match_current_overlay() {
-        assert_eq!(
-            help_lines(BindingContext::Log),
-            vec![
-                "enter                open change / drill into ~",
-                "d                    open selected-change diff",
-                "v                    open selected-change evolog",
-                "s                    open repository status",
-                "o                    open operation log",
-                "m                    describe selected revision",
-                "n                    preview jj new",
-                "e                    preview jj edit",
-                "a                    preview jj abandon",
-                "u                    preview jj undo",
-                "U                    preview jj redo",
-                "space                mark/unmark selected revision",
-                "c                    clear revision marks when marks exist",
-                "C                    open command history",
-                ":                    run jj command",
-                "V                    open view options",
-                "r                    refresh",
-                "H / L                home command / jj log",
-                "j/k or arrows        move selection",
-                "Ctrl-j/k             scroll one line",
-                "b, Ctrl-f/b, PgUp/Dn page down/up",
-                "g/G or Home/End      jump to top/bottom",
-                "right, l             expand change / drill into ~",
-                "left, h              collapse selected change",
-                "?, q, Esc            close help",
-            ]
+    fn log_help_lines_group_contextual_commands() {
+        let lines = help_lines(BindingContext::Log);
+
+        assert_help_header(&lines);
+        assert_ordered_lines(
+            &lines,
+            &[
+                "Open and inspect:",
+                "  enter        open change / drill into ~",
+                "Move and find:",
+                "  ↑/↓, j/k     move selection",
+                "  PgDn, Ctrl-f page down",
+                "  PgUp, Ctrl-b page up",
+                "  →, l         expand change / drill into ~",
+                "Change actions:",
+                "  m            describe selected revision",
+                "  space        mark/unmark selected revision",
+                "History and recovery:",
+                "  o            open operation log",
+                "Session:",
+                "  ?, Esc       close help",
+            ],
         );
     }
 
     #[test]
-    fn diff_help_lines_match_current_overlay() {
-        assert_eq!(
-            help_lines(BindingContext::Diff),
-            vec![
-                "f                    open file list",
-                "[ / ]                previous/next file",
-                "{ / }                previous/next hunk",
-                "h / l                fold/unfold current file",
-                "Ctrl-left/right      fold/unfold all files",
-                "- / +                fold/unfold current hunk",
-                "< / >                horizontal scroll",
-                "/, n, N              search, next, previous",
-                "C                    open command history",
-                ":                    run jj command",
-                "V                    open view options",
-                "r                    refresh",
-                "j/k or arrows        scroll one line",
-                "Ctrl-j/k             scroll one line",
-                "space / b, Ctrl-f/b  page down/up",
-                "g/G or Home/End      jump to top/bottom",
-                "H / L                go back",
-                "?, q, Esc            close help",
-            ]
+    fn diff_help_lines_group_file_search_and_navigation_commands() {
+        let lines = help_lines(BindingContext::Diff);
+
+        assert_help_header(&lines);
+        assert_ordered_lines(
+            &lines,
+            &[
+                "Open and inspect:",
+                "  f                   open file list",
+                "  V                   open view options",
+                "Move and find:",
+                "  < / >               horizontal scroll",
+                "  /, n, N             search, next, previous",
+                "Session:",
+                "  ?, Esc              close help",
+            ],
         );
     }
 
     #[test]
-    fn inspection_help_lines_match_current_overlay() {
-        assert_eq!(
-            help_lines(BindingContext::Inspection),
-            vec![
-                "/, n, N              search, next, previous",
-                "C                    open command history",
-                ":                    run jj command",
-                "V                    open view options",
-                "r                    refresh",
-                "j/k or arrows        scroll one line",
-                "Ctrl-j/k             scroll one line",
-                "space / b, Ctrl-f/b  page down/up",
-                "g/G or Home/End      jump to top/bottom",
-                "H / L                go back",
-                "?, q, Esc            close help",
-            ]
+    fn inspection_help_lines_lead_with_search() {
+        let lines = help_lines(BindingContext::Inspection);
+
+        assert_help_header(&lines);
+        assert_ordered_lines(
+            &lines,
+            &[
+                "Open and inspect:",
+                "  V                   open view options",
+                "Move and find:",
+                "  /, n, N             search, next, previous",
+                "  H / L               go back",
+                "Session:",
+                "  ?, Esc              close help",
+            ],
         );
     }
 
     #[test]
-    fn workspaces_help_lines_match_current_overlay() {
-        assert_eq!(
-            help_lines(BindingContext::Workspaces),
-            vec![
-                "l                    open selected workspace log",
-                "enter, s             open selected workspace status",
-                "d                    open selected workspace diff",
-                "u                    update selected stale workspace",
-                "C                    open command history",
-                ":                    run jj command",
-                "V                    open view options",
-                "r                    refresh workspaces",
-                "j/k or arrows        move selection",
-                "Ctrl-j/k             scroll one line",
-                "Backspace, Esc, H/L  return to previous view",
-                "?, q, Esc            close help",
-            ]
+    fn workspaces_help_lines_keep_workspace_actions_together() {
+        let lines = help_lines(BindingContext::Workspaces);
+
+        assert_help_header(&lines);
+        assert_ordered_lines(
+            &lines,
+            &[
+                "Open and inspect:",
+                "  l                   open selected workspace log",
+                "Move and find:",
+                "  Backspace, Esc, H/L return to previous view",
+                "History and recovery:",
+                "  C                   open command history",
+                "Session:",
+                "  u                   update selected stale workspace",
+            ],
         );
     }
 
     #[test]
-    fn command_history_help_lines_match_current_overlay() {
-        assert_eq!(
-            help_lines(BindingContext::CommandHistory),
-            vec![
-                "enter                open command details",
-                "o                    open operation or operation log",
-                "y                    copy selected command",
-                "r                    refresh history",
-                "C                    refresh command history",
-                ":                    run jj command",
-                "j/k or arrows        move selection",
-                "space / b, Ctrl-f/b  page down/up",
-                "g/G or Home/End      jump to top/bottom",
-                "Backspace, Esc       return to previous view",
-                "?, q, Esc            close help",
-            ]
+    fn command_history_help_lines_group_history_and_recovery() {
+        let lines = help_lines(BindingContext::CommandHistory);
+
+        assert_help_header(&lines);
+        assert_ordered_lines(
+            &lines,
+            &[
+                "History and recovery:",
+                "  enter               open command details",
+                "  o                   open operation or operation log",
+                "Move and find:",
+                "  Backspace, Esc      return to previous view",
+                "Session:",
+                "  :                   run jj command",
+            ],
         );
     }
 
     #[test]
-    fn operation_log_help_lines_match_current_overlay() {
-        assert_eq!(
-            help_lines(BindingContext::OperationLog),
-            vec![
-                "enter                open selected operation show",
-                "d                    open selected operation diff",
-                "r                    refresh operation log",
-                ":                    run jj command",
-                "j/k or arrows        move selection",
-                "space / b, Ctrl-f/b  page down/up",
-                "g/G or Home/End      jump to top/bottom",
-                "Backspace, Esc       return to previous view",
-                "?, q, Esc            close help",
-            ]
+    fn operation_log_help_lines_keep_operation_routes_visible() {
+        let lines = help_lines(BindingContext::OperationLog);
+
+        assert_help_header(&lines);
+        assert_ordered_lines(
+            &lines,
+            &[
+                "Open and inspect:",
+                "  enter               open selected operation show",
+                "  d                   open selected operation diff",
+                "Move and find:",
+                "  Backspace, Esc      return to previous view",
+                "Session:",
+                "  r                   refresh operation log",
+                "  :                   run jj command",
+            ],
         );
     }
 
@@ -1184,102 +1567,65 @@ mod tests {
         }
     }
 
-    #[test]
-    fn discovery_filter_matches_all_tokens_case_insensitively() {
-        let rows = filter_discovery_rows(BindingContext::Log, "JJ SHOW");
-
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].keys, "enter");
-        assert_eq!(rows[0].action, "Open show");
-    }
-
-    #[test]
-    fn discovery_filter_searches_view_options_aliases() {
-        let rows = filter_discovery_rows(BindingContext::Log, "template log");
-
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].keys, "V");
-        assert_eq!(rows[0].command_family_label(), Some("view options"));
-
-        let rows = filter_discovery_rows(BindingContext::Log, "view options");
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].keys, "V");
+    fn discovery_row_for_key(rows: &[DiscoveryRow], key: &str) -> DiscoveryRow {
+        rows.iter()
+            .find(|row| row.keys == key)
+            .map_or_else(|| panic!("missing discovery row for key {key}"), |row| *row)
     }
 
     #[test]
     fn log_discovery_finds_mark_and_clear_bindings() {
-        let mark_rows = filter_discovery_rows(BindingContext::Log, "space mark");
-        assert_eq!(mark_rows.len(), 1);
-        assert_eq!(mark_rows[0].keys, "space");
-        assert_eq!(mark_rows[0].command_family_label(), Some("mark"));
+        let rows = discovery_rows(BindingContext::Log);
+        let mark_row = discovery_row_for_key(&rows, "space");
+        assert_eq!(mark_row.command_family_label(), Some("mark"));
 
-        let clear_rows = filter_discovery_rows(BindingContext::Log, "clear marks");
-        assert_eq!(clear_rows.len(), 1);
-        assert_eq!(clear_rows[0].keys, "c");
+        let clear_row = discovery_row_for_key(&rows, "c");
+        assert_eq!(clear_row.action, "Clear marks");
     }
 
     #[test]
-    fn log_discovery_finds_evolog_binding() {
-        for query in [
-            "v",
-            "evolog",
-            "jj evolog",
-            "evolution history",
-            "selected change",
-        ] {
-            let rows = filter_discovery_rows(BindingContext::Log, query);
-            let evolog_row = rows
-                .iter()
-                .find(|row| row.keys == "v")
-                .copied()
-                .unwrap_or_else(|| panic!("missing evolog row for query {query:?}"));
+    fn log_discovery_keeps_evolog_binding() {
+        let rows = discovery_rows(BindingContext::Log);
+        let evolog_row = discovery_row_for_key(&rows, "v");
 
-            assert_eq!(evolog_row.action, "Open evolog");
-            assert_eq!(evolog_row.command_family_label(), Some("jj evolog"));
-        }
+        assert_eq!(evolog_row.action, "Open evolog");
+        assert_eq!(evolog_row.command_family_label(), Some("jj evolog"));
     }
 
     #[test]
-    fn workspaces_discovery_finds_workspace_actions() {
-        let log_rows = filter_discovery_rows(BindingContext::Workspaces, "workspace log");
-        assert_eq!(log_rows.len(), 1);
-        assert_eq!(log_rows[0].keys, "l");
-        assert_eq!(log_rows[0].command_family_label(), Some("jj log"));
+    fn workspaces_discovery_keeps_workspace_actions() {
+        let rows = discovery_rows(BindingContext::Workspaces);
 
-        let status_rows = filter_discovery_rows(BindingContext::Workspaces, "workspace status");
-        assert_eq!(status_rows.len(), 1);
-        assert_eq!(status_rows[0].keys, "enter, s");
-        assert_eq!(status_rows[0].command_family_label(), Some("jj status"));
+        let log_row = discovery_row_for_key(&rows, "l");
+        assert_eq!(log_row.command_family_label(), Some("jj log"));
 
-        let back_rows = filter_discovery_rows(BindingContext::Workspaces, "back previous");
-        assert_eq!(back_rows.len(), 1);
-        assert_eq!(back_rows[0].keys, "Backspace, Esc, H/L");
-        assert_eq!(back_rows[0].context_label(), "workspaces");
+        let status_row = discovery_row_for_key(&rows, "enter, s");
+        assert_eq!(status_row.command_family_label(), Some("jj status"));
 
-        let update_rows = filter_discovery_rows(BindingContext::Workspaces, "update stale");
-        assert_eq!(update_rows.len(), 1);
-        assert_eq!(update_rows[0].keys, "u");
-        assert_eq!(update_rows[0].command_family_label(), Some("jj workspace"));
+        let back_row = discovery_row_for_key(&rows, "Backspace, Esc, H/L");
+        assert_eq!(back_row.context_label(), "workspaces");
+
+        let update_row = discovery_row_for_key(&rows, "u");
+        assert_eq!(update_row.command_family_label(), Some("jj workspace"));
     }
 
     #[test]
-    fn discovery_finds_command_history_entry_point() {
+    fn discovery_keeps_command_history_entry_point() {
         for context in [
             BindingContext::Log,
             BindingContext::Diff,
             BindingContext::Inspection,
             BindingContext::Workspaces,
         ] {
-            let rows = filter_discovery_rows(context, "command history");
+            let rows = discovery_rows(context);
+            let row = discovery_row_for_key(&rows, "C");
 
-            assert_eq!(rows.len(), 1, "{context:?}");
-            assert_eq!(rows[0].keys, "C");
-            assert_eq!(rows[0].command_family_label(), Some("history"));
+            assert_eq!(row.command_family_label(), Some("history"), "{context:?}");
         }
     }
 
     #[test]
-    fn discovery_finds_colon_command_mode() {
+    fn discovery_keeps_colon_command_mode() {
         for context in [
             BindingContext::Log,
             BindingContext::Diff,
@@ -1288,63 +1634,173 @@ mod tests {
             BindingContext::CommandHistory,
             BindingContext::OperationLog,
         ] {
-            let rows = filter_discovery_rows(context, "colon prompt");
+            let rows = discovery_rows(context);
+            let row = discovery_row_for_key(&rows, ":");
 
-            assert_eq!(rows.len(), 1, "{context:?}");
-            assert_eq!(rows[0].keys, ":");
-            assert_eq!(rows[0].action, "Run jj command");
-            assert_eq!(rows[0].command_family_label(), Some("jj command"));
+            assert_eq!(row.action, "Run jj command");
+            assert_eq!(row.command_family_label(), Some("jj command"));
         }
     }
 
     #[test]
-    fn command_history_discovery_finds_operation_route() {
-        for query in ["operation", "op log", "recovery selected command"] {
-            let rows = filter_discovery_rows(BindingContext::CommandHistory, query);
+    fn command_history_discovery_keeps_operation_route() {
+        let rows = discovery_rows(BindingContext::CommandHistory);
+        let row = discovery_row_for_key(&rows, "o");
 
-            assert_eq!(rows.len(), 1, "{query}");
-            assert_eq!(rows[0].keys, "o");
-            assert_eq!(rows[0].action, "Open operation");
-            assert_eq!(rows[0].command_family_label(), Some("jj operation"));
+        assert_eq!(row.action, "Open operation");
+        assert_eq!(row.command_family_label(), Some("jj operation"));
+    }
+
+    #[test]
+    fn operation_log_discovery_keeps_show_diff_and_refresh() {
+        let rows = discovery_rows(BindingContext::OperationLog);
+
+        let show_row = discovery_row_for_key(&rows, "enter");
+        assert_eq!(show_row.command_family_label(), Some("jj operation"));
+
+        let diff_row = discovery_row_for_key(&rows, "d");
+        assert_eq!(diff_row.command_family_label(), Some("jj operation"));
+
+        let refresh_row = discovery_row_for_key(&rows, "r");
+        assert_eq!(refresh_row.command_family_label(), Some("refresh"));
+    }
+
+    #[test]
+    fn discovery_lines_use_inline_context_and_scroll_affordance() {
+        let lines = discovery_lines(BindingContext::Log, "", 0);
+
+        assert!(!lines.iter().any(|line| line.contains("family")));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("enter") && line.contains("jj show"))
+        );
+        assert!(!lines.iter().any(|line| line.contains('>')));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains('d') && line.contains("jj diff"))
+        );
+        assert!(!lines.iter().any(|line| line.starts_with("showing lines")));
+        assert!(!lines.iter().any(String::is_empty));
+    }
+
+    #[test]
+    fn discovery_lines_use_aligned_columns_when_wide() {
+        let lines = discovery_lines_for_width(BindingContext::Log, "", 0, 120);
+
+        let view_line = lines
+            .iter()
+            .find(|line| line.contains("jj show") && line.contains("jj diff"))
+            .unwrap_or_else(|| panic!("missing two-column view line in {lines:?}"));
+
+        assert!(view_line.contains("enter"));
+        assert!(view_line.contains('d'));
+        assert!(visible_width(view_line) <= 120);
+    }
+
+    #[test]
+    fn discovery_lines_do_not_truncate_keys_or_instructions() {
+        let lines = discovery_lines_for_width(BindingContext::Log, "", 0, DISCOVERY_DEFAULT_WIDTH);
+
+        assert!(lines.iter().any(|line| line.contains("PgDn, Ctrl-f")));
+        assert!(lines.iter().any(|line| line.contains("PgUp, Ctrl-b")));
+        assert!(lines.iter().any(|line| line.contains("jj log")));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains('q') && line.contains("Quit / exit"))
+        );
+        assert!(!lines.iter().any(|line| line.contains("...")));
+    }
+
+    #[test]
+    fn discovery_lines_compress_chrome_in_compact_width() {
+        let lines = discovery_lines_for_width(BindingContext::Log, "", 0, 40);
+
+        assert_eq!(lines.first().map(String::as_str), Some("Open and inspect:"));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.starts_with("showing lines 1-"))
+        );
+        assert!(lines.iter().any(|line| line.contains("j/k scroll")));
+        assert!(lines.iter().any(|line| line.contains("↑/↓, j/k")));
+        assert!(!lines.iter().any(|line| line.contains("...")));
+    }
+
+    #[test]
+    fn discovery_lines_fit_common_terminal_widths() {
+        for context in [
+            BindingContext::Log,
+            BindingContext::Diff,
+            BindingContext::Inspection,
+            BindingContext::Workspaces,
+            BindingContext::CommandHistory,
+            BindingContext::OperationLog,
+        ] {
+            for width in [40, 60, 80, 100, 120, 130] {
+                for visible_rows in [8, 12, 20, 34] {
+                    let lines =
+                        discovery_lines_for_width_and_rows(context, "", 0, width, visible_rows);
+
+                    for line in &lines {
+                        assert!(
+                            visible_width(line) <= width,
+                            "{context:?} width {width} rows {visible_rows}: {line:?} in {lines:?}"
+                        );
+                    }
+                }
+            }
         }
     }
 
     #[test]
-    fn operation_log_discovery_finds_show_diff_and_refresh() {
-        let show_rows = filter_discovery_rows(BindingContext::OperationLog, "operation show");
-        assert_eq!(show_rows.len(), 1);
-        assert_eq!(show_rows[0].keys, "enter");
-        assert_eq!(show_rows[0].command_family_label(), Some("jj operation"));
+    fn discovery_lines_adapt_columns_to_width_and_height() {
+        let compact = discovery_lines_for_width_and_rows(BindingContext::Log, "", 0, 40, 12);
+        assert!(
+            !compact
+                .iter()
+                .any(|line| line.contains("jj show") && line.contains("jj diff"))
+        );
+        assert!(!compact.iter().any(String::is_empty));
+        assert!(compact.iter().any(|line| line.contains("more below")));
 
-        let diff_rows = filter_discovery_rows(BindingContext::OperationLog, "operation diff");
-        assert_eq!(diff_rows.len(), 1);
-        assert_eq!(diff_rows[0].keys, "d");
-        assert_eq!(diff_rows[0].command_family_label(), Some("jj operation"));
+        let wide_short = discovery_lines_for_width_and_rows(BindingContext::Log, "", 0, 120, 12);
+        assert!(
+            wide_short
+                .iter()
+                .any(|line| line.contains("jj show") && line.contains("jj diff"))
+        );
+        assert!(wide_short.iter().any(|line| line.contains("more below")));
 
-        let refresh_rows = filter_discovery_rows(BindingContext::OperationLog, "operation reload");
-        assert_eq!(refresh_rows.len(), 1);
-        assert_eq!(refresh_rows[0].keys, "r");
-        assert_eq!(refresh_rows[0].command_family_label(), Some("refresh"));
+        let wide_tall = discovery_lines_for_width_and_rows(BindingContext::Log, "", 0, 120, 34);
+        assert!(
+            wide_tall
+                .iter()
+                .any(|line| line.contains("jj show") && line.contains("jj diff"))
+        );
+        assert!(
+            !wide_tall
+                .iter()
+                .any(|line| line.starts_with("showing lines"))
+        );
+        assert!(wide_tall.iter().any(String::is_empty));
     }
 
     #[test]
-    fn discovery_filter_keeps_binding_order_without_scoring() {
-        let rows = filter_discovery_rows(BindingContext::Diff, "fold");
-        let keys = rows.iter().map(|row| row.keys).collect::<Vec<_>>();
+    fn discovery_lines_scroll_by_rendered_line_when_wide() {
+        let top_lines = discovery_lines_for_width_and_rows(BindingContext::Log, "", 0, 120, 12);
+        let scrolled_lines =
+            discovery_lines_for_width_and_rows(BindingContext::Log, "", 1, 120, 12);
 
-        assert_eq!(keys, vec!["h / l", "Ctrl-left/right", "- / +"]);
-    }
-
-    #[test]
-    fn discovery_lines_render_empty_state_for_no_results() {
-        assert_eq!(
-            discovery_lines(BindingContext::Inspection, "definitely-not-present", 99),
-            vec![
-                "? definitely-not-present",
-                "  no matching commands",
-                "",
-                "type to filter   j/k or arrows move   enter/esc close",
-            ]
+        assert_eq!(top_lines[0], "Open and inspect:");
+        assert_eq!(scrolled_lines[0], top_lines[1]);
+        assert!(
+            scrolled_lines
+                .iter()
+                .any(|line| line.starts_with("showing lines 2-13 of ")
+                    && line.contains("more above/below"))
         );
     }
 }

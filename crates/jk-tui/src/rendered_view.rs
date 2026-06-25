@@ -311,7 +311,8 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("Inspection keys"));
-        assert!(rendered.contains("/, n, N              search, next, previous"));
+        assert!(rendered.contains("Move and find:"));
+        assert!(rendered.contains("search, next, previous"));
     }
 
     fn snapshot(target: &str, rendered: &str) -> InspectionSnapshot {
