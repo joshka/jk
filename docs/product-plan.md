@@ -434,6 +434,8 @@ revisions are abandoned immediately, while non-empty revisions open the destruct
 New, Edit, Undo, and Redo run immediately after their respective input or menu selection. Every executed
 action records the command and resulting operation id, refreshes the graph,
 and keeps the recovery controls visible alongside a short result message.
+Squash resolves ordered marks as sources and the cursor as destination, previews explicit
+`--from`/`--into` roles, and currently moves whole changes only.
 
 ### 3.6 Recovery is first-class
 
@@ -636,10 +638,10 @@ destination toggle o/A/B -> --onto / --insert-after / --insert-before
 Squash:
 
 ```text
-cursor A                -> jj squash -r A
-mark A, cursor B        -> jj squash --from A --into B
-marked files            -> append filesets
-hunks selected          -> start with jj squash --interactive, later native hunk spec
+cursor A, no marks      -> reject: mark at least one source
+marks A..N, cursor B    -> jj squash --from A ... --from N --into B
+marked files            -> deferred
+hunks selected          -> deferred
 ```
 
 Describe:
@@ -737,9 +739,10 @@ inspection views rather than competing with the log action menu.
 The `a` prefix opens a visible overlay. Keys are active only while the overlay is open.
 
 Current implementation note: the first prefix menu contains the shipped describe, new, edit,
-abandon, undo, and redo workflows. `a a` checks whether the selected revision is empty and only
+squash, abandon, undo, and redo workflows. `a a` checks whether the selected revision is empty and only
 opens the command-spec-backed abandon preview when it is not; empty revisions run immediately.
-`m`, `n`, `e`, `u`, and `U` run their action-menu rows immediately.
+`m`, `n`, `e`, `u`, and `U` run their action-menu rows immediately. `a s` always opens a
+whole-change confirmation with explicit source and destination roles.
 
 Current implementation note: `n` runs the action-menu `jj new PARENT...` path from the log.
 Ordered marks become parents when present; otherwise the selected revision is the parent. The
@@ -753,7 +756,7 @@ still reopens the command prompt when a command-output view is active.
 | ----- | ------------------------------- | ---------------------------------------------------------- |
 | `a a` | `jj abandon`                    | Check emptiness; preview non-empty revisions.              |
 | `b`   | `jj absorb`                     | Review with `jj op show -p` after success.                 |
-| `s`   | `jj squash`                     | Source/destination resolver; filesets if file marks exist. |
+| `a s` | `jj squash`                     | Marked sources into cursor; whole changes only.            |
 | `S`   | `jj split`                      | Uses configured diff editor initially.                     |
 | `r`   | `jj restore`                    | File/hunk/revision aware; confirm.                         |
 | `v`   | `jj revert`                     | Confirm destination.                                       |

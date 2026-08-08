@@ -54,6 +54,7 @@ and routes each selection through the existing command runner:
 - `m` opens an inline description editor for the selected revision; `Enter` saves it immediately.
 - `n` runs New change inside the action menu from marks or the selected revision.
 - `e` runs Edit change inside the action menu.
+- `s` previews Squash after resolving ordered marks as sources and the cursor as destination.
 - `u` runs `jj undo` inside the action menu.
 - `U` runs `jj redo` inside the action menu.
 
@@ -61,6 +62,11 @@ Inside the menu, press an action key or select a row with `j`/`k` and `Enter`. I
 checks whether the selected revision is empty before abandoning it: empty revisions run
 immediately, while non-empty revisions open the destructive preview. Describe, New, Edit, Undo,
 and Redo are menu-only there. Inspection views remain read-only and do not offer repository actions.
+
+Squash currently operates on whole changes. Mark one or more source revisions in the order you want
+them shown, move the cursor to a distinct destination, then press `a s`. The confirmation labels
+each role, shows the exact command, keeps the destination description, and supports cancellation.
+File and hunk selection are intentionally deferred.
 
 For actions that open a preview:
 
@@ -139,7 +145,8 @@ history.
 ## Current Limits
 
 - Command History is in-memory for the current `jk` session.
-- Rebase, squash, split, restore, bookmarks, fetch, and push are planned workflows.
-- The action menu currently covers log revision changes and recovery; revision rebase, squash,
-  restore, refs, remote, and workspace actions remain planned.
+- Rebase, split, restore, bookmarks, fetch, and push are planned workflows.
+- Squash is whole-change only; file and hunk selection remain planned.
+- The action menu currently covers log revision changes and recovery; revision rebase, restore,
+  refs, remote, and workspace actions remain planned.
 - Public README, crates.io, and website media still need a release-media refresh.

@@ -155,6 +155,19 @@ impl LogState {
             .map(|entry| revision_id_prefix(entry.change_id()))
     }
 
+    /// Returns the selected entry's full commit id for exact mutation targeting.
+    pub fn selected_commit_id(&self) -> Option<&str> {
+        self.selected_entry().map(LogEntry::commit_id)
+    }
+
+    /// Returns the full commit id for a visible stable change id.
+    pub fn commit_id_for_change_id(&self, change_id: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|entry| entry.change_id() == change_id)
+            .map(LogEntry::commit_id)
+    }
+
     /// Selects the visible entry with the given change identifier or unique prefix.
     #[must_use]
     pub fn select_change_id(&mut self, change_id: &str) -> bool {

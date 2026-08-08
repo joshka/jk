@@ -190,6 +190,18 @@ impl LogView {
         self.state.selected_revision_id()
     }
 
+    /// Returns the selected revision's full commit id for exact mutation targeting.
+    #[must_use]
+    pub fn selected_commit_id(&self) -> Option<&str> {
+        self.state.selected_commit_id()
+    }
+
+    /// Returns the full commit id for a visible stable change id.
+    #[must_use]
+    pub fn commit_id_for_change_id(&self, change_id: &str) -> Option<&str> {
+        self.state.commit_id_for_change_id(change_id)
+    }
+
     /// Selects the visible entry with the given change identifier.
     #[must_use]
     pub fn select_change_id(&mut self, change_id: &str) -> bool {

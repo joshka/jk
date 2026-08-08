@@ -1,6 +1,8 @@
 use jk_core::{CommandPreview, SourceAction};
 use jk_tui::log_view::LogView;
 
+use crate::squash::SquashSelection;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingCommandPreview {
     pub(crate) preview: CommandPreview,
@@ -8,6 +10,9 @@ pub struct PendingCommandPreview {
     pub(crate) source_key: &'static str,
     pub(crate) failure_label: &'static str,
     pub(crate) success_message: &'static str,
+    pub(crate) details: Vec<String>,
+    pub(crate) reselect_change_id: Option<String>,
+    pub(crate) copy_status: Option<String>,
 }
 
 impl PendingCommandPreview {
@@ -18,6 +23,9 @@ impl PendingCommandPreview {
             source_key: "a m",
             failure_label: "jj describe",
             success_message: "Described revision",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
         }
     }
 
@@ -28,6 +36,9 @@ impl PendingCommandPreview {
             source_key: "a a",
             failure_label: "jj abandon",
             success_message: "Abandoned revision",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
         }
     }
 
@@ -38,6 +49,9 @@ impl PendingCommandPreview {
             source_key: "a n",
             failure_label: "jj new",
             success_message: "Created new change",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
         }
     }
 
@@ -48,6 +62,9 @@ impl PendingCommandPreview {
             source_key: "a e",
             failure_label: "jj edit",
             success_message: "Edited revision",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
         }
     }
 
@@ -58,6 +75,9 @@ impl PendingCommandPreview {
             source_key: "a u",
             failure_label: "jj undo",
             success_message: "Undid operation",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
         }
     }
 
@@ -68,6 +88,22 @@ impl PendingCommandPreview {
             source_key: "a U",
             failure_label: "jj redo",
             success_message: "Redid operation",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+        }
+    }
+
+    pub(crate) fn squash(preview: CommandPreview, selection: &SquashSelection) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::SquashRevision,
+            source_key: "a s",
+            failure_label: "jj squash",
+            success_message: "Squashed source changes · a u undo · C history",
+            details: selection.preview_details(),
+            reselect_change_id: Some(selection.destination_change_id().to_owned()),
+            copy_status: None,
         }
     }
 }

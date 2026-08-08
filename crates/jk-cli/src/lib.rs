@@ -22,6 +22,7 @@ pub mod new;
 pub mod operation;
 pub mod recovery;
 pub mod show;
+pub mod squash;
 pub mod status;
 pub mod workspaces;
 
@@ -38,6 +39,7 @@ pub use new::{JjNew, NewQuery};
 pub use operation::{JjOperation, JjOperationError, OperationQuery};
 pub use recovery::{JjRecovery, RecoveryCommand};
 pub use show::{JjShow, JjShowError, ShowQuery};
+pub use squash::{JjSquash, SquashQuery};
 pub use status::{JjStatus, JjStatusError, StatusQuery};
 pub use workspaces::{
     JjWorkspaces, JjWorkspacesError, WorkspaceInspectionQuery, WorkspaceListParseError,

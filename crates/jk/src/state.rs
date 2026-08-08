@@ -283,6 +283,9 @@ pub enum InputMode {
         pending: PendingCommandPreview,
         dialog: Box<crate::abandon_confirmation::AbandonConfirmation>,
     },
+    SquashConfirmation {
+        pending: PendingCommandPreview,
+    },
     JjCommand {
         input: String,
         error: Option<String>,

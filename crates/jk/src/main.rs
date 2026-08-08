@@ -27,7 +27,7 @@ use jk_cli::RecoveryCommand;
 use jk_cli::{
     DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjCommandRunner,
     JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery,
-    JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
+    JjShow, JjSquash, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
     RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
     WorkspaceInspectionQuery,
 };
@@ -64,6 +64,7 @@ mod refresh;
 mod rendering;
 mod root_views;
 mod runner;
+mod squash;
 mod state;
 #[cfg(test)]
 mod test_support;
@@ -107,6 +108,7 @@ use root_views::{
     root_diff_view, root_log_view, root_show_view, root_status_view, root_workspaces_view,
 };
 pub(crate) use runner::recording_runner;
+use squash::open_squash_preview;
 #[cfg(test)]
 use state::ViewStack;
 use state::{AppState, AppView, InputMode, InputModeResult, ModeStack};
@@ -136,6 +138,7 @@ fn main() -> Result<()> {
     let abandon_source = args.abandon_source();
     let new_source = args.new_source();
     let edit_source = args.edit_source();
+    let squash_source = args.squash_source();
     let operation_source = args.operation_source();
     let recovery_source = args.recovery_source();
     let workspaces_source = args.workspaces_source();
@@ -168,6 +171,7 @@ fn main() -> Result<()> {
         &abandon_source,
         &new_source,
         &edit_source,
+        &squash_source,
         &operation_source,
         &recovery_source,
         &workspaces_source,
@@ -193,6 +197,7 @@ fn run_terminal(
     abandon_source: &JjAbandon,
     new_source: &JjNew,
     edit_source: &JjEdit,
+    squash_source: &JjSquash,
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
@@ -254,6 +259,7 @@ fn run_terminal(
                     abandon: abandon_source,
                     new_change: new_source,
                     edit: edit_source,
+                    squash: squash_source,
                     operation: operation_source,
                     recovery: recovery_source,
                     workspaces: workspaces_source,
@@ -308,6 +314,12 @@ fn handle_input_mode(
         abandon_confirmation::handle_input(state, source, key);
         return InputModeResult::Handled;
     }
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::SquashConfirmation { .. })
+    ) {
+        return handle_squash_confirmation_mode(state, source, key);
+    }
     if matches!(state.modes.active(), Some(InputMode::JjCommand { .. })) {
         return handle_jj_command_mode(state, command_repository, key);
     }
@@ -354,6 +366,7 @@ fn handle_input_mode(
                 InputMode::AbandonConfirmation { .. } => {
                     unreachable!()
                 }
+                InputMode::SquashConfirmation { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
@@ -385,6 +398,7 @@ fn handle_input_mode(
                 InputMode::AbandonConfirmation { .. } => {
                     unreachable!()
                 }
+                InputMode::SquashConfirmation { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
@@ -392,6 +406,42 @@ fn handle_input_mode(
         }
         _ => InputModeResult::Handled,
     }
+}
+
+fn handle_squash_confirmation_mode(
+    state: &mut AppState,
+    source: &mut JjLog,
+    key: KeyEvent,
+) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q'),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            state.modes.pop();
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            let Some(InputMode::SquashConfirmation { pending }) = state.modes.pop() else {
+                return InputModeResult::Handled;
+            };
+            execute_pending_command_with_runner(state, source, pending, SystemJjCommandRunner);
+        }
+        KeyEvent {
+            code: KeyCode::Char('y'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            if let Some(InputMode::SquashConfirmation { pending }) = state.modes.active_mut() {
+                pending.copy_status = Some(copy_command_line(&pending.preview.command_line));
+            }
+        }
+        _ => {}
+    }
+    InputModeResult::Handled
 }
 
 fn handle_action_menu_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
@@ -2676,7 +2726,7 @@ mod tests {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.modes.push(InputMode::ActionMenu {
             context: BindingContext::Log,
-            selected: 3,
+            selected: 4,
         });
 
         assert_eq!(
@@ -2721,7 +2771,7 @@ mod tests {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.modes.push(InputMode::ActionMenu {
             context: BindingContext::Log,
-            selected: 3,
+            selected: 4,
         });
 
         terminal

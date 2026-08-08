@@ -1,5 +1,6 @@
 use jk_cli::LogTemplateSelection;
 use jk_tui::command_discovery::{BindingContext, discovery_lines_for_width_and_rows};
+use jk_tui::command_preview_view::CommandPreviewView;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style};
 use ratatui::widgets::{Block, Clear, Paragraph};
@@ -60,6 +61,13 @@ pub fn render_app(
                 {
                     dialog.render(frame);
                 }
+            }
+            Some(InputMode::SquashConfirmation { pending }) => {
+                log.render(frame);
+                CommandPreviewView::new(pending.preview.clone())
+                    .with_details(pending.details.clone())
+                    .with_status(pending.copy_status.clone())
+                    .render(frame);
             }
             _ => log.render(frame),
         },

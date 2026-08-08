@@ -31,6 +31,8 @@ pub enum ActionMenuAction {
     EditChange,
     /// Abandon the selected revision.
     Abandon,
+    /// Squash marked sources into the selected destination.
+    Squash,
     /// Undo the latest operation.
     Undo,
     /// Redo the latest undone operation.
@@ -141,6 +143,7 @@ enum ActionId {
     NewChange,
     EditChange,
     Abandon,
+    Squash,
     Undo,
     Redo,
     UpdateStale,
@@ -193,6 +196,7 @@ const fn default_help_group(action: ActionId) -> HelpGroup {
         | ActionId::NewChange
         | ActionId::EditChange
         | ActionId::Abandon
+        | ActionId::Squash
         | ActionId::Mark
         | ActionId::ClearMarks => HelpGroup::Mutations,
         ActionId::OpenCommandHistory
@@ -260,6 +264,7 @@ impl ActionId {
             Self::NewChange => "New change",
             Self::EditChange => "Edit change",
             Self::Abandon => "Abandon revision",
+            Self::Squash => "Squash revisions",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
@@ -297,6 +302,8 @@ pub enum CommandFamily {
     JjNew,
     /// Commands and actions related to `jj edit`.
     JjEdit,
+    /// Commands and actions related to `jj squash`.
+    JjSquash,
     /// Commands and actions related to `jj evolog`.
     JjEvolog,
     /// Commands and actions related to `jj show`.
@@ -342,6 +349,7 @@ impl CommandFamily {
             Self::JjDescribe => "jj describe",
             Self::JjNew => "jj new",
             Self::JjEdit => "jj edit",
+            Self::JjSquash => "jj squash",
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
@@ -506,6 +514,23 @@ const LOG_BINDINGS: &[KeyBinding] = &[
             ActionMenuGroup::Change,
             ActionMenuSafety::ImmediateLocal,
             30,
+        ),
+    KeyBinding::new(ActionId::Squash, "a s", "preview jj squash")
+        .with_family(CommandFamily::JjSquash)
+        .with_aliases(&[
+            "squash",
+            "source",
+            "destination",
+            "whole change",
+            "mutation",
+            "preview",
+        ])
+        .with_action_menu(
+            ActionMenuAction::Squash,
+            "s",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::LocalRewrite,
+            35,
         ),
     KeyBinding::new(ActionId::Abandon, "a a", "preview jj abandon")
         .with_family(CommandFamily::JjOperation)
@@ -1793,6 +1818,7 @@ mod tests {
                 ActionMenuAction::Describe,
                 ActionMenuAction::NewChange,
                 ActionMenuAction::EditChange,
+                ActionMenuAction::Squash,
                 ActionMenuAction::Abandon,
                 ActionMenuAction::Undo,
                 ActionMenuAction::Redo,
@@ -1802,11 +1828,13 @@ mod tests {
         assert_eq!(rows[0].safety, ActionMenuSafety::InlineSubmit);
         assert_eq!(rows[1].safety, ActionMenuSafety::ImmediateLocal);
         assert_eq!(rows[2].safety, ActionMenuSafety::ImmediateLocal);
-        assert_eq!(rows[3].safety, ActionMenuSafety::ConditionalDestructive);
-        assert_eq!(rows[4].group, ActionMenuGroup::Recovery);
-        assert_eq!(rows[4].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[3].safety, ActionMenuSafety::LocalRewrite);
+        assert_eq!(rows[4].safety, ActionMenuSafety::ConditionalDestructive);
+        assert_eq!(rows[5].group, ActionMenuGroup::Recovery);
         assert_eq!(rows[5].safety, ActionMenuSafety::ImmediateLocal);
-        assert_eq!(rows[3].key, "a");
+        assert_eq!(rows[6].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[3].key, "s");
+        assert_eq!(rows[4].key, "a");
     }
 
     #[test]

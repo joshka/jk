@@ -27,6 +27,7 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
 ) {
     let command_source = CommandSource::new(SourceView::Log, pending.source_action.clone())
         .with_key(pending.source_key);
+    let reselect_change_id = pending.reselect_change_id.clone();
     let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);
     let result = runner.run_confirmed_mutation(&pending.preview.spec);
     let runner = runner.into_inner();
@@ -39,6 +40,9 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
                 refresh_after_mutation_with_runner(state, source, runner, pending.success_message);
             if refreshed && pending.source_action == SourceAction::NewRevision {
                 select_new_change(state, new_change_id.as_deref());
+            }
+            if refreshed && let Some(change_id) = reselect_change_id.as_deref() {
+                select_change(state, change_id);
             }
         }
         Ok(output) => {
@@ -160,6 +164,13 @@ fn select_new_change(state: &mut AppState, change_id: Option<&str>) {
         return;
     }
     log.select_first();
+}
+
+fn select_change(state: &mut AppState, change_id: &str) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    let _ = log.select_change_id(change_id);
 }
 
 fn selected_revision_id(state: &AppState) -> Option<String> {

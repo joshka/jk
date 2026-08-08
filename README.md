@@ -46,6 +46,8 @@ The useful current workflows are:
 - run direct `jj` commands from `:` command mode and keep captured output in the TUI;
 - save an inline describe message directly with `Enter`; action-menu New, Edit, Undo, and Redo run
   immediately through the recorded mutation path, while non-empty abandon keeps its safety preview;
+- mark squash sources, leave the cursor on the destination, and use `a s` to review the exact
+  whole-change `jj squash` command before confirming it;
 - use Command History and Operation Log to inspect what ran and recover through `jj op` views;
 - inspect sibling jj workspaces, including workspace-scoped log/status/diff views, without leaving
   the TUI.
@@ -60,9 +62,10 @@ Use `?` inside `jk` for the full key list for the active screen. For task-orient
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
-- rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
-- the action menu currently covers describe, new, edit, abandon, undo, and redo from the log;
-  revision rebase, squash, restore, refs, remote, and workspace actions remain planned.
+- rebase, split, restore, bookmarks, fetch, and push are still planned workflows;
+- squash currently moves whole changes only; file and hunk selection remains planned;
+- the action menu currently covers describe, new, edit, squash, abandon, undo, and redo from the
+  log; revision rebase, restore, refs, remote, and workspace actions remain planned.
 
 ## First Useful Paths
 

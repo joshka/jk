@@ -59,6 +59,9 @@ pub enum AppKey {
     /// Preview abandoning the selected revision.
     StartAbandon,
 
+    /// Preview squashing marked sources into the selected destination.
+    StartSquash,
+
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
@@ -163,6 +166,7 @@ impl AppKey {
             ActionMenuAction::NewChange => Self::StartNew,
             ActionMenuAction::EditChange => Self::StartEdit,
             ActionMenuAction::Abandon => Self::StartAbandon,
+            ActionMenuAction::Squash => Self::StartSquash,
             ActionMenuAction::Undo => Self::RunUndo,
             ActionMenuAction::Redo => Self::RunRedo,
         }
@@ -402,6 +406,10 @@ mod tests {
         assert_eq!(
             AppKey::from_action_menu(ActionMenuAction::Abandon),
             AppKey::StartAbandon
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Squash),
+            AppKey::StartSquash
         );
         assert_eq!(
             AppKey::from_action_menu(ActionMenuAction::Undo),

@@ -57,6 +57,8 @@ pub enum CommandFamily {
     JjNew,
     /// `jj edit`.
     JjEdit,
+    /// `jj squash`.
+    JjSquash,
     /// `jj evolog`.
     JjEvolog,
     /// `jj workspace ...`.
@@ -88,6 +90,7 @@ impl CommandFamily {
             "describe" => Self::JjDescribe,
             "new" => Self::JjNew,
             "edit" => Self::JjEdit,
+            "squash" => Self::JjSquash,
             "evolog" => Self::JjEvolog,
             "workspace" => Self::JjWorkspace,
             "op" => Self::JjOperation,
@@ -184,6 +187,8 @@ pub enum SourceAction {
     NewRevision,
     /// Move the working copy to the selected revision.
     EditRevision,
+    /// Squash marked source revisions into the selected destination.
+    SquashRevision,
     /// List workspaces.
     WorkspaceList,
     /// Show selected workspace status.

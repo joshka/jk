@@ -646,6 +646,7 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::OpenStatus | SourceAction::WorkspaceStatus => "status".to_owned(),
         SourceAction::OpenEvolog => "evolog".to_owned(),
         SourceAction::DescribeRevision => "describe".to_owned(),
+        SourceAction::SquashRevision => "squash".to_owned(),
         SourceAction::WorkspaceList => "list".to_owned(),
         SourceAction::WorkspaceLog => "log".to_owned(),
         SourceAction::WorkspaceUpdateStale => "update-stale".to_owned(),

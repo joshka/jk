@@ -6,16 +6,29 @@ use jk_core::{CommandPreview, CommandPreviewWarning, ExecutionMode, RefreshPlan,
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
-use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Clear, Padding, Paragraph, Wrap};
 
 const PANEL_WIDTH: u16 = 78;
 const MIN_PANEL_HEIGHT: u16 = 8;
+const SURFACE: Color = Color::Rgb(30, 35, 47);
+const REGION: Color = Color::Rgb(40, 45, 55);
+const ROLE_REGION: Color = Color::Rgb(35, 51, 62);
+const HEADER_REGION: Color = Color::Rgb(58, 72, 90);
+const WARNING_REGION: Color = Color::Rgb(70, 39, 43);
+const SUCCESS_REGION: Color = Color::Rgb(35, 68, 55);
+const MUTED: Color = Color::Rgb(161, 174, 190);
+
+struct PreviewRegion<'a> {
+    text: Text<'a>,
+    background: Color,
+}
 
 /// A compact confirmation view for a pending command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandPreviewView {
     preview: CommandPreview,
     status: Option<String>,
+    details: Vec<String>,
 }
 
 impl CommandPreviewView {
@@ -25,6 +38,7 @@ impl CommandPreviewView {
         Self {
             preview,
             status: None,
+            details: Vec::new(),
         }
     }
 
@@ -41,6 +55,13 @@ impl CommandPreviewView {
         self
     }
 
+    /// Adds workflow-specific role and scope lines below the exact command.
+    #[must_use]
+    pub fn with_details(mut self, details: Vec<String>) -> Self {
+        self.details = details;
+        self
+    }
+
     /// Renders the command preview without executing anything.
     pub fn render(&self, frame: &mut Frame<'_>) {
         let area = frame.area();
@@ -48,94 +69,157 @@ impl CommandPreviewView {
             return;
         }
 
-        let text = self.body_text();
         let panel_width = PANEL_WIDTH.min(area.width);
-        let content_width = panel_width.saturating_sub(2).max(1);
-        let panel = centered_panel(area, panel_height(&text, content_width).saturating_add(3));
+        let content_width = panel_width.saturating_sub(4).max(1);
+        let regions = self.regions();
+        let content_height = regions
+            .iter()
+            .map(|region| text_height(&region.text, content_width))
+            .sum::<u16>();
+        let panel = centered_panel(area, content_height.saturating_add(2));
         frame.render_widget(Clear, panel);
-
-        let block = Block::bordered()
-            .title(" Confirm command ")
-            .style(Style::new().fg(Color::White).bg(Color::Black));
-        let inner = block.inner(panel);
-        frame.render_widget(block, panel);
-        if inner.is_empty() {
+        frame.render_widget(Block::default().style(Style::new().bg(SURFACE)), panel);
+        if panel.is_empty() {
             return;
         }
 
+        let header_area = Rect::new(panel.x, panel.y, panel.width, 1);
         let footer_area = Rect {
-            x: inner.x,
-            y: inner.y + inner.height.saturating_sub(1),
-            width: inner.width,
+            x: panel.x,
+            y: panel.bottom().saturating_sub(1),
+            width: panel.width,
             height: 1,
         };
-        let body_area = Rect {
-            x: inner.x,
-            y: inner.y,
-            width: inner.width,
-            height: inner.height.saturating_sub(1),
-        };
+        frame.render_widget(
+            Paragraph::new("Confirm command")
+                .style(
+                    Style::new()
+                        .fg(Color::White)
+                        .bg(HEADER_REGION)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .block(Block::default().padding(Padding::horizontal(2))),
+            header_area,
+        );
 
-        if !body_area.is_empty() {
-            let paragraph = Paragraph::new(text)
-                .style(Style::new().fg(Color::White).bg(Color::Black))
-                .wrap(Wrap { trim: false });
-            frame.render_widget(paragraph, body_area);
+        let mut y = header_area.bottom();
+        for region in regions {
+            if y >= footer_area.y {
+                break;
+            }
+            let height = text_height(&region.text, content_width).min(footer_area.y - y);
+            let region_area = Rect::new(panel.x + 1, y, panel.width.saturating_sub(2), height);
+            render_region(frame, region_area, region);
+            y = y.saturating_add(height);
         }
         frame.render_widget(
             Paragraph::new(footer_line(self.status.as_deref()))
-                .style(Style::new().fg(Color::White).bg(Color::Black)),
+                .style(Style::new().fg(Color::White).bg(REGION))
+                .block(Block::default().padding(Padding::horizontal(2))),
             footer_area,
         );
     }
 
-    fn body_text(&self) -> Text<'_> {
-        let mut lines = vec![
-            Line::from(Span::styled(
+    fn regions(&self) -> Vec<PreviewRegion<'_>> {
+        let mut regions = vec![PreviewRegion {
+            text: Text::from(Line::from(Span::styled(
                 self.preview.title.as_str(),
-                Style::new().add_modifier(Modifier::BOLD),
-            )),
-            Line::from(""),
-            Line::from(Span::styled(
-                "Command",
-                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                self.preview.command_line.as_str(),
-                Style::new().fg(Color::Yellow),
-            )),
-            Line::from(""),
-            Line::from(Span::styled(
-                "Summary",
-                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(format!("Safety: {}", safety_label(self.preview.safety))),
-            Line::from(format!(
-                "Execution: {}",
-                execution_label(self.preview.execution_mode)
-            )),
-            Line::from(format!(
-                "Refresh: {}",
-                refresh_label(self.preview.refresh_plan)
-            )),
-        ];
+                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+            ))),
+            background: SURFACE,
+        }];
+        regions.push(PreviewRegion {
+            text: Text::from(vec![
+                Line::from(Span::styled(
+                    "Command",
+                    Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                )),
+                Line::from(Span::styled(
+                    self.preview.command_line.as_str(),
+                    Style::new().fg(Color::Yellow),
+                )),
+            ]),
+            background: REGION,
+        });
 
-        lines.push(Line::from(""));
-        if self.preview.warnings.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "No warnings for this command.",
-                Style::new().fg(Color::Green),
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                "Warnings",
-                Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
-            )));
-            lines.extend(self.preview.warnings.iter().map(warning_line));
+        if !self.details.is_empty() {
+            let mut lines = vec![Line::from(Span::styled(
+                "Roles and scope",
+                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            ))];
+            lines.extend(self.details.iter().map(|detail| {
+                Line::from(Span::styled(detail.as_str(), Style::new().fg(Color::White)))
+            }));
+            regions.push(PreviewRegion {
+                text: Text::from(lines),
+                background: ROLE_REGION,
+            });
         }
 
-        Text::from(lines)
+        regions.push(PreviewRegion {
+            text: Text::from(vec![
+                Line::from(Span::styled(
+                    "Summary",
+                    Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                )),
+                Line::from(Span::styled(
+                    format!("Safety: {}", safety_label(self.preview.safety)),
+                    Style::new().fg(MUTED),
+                )),
+                Line::from(Span::styled(
+                    format!(
+                        "Execution: {}",
+                        execution_label(self.preview.execution_mode)
+                    ),
+                    Style::new().fg(MUTED),
+                )),
+                Line::from(Span::styled(
+                    format!("Refresh: {}", refresh_label(self.preview.refresh_plan)),
+                    Style::new().fg(MUTED),
+                )),
+            ]),
+            background: REGION,
+        });
+
+        if self.preview.warnings.is_empty() {
+            regions.push(PreviewRegion {
+                text: Text::from(Line::from(Span::styled(
+                    "No warnings for this command.",
+                    Style::new().fg(Color::LightGreen),
+                ))),
+                background: SUCCESS_REGION,
+            });
+        } else {
+            let mut lines = vec![Line::from(Span::styled(
+                "Warnings",
+                Style::new()
+                    .fg(Color::LightRed)
+                    .add_modifier(Modifier::BOLD),
+            ))];
+            lines.extend(self.preview.warnings.iter().map(warning_line));
+            regions.push(PreviewRegion {
+                text: Text::from(lines),
+                background: WARNING_REGION,
+            });
+        }
+
+        regions
     }
+}
+
+fn render_region(frame: &mut Frame<'_>, area: Rect, region: PreviewRegion<'_>) {
+    if area.is_empty() {
+        return;
+    }
+    let style = Style::new().fg(Color::White).bg(region.background);
+    frame.render_widget(Block::default().style(style), area);
+    frame.render_widget(
+        Paragraph::new(region.text)
+            .style(style)
+            .wrap(Wrap { trim: false })
+            .block(Block::default().padding(Padding::horizontal(1))),
+        area,
+    );
 }
 
 fn footer_line(status: Option<&str>) -> Line<'static> {
@@ -172,8 +256,8 @@ fn footer_line(status: Option<&str>) -> Line<'static> {
 
 fn warning_line(warning: &CommandPreviewWarning) -> Line<'_> {
     Line::from(vec![
-        Span::styled("! ", Style::new().fg(Color::Red)),
-        Span::raw(warning_label(warning)),
+        Span::styled("! ", Style::new().fg(Color::LightRed)),
+        Span::styled(warning_label(warning), Style::new().fg(Color::White)),
     ])
 }
 
@@ -246,14 +330,14 @@ fn centered_panel(area: Rect, preferred_height: u16) -> Rect {
     }
 }
 
-fn panel_height(text: &Text<'_>, content_width: u16) -> u16 {
+fn text_height(text: &Text<'_>, content_width: u16) -> u16 {
     let content_width = usize::from(content_width.max(1));
     let text_height = text
         .lines
         .iter()
         .map(|line| line.width().div_ceil(content_width).max(1))
         .sum::<usize>();
-    text_height.saturating_add(2).try_into().unwrap_or(u16::MAX)
+    text_height.try_into().unwrap_or(u16::MAX)
 }
 
 #[cfg(test)]
@@ -302,6 +386,24 @@ mod tests {
         assert!(rendered.contains("copy"));
         assert!(rendered.contains("esc"));
         assert!(rendered.contains("cancel"));
+        assert!(!rendered.contains('┌'));
+        assert!(!rendered.contains('┐'));
+        assert!(
+            terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .any(|cell| cell.bg == HEADER_REGION)
+        );
+        assert!(
+            terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .any(|cell| cell.bg == WARNING_REGION)
+        );
     }
 
     #[test]

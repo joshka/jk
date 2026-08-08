@@ -261,6 +261,20 @@ fn edit_specs_use_edit_family_and_typed_source_action() {
 }
 
 #[test]
+fn squash_specs_use_squash_family_and_typed_source_action() {
+    let spec = JjCommandSpec::confirm_mutation(
+        ["squash", "--from", "source", "--into", "destination"],
+        SafetyClass::LocalRewrite,
+    );
+    let start =
+        CommandRecordStart::from_spec(&spec, source(SourceView::Log, SourceAction::SquashRevision));
+
+    assert_eq!(start.command.command_family, CommandFamily::JjSquash);
+    assert_eq!(start.source.view, SourceView::Log);
+    assert_eq!(start.source.action, SourceAction::SquashRevision);
+}
+
+#[test]
 fn operation_specs_use_operation_family_and_typed_source_actions() {
     let cases = [
         (
