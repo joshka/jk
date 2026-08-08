@@ -73,7 +73,7 @@ History, and keeps the normal footer controls visible alongside a short success 
 After `jj new` succeeds, the selection moves to the newly created working copy. When `jj` reports a
 resulting operation id, Command History can open the exact `jj op show` view.
 
-## Run A Direct jj Command
+## Run Direct Commands
 
 Press `:` to run a direct `jj` command without leaving the TUI:
 
@@ -87,6 +87,28 @@ Command mode accepts an optional `jj` prefix. It parses argv-like input, does no
 captures stdout and stderr, and records the result in Command History.
 
 From command output, press `e` to reopen command mode with the previous input.
+
+Press `!` to run an external executable with explicit argv:
+
+```text
+!printf '%s\n' 'hello from jk'
+!rg -n 'CommandHistory' crates
+!sh -c 'printf "shell requested explicitly\n" | cat'
+```
+
+External command mode never adds a shell. Quotes and backslashes group argv for `jk`; shell
+metacharacters such as `$`, `|`, `>`, and `&&` remain literal arguments. Run `sh -c` (or another
+shell) explicitly when shell expansion, pipes, redirects, or built-ins are intentional.
+
+This first external-command mode is captured and noninteractive: stdin is closed, stdout and stderr
+are retained in the output view, and the exit code or terminating signal is recorded in Command
+History. Commands that require a foreground terminal, password prompt, or full-screen TUI are not
+supported in this mode; run them after leaving `jk`. This keeps `jk`'s terminal state intact while a
+future foreground/cancellable runner can own terminal suspension and restoration explicitly.
+
+Failures remain inspectable. Press `e` to edit or retry the same `!` input, `C` to inspect its
+redacted history record, or `y` in Command History to copy the redacted command line. Obvious
+secret-looking argv, stdout, and stderr values use the same redaction policy as `jj` commands.
 
 ## Inspect History And Operations
 

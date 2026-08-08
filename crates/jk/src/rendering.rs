@@ -4,7 +4,7 @@ use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
-use crate::command_mode::jj_command_lines;
+use crate::command_mode::{external_command_lines, jj_command_lines};
 use crate::menus::{
     action_menu_lines, diff_file_list_lines, template_selector_lines, view_options_lines,
 };
@@ -45,6 +45,11 @@ pub fn render_app(
                 log.render(frame);
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
+            }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                log.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
             }
             Some(InputMode::DescribeMessage { .. }) => {
                 log.render(frame);
@@ -88,6 +93,10 @@ pub fn render_app(
                 let lines = jj_command_lines(input, error.as_deref());
                 view.render_with_overlay(frame, "jj command", &lines);
             }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                let lines = external_command_lines(input, error.as_deref());
+                view.render_with_overlay(frame, "external command", &lines);
+            }
             _ => view.render(frame),
         },
         AppView::Show { view, .. } => render_inspection(frame, view, &mode, template),
@@ -112,6 +121,11 @@ pub fn render_app(
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
             }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                view.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
+            }
             _ => view.render(frame),
         },
         AppView::CommandHistory { view } => match &mode {
@@ -127,6 +141,11 @@ pub fn render_app(
                 view.render(frame);
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
+            }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                view.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
             }
             _ => view.render(frame),
         },
@@ -148,6 +167,11 @@ pub fn render_app(
                 view.render(frame);
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
+            }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                view.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
             }
             _ => view.render(frame),
         },
@@ -221,6 +245,10 @@ fn render_inspection(
         Some(InputMode::JjCommand { input, error }) => {
             let lines = jj_command_lines(input, error.as_deref());
             view.render_with_overlay(frame, "jj command", &lines);
+        }
+        Some(InputMode::ExternalCommand { input, error }) => {
+            let lines = external_command_lines(input, error.as_deref());
+            view.render_with_overlay(frame, "external command", &lines);
         }
         _ => view.render(frame),
     }
@@ -342,31 +370,69 @@ fn render_mode_overlay_with_sizing(
     };
     frame.render_widget(Clear, overlay);
 
-    let command_discovery = title == "Command discovery";
-    let display_title = if command_discovery { "Help" } else { title };
-    let mut text_lines = Vec::new();
-    if !command_discovery {
-        text_lines.push(Line::from(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        )));
-        text_lines.push(Line::from(""));
-    }
-    text_lines.extend(lines.iter().map(|line| overlay_line(line)));
-    let text = Text::from(text_lines);
-    let mut block = Block::bordered();
-    if command_discovery {
-        block = block.title(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ));
-    }
-    let paragraph = Paragraph::new(text)
-        .block(block)
-        .style(Style::new().fg(Color::White).bg(Color::Black))
-        .wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, overlay);
+    let display_title = if title == "Command discovery" {
+        "Help"
+    } else {
+        title
+    };
+    let panel_style = Style::new().fg(Color::White).bg(Color::Rgb(30, 35, 47));
+    frame.render_widget(Block::default().style(panel_style), overlay);
+
+    let title_area = Rect::new(overlay.x, overlay.y, overlay.width, overlay.height.min(1));
+    frame.render_widget(
+        Paragraph::new(format!("  {display_title}")).style(
+            Style::new()
+                .fg(Color::White)
+                .bg(Color::Rgb(58, 72, 90))
+                .bold(),
+        ),
+        title_area,
+    );
+
+    let body = Rect::new(
+        overlay.x.saturating_add(2),
+        overlay.y.saturating_add(2),
+        overlay.width.saturating_sub(4),
+        overlay.height.saturating_sub(3),
+    );
+    render_overlay_regions(frame, body, lines);
+    let text = Text::from(
+        lines
+            .iter()
+            .map(|line| overlay_line(line))
+            .collect::<Vec<_>>(),
+    );
+    frame.render_widget(
+        Paragraph::new(text)
+            .style(Style::new().fg(Color::White))
+            .wrap(Wrap { trim: false }),
+        body,
+    );
     Some(overlay)
+}
+
+fn render_overlay_regions(frame: &mut ratatui::Frame<'_>, body: Rect, lines: &[String]) {
+    use ratatui::widgets::Block;
+
+    for (row, line) in lines.iter().take(usize::from(body.height)).enumerate() {
+        let background = if line.starts_with("! ") || line.starts_with(": ") {
+            Some(Color::Rgb(58, 72, 90))
+        } else if line.starts_with("error:") {
+            Some(Color::Rgb(120, 45, 50))
+        } else {
+            None
+        };
+        let Some(background) = background else {
+            continue;
+        };
+        let y = body
+            .y
+            .saturating_add(u16::try_from(row).unwrap_or(u16::MAX));
+        frame.render_widget(
+            Block::default().style(Style::new().fg(Color::White).bg(background)),
+            Rect::new(body.x, y, body.width, 1),
+        );
+    }
 }
 
 fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
@@ -397,7 +463,7 @@ fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
 
 fn overlay_height(title: &str, lines: &[String]) -> usize {
     if title == "Command discovery" {
-        return lines.len().saturating_add(2);
+        return lines.len().saturating_add(3);
     }
 
     lines.len().saturating_add(4)
@@ -552,5 +618,45 @@ mod tests {
                     .unwrap();
             }
         }
+    }
+
+    #[test]
+    fn command_overlay_uses_color_regions_without_a_border() {
+        let lines = vec![
+            "! printf hello".to_owned(),
+            "error: fixture".to_owned(),
+            String::new(),
+            "enter run   esc cancel".to_owned(),
+        ];
+        let backend = TestBackend::new(80, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                let _ = render_mode_overlay(frame, "external command", &lines);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let rendered = buffer
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(!rendered.contains('│'));
+        assert!(!rendered.contains('┌'));
+
+        let overlay_width = 56;
+        let overlay_height = 8;
+        let overlay_x = (80 - overlay_width) / 2;
+        let overlay_y = 1 + (18 - overlay_height) / 2;
+        assert_eq!(buffer[(overlay_x, overlay_y)].bg, Color::Rgb(58, 72, 90));
+        assert_eq!(
+            buffer[(overlay_x + 2, overlay_y + 2)].bg,
+            Color::Rgb(58, 72, 90)
+        );
+        assert_eq!(
+            buffer[(overlay_x + 2, overlay_y + 3)].bg,
+            Color::Rgb(120, 45, 50)
+        );
     }
 }

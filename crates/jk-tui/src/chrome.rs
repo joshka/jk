@@ -24,30 +24,44 @@ pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines
     );
     frame.render_widget(Clear, overlay);
 
-    let command_discovery = title == "Command discovery";
-    let display_title = if command_discovery { "Help" } else { title };
-    let mut text_lines = Vec::new();
-    if !command_discovery {
-        text_lines.push(Line::from(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        )));
-        text_lines.push(Line::from(""));
-    }
-    text_lines.extend(lines.iter().map(|line| overlay_line(line)));
-    let text = Text::from(text_lines);
-    let mut block = Block::bordered();
-    if command_discovery {
-        block = block.title(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ));
-    }
-    let paragraph = Paragraph::new(text)
-        .block(block)
-        .style(Style::new().fg(Color::White).bg(Color::Black))
-        .wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, overlay);
+    let display_title = if title == "Command discovery" {
+        "Help"
+    } else {
+        title
+    };
+    frame.render_widget(
+        Block::default().style(Style::new().fg(Color::White).bg(Color::Rgb(30, 35, 47))),
+        overlay,
+    );
+    let title_area = Rect::new(overlay.x, overlay.y, overlay.width, overlay.height.min(1));
+    frame.render_widget(
+        Paragraph::new(format!("  {display_title}")).style(
+            Style::new()
+                .fg(Color::White)
+                .bg(Color::Rgb(58, 72, 90))
+                .bold(),
+        ),
+        title_area,
+    );
+
+    let body = Rect::new(
+        overlay.x.saturating_add(2),
+        overlay.y.saturating_add(2),
+        overlay.width.saturating_sub(4),
+        overlay.height.saturating_sub(3),
+    );
+    let text = Text::from(
+        lines
+            .iter()
+            .map(|line| overlay_line(line))
+            .collect::<Vec<_>>(),
+    );
+    frame.render_widget(
+        Paragraph::new(text)
+            .style(Style::new().fg(Color::White))
+            .wrap(Wrap { trim: false }),
+        body,
+    );
 }
 
 fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
@@ -78,7 +92,7 @@ fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
 
 fn overlay_height(title: &str, lines: &[String]) -> usize {
     if title == "Command discovery" {
-        return lines.len().saturating_add(2);
+        return lines.len().saturating_add(3);
     }
 
     lines.len().saturating_add(4)

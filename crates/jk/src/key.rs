@@ -65,6 +65,9 @@ pub enum AppKey {
     /// Start the `:` prompt for an arbitrary jj command.
     StartCommandMode,
 
+    /// Start the `!` prompt for a shell-free external command.
+    StartExternalCommandMode,
+
     /// Reopen command-output input.
     EditCommandOutput,
 
@@ -174,6 +177,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
     match character {
         'q' => Some(AppKey::Action(LogAction::Quit)),
         ':' => Some(AppKey::StartCommandMode),
+        '!' => Some(AppKey::StartExternalCommandMode),
         'r' => Some(AppKey::Action(LogAction::Refresh)),
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
@@ -286,6 +290,14 @@ mod tests {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::NONE)),
             AppKey::StartCommandMode
+        );
+    }
+
+    #[test]
+    fn bang_starts_external_command_mode() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('!'), KeyModifiers::NONE)),
+            AppKey::StartExternalCommandMode
         );
     }
 

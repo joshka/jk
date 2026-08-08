@@ -46,6 +46,9 @@ betamax-diff:
 betamax-release-smoke:
     {{betamax}} run tapes/release-smoke.tape
 
+betamax-external-command:
+    {{betamax}} run tapes/external-command-mode.tape
+
 betamax-action-menu:
     {{betamax}} run tapes/action-menu.tape
 

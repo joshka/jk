@@ -6,9 +6,9 @@ use std::time::SystemTime;
 
 use jk_core::{
     ColorPolicy, CommandHistory, CommandRecordFinish, CommandRecordStart, CommandResultSummary,
-    CommandSource, ExecutionMode, ExitStatusSummary, ImmutabilityPolicy, JjCommandSpec,
-    OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, SafetyClass, StreamSummary,
-    WorkingCopyPolicy,
+    CommandSource, ExecutionMode, ExitStatusSummary, ExternalCommandSpec, ImmutabilityPolicy,
+    JjCommandSpec, OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, SafetyClass,
+    StreamSummary, WorkingCopyPolicy,
 };
 
 const HISTORY_STREAM_LIMIT: usize = 8 * 1024;
@@ -28,6 +28,71 @@ pub trait JjCommandRunner {
     ///
     /// Returns the underlying I/O error when spawning, writing, or waiting fails.
     fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output>;
+}
+
+/// Runs a shell-free external command spec and returns its captured output.
+pub trait ExternalCommandRunner {
+    /// Runs the executable and argv directly, without shell interpretation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying I/O error when the process cannot be spawned or waited on.
+    fn run(&mut self, spec: &ExternalCommandSpec) -> std::io::Result<Output>;
+}
+
+/// Executes captured external commands with null stdin and piped stdout/stderr.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SystemExternalCommandRunner;
+
+impl ExternalCommandRunner for SystemExternalCommandRunner {
+    fn run(&mut self, spec: &ExternalCommandSpec) -> std::io::Result<Output> {
+        let mut command = build_external_command(spec);
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+    }
+}
+
+/// Records command-history entries around an external command runner.
+#[derive(Debug)]
+pub struct RecordingExternalCommandRunner<'a, R> {
+    inner: R,
+    history: &'a mut CommandHistory,
+    source: CommandSource,
+}
+
+impl<'a, R> RecordingExternalCommandRunner<'a, R> {
+    /// Creates a recording runner for one external command source action.
+    pub const fn new(inner: R, history: &'a mut CommandHistory, source: CommandSource) -> Self {
+        Self {
+            inner,
+            history,
+            source,
+        }
+    }
+}
+
+impl<R> ExternalCommandRunner for RecordingExternalCommandRunner<'_, R>
+where
+    R: ExternalCommandRunner,
+{
+    fn run(&mut self, spec: &ExternalCommandSpec) -> std::io::Result<Output> {
+        let pending = self.history.start(CommandRecordStart::from_external_spec(
+            spec,
+            self.source.clone(),
+        ));
+        let result = self.inner.run(spec);
+        let finish = match &result {
+            Ok(output) => finish_from_output(output, SystemTime::now()),
+            Err(error) => {
+                CommandRecordFinish::from_spawn_error(error.to_string(), "", "", SystemTime::now())
+            }
+        };
+        self.history.finish(&pending, finish);
+        result
+    }
 }
 
 /// Executes `jj` commands with the system `jj` binary.
@@ -269,6 +334,19 @@ pub fn build_jj_command(spec: &JjCommandSpec) -> Command {
     command
 }
 
+/// Builds a process command directly from an external executable and argv.
+pub fn build_external_command(spec: &ExternalCommandSpec) -> Command {
+    let Some((executable, argv)) = spec.argv().split_first() else {
+        unreachable!("ExternalCommandSpec always contains an executable");
+    };
+    let mut command = Command::new(executable);
+    command.args(argv);
+    if let Some(cwd) = spec.cwd() {
+        command.current_dir(cwd);
+    }
+    command
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used)]
@@ -285,6 +363,37 @@ mod tests {
         argv.into_iter()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect()
+    }
+
+    #[test]
+    fn external_command_keeps_program_args_and_cwd_distinct() {
+        let spec = ExternalCommandSpec::new(["printf", "%s", "a; echo unsafe"])
+            .expect("non-empty external argv")
+            .with_cwd("/tmp");
+        let command = build_external_command(&spec);
+
+        assert_eq!(command.get_program(), "printf");
+        assert_eq!(
+            strings(command.get_args().map(std::ffi::OsStr::to_owned)),
+            vec!["%s", "a; echo unsafe"]
+        );
+        assert_eq!(
+            command.get_current_dir(),
+            Some(std::path::Path::new("/tmp"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn captured_external_command_has_no_foreground_terminal_stdin() {
+        let spec = ExternalCommandSpec::new(["test", "-t", "0"]).expect("non-empty external argv");
+        let output = SystemExternalCommandRunner
+            .run(&spec)
+            .expect("test executable runs");
+
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        assert!(output.stderr.is_empty());
     }
 
     #[test]

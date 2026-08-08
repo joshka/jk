@@ -9,8 +9,9 @@ mod command_history;
 
 pub use command::{
     ColorPolicy, CommandPreview, CommandPreviewWarning, ConfigOverlay, ExecutionMode,
-    GlobalOptions, ImmutabilityPolicy, JjCommandSpec, OperationIntegrationPolicy,
-    OperationLoadPolicy, OutputPolicy, PagerPolicy, RefreshPlan, SafetyClass, WorkingCopyPolicy,
+    ExternalCommandSpec, GlobalOptions, ImmutabilityPolicy, JjCommandSpec,
+    OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, PagerPolicy, RefreshPlan,
+    SafetyClass, WorkingCopyPolicy,
 };
 pub use command_history::{
     CommandExecutionContext, CommandFamily, CommandHistory, CommandIdentity, CommandRecord,

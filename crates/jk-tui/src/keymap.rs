@@ -138,6 +138,7 @@ enum ActionId {
     OpenCommandDetails,
     CopyCommand,
     CommandMode,
+    ExternalCommandMode,
     NewChange,
     EditChange,
     Abandon,
@@ -203,6 +204,7 @@ const fn default_help_group(action: ActionId) -> HelpGroup {
         | ActionId::Undo
         | ActionId::Redo => HelpGroup::Recovery,
         ActionId::CommandMode
+        | ActionId::ExternalCommandMode
         | ActionId::Refresh
         | ActionId::UpdateStale
         | ActionId::CloseHelp
@@ -257,6 +259,7 @@ impl ActionId {
             Self::OpenCommandDetails => "Open command details",
             Self::CopyCommand => "Copy command",
             Self::CommandMode => "Run jj command",
+            Self::ExternalCommandMode => "Run external command",
             Self::NewChange => "New change",
             Self::EditChange => "Edit change",
             Self::Abandon => "Abandon revision",
@@ -327,6 +330,8 @@ pub enum CommandFamily {
     ViewOptions,
     /// User-entered `jj` command mode.
     CommandMode,
+    /// User-entered shell-free external command mode.
+    ExternalCommandMode,
     /// Help controls.
     Help,
     /// Quitting the application.
@@ -357,6 +362,7 @@ impl CommandFamily {
             Self::Hunk => "hunk",
             Self::ViewOptions => "view options",
             Self::CommandMode => "jj command",
+            Self::ExternalCommandMode => "external command",
             Self::Help => "help",
             Self::Quit => "quit",
         }
@@ -555,6 +561,9 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
@@ -623,6 +632,9 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -666,6 +678,9 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -730,6 +745,9 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -791,6 +809,9 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "command", "current row"])
@@ -839,6 +860,9 @@ const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "operation", "current row"])
@@ -1881,6 +1905,24 @@ mod tests {
 
             assert_eq!(row.action, "Run jj command");
             assert_eq!(row.command_family_label(), Some("jj command"));
+        }
+    }
+
+    #[test]
+    fn discovery_keeps_bang_external_command_mode() {
+        for context in [
+            BindingContext::Log,
+            BindingContext::Diff,
+            BindingContext::Inspection,
+            BindingContext::Workspaces,
+            BindingContext::CommandHistory,
+            BindingContext::OperationLog,
+        ] {
+            let rows = discovery_rows(context);
+            let row = discovery_row_for_key(&rows, "!");
+
+            assert_eq!(row.action, "Run external command");
+            assert_eq!(row.command_family_label(), Some("external command"));
         }
     }
 

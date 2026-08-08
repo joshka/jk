@@ -12,9 +12,9 @@ use crate::{
     copy_selected_command, edit_command_output, execute_edit_action, execute_new_action,
     execute_recovery_action, handle_back_with_log_source, open_action_menu, open_command_discovery,
     open_command_history, open_command_history_operation, open_diff_file_list,
-    open_jj_command_mode, open_operation_log, open_view_options, open_workspaces,
-    push_selected_command_history_details, push_selected_evolog, push_selected_operation_show,
-    push_selected_show, push_selected_workspace_status, push_status,
+    open_external_command_mode, open_jj_command_mode, open_operation_log, open_view_options,
+    open_workspaces, push_selected_command_history_details, push_selected_evolog,
+    push_selected_operation_show, push_selected_show, push_selected_workspace_status, push_status,
     update_selected_workspace_stale,
 };
 
@@ -175,6 +175,9 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         }
         AppKey::StartCommandMode => {
             open_jj_command_mode(state);
+        }
+        AppKey::StartExternalCommandMode => {
+            open_external_command_mode(state);
         }
         AppKey::EditCommandOutput if matches!(state.views.active(), AppView::Log(_)) => {}
         AppKey::EditCommandOutput => {

@@ -55,6 +55,7 @@ pub enum AppView {
     CommandOutput {
         view: RenderedView,
         input: String,
+        kind: CommandInputKind,
     },
     OperationLog {
         view: OperationLogView,
@@ -287,10 +288,21 @@ pub enum InputMode {
         input: String,
         error: Option<String>,
     },
+    ExternalCommand {
+        input: String,
+        error: Option<String>,
+    },
     LogTemplate {
         options: Vec<LogTemplateSelection>,
         selected: usize,
     },
+}
+
+/// Which direct-command prompt owns a captured command output view.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CommandInputKind {
+    Jj,
+    External,
 }
 
 /// Whether an input-mode handler consumed a key event.

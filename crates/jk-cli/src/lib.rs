@@ -28,7 +28,10 @@ pub mod workspaces;
 pub use abandon::{
     AbandonDetails, AbandonDetailsError, AbandonFile, AbandonProbeError, AbandonQuery, JjAbandon,
 };
-pub use command::{JjCommandRunner, RecordingJjCommandRunner, SystemJjCommandRunner};
+pub use command::{
+    ExternalCommandRunner, JjCommandRunner, RecordingExternalCommandRunner,
+    RecordingJjCommandRunner, SystemExternalCommandRunner, SystemJjCommandRunner,
+};
 pub use describe::{DescribeQuery, JjDescribe};
 pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
 pub use edit::{EditQuery, JjEdit};

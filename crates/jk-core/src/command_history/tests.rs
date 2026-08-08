@@ -4,8 +4,8 @@ use std::time::{Duration, SystemTime};
 
 use super::*;
 use crate::{
-    ConfigOverlay, ExecutionMode, GlobalOptions, JjCommandSpec, OutputPolicy, PagerPolicy,
-    SafetyClass,
+    ConfigOverlay, ExecutionMode, ExternalCommandSpec, GlobalOptions, JjCommandSpec, OutputPolicy,
+    PagerPolicy, SafetyClass,
 };
 
 fn strings(argv: &[OsString]) -> Vec<String> {
@@ -190,6 +190,36 @@ fn command_mode_specs_use_user_command_family() {
 }
 
 #[test]
+fn external_command_specs_keep_executable_identity_without_jj_context() {
+    let Some(spec) = ExternalCommandSpec::new(["env", "token=secret", "two words"]) else {
+        panic!("expected external spec");
+    };
+    let spec = spec.with_cwd("/tmp/repo");
+    let start = CommandRecordStart::from_external_spec(
+        &spec,
+        source(
+            SourceView::Other("external command mode".to_owned()),
+            SourceAction::UserExternalCommand,
+        ),
+    );
+
+    assert_eq!(start.command.command_family, CommandFamily::ExternalCommand);
+    assert_eq!(
+        strings(&start.command.argv),
+        vec!["env", "token=<redacted>", "two words"]
+    );
+    assert_eq!(
+        start.command.process_preview(),
+        "env 'token=<redacted>' 'two words'"
+    );
+    assert_eq!(start.context.cwd.as_deref(), Some(Path::new("/tmp/repo")));
+    assert_eq!(start.context.repository, None);
+    assert!(start.context.global_options.argv.is_empty());
+    assert_eq!(start.execution_mode, ExecutionMode::ExternalCommand);
+    assert_eq!(start.safety, SafetyClass::ExternalCommand);
+}
+
+#[test]
 fn context_global_options_are_redacted() {
     let spec = JjCommandSpec::render_read_only(["log"]).with_global_options(
         GlobalOptions::default().with_config_overlay(ConfigOverlay::Inline {
@@ -331,6 +361,17 @@ fn spawn_error_has_no_exit_code() {
     assert_eq!(
         record.result.spawn_error.as_deref(),
         Some("failed to spawn jj")
+    );
+}
+
+#[test]
+fn spawn_error_redacts_secret_looking_context() {
+    let finish =
+        CommandRecordFinish::from_spawn_error("failed with token=secret", "", "", finish_at());
+
+    assert_eq!(
+        finish.result.spawn_error.as_deref(),
+        Some("failed with token=<redacted>")
     );
 }
 

@@ -655,6 +655,7 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::Undo => "undo".to_owned(),
         SourceAction::Redo => "redo".to_owned(),
         SourceAction::UserJjCommand => "command".to_owned(),
+        SourceAction::UserExternalCommand => "external command".to_owned(),
         SourceAction::Other(label) => label,
         _ => "unknown".to_owned(),
     }

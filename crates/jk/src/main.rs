@@ -25,11 +25,11 @@ use jk_cli::AbandonQuery;
 #[cfg(test)]
 use jk_cli::RecoveryCommand;
 use jk_cli::{
-    DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjCommandRunner,
-    JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery,
-    JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
-    RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
-    WorkspaceInspectionQuery,
+    DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, ExternalCommandRunner, JjAbandon,
+    JjCommandRunner, JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation,
+    JjRecovery, JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
+    RecordingExternalCommandRunner, RecordingJjCommandRunner, ShowQuery, StatusQuery,
+    SystemExternalCommandRunner, SystemJjCommandRunner, WorkspaceInspectionQuery,
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
 #[cfg(test)]
@@ -81,7 +81,10 @@ pub(crate) use command_history::{
 pub(crate) use command_history::{
     open_command_history_operation, open_operation_log, push_selected_command_history_details,
 };
-use command_mode::{command_mode_snapshot, command_mode_spec, parse_jj_command_args};
+use command_mode::{
+    command_mode_snapshot, command_mode_spec, external_command_snapshot, external_command_spec,
+    parse_command_args, parse_jj_command_args,
+};
 use description_editor::DescriptionEditor;
 use key::AppKey;
 use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
@@ -109,7 +112,7 @@ use root_views::{
 pub(crate) use runner::recording_runner;
 #[cfg(test)]
 use state::ViewStack;
-use state::{AppState, AppView, InputMode, InputModeResult, ModeStack};
+use state::{AppState, AppView, CommandInputKind, InputMode, InputModeResult, ModeStack};
 use workspace_routes::{
     WorkspaceInspectionKind, open_workspaces, push_selected_workspace_diff,
     push_selected_workspace_log, push_selected_workspace_status, push_status,
@@ -313,6 +316,12 @@ fn handle_input_mode(
     }
     if matches!(
         state.modes.active(),
+        Some(InputMode::ExternalCommand { .. })
+    ) {
+        return handle_external_command_mode(state, command_repository, key);
+    }
+    if matches!(
+        state.modes.active(),
         Some(InputMode::DescribeMessage { .. })
     ) {
         if key.kind == crossterm::event::KeyEventKind::Release {
@@ -355,6 +364,7 @@ fn handle_input_mode(
                     unreachable!()
                 }
                 InputMode::JjCommand { .. } => unreachable!(),
+                InputMode::ExternalCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
             state.modes.pop();
@@ -386,6 +396,7 @@ fn handle_input_mode(
                     unreachable!()
                 }
                 InputMode::JjCommand { .. } => unreachable!(),
+                InputMode::ExternalCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
             InputModeResult::Handled
@@ -591,6 +602,68 @@ fn handle_jj_command_mode(
     }
 }
 
+fn handle_external_command_mode(
+    state: &mut AppState,
+    working_directory: Option<&Path>,
+    key: KeyEvent,
+) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc, ..
+        } => {
+            state.modes.pop();
+        }
+        KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        } => {
+            let should_close = match state.modes.active_mut() {
+                Some(InputMode::ExternalCommand { input, error }) if input.is_empty() => {
+                    *error = None;
+                    true
+                }
+                Some(InputMode::ExternalCommand { input, error }) => {
+                    input.pop();
+                    *error = None;
+                    false
+                }
+                _ => false,
+            };
+            if should_close {
+                state.modes.pop();
+            }
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            submit_external_command_mode(state, working_directory);
+        }
+        KeyEvent {
+            code: KeyCode::Char('u'),
+            modifiers,
+            ..
+        } if modifiers == KeyModifiers::CONTROL => {
+            if let Some(InputMode::ExternalCommand { input, error }) = state.modes.active_mut() {
+                input.clear();
+                *error = None;
+            }
+        }
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            if let Some(InputMode::ExternalCommand { input, error }) = state.modes.active_mut() {
+                input.push(character);
+                *error = None;
+            }
+        }
+        _ => {}
+    }
+    InputModeResult::Handled
+}
+
 fn open_jj_command_mode(state: &mut AppState) {
     open_jj_command_mode_with_input(state, String::new());
 }
@@ -601,11 +674,24 @@ fn open_jj_command_mode_with_input(state: &mut AppState, input: String) {
         .push(InputMode::JjCommand { input, error: None });
 }
 
+fn open_external_command_mode(state: &mut AppState) {
+    open_external_command_mode_with_input(state, String::new());
+}
+
+fn open_external_command_mode_with_input(state: &mut AppState, input: String) {
+    state
+        .modes
+        .push(InputMode::ExternalCommand { input, error: None });
+}
+
 fn edit_command_output(state: &mut AppState) {
-    let AppView::CommandOutput { input, .. } = state.views.active() else {
+    let AppView::CommandOutput { input, kind, .. } = state.views.active() else {
         return;
     };
-    open_jj_command_mode_with_input(state, input.clone());
+    match kind {
+        CommandInputKind::Jj => open_jj_command_mode_with_input(state, input.clone()),
+        CommandInputKind::External => open_external_command_mode_with_input(state, input.clone()),
+    }
 }
 
 fn submit_jj_command_mode(state: &mut AppState, repository: Option<&Path>) {
@@ -658,8 +744,65 @@ fn run_jj_command_mode_with_runner<R: JjCommandRunner>(
     let result = runner.run(&spec);
     let snapshot = command_mode_snapshot(&command_line, result.as_ref());
     state.views.push(AppView::CommandOutput {
-        view: RenderedView::new(snapshot),
+        view: RenderedView::command_output(snapshot),
         input: input.trim().to_owned(),
+        kind: CommandInputKind::Jj,
+    });
+    Ok(())
+}
+
+fn submit_external_command_mode(state: &mut AppState, working_directory: Option<&Path>) {
+    let input = match state.modes.active() {
+        Some(InputMode::ExternalCommand { input, .. }) => input.clone(),
+        _ => return,
+    };
+
+    match run_external_command_mode_with_runner(
+        state,
+        working_directory,
+        &input,
+        SystemExternalCommandRunner,
+    ) {
+        Ok(()) => {
+            state.modes.pop();
+        }
+        Err(error) => {
+            if let Some(InputMode::ExternalCommand {
+                error: active_error,
+                ..
+            }) = state.modes.active_mut()
+            {
+                *active_error = Some(error);
+            }
+        }
+    }
+}
+
+fn run_external_command_mode_with_runner<R: ExternalCommandRunner>(
+    state: &mut AppState,
+    working_directory: Option<&Path>,
+    input: &str,
+    runner: R,
+) -> std::result::Result<(), String> {
+    let argv = parse_command_args(input)?;
+    let spec = external_command_spec(argv, working_directory)
+        .ok_or_else(|| "type an external command after !".to_owned())?;
+    let command_line = spec.preview();
+    let mut runner = RecordingExternalCommandRunner::new(
+        runner,
+        &mut state.history,
+        CommandSource::new(
+            SourceView::Other("external command mode".to_owned()),
+            SourceAction::UserExternalCommand,
+        )
+        .with_key("!"),
+    );
+    let result = runner.run(&spec);
+    let snapshot = external_command_snapshot(&command_line, result.as_ref());
+    state.views.push(AppView::CommandOutput {
+        view: RenderedView::command_output(snapshot),
+        input: input.to_owned(),
+        kind: CommandInputKind::External,
     });
     Ok(())
 }
@@ -3697,6 +3840,122 @@ mod tests {
 
         let record = state.command_history().records().next().expect("record");
         assert_eq!(record.command.spec_preview, "jj status");
+    }
+
+    #[test]
+    fn external_command_empty_enter_keeps_prompt_with_error() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        open_external_command_mode(&mut state);
+
+        submit_external_command_mode(&mut state, None);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ExternalCommand {
+                input: String::new(),
+                error: Some("type an external command after !".to_owned()),
+            })
+        );
+        assert_eq!(state.views.len(), 1);
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn external_command_records_distinct_identity_status_and_source() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        run_external_command_mode_with_runner(
+            &mut state,
+            Some(Path::new("/repo/dogfood")),
+            "printf '%s' 'two words'",
+            SequencedRunner::successes(vec![output(7, "two words", "warning\n")]),
+        )
+        .expect("external command runs");
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandOutput {
+                kind: CommandInputKind::External,
+                ..
+            }
+        ));
+        let record = state.command_history().records().next().expect("record");
+        assert_eq!(
+            record.command.command_family,
+            jk_core::CommandFamily::ExternalCommand
+        );
+        assert_eq!(record.command.process_preview(), "printf '%s' 'two words'");
+        assert_eq!(
+            record.context.cwd.as_deref(),
+            Some(Path::new("/repo/dogfood"))
+        );
+        assert_eq!(record.context.repository, None);
+        assert_eq!(record.source.action, SourceAction::UserExternalCommand);
+        assert_eq!(record.source.key.as_deref(), Some("!"));
+        assert_eq!(
+            record.execution_mode,
+            jk_core::ExecutionMode::ExternalCommand
+        );
+        assert_eq!(
+            record
+                .result
+                .exit_status
+                .as_ref()
+                .and_then(|status| status.code),
+            Some(7)
+        );
+        assert!(record.result.stdout.snippet.contains("two words"));
+        assert!(record.result.stderr.snippet.contains("warning"));
+    }
+
+    #[test]
+    fn external_command_output_edit_reopens_external_prompt() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        run_external_command_mode_with_runner(
+            &mut state,
+            None,
+            "printf ''",
+            SequencedRunner::successes(vec![output(0, "", "")]),
+        )
+        .expect("external command runs");
+        edit_command_output(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ExternalCommand {
+                input: "printf ''".to_owned(),
+                error: None,
+            })
+        );
+    }
+
+    #[test]
+    fn missing_external_executable_keeps_spawn_failure_inspectable() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let error = io::Error::new(io::ErrorKind::NotFound, "program not found");
+
+        run_external_command_mode_with_runner(
+            &mut state,
+            None,
+            "missing-program",
+            SequencedRunner::results(vec![Err(error)]),
+        )
+        .expect("spawn failure still opens command output");
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandOutput {
+                kind: CommandInputKind::External,
+                ..
+            }
+        ));
+        let record = state.command_history().records().next().expect("record");
+        assert_eq!(
+            record.result.spawn_error.as_deref(),
+            Some("program not found")
+        );
+        assert_eq!(record.result.exit_status, None);
     }
 
     #[test]

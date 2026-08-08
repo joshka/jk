@@ -4,7 +4,7 @@ use super::{
     CommandExecutionContext, CommandIdentity, CommandRecordId, CommandResultSummary, CommandSource,
     DEFAULT_STREAM_LIMIT, ExitStatusSummary, OutputRetention, StreamSummary,
 };
-use crate::{ExecutionMode, JjCommandSpec, RefreshPlan, SafetyClass};
+use crate::{ExecutionMode, ExternalCommandSpec, JjCommandSpec, RefreshPlan, SafetyClass};
 
 /// One retained command-history record.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -109,6 +109,21 @@ impl CommandRecordStart {
         }
     }
 
+    /// Creates start data from an external command spec and source.
+    #[must_use]
+    pub fn from_external_spec(spec: &ExternalCommandSpec, source: CommandSource) -> Self {
+        Self {
+            command: CommandIdentity::from_external_spec(spec),
+            source,
+            context: CommandExecutionContext::from_external_spec(spec),
+            started_at: SystemTime::now(),
+            retention: OutputRetention::summary_only(DEFAULT_STREAM_LIMIT, DEFAULT_STREAM_LIMIT),
+            refresh: spec.refresh_plan(),
+            safety: spec.safety(),
+            execution_mode: spec.mode(),
+        }
+    }
+
     /// Sets the start time for deterministic tests or caller-owned timing.
     #[must_use]
     pub const fn with_started_at(mut self, started_at: SystemTime) -> Self {
@@ -178,10 +193,11 @@ impl CommandRecordFinish {
         stderr: impl AsRef<[u8]>,
         ended_at: SystemTime,
     ) -> Self {
+        let error = super::redaction::redact_text(&error.into()).0;
         Self::from_result(
             CommandResultSummary {
                 exit_status: None,
-                spawn_error: Some(error.into()),
+                spawn_error: Some(error),
                 stdout: StreamSummary::from_bytes(stdout.as_ref(), DEFAULT_STREAM_LIMIT),
                 stderr: StreamSummary::from_bytes(stderr.as_ref(), DEFAULT_STREAM_LIMIT),
             },

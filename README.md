@@ -43,7 +43,8 @@ The useful current workflows are:
 
 - inspect selected changes with `show`, `diff`, `evolog`, and `status`;
 - review diffs with file/hunk movement, folding, search, file list, and View Options;
-- run direct `jj` commands from `:` command mode and keep captured output in the TUI;
+- run direct `jj` commands with `:` or shell-free external commands with `!`, keeping captured
+  output in the TUI;
 - save an inline describe message directly with `Enter`; action-menu New, Edit, Undo, and Redo run
   immediately through the recorded mutation path, while non-empty abandon keeps its safety preview;
 - use Command History and Operation Log to inspect what ran and recover through `jj op` views;
@@ -69,7 +70,8 @@ Current limitations:
 Start with `jk` or `jk log`, then use:
 
 - `Enter`, `d`, `v`, and `s` to inspect the selected change;
-- `:` to run a direct `jj` command without dropping TUI context;
+- `:` to run a direct `jj` command or `!` to run an external executable without shell
+  interpretation;
 - `a` to open actions for the selected change, then `a` again to preview abandon;
 - `a`, then `m` to edit and save a description inline; choose New, Edit, Undo, or Redo from `a`
   to run them immediately;

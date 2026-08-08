@@ -2,13 +2,14 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use super::redaction::{redact_argv, redact_text};
-use crate::command::preview_argv;
-use crate::{ExecutionMode, GlobalOptions, JjCommandSpec};
+use crate::command::{preview_argv, preview_process_argv};
+use crate::{ExecutionMode, ExternalCommandSpec, GlobalOptions, JjCommandSpec};
 
 /// Command data captured from a typed command spec.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommandIdentity {
-    /// Exact process argv after global options are applied, excluding the `jj` binary.
+    /// Redacted process argv. `jj` records exclude the fixed `jj` binary; external records include
+    /// their executable as the first element.
     pub argv: Vec<OsString>,
     /// Display-only preview from the command spec.
     pub spec_preview: String,
@@ -30,10 +31,25 @@ impl CommandIdentity {
         }
     }
 
+    /// Captures an external process identity without treating it as a `jj` command.
+    #[must_use]
+    pub fn from_external_spec(spec: &ExternalCommandSpec) -> Self {
+        Self {
+            argv: redact_argv(spec.argv().to_vec()),
+            spec_preview: spec.preview(),
+            command_family: CommandFamily::ExternalCommand,
+            title: redact_text(spec.title()).0,
+        }
+    }
+
     /// Returns the exact redacted process command line captured for this command.
     #[must_use]
     pub fn process_preview(&self) -> String {
-        preview_argv(&self.argv)
+        if self.command_family == CommandFamily::ExternalCommand {
+            preview_process_argv(&self.argv)
+        } else {
+            preview_argv(&self.argv)
+        }
     }
 }
 
@@ -65,7 +81,7 @@ pub enum CommandFamily {
     JjOperation,
     /// Future user-entered `:` command.
     UserJjCommand,
-    /// Future foreground external command.
+    /// User-entered external command.
     ExternalCommand,
     /// A command family not yet modeled.
     Other(String),
@@ -206,6 +222,8 @@ pub enum SourceAction {
     Redo,
     /// Run a user-entered `jj` command.
     UserJjCommand,
+    /// Run a user-entered external command.
+    UserExternalCommand,
     /// A source action not yet modeled.
     Other(String),
 }
@@ -229,6 +247,16 @@ impl CommandExecutionContext {
             cwd: spec.cwd().map(PathBuf::from),
             repository: spec.repository().map(PathBuf::from),
             global_options: GlobalOptionsSnapshot::from_global_options(spec.global_options()),
+        }
+    }
+
+    /// Captures execution context from an external command spec.
+    #[must_use]
+    pub fn from_external_spec(spec: &ExternalCommandSpec) -> Self {
+        Self {
+            cwd: spec.cwd().map(PathBuf::from),
+            repository: None,
+            global_options: GlobalOptionsSnapshot { argv: Vec::new() },
         }
     }
 }
