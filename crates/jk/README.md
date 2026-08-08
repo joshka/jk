@@ -38,7 +38,8 @@ cargo install jk --locked
 - inspect changes through log, show, diff, evolog, and status views;
 - review diffs with file/hunk navigation, folding, search, and View Options;
 - run direct `jj` commands from `:` command mode with captured output;
-- preview local mutations before describe, abandon, new, edit, undo, and redo;
+- save an inline describe message directly with `Enter`; run New, Edit, Undo, and Redo immediately
+  from the action menu; retain the safety preview for non-empty abandon;
 - inspect Command History, Operation Log, and sibling jj workspaces, including workspace-scoped
   log/status/diff views.
 
@@ -46,7 +47,8 @@ Current limitations:
 
 - command history is in-memory for the current `jk` session;
 - rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
-- direct `a`, `n`, and `e` mutation keys are dogfood shortcuts until the broader action menu exists.
+- the action menu currently covers describe, new, edit, abandon, undo, and redo from the log;
+  revision rebase, squash, restore, refs, remote, and workspace actions remain planned.
 
 Use `?` inside the TUI for full screen-specific key help. The repository's
 [Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) guide has

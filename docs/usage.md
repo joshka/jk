@@ -45,25 +45,33 @@ Use the smallest set of controls that gets you through review:
 The diff view still renders `jj diff`; `jk` adds navigation, folding, search, current-file context,
 and format switching around that output.
 
-## Preview A Local Mutation
+## Open The Action Menu
 
-Mutation shortcuts open a preview instead of running immediately:
+Press `a` from the log to open actions that are meaningful for the selected revision. The menu
+groups revision changes separately from history and recovery, labels safety and execution behavior,
+and routes each selection through the existing command runner:
 
-- `m` previews `jj describe` for the selected revision.
-- `a` previews `jj abandon <revision>`.
-- `n` previews `jj new <parents>` from marks or the selected revision.
-- `e` previews `jj edit <revision>`.
-- `u` previews `jj undo`.
-- `U` previews `jj redo`.
+- `m` opens an inline description editor for the selected revision; `Enter` saves it immediately.
+- `n` runs New change inside the action menu from marks or the selected revision.
+- `e` runs Edit change inside the action menu.
+- `u` runs `jj undo` inside the action menu.
+- `U` runs `jj redo` inside the action menu.
 
-In the preview:
+Inside the menu, press an action key or select a row with `j`/`k` and `Enter`. In particular, `a a`
+checks whether the selected revision is empty before abandoning it: empty revisions run
+immediately, while non-empty revisions open the destructive preview. Describe, New, Edit, Undo,
+and Redo are menu-only there. Inspection views remain read-only and do not offer repository actions.
+
+For actions that open a preview:
 
 - `Enter` runs the displayed command.
 - `y` copies the displayed command line.
 - `Esc` cancels.
 
-After a confirmed mutation, `jk` refreshes the log and records the result in Command History. When
-`jj` reports a resulting operation id, Command History can open the exact `jj op show` view.
+After an action runs, `jk` refreshes the log, records the command and resulting operation in Command
+History, and keeps the normal footer controls visible alongside a short success or error message.
+After `jj new` succeeds, the selection moves to the newly created working copy. When `jj` reports a
+resulting operation id, Command History can open the exact `jj op show` view.
 
 ## Run A Direct jj Command
 
@@ -132,5 +140,6 @@ history.
 
 - Command History is in-memory for the current `jk` session.
 - Rebase, squash, split, restore, bookmarks, fetch, and push are planned workflows.
-- Direct mutation keys are dogfood shortcuts until the broader action menu exists.
+- The action menu currently covers log revision changes and recovery; revision rebase, squash,
+  restore, refs, remote, and workspace actions remain planned.
 - Public README, crates.io, and website media still need a release-media refresh.

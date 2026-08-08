@@ -64,18 +64,20 @@ Add the two features that turn `jk` from an inspection helper into a daily jj TU
 
 ### 0.6 Safe Mutation Core
 
-Introduce mutating workflows only through command preview and recovery.
+Introduce mutating workflows through recorded command execution, using command previews and recovery
+for safety-sensitive actions.
 
 - Add a reusable Run Options drawer for global options and advanced safety toggles before mutating
   wizards depend on them.
 - Add inline and editor describe flows. The current implementation prefills the inline `m` prompt
-  from the selected revision's full description and supports `Ctrl-u` clear before preview; editor
-  describe and before/after review remain follow-up work.
-- Add new, commit, edit, rebase, and abandon flows. The current implementation has direct
-  selected-revision `a` -> `jj abandon REV`, `n` -> `jj new PARENT...`, and
-  `e` -> `jj edit REV` previews. `jj new` already uses ordered marks as parents when present and
-  falls back to the selected revision; the durable action-menu shape still belongs with the broader
-  mutation selector work.
+  from the selected revision's full description, shows an insertion cursor, supports `Ctrl-u` clear,
+  and saves directly on `Enter`; editor describe and before/after review remain follow-up work.
+- Add new, commit, edit, rebase, and abandon flows. The current context-aware `a` menu groups the
+  shipped describe, new, edit, abandon, undo, and redo actions; Describe, New, Edit, Undo, and Redo
+  run immediately, `a a` checks emptiness before abandoning, and only non-empty revisions open the
+  destructive preview. `m`/`n`/`e`/`u`/`U` are menu-only.
+  `jj new` already uses ordered marks as parents when present and falls back to the selected revision.
+  Rebase, squash, restore, refs, remote, and workspace menu actions remain follow-up selector workflows.
 - Add rebase destination search and command preview before any graph mutation.
 - Add undo/redo and operation log entry points.
 - Log every mutation in command history.

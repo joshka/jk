@@ -44,7 +44,8 @@ The useful current workflows are:
 - inspect selected changes with `show`, `diff`, `evolog`, and `status`;
 - review diffs with file/hunk movement, folding, search, file list, and View Options;
 - run direct `jj` commands from `:` command mode and keep captured output in the TUI;
-- preview local mutations before running describe, abandon, new, edit, undo, and redo;
+- save an inline describe message directly with `Enter`; action-menu New, Edit, Undo, and Redo run
+  immediately through the recorded mutation path, while non-empty abandon keeps its safety preview;
 - use Command History and Operation Log to inspect what ran and recover through `jj op` views;
 - inspect sibling jj workspaces, including workspace-scoped log/status/diff views, without leaving
   the TUI.
@@ -60,7 +61,8 @@ Current limitations:
 
 - command history is in-memory for the current `jk` session;
 - rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
-- direct `a`, `n`, and `e` bindings are dogfood shortcuts until the broader action menu exists.
+- the action menu currently covers describe, new, edit, abandon, undo, and redo from the log;
+  revision rebase, squash, restore, refs, remote, and workspace actions remain planned.
 
 ## First Useful Paths
 
@@ -68,7 +70,9 @@ Start with `jk` or `jk log`, then use:
 
 - `Enter`, `d`, `v`, and `s` to inspect the selected change;
 - `:` to run a direct `jj` command without dropping TUI context;
-- `m`, `a`, `n`, `e`, `u`, or `U` to preview a local mutation before it runs;
+- `a` to open actions for the selected change, then `a` again to preview abandon;
+- `a`, then `m` to edit and save a description inline; choose New, Edit, Undo, or Redo from `a`
+  to run them immediately;
 - `C` and `o` to inspect Command History and Operation Log;
 - `W` to inspect other jj workspaces.
 
