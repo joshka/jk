@@ -61,6 +61,12 @@ pub enum CommandFamily {
     JjEvolog,
     /// `jj workspace ...`.
     JjWorkspace,
+    /// `jj bookmark ...`.
+    JjBookmark,
+    /// `jj git fetch ...`.
+    JjGitFetch,
+    /// `jj git push ...`.
+    JjGitPush,
     /// Future `jj op ...`.
     JjOperation,
     /// Future user-entered `:` command.
@@ -90,6 +96,12 @@ impl CommandFamily {
             "edit" => Self::JjEdit,
             "evolog" => Self::JjEvolog,
             "workspace" => Self::JjWorkspace,
+            "bookmark" => Self::JjBookmark,
+            "git" => match spec.argv().get(1).map(|arg| arg.to_string_lossy()) {
+                Some(command) if command == "fetch" => Self::JjGitFetch,
+                Some(command) if command == "push" => Self::JjGitPush,
+                _ => Self::Other("git".to_owned()),
+            },
             "op" => Self::JjOperation,
             other => Self::Other(other.to_owned()),
         }
@@ -142,6 +154,8 @@ pub enum SourceView {
     Evolog,
     /// Workspaces list.
     Workspaces,
+    /// Bookmark list and mutation previews.
+    Bookmarks,
     /// Selected workspace log view.
     WorkspaceLog,
     /// Selected workspace status view.
@@ -186,6 +200,20 @@ pub enum SourceAction {
     EditRevision,
     /// List workspaces.
     WorkspaceList,
+    /// List bookmarks.
+    BookmarkList,
+    /// Open a bookmark target.
+    BookmarkTarget,
+    /// Preview bookmark creation.
+    BookmarkCreate,
+    /// Preview bookmark movement.
+    BookmarkMove,
+    /// Preview bookmark deletion.
+    BookmarkDelete,
+    /// Fetch a selected remote.
+    GitFetch,
+    /// Preview pushing a selected bookmark.
+    GitPushDryRun,
     /// Show selected workspace status.
     WorkspaceStatus,
     /// Show selected workspace log.

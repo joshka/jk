@@ -49,6 +49,8 @@ The useful current workflows are:
 - use Command History and Operation Log to inspect what ran and recover through `jj op` views;
 - inspect sibling jj workspaces, including workspace-scoped log/status/diff views, without leaving
   the TUI.
+- inspect local and remote bookmarks with `B`, preview local bookmark mutations, and review
+  explicit fetch or push dry-run commands with a configured remote chooser.
 
 The current implementation intentionally treats rendered `jj` output as the source of truth. The
 TUI parses only enough structure to support navigation, search, sticky headers, folding, command
@@ -60,9 +62,9 @@ Use `?` inside `jk` for the full key list for the active screen. For task-orient
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
-- rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
-- the action menu currently covers describe, new, edit, abandon, undo, and redo from the log;
-  revision rebase, squash, restore, refs, remote, and workspace actions remain planned.
+- rebase, squash, split, restore, and real remote pushes remain planned;
+- bookmark inspection, local mutation previews, confirmed fetches, and push dry-runs are available;
+- the action menu covers log changes and recovery; bookmark actions use the bookmark screen.
 
 ## First Useful Paths
 

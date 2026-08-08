@@ -43,6 +43,9 @@ betamax-log:
 betamax-diff:
     {{betamax}} run tapes/jk-diff.tape
 
+betamax-refs-remotes:
+    {{betamax}} run tapes/refs-remotes.tape
+
 betamax-release-smoke:
     {{betamax}} run tapes/release-smoke.tape
 

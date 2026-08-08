@@ -42,13 +42,15 @@ cargo install jk --locked
   from the action menu; retain the safety preview for non-empty abandon;
 - inspect Command History, Operation Log, and sibling jj workspaces, including workspace-scoped
   log/status/diff views.
+- inspect bookmarks with `B`; local bookmark changes open a confirmation preview, while `F` fetches
+  a selected remote only after confirmation and `P` shows a scoped push dry-run.
 
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
-- rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
-- the action menu currently covers describe, new, edit, abandon, undo, and redo from the log;
-  revision rebase, squash, restore, refs, remote, and workspace actions remain planned.
+- rebase, squash, split, restore, and real remote pushes remain planned;
+- bookmark inspection, local mutation previews, confirmed fetches, and push dry-runs are available;
+- the action menu covers log changes and recovery; bookmark actions use the bookmark screen.
 
 Use `?` inside the TUI for full screen-specific key help. The repository's
 [Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) guide has

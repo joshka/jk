@@ -234,6 +234,7 @@ impl CommandPreview {
         matches!(
             self.execution_mode,
             ExecutionMode::ConfirmMutation
+                | ExecutionMode::ConfirmNetworkRead
                 | ExecutionMode::ConfirmExternalTool
                 | ExecutionMode::DryRunThenConfirm
         )
@@ -598,6 +599,8 @@ pub enum ExecutionMode {
     RenderReadOnly,
     /// Show a mutation confirmation before execution.
     ConfirmMutation,
+    /// Show a confirmation before a network read.
+    ConfirmNetworkRead,
     /// Restore the terminal and run a foreground external tool.
     ConfirmExternalTool,
     /// Run a dry-run first, then ask before the real command.
@@ -862,6 +865,18 @@ mod tests {
         assert_eq!(spec.mode(), ExecutionMode::ConfirmMutation);
         assert_eq!(spec.safety(), SafetyClass::LocalMetadata);
         assert_eq!(spec.refresh_plan(), RefreshPlan::ReRunSpec);
+    }
+
+    #[test]
+    fn network_read_preview_requires_explicit_confirmation() {
+        let spec = JjCommandSpec::render_read_only(["git", "fetch"])
+            .with_mode(ExecutionMode::ConfirmNetworkRead)
+            .with_safety(SafetyClass::NetworkRead);
+        let preview = spec.command_preview();
+
+        assert!(preview.requires_confirmation());
+        assert_eq!(preview.execution_mode, ExecutionMode::ConfirmNetworkRead);
+        assert_eq!(preview.safety, SafetyClass::NetworkRead);
     }
 
     #[test]

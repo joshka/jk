@@ -1,8 +1,14 @@
 # Refs and Remotes Workflows
 
-Status: ready for implementation
+Status: implemented through push dry-run; real push remains gated
 
 Owner: Luna
+
+Implementation note: the completed workflow uses a small in-app remote chooser, exact-pattern
+arguments, and local jj fixture repositories. Fetch refreshes bookmarks and retains command output.
+Command mode rejects these mutation/network commands in favor of the preview paths, including
+push dry-run. Real push remains disabled. The original design below records intended review and
+acceptance criteria; implementation file boundaries differ where existing app patterns were reused.
 
 Scope: bookmarks, explicit fetch, and push dry-run after the current mutation and history foundations
 

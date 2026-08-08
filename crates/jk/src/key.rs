@@ -29,6 +29,19 @@ pub enum AppKey {
     /// Open the workspace list.
     OpenWorkspaces,
 
+    /// Open the bookmark list.
+    OpenBookmarks,
+    BookmarkMove,
+
+    /// Preview fetching the selected bookmark's remote.
+    FetchRemote,
+
+    /// Preview a dry-run push for the selected bookmark and remote.
+    PushDryRun,
+
+    /// Preview deleting the selected bookmark.
+    DeleteBookmark,
+
     /// Open the command-history list.
     OpenCommandHistory,
 
@@ -179,6 +192,11 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'L' => Some(AppKey::Action(LogAction::Log)),
         'V' => Some(AppKey::OpenViewOptions),
         'W' => Some(AppKey::OpenWorkspaces),
+        'B' => Some(AppKey::OpenBookmarks),
+        'm' => Some(AppKey::BookmarkMove),
+        'F' => Some(AppKey::FetchRemote),
+        'P' => Some(AppKey::PushDryRun),
+        'x' => Some(AppKey::DeleteBookmark),
         'C' => Some(AppKey::OpenCommandHistory),
         'e' => Some(AppKey::EditCommandOutput),
         'f' => Some(AppKey::OpenDiffFileList),
@@ -298,6 +316,22 @@ mod tests {
     }
 
     #[test]
+    fn bookmark_remote_keys_are_explicit() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('F'), KeyModifiers::NONE)),
+            AppKey::FetchRemote
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::NONE)),
+            AppKey::PushDryRun
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE)),
+            AppKey::DeleteBookmark
+        );
+    }
+
+    #[test]
     fn uppercase_c_opens_command_history() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('C'), KeyModifiers::NONE)),
@@ -370,10 +404,10 @@ mod tests {
     }
 
     #[test]
-    fn lowercase_m_is_menu_only() {
+    fn lowercase_m_routes_only_the_bookmark_move_action() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE)),
-            AppKey::Ignore
+            AppKey::BookmarkMove
         );
     }
 

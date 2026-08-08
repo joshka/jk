@@ -1,21 +1,21 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use jk_cli::{
-    JjAbandon, JjDiff, JjEdit, JjEvolog, JjLog, JjNew, JjOperation, JjRecovery, JjShow, JjStatus,
-    JjWorkspaces, RecoveryCommand,
+    JjAbandon, JjBookmarks, JjDiff, JjEdit, JjEvolog, JjGitRemote, JjLog, JjNew, JjOperation,
+    JjRecovery, JjShow, JjStatus, JjWorkspaces, RecoveryCommand,
 };
 use jk_tui::log_view::LogAction;
 
 use crate::key::AppKey;
 use crate::state::{AppState, AppView, InputMode};
 use crate::{
-    AppLoop, SearchDirection, abandon_or_preview, apply_action, apply_search_action,
-    copy_selected_command, edit_command_output, execute_edit_action, execute_new_action,
-    execute_recovery_action, handle_back_with_log_source, open_action_menu, open_command_discovery,
-    open_command_history, open_command_history_operation, open_diff_file_list,
-    open_jj_command_mode, open_operation_log, open_view_options, open_workspaces,
-    push_selected_command_history_details, push_selected_evolog, push_selected_operation_show,
-    push_selected_show, push_selected_workspace_status, push_status,
-    update_selected_workspace_stale,
+    AppLoop, SearchDirection, abandon_or_preview, apply_action, apply_bookmark_action,
+    apply_search_action, copy_selected_command, edit_command_output, execute_edit_action,
+    execute_new_action, execute_recovery_action, handle_back_with_log_source, open_action_menu,
+    open_bookmarks, open_command_discovery, open_command_history, open_command_history_operation,
+    open_diff_file_list, open_jj_command_mode, open_operation_log, open_remote_preview,
+    open_view_options, open_workspaces, push_selected_command_history_details,
+    push_selected_evolog, push_selected_operation_show, push_selected_show,
+    push_selected_workspace_status, push_status, update_selected_workspace_stale,
 };
 
 pub struct AppSources<'a> {
@@ -30,6 +30,8 @@ pub struct AppSources<'a> {
     pub(crate) operation: &'a JjOperation,
     pub(crate) recovery: &'a JjRecovery,
     pub(crate) workspaces: &'a JjWorkspaces,
+    pub(crate) bookmarks: &'a JjBookmarks,
+    pub(crate) remotes: &'a JjGitRemote,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -44,9 +46,23 @@ pub fn dispatch_app_key(
     key: KeyEvent,
     app_key: AppKey,
 ) -> DispatchResult {
+    if matches!(state.views.active(), AppView::Bookmarks { .. }) {
+        let action = match key.code {
+            KeyCode::Char('m') => Some(jk_tui::bookmark_view::BookmarkAction::Move),
+            KeyCode::Char('?') => Some(jk_tui::bookmark_view::BookmarkAction::ToggleHelp),
+            _ => None,
+        };
+        if let Some(action) = action {
+            apply_bookmark_action(state, sources.bookmarks, sources.show, action);
+            return DispatchResult::Continue;
+        }
+    }
     if matches!(
         state.views.active(),
-        AppView::Workspaces { .. } | AppView::CommandHistory { .. } | AppView::OperationLog { .. }
+        AppView::Bookmarks { .. }
+            | AppView::Workspaces { .. }
+            | AppView::CommandHistory { .. }
+            | AppView::OperationLog { .. }
     ) && matches!(key.code, KeyCode::Esc)
     {
         handle_back_with_log_source(state, sources.log);
@@ -70,6 +86,16 @@ pub fn dispatch_app_key(
         return DispatchResult::Continue;
     }
 
+    if matches!(state.views.active(), AppView::Bookmarks { .. }) {
+        apply_bookmark_action(
+            state,
+            sources.bookmarks,
+            sources.show,
+            bookmark_action_for_log_action(action),
+        );
+        return DispatchResult::Continue;
+    }
+
     if apply_action(
         state,
         sources.log,
@@ -88,6 +114,24 @@ pub fn dispatch_app_key(
     }
 }
 
+fn bookmark_action_for_log_action(action: LogAction) -> jk_tui::bookmark_view::BookmarkAction {
+    use jk_tui::bookmark_view::BookmarkAction;
+    match action {
+        LogAction::Previous | LogAction::ScrollPreviousLine => BookmarkAction::Previous,
+        LogAction::Next | LogAction::ScrollNextLine => BookmarkAction::Next,
+        LogAction::First => BookmarkAction::First,
+        LogAction::Last => BookmarkAction::Last,
+        LogAction::Refresh => BookmarkAction::Refresh,
+        LogAction::ClearMarks => BookmarkAction::Create,
+        LogAction::ToggleHelp => BookmarkAction::ToggleHelp,
+        LogAction::Quit => BookmarkAction::Quit,
+        LogAction::CollapseExpanded | LogAction::Home | LogAction::Log => {
+            BookmarkAction::ReturnBack
+        }
+        _ => BookmarkAction::Continue,
+    }
+}
+
 fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, app_key: AppKey) {
     match app_key {
         AppKey::OpenActionMenu => {
@@ -97,7 +141,14 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
             handle_back_with_log_source(state, sources.log);
         }
         AppKey::OpenShow => {
-            if matches!(state.views.active(), AppView::OperationLog { .. }) {
+            if matches!(state.views.active(), AppView::Bookmarks { .. }) {
+                apply_bookmark_action(
+                    state,
+                    sources.bookmarks,
+                    sources.show,
+                    jk_tui::bookmark_view::BookmarkAction::OpenTarget,
+                );
+            } else if matches!(state.views.active(), AppView::OperationLog { .. }) {
                 push_selected_operation_show(state, sources.operation);
             } else if matches!(state.views.active(), AppView::Workspaces { .. }) {
                 push_selected_workspace_status(state, sources.workspaces);
@@ -132,6 +183,19 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         AppKey::OpenWorkspaces => {
             open_workspaces(state, sources.workspaces);
         }
+        AppKey::OpenBookmarks => {
+            open_bookmarks(state, sources.bookmarks);
+        }
+        AppKey::FetchRemote => {
+            if matches!(state.views.active(), AppView::Bookmarks { .. }) {
+                open_remote_preview(state, sources.remotes, false);
+            }
+        }
+        AppKey::PushDryRun => {
+            if matches!(state.views.active(), AppView::Bookmarks { .. }) {
+                open_remote_preview(state, sources.remotes, true);
+            }
+        }
         AppKey::OpenCommandHistory => {
             open_command_history(state);
         }
@@ -156,8 +220,27 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         AppKey::RunRedo => {
             execute_recovery_action(state, sources.log, sources.recovery, RecoveryCommand::Redo);
         }
-        AppKey::StartDescribe => {
-            crate::open_describe_message(state);
+        AppKey::BookmarkMove | AppKey::StartDescribe => {
+            if matches!(state.views.active(), AppView::Bookmarks { .. }) {
+                apply_bookmark_action(
+                    state,
+                    sources.bookmarks,
+                    sources.show,
+                    jk_tui::bookmark_view::BookmarkAction::Move,
+                );
+            } else if app_key == AppKey::StartDescribe {
+                crate::open_describe_message(state);
+            }
+        }
+        AppKey::DeleteBookmark => {
+            if matches!(state.views.active(), AppView::Bookmarks { .. }) {
+                apply_bookmark_action(
+                    state,
+                    sources.bookmarks,
+                    sources.show,
+                    jk_tui::bookmark_view::BookmarkAction::Delete,
+                );
+            }
         }
         AppKey::StartNew => {
             execute_new_action(state, sources.log, sources.new_change);
@@ -239,6 +322,7 @@ fn search_input_mode(state: &AppState) -> InputMode {
             query: String::new(),
         },
         AppView::Log(_)
+        | AppView::Bookmarks { .. }
         | AppView::Workspaces { .. }
         | AppView::OperationLog { .. }
         | AppView::CommandHistory { .. } => unreachable!("search support checked before call"),
@@ -279,6 +363,8 @@ mod tests {
             operation: &operation,
             recovery: &recovery,
             workspaces: &workspaces,
+            bookmarks: &JjBookmarks::default(),
+            remotes: &JjGitRemote::default(),
         };
 
         assert_eq!(

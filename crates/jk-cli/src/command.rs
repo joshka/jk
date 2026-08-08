@@ -139,11 +139,13 @@ where
 }
 
 const fn should_probe_resulting_operation(spec: &JjCommandSpec) -> bool {
-    matches!(spec.mode(), ExecutionMode::ConfirmMutation)
-        && matches!(
-            spec.safety(),
-            SafetyClass::LocalMetadata | SafetyClass::LocalRewrite | SafetyClass::DestructiveLocal
-        )
+    matches!(
+        spec.mode(),
+        ExecutionMode::ConfirmMutation | ExecutionMode::ConfirmNetworkRead
+    ) && matches!(
+        spec.safety(),
+        SafetyClass::LocalMetadata | SafetyClass::LocalRewrite | SafetyClass::DestructiveLocal
+    )
 }
 
 fn current_operation_id(

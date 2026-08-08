@@ -5,6 +5,7 @@ use jk_cli::{
     WorkspaceInspectionQuery,
 };
 use jk_core::CommandHistory;
+use jk_tui::bookmark_view::BookmarkView;
 use jk_tui::command_discovery::{ActionMenuAction, BindingContext};
 use jk_tui::command_history_view::CommandHistoryView;
 use jk_tui::diff_view::DiffView;
@@ -26,6 +27,9 @@ struct Toast {
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AppView {
+    Bookmarks {
+        view: BookmarkView,
+    },
     Log(LogView),
     Diff {
         view: DiffView,
@@ -279,6 +283,20 @@ pub enum InputMode {
         rev: String,
         message: crate::description_editor::DescriptionEditor,
     },
+    BookmarkMutation {
+        kind: BookmarkMutationKind,
+        name: String,
+        revision: String,
+        field: BookmarkMutationField,
+    },
+    RemotePicker {
+        names: Vec<String>,
+        selected: usize,
+        bookmark: Option<String>,
+    },
+    CommandPreview {
+        pending: PendingCommandPreview,
+    },
     AbandonConfirmation {
         pending: PendingCommandPreview,
         dialog: Box<crate::abandon_confirmation::AbandonConfirmation>,
@@ -291,6 +309,20 @@ pub enum InputMode {
         options: Vec<LogTemplateSelection>,
         selected: usize,
     },
+}
+
+/// Bookmark mutation prompt kind.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BookmarkMutationKind {
+    Create,
+    Move,
+}
+
+/// Field edited by the bookmark mutation prompt.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BookmarkMutationField {
+    Name,
+    Revision,
 }
 
 /// Whether an input-mode handler consumed a key event.

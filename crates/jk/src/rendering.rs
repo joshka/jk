@@ -1,5 +1,6 @@
 use jk_cli::LogTemplateSelection;
 use jk_tui::command_discovery::{BindingContext, discovery_lines_for_width_and_rows};
+use jk_tui::command_preview_view::CommandPreviewView;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style};
 use ratatui::widgets::{Block, Clear, Paragraph};
@@ -8,7 +9,7 @@ use crate::command_mode::jj_command_lines;
 use crate::menus::{
     action_menu_lines, diff_file_list_lines, template_selector_lines, view_options_lines,
 };
-use crate::state::{AppState, AppView, InputMode};
+use crate::state::{AppState, AppView, BookmarkMutationField, BookmarkMutationKind, InputMode};
 
 pub fn render_app(
     frame: &mut ratatui::Frame<'_>,
@@ -62,6 +63,49 @@ pub fn render_app(
                 }
             }
             _ => log.render(frame),
+        },
+        AppView::Bookmarks { view } => match &mode {
+            Some(InputMode::RemotePicker {
+                names,
+                selected,
+                bookmark,
+            }) => {
+                view.render(frame);
+                let title = bookmark.as_ref().map_or_else(
+                    || "Fetch from remote".to_owned(),
+                    |name| format!("Push dry-run: {name}"),
+                );
+                let start =
+                    selected.saturating_sub(usize::from(frame.area().height.saturating_sub(10)));
+                let mut lines = names
+                    .iter()
+                    .enumerate()
+                    .skip(start)
+                    .map(|(index, name)| {
+                        format!("{} {name}", if index == *selected { ">" } else { " " })
+                    })
+                    .collect::<Vec<_>>();
+                lines.push("↑/↓ choose  Enter preview  Esc cancel".to_owned());
+                render_mode_overlay(frame, &title, &lines);
+            }
+            Some(InputMode::BookmarkMutation {
+                kind,
+                name,
+                revision,
+                field,
+            }) => {
+                view.render(frame);
+                render_mode_overlay(
+                    frame,
+                    "Bookmark mutation",
+                    &bookmark_mutation_lines(*kind, name, revision, *field),
+                );
+            }
+            Some(InputMode::CommandPreview { pending }) => {
+                view.render(frame);
+                CommandPreviewView::new(pending.preview.clone()).render(frame);
+            }
+            _ => view.render(frame),
         },
         AppView::Diff { view, query } => match &mode {
             Some(InputMode::ViewOptions { context, selected }) => {
@@ -193,6 +237,39 @@ fn render_toast(frame: &mut ratatui::Frame<'_>, message: &str) {
         .style(Style::new().fg(Color::White).bg(Color::Black));
     frame.render_widget(Clear, toast);
     frame.render_widget(paragraph, toast);
+}
+
+fn bookmark_mutation_lines(
+    kind: BookmarkMutationKind,
+    name: &str,
+    revision: &str,
+    field: BookmarkMutationField,
+) -> Vec<String> {
+    let operation = match kind {
+        BookmarkMutationKind::Create => "create",
+        BookmarkMutationKind::Move => "move",
+    };
+    vec![
+        format!("Operation: bookmark {operation}"),
+        format!(
+            "{} Name: {name}",
+            if field == BookmarkMutationField::Name {
+                ">"
+            } else {
+                " "
+            }
+        ),
+        format!(
+            "{} Revision: {revision}",
+            if field == BookmarkMutationField::Revision {
+                ">"
+            } else {
+                " "
+            }
+        ),
+        String::new(),
+        "tab switch field   enter preview   backspace edit   esc cancel".to_owned(),
+    ]
 }
 
 fn render_inspection(

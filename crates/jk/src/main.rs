@@ -25,10 +25,10 @@ use jk_cli::AbandonQuery;
 #[cfg(test)]
 use jk_cli::RecoveryCommand;
 use jk_cli::{
-    DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjCommandRunner,
-    JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery,
-    JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
-    RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
+    DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjBookmarks,
+    JjCommandRunner, JjDescribe, JjDiff, JjEdit, JjEvolog, JjGitRemote, JjLog, JjLogCommand, JjNew,
+    JjOperation, JjRecovery, JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery,
+    OperationQuery, RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
     WorkspaceInspectionQuery,
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
@@ -50,6 +50,7 @@ use jk_tui::workspaces_view::{WorkspacesActionResult, WorkspacesView};
 
 mod abandon_confirmation;
 mod actions;
+mod bookmark_routes;
 mod cli;
 mod clipboard;
 mod command_history;
@@ -71,6 +72,10 @@ mod workspace_routes;
 mod workspaces;
 
 use actions::{AppSources, DispatchResult, dispatch_app_key};
+use bookmark_routes::{
+    apply_bookmark_action, bookmark_mutation_from_prompt, open_bookmark_preview, open_bookmarks,
+    open_remote_preview,
+};
 use cli::{Args, Command};
 use clipboard::copy_command_line;
 use command_history::{apply_command_history_action, open_command_history};
@@ -81,7 +86,9 @@ pub(crate) use command_history::{
 pub(crate) use command_history::{
     open_command_history_operation, open_operation_log, push_selected_command_history_details,
 };
-use command_mode::{command_mode_snapshot, command_mode_spec, parse_jj_command_args};
+use command_mode::{
+    command_mode_snapshot, command_mode_spec, parse_jj_command_args, validate_command_mode_args,
+};
 use description_editor::DescriptionEditor;
 use key::AppKey;
 use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
@@ -109,7 +116,7 @@ use root_views::{
 pub(crate) use runner::recording_runner;
 #[cfg(test)]
 use state::ViewStack;
-use state::{AppState, AppView, InputMode, InputModeResult, ModeStack};
+use state::{AppState, AppView, BookmarkMutationField, InputMode, InputModeResult, ModeStack};
 use workspace_routes::{
     WorkspaceInspectionKind, open_workspaces, push_selected_workspace_diff,
     push_selected_workspace_log, push_selected_workspace_status, push_status,
@@ -139,6 +146,8 @@ fn main() -> Result<()> {
     let operation_source = args.operation_source();
     let recovery_source = args.recovery_source();
     let workspaces_source = args.workspaces_source();
+    let bookmarks_source = args.bookmarks_source();
+    let remotes_source = args.git_remote_source();
     let mut history = CommandHistory::default();
     let app = match &args.command {
         Some(Command::Diff(diff_args)) => {
@@ -171,6 +180,8 @@ fn main() -> Result<()> {
         &operation_source,
         &recovery_source,
         &workspaces_source,
+        &bookmarks_source,
+        &remotes_source,
         args.repository,
         history,
     )?;
@@ -196,6 +207,8 @@ fn run_terminal(
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
+    bookmarks_source: &JjBookmarks,
+    remotes_source: &JjGitRemote,
     command_repository: Option<PathBuf>,
     history: CommandHistory,
 ) -> Result<()> {
@@ -234,6 +247,7 @@ fn run_terminal(
                     &mut source,
                     diff_source,
                     describe_source,
+                    bookmarks_source,
                     command_repository.as_deref(),
                     key,
                 );
@@ -257,6 +271,8 @@ fn run_terminal(
                     operation: operation_source,
                     recovery: recovery_source,
                     workspaces: workspaces_source,
+                    bookmarks: bookmarks_source,
+                    remotes: remotes_source,
                 };
                 if dispatch_app_key(&mut state, &mut sources, key, app_key) == DispatchResult::Quit
                 {
@@ -280,6 +296,7 @@ fn handle_input_mode(
     source: &mut JjLog,
     diff_source: &JjDiff,
     describe_source: &JjDescribe,
+    bookmarks_source: &JjBookmarks,
     command_repository: Option<&Path>,
     key: KeyEvent,
 ) -> InputModeResult {
@@ -300,6 +317,15 @@ fn handle_input_mode(
         Some(InputMode::CommandDiscovery { .. })
     ) {
         return handle_command_discovery_mode(state, key);
+    }
+    if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
+        return handle_command_preview_mode(state, bookmarks_source, key);
+    }
+    if matches!(state.modes.active(), Some(InputMode::RemotePicker { .. })) {
+        let remotes = command_repository.map_or_else(JjGitRemote::default, |repository| {
+            JjGitRemote::default().with_repository(repository)
+        });
+        return bookmark_routes::handle_remote_picker(state, &remotes, key);
     }
     if matches!(
         state.modes.active(),
@@ -348,6 +374,21 @@ fn handle_input_mode(
                 InputMode::InspectionSearch { query } => SearchSubmit::Inspection(query.clone()),
                 InputMode::DescribeMessage { .. } => unreachable!(),
                 InputMode::ActionMenu { .. } => unreachable!(),
+                InputMode::BookmarkMutation {
+                    kind,
+                    name,
+                    revision,
+                    ..
+                } => {
+                    let Some(mutation) =
+                        bookmark_mutation_from_prompt(*kind, name.clone(), revision.clone())
+                    else {
+                        return InputModeResult::Handled;
+                    };
+                    state.modes.pop();
+                    open_bookmark_preview(state, bookmarks_source, mutation);
+                    return InputModeResult::Handled;
+                }
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
@@ -356,6 +397,7 @@ fn handle_input_mode(
                 }
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
+                InputMode::RemotePicker { .. } | InputMode::CommandPreview { .. } => unreachable!(),
             };
             state.modes.pop();
             apply_search_submit(state, action);
@@ -365,7 +407,54 @@ fn handle_input_mode(
             code: KeyCode::Backspace,
             ..
         } => {
+            if let InputMode::BookmarkMutation {
+                field,
+                name,
+                revision,
+                ..
+            } = mode
+            {
+                match field {
+                    BookmarkMutationField::Name => {
+                        name.pop();
+                    }
+                    BookmarkMutationField::Revision => {
+                        revision.pop();
+                    }
+                }
+                return InputModeResult::Handled;
+            }
             state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Tab, ..
+        } => {
+            if let Some(InputMode::BookmarkMutation { field, .. }) = state.modes.active_mut() {
+                *field = match field {
+                    BookmarkMutationField::Name => BookmarkMutationField::Revision,
+                    BookmarkMutationField::Revision => BookmarkMutationField::Name,
+                };
+            }
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char('u'),
+            modifiers,
+            ..
+        } if modifiers == KeyModifiers::CONTROL => {
+            if let InputMode::BookmarkMutation {
+                field,
+                name,
+                revision,
+                ..
+            } = mode
+            {
+                match field {
+                    BookmarkMutationField::Name => name.clear(),
+                    BookmarkMutationField::Revision => revision.clear(),
+                }
+            }
             InputModeResult::Handled
         }
         KeyEvent {
@@ -379,6 +468,15 @@ fn handle_input_mode(
                 }
                 InputMode::DescribeMessage { .. } => unreachable!(),
                 InputMode::ActionMenu { .. } => unreachable!(),
+                InputMode::BookmarkMutation {
+                    field,
+                    name,
+                    revision,
+                    ..
+                } => match field {
+                    BookmarkMutationField::Name => name.push(character),
+                    BookmarkMutationField::Revision => revision.push(character),
+                },
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
@@ -387,6 +485,7 @@ fn handle_input_mode(
                 }
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
+                InputMode::RemotePicker { .. } | InputMode::CommandPreview { .. } => unreachable!(),
             }
             InputModeResult::Handled
         }
@@ -525,6 +624,71 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
     }
 }
 
+fn handle_command_preview_mode(
+    state: &mut AppState,
+    bookmarks_source: &JjBookmarks,
+    key: KeyEvent,
+) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc | KeyCode::Backspace,
+            ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('q'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
+                return InputModeResult::Handled;
+            };
+            if matches!(
+                pending.source_action,
+                SourceAction::BookmarkCreate
+                    | SourceAction::BookmarkMove
+                    | SourceAction::BookmarkDelete
+            ) {
+                crate::mutations::confirm_bookmark_command_preview(
+                    state,
+                    bookmarks_source,
+                    pending,
+                );
+            } else if matches!(
+                pending.source_action,
+                SourceAction::GitFetch | SourceAction::GitPushDryRun
+            ) {
+                crate::mutations::confirm_remote_command_preview(state, bookmarks_source, pending);
+            }
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char('y'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            copy_pending_command(state);
+            InputModeResult::Handled
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+fn copy_pending_command(state: &mut AppState) {
+    let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+        return;
+    };
+    let status = copy_command_line(&pending.preview.command_line);
+    if let AppView::Bookmarks { view } = state.views.active_mut() {
+        view.show_status(status);
+    }
+}
 fn handle_jj_command_mode(
     state: &mut AppState,
     repository: Option<&Path>,
@@ -643,6 +807,8 @@ fn run_jj_command_mode_with_runner<R: JjCommandRunner>(
     if argv.is_empty() {
         return Err("type a jj command after :".to_owned());
     }
+
+    validate_command_mode_args(&argv)?;
 
     let spec = command_mode_spec(argv, repository);
     let command_line = spec.command_preview().command_line;
@@ -1046,7 +1212,7 @@ fn active_binding_context(state: &AppState) -> BindingContext {
         | AppView::OperationDiff { .. }
         | AppView::CommandOutput { .. }
         | AppView::CommandHistoryDetails { .. } => BindingContext::Inspection,
-        AppView::Workspaces { .. } => BindingContext::Workspaces,
+        AppView::Workspaces { .. } | AppView::Bookmarks { .. } => BindingContext::Workspaces,
         AppView::CommandHistory { .. } => BindingContext::CommandHistory,
         AppView::OperationLog { .. } => BindingContext::OperationLog,
     }
@@ -1248,6 +1414,7 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
             let _ = view.apply(action);
         }
         AppView::Log(_)
+        | AppView::Bookmarks { .. }
         | AppView::Workspaces { .. }
         | AppView::CommandHistory { .. }
         | AppView::OperationLog { .. } => {}
@@ -1351,6 +1518,7 @@ fn apply_action(
                 SourceView::OperationDiff,
                 action,
             ),
+            AppView::Bookmarks { .. } => AppTransition::Continue,
         }
     };
 
@@ -2843,6 +3011,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
@@ -2889,6 +3058,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE),
         );
@@ -2966,6 +3136,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
@@ -2990,6 +3161,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
         );
@@ -3048,6 +3220,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL),
         );
@@ -3700,6 +3873,28 @@ mod tests {
     }
 
     #[test]
+    fn command_mode_rejects_network_fetch_and_real_push() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let fetch = run_jj_command_mode_with_runner(
+            &mut state,
+            None,
+            "git fetch --remote origin",
+            SequencedRunner::successes(vec![]),
+        )
+        .expect_err("fetch should require the reviewed route");
+        assert!(fetch.contains("bookmark view's F action"));
+
+        let push = run_jj_command_mode_with_runner(
+            &mut state,
+            None,
+            "git push --remote origin --bookmark main",
+            SequencedRunner::successes(vec![]),
+        )
+        .expect_err("real push should be unavailable");
+        assert!(push.contains("bookmark view's P action"));
+    }
+
+    #[test]
     fn undo_records_recovery_action_before_refresh() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
@@ -3847,6 +4042,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
         );
@@ -3857,6 +4053,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
@@ -3898,6 +4095,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
@@ -3963,6 +4161,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
         );
@@ -4013,6 +4212,7 @@ mod tests {
             &mut source,
             &JjDiff::default(),
             &JjDescribe::default(),
+            &JjBookmarks::default(),
             None,
             KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
         );

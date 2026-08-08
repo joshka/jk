@@ -70,6 +70,56 @@ impl PendingCommandPreview {
             success_message: "Redid operation",
         }
     }
+
+    pub(crate) const fn bookmark_create(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkCreate,
+            source_key: "c",
+            failure_label: "jj bookmark create",
+            success_message: "Created bookmark",
+        }
+    }
+
+    pub(crate) const fn bookmark_move(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkMove,
+            source_key: "m",
+            failure_label: "jj bookmark move",
+            success_message: "Moved bookmark",
+        }
+    }
+
+    pub(crate) const fn bookmark_delete(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkDelete,
+            source_key: "x",
+            failure_label: "jj bookmark delete",
+            success_message: "Deleted bookmark",
+        }
+    }
+
+    pub(crate) const fn git_fetch(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::GitFetch,
+            source_key: "F",
+            failure_label: "jj git fetch",
+            success_message: "Fetched remote",
+        }
+    }
+
+    pub(crate) const fn git_push_dry_run(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::GitPushDryRun,
+            source_key: "P",
+            failure_label: "jj git push --dry-run",
+            success_message: "Push dry-run complete",
+        }
+    }
 }
 
 pub fn selected_new_parents(log: &LogView) -> Vec<String> {

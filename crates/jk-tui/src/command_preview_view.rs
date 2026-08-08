@@ -194,6 +194,7 @@ const fn execution_label(mode: ExecutionMode) -> &'static str {
     match mode {
         ExecutionMode::RenderReadOnly => "render read-only",
         ExecutionMode::ConfirmMutation => "confirm mutation",
+        ExecutionMode::ConfirmNetworkRead => "confirm network read",
         ExecutionMode::ConfirmExternalTool => "confirm external tool",
         ExecutionMode::DryRunThenConfirm => "dry-run then confirm",
         ExecutionMode::CommandMode => "command mode",

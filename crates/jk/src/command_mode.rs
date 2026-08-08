@@ -105,6 +105,72 @@ pub fn parse_jj_command_args(input: &str) -> std::result::Result<Vec<String>, St
     }
 }
 
+/// Rejects reference and remote mutations that require their dedicated confirmation flows.
+///
+/// `argv` is the parsed argument list after an optional leading `jj` has been removed.
+pub fn validate_command_mode_args(argv: &[String]) -> std::result::Result<(), String> {
+    let Some((family, action)) = command_family_and_action(argv) else {
+        return Ok(());
+    };
+
+    match (family, action) {
+        ("bookmark" | "b", "create" | "c" | "move" | "m" | "delete" | "d") => Err(
+            "bookmark changes are unavailable in command mode; use the bookmark view's B action"
+                .to_owned(),
+        ),
+        ("git", "fetch") => {
+            Err("use the bookmark view's F action to confirm jj git fetch".to_owned())
+        }
+        ("git", "push") => Err(
+            "git push is unavailable in command mode, including --dry-run; use the bookmark view's P action"
+                .to_owned(),
+        ),
+        _ => Ok(()),
+    }
+}
+
+fn command_family_and_action(argv: &[String]) -> Option<(&str, &str)> {
+    let family_index = first_command_word(argv)?;
+    let family = argv[family_index].as_str();
+    if !matches!(family, "bookmark" | "b" | "git") {
+        return None;
+    }
+
+    let action_index = next_command_word(argv, family_index + 1)?;
+    Some((family, argv[action_index].as_str()))
+}
+
+fn first_command_word(argv: &[String]) -> Option<usize> {
+    next_command_word(argv, 0)
+}
+
+fn next_command_word(argv: &[String], start: usize) -> Option<usize> {
+    let mut index = start;
+    while let Some(argument) = argv.get(index) {
+        if !argument.starts_with('-') || argument == "-" {
+            return Some(index);
+        }
+
+        index += 1;
+        if global_option_takes_value(argument) && !argument.contains('=') {
+            index += 1;
+        }
+    }
+    None
+}
+
+fn global_option_takes_value(argument: &str) -> bool {
+    matches!(
+        argument,
+        "-R" | "--repository"
+            | "--at-operation"
+            | "--at-op"
+            | "--color"
+            | "--config"
+            | "--config-file"
+    )
+}
+
 pub fn command_mode_snapshot(
     command_line: &str,
     result: std::result::Result<&Output, &io::Error>,
@@ -217,6 +283,66 @@ mod tests {
             parse_jj_command_args("log \\"),
             Err("dangling escape".to_owned())
         );
+    }
+
+    #[test]
+    fn command_mode_validation_allows_read_only_commands() {
+        for argv in [
+            ["status"].as_slice(),
+            ["--repository", "/repo", "bookmark", "list"].as_slice(),
+            ["git", "remote", "list"].as_slice(),
+            ["--color=always", "log", "-r", "@"].as_slice(),
+        ] {
+            let argv = argv.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>();
+            assert_eq!(validate_command_mode_args(&argv), Ok(()));
+        }
+    }
+
+    #[test]
+    fn command_mode_validation_rejects_bookmark_mutations_through_aliases_and_global_flags() {
+        for argv in [
+            ["bookmark", "create", "main"].as_slice(),
+            ["b", "m", "main", "-r", "@"].as_slice(),
+            [
+                "--repository",
+                "/repo",
+                "bookmark",
+                "--color",
+                "always",
+                "delete",
+                "main",
+            ]
+            .as_slice(),
+        ] {
+            let argv = argv.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>();
+            let error = validate_command_mode_args(&argv).expect_err("mutation must be routed");
+            assert!(error.contains("bookmark view's B action"));
+        }
+    }
+
+    #[test]
+    fn command_mode_validation_rejects_remote_operations_even_with_dry_run() {
+        for argv in [
+            ["git", "fetch", "origin"].as_slice(),
+            [
+                "--color",
+                "always",
+                "git",
+                "--repository",
+                "/repo",
+                "push",
+                "--dry-run",
+            ]
+            .as_slice(),
+            ["git", "--dry-run", "push", "origin"].as_slice(),
+        ] {
+            let argv = argv.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>();
+            let error = validate_command_mode_args(&argv).expect_err("remote operation must route");
+            assert!(
+                error.contains("bookmark view's F action")
+                    || error.contains("bookmark view's P action")
+            );
+        }
     }
 
     #[test]
