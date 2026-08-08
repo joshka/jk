@@ -17,6 +17,15 @@ use crate::log_state::LogState;
 use crate::rendered_log::{ExpandedDetails, RenderedLog, rendered_text};
 use crate::selected_row::paint_selected_row;
 
+/// A visible revision eligible for explicit destination selection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RevisionChoice {
+    /// Full commit identifier; never a potentially ambiguous change prefix.
+    pub revision: String,
+    /// Human-readable description used for filtering and display.
+    pub summary: String,
+}
+
 /// The effect requested after applying an input action to the log view.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -194,6 +203,19 @@ impl LogView {
     #[must_use]
     pub fn selected_commit_id(&self) -> Option<&str> {
         self.state.selected_commit_id()
+    }
+
+    /// Returns exact visible revisions in display order for destination selection.
+    #[must_use]
+    pub fn revision_choices(&self) -> Vec<RevisionChoice> {
+        self.state
+            .entries()
+            .iter()
+            .map(|entry| RevisionChoice {
+                revision: entry.commit_id().to_owned(),
+                summary: entry.description().to_owned(),
+            })
+            .collect()
     }
 
     /// Returns the full commit id for a visible stable change id.

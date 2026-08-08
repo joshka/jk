@@ -64,6 +64,16 @@ pub enum AppKey {
 
     /// Preview restoring all paths from the selected revision into the working copy.
     StartRestore,
+    /// Select explicit rebase roles and destination before confirmation.
+    StartRebase,
+    /// Start adding a workspace.
+    StartWorkspaceAdd,
+    /// Start renaming the selected workspace.
+    StartWorkspaceRename,
+    /// Preview forgetting selected workspace metadata.
+    StartWorkspaceForget,
+    /// Preview updating selected stale workspace metadata.
+    StartWorkspaceUpdateStale,
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
@@ -164,6 +174,10 @@ impl AppKey {
     /// Returns the existing application action for a menu selection.
     pub const fn from_action_menu(action: ActionMenuAction) -> Self {
         match action {
+            ActionMenuAction::AddWorkspace => Self::StartWorkspaceAdd,
+            ActionMenuAction::RenameWorkspace => Self::StartWorkspaceRename,
+            ActionMenuAction::ForgetWorkspace => Self::StartWorkspaceForget,
+            ActionMenuAction::UpdateStaleWorkspace => Self::StartWorkspaceUpdateStale,
             ActionMenuAction::Describe => Self::StartDescribe,
             ActionMenuAction::NewChange => Self::StartNew,
             ActionMenuAction::EditChange => Self::StartEdit,
@@ -193,6 +207,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'y' => Some(AppKey::CopyCommand),
         'u' => Some(AppKey::StartUndo),
         'a' => Some(AppKey::OpenActionMenu),
+        'R' => Some(AppKey::StartRebase),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),

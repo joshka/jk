@@ -52,12 +52,22 @@ betamax-action-menu:
 betamax-action-menu-demo:
     {{betamax}} run tapes/action-menu-demo.tape
 
+betamax-workspace-lifecycle:
+    cargo build -p jk
+    JK_SOURCE_REPO="$PWD" {{betamax}} run tapes/workspace-lifecycle.tape
+
 betamax-abandon-confirmation:
     {{betamax}} run tapes/abandon-confirmation.tape
     {{betamax}} run tapes/abandon-confirmation-long.tape
 
 betamax-restore-preview:
-    {{betamax}} run tapes/restore-preview.tape
+    cargo build -p jk
+    JK_SOURCE_REPO="$PWD" {{betamax}} run tapes/restore-preview.tape
+
+# Exercise the integrated workflows in isolated local fixtures, never this checkout's graph.
+betamax-workflows:
+    cargo build -p jk
+    JK_SOURCE_REPO="$PWD" {{betamax}} run tapes/workflows-integration.tape
 
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings

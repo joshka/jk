@@ -76,16 +76,35 @@ For actions that open a preview:
 - `Enter` runs the displayed command.
 - `y` copies the displayed command line.
 - `Esc` cancels.
+- Arrow keys and Page Up/Down scroll long previews without hiding the confirmation controls.
 
-After an action runs, `jk` refreshes the log, records the command and resulting operation in Command
-History, and keeps the normal footer controls visible alongside a short success or error message.
-After `jj new` succeeds, the selection moves to the newly created working copy. When `jj` reports a
-resulting operation id, Command History can open the exact `jj op show` view.
+After a successful action, `jk` refreshes the log and records the command and resulting operation in
+Command History. The normal footer controls remain visible alongside a short success or error
+message. After `jj new` succeeds, selection moves to the newly created working copy. When jj reports
+a resulting operation id, Command History can open the exact `jj op show` view.
 
 The first restore slice intentionally supports only all-path content copying from one selected
 revision into the working copy. Fileset selection, alternate destinations, `--changes-in`, and hunk
 restore remain follow-up work. Immutable destinations fail through jj's normal check; `jk` keeps
 stderr inspectable in Command History and does not expose `--ignore-immutable` in this workflow.
+
+## Rebase A Revision
+
+Press `R` from the log. With no marks, the cursor is the source. With one mark, that mark is the
+source and the cursor suggests a destination. Multiple marks are rejected rather than assigned
+implicit roles. The picker searches visible revisions by description or commit ID with `/`.
+
+The default moves the selected revision onto the destination (`-r`, `-o`), reconnecting its
+descendants to its old parents. Choose `b` for a branch relative to the destination, including
+applicable ancestors and descendants, or `s` for the source and its descendants. Placement `A` inserts
+after the destination and also rewrites its existing descendants; `B` inserts before it and rewrites
+the destination and its descendants. These broader modes can affect other workspaces: review their
+scope carefully. `o` returns to onto placement.
+
+Enter opens a separate, exact-command preview; it does not execute from the picker. Enter again in
+the preview confirms. Escape cancels without a graph mutation (while searching, the first Escape
+exits search). Commands use full commit IDs so later selection changes cannot retarget the preview.
+Immutable revisions are never overridden: jj failures remain inspectable in Command History.
 
 ## Run A Direct jj Command
 
@@ -124,7 +143,10 @@ Press `W` to list jj workspaces, or start there with `jk workspaces`. From there
 - `l` opens log for the selected workspace.
 - `Enter` or `s` opens status for the selected workspace.
 - `d` opens diff for the selected workspace.
-- `u` runs `jj workspace update-stale` when the selected workspace is stale.
+- `u` previews `jj workspace update-stale` for the selected workspace.
+- `a` opens workspace actions: `a` add, `r` rename, `f` forget metadata, and `u` update stale.
+- Add and rename first collect input, then show the exact command for confirmation.
+- Forget removes only jj workspace metadata; the workspace directory and files remain on disk.
 - `r` refreshes the workspace list.
 
 Missing workspace roots are reported inside `jk` instead of pushing a broken view.
@@ -153,8 +175,8 @@ history.
 ## Current Limits
 
 - Command History is in-memory for the current `jk` session.
-- Rebase, split, file/hunk restore, bookmarks, fetch, and push are planned workflows.
+- Split, file/hunk restore, bookmarks, fetch, and push are planned workflows.
 - Squash is whole-change only; file and hunk selection remain planned.
-- The action menu currently covers log revision changes and recovery; revision rebase,
-  refs, remote, and workspace actions remain planned.
+- The action menu covers log revision changes, recovery, and workspace lifecycle actions.
+  Rebase has a direct `R` entry; refs and remote actions remain planned.
 - Public README, crates.io, and website media still need a release-media refresh.

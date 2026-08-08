@@ -210,12 +210,21 @@ impl WorkspacesView {
     /// Selection is preserved by workspace name when possible, then falls back to the current
     /// workspace row, then clamps to the nearest available row.
     pub fn refresh(&mut self, snapshot: WorkspaceViewSnapshot) {
+        self.refresh_selecting(snapshot, None);
+    }
+
+    /// Replaces rows and prefers an explicit workspace name after a lifecycle mutation.
+    pub fn refresh_selecting(&mut self, snapshot: WorkspaceViewSnapshot, preferred: Option<&str>) {
         let previous_name = self.selected_row().map(|row| row.name.clone());
         let previous_selected = self.selected;
         self.snapshot = snapshot;
-        self.selected = previous_name
-            .as_deref()
+        self.selected = preferred
             .and_then(|name| self.snapshot.named_index(name))
+            .or_else(|| {
+                previous_name
+                    .as_deref()
+                    .and_then(|name| self.snapshot.named_index(name))
+            })
             .or_else(|| self.snapshot.current_index())
             .or_else(|| clamp_index(previous_selected, self.snapshot.rows.len()));
         self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rows.len());
@@ -484,6 +493,21 @@ mod tests {
         ]));
 
         assert_eq!(view.selected_workspace_name(), Some("dogfood"));
+    }
+
+    #[test]
+    fn refresh_can_prefer_workspace_created_or_renamed_by_mutation() {
+        let mut view = WorkspacesView::new(WorkspaceViewSnapshot::new(vec![
+            row("default", true),
+            row("scratch", false),
+        ]));
+
+        view.refresh_selecting(
+            WorkspaceViewSnapshot::new(vec![row("default", true), row("renamed", false)]),
+            Some("renamed"),
+        );
+
+        assert_eq!(view.selected_workspace_name(), Some("renamed"));
     }
 
     #[test]

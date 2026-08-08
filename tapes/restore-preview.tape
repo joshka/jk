@@ -20,30 +20,18 @@ Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "test -f /Users/joshka/local/jk/work/restore-workflow/Cargo.toml && mkdir -p /Users/joshka/local/jk/work/restore-workflow/target/dogfood-artifacts/betamax"
+Type "cd \"${JK_SOURCE_REPO:?Run just betamax-restore-preview}\" && bin=$PWD/target/debug/jk && fixture_root=$(bash scripts/workflows-demo-fixture.sh target/dogfood-artifacts) && printf 'JK_%s\\n' RESTORE_READY"
 Enter
-Wait
-Type "cd /Users/joshka/local/jk/work/restore-workflow && cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-restore-preview-build.log 2>&1"
-Enter
-Wait
-Type "rm -rf /tmp/jk-restore-preview-fixture"
-Enter
-Wait
-Type "mkdir -p /tmp/jk-restore-preview-fixture && cd /tmp/jk-restore-preview-fixture && jj git init --colocate"
-Enter
-Wait
-Type "printf 'base content\\n' > /tmp/jk-restore-preview-fixture/file.txt && cd /tmp/jk-restore-preview-fixture && jj file track file.txt && jj commit -m 'Base content'"
-Enter
-Wait
-Type "printf 'working content\\n' > /tmp/jk-restore-preview-fixture/file.txt && cd /tmp/jk-restore-preview-fixture && jj describe -m 'Working content'"
+Wait+Screen "JK_RESTORE_READY"
+Type "clear"
 Enter
 Wait
 Show
 
 Caption "Choose one source revision, then open Restore from the action menu."
-Type "/Users/joshka/local/jk/work/restore-workflow/target/debug/jk -R /tmp/jk-restore-preview-fixture -n 3"
+Type "\"$bin\" -R \"$fixture_root/restore\" -n 3"
 Enter
-Wait+Screen "Working content"
+Wait+Screen "Restore working content"
 Type "j"
 Sleep 300ms
 Type "a"
@@ -56,7 +44,7 @@ State target/dogfood-artifacts/betamax/restore-preview-00-confirm.json
 
 Caption "Escape cancels without changing the repository or losing log context."
 Escape
-Wait+Screen "Base content"
+Wait+Screen "Restore base"
 Sleep 700ms
 Screenshot target/dogfood-artifacts/betamax/restore-preview-01-cancelled.png
 State target/dogfood-artifacts/betamax/restore-preview-01-cancelled.json

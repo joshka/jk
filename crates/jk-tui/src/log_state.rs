@@ -162,10 +162,17 @@ impl LogState {
 
     /// Returns the full commit id for a visible stable change id.
     pub fn commit_id_for_change_id(&self, change_id: &str) -> Option<&str> {
-        self.entries
+        let mut matches = self
+            .entries
             .iter()
-            .find(|entry| entry.change_id() == change_id)
-            .map(LogEntry::commit_id)
+            .filter(|entry| entry.change_id() == change_id);
+        let entry = matches.next()?;
+        // Divergent changes have more than one commit. Do not guess which mark meant.
+        matches.next().is_none().then(|| entry.commit_id())
+    }
+
+    pub(crate) fn entries(&self) -> &[LogEntry] {
+        &self.entries
     }
 
     /// Selects the visible entry with the given change identifier or unique prefix.
@@ -742,6 +749,23 @@ fn entry_has_details(entry: &LogEntry) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn marked_change_resolution_rejects_divergent_commits() {
+        let state = LogState::new(LogSnapshot::new(
+            "@ aaa first\n○ aaa divergent\n○ bbb unique\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("aaa", "222", "divergent").with_rendered_line(1),
+                LogEntry::new("bbb", "333", "unique").with_rendered_line(2),
+            ],
+        ));
+
+        assert_eq!(state.commit_id_for_change_id("aaa"), None);
+        assert_eq!(state.commit_id_for_change_id("bbb"), Some("333"));
+        assert_eq!(state.commit_id_for_change_id("missing"), None);
+        assert_eq!(state.selected_commit_id(), Some("111"));
+    }
 
     #[test]
     fn refresh_keeps_selected_change_when_still_visible() {

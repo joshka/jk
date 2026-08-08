@@ -20,6 +20,7 @@ pub mod evolog;
 pub mod log;
 pub mod new;
 pub mod operation;
+pub mod rebase;
 pub mod recovery;
 pub mod restore;
 pub mod show;
@@ -38,6 +39,9 @@ pub use evolog::{EvologQuery, JjEvolog, JjEvologError};
 pub use log::{JjLog, JjLogCommand, JjLogError, LogTemplateSelection};
 pub use new::{JjNew, NewQuery};
 pub use operation::{JjOperation, JjOperationError, OperationQuery};
+pub use rebase::{
+    JjRebase, RebaseDestinationRole, RebaseQuery, RebaseQueryError, RebaseSourceRole,
+};
 pub use recovery::{JjRecovery, RecoveryCommand};
 pub use restore::{JjRestore, RestoreQuery};
 pub use show::{JjShow, JjShowError, ShowQuery};

@@ -23,6 +23,14 @@ pub enum BindingContext {
 /// Repository action selected from the context-aware action menu.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionMenuAction {
+    /// Add a workspace at a destination path.
+    AddWorkspace,
+    /// Rename the selected workspace.
+    RenameWorkspace,
+    /// Forget selected workspace metadata without deleting files.
+    ForgetWorkspace,
+    /// Update selected stale workspace metadata.
+    UpdateStaleWorkspace,
     /// Describe the selected revision.
     Describe,
     /// Create a new change from the selected or marked revisions.
@@ -44,6 +52,8 @@ pub enum ActionMenuAction {
 /// User-facing section in the action menu.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionMenuGroup {
+    /// Actions that manage workspace lifecycle metadata.
+    Workspace,
     /// Actions that change revisions or working-copy state.
     Change,
     /// Actions that recover through operation history.
@@ -55,6 +65,7 @@ impl ActionMenuGroup {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
+            Self::Workspace => "Workspace lifecycle",
             Self::Change => "Change actions",
             Self::Recovery => "History and recovery",
         }
@@ -64,6 +75,12 @@ impl ActionMenuGroup {
 /// Safety and execution cue shown before an action runs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionMenuSafety {
+    /// Creates a workspace directory after preview.
+    FilesystemCreate,
+    /// Changes workspace metadata after preview.
+    LocalMetadata,
+    /// Forgets metadata but leaves files on disk.
+    MetadataOnlyForget,
     /// The command rewrites local repository state and requires a preview.
     LocalRewrite,
     /// The command opens an inline editor whose Enter key saves the change immediately.
@@ -81,6 +98,9 @@ impl ActionMenuSafety {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
+            Self::FilesystemCreate => "creates files · preview",
+            Self::LocalMetadata => "local metadata · preview",
+            Self::MetadataOnlyForget => "forgets metadata · files stay",
             Self::LocalRewrite => "local rewrite · preview",
             Self::InlineSubmit => "local rewrite · enter saves",
             Self::ImmediateLocal => "local rewrite · runs now",
@@ -93,7 +113,9 @@ impl ActionMenuSafety {
     #[must_use]
     pub const fn compact_label(self) -> &'static str {
         match self {
-            Self::LocalRewrite => "preview",
+            Self::FilesystemCreate => "creates files",
+            Self::LocalMetadata | Self::LocalRewrite => "preview",
+            Self::MetadataOnlyForget => "files stay",
             Self::InlineSubmit => "enter saves",
             Self::ImmediateLocal => "runs now",
             Self::ConditionalDestructive => "checks first",
@@ -147,9 +169,13 @@ enum ActionId {
     Abandon,
     Squash,
     Restore,
+    Rebase,
     Undo,
     Redo,
     UpdateStale,
+    AddWorkspace,
+    RenameWorkspace,
+    ForgetWorkspace,
     ViewOptions,
     Refresh,
     SwitchLogCommand,
@@ -200,9 +226,13 @@ const fn default_help_group(action: ActionId) -> HelpGroup {
         | ActionId::EditChange
         | ActionId::Abandon
         | ActionId::Squash
+        | ActionId::Rebase
         | ActionId::Restore
         | ActionId::Mark
         | ActionId::ClearMarks => HelpGroup::Mutations,
+        ActionId::AddWorkspace | ActionId::RenameWorkspace | ActionId::ForgetWorkspace => {
+            HelpGroup::Mutations
+        }
         ActionId::OpenCommandHistory
         | ActionId::OpenCommandDetails
         | ActionId::CopyCommand
@@ -269,10 +299,14 @@ impl ActionId {
             Self::EditChange => "Edit change",
             Self::Abandon => "Abandon revision",
             Self::Squash => "Squash revisions",
+            Self::Rebase => "Rebase revisions",
             Self::Restore => "Restore all paths",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
+            Self::AddWorkspace => "Add workspace",
+            Self::RenameWorkspace => "Rename workspace",
+            Self::ForgetWorkspace => "Forget workspace metadata",
             Self::ViewOptions => "View options",
             Self::Refresh => "Refresh",
             Self::SwitchLogCommand => "Switch log command",
@@ -309,6 +343,8 @@ pub enum CommandFamily {
     JjEdit,
     /// Commands and actions related to `jj squash`.
     JjSquash,
+    /// Commands related to `jj rebase`.
+    JjRebase,
     /// Commands and actions related to `jj restore`.
     JjRestore,
     /// Commands and actions related to `jj evolog`.
@@ -357,6 +393,7 @@ impl CommandFamily {
             Self::JjNew => "jj new",
             Self::JjEdit => "jj edit",
             Self::JjSquash => "jj squash",
+            Self::JjRebase => "jj rebase",
             Self::JjRestore => "jj restore",
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
@@ -523,6 +560,9 @@ const LOG_BINDINGS: &[KeyBinding] = &[
             ActionMenuSafety::ImmediateLocal,
             30,
         ),
+    KeyBinding::new(ActionId::Rebase, "R", "choose rebase destination")
+        .with_family(CommandFamily::JjRebase)
+        .with_aliases(&["rebase", "branch", "source", "destination", "preview"]),
     KeyBinding::new(ActionId::Squash, "a s", "preview jj squash")
         .with_family(CommandFamily::JjSquash)
         .with_aliases(&[
@@ -749,6 +789,58 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
 ];
 
 const WORKSPACES_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(ActionId::AddWorkspace, "a a", "add workspace")
+        .with_family(CommandFamily::JjWorkspace)
+        .with_aliases(&["workspace", "add", "create", "destination", "preview"])
+        .with_action_menu(
+            ActionMenuAction::AddWorkspace,
+            "a",
+            ActionMenuGroup::Workspace,
+            ActionMenuSafety::FilesystemCreate,
+            10,
+        ),
+    KeyBinding::new(
+        ActionId::RenameWorkspace,
+        "a r",
+        "rename selected workspace",
+    )
+    .with_family(CommandFamily::JjWorkspace)
+    .with_aliases(&["workspace", "rename", "name", "preview"])
+    .with_action_menu(
+        ActionMenuAction::RenameWorkspace,
+        "r",
+        ActionMenuGroup::Workspace,
+        ActionMenuSafety::LocalMetadata,
+        20,
+    ),
+    KeyBinding::new(
+        ActionId::ForgetWorkspace,
+        "a f",
+        "forget selected workspace metadata",
+    )
+    .with_family(CommandFamily::JjWorkspace)
+    .with_aliases(&["workspace", "forget", "metadata", "files stay", "preview"])
+    .with_action_menu(
+        ActionMenuAction::ForgetWorkspace,
+        "f",
+        ActionMenuGroup::Workspace,
+        ActionMenuSafety::MetadataOnlyForget,
+        30,
+    ),
+    KeyBinding::new(
+        ActionId::UpdateStale,
+        "a u",
+        "update selected stale workspace",
+    )
+    .with_family(CommandFamily::JjWorkspace)
+    .with_aliases(&["update", "stale", "workspace", "metadata", "preview"])
+    .with_action_menu(
+        ActionMenuAction::UpdateStaleWorkspace,
+        "u",
+        ActionMenuGroup::Workspace,
+        ActionMenuSafety::LocalMetadata,
+        40,
+    ),
     KeyBinding::new(ActionId::OpenLog, "l", "open selected workspace log")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["log", "workspace", "selected"])
@@ -1871,10 +1963,25 @@ mod tests {
             BindingContext::Inspection,
             BindingContext::CommandHistory,
             BindingContext::OperationLog,
-            BindingContext::Workspaces,
         ] {
             assert!(action_menu_rows(context).is_empty(), "{context:?}");
         }
+    }
+
+    #[test]
+    fn workspace_action_menu_exposes_lifecycle_with_metadata_safety() {
+        let rows = action_menu_rows(BindingContext::Workspaces);
+        assert_eq!(
+            rows.iter().map(|row| row.action).collect::<Vec<_>>(),
+            vec![
+                ActionMenuAction::AddWorkspace,
+                ActionMenuAction::RenameWorkspace,
+                ActionMenuAction::ForgetWorkspace,
+                ActionMenuAction::UpdateStaleWorkspace,
+            ]
+        );
+        assert_eq!(rows[2].safety, ActionMenuSafety::MetadataOnlyForget);
+        assert_eq!(rows[2].safety.label(), "forgets metadata · files stay");
     }
 
     #[test]

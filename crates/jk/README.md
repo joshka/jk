@@ -48,10 +48,11 @@ cargo install jk --locked
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
-- rebase, split, file/hunk restore, bookmarks, fetch, and push are still planned workflows;
+- split, file/hunk restore, bookmarks, fetch, and push are still planned workflows;
+- `R` selects a rebase destination and previews exact source/placement roles before confirmation;
 - squash currently moves whole changes only; file and hunk selection remains planned;
-- the action menu currently covers describe, new, edit, squash, restore, abandon, undo, and redo from the
-  log; revision rebase, refs, remote, and workspace actions remain planned.
+- the log action menu covers describe, new, edit, squash, restore, abandon, undo, and redo;
+  rebase is available through `R` and workspace actions through `W`, then `a`.
 
 Use `?` inside the TUI for full screen-specific key help. The repository's
 [Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) guide has

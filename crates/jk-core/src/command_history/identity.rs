@@ -59,6 +59,8 @@ pub enum CommandFamily {
     JjEdit,
     /// `jj squash`.
     JjSquash,
+    /// `jj rebase`.
+    JjRebase,
     /// `jj evolog`.
     JjEvolog,
     /// `jj workspace ...`.
@@ -91,6 +93,7 @@ impl CommandFamily {
             "new" => Self::JjNew,
             "edit" => Self::JjEdit,
             "squash" => Self::JjSquash,
+            "rebase" => Self::JjRebase,
             "evolog" => Self::JjEvolog,
             "workspace" => Self::JjWorkspace,
             "op" => Self::JjOperation,
@@ -189,6 +192,8 @@ pub enum SourceAction {
     EditRevision,
     /// Squash marked source revisions into the selected destination.
     SquashRevision,
+    /// Rebase a revision with explicit source and destination roles.
+    RebaseRevision,
     /// Restore all paths from the selected revision into the working copy.
     RestoreRevision,
     /// List workspaces.
@@ -199,6 +204,12 @@ pub enum SourceAction {
     WorkspaceLog,
     /// Show selected workspace diff.
     WorkspaceDiff,
+    /// Add a workspace.
+    WorkspaceAdd,
+    /// Rename a workspace.
+    WorkspaceRename,
+    /// Forget workspace metadata without deleting files.
+    WorkspaceForget,
     /// Run selected workspace update-stale.
     WorkspaceUpdateStale,
     /// List repository operations.

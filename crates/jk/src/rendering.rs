@@ -19,6 +19,10 @@ pub fn render_app(
     let mode = state.modes.active().cloned();
     match state.views.active_mut() {
         AppView::Log(log) => match &mode {
+            Some(InputMode::RebaseDestination { pending }) => {
+                log.render(frame);
+                pending.render(frame);
+            }
             Some(InputMode::ActionMenu { context, selected }) => {
                 log.render(frame);
                 let width = usize::from(frame.area().width.saturating_sub(6));
@@ -62,12 +66,18 @@ pub fn render_app(
                     dialog.render(frame);
                 }
             }
-            Some(InputMode::CommandPreview { pending }) => {
+            Some(InputMode::CommandPreview { .. }) => {
                 log.render(frame);
-                CommandPreviewView::new(pending.preview.clone())
+                let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() else {
+                    return;
+                };
+                let view = CommandPreviewView::new(pending.preview.clone())
                     .with_status(pending.copy_status.clone())
-                    .with_details(pending.details.clone())
-                    .render(frame);
+                    .with_details(pending.details.clone());
+                pending.can_confirm = view.can_confirm(frame.area());
+                pending.max_scroll = view.max_scroll(frame.area());
+                pending.scroll = pending.scroll.min(pending.max_scroll);
+                view.with_scroll(pending.scroll).render(frame);
             }
             _ => log.render(frame),
         },
@@ -102,6 +112,18 @@ pub fn render_app(
         AppView::Evolog { view, .. } => render_inspection(frame, view, &mode, template),
         AppView::Status { view, .. } => render_inspection(frame, view, &mode, template),
         AppView::Workspaces { view } => match &mode {
+            Some(InputMode::ActionMenu { context, selected }) => {
+                view.render(frame);
+                let width = usize::from(frame.area().width.saturating_sub(6));
+                let lines = action_menu_lines(*context, *selected, width);
+                render_mode_overlay(frame, "Actions", &lines);
+            }
+            Some(InputMode::WorkspaceLifecycle { .. }) => {
+                view.render(frame);
+                if let Some(InputMode::WorkspaceLifecycle { dialog }) = state.modes.active_mut() {
+                    dialog.render(frame);
+                }
+            }
             Some(InputMode::ViewOptions { context, selected }) => {
                 let lines = view_options_lines(*context, *selected, template, None);
                 view.render(frame);

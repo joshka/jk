@@ -117,6 +117,11 @@ impl Args {
         self.with_repository(JjRestore::default())
     }
 
+    /// Builds the command source for the explicit rebase picker.
+    pub(crate) fn rebase_source(&self) -> jk_cli::JjRebase {
+        self.with_repository(jk_cli::JjRebase::default())
+    }
+
     /// Builds the operation source for operation log/show/diff inspection.
     pub(crate) fn operation_source(&self) -> JjOperation {
         self.with_repository(JjOperation::default())
@@ -257,6 +262,7 @@ impl_with_repository!(
     JjOperation,
     JjRecovery,
     JjRestore,
+    jk_cli::JjRebase,
     JjShow,
     JjSquash,
     JjStatus,

@@ -253,6 +253,9 @@ impl ModeStack {
 /// Transient input modes owned by the terminal loop.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InputMode {
+    RebaseDestination {
+        pending: crate::rebase::PendingRebase,
+    },
     ActionMenu {
         context: BindingContext,
         selected: usize,
@@ -285,6 +288,9 @@ pub enum InputMode {
     },
     CommandPreview {
         pending: PendingCommandPreview,
+    },
+    WorkspaceLifecycle {
+        dialog: Box<crate::workspace_lifecycle::WorkspaceLifecycleDialog>,
     },
     JjCommand {
         input: String,

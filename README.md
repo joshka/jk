@@ -63,10 +63,11 @@ Use `?` inside `jk` for the full key list for the active screen. For task-orient
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
-- rebase, split, file/hunk restore, bookmarks, fetch, and push are still planned workflows;
+- split, file/hunk restore, bookmarks, fetch, and push are still planned workflows;
+- `R` selects a rebase destination and previews exact source/placement roles before confirmation;
 - squash currently moves whole changes only; file and hunk selection remains planned;
-- the action menu currently covers describe, new, edit, squash, restore, abandon, undo, and redo from the
-  log; revision rebase, refs, remote, and workspace actions remain planned.
+- the log action menu covers describe, new, edit, squash, restore, abandon, undo, and redo;
+  rebase is available through `R` and workspace actions through `W`, then `a`.
 
 ## First Useful Paths
 
@@ -113,7 +114,7 @@ The detailed product and engineering plan lives in
 
 The current stabilization direction is:
 
-- stabilize the current jk surface before starting rebase;
+- stabilize the integrated rebase, squash, restore, and workspace workflows;
 - keep README, crate README, changelog, website, and media aligned with released behavior;
 - keep mutating workflows behind command previews, command history, and operation recovery;
 - make [Betamax](https://www.joshka.net/betamax/) tapes the source for regression tests,

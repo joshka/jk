@@ -77,9 +77,11 @@ for safety-sensitive actions.
   run immediately, `a a` checks emptiness before abandoning, and only non-empty revisions open the
   destructive preview. `m`/`n`/`e`/`u`/`U` are menu-only.
   `jj new` already uses ordered marks as parents when present and falls back to the selected revision.
-  Rebase, squash, fileset/hunk restore, refs, remote, and workspace menu actions remain follow-up
-  selector workflows.
-- Add rebase destination search and command preview before any graph mutation.
+  Whole-change squash and all-path restore now use explicit-role confirmation previews.
+  Workspace add, rename, forget, and update-stale use the workspace action menu.
+- Rebase destination search and exact-command confirmation are implemented through `R`.
+  The default is revision-only onto; branch, source-and-descendants, and insertion modes are explicit.
+  Multi-parent destinations and ghost previews remain follow-up work.
 - Add undo/redo and operation log entry points.
 - Log every mutation in command history.
 - Make operation recovery visible after every mutation.
@@ -90,7 +92,7 @@ Bring file and hunk workflows into the same command-shaped model.
 
 - Add shared selector models for revisions, filesets, operations, bookmarks, tags, remotes, and
   workspaces before expanding content command forms.
-- Add squash, split, diffedit, and absorb flows. The first restore slice now previews an explicit
+- Whole-change squash is implemented. Split, diffedit, and absorb remain. Restore previews an explicit
   selected-commit source, `@` destination, and all-path scope; fileset and hunk restore remain.
 - Support file selection first, then hunk-aware paths where jj/editor support is strong enough.
 - Add conflict and resolve affordances after the file model is stable.
@@ -333,6 +335,9 @@ Make graph mutation safer by resolving roles visibly before running jj.
 - Acceptance: users can search to a destination, see the exact rebase command, cancel safely, and
   reach operation recovery after success.
 - Tests: role resolver tests, rebase fixture tests, and Betamax rebase-preview tape.
+- Implemented scope: one exact source, visible-destination search, explicit roles, cancellation,
+  shared confirmation, recorded operation, and refreshed log. Combined evidence is reproducible with
+  `just betamax-workflows`; multi-parent selection and ghost previews remain deferred.
 
 ### Harden jj Integration Boundary
 

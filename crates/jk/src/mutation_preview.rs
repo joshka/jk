@@ -13,9 +13,28 @@ pub struct PendingCommandPreview {
     pub(crate) details: Vec<String>,
     pub(crate) reselect_change_id: Option<String>,
     pub(crate) copy_status: Option<String>,
+    /// Updated by rendering; confirmation is disabled until its controls are visible.
+    pub(crate) can_confirm: bool,
+    pub(crate) scroll: u16,
+    pub(crate) max_scroll: u16,
 }
 
 impl PendingCommandPreview {
+    pub(crate) fn rebase(preview: CommandPreview, details: Vec<String>) -> Self {
+        Self {
+            preview,
+            details,
+            source_action: SourceAction::RebaseRevision,
+            source_key: "R",
+            failure_label: "jj rebase",
+            success_message: "Rebased revisions · a u undo · C history · o operations",
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
     pub(crate) const fn describe(preview: CommandPreview) -> Self {
         Self {
             preview,
@@ -26,6 +45,9 @@ impl PendingCommandPreview {
             details: Vec::new(),
             reselect_change_id: None,
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -39,6 +61,9 @@ impl PendingCommandPreview {
             details: Vec::new(),
             reselect_change_id: None,
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -52,6 +77,9 @@ impl PendingCommandPreview {
             details: Vec::new(),
             reselect_change_id: None,
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -64,6 +92,9 @@ impl PendingCommandPreview {
             success_message: "Edited revision",
             reselect_change_id: None,
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
             details: Vec::new(),
         }
     }
@@ -77,6 +108,9 @@ impl PendingCommandPreview {
             success_message: "Restored all paths into working copy",
             reselect_change_id: None,
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
             details: vec![
                 format!("Source: {source}"),
                 "Destination: @ (working copy)".to_owned(),
@@ -95,6 +129,9 @@ impl PendingCommandPreview {
             details: Vec::new(),
             reselect_change_id: None,
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -108,6 +145,9 @@ impl PendingCommandPreview {
             details: Vec::new(),
             reselect_change_id: None,
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -121,6 +161,9 @@ impl PendingCommandPreview {
             details: selection.preview_details(),
             reselect_change_id: Some(selection.destination_change_id().to_owned()),
             copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 }
@@ -172,12 +215,16 @@ fn strip_ansi(text: &str) -> String {
 }
 
 pub fn command_failure_message(command: &str, stderr: &[u8], stdout: &[u8]) -> String {
-    let stderr = String::from_utf8_lossy(stderr).trim().to_owned();
+    let stderr = strip_ansi(&String::from_utf8_lossy(stderr))
+        .trim()
+        .to_owned();
     if !stderr.is_empty() {
         return format!("{command} failed: {stderr}");
     }
 
-    let stdout = String::from_utf8_lossy(stdout).trim().to_owned();
+    let stdout = strip_ansi(&String::from_utf8_lossy(stdout))
+        .trim()
+        .to_owned();
     if !stdout.is_empty() {
         return format!("{command} failed: {stdout}");
     }

@@ -27,8 +27,8 @@ use jk_cli::RecoveryCommand;
 use jk_cli::{
     DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjCommandRunner,
     JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery,
-    JjRestore, JjShow, JjSquash, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
-    RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
+    JjRestore, JjShow, JjSquash, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery,
+    OperationQuery, RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
     WorkspaceInspectionQuery,
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
@@ -60,6 +60,7 @@ mod menus;
 mod mutation_preview;
 mod mutations;
 mod operation_log;
+mod rebase;
 mod refresh;
 mod rendering;
 mod root_views;
@@ -68,6 +69,7 @@ mod squash;
 mod state;
 #[cfg(test)]
 mod test_support;
+mod workspace_lifecycle;
 mod workspace_routes;
 mod workspaces;
 
@@ -118,12 +120,11 @@ use state::{AppState, AppView, InputMode, InputModeResult, ModeStack};
 use workspace_routes::{
     WorkspaceInspectionKind, open_workspaces, push_selected_workspace_diff,
     push_selected_workspace_log, push_selected_workspace_status, push_status,
-    update_selected_workspace_stale,
 };
 #[cfg(test)]
 use workspace_routes::{
     open_workspaces_with_runner, push_selected_workspace_log_with_runner, push_status_with_runner,
-    push_workspace_view,
+    push_workspace_view, update_selected_workspace_stale,
 };
 use workspaces::{workspace_action_for_log_action, workspace_inspection_action_for_log_action};
 
@@ -143,6 +144,7 @@ fn main() -> Result<()> {
     let edit_source = args.edit_source();
     let squash_source = args.squash_source();
     let restore_source = args.restore_source();
+    let rebase_source = args.rebase_source();
     let operation_source = args.operation_source();
     let recovery_source = args.recovery_source();
     let workspaces_source = args.workspaces_source();
@@ -177,6 +179,7 @@ fn main() -> Result<()> {
         &edit_source,
         &squash_source,
         &restore_source,
+        &rebase_source,
         &operation_source,
         &recovery_source,
         &workspaces_source,
@@ -204,6 +207,7 @@ fn run_terminal(
     edit_source: &JjEdit,
     squash_source: &JjSquash,
     restore_source: &JjRestore,
+    rebase_source: &jk_cli::JjRebase,
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
@@ -240,11 +244,12 @@ fn run_terminal(
 
         match event {
             Event::Key(key) => {
-                let mode_result = handle_input_mode(
+                let mode_result = handle_input_mode_with_workspaces(
                     &mut state,
                     &mut source,
                     diff_source,
                     describe_source,
+                    workspaces_source,
                     command_repository.as_deref(),
                     key,
                 );
@@ -267,6 +272,7 @@ fn run_terminal(
                     edit: edit_source,
                     squash: squash_source,
                     restore: restore_source,
+                    rebase: rebase_source,
                     operation: operation_source,
                     recovery: recovery_source,
                     workspaces: workspaces_source,
@@ -288,14 +294,21 @@ fn run_terminal(
 }
 
 /// Handles key input while a prompt-like mode is active.
-fn handle_input_mode(
+fn handle_input_mode_with_workspaces(
     state: &mut AppState,
     source: &mut JjLog,
     diff_source: &JjDiff,
     describe_source: &JjDescribe,
+    workspaces_source: &JjWorkspaces,
     command_repository: Option<&Path>,
     key: KeyEvent,
 ) -> InputModeResult {
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::RebaseDestination { .. })
+    ) {
+        return rebase::handle_input(state, key);
+    }
     if matches!(state.modes.active(), Some(InputMode::ActionMenu { .. })) {
         return handle_action_menu_mode(state, key);
     }
@@ -323,6 +336,32 @@ fn handle_input_mode(
     }
     if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
         return handle_command_preview_mode(state, source, key);
+    }
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::WorkspaceLifecycle { .. })
+    ) {
+        let decision = match state.modes.active_mut() {
+            Some(InputMode::WorkspaceLifecycle { dialog }) => dialog.input(key, workspaces_source),
+            _ => unreachable!(),
+        };
+        match decision {
+            workspace_lifecycle::DialogDecision::Stay => {}
+            workspace_lifecycle::DialogDecision::Cancel => {
+                state.modes.pop();
+            }
+            workspace_lifecycle::DialogDecision::Run(spec, kind, preferred) => {
+                state.modes.pop();
+                workspace_routes::execute_workspace_lifecycle(
+                    state,
+                    workspaces_source,
+                    spec,
+                    kind,
+                    preferred,
+                );
+            }
+        }
+        return InputModeResult::Handled;
     }
     if matches!(state.modes.active(), Some(InputMode::JjCommand { .. })) {
         return handle_jj_command_mode(state, command_repository, key);
@@ -371,6 +410,8 @@ fn handle_input_mode(
                     unreachable!()
                 }
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::RebaseDestination { .. } => unreachable!(),
+                InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
@@ -403,6 +444,8 @@ fn handle_input_mode(
                     unreachable!()
                 }
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::RebaseDestination { .. } => unreachable!(),
+                InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
@@ -423,6 +466,28 @@ fn handle_command_preview_mode(
     }
     match key {
         KeyEvent {
+            code:
+                KeyCode::Down
+                | KeyCode::PageDown
+                | KeyCode::Up
+                | KeyCode::PageUp
+                | KeyCode::Home
+                | KeyCode::End,
+            ..
+        } => {
+            if let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() {
+                pending.scroll = match key.code {
+                    KeyCode::Down => pending.scroll.saturating_add(1),
+                    KeyCode::PageDown => pending.scroll.saturating_add(10),
+                    KeyCode::Up => pending.scroll.saturating_sub(1),
+                    KeyCode::PageUp => pending.scroll.saturating_sub(10),
+                    KeyCode::End => pending.max_scroll,
+                    _ => 0,
+                }
+                .min(pending.max_scroll);
+            }
+        }
+        KeyEvent {
             code: KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q'),
             modifiers,
             ..
@@ -433,6 +498,10 @@ fn handle_command_preview_mode(
             code: KeyCode::Enter,
             ..
         } => {
+            if !matches!(state.modes.active(), Some(InputMode::CommandPreview { pending }) if pending.can_confirm)
+            {
+                return InputModeResult::Handled;
+            }
             let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
                 return InputModeResult::Handled;
             };
@@ -450,6 +519,25 @@ fn handle_command_preview_mode(
         _ => {}
     }
     InputModeResult::Handled
+}
+#[cfg(test)]
+fn handle_input_mode(
+    state: &mut AppState,
+    source: &mut JjLog,
+    diff_source: &JjDiff,
+    describe_source: &JjDescribe,
+    command_repository: Option<&Path>,
+    key: KeyEvent,
+) -> InputModeResult {
+    handle_input_mode_with_workspaces(
+        state,
+        source,
+        diff_source,
+        describe_source,
+        &JjWorkspaces::default(),
+        command_repository,
+        key,
+    )
 }
 fn handle_action_menu_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
     match key {

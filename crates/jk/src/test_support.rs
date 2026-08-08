@@ -132,6 +132,11 @@ pub struct SequencedRunner {
 }
 
 impl SequencedRunner {
+    pub fn results(outputs: Vec<io::Result<Output>>) -> Self {
+        Self {
+            outputs: outputs.into(),
+        }
+    }
     pub(crate) fn successes(outputs: Vec<Output>) -> Self {
         Self {
             outputs: outputs.into_iter().map(Ok).collect(),

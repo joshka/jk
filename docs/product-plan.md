@@ -13,6 +13,10 @@ current implementation. The README and crate README should continue to describe 
 today; this plan describes the product direction, design contracts, and reviewable slices needed to
 get there.
 
+The [safe workflow integration](workflow-integration.md) records the implemented rebase,
+whole-change squash, all-path restore, and workspace lifecycle slice, its recovered inputs, and
+reproducible combined Betamax evidence. Broader forms below remain roadmap targets.
+
 Treat strong claims in this document as one of three things:
 
 - **Current behavior:** backed by the live repo, README, crate docs, or existing tapes.

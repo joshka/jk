@@ -1,21 +1,22 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use jk_cli::{
-    JjAbandon, JjDiff, JjEdit, JjEvolog, JjLog, JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash,
-    JjStatus, JjWorkspaces, RecoveryCommand,
+    JjAbandon, JjDiff, JjEdit, JjEvolog, JjLog, JjNew, JjOperation, JjRecovery, JjRestore, JjShow,
+    JjSquash, JjStatus, JjWorkspaces, RecoveryCommand,
 };
 use jk_tui::log_view::LogAction;
 
 use crate::key::AppKey;
 use crate::state::{AppState, AppView, InputMode};
+use crate::workspace_lifecycle::WorkspaceLifecycleKind;
 use crate::{
     AppLoop, SearchDirection, abandon_or_preview, apply_action, apply_search_action,
     copy_selected_command, edit_command_output, execute_edit_action, execute_new_action,
     execute_recovery_action, handle_back_with_log_source, open_action_menu, open_command_discovery,
     open_command_history, open_command_history_operation, open_diff_file_list,
-    open_jj_command_mode, open_operation_log, open_restore_preview, open_squash_preview, open_view_options,
-    open_workspaces, push_selected_command_history_details, push_selected_evolog,
-    push_selected_operation_show, push_selected_show, push_selected_workspace_status, push_status,
-    update_selected_workspace_stale,
+    open_jj_command_mode, open_operation_log, open_restore_preview, open_squash_preview,
+    open_view_options, open_workspaces, push_selected_command_history_details,
+    push_selected_evolog, push_selected_operation_show, push_selected_show,
+    push_selected_workspace_status, push_status,
 };
 
 pub struct AppSources<'a> {
@@ -29,6 +30,7 @@ pub struct AppSources<'a> {
     pub(crate) edit: &'a JjEdit,
     pub(crate) squash: &'a JjSquash,
     pub(crate) restore: &'a JjRestore,
+    pub(crate) rebase: &'a jk_cli::JjRebase,
     pub(crate) operation: &'a JjOperation,
     pub(crate) recovery: &'a JjRecovery,
     pub(crate) workspaces: &'a JjWorkspaces,
@@ -149,7 +151,11 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         }
         AppKey::StartUndo => {
             if matches!(state.views.active(), AppView::Workspaces { .. }) {
-                update_selected_workspace_stale(state, sources.workspaces);
+                crate::workspace_routes::open_workspace_lifecycle(
+                    state,
+                    sources.workspaces,
+                    WorkspaceLifecycleKind::UpdateStale,
+                );
             }
         }
         AppKey::RunUndo => {
@@ -176,6 +182,27 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         AppKey::StartRestore => {
             open_restore_preview(state, sources.restore);
         }
+        AppKey::StartRebase => crate::rebase::open_rebase_destination(state, sources.rebase),
+        AppKey::StartWorkspaceAdd => crate::workspace_routes::open_workspace_lifecycle(
+            state,
+            sources.workspaces,
+            WorkspaceLifecycleKind::Add,
+        ),
+        AppKey::StartWorkspaceRename => crate::workspace_routes::open_workspace_lifecycle(
+            state,
+            sources.workspaces,
+            WorkspaceLifecycleKind::Rename,
+        ),
+        AppKey::StartWorkspaceForget => crate::workspace_routes::open_workspace_lifecycle(
+            state,
+            sources.workspaces,
+            WorkspaceLifecycleKind::Forget,
+        ),
+        AppKey::StartWorkspaceUpdateStale => crate::workspace_routes::open_workspace_lifecycle(
+            state,
+            sources.workspaces,
+            WorkspaceLifecycleKind::UpdateStale,
+        ),
         AppKey::OpenViewOptions => {
             if !matches!(state.views.active(), AppView::CommandHistory { .. }) {
                 open_view_options(state);
@@ -274,6 +301,7 @@ mod tests {
         let edit = JjEdit::default();
         let squash = JjSquash::default();
         let restore = JjRestore::default();
+        let rebase = jk_cli::JjRebase::default();
         let operation = JjOperation::default();
         let recovery = JjRecovery::default();
         let workspaces = JjWorkspaces::default();
@@ -288,6 +316,7 @@ mod tests {
             edit: &edit,
             squash: &squash,
             restore: &restore,
+            rebase: &rebase,
             operation: &operation,
             recovery: &recovery,
             workspaces: &workspaces,
