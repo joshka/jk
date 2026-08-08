@@ -1,8 +1,11 @@
 //! Shared execution adapter for typed `jj` command specs.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Output, Stdio};
-use std::time::SystemTime;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use jk_core::{
     ColorPolicy, CommandHistory, CommandRecordFinish, CommandRecordStart, CommandResultSummary,
@@ -41,6 +44,55 @@ pub struct SystemJjCommandRunner;
 impl JjCommandRunner for SystemJjCommandRunner {
     fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
         run_system_jj_spec(spec)
+    }
+}
+
+/// Shared cancellation signal for a running read-only command.
+///
+/// Cancellation is cooperative at the runner boundary: the system runner observes the signal,
+/// terminates the child process, drains its output, and reaps it before returning an interrupted
+/// I/O error. Clones refer to the same signal.
+#[derive(Clone, Debug, Default)]
+pub struct CancellationToken {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl CancellationToken {
+    /// Creates a signal in the active state.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Requests cancellation of work observing this signal.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+    }
+
+    /// Returns whether cancellation has been requested.
+    #[must_use]
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+}
+
+/// Executes system `jj` commands while observing a cancellation signal.
+#[derive(Clone, Debug)]
+pub struct CancellableSystemJjCommandRunner {
+    cancellation: CancellationToken,
+}
+
+impl CancellableSystemJjCommandRunner {
+    /// Creates a runner tied to `cancellation`.
+    #[must_use]
+    pub const fn new(cancellation: CancellationToken) -> Self {
+        Self { cancellation }
+    }
+}
+
+impl JjCommandRunner for CancellableSystemJjCommandRunner {
+    fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
+        run_system_jj_spec_with_cancellation(spec, Some(&self.cancellation))
     }
 }
 
@@ -193,6 +245,13 @@ fn looks_like_operation_id(value: &str) -> bool {
 }
 
 fn run_system_jj_spec(spec: &JjCommandSpec) -> std::io::Result<Output> {
+    run_system_jj_spec_with_cancellation(spec, None)
+}
+
+fn run_system_jj_spec_with_cancellation(
+    spec: &JjCommandSpec,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<Output> {
     let mut command = build_jj_command(spec);
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
@@ -204,12 +263,74 @@ fn run_system_jj_spec(spec: &JjCommandSpec) -> std::io::Result<Output> {
     if let Some(stdin) = spec.stdin() {
         let child_stdin = child
             .stdin
-            .as_mut()
+            .take()
             .ok_or_else(|| std::io::Error::other("stdin was not piped"))?;
-        child_stdin.write_all(stdin.as_bytes())?;
+        write_child_stdin(child_stdin, stdin.as_bytes())?;
     }
 
-    child.wait_with_output()
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| std::io::Error::other("stdout was not piped"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| std::io::Error::other("stderr was not piped"))?;
+
+    thread::scope(|scope| {
+        let stdout_reader = scope.spawn(|| read_all(stdout));
+        let stderr_reader = scope.spawn(|| read_all(stderr));
+        let (status, cancelled) = wait_for_child(&mut child, cancellation)?;
+        let stdout = join_reader(stdout_reader)?;
+        let stderr = join_reader(stderr_reader)?;
+
+        if cancelled {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Interrupted,
+                "jj command cancelled",
+            ));
+        }
+
+        Ok(Output {
+            status,
+            stdout,
+            stderr,
+        })
+    })
+}
+
+fn write_child_stdin(mut stdin: impl Write, bytes: &[u8]) -> std::io::Result<()> {
+    stdin.write_all(bytes)
+}
+
+fn read_all(mut reader: impl Read) -> std::io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn join_reader(
+    reader: thread::ScopedJoinHandle<'_, std::io::Result<Vec<u8>>>,
+) -> std::io::Result<Vec<u8>> {
+    reader
+        .join()
+        .map_err(|_| std::io::Error::other("jj output reader panicked"))?
+}
+
+fn wait_for_child(
+    child: &mut std::process::Child,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<(std::process::ExitStatus, bool)> {
+    loop {
+        if cancellation.is_some_and(CancellationToken::is_cancelled) {
+            let _ = child.kill();
+            return child.wait().map(|status| (status, true));
+        }
+        if let Some(status) = child.try_wait()? {
+            return Ok((status, false));
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 fn finish_from_output(output: &Output, ended_at: SystemTime) -> CommandRecordFinish {
@@ -366,6 +487,24 @@ mod tests {
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("jj "));
         assert!(output.stderr.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_kills_and_reaps_a_slow_child() {
+        let mut child = Command::new("sh")
+            .args(["-c", "while :; do :; done"])
+            .spawn()
+            .expect("spawn fake slow command");
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+
+        let (status, cancelled) =
+            wait_for_child(&mut child, Some(&cancellation)).expect("reap cancelled child");
+
+        assert!(cancelled);
+        assert!(!status.success());
+        assert!(child.try_wait().expect("child already reaped").is_some());
     }
 
     #[test]

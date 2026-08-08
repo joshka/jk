@@ -14,6 +14,7 @@
 
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use clap::Parser;
 use color_eyre::Result;
@@ -61,6 +62,7 @@ mod mutation_preview;
 mod mutations;
 mod operation_log;
 mod refresh;
+pub mod refresh_runner;
 mod rendering;
 mod root_views;
 mod runner;
@@ -98,10 +100,10 @@ use mutations::{
 use refresh::show_log_template_load_error;
 use refresh::{
     OperationRenderedKind, apply_log_template_selection, operation_rendered_transition,
-    refresh_diff, refresh_evolog, refresh_log, refresh_operation_log, refresh_operation_rendered,
-    refresh_show, refresh_status, refresh_workspace_inspection, refresh_workspaces,
-    switch_log_command,
+    refresh_diff, refresh_evolog, refresh_operation_log, refresh_operation_rendered, refresh_show,
+    refresh_status, refresh_workspace_inspection, refresh_workspaces, switch_log_command,
 };
+use refresh_runner::{LogRefreshRunner, RefreshCompletion};
 use rendering::render_app;
 use root_views::{
     root_diff_view, root_log_view, root_show_view, root_status_view, root_workspaces_view,
@@ -212,20 +214,24 @@ fn run_terminal(
     let mut state = AppState::with_history(app, history);
 
     loop {
+        if apply_log_refresh_completions(&mut state, &source) {
+            needs_redraw = true;
+        }
+
         if needs_redraw {
             terminal.draw(|frame| render_app(frame, &mut state, source.template()))?;
             needs_redraw = false;
         }
 
-        let event = if let Some(timeout) = state.toast_timeout() {
-            if !event::poll(timeout)? {
-                needs_redraw = true;
-                continue;
-            }
-            event::read()?
-        } else {
-            event::read()?
-        };
+        let refresh_poll = Duration::from_millis(50);
+        let timeout = state
+            .toast_timeout()
+            .map_or(refresh_poll, |toast| toast.min(refresh_poll));
+        if !event::poll(timeout)? {
+            needs_redraw = state.toast_timeout().is_some();
+            continue;
+        }
+        let event = event::read()?;
 
         match event {
             Event::Key(key) => {
@@ -272,6 +278,39 @@ fn run_terminal(
     }
 
     Ok(())
+}
+
+fn apply_log_refresh_completions(state: &mut AppState, source: &JjLog) -> bool {
+    let completions = state.refreshes.drain();
+    if completions.is_empty() {
+        return false;
+    }
+
+    for completion in completions {
+        let result = match completion {
+            RefreshCompletion::Current(result) => Some(result),
+            RefreshCompletion::Superseded(result) => {
+                state.history.absorb(result.history);
+                None
+            }
+        };
+        let Some(result) = result else {
+            continue;
+        };
+        state.history.absorb(result.history);
+        if &result.source != source {
+            continue;
+        }
+        let AppView::Log(log) = state.views.active_mut() else {
+            continue;
+        };
+        match result.outcome {
+            Ok(snapshot) => log.refresh(snapshot),
+            Err(error) => log.show_error(format!("Refresh failed: {error}")),
+        }
+    }
+
+    true
 }
 
 /// Handles key input while a prompt-like mode is active.
@@ -1287,9 +1326,16 @@ fn apply_action(
     action: jk_tui::log_view::LogAction,
 ) -> AppLoop {
     let transition = {
-        let AppState { views, history, .. } = state;
+        let AppState {
+            views,
+            history,
+            refreshes,
+            ..
+        } = state;
         match views.active_mut() {
-            AppView::Log(log) => apply_log_action(log, history, source, diff_source, action),
+            AppView::Log(log) => {
+                apply_log_action(log, history, refreshes, source, diff_source, action)
+            }
             AppView::Diff { view, query } => {
                 apply_diff_action(view, query, history, diff_source, action)
             }
@@ -1396,24 +1442,28 @@ fn apply_action(
 fn apply_log_action(
     log: &mut LogView,
     history: &mut CommandHistory,
+    refreshes: &mut LogRefreshRunner,
     source: &mut JjLog,
     diff_source: &JjDiff,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
     match log.apply(action) {
         ActionResult::Refresh => {
-            refresh_log(
-                log,
-                history,
-                source,
-                CommandSource::new(SourceView::Log, SourceAction::Refresh),
-            );
+            log.show_loading();
+            refreshes.start_manual(source.clone());
         }
         ActionResult::SwitchHome => {
+            refreshes.cancel_active();
             switch_log_command(log, history, source, JjLogCommand::ConfiguredDefault);
         }
-        ActionResult::SwitchLog => switch_log_command(log, history, source, JjLogCommand::Log),
-        ActionResult::DrillElision => return drill_log_elision(log, history, source),
+        ActionResult::SwitchLog => {
+            refreshes.cancel_active();
+            switch_log_command(log, history, source, JjLogCommand::Log);
+        }
+        ActionResult::DrillElision => {
+            refreshes.cancel_active();
+            return drill_log_elision(log, history, source);
+        }
         ActionResult::Quit => return AppTransition::Quit,
         _ => {}
     }

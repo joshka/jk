@@ -25,6 +25,7 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
     pending: PendingCommandPreview,
     runner: R,
 ) {
+    state.refreshes.cancel_active();
     let command_source = CommandSource::new(SourceView::Log, pending.source_action.clone())
         .with_key(pending.source_key);
     let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);

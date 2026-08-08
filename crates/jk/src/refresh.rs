@@ -21,16 +21,6 @@ pub enum OperationRenderedKind {
     Diff,
 }
 
-/// Reloads the current command without replacing the view on failure.
-pub fn refresh_log(
-    app: &mut LogView,
-    history: &mut CommandHistory,
-    source: &JjLog,
-    command_source: CommandSource,
-) -> bool {
-    refresh_log_with_runner(app, history, source, command_source, SystemJjCommandRunner)
-}
-
 pub fn refresh_log_with_runner<R: JjCommandRunner>(
     app: &mut LogView,
     history: &mut CommandHistory,
@@ -159,7 +149,7 @@ pub fn refresh_operation_log(
             snapshot.title(),
             snapshot.rendered(),
         )),
-        Err(_error) => {}
+        Err(error) => app.show_error(error.to_string()),
     }
 }
 
@@ -285,6 +275,7 @@ pub fn apply_log_template_selection(
     if !matches!(state.views.active(), AppView::Log(_)) {
         return;
     }
+    state.refreshes.cancel_active();
 
     let next_source = source
         .clone()

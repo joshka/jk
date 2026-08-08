@@ -52,6 +52,9 @@ betamax-action-menu:
 betamax-action-menu-demo:
     {{betamax}} run tapes/action-menu-demo.tape
 
+betamax-cancellable-refresh:
+    {{betamax}} run tapes/cancellable-refresh.tape
+
 betamax-abandon-confirmation:
     {{betamax}} run tapes/abandon-confirmation.tape
     {{betamax}} run tapes/abandon-confirmation-long.tape

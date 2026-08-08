@@ -1319,6 +1319,39 @@ mod tests {
     }
 
     #[test]
+    fn refresh_preserves_only_hunks_with_the_same_path_and_header() {
+        let mut state = DiffState::new(snapshot(
+            "aaa",
+            concat!(
+                "Modified regular file src/a.rs:\n",
+                "@@ -1,1 +1,1 @@\n",
+                " hidden\n",
+                "@@ -8,1 +8,1 @@\n",
+                " visible\n",
+            ),
+        ));
+        state.fold_selected_hunk();
+        state.select_next_hunk();
+        state.fold_selected_hunk();
+
+        state.refresh(snapshot(
+            "aaa",
+            concat!(
+                "Modified regular file src/a.rs:\n",
+                "@@ -1,1 +1,1 @@\n",
+                " still hidden\n",
+                "@@ -9,1 +9,1 @@\n",
+                " changed header is visible\n",
+            ),
+        ));
+
+        let rendered = state.visible_rendered();
+        assert!(rendered.contains("@@ -1,1 +1,1 @@\n  | folded hunk\n"));
+        assert!(!rendered.contains("still hidden"));
+        assert!(rendered.contains("changed header is visible"));
+    }
+
+    #[test]
     fn unfold_selected_file_keeps_other_files_folded() {
         let mut state = DiffState::new(snapshot(
             "aaa",

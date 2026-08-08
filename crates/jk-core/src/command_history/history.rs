@@ -77,6 +77,18 @@ impl CommandHistory {
         id
     }
 
+    /// Moves completed records from another history into this history.
+    ///
+    /// Imported records receive new process-local ids while retaining their command, timing,
+    /// result, and source metadata. This keeps background command execution from sharing mutable
+    /// history state with the application thread.
+    pub fn absorb(&mut self, other: Self) {
+        for mut record in other.records {
+            record.id = self.allocate_id();
+            self.push_record(record);
+        }
+    }
+
     /// Returns retained records from oldest to newest.
     #[must_use]
     pub fn records(&self) -> impl DoubleEndedIterator<Item = &CommandRecord> {

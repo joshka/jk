@@ -14,6 +14,7 @@ use jk_tui::rendered_view::RenderedView;
 use jk_tui::workspaces_view::WorkspacesView;
 
 use crate::mutation_preview::PendingCommandPreview;
+use crate::refresh_runner::LogRefreshRunner;
 
 const TOAST_DURATION: Duration = Duration::from_secs(3);
 
@@ -87,6 +88,7 @@ pub struct AppState {
     pub(crate) views: ViewStack,
     pub(crate) modes: ModeStack,
     pub(crate) history: CommandHistory,
+    pub(crate) refreshes: LogRefreshRunner,
     log_source_stack: Vec<JjLog>,
     toast: Option<Toast>,
 }
@@ -102,6 +104,7 @@ impl AppState {
             views: ViewStack::new(root),
             modes: ModeStack::default(),
             history,
+            refreshes: LogRefreshRunner::default(),
             log_source_stack: Vec::new(),
             toast: None,
         }
