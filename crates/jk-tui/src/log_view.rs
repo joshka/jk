@@ -190,6 +190,17 @@ impl LogView {
         self.state.selected_revision_id()
     }
 
+    /// Selects the visible entry with the given change identifier.
+    #[must_use]
+    pub fn select_change_id(&mut self, change_id: &str) -> bool {
+        self.state.select_change_id(change_id)
+    }
+
+    /// Selects the first visible log entry.
+    pub fn select_first(&mut self) {
+        self.state.select_first();
+    }
+
     /// Returns the visible change before the selected graph elision.
     #[must_use]
     pub fn selected_elision_before_change_id(&self) -> Option<&str> {

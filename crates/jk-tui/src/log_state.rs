@@ -155,6 +155,28 @@ impl LogState {
             .map(|entry| revision_id_prefix(entry.change_id()))
     }
 
+    /// Selects the visible entry with the given change identifier or unique prefix.
+    #[must_use]
+    pub fn select_change_id(&mut self, change_id: &str) -> bool {
+        let Some(index) = self
+            .entries
+            .iter()
+            .position(|entry| entry.change_id() == change_id)
+            .or_else(|| {
+                self.entries
+                    .iter()
+                    .position(|entry| entry.change_id().starts_with(change_id))
+            })
+        else {
+            return false;
+        };
+        self.selected = Some(LogSelection::Entry(index));
+        self.follow_selection = true;
+        self.expanded_change_id = None;
+        self.keep_selected_visible();
+        true
+    }
+
     /// Returns the visible change before the selected graph elision.
     #[must_use]
     pub fn selected_elision_before_change_id(&self) -> Option<&str> {
@@ -1218,6 +1240,40 @@ mod tests {
         assert_eq!(
             state.selected_entry().map(LogEntry::change_id),
             Some("current")
+        );
+    }
+
+    #[test]
+    fn selecting_change_id_moves_to_the_named_entry() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  current\n○  new\n◆  root\n",
+            vec![
+                LogEntry::new("current", "333", "current").with_rendered_line(0),
+                LogEntry::new("new", "222", "new").with_rendered_line(1),
+                LogEntry::new("root", "111", "root").with_rendered_line(2),
+            ],
+        ));
+
+        assert!(state.select_change_id("new"));
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("new"));
+        assert!(!state.select_change_id("missing"));
+        assert_eq!(state.selected_entry().map(LogEntry::change_id), Some("new"));
+    }
+
+    #[test]
+    fn selecting_change_id_accepts_jj_short_prefixes() {
+        let mut state = LogState::new(LogSnapshot::new(
+            "@  abcdefgh12345678\n○  root\n",
+            vec![
+                LogEntry::new("abcdefgh12345678", "333", "current").with_rendered_line(0),
+                LogEntry::new("root", "111", "root").with_rendered_line(1),
+            ],
+        ));
+
+        assert!(state.select_change_id("abcdefgh"));
+        assert_eq!(
+            state.selected_entry().map(LogEntry::change_id),
+            Some("abcdefgh12345678")
         );
     }
 
