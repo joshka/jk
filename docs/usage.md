@@ -55,13 +55,16 @@ and routes each selection through the existing command runner:
 - `n` runs New change inside the action menu from marks or the selected revision.
 - `e` runs Edit change inside the action menu.
 - `s` previews Squash after resolving ordered marks as sources and the cursor as destination.
+- `r` previews copying all paths from the selected revision into `@`.
 - `u` runs `jj undo` inside the action menu.
 - `U` runs `jj redo` inside the action menu.
 
 Inside the menu, press an action key or select a row with `j`/`k` and `Enter`. In particular, `a a`
 checks whether the selected revision is empty before abandoning it: empty revisions run
 immediately, while non-empty revisions open the destructive preview. Describe, New, Edit, Undo,
-and Redo are menu-only there. Inspection views remain read-only and do not offer repository actions.
+and Redo are menu-only there. Restore rejects revision marks as ambiguous, resolves the selected
+source to an exact commit, and shows source, destination, and `all paths` scope before confirmation.
+Inspection views remain read-only and do not offer repository actions.
 
 Squash currently operates on whole changes. Mark one or more source revisions in the order you want
 them shown, move the cursor to a distinct destination, then press `a s`. The confirmation labels
@@ -78,6 +81,11 @@ After an action runs, `jk` refreshes the log, records the command and resulting 
 History, and keeps the normal footer controls visible alongside a short success or error message.
 After `jj new` succeeds, the selection moves to the newly created working copy. When `jj` reports a
 resulting operation id, Command History can open the exact `jj op show` view.
+
+The first restore slice intentionally supports only all-path content copying from one selected
+revision into the working copy. Fileset selection, alternate destinations, `--changes-in`, and hunk
+restore remain follow-up work. Immutable destinations fail through jj's normal check; `jk` keeps
+stderr inspectable in Command History and does not expose `--ignore-immutable` in this workflow.
 
 ## Run A Direct jj Command
 
@@ -145,8 +153,8 @@ history.
 ## Current Limits
 
 - Command History is in-memory for the current `jk` session.
-- Rebase, split, restore, bookmarks, fetch, and push are planned workflows.
+- Rebase, split, file/hunk restore, bookmarks, fetch, and push are planned workflows.
 - Squash is whole-change only; file and hunk selection remain planned.
-- The action menu currently covers log revision changes and recovery; revision rebase, restore,
+- The action menu currently covers log revision changes and recovery; revision rebase,
   refs, remote, and workspace actions remain planned.
 - Public README, crates.io, and website media still need a release-media refresh.

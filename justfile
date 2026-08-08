@@ -56,6 +56,9 @@ betamax-abandon-confirmation:
     {{betamax}} run tapes/abandon-confirmation.tape
     {{betamax}} run tapes/abandon-confirmation-long.tape
 
+betamax-restore-preview:
+    {{betamax}} run tapes/restore-preview.tape
+
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
 

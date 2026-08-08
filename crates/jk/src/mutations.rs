@@ -1,6 +1,6 @@
 use jk_cli::{
-    AbandonQuery, JjAbandon, JjCommandRunner, JjLog, JjRecovery, RecordingJjCommandRunner,
-    RecoveryCommand, SystemJjCommandRunner,
+    AbandonQuery, JjAbandon, JjCommandRunner, JjLog, JjRecovery, JjRestore,
+    RecordingJjCommandRunner, RecoveryCommand, RestoreQuery, SystemJjCommandRunner,
 };
 use jk_core::{CommandSource, SourceAction, SourceView};
 
@@ -57,6 +57,27 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
             );
         }
     }
+}
+
+/// Opens a destructive preview that restores all paths from one exact commit into `@`.
+pub fn open_restore_preview(state: &mut AppState, restore_source: &JjRestore) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    if log.has_marks() {
+        log.show_error("Restore needs one source revision; clear revision marks first");
+        return;
+    }
+    let Some(source) = log.selected_commit_id().map(ToOwned::to_owned) else {
+        log.show_error("No source revision selected");
+        return;
+    };
+
+    let query = RestoreQuery::all_paths(source.clone(), "@");
+    let preview = restore_source.spec_for(&query).command_preview();
+    state.modes.push(InputMode::CommandPreview {
+        pending: PendingCommandPreview::restore(preview, &source),
+    });
 }
 
 /// Executes an empty revision's abandon immediately, or opens a destructive preview otherwise.

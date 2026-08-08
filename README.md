@@ -45,7 +45,8 @@ The useful current workflows are:
 - review diffs with file/hunk movement, folding, search, file list, and View Options;
 - run direct `jj` commands from `:` command mode and keep captured output in the TUI;
 - save an inline describe message directly with `Enter`; action-menu New, Edit, Undo, and Redo run
-  immediately through the recorded mutation path, while non-empty abandon keeps its safety preview;
+  immediately through the recorded mutation path, while non-empty abandon and whole-content
+  restore keep destructive safety previews;
 - mark squash sources, leave the cursor on the destination, and use `a s` to review the exact
   whole-change `jj squash` command before confirming it;
 - use Command History and Operation Log to inspect what ran and recover through `jj op` views;
@@ -62,10 +63,10 @@ Use `?` inside `jk` for the full key list for the active screen. For task-orient
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
-- rebase, split, restore, bookmarks, fetch, and push are still planned workflows;
+- rebase, split, file/hunk restore, bookmarks, fetch, and push are still planned workflows;
 - squash currently moves whole changes only; file and hunk selection remains planned;
-- the action menu currently covers describe, new, edit, squash, abandon, undo, and redo from the
-  log; revision rebase, restore, refs, remote, and workspace actions remain planned.
+- the action menu currently covers describe, new, edit, squash, restore, abandon, undo, and redo from the
+  log; revision rebase, refs, remote, and workspace actions remain planned.
 
 ## First Useful Paths
 
@@ -74,6 +75,7 @@ Start with `jk` or `jk log`, then use:
 - `Enter`, `d`, `v`, and `s` to inspect the selected change;
 - `:` to run a direct `jj` command without dropping TUI context;
 - `a` to open actions for the selected change, then `a` again to preview abandon;
+- `a`, then `r` to preview restoring all paths from the selected revision into `@`;
 - `a`, then `m` to edit and save a description inline; choose New, Edit, Undo, or Redo from `a`
   to run them immediately;
 - `C` and `o` to inspect Command History and Operation Log;

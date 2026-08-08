@@ -20,7 +20,7 @@ pub fn open_squash_preview(state: &mut AppState, squash_source: &JjSquash) {
         }
     };
     let preview = squash_source.spec_for(&selection.query()).command_preview();
-    state.modes.push(InputMode::SquashConfirmation {
+    state.modes.push(InputMode::CommandPreview {
         pending: PendingCommandPreview::squash(preview, &selection),
     });
 }
@@ -252,7 +252,7 @@ mod tests {
 
         open_squash_preview(&mut state, &JjSquash::default());
 
-        let Some(InputMode::SquashConfirmation { pending }) = state.modes.active() else {
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
             panic!("expected squash confirmation");
         };
         assert_eq!(pending.source_action, SourceAction::SquashRevision);
@@ -279,7 +279,7 @@ mod tests {
         open_squash_preview(&mut state, &JjSquash::default());
         let mut source = jk_cli::JjLog::default();
 
-        crate::handle_squash_confirmation_mode(
+        crate::handle_command_preview_mode(
             &mut state,
             &mut source,
             KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
@@ -298,7 +298,7 @@ mod tests {
     fn confirmed_squash_records_operation_refreshes_and_reselects_destination() {
         let mut state = marked_source_and_destination_state();
         open_squash_preview(&mut state, &JjSquash::default());
-        let Some(InputMode::SquashConfirmation { pending }) = state.modes.pop() else {
+        let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
             panic!("expected squash confirmation");
         };
         let mut source = jk_cli::JjLog::default();
@@ -332,7 +332,7 @@ mod tests {
     fn failed_squash_stays_in_log_and_preserves_useful_selection() {
         let mut state = marked_source_and_destination_state();
         open_squash_preview(&mut state, &JjSquash::default());
-        let Some(InputMode::SquashConfirmation { pending }) = state.modes.pop() else {
+        let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
             panic!("expected squash confirmation");
         };
         let runner = SequencedRunner::successes(vec![

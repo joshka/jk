@@ -62,9 +62,26 @@ impl PendingCommandPreview {
             source_key: "a e",
             failure_label: "jj edit",
             success_message: "Edited revision",
-            details: Vec::new(),
             reselect_change_id: None,
             copy_status: None,
+            details: Vec::new(),
+        }
+    }
+
+    pub(crate) fn restore(preview: CommandPreview, source: &str) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::RestoreRevision,
+            source_key: "a r",
+            failure_label: "jj restore",
+            success_message: "Restored all paths into working copy",
+            reselect_change_id: None,
+            copy_status: None,
+            details: vec![
+                format!("Source: {source}"),
+                "Destination: @ (working copy)".to_owned(),
+                "Affected content: all paths".to_owned(),
+            ],
         }
     }
 

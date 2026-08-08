@@ -62,11 +62,11 @@ pub fn render_app(
                     dialog.render(frame);
                 }
             }
-            Some(InputMode::SquashConfirmation { pending }) => {
+            Some(InputMode::CommandPreview { pending }) => {
                 log.render(frame);
                 CommandPreviewView::new(pending.preview.clone())
-                    .with_details(pending.details.clone())
                     .with_status(pending.copy_status.clone())
+                    .with_details(pending.details.clone())
                     .render(frame);
             }
             _ => log.render(frame),

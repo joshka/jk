@@ -77,7 +77,8 @@ for safety-sensitive actions.
   run immediately, `a a` checks emptiness before abandoning, and only non-empty revisions open the
   destructive preview. `m`/`n`/`e`/`u`/`U` are menu-only.
   `jj new` already uses ordered marks as parents when present and falls back to the selected revision.
-  Rebase, squash, restore, refs, remote, and workspace menu actions remain follow-up selector workflows.
+  Rebase, squash, fileset/hunk restore, refs, remote, and workspace menu actions remain follow-up
+  selector workflows.
 - Add rebase destination search and command preview before any graph mutation.
 - Add undo/redo and operation log entry points.
 - Log every mutation in command history.
@@ -89,7 +90,8 @@ Bring file and hunk workflows into the same command-shaped model.
 
 - Add shared selector models for revisions, filesets, operations, bookmarks, tags, remotes, and
   workspaces before expanding content command forms.
-- Add squash, split, restore, diffedit, and absorb flows.
+- Add squash, split, diffedit, and absorb flows. The first restore slice now previews an explicit
+  selected-commit source, `@` destination, and all-path scope; fileset and hunk restore remain.
 - Support file selection first, then hunk-aware paths where jj/editor support is strong enough.
 - Add conflict and resolve affordances after the file model is stable.
 

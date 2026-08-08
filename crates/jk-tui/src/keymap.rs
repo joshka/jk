@@ -33,6 +33,8 @@ pub enum ActionMenuAction {
     Abandon,
     /// Squash marked sources into the selected destination.
     Squash,
+    /// Restore all paths from the selected revision into the working copy.
+    Restore,
     /// Undo the latest operation.
     Undo,
     /// Redo the latest undone operation.
@@ -144,6 +146,7 @@ enum ActionId {
     EditChange,
     Abandon,
     Squash,
+    Restore,
     Undo,
     Redo,
     UpdateStale,
@@ -197,6 +200,7 @@ const fn default_help_group(action: ActionId) -> HelpGroup {
         | ActionId::EditChange
         | ActionId::Abandon
         | ActionId::Squash
+        | ActionId::Restore
         | ActionId::Mark
         | ActionId::ClearMarks => HelpGroup::Mutations,
         ActionId::OpenCommandHistory
@@ -265,6 +269,7 @@ impl ActionId {
             Self::EditChange => "Edit change",
             Self::Abandon => "Abandon revision",
             Self::Squash => "Squash revisions",
+            Self::Restore => "Restore all paths",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
@@ -304,6 +309,8 @@ pub enum CommandFamily {
     JjEdit,
     /// Commands and actions related to `jj squash`.
     JjSquash,
+    /// Commands and actions related to `jj restore`.
+    JjRestore,
     /// Commands and actions related to `jj evolog`.
     JjEvolog,
     /// Commands and actions related to `jj show`.
@@ -350,6 +357,7 @@ impl CommandFamily {
             Self::JjNew => "jj new",
             Self::JjEdit => "jj edit",
             Self::JjSquash => "jj squash",
+            Self::JjRestore => "jj restore",
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
@@ -541,6 +549,22 @@ const LOG_BINDINGS: &[KeyBinding] = &[
             ActionMenuGroup::Change,
             ActionMenuSafety::ConditionalDestructive,
             40,
+        ),
+    KeyBinding::new(ActionId::Restore, "a r", "preview all-path jj restore")
+        .with_family(CommandFamily::JjRestore)
+        .with_aliases(&[
+            "restore",
+            "working copy",
+            "all paths",
+            "destructive",
+            "preview",
+        ])
+        .with_action_menu(
+            ActionMenuAction::Restore,
+            "r",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::DestructiveLocal,
+            45,
         ),
     KeyBinding::new(ActionId::Undo, "a u", "run jj undo")
         .with_family(CommandFamily::JjOperation)
@@ -1820,6 +1844,7 @@ mod tests {
                 ActionMenuAction::EditChange,
                 ActionMenuAction::Squash,
                 ActionMenuAction::Abandon,
+                ActionMenuAction::Restore,
                 ActionMenuAction::Undo,
                 ActionMenuAction::Redo,
             ]
@@ -1830,11 +1855,13 @@ mod tests {
         assert_eq!(rows[2].safety, ActionMenuSafety::ImmediateLocal);
         assert_eq!(rows[3].safety, ActionMenuSafety::LocalRewrite);
         assert_eq!(rows[4].safety, ActionMenuSafety::ConditionalDestructive);
-        assert_eq!(rows[5].group, ActionMenuGroup::Recovery);
-        assert_eq!(rows[5].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[5].safety, ActionMenuSafety::DestructiveLocal);
+        assert_eq!(rows[6].group, ActionMenuGroup::Recovery);
         assert_eq!(rows[6].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[7].safety, ActionMenuSafety::ImmediateLocal);
         assert_eq!(rows[3].key, "s");
         assert_eq!(rows[4].key, "a");
+        assert_eq!(rows[5].key, "r");
     }
 
     #[test]
@@ -1856,6 +1883,10 @@ mod tests {
         assert_eq!(discovery_row_for_key(&rows, "a").action, "Open action menu");
         assert_eq!(discovery_row_for_key(&rows, "a n").action, "New change");
         assert_eq!(discovery_row_for_key(&rows, "a e").action, "Edit change");
+        assert_eq!(
+            discovery_row_for_key(&rows, "a r").action,
+            "Restore all paths"
+        );
         assert_eq!(
             discovery_row_for_key(&rows, "a a").action,
             "Abandon revision"

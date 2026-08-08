@@ -27,7 +27,7 @@ use jk_cli::RecoveryCommand;
 use jk_cli::{
     DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjCommandRunner,
     JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery,
-    JjShow, JjSquash, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
+    JjRestore, JjShow, JjSquash, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
     RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
     WorkspaceInspectionQuery,
 };
@@ -89,7 +89,10 @@ use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
 #[cfg(test)]
 use menus::{diff_file_list_lines, view_options_lines};
 use mutation_preview::{PendingCommandPreview, selected_new_parents};
-use mutations::{abandon_or_preview, execute_pending_command_with_runner, execute_recovery_action};
+use mutations::{
+    abandon_or_preview, execute_pending_command_with_runner, execute_recovery_action,
+    open_restore_preview,
+};
 #[cfg(test)]
 use mutations::{
     abandon_or_preview_with_runner, confirm_command_preview_with_runner,
@@ -139,6 +142,7 @@ fn main() -> Result<()> {
     let new_source = args.new_source();
     let edit_source = args.edit_source();
     let squash_source = args.squash_source();
+    let restore_source = args.restore_source();
     let operation_source = args.operation_source();
     let recovery_source = args.recovery_source();
     let workspaces_source = args.workspaces_source();
@@ -172,6 +176,7 @@ fn main() -> Result<()> {
         &new_source,
         &edit_source,
         &squash_source,
+        &restore_source,
         &operation_source,
         &recovery_source,
         &workspaces_source,
@@ -198,6 +203,7 @@ fn run_terminal(
     new_source: &JjNew,
     edit_source: &JjEdit,
     squash_source: &JjSquash,
+    restore_source: &JjRestore,
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
@@ -260,6 +266,7 @@ fn run_terminal(
                     new_change: new_source,
                     edit: edit_source,
                     squash: squash_source,
+                    restore: restore_source,
                     operation: operation_source,
                     recovery: recovery_source,
                     workspaces: workspaces_source,
@@ -314,11 +321,8 @@ fn handle_input_mode(
         abandon_confirmation::handle_input(state, source, key);
         return InputModeResult::Handled;
     }
-    if matches!(
-        state.modes.active(),
-        Some(InputMode::SquashConfirmation { .. })
-    ) {
-        return handle_squash_confirmation_mode(state, source, key);
+    if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
+        return handle_command_preview_mode(state, source, key);
     }
     if matches!(state.modes.active(), Some(InputMode::JjCommand { .. })) {
         return handle_jj_command_mode(state, command_repository, key);
@@ -366,7 +370,7 @@ fn handle_input_mode(
                 InputMode::AbandonConfirmation { .. } => {
                     unreachable!()
                 }
-                InputMode::SquashConfirmation { .. } => unreachable!(),
+                InputMode::CommandPreview { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
@@ -398,7 +402,7 @@ fn handle_input_mode(
                 InputMode::AbandonConfirmation { .. } => {
                     unreachable!()
                 }
-                InputMode::SquashConfirmation { .. } => unreachable!(),
+                InputMode::CommandPreview { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
@@ -408,11 +412,15 @@ fn handle_input_mode(
     }
 }
 
-fn handle_squash_confirmation_mode(
+fn handle_command_preview_mode(
     state: &mut AppState,
     source: &mut JjLog,
     key: KeyEvent,
 ) -> InputModeResult {
+    // A held Enter from the previous selector must not confirm a mutation.
+    if key.kind != crossterm::event::KeyEventKind::Press {
+        return InputModeResult::Handled;
+    }
     match key {
         KeyEvent {
             code: KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q'),
@@ -425,7 +433,7 @@ fn handle_squash_confirmation_mode(
             code: KeyCode::Enter,
             ..
         } => {
-            let Some(InputMode::SquashConfirmation { pending }) = state.modes.pop() else {
+            let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
                 return InputModeResult::Handled;
             };
             execute_pending_command_with_runner(state, source, pending, SystemJjCommandRunner);
@@ -435,7 +443,7 @@ fn handle_squash_confirmation_mode(
             modifiers: KeyModifiers::NONE,
             ..
         } => {
-            if let Some(InputMode::SquashConfirmation { pending }) = state.modes.active_mut() {
+            if let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() {
                 pending.copy_status = Some(copy_command_line(&pending.preview.command_line));
             }
         }
@@ -443,7 +451,6 @@ fn handle_squash_confirmation_mode(
     }
     InputModeResult::Handled
 }
-
 fn handle_action_menu_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
     match key {
         KeyEvent {
@@ -2751,6 +2758,7 @@ mod tests {
         for (key, action) in [
             ('n', ActionMenuAction::NewChange),
             ('e', ActionMenuAction::EditChange),
+            ('r', ActionMenuAction::Restore),
         ] {
             open_action_menu(&mut state);
             assert_eq!(
@@ -3268,6 +3276,130 @@ mod tests {
             pending.preview.warnings,
             vec![jk_core::CommandPreviewWarning::LocalRewrite]
         );
+    }
+
+    #[test]
+    fn restore_preview_names_source_destination_and_all_paths() {
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
+
+        open_restore_preview(&mut state, &JjRestore::default());
+
+        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
+            panic!("expected restore preview");
+        };
+        assert_eq!(pending.source_action, SourceAction::RestoreRevision);
+        assert_eq!(pending.source_key, "a r");
+        assert_eq!(pending.failure_label, "jj restore");
+        assert_eq!(
+            pending.preview.command_line,
+            "jj --no-pager --color always restore --from commit --into @"
+        );
+        assert_eq!(
+            pending.details,
+            [
+                "Source: commit",
+                "Destination: @ (working copy)",
+                "Affected content: all paths",
+            ]
+        );
+        assert_eq!(
+            pending.preview.warnings,
+            vec![jk_core::CommandPreviewWarning::DestructiveLocal]
+        );
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn restore_rejects_ambiguous_revision_marks() {
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
+        let AppView::Log(log) = state.views.active_mut() else {
+            panic!("expected log");
+        };
+        let _ = log.apply(LogAction::ToggleMark);
+
+        open_restore_preview(&mut state, &JjRestore::default());
+
+        assert_eq!(state.modes.active(), None);
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn cancelling_restore_preview_keeps_log_state_and_history() {
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
+        let mut source = JjLog::default();
+        open_restore_preview(&mut state, &JjRestore::default());
+
+        handle_command_preview_mode(
+            &mut state,
+            &mut source,
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+        );
+
+        assert_eq!(state.modes.active(), None);
+        let AppView::Log(log) = state.views.active() else {
+            panic!("expected log");
+        };
+        assert_eq!(log.selected_revision_id(), Some("abcdefgh"));
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn confirmed_restore_records_operation_and_refreshes() {
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
+        let mut source = JjLog::default();
+        open_restore_preview(&mut state, &JjRestore::default());
+        let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
+            panic!("expected restore preview");
+        };
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "", "Working copy now at: abcdefgh\n"),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        execute_pending_command_with_runner(&mut state, &mut source, pending, runner);
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert_eq!(records.len(), 3);
+        assert_eq!(
+            records[0].command.spec_preview,
+            "jj restore --from commit --into @"
+        );
+        assert_eq!(records[0].source.action, SourceAction::RestoreRevision);
+        assert_eq!(records[0].source.key.as_deref(), Some("a r"));
+        assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
+        assert_eq!(records[1].source.action, SourceAction::Refresh);
+        assert_eq!(records[2].source.action, SourceAction::Refresh);
+    }
+
+    #[test]
+    fn failed_restore_keeps_current_log_without_refresh() {
+        let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
+        let mut source = JjLog::default();
+        open_restore_preview(&mut state, &JjRestore::default());
+        let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
+            panic!("expected restore preview");
+        };
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(1, "", "Commit commit is immutable\n"),
+        ]);
+
+        execute_pending_command_with_runner(&mut state, &mut source, pending, runner);
+
+        let records = state.command_history().records().collect::<Vec<_>>();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].source.action, SourceAction::RestoreRevision);
+        assert_eq!(
+            records[0].result.stderr.snippet,
+            "Commit commit is immutable\n"
+        );
+        let AppView::Log(log) = state.views.active() else {
+            panic!("expected log");
+        };
+        assert_eq!(log.selected_revision_id(), Some("abcdefgh"));
     }
 
     #[test]

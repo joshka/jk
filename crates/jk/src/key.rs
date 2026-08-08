@@ -62,6 +62,8 @@ pub enum AppKey {
     /// Preview squashing marked sources into the selected destination.
     StartSquash,
 
+    /// Preview restoring all paths from the selected revision into the working copy.
+    StartRestore,
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
@@ -167,6 +169,7 @@ impl AppKey {
             ActionMenuAction::EditChange => Self::StartEdit,
             ActionMenuAction::Abandon => Self::StartAbandon,
             ActionMenuAction::Squash => Self::StartSquash,
+            ActionMenuAction::Restore => Self::StartRestore,
             ActionMenuAction::Undo => Self::RunUndo,
             ActionMenuAction::Redo => Self::RunRedo,
         }
@@ -410,6 +413,10 @@ mod tests {
         assert_eq!(
             AppKey::from_action_menu(ActionMenuAction::Squash),
             AppKey::StartSquash
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Restore),
+            AppKey::StartRestore
         );
         assert_eq!(
             AppKey::from_action_menu(ActionMenuAction::Undo),

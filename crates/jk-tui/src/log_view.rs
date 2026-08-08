@@ -201,7 +201,6 @@ impl LogView {
     pub fn commit_id_for_change_id(&self, change_id: &str) -> Option<&str> {
         self.state.commit_id_for_change_id(change_id)
     }
-
     /// Selects the visible entry with the given change identifier.
     #[must_use]
     pub fn select_change_id(&mut self, change_id: &str) -> bool {

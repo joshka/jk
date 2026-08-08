@@ -66,7 +66,9 @@ then broaden into mutation flows, selectors, run options, and generated help.
 1. Add `jj squash` preview flow: use selected/marked revisions and show the exact squash command.
 1. Add `jj split` entry point: likely external/editor-backed first, with preview and recovery rather
    than native hunk UI.
-1. Add `jj restore` preview flow: start with file-level restore before hunk-level restore.
+1. Done: add the first `jj restore` preview flow. `a r` copies all paths from one exact selected
+   commit into `@`, rejects ambiguous revision marks, and shows source, destination, and scope before
+   confirmation. Shared fileset selection and hunk-level restore remain follow-up work.
 
 ## Foundation Catch-Up
 

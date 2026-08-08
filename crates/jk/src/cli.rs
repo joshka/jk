@@ -4,8 +4,8 @@ use std::process::Command as ProcessCommand;
 use clap::{Parser, Subcommand};
 use jk_cli::{
     DiffFormat, DiffQuery, JjAbandon, JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand,
-    JjNew, JjOperation, JjRecovery, JjShow, JjSquash, JjStatus, JjWorkspaces, LogTemplateSelection,
-    ShowQuery, StatusQuery,
+    JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash, JjStatus, JjWorkspaces,
+    LogTemplateSelection, ShowQuery, StatusQuery,
 };
 
 /// Command-line options for the first log-oriented `jk` surface.
@@ -110,6 +110,11 @@ impl Args {
     /// Builds the squash source for ordered source marks and the selected destination.
     pub(crate) fn squash_source(&self) -> JjSquash {
         self.with_repository(JjSquash::default())
+    }
+
+    /// Builds the restore source for selected-revision mutation preview.
+    pub(crate) fn restore_source(&self) -> JjRestore {
+        self.with_repository(JjRestore::default())
     }
 
     /// Builds the operation source for operation log/show/diff inspection.
@@ -251,6 +256,7 @@ impl_with_repository!(
     JjNew,
     JjOperation,
     JjRecovery,
+    JjRestore,
     JjShow,
     JjSquash,
     JjStatus,

@@ -189,6 +189,8 @@ pub enum SourceAction {
     EditRevision,
     /// Squash marked source revisions into the selected destination.
     SquashRevision,
+    /// Restore all paths from the selected revision into the working copy.
+    RestoreRevision,
     /// List workspaces.
     WorkspaceList,
     /// Show selected workspace status.
