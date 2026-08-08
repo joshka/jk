@@ -1,9 +1,11 @@
+use std::time::{Duration, Instant};
+
 use jk_cli::{
     DiffQuery, EvologQuery, JjLog, LogTemplateSelection, OperationQuery, ShowQuery, StatusQuery,
     WorkspaceInspectionQuery,
 };
 use jk_core::CommandHistory;
-use jk_tui::command_discovery::BindingContext;
+use jk_tui::command_discovery::{ActionMenuAction, BindingContext};
 use jk_tui::command_history_view::CommandHistoryView;
 use jk_tui::diff_view::DiffView;
 use jk_tui::log_view::LogView;
@@ -12,6 +14,14 @@ use jk_tui::rendered_view::RenderedView;
 use jk_tui::workspaces_view::WorkspacesView;
 
 use crate::mutation_preview::PendingCommandPreview;
+
+const TOAST_DURATION: Duration = Duration::from_secs(3);
+
+#[derive(Debug)]
+struct Toast {
+    message: String,
+    expires_at: Instant,
+}
 
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -78,6 +88,7 @@ pub struct AppState {
     pub(crate) modes: ModeStack,
     pub(crate) history: CommandHistory,
     log_source_stack: Vec<JjLog>,
+    toast: Option<Toast>,
 }
 
 impl AppState {
@@ -92,6 +103,7 @@ impl AppState {
             modes: ModeStack::default(),
             history,
             log_source_stack: Vec::new(),
+            toast: None,
         }
     }
 
@@ -121,6 +133,41 @@ impl AppState {
         }
         *source = previous_source;
         true
+    }
+
+    /// Shows a short-lived completion notice without changing the active view's persistent chrome.
+    pub(crate) fn show_toast(&mut self, message: impl Into<String>) {
+        self.show_toast_until(message, Instant::now() + TOAST_DURATION);
+    }
+
+    /// Returns the active completion notice, removing it when it has expired.
+    pub(crate) fn toast_message(&mut self) -> Option<&str> {
+        self.toast_message_at(Instant::now())
+    }
+
+    /// Returns how long the terminal loop should wait before redrawing to remove the toast.
+    pub(crate) fn toast_timeout(&self) -> Option<Duration> {
+        self.toast
+            .as_ref()
+            .map(|toast| toast.expires_at.saturating_duration_since(Instant::now()))
+    }
+
+    fn show_toast_until(&mut self, message: impl Into<String>, expires_at: Instant) {
+        self.toast = Some(Toast {
+            message: message.into(),
+            expires_at,
+        });
+    }
+
+    fn toast_message_at(&mut self, now: Instant) -> Option<&str> {
+        let expired = self
+            .toast
+            .as_ref()
+            .is_some_and(|toast| toast.expires_at <= now);
+        if expired {
+            self.toast = None;
+        }
+        self.toast.as_ref().map(|toast| toast.message.as_str())
     }
 }
 
@@ -206,6 +253,10 @@ impl ModeStack {
 /// Transient input modes owned by the terminal loop.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InputMode {
+    ActionMenu {
+        context: BindingContext,
+        selected: usize,
+    },
     ViewOptions {
         context: BindingContext,
         selected: usize,
@@ -246,4 +297,20 @@ pub enum InputMode {
 pub enum InputModeResult {
     Handled,
     Unhandled,
+    Action(ActionMenuAction),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn toast_expires_at_its_deadline() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let now = Instant::now();
+        state.show_toast_until("Created new change", now + TOAST_DURATION);
+
+        assert_eq!(state.toast_message_at(now), Some("Created new change"));
+        assert_eq!(state.toast_message_at(now + TOAST_DURATION), None);
+    }
 }

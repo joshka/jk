@@ -640,7 +640,7 @@ mod tests {
         assert!(rendered.contains("preview jj abandon"));
         assert!(rendered.contains("expand change / drill into ~"));
         assert!(rendered.contains("History and recovery:"));
-        assert!(rendered.contains("preview jj undo"));
+        assert!(rendered.contains("run jj undo"));
         assert!(rendered.contains("Session:"));
         assert!(rendered.contains("close help"));
     }

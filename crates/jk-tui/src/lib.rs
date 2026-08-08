@@ -25,7 +25,8 @@ mod selected_row;
 /// Contextual command-help metadata and popup formatting.
 pub mod command_discovery {
     pub use crate::keymap::{
-        BindingContext, CommandFamily, DiscoveryRow, discovery_len, discovery_lines,
+        ActionMenuAction, ActionMenuGroup, ActionMenuRow, ActionMenuSafety, BindingContext,
+        CommandFamily, DiscoveryRow, action_menu_rows, discovery_len, discovery_lines,
         discovery_lines_for_width, discovery_lines_for_width_and_rows, discovery_rows,
         discovery_scroll_limit,
     };

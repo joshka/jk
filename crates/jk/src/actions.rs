@@ -8,13 +8,14 @@ use jk_tui::log_view::LogAction;
 use crate::key::AppKey;
 use crate::state::{AppState, AppView, InputMode};
 use crate::{
-    AppLoop, SearchDirection, apply_action, apply_search_action, copy_selected_command,
-    edit_command_output, handle_back_with_log_source, open_abandon_preview, open_command_discovery,
-    open_command_history, open_command_history_operation, open_diff_file_list, open_edit_preview,
-    open_jj_command_mode, open_new_preview, open_operation_log, open_recovery_preview,
-    open_view_options, open_workspaces, push_selected_command_history_details,
-    push_selected_evolog, push_selected_operation_show, push_selected_show,
-    push_selected_workspace_status, push_status, update_selected_workspace_stale,
+    AppLoop, SearchDirection, abandon_or_preview, apply_action, apply_search_action,
+    copy_selected_command, edit_command_output, execute_edit_action, execute_new_action,
+    execute_recovery_action, handle_back_with_log_source, open_action_menu, open_command_discovery,
+    open_command_history, open_command_history_operation, open_diff_file_list,
+    open_jj_command_mode, open_operation_log, open_view_options, open_workspaces,
+    push_selected_command_history_details, push_selected_evolog, push_selected_operation_show,
+    push_selected_show, push_selected_workspace_status, push_status,
+    update_selected_workspace_stale,
 };
 
 pub struct AppSources<'a> {
@@ -89,6 +90,9 @@ pub fn dispatch_app_key(
 
 fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, app_key: AppKey) {
     match app_key {
+        AppKey::OpenActionMenu => {
+            open_action_menu(state);
+        }
         AppKey::Back => {
             handle_back_with_log_source(state, sources.log);
         }
@@ -144,18 +148,25 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         AppKey::StartUndo => {
             if matches!(state.views.active(), AppView::Workspaces { .. }) {
                 update_selected_workspace_stale(state, sources.workspaces);
-            } else {
-                open_recovery_preview(state, sources.recovery, RecoveryCommand::Undo);
             }
         }
-        AppKey::StartRedo => {
-            open_recovery_preview(state, sources.recovery, RecoveryCommand::Redo);
+        AppKey::RunUndo => {
+            execute_recovery_action(state, sources.log, sources.recovery, RecoveryCommand::Undo);
+        }
+        AppKey::RunRedo => {
+            execute_recovery_action(state, sources.log, sources.recovery, RecoveryCommand::Redo);
         }
         AppKey::StartDescribe => {
             crate::open_describe_message(state);
         }
+        AppKey::StartNew => {
+            execute_new_action(state, sources.log, sources.new_change);
+        }
+        AppKey::StartEdit => {
+            execute_edit_action(state, sources.log, sources.edit);
+        }
         AppKey::StartAbandon => {
-            open_abandon_preview(state, sources.abandon);
+            abandon_or_preview(state, sources.log, sources.abandon);
         }
         AppKey::OpenViewOptions => {
             if !matches!(state.views.active(), AppView::CommandHistory { .. }) {
@@ -165,12 +176,9 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         AppKey::StartCommandMode => {
             open_jj_command_mode(state);
         }
+        AppKey::EditCommandOutput if matches!(state.views.active(), AppView::Log(_)) => {}
         AppKey::EditCommandOutput => {
-            if matches!(state.views.active(), AppView::Log(_)) {
-                open_edit_preview(state, sources.edit);
-            } else {
-                edit_command_output(state);
-            }
+            edit_command_output(state);
         }
         AppKey::OpenDiffFileList => {
             open_diff_file_list(state);
@@ -178,9 +186,7 @@ fn dispatch_direct_app_key(state: &mut AppState, sources: &mut AppSources<'_>, a
         AppKey::StartSearch if active_view_supports_search(state) => {
             state.modes.push(search_input_mode(state));
         }
-        AppKey::SearchNext if matches!(state.views.active(), AppView::Log(_)) => {
-            open_new_preview(state, sources.new_change);
-        }
+        AppKey::SearchNext if matches!(state.views.active(), AppView::Log(_)) => {}
         AppKey::SearchNext => {
             apply_search_action(state, SearchDirection::Next);
         }
@@ -236,5 +242,90 @@ fn search_input_mode(state: &AppState) -> InputMode {
         | AppView::Workspaces { .. }
         | AppView::OperationLog { .. }
         | AppView::CommandHistory { .. } => unreachable!("search support checked before call"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    use super::*;
+
+    #[test]
+    fn direct_mutation_keys_are_menu_only_on_log() {
+        let mut state = AppState::new(AppView::Log(jk_tui::log_view::LogView::default()));
+        let before = state.views.active().clone();
+
+        let mut log = JjLog::default();
+        let diff = JjDiff::default();
+        let evolog = JjEvolog::default();
+        let show = JjShow::default();
+        let status = JjStatus::default();
+        let abandon = JjAbandon::default();
+        let new_change = JjNew::default();
+        let edit = JjEdit::default();
+        let operation = JjOperation::default();
+        let recovery = JjRecovery::default();
+        let workspaces = JjWorkspaces::default();
+        let mut sources = AppSources {
+            log: &mut log,
+            diff: &diff,
+            evolog: &evolog,
+            show: &show,
+            status: &status,
+            abandon: &abandon,
+            new_change: &new_change,
+            edit: &edit,
+            operation: &operation,
+            recovery: &recovery,
+            workspaces: &workspaces,
+        };
+
+        assert_eq!(
+            dispatch_app_key(
+                &mut state,
+                &mut sources,
+                KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE),
+                AppKey::SearchNext,
+            ),
+            DispatchResult::Continue
+        );
+        assert_eq!(state.views.active(), &before);
+
+        assert_eq!(
+            dispatch_app_key(
+                &mut state,
+                &mut sources,
+                KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE),
+                AppKey::EditCommandOutput,
+            ),
+            DispatchResult::Continue
+        );
+        assert_eq!(state.views.active(), &before);
+        assert_eq!(state.modes.active(), None);
+
+        assert_eq!(
+            dispatch_app_key(
+                &mut state,
+                &mut sources,
+                KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE),
+                AppKey::Ignore,
+            ),
+            DispatchResult::Continue
+        );
+        assert_eq!(state.views.active(), &before);
+        assert_eq!(state.modes.active(), None);
+
+        assert_eq!(
+            dispatch_app_key(
+                &mut state,
+                &mut sources,
+                KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE),
+                AppKey::StartUndo,
+            ),
+            DispatchResult::Continue
+        );
+        assert_eq!(state.views.active(), &before);
+        assert_eq!(state.modes.active(), None);
     }
 }
