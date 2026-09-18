@@ -346,6 +346,9 @@ Related upstream discussion anchors:
 
 ## 3. Non-negotiable design principles
 
+The [TUI design guidelines](tui-design.md) define the cross-screen visual and interaction contract
+for applying these principles, including jj output fidelity, controls, dialogs, and validation.
+
 ### 3.1 Command-shaped actions
 
 Every action resolves to one of these:
