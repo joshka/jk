@@ -163,7 +163,7 @@ fn command_row_line(line: &str) -> Option<Line<'_>> {
     Some(Line::from(spans))
 }
 
-fn find_next_cell_prefix(line: &str, start: usize) -> Option<usize> {
+const fn find_next_cell_prefix(line: &str, start: usize) -> Option<usize> {
     let mut cursor = start;
     while let Some(prefix_start) = find_cell_prefix(line, cursor) {
         let key_start = skip_spaces(line, prefix_start);
@@ -175,7 +175,7 @@ fn find_next_cell_prefix(line: &str, start: usize) -> Option<usize> {
     None
 }
 
-fn find_cell_prefix(line: &str, start: usize) -> Option<usize> {
+const fn find_cell_prefix(line: &str, start: usize) -> Option<usize> {
     let mut cursor = start;
     while let Some(space_start) = find_space_run(line, cursor, 2) {
         let key_start = skip_spaces(line, space_start);
@@ -187,7 +187,7 @@ fn find_cell_prefix(line: &str, start: usize) -> Option<usize> {
     None
 }
 
-fn find_space_run(line: &str, start: usize, min_len: usize) -> Option<usize> {
+const fn find_space_run(line: &str, start: usize, min_len: usize) -> Option<usize> {
     let bytes = line.as_bytes();
     let mut cursor = start;
     while cursor < bytes.len() {
@@ -207,7 +207,7 @@ fn find_space_run(line: &str, start: usize, min_len: usize) -> Option<usize> {
     None
 }
 
-fn skip_spaces(line: &str, start: usize) -> usize {
+const fn skip_spaces(line: &str, start: usize) -> usize {
     let bytes = line.as_bytes();
     let mut cursor = start;
     while cursor < bytes.len() && bytes[cursor] == b' ' {
