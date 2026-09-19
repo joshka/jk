@@ -254,7 +254,7 @@ The docs should be direct about limitations:
 
 - rebase is intentionally deferred;
 - command previews are the supported mutation shape;
-- direct `a`, `n`, and `e` bindings are dogfood shortcuts until the action menu exists;
+- the first `a` action menu covers shipped log mutations while broader selectors remain deferred;
 - command history is currently in-memory unless later persistence lands;
 - generated media comes from Betamax and public assets live outside this source repository.
 

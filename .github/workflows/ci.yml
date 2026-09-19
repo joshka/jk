@@ -46,10 +46,10 @@ jobs:
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
-      - name: Install cargo-deny
+      - name: Install validation tools
         uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
         with:
-          tool: cargo-deny,cargo-udeps,just
+          tool: cargo-deny,cargo-udeps,just,jj-cli@0.45.1
 
       - name: Check release baseline
         # Mirrors local release validation except for Markdown, which is split

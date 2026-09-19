@@ -1,0 +1,55 @@
+Output target/dogfood-artifacts/betamax/abandon-confirmation-v2-20260919.gif
+
+Require cargo
+Require jj
+Set Shell "bash"
+Set Theme "Aardvark Ink"
+Set FontSize 22
+Set Width 1400
+Set Height 880
+Set Padding 0
+Set Margin 20
+Set WindowBar Colorful
+Set CursorBlink false
+Set KeyboardOverlay Input
+Set TypingSpeed 80ms
+Set WaitTimeout 60s
+Env NO_COLOR "1"
+
+Hide
+Type "cd /Users/joshka/local/jk/work/action-menu && cargo build -q -p jk && JK_DEMO_REPO=$(bash scripts/abandon-dialog-fixture.sh) && export JK_DEMO_REPO"
+Enter
+Wait
+Type "clear && exec target/debug/jk -R $JK_DEMO_REPO -n 8"
+Enter
+Wait+Screen "Tune forecast caching"
+Sleep 1s
+Type "jj"
+Type "aa"
+Wait+Screen "Abandon this change?"
+Sleep 1s
+Show
+Sleep 5s
+Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-short-v2-20260919.png
+Left
+Sleep 1s
+Enter
+Wait+Screen "Changes to abandon"
+Sleep 4s
+Down
+Down
+Sleep 2s
+Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-diff-v2-20260919.png
+Escape
+Wait+Screen "Abandon this change?"
+Sleep 2s
+Tab
+Sleep 1s
+Right
+Sleep 2s
+Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-focused-v2-20260919.png
+Space
+Wait+Screen "Abandoned revision"
+Sleep 3s
+Hide
+Type "q"

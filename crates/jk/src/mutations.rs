@@ -1,23 +1,25 @@
 use jk_cli::{
-    JjCommandRunner, JjLog, JjRecovery, RecordingJjCommandRunner, RecoveryCommand,
-    SystemJjCommandRunner,
+    AbandonQuery, JjAbandon, JjCommandRunner, JjLog, JjRecovery, RecordingJjCommandRunner,
+    RecoveryCommand, SystemJjCommandRunner,
 };
 use jk_core::{CommandSource, SourceAction, SourceView};
 
-use crate::mutation_preview::{PendingCommandPreview, command_failure_message};
+use crate::abandon_confirmation::AbandonConfirmation;
+use crate::mutation_preview::{
+    PendingCommandPreview, command_failure_message, new_change_id_from_output,
+};
 use crate::state::{AppState, AppView, InputMode};
 
-pub const POST_MUTATION_RECOVERY_STATUS: &str = "u undo  U redo  o operation  C history";
-
-pub fn confirm_command_preview(
+pub fn confirm_command_preview_with_runner<R: JjCommandRunner>(
     state: &mut AppState,
     source: &mut JjLog,
     pending: PendingCommandPreview,
+    runner: R,
 ) {
-    confirm_command_preview_with_runner(state, source, pending, SystemJjCommandRunner);
+    execute_pending_command_with_runner(state, source, pending, runner);
 }
 
-pub fn confirm_command_preview_with_runner<R: JjCommandRunner>(
+pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
     state: &mut AppState,
     source: &mut JjLog,
     pending: PendingCommandPreview,
@@ -30,7 +32,14 @@ pub fn confirm_command_preview_with_runner<R: JjCommandRunner>(
     let runner = runner.into_inner();
     match result {
         Ok(output) if output.status.success() => {
-            refresh_after_mutation_with_runner(state, source, runner)
+            let new_change_id = (pending.source_action == SourceAction::NewRevision)
+                .then(|| new_change_id_from_output(&output.stderr))
+                .flatten();
+            let refreshed =
+                refresh_after_mutation_with_runner(state, source, runner, pending.success_message);
+            if refreshed && pending.source_action == SourceAction::NewRevision {
+                select_new_change(state, new_change_id.as_deref());
+            }
         }
         Ok(output) => {
             let message =
@@ -46,10 +55,67 @@ pub fn confirm_command_preview_with_runner<R: JjCommandRunner>(
     }
 }
 
-pub fn open_recovery_preview(
+/// Executes an empty revision's abandon immediately, or opens a destructive preview otherwise.
+///
+/// The emptiness probe snapshots working-copy edits before checking. If it fails, this takes the
+/// conservative path and opens the same destructive preview used for a non-empty revision. The user
+/// can inspect or cancel instead of having an uncertain probe turn into an immediate mutation.
+pub fn abandon_or_preview(state: &mut AppState, source: &mut JjLog, abandon_source: &JjAbandon) {
+    abandon_or_preview_with_runner(state, source, abandon_source, SystemJjCommandRunner);
+}
+
+pub(crate) fn abandon_or_preview_with_runner<R: JjCommandRunner>(
     state: &mut AppState,
+    source: &mut JjLog,
+    abandon_source: &JjAbandon,
+    mut runner: R,
+) {
+    let Some(rev) = selected_revision_id(state) else {
+        show_log_error(state, "No revision selected".to_owned());
+        return;
+    };
+    let query = AbandonQuery::new(&rev);
+    let probe = abandon_source.is_empty_with_runner(&query, &mut runner);
+    if matches!(probe, Ok(true)) {
+        execute_pending_command_with_runner(
+            state,
+            source,
+            PendingCommandPreview::abandon(abandon_source.spec_for(&query).command_preview()),
+            runner,
+        );
+        return;
+    }
+    let details = abandon_source
+        .details_with_runner(&query, &mut runner)
+        .map_err(|error| error.to_string());
+    state.modes.push(InputMode::AbandonConfirmation {
+        pending: PendingCommandPreview::abandon(abandon_source.spec_for(&query).command_preview()),
+        dialog: Box::new(AbandonConfirmation::new(rev, details, probe.is_err())),
+    });
+}
+
+/// Runs an operation recovery command through the recorded mutation path.
+pub fn execute_recovery_action(
+    state: &mut AppState,
+    source: &mut JjLog,
     recovery_source: &JjRecovery,
     command: RecoveryCommand,
+) {
+    execute_recovery_action_with_runner(
+        state,
+        source,
+        recovery_source,
+        command,
+        SystemJjCommandRunner,
+    );
+}
+
+pub(crate) fn execute_recovery_action_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    source: &mut JjLog,
+    recovery_source: &JjRecovery,
+    command: RecoveryCommand,
+    runner: R,
 ) {
     if !matches!(state.views.active(), AppView::Log(_)) {
         return;
@@ -60,16 +126,17 @@ pub fn open_recovery_preview(
         RecoveryCommand::Undo => PendingCommandPreview::undo(preview),
         RecoveryCommand::Redo => PendingCommandPreview::redo(preview),
     };
-    state.modes.push(InputMode::CommandPreview { pending });
+    execute_pending_command_with_runner(state, source, pending, runner);
 }
 
 fn refresh_after_mutation_with_runner<R: JjCommandRunner>(
     state: &mut AppState,
     source: &mut JjLog,
     runner: R,
-) {
+    success_message: &'static str,
+) -> bool {
     let AppView::Log(log) = state.views.active_mut() else {
-        return;
+        return false;
     };
 
     let refreshed = crate::refresh::refresh_log_with_runner(
@@ -80,8 +147,26 @@ fn refresh_after_mutation_with_runner<R: JjCommandRunner>(
         runner,
     );
     if refreshed {
-        log.show_status(POST_MUTATION_RECOVERY_STATUS);
+        state.show_toast(success_message);
     }
+    refreshed
+}
+
+fn select_new_change(state: &mut AppState, change_id: Option<&str>) {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return;
+    };
+    if change_id.is_some_and(|change_id| log.select_change_id(change_id)) {
+        return;
+    }
+    log.select_first();
+}
+
+fn selected_revision_id(state: &AppState) -> Option<String> {
+    let AppView::Log(log) = state.views.active() else {
+        return None;
+    };
+    log.selected_revision_id().map(ToOwned::to_owned)
 }
 
 fn show_log_error(state: &mut AppState, message: String) {

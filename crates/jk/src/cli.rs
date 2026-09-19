@@ -87,7 +87,7 @@ impl Args {
         self.with_repository(JjStatus::default())
     }
 
-    /// Builds the describe source for selected-change mutation preview.
+    /// Builds the describe source for selected-change mutation execution.
     pub(crate) fn describe_source(&self) -> JjDescribe {
         self.with_repository(JjDescribe::default())
     }

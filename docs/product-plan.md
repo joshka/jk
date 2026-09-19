@@ -356,8 +356,9 @@ Every action resolves to one of these:
 - An internal view operation that is not a repo mutation, such as scrolling, marking, folding,
   filtering, switching a focused region, or opening an overlay.
 
-Mutating actions always go through a command preview unless they are explicitly configured as
-no-confirm.
+Safety-sensitive mutating actions go through a command preview unless they are explicitly configured
+as no-confirm. Inline Describe treats `Enter` on the edited message as that explicit confirmation.
+No-confirm actions still use the same recorded command runner and refresh path.
 
 ### 3.2 Config-faithful presentation
 
@@ -426,13 +427,13 @@ All rewrite/destructive/network actions should follow:
 6. Refresh state after success.
 7. Show result, command history entry, and operation-recovery actions.
 
-Current implementation status: selected-revision `jj abandon REV`, parented `jj new`, and
-selected-revision `jj edit REV` have the first mutation previews. Pressing `a` on the log previews
-`jj abandon REV`; pressing `n` previews `jj new PARENT...`, using ordered marks as parents when
-present and otherwise using the selected revision; pressing `e` previews `jj edit REV`. Enter runs
-the command, successful runs refresh the graph, command history records the resulting operation id,
-and the recovery footer surfaces undo/redo/operation/history actions. The direct `a` binding is a
-dogfood shortcut until the long-term action-menu prefix exists.
+Current implementation status: pressing `a` on the log opens the context-aware action menu. Inside
+the menu, `n` runs `jj new PARENT...` and `e` runs `jj edit REV`, using ordered marks as parents
+when present and otherwise using the selected revision. `a a` checks `self.empty()` first: empty
+revisions are abandoned immediately, while non-empty revisions open the destructive preview. Describe,
+New, Edit, Undo, and Redo run immediately after their respective input or menu selection. Every executed
+action records the command and resulting operation id, refreshes the graph,
+and keeps the recovery controls visible alongside a short result message.
 
 ### 3.6 Recovery is first-class
 
@@ -644,7 +645,7 @@ hunks selected          -> start with jj squash --interactive, later native hunk
 Describe:
 
 ```text
-m on A                  -> inline prompt -> jj describe -m "..." A
+a m on A                -> inline prompt -> jj describe -m "..." A
 M on A                  -> external editor -> jj describe A
 ```
 
@@ -671,8 +672,8 @@ configuration may remap it later.
 | `:`         | jj command mode, `jj` prefix optional.                                      |
 | `!`         | External command mode, explicit non-shell command unless user runs `sh -c`. |
 | `r`         | Refresh current view.                                                       |
-| `u`         | Undo, preview/confirm unless configured otherwise.                          |
-| `U`         | Redo, preview/confirm unless configured otherwise.                          |
+| `a u`       | Undo from the action menu, runs immediately.                                |
+| `a U`       | Redo from the action menu, runs immediately.                                |
 | `Tab`       | Cycle focused regions within the active screen, if that screen has regions. |
 | `V`         | Reusable View Options overlay for display, diff, graph, and template flags. |
 | `h/l`       | Collapse/open or fold/unfold where sensible.                                |
@@ -700,8 +701,8 @@ pickers.
 | `c`             | Clear marks when marks exist; otherwise screen-specific commit/create action if valid. |
 | `y`             | Yank/copy ID/revset/path/command for current object.                                   |
 
-Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` rather than stealing
-`n/N`.
+Rationale: the log action menu owns `n` for `new`; search repeat remains scoped to diff and rendered
+inspection views rather than competing with the log action menu.
 
 ### 5.3 Revision graph / main TUI
 
@@ -714,11 +715,11 @@ Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` r
 | `v`     | Evolution log for selected revision: `jj evolog`.                                        |
 | `s`     | Status screen.                                                                           |
 | `f`     | Revset/filter input with completion.                                                     |
-| `n`     | New change from cursor/marks: `jj new ...`.                                              |
+| `a n`   | New change from cursor/marks: `jj new ...`.                                              |
 | `N`     | New change with inline message.                                                          |
 | `c`     | Commit working-copy change when selected/current object is `@`: `jj commit`.             |
-| `e`     | Edit selected revision: `jj edit <rev>`; preview if immutable or surprising.             |
-| `m`     | Inline describe/message: `jj describe -m ... <rev>`.                                     |
+| `a e`   | Edit selected revision: `jj edit <rev>`; runs immediately from menu.                     |
+| `a m`   | Inline describe/message: `jj describe -m ... <rev>`.                                     |
 | `M`     | Describe in editor: `jj describe <rev>`.                                                 |
 | `R`     | Rebase wizard/destination-pick mode.                                                     |
 | `a`     | Action menu for rewrite/content/destructive commands.                                    |
@@ -735,34 +736,36 @@ Rationale: `n` remains available for `new`; search repeat uses `Ctrl-n/Ctrl-p` r
 
 The `a` prefix opens a visible overlay. Keys are active only while the overlay is open.
 
-Current implementation note: before this prefix menu exists, `a` directly previews
-`jj abandon REV` for the selected log revision. Keep that implementation path command-spec based so
-it can move under `a a` later without rewriting the mutation runner.
+Current implementation note: the first prefix menu contains the shipped describe, new, edit,
+abandon, undo, and redo workflows. `a a` checks whether the selected revision is empty and only
+opens the command-spec-backed abandon preview when it is not; empty revisions run immediately.
+`m`, `n`, `e`, `u`, and `U` run their action-menu rows immediately.
 
-Current implementation note: `n` directly previews `jj new PARENT...` from the log. Ordered marks
-become parents when present; otherwise the selected revision is the parent. Search-next remains
-scoped to diff and rendered inspection views.
+Current implementation note: `n` runs the action-menu `jj new PARENT...` path from the log.
+Ordered marks become parents when present; otherwise the selected revision is the parent. The
+command is recorded and the log refreshes after success. Search-next remains scoped to diff and
+rendered inspection views.
 
-Current implementation note: `e` directly previews `jj edit REV` from the log. The same key still
-reopens the command prompt when a command-output view is active.
+Current implementation note: `e` runs the action-menu `jj edit REV` path from the log. The same key
+still reopens the command prompt when a command-output view is active.
 
-| Key | jj command family               | Notes                                                      |
-| --- | ------------------------------- | ---------------------------------------------------------- |
-| `a` | `jj abandon`                    | Confirm; explain descendant behavior.                      |
-| `b` | `jj absorb`                     | Review with `jj op show -p` after success.                 |
-| `s` | `jj squash`                     | Source/destination resolver; filesets if file marks exist. |
-| `S` | `jj split`                      | Uses configured diff editor initially.                     |
-| `r` | `jj restore`                    | File/hunk/revision aware; confirm.                         |
-| `v` | `jj revert`                     | Confirm destination.                                       |
-| `d` | `jj diffedit`                   | External diff editor flow.                                 |
-| `f` | `jj fix`                        | Preview and post-op review.                                |
-| `m` | `jj metaedit`                   | Metadata editor/options.                                   |
-| `M` | Merge/new-with-multiple-parents | `jj new <target> <source>` role picker.                    |
-| `D` | `jj duplicate`                  | Confirm duplicates/targets.                                |
-| `p` | `jj parallelize`                | Preview.                                                   |
-| `P` | `jj simplify-parents`           | Preview.                                                   |
-| `R` | `jj resolve`                    | Conflict resolver/tool flow.                               |
-| `E` | `jj edit --ignore-immutable`    | Confirm strongly.                                          |
+| Key   | jj command family               | Notes                                                      |
+| ----- | ------------------------------- | ---------------------------------------------------------- |
+| `a a` | `jj abandon`                    | Check emptiness; preview non-empty revisions.              |
+| `b`   | `jj absorb`                     | Review with `jj op show -p` after success.                 |
+| `s`   | `jj squash`                     | Source/destination resolver; filesets if file marks exist. |
+| `S`   | `jj split`                      | Uses configured diff editor initially.                     |
+| `r`   | `jj restore`                    | File/hunk/revision aware; confirm.                         |
+| `v`   | `jj revert`                     | Confirm destination.                                       |
+| `d`   | `jj diffedit`                   | External diff editor flow.                                 |
+| `f`   | `jj fix`                        | Preview and post-op review.                                |
+| `m`   | `jj metaedit`                   | Metadata editor/options.                                   |
+| `M`   | Merge/new-with-multiple-parents | `jj new <target> <source>` role picker.                    |
+| `D`   | `jj duplicate`                  | Confirm duplicates/targets.                                |
+| `p`   | `jj parallelize`                | Preview.                                                   |
+| `P`   | `jj simplify-parents`           | Preview.                                                   |
+| `R`   | `jj resolve`                    | Conflict resolver/tool flow.                               |
+| `E`   | `jj edit --ignore-immutable`    | Confirm strongly.                                          |
 
 ### 5.5 Diff/show/details screen
 
@@ -977,11 +980,11 @@ Navigation contract:
 | --------------------- | --------------------------- | -------- | --------------------------------------------------- |
 | `jj describe`         | `m/M`                       | P0       | Inline and editor flows.                            |
 | `jj metaedit`         | `a m`                       | P2       | Advanced metadata.                                  |
-| `jj new`              | `n/N`                       | P0       | From cursor/marks as parents; with/without message. |
+| `jj new`              | `a n`                       | P0       | From cursor/marks as parents; with/without message. |
 | `jj commit`           | `c` where `@`/status valid  | P0       | Working-copy flow.                                  |
-| `jj edit`             | `e`                         | P0/P1    | Direct but clear; `a E` for ignore immutable.       |
+| `jj edit`             | `a e`                       | P0/P1    | Menu action; `a E` for ignore immutable.            |
 | `jj rebase`           | `R`                         | P0       | Visual role picker.                                 |
-| `jj abandon`          | `a` now, `a a` later        | P0/P1    | Destructive preview and operation recovery.         |
+| `jj abandon`          | `a a`                       | P0/P1    | Check emptiness; preview non-empty revisions.       |
 | `jj revert`           | `a v`                       | P2       | Destination picker.                                 |
 | `jj duplicate`        | `a D`                       | P2       | Preserve command preview.                           |
 | `jj parallelize`      | `a p`                       | P2       | Stack cleanup.                                      |
@@ -1010,8 +1013,8 @@ Navigation contract:
 | `jj op diff`              | `d` in op log     | P0       | Compare operations.     |
 | `jj op restore`           | `r` in op log     | P0/P1    | Strong confirmation.    |
 | `jj op revert`            | `v` in op log     | P0/P1    | Strong confirmation.    |
-| `jj undo`                 | `u`               | P0       | Preview/confirm.        |
-| `jj redo`                 | `U`               | P0       | Preview/confirm.        |
+| `jj undo`                 | `a u`             | P0       | Run immediately.        |
+| `jj redo`                 | `a U`             | P0       | Run immediately.        |
 | `jj op abandon/integrate` | op action menu    | P2       | Advanced maintenance.   |
 
 ### 7.5 Bookmarks, tags, Git
@@ -1370,9 +1373,9 @@ Prompt keys:
 - `Ctrl+s`: save when multiline editor is active.
 
 Current implementation status: `m` opens the inline prompt prefilled with the selected revision's full
-description, and `Ctrl-u` clears the prefilled text before preview. The prompt still submits through
-command preview, command history, operation-id capture, log refresh, and recovery footer. It does
-not yet support multiline editing, editor handoff, or a before/after review panel.
+description, shows an insertion cursor, and supports `Ctrl-u` clear. `Enter` saves immediately through
+the recorded mutation path, then captures the operation id, refreshes the log, and shows the recovery
+footer. It does not yet support multiline editing, editor handoff, or a before/after review panel.
 
 `M` opens configured editor directly:
 
@@ -1392,9 +1395,9 @@ Role inference:
 - Else cursor is parent.
 - If cursor is absent: default jj behavior.
 
-Current implementation status: direct `n` implements the marks-or-cursor parent rule and routes
-through command preview, command history, operation-id capture, log refresh, and recovery footer. It
-does not yet support inline messages or the later role-resolver overlay.
+Current implementation status: action-menu `n` implements the marks-or-cursor parent rule and runs
+through the recorded mutation runner, operation-id capture, log refresh, and recovery footer. It does
+not yet support inline messages or the later role-resolver overlay.
 
 `N`: create new change with inline message.
 
@@ -1408,8 +1411,8 @@ jj edit <rev>
 
 If revision is immutable or hidden, require stronger preview or route to action menu variant.
 
-Current implementation status: direct `e` implements the selected-revision preview path and routes
-through command preview, command history, operation-id capture, log refresh, and recovery footer. It
+Current implementation status: action-menu `e` implements the selected-revision immediate path and
+runs through the recorded mutation runner, operation-id capture, log refresh, and recovery footer. It
 does not yet add immutable-specific warning copy or the stronger `a E` ignore-immutable variant.
 
 ### 9.6 Squash/split/restore/absorb
@@ -2213,7 +2216,8 @@ Safety classes determine confirmation:
 
 - Read-only: no confirmation.
 - Local metadata: preview optional, but command visible.
-- Local rewrite: preview required.
+- Local rewrite: preview required unless the action has a dedicated editing submission, such as inline
+  Describe, where `Enter` is the explicit confirmation.
 - Destructive local: preview + strong confirm.
 - Network read: direct allowed if user initiated.
 - Network write: dry-run/preview required where supported.

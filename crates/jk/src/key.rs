@@ -5,6 +5,7 @@
 //! and keeps key binding tests close to the binary surface users exercise.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use jk_tui::command_discovery::ActionMenuAction;
 use jk_tui::log_view::LogAction;
 
 /// Result of interpreting one terminal key event.
@@ -12,6 +13,9 @@ use jk_tui::log_view::LogAction;
 pub enum AppKey {
     /// Dispatch this action to the active view.
     Action(LogAction),
+
+    /// Open the context-aware repository action menu.
+    OpenActionMenu,
 
     /// Open the selected revision show/details view.
     OpenShow,
@@ -34,14 +38,23 @@ pub enum AppKey {
     /// Copy the current command line.
     CopyCommand,
 
-    /// Preview and run `jj undo`.
+    /// Update the selected stale workspace.
     StartUndo,
 
-    /// Preview and run `jj redo`.
-    StartRedo,
+    /// Run `jj undo` from the action menu.
+    RunUndo,
+
+    /// Run `jj redo` from the action menu.
+    RunRedo,
 
     /// Start an inline describe mutation for the selected revision.
     StartDescribe,
+
+    /// Preview creating a new change from the selected log revisions.
+    StartNew,
+
+    /// Preview editing the selected log revision.
+    StartEdit,
 
     /// Preview abandoning the selected revision.
     StartAbandon,
@@ -52,7 +65,7 @@ pub enum AppKey {
     /// Start the `:` prompt for an arbitrary jj command.
     StartCommandMode,
 
-    /// Preview `jj edit` from the log or reopen command-output input.
+    /// Reopen command-output input.
     EditCommandOutput,
 
     /// Open the current diff file list.
@@ -142,6 +155,18 @@ impl AppKey {
             _ => Self::Ignore,
         }
     }
+
+    /// Returns the existing application action for a menu selection.
+    pub const fn from_action_menu(action: ActionMenuAction) -> Self {
+        match action {
+            ActionMenuAction::Describe => Self::StartDescribe,
+            ActionMenuAction::NewChange => Self::StartNew,
+            ActionMenuAction::EditChange => Self::StartEdit,
+            ActionMenuAction::Abandon => Self::StartAbandon,
+            ActionMenuAction::Undo => Self::RunUndo,
+            ActionMenuAction::Redo => Self::RunRedo,
+        }
+    }
 }
 
 /// Interprets unmodified character keys.
@@ -160,9 +185,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'o' => Some(AppKey::OpenOperationLog),
         'y' => Some(AppKey::CopyCommand),
         'u' => Some(AppKey::StartUndo),
-        'U' => Some(AppKey::StartRedo),
-        'm' => Some(AppKey::StartDescribe),
-        'a' => Some(AppKey::StartAbandon),
+        'a' => Some(AppKey::OpenActionMenu),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
@@ -315,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn lowercase_u_starts_undo_preview() {
+    fn lowercase_u_keeps_workspace_update_binding() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE)),
             AppKey::StartUndo
@@ -323,10 +346,10 @@ mod tests {
     }
 
     #[test]
-    fn uppercase_u_starts_redo_preview() {
+    fn uppercase_u_is_menu_only() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('U'), KeyModifiers::NONE)),
-            AppKey::StartRedo
+            AppKey::Ignore
         );
     }
 
@@ -347,18 +370,46 @@ mod tests {
     }
 
     #[test]
-    fn lowercase_m_starts_describe() {
+    fn lowercase_m_is_menu_only() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE)),
-            AppKey::StartDescribe
+            AppKey::Ignore
         );
     }
 
     #[test]
-    fn lowercase_a_starts_abandon_preview() {
+    fn lowercase_a_opens_action_menu() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE)),
+            AppKey::OpenActionMenu
+        );
+    }
+
+    #[test]
+    fn action_menu_selections_reuse_existing_application_actions() {
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Describe),
+            AppKey::StartDescribe
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::NewChange),
+            AppKey::StartNew
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::EditChange),
+            AppKey::StartEdit
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Abandon),
             AppKey::StartAbandon
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Undo),
+            AppKey::RunUndo
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Redo),
+            AppKey::RunRedo
         );
     }
 

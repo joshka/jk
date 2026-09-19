@@ -1,11 +1,13 @@
 use jk_cli::LogTemplateSelection;
 use jk_tui::command_discovery::{BindingContext, discovery_lines_for_width_and_rows};
-use jk_tui::command_preview_view::CommandPreviewView;
+use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style};
+use ratatui::widgets::{Block, Clear, Paragraph};
 
 use crate::command_mode::jj_command_lines;
-use crate::menus::{diff_file_list_lines, template_selector_lines, view_options_lines};
-use crate::mutation_preview::describe_message_lines;
+use crate::menus::{
+    action_menu_lines, diff_file_list_lines, template_selector_lines, view_options_lines,
+};
 use crate::state::{AppState, AppView, InputMode};
 
 pub fn render_app(
@@ -16,6 +18,13 @@ pub fn render_app(
     let mode = state.modes.active().cloned();
     match state.views.active_mut() {
         AppView::Log(log) => match &mode {
+            Some(InputMode::ActionMenu { context, selected }) => {
+                log.render(frame);
+                let width = usize::from(frame.area().width.saturating_sub(6));
+                let lines = action_menu_lines(*context, *selected, width);
+                clear_overlay_status_row(frame);
+                render_mode_overlay(frame, "Actions", &lines);
+            }
             Some(InputMode::ViewOptions { context, selected }) => {
                 let lines = view_options_lines(*context, *selected, template, None);
                 log.render_with_selector(frame, "View Options", &lines);
@@ -37,16 +46,20 @@ pub fn render_app(
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
             }
-            Some(InputMode::DescribeMessage { rev, message }) => {
+            Some(InputMode::DescribeMessage { .. }) => {
                 log.render(frame);
-                let lines = describe_message_lines(rev, message);
-                render_mode_overlay(frame, "Describe revision", &lines);
+                if let Some(InputMode::DescribeMessage { rev, message }) = state.modes.active_mut()
+                {
+                    message.render(frame, rev);
+                }
             }
-            Some(InputMode::CommandPreview { pending }) => {
+            Some(InputMode::AbandonConfirmation { .. }) => {
                 log.render(frame);
-                CommandPreviewView::new(pending.preview.clone())
-                    .with_status(pending.copy_status.clone())
-                    .render(frame);
+                if let Some(InputMode::AbandonConfirmation { dialog, .. }) =
+                    state.modes.active_mut()
+                {
+                    dialog.render(frame);
+                }
             }
             _ => log.render(frame),
         },
@@ -146,6 +159,40 @@ pub fn render_app(
         | AppView::OperationShow { view, .. }
         | AppView::OperationDiff { view, .. } => render_inspection(frame, view, &mode, template),
     }
+
+    if let Some(message) = state.toast_message() {
+        render_toast(frame, message);
+    }
+}
+
+fn render_toast(frame: &mut ratatui::Frame<'_>, message: &str) {
+    let area = frame.area();
+    let content = Rect {
+        x: area.x,
+        y: area.y.saturating_add(1),
+        width: area.width,
+        height: area.height.saturating_sub(2),
+    };
+    if content.width < 12 || content.height < 3 {
+        return;
+    }
+
+    let label = format!("✓ {message}");
+    let width = u16::try_from(label.chars().count().saturating_add(4))
+        .unwrap_or(u16::MAX)
+        .clamp(12, content.width);
+    let toast = Rect {
+        x: content.x + content.width.saturating_sub(width),
+        y: content.y + content.height.saturating_sub(3),
+        width,
+        height: 3,
+    };
+    let block = Block::bordered().border_style(Style::new().fg(Color::Green));
+    let paragraph = Paragraph::new(label)
+        .block(block)
+        .style(Style::new().fg(Color::White).bg(Color::Black));
+    frame.render_widget(Clear, toast);
+    frame.render_widget(paragraph, toast);
 }
 
 fn render_inspection(
@@ -252,8 +299,12 @@ const fn command_discovery_visible_rows(content_width: usize, area_height: u16) 
     }
 }
 
-fn render_mode_overlay(frame: &mut ratatui::Frame<'_>, title: &str, lines: &[String]) {
-    render_mode_overlay_with_sizing(frame, title, lines, lines);
+fn render_mode_overlay(
+    frame: &mut ratatui::Frame<'_>,
+    title: &str,
+    lines: &[String],
+) -> Option<Rect> {
+    render_mode_overlay_with_sizing(frame, title, lines, lines)
 }
 
 fn render_mode_overlay_with_sizing(
@@ -261,14 +312,14 @@ fn render_mode_overlay_with_sizing(
     title: &str,
     lines: &[String],
     sizing_lines: &[String],
-) {
+) -> Option<Rect> {
     use ratatui::layout::Rect;
     use ratatui::prelude::Text;
     use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
     let area = frame.area();
     if area.is_empty() {
-        return;
+        return None;
     }
 
     let content = Rect {
@@ -315,6 +366,7 @@ fn render_mode_overlay_with_sizing(
         .style(Style::new().fg(Color::White).bg(Color::Black))
         .wrap(Wrap { trim: false });
     frame.render_widget(paragraph, overlay);
+    Some(overlay)
 }
 
 fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
@@ -481,4 +533,24 @@ fn skip_spaces(line: &str, start: usize) -> usize {
         cursor += 1;
     }
     cursor
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    use super::*;
+
+    #[test]
+    fn toast_handles_tiny_terminals_without_panicking() {
+        for width in 0..=14 {
+            for height in 0..=8 {
+                let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+                terminal
+                    .draw(|frame| render_toast(frame, "Created new change"))
+                    .unwrap();
+            }
+        }
+    }
 }

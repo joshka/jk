@@ -21,16 +21,20 @@ use color_eyre::eyre::eyre;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::force_color_output;
 #[cfg(test)]
+use jk_cli::AbandonQuery;
+#[cfg(test)]
 use jk_cli::RecoveryCommand;
 use jk_cli::{
-    AbandonQuery, DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon,
-    JjCommandRunner, JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation,
-    JjRecovery, JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
+    DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjCommandRunner,
+    JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery,
+    JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery,
     RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
     WorkspaceInspectionQuery,
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
-use jk_tui::command_discovery::{BindingContext, discovery_scroll_limit};
+#[cfg(test)]
+use jk_tui::command_discovery::ActionMenuAction;
+use jk_tui::command_discovery::{BindingContext, action_menu_rows, discovery_scroll_limit};
 use jk_tui::command_history_view::{CommandHistoryAction, CommandHistoryActionResult};
 #[cfg(test)]
 use jk_tui::command_history_view::{CommandHistorySnapshot, CommandHistoryView};
@@ -44,11 +48,13 @@ use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
 use jk_tui::workspaces_view::WorkspaceViewSnapshot;
 use jk_tui::workspaces_view::{WorkspacesActionResult, WorkspacesView};
 
+mod abandon_confirmation;
 mod actions;
 mod cli;
 mod clipboard;
 mod command_history;
 mod command_mode;
+mod description_editor;
 mod key;
 mod menus;
 mod mutation_preview;
@@ -76,14 +82,18 @@ pub(crate) use command_history::{
     open_command_history_operation, open_operation_log, push_selected_command_history_details,
 };
 use command_mode::{command_mode_snapshot, command_mode_spec, parse_jj_command_args};
+use description_editor::DescriptionEditor;
 use key::AppKey;
 use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
 #[cfg(test)]
 use menus::{diff_file_list_lines, view_options_lines};
 use mutation_preview::{PendingCommandPreview, selected_new_parents};
+use mutations::{abandon_or_preview, execute_pending_command_with_runner, execute_recovery_action};
 #[cfg(test)]
-use mutations::confirm_command_preview_with_runner;
-use mutations::{confirm_command_preview, open_recovery_preview};
+use mutations::{
+    abandon_or_preview_with_runner, confirm_command_preview_with_runner,
+    execute_recovery_action_with_runner,
+};
 #[cfg(test)]
 use refresh::show_log_template_load_error;
 use refresh::{
@@ -207,22 +217,34 @@ fn run_terminal(
             needs_redraw = false;
         }
 
-        match event::read()? {
+        let event = if let Some(timeout) = state.toast_timeout() {
+            if !event::poll(timeout)? {
+                needs_redraw = true;
+                continue;
+            }
+            event::read()?
+        } else {
+            event::read()?
+        };
+
+        match event {
             Event::Key(key) => {
-                if handle_input_mode(
+                let mode_result = handle_input_mode(
                     &mut state,
                     &mut source,
                     diff_source,
                     describe_source,
                     command_repository.as_deref(),
                     key,
-                ) == InputModeResult::Handled
-                {
-                    needs_redraw = true;
-                    continue;
-                }
-
-                let app_key = AppKey::from_crossterm(key);
+                );
+                let app_key = match mode_result {
+                    InputModeResult::Handled => {
+                        needs_redraw = true;
+                        continue;
+                    }
+                    InputModeResult::Unhandled => AppKey::from_crossterm(key),
+                    InputModeResult::Action(action) => AppKey::from_action_menu(action),
+                };
                 let mut sources = AppSources {
                     log: &mut source,
                     diff: diff_source,
@@ -261,6 +283,9 @@ fn handle_input_mode(
     command_repository: Option<&Path>,
     key: KeyEvent,
 ) -> InputModeResult {
+    if matches!(state.modes.active(), Some(InputMode::ActionMenu { .. })) {
+        return handle_action_menu_mode(state, key);
+    }
     if matches!(state.modes.active(), Some(InputMode::ViewOptions { .. })) {
         return handle_view_options_mode(state, source, diff_source, key);
     }
@@ -276,11 +301,31 @@ fn handle_input_mode(
     ) {
         return handle_command_discovery_mode(state, key);
     }
-    if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
-        return handle_command_preview_mode(state, source, key);
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::AbandonConfirmation { .. })
+    ) {
+        abandon_confirmation::handle_input(state, source, key);
+        return InputModeResult::Handled;
     }
     if matches!(state.modes.active(), Some(InputMode::JjCommand { .. })) {
         return handle_jj_command_mode(state, command_repository, key);
+    }
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::DescribeMessage { .. })
+    ) {
+        if key.kind == crossterm::event::KeyEventKind::Release {
+            return InputModeResult::Handled;
+        }
+        if key.code == KeyCode::Esc {
+            state.modes.pop();
+        } else if key.code == KeyCode::Enter && key.modifiers.is_empty() {
+            submit_describe_message(state, source, describe_source);
+        } else if let Some(InputMode::DescribeMessage { message, .. }) = state.modes.active_mut() {
+            message.input(key);
+        }
+        return InputModeResult::Handled;
     }
 
     let Some(mode) = state.modes.active_mut() else {
@@ -301,23 +346,14 @@ fn handle_input_mode(
             let action = match mode {
                 InputMode::DiffSearch { query } => SearchSubmit::Diff(query.clone()),
                 InputMode::InspectionSearch { query } => SearchSubmit::Inspection(query.clone()),
-                InputMode::DescribeMessage { rev, message } => {
-                    if message.trim().is_empty() {
-                        return InputModeResult::Handled;
-                    }
-                    let preview = describe_source
-                        .spec_for(&DescribeQuery::new(rev.clone(), message.clone()))
-                        .command_preview();
-                    state.modes.pop();
-                    state.modes.push(InputMode::CommandPreview {
-                        pending: PendingCommandPreview::describe(preview),
-                    });
-                    return InputModeResult::Handled;
-                }
+                InputMode::DescribeMessage { .. } => unreachable!(),
+                InputMode::ActionMenu { .. } => unreachable!(),
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
-                InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::AbandonConfirmation { .. } => {
+                    unreachable!()
+                }
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
@@ -329,23 +365,7 @@ fn handle_input_mode(
             code: KeyCode::Backspace,
             ..
         } => {
-            if let InputMode::DescribeMessage { message, .. } = mode
-                && !message.is_empty()
-            {
-                message.pop();
-                return InputModeResult::Handled;
-            }
             state.modes.pop();
-            InputModeResult::Handled
-        }
-        KeyEvent {
-            code: KeyCode::Char('u'),
-            modifiers,
-            ..
-        } if modifiers == KeyModifiers::CONTROL => {
-            if let InputMode::DescribeMessage { message, .. } = mode {
-                message.clear();
-            }
             InputModeResult::Handled
         }
         KeyEvent {
@@ -357,13 +377,14 @@ fn handle_input_mode(
                 InputMode::DiffSearch { query } | InputMode::InspectionSearch { query } => {
                     query.push(character);
                 }
-                InputMode::DescribeMessage { message, .. } => {
-                    message.push(character);
-                }
+                InputMode::DescribeMessage { .. } => unreachable!(),
+                InputMode::ActionMenu { .. } => unreachable!(),
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
-                InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::AbandonConfirmation { .. } => {
+                    unreachable!()
+                }
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
@@ -371,6 +392,79 @@ fn handle_input_mode(
         }
         _ => InputModeResult::Handled,
     }
+}
+
+fn handle_action_menu_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q'),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Up | KeyCode::Char('k'),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            move_action_menu_selection(state, MenuDirection::Previous);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Down | KeyCode::Char('j'),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            move_action_menu_selection(state, MenuDirection::Next);
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => select_action_menu_row(state),
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            select_action_menu_key(state, character)
+        }
+        _ => InputModeResult::Handled,
+    }
+}
+
+fn select_action_menu_row(state: &mut AppState) -> InputModeResult {
+    let Some(InputMode::ActionMenu { context, selected }) = state.modes.active() else {
+        return InputModeResult::Handled;
+    };
+    let action = action_menu_rows(*context)
+        .get(*selected)
+        .map(|row| row.action);
+    state.modes.pop();
+    action.map_or(InputModeResult::Handled, InputModeResult::Action)
+}
+
+fn select_action_menu_key(state: &mut AppState, character: char) -> InputModeResult {
+    let Some(InputMode::ActionMenu { context, .. }) = state.modes.active() else {
+        return InputModeResult::Handled;
+    };
+    let action = action_menu_rows(*context)
+        .into_iter()
+        .find(|row| row.key.len() == character.len_utf8() && row.key.starts_with(character))
+        .map(|row| row.action);
+    if action.is_some() {
+        state.modes.pop();
+    }
+    action.map_or(InputModeResult::Handled, InputModeResult::Action)
+}
+
+fn move_action_menu_selection(state: &mut AppState, direction: MenuDirection) {
+    let Some(InputMode::ActionMenu { context, selected }) = state.modes.active_mut() else {
+        return;
+    };
+    *selected = wrapped_selection(*selected, action_menu_rows(*context).len(), direction);
 }
 
 fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputModeResult {
@@ -425,46 +519,6 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
             modifiers,
             ..
         } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
-            InputModeResult::Handled
-        }
-        _ => InputModeResult::Handled,
-    }
-}
-
-fn handle_command_preview_mode(
-    state: &mut AppState,
-    source: &mut JjLog,
-    key: KeyEvent,
-) -> InputModeResult {
-    match key {
-        KeyEvent {
-            code: KeyCode::Esc | KeyCode::Backspace,
-            ..
-        }
-        | KeyEvent {
-            code: KeyCode::Char('q'),
-            modifiers: KeyModifiers::NONE,
-            ..
-        } => {
-            state.modes.pop();
-            InputModeResult::Handled
-        }
-        KeyEvent {
-            code: KeyCode::Enter,
-            ..
-        } => {
-            let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
-                return InputModeResult::Handled;
-            };
-            confirm_command_preview(state, source, pending);
-            InputModeResult::Handled
-        }
-        KeyEvent {
-            code: KeyCode::Char('y'),
-            modifiers: KeyModifiers::NONE,
-            ..
-        } => {
-            copy_pending_command(state);
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
@@ -618,69 +672,114 @@ fn open_describe_message(state: &mut AppState) {
         log.show_error("No revision selected");
         return;
     };
-    let message = log.selected_description().unwrap_or_default().to_owned();
+    let message = DescriptionEditor::new(&describe_message_from_log(
+        log.selected_description().unwrap_or_default(),
+    ));
 
     state
         .modes
         .push(InputMode::DescribeMessage { rev, message });
 }
 
-fn open_abandon_preview(state: &mut AppState, abandon_source: &JjAbandon) {
-    let AppView::Log(log) = state.views.active_mut() else {
-        return;
-    };
-    let Some(rev) = log.selected_revision_id().map(ToOwned::to_owned) else {
-        log.show_error("No revision selected");
-        return;
-    };
-
-    let preview = abandon_source
-        .spec_for(&AbandonQuery::new(rev))
-        .command_preview();
-    state.modes.push(InputMode::CommandPreview {
-        pending: PendingCommandPreview::abandon(preview),
-    });
+fn describe_message_from_log(description: &str) -> String {
+    description
+        .strip_suffix("\r\n")
+        .or_else(|| description.strip_suffix('\n'))
+        .unwrap_or(description)
+        .to_owned()
 }
 
-fn open_new_preview(state: &mut AppState, new_source: &JjNew) {
-    let AppView::Log(log) = state.views.active_mut() else {
+fn submit_describe_message(state: &mut AppState, source: &mut JjLog, describe_source: &JjDescribe) {
+    submit_describe_message_with_runner(state, source, describe_source, SystemJjCommandRunner);
+}
+
+fn submit_describe_message_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    source: &mut JjLog,
+    describe_source: &JjDescribe,
+    runner: R,
+) {
+    let Some(InputMode::DescribeMessage { rev, message }) = state.modes.pop() else {
         return;
+    };
+    if message.text().trim().is_empty() {
+        state
+            .modes
+            .push(InputMode::DescribeMessage { rev, message });
+        return;
+    }
+
+    let preview = describe_source
+        .spec_for(&DescribeQuery::new(rev, message.text()))
+        .command_preview();
+    execute_pending_command_with_runner(
+        state,
+        source,
+        PendingCommandPreview::describe(preview),
+        runner,
+    );
+}
+
+fn execute_new_action(state: &mut AppState, source: &mut JjLog, new_source: &JjNew) {
+    execute_new_action_with_runner(state, source, new_source, SystemJjCommandRunner);
+}
+
+fn execute_new_action_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    source: &mut JjLog,
+    new_source: &JjNew,
+    runner: R,
+) {
+    if let Some(pending) = new_preview_pending(state, new_source) {
+        execute_pending_command_with_runner(state, source, pending, runner);
+    }
+}
+
+fn new_preview_pending(state: &mut AppState, new_source: &JjNew) -> Option<PendingCommandPreview> {
+    let AppView::Log(log) = state.views.active_mut() else {
+        return None;
     };
     let parents = selected_new_parents(log);
     if parents.is_empty() {
         log.show_error("No parent revision selected");
-        return;
+        return None;
     }
 
     let preview = new_source
         .spec_for(&NewQuery::new(parents))
         .command_preview();
-    state.modes.push(InputMode::CommandPreview {
-        pending: PendingCommandPreview::new_change(preview),
-    });
+    Some(PendingCommandPreview::new_change(preview))
 }
 
-fn open_edit_preview(state: &mut AppState, edit_source: &JjEdit) {
+fn execute_edit_action(state: &mut AppState, source: &mut JjLog, edit_source: &JjEdit) {
+    execute_edit_action_with_runner(state, source, edit_source, SystemJjCommandRunner);
+}
+
+fn execute_edit_action_with_runner<R: JjCommandRunner>(
+    state: &mut AppState,
+    source: &mut JjLog,
+    edit_source: &JjEdit,
+    runner: R,
+) {
+    if let Some(pending) = edit_preview_pending(state, edit_source) {
+        execute_pending_command_with_runner(state, source, pending, runner);
+    }
+}
+
+fn edit_preview_pending(
+    state: &mut AppState,
+    edit_source: &JjEdit,
+) -> Option<PendingCommandPreview> {
     let AppView::Log(log) = state.views.active_mut() else {
-        return;
+        return None;
     };
     let Some(rev) = log.selected_revision_id().map(ToOwned::to_owned) else {
         log.show_error("No revision selected");
-        return;
+        return None;
     };
 
     let preview = edit_source.spec_for(&EditQuery::new(rev)).command_preview();
-    state.modes.push(InputMode::CommandPreview {
-        pending: PendingCommandPreview::edit(preview),
-    });
-}
-
-fn copy_pending_command(state: &mut AppState) {
-    let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() else {
-        return;
-    };
-    let status = copy_command_line(&pending.preview.command_line);
-    pending.copy_status = Some(status);
+    Some(PendingCommandPreview::edit(preview))
 }
 
 fn copy_selected_command(state: &mut AppState) {
@@ -898,6 +997,17 @@ fn open_command_discovery(state: &mut AppState) {
         context,
         query: String::new(),
         scroll_offset: 0,
+    });
+}
+
+fn open_action_menu(state: &mut AppState) {
+    let context = active_binding_context(state);
+    if action_menu_rows(context).is_empty() {
+        return;
+    }
+    state.modes.push(InputMode::ActionMenu {
+        context,
+        selected: 0,
     });
 }
 
@@ -2502,6 +2612,208 @@ mod tests {
     }
 
     #[test]
+    fn action_menu_opens_only_where_repository_actions_are_meaningful() {
+        let mut log_state = AppState::new(AppView::Log(LogView::default()));
+        open_action_menu(&mut log_state);
+        assert_eq!(
+            log_state.modes.active(),
+            Some(&InputMode::ActionMenu {
+                context: BindingContext::Log,
+                selected: 0,
+            })
+        );
+
+        let mut inspection_state = AppState::new(diff_app_view("aaa"));
+        open_action_menu(&mut inspection_state);
+        assert_eq!(inspection_state.modes.active(), None);
+    }
+
+    #[test]
+    fn action_menu_navigation_wraps_and_escape_cancels() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        open_action_menu(&mut state);
+
+        move_action_menu_selection(&mut state, MenuDirection::Previous);
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ActionMenu {
+                context: BindingContext::Log,
+                selected: action_menu_rows(BindingContext::Log).len() - 1,
+            })
+        );
+
+        let result =
+            handle_action_menu_mode(&mut state, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(result, InputModeResult::Handled);
+        assert_eq!(state.modes.active(), None);
+
+        open_action_menu(&mut state);
+        assert_eq!(
+            handle_action_menu_mode(
+                &mut state,
+                KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
+            ),
+            InputModeResult::Handled
+        );
+        assert_eq!(state.modes.active(), None);
+
+        open_action_menu(&mut state);
+        assert_eq!(
+            handle_action_menu_mode(
+                &mut state,
+                KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE),
+            ),
+            InputModeResult::Handled
+        );
+        assert!(matches!(
+            state.modes.active(),
+            Some(InputMode::ActionMenu { .. })
+        ));
+    }
+
+    #[test]
+    fn action_menu_enter_and_accelerator_return_existing_actions() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::ActionMenu {
+            context: BindingContext::Log,
+            selected: 3,
+        });
+
+        assert_eq!(
+            handle_action_menu_mode(
+                &mut state,
+                KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            ),
+            InputModeResult::Action(ActionMenuAction::Abandon)
+        );
+        assert_eq!(state.modes.active(), None);
+
+        open_action_menu(&mut state);
+        assert_eq!(
+            handle_action_menu_mode(
+                &mut state,
+                KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE),
+            ),
+            InputModeResult::Action(ActionMenuAction::Describe)
+        );
+        assert_eq!(state.modes.active(), None);
+
+        for (key, action) in [
+            ('n', ActionMenuAction::NewChange),
+            ('e', ActionMenuAction::EditChange),
+        ] {
+            open_action_menu(&mut state);
+            assert_eq!(
+                handle_action_menu_mode(
+                    &mut state,
+                    KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE),
+                ),
+                InputModeResult::Action(action)
+            );
+            assert_eq!(state.modes.active(), None);
+        }
+    }
+
+    #[test]
+    fn action_menu_render_shows_groups_selection_and_safety() {
+        let backend = TestBackend::new(80, 22);
+        let mut terminal = Terminal::new(backend).expect("terminal");
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::ActionMenu {
+            context: BindingContext::Log,
+            selected: 3,
+        });
+
+        terminal
+            .draw(|frame| render_app(frame, &mut state, &LogTemplateSelection::Configured))
+            .expect("render action menu");
+        let rendered = (0..22)
+            .map(|row| buffer_line(terminal.backend().buffer(), row))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(rendered.contains("Actions"));
+        assert!(rendered.contains("Change actions:"));
+        assert!(rendered.contains("local rewrite · enter saves"));
+        assert!(rendered.contains("> a  Abandon revision"));
+        assert!(rendered.contains("destructive · checks first"));
+        assert!(rendered.contains("History and recovery:"));
+        assert!(!rendered.contains("a abandon"));
+    }
+
+    #[test]
+    fn action_menu_render_keeps_compact_rows_together_at_narrow_width() {
+        let backend = TestBackend::new(40, 22);
+        let mut terminal = Terminal::new(backend).expect("terminal");
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::ActionMenu {
+            context: BindingContext::Log,
+            selected: 3,
+        });
+
+        terminal
+            .draw(|frame| render_app(frame, &mut state, &LogTemplateSelection::Configured))
+            .expect("render narrow action menu");
+        let rendered = (0..22)
+            .map(|row| buffer_line(terminal.backend().buffer(), row))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(rendered.contains("a  Abandon revision  checks first"));
+        assert!(!rendered.contains("a  Abandon revision\n"));
+        assert!(!rendered.contains("a abandon"));
+    }
+
+    #[test]
+    fn describe_prompt_uses_terminal_cursor_without_painting_a_caret() {
+        let backend = TestBackend::new(80, 16);
+        let mut terminal = Terminal::new(backend).expect("terminal");
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.modes.push(InputMode::DescribeMessage {
+            rev: "abc123".to_owned(),
+            message: DescriptionEditor::new("Draft\nwith a body"),
+        });
+
+        terminal
+            .draw(|frame| render_app(frame, &mut state, &LogTemplateSelection::Configured))
+            .expect("render describe prompt");
+        let rendered = (0..16)
+            .map(|row| buffer_line(terminal.backend().buffer(), row))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(rendered.contains("Draft"));
+        assert!(rendered.contains("with a body"));
+        assert!(!rendered.contains('▌'));
+        let second_line = (0..16)
+            .find(|row| buffer_line(terminal.backend().buffer(), *row).contains("with a body"))
+            .expect("rendered describe body");
+        assert_eq!(terminal.backend().cursor_position().y, second_line);
+    }
+
+    #[test]
+    fn mutation_success_toast_preserves_log_hotbar() {
+        let backend = TestBackend::new(80, 12);
+        let mut terminal = Terminal::new(backend).expect("terminal");
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        state.show_toast("Created new change");
+
+        terminal
+            .draw(|frame| render_app(frame, &mut state, &LogTemplateSelection::Configured))
+            .expect("render toast");
+        let rendered = (0..12)
+            .map(|row| buffer_line(terminal.backend().buffer(), row))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let status = buffer_line(terminal.backend().buffer(), 11);
+
+        assert!(rendered.contains("✓ Created new change"));
+        assert!(status.contains("? help"));
+        assert!(!status.contains("m describe"));
+        assert!(!status.contains("Created new change"));
+    }
+
+    #[test]
     fn mode_stack_closes_search_before_popping_view() {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.views.push(diff_app_view("aaa"));
@@ -2696,7 +3008,7 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abcdefgh".to_owned(),
-                message: "abcdefghijklmnop summary".to_owned(),
+                message: DescriptionEditor::new("abcdefghijklmnop summary"),
             })
         );
     }
@@ -2705,7 +3017,7 @@ mod tests {
     fn describe_message_prefills_full_selected_description() {
         let mut state = AppState::new(log_app_view_with_description(
             "abc123",
-            "Current summary\n\nCurrent body",
+            "Current summary\n\nCurrent body\n",
         ));
 
         open_describe_message(&mut state);
@@ -2714,9 +3026,15 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abc123".to_owned(),
-                message: "Current summary\n\nCurrent body".to_owned(),
+                message: DescriptionEditor::new("Current summary\n\nCurrent body"),
             })
         );
+    }
+
+    #[test]
+    fn describe_message_keeps_semantic_trailing_blank_lines() {
+        assert_eq!(describe_message_from_log("summary\n\n"), "summary\n");
+        assert_eq!(describe_message_from_log("summary\r\n"), "summary");
     }
 
     #[test]
@@ -2739,42 +3057,50 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abc123".to_owned(),
-                message: String::new(),
+                message: DescriptionEditor::new(""),
             })
         );
     }
 
     #[test]
-    fn describe_message_enter_opens_command_preview() {
+    fn describe_message_enter_executes_immediately_and_records_the_mutation() {
         let mut state = AppState::new(log_app_view("abc123"));
         state.modes.push(InputMode::DescribeMessage {
             rev: "abc123".to_owned(),
-            message: "New description".to_owned(),
+            message: DescriptionEditor::new("New description"),
         });
         let mut source = JjLog::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "Working copy now at: abc123\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
 
-        let result = handle_input_mode(
+        submit_describe_message_with_runner(
             &mut state,
             &mut source,
-            &JjDiff::default(),
             &JjDescribe::default(),
-            None,
-            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            runner,
         );
 
-        assert_eq!(result, InputModeResult::Handled);
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected command preview mode");
-        };
-        let preview = &pending.preview;
-        assert_eq!(pending.source_action, SourceAction::DescribeRevision);
-        assert_eq!(pending.source_key, "m");
-        assert_eq!(preview.spec.argv()[0].to_string_lossy(), "describe");
+        assert_eq!(state.modes.active(), None);
+        let record = state
+            .command_history()
+            .records()
+            .next()
+            .expect("describe record");
+        assert_eq!(record.source.action, SourceAction::DescribeRevision);
+        assert_eq!(record.source.key.as_deref(), Some("a m"));
         assert_eq!(
-            preview.command_line,
-            "jj --no-pager --color always describe -m 'New description' abc123"
+            record.command.spec_preview,
+            "jj describe -m 'New description' abc123"
         );
-        assert_eq!(preview.safety, jk_core::SafetyClass::LocalRewrite);
+        assert_eq!(
+            record.execution_mode,
+            jk_core::ExecutionMode::ConfirmMutation
+        );
     }
 
     #[test]
@@ -2782,25 +3108,22 @@ mod tests {
         let mut state = AppState::new(log_app_view("abc123"));
         state.modes.push(InputMode::DescribeMessage {
             rev: "abc123".to_owned(),
-            message: "   ".to_owned(),
+            message: DescriptionEditor::new("   "),
         });
         let mut source = JjLog::default();
 
-        let result = handle_input_mode(
+        submit_describe_message_with_runner(
             &mut state,
             &mut source,
-            &JjDiff::default(),
             &JjDescribe::default(),
-            None,
-            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            SequencedRunner::successes(Vec::new()),
         );
 
-        assert_eq!(result, InputModeResult::Handled);
         assert_eq!(
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abc123".to_owned(),
-                message: "   ".to_owned(),
+                message: DescriptionEditor::new("   "),
             })
         );
         assert_eq!(state.command_history().records().count(), 0);
@@ -2810,13 +3133,18 @@ mod tests {
     fn abandon_preview_uses_selected_revision() {
         let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
-        open_abandon_preview(&mut state, &JjAbandon::default());
+        abandon_or_preview_with_runner(
+            &mut state,
+            &mut JjLog::default(),
+            &JjAbandon::default(),
+            SequencedRunner::successes(vec![output(0, "false", ""), output(1, "", "unavailable")]),
+        );
 
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected abandon command preview");
+        let Some(InputMode::AbandonConfirmation { pending, .. }) = state.modes.active() else {
+            panic!("expected abandon confirmation");
         };
         assert_eq!(pending.source_action, SourceAction::AbandonRevision);
-        assert_eq!(pending.source_key, "a");
+        assert_eq!(pending.source_key, "a a");
         assert_eq!(pending.failure_label, "jj abandon");
         assert_eq!(
             pending.preview.command_line,
@@ -2836,13 +3164,9 @@ mod tests {
     fn new_preview_uses_selected_revision_as_parent() {
         let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
-        open_new_preview(&mut state, &JjNew::default());
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected new command preview");
-        };
+        let pending = new_preview_pending(&mut state, &JjNew::default()).expect("pending new");
         assert_eq!(pending.source_action, SourceAction::NewRevision);
-        assert_eq!(pending.source_key, "n");
+        assert_eq!(pending.source_key, "a n");
         assert_eq!(pending.failure_label, "jj new");
         assert_eq!(
             pending.preview.command_line,
@@ -2870,11 +3194,7 @@ mod tests {
         let _ = log.apply(LogAction::Next);
         let _ = log.apply(LogAction::ToggleMark);
 
-        open_new_preview(&mut state, &JjNew::default());
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected new command preview");
-        };
+        let pending = new_preview_pending(&mut state, &JjNew::default()).expect("pending new");
         assert_eq!(
             pending.preview.command_line,
             "jj --no-pager --color always new abcdefgh zyxwvuts"
@@ -2885,13 +3205,9 @@ mod tests {
     fn edit_preview_uses_selected_revision() {
         let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
-        open_edit_preview(&mut state, &JjEdit::default());
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected edit command preview");
-        };
+        let pending = edit_preview_pending(&mut state, &JjEdit::default()).expect("pending edit");
         assert_eq!(pending.source_action, SourceAction::EditRevision);
-        assert_eq!(pending.source_key, "e");
+        assert_eq!(pending.source_key, "a e");
         assert_eq!(pending.failure_label, "jj edit");
         assert_eq!(
             pending.preview.command_line,
@@ -2905,7 +3221,146 @@ mod tests {
     }
 
     #[test]
-    fn confirming_describe_preview_records_mutation_before_refresh() {
+    fn menu_new_executes_without_opening_a_preview() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(
+                0,
+                "",
+                "Working copy  (@) now at: def456 222 (empty) new\nParent commit (@-): abc123 111 parent\n",
+            ),
+            output(0, "222222222222\n", ""),
+            output(0, "○  abc123 parent\n@  def456 new\n", ""),
+            output(
+                0,
+                "{\"change_id\":\"abc123\",\"commit_id\":\"111\",\"description\":\"parent\"}\t\"\"\n{\"change_id\":\"def456789\",\"commit_id\":\"222\",\"description\":\"new\"}\t\"\"\n",
+                "",
+            ),
+        ]);
+
+        execute_new_action_with_runner(&mut state, &mut source, &JjNew::default(), runner);
+
+        assert_eq!(state.modes.active(), None);
+        assert_eq!(
+            match state.views.active() {
+                AppView::Log(log) => log.selected_change_id(),
+                _ => None,
+            },
+            Some("def456789")
+        );
+        let record = state
+            .command_history()
+            .records()
+            .next()
+            .expect("new record");
+        assert_eq!(record.source.action, SourceAction::NewRevision);
+        assert_eq!(record.command.spec_preview, "jj new abc123");
+    }
+
+    #[test]
+    fn menu_edit_executes_without_opening_a_preview() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "Working copy now at: abc123\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        execute_edit_action_with_runner(&mut state, &mut source, &JjEdit::default(), runner);
+
+        assert_eq!(state.modes.active(), None);
+        let record = state
+            .command_history()
+            .records()
+            .next()
+            .expect("edit record");
+        assert_eq!(record.source.action, SourceAction::EditRevision);
+        assert_eq!(record.command.spec_preview, "jj edit abc123");
+    }
+
+    #[test]
+    fn empty_abandon_executes_immediately_after_probe() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "true\n", ""),
+            output(0, "111111111111\n", ""),
+            output(0, "Abandoned 1 commits.\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
+
+        abandon_or_preview_with_runner(&mut state, &mut source, &JjAbandon::default(), runner);
+
+        assert_eq!(state.modes.active(), None);
+        let record = state
+            .command_history()
+            .records()
+            .next()
+            .expect("abandon record");
+        assert_eq!(record.source.action, SourceAction::AbandonRevision);
+        assert_eq!(record.command.spec_preview, "jj abandon abc123");
+    }
+
+    #[test]
+    fn non_empty_abandon_keeps_the_destructive_preview() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "false\n", ""),
+            output(1, "", "details unavailable"),
+        ]);
+
+        abandon_or_preview_with_runner(&mut state, &mut source, &JjAbandon::default(), runner);
+
+        assert!(matches!(
+            state.modes.active(),
+            Some(InputMode::AbandonConfirmation { pending, .. })
+                if pending.source_action == SourceAction::AbandonRevision
+        ));
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn non_empty_abandon_loads_contents_without_executing() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let runner = SequencedRunner::successes(vec![
+            output(0, "false\n", ""),
+            output(0, "\"abc123\"\t\"Add cache\\n\"\ttrue\n", ""),
+            output(0, "\"src/cache.rs\"\t\"A\"\t84\t0\n", ""),
+            output(0, "2\n", ""),
+            output(0, "+cache contents\n", ""),
+        ]);
+        abandon_or_preview_with_runner(
+            &mut state,
+            &mut JjLog::default(),
+            &JjAbandon::default(),
+            runner,
+        );
+        let Some(InputMode::AbandonConfirmation { dialog, .. }) = state.modes.active_mut() else {
+            panic!("expected confirmation");
+        };
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal.draw(|frame| dialog.render(frame)).expect("render");
+        let rendered = (0..30)
+            .map(|y| crate::test_support::buffer_line(terminal.backend().buffer(), y))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(rendered.contains("src/cache.rs"));
+        assert!(rendered.contains("+84"));
+        assert!(rendered.contains("> Cancel <"));
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn recorded_describe_mutation_refreshes_after_execution() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
         let preview = JjDescribe::default()
@@ -2935,7 +3390,7 @@ mod tests {
         assert_eq!(records[0].command.title, "jj describe abc123");
         assert_eq!(records[0].source.view, SourceView::Log);
         assert_eq!(records[0].source.action, SourceAction::DescribeRevision);
-        assert_eq!(records[0].source.key.as_deref(), Some("m"));
+        assert_eq!(records[0].source.key.as_deref(), Some("a m"));
         assert_eq!(records[0].safety, jk_core::SafetyClass::LocalRewrite);
         assert_eq!(
             records[0].execution_mode,
@@ -2975,7 +3430,7 @@ mod tests {
         assert_eq!(records[0].command.title, "jj abandon abc123");
         assert_eq!(records[0].source.view, SourceView::Log);
         assert_eq!(records[0].source.action, SourceAction::AbandonRevision);
-        assert_eq!(records[0].source.key.as_deref(), Some("a"));
+        assert_eq!(records[0].source.key.as_deref(), Some("a a"));
         assert_eq!(records[0].safety, jk_core::SafetyClass::DestructiveLocal);
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);
@@ -3010,7 +3465,7 @@ mod tests {
         assert_eq!(records[0].command.title, "jj new abc123");
         assert_eq!(records[0].source.view, SourceView::Log);
         assert_eq!(records[0].source.action, SourceAction::NewRevision);
-        assert_eq!(records[0].source.key.as_deref(), Some("n"));
+        assert_eq!(records[0].source.key.as_deref(), Some("a n"));
         assert_eq!(records[0].safety, jk_core::SafetyClass::LocalRewrite);
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);
@@ -3045,7 +3500,7 @@ mod tests {
         assert_eq!(records[0].command.title, "jj edit abc123");
         assert_eq!(records[0].source.view, SourceView::Log);
         assert_eq!(records[0].source.action, SourceAction::EditRevision);
-        assert_eq!(records[0].source.key.as_deref(), Some("e"));
+        assert_eq!(records[0].source.key.as_deref(), Some("a e"));
         assert_eq!(records[0].safety, jk_core::SafetyClass::LocalRewrite);
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);
@@ -3090,38 +3545,68 @@ mod tests {
     }
 
     #[test]
-    fn undo_preview_uses_recovery_command_spec() {
+    fn undo_runs_immediately_through_recovery_command_spec() {
         let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "undid\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
 
-        open_recovery_preview(&mut state, &JjRecovery::default(), RecoveryCommand::Undo);
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected undo command preview");
-        };
-        assert_eq!(pending.source_action, SourceAction::Undo);
-        assert_eq!(pending.source_key, "u");
-        assert_eq!(
-            pending.preview.command_line,
-            "jj --no-pager --color always undo"
+        execute_recovery_action_with_runner(
+            &mut state,
+            &mut source,
+            &JjRecovery::default(),
+            RecoveryCommand::Undo,
+            runner,
         );
-        assert_eq!(pending.preview.safety, jk_core::SafetyClass::LocalRewrite);
+
+        assert_eq!(state.modes.active(), None);
+        let record = state
+            .command_history()
+            .records()
+            .next()
+            .expect("undo record");
+        assert_eq!(record.command.spec_preview, "jj undo");
+        assert_eq!(record.source.action, SourceAction::Undo);
+        assert_eq!(record.source.key.as_deref(), Some("a u"));
+        assert_eq!(record.safety, jk_core::SafetyClass::LocalRewrite);
+        assert_eq!(record.operation_id.as_deref(), Some("222222222222"));
     }
 
     #[test]
-    fn redo_preview_uses_recovery_command_spec() {
+    fn redo_runs_immediately_through_recovery_command_spec() {
         let mut state = AppState::new(log_app_view("abc123"));
+        let mut source = JjLog::default();
+        let runner = SequencedRunner::successes(vec![
+            output(0, "111111111111\n", ""),
+            output(0, "redid\n", ""),
+            output(0, "222222222222\n", ""),
+            output(0, "refreshed rendered log\n", ""),
+            output(0, "{}\n", ""),
+        ]);
 
-        open_recovery_preview(&mut state, &JjRecovery::default(), RecoveryCommand::Redo);
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected redo command preview");
-        };
-        assert_eq!(pending.source_action, SourceAction::Redo);
-        assert_eq!(pending.source_key, "U");
-        assert_eq!(
-            pending.preview.command_line,
-            "jj --no-pager --color always redo"
+        execute_recovery_action_with_runner(
+            &mut state,
+            &mut source,
+            &JjRecovery::default(),
+            RecoveryCommand::Redo,
+            runner,
         );
+
+        assert_eq!(state.modes.active(), None);
+        let record = state
+            .command_history()
+            .records()
+            .next()
+            .expect("redo record");
+        assert_eq!(record.command.spec_preview, "jj redo");
+        assert_eq!(record.source.action, SourceAction::Redo);
+        assert_eq!(record.source.key.as_deref(), Some("a U"));
+        assert_eq!(record.operation_id.as_deref(), Some("222222222222"));
     }
 
     #[test]
@@ -3215,12 +3700,9 @@ mod tests {
     }
 
     #[test]
-    fn confirming_undo_preview_records_recovery_action_before_refresh() {
+    fn undo_records_recovery_action_before_refresh() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
-        let preview = JjRecovery::default()
-            .spec_for(RecoveryCommand::Undo)
-            .command_preview();
         let runner = SequencedRunner::successes(vec![
             output(0, "111111111111\n", ""),
             output(0, "undid\n", ""),
@@ -3229,10 +3711,11 @@ mod tests {
             output(0, "{}\n", ""),
         ]);
 
-        confirm_command_preview_with_runner(
+        execute_recovery_action_with_runner(
             &mut state,
             &mut source,
-            PendingCommandPreview::undo(preview),
+            &JjRecovery::default(),
+            RecoveryCommand::Undo,
             runner,
         );
 
@@ -3240,7 +3723,7 @@ mod tests {
         assert_eq!(records.len(), 3);
         assert_eq!(records[0].command.spec_preview, "jj undo");
         assert_eq!(records[0].source.action, SourceAction::Undo);
-        assert_eq!(records[0].source.key.as_deref(), Some("u"));
+        assert_eq!(records[0].source.key.as_deref(), Some("a u"));
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);
     }

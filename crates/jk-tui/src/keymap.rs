@@ -20,8 +20,102 @@ pub enum BindingContext {
     OperationLog,
 }
 
+/// Repository action selected from the context-aware action menu.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ActionMenuAction {
+    /// Describe the selected revision.
+    Describe,
+    /// Create a new change from the selected or marked revisions.
+    NewChange,
+    /// Edit the selected revision.
+    EditChange,
+    /// Abandon the selected revision.
+    Abandon,
+    /// Undo the latest operation.
+    Undo,
+    /// Redo the latest undone operation.
+    Redo,
+}
+
+/// User-facing section in the action menu.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ActionMenuGroup {
+    /// Actions that change revisions or working-copy state.
+    Change,
+    /// Actions that recover through operation history.
+    Recovery,
+}
+
+impl ActionMenuGroup {
+    /// Returns the section heading shown in the menu.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Change => "Change actions",
+            Self::Recovery => "History and recovery",
+        }
+    }
+}
+
+/// Safety and execution cue shown before an action runs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ActionMenuSafety {
+    /// The command rewrites local repository state and requires a preview.
+    LocalRewrite,
+    /// The command opens an inline editor whose Enter key saves the change immediately.
+    InlineSubmit,
+    /// The command rewrites local repository state and runs immediately.
+    ImmediateLocal,
+    /// The command checks the selected revision and previews only when it is non-empty.
+    ConditionalDestructive,
+    /// The command is destructive locally and requires a preview.
+    DestructiveLocal,
+}
+
+impl ActionMenuSafety {
+    /// Returns the full safety label shown in ordinary-width menus.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::LocalRewrite => "local rewrite · preview",
+            Self::InlineSubmit => "local rewrite · enter saves",
+            Self::ImmediateLocal => "local rewrite · runs now",
+            Self::ConditionalDestructive => "destructive · checks first",
+            Self::DestructiveLocal => "destructive · preview",
+        }
+    }
+
+    /// Returns the compact safety label shown in narrow menus.
+    #[must_use]
+    pub const fn compact_label(self) -> &'static str {
+        match self {
+            Self::LocalRewrite => "preview",
+            Self::InlineSubmit => "enter saves",
+            Self::ImmediateLocal => "runs now",
+            Self::ConditionalDestructive => "checks first",
+            Self::DestructiveLocal => "destructive",
+        }
+    }
+}
+
+/// One selectable action-menu row derived from keymap metadata.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ActionMenuRow {
+    /// Semantic action routed through the application's existing dispatcher.
+    pub action: ActionMenuAction,
+    /// Key active while the action menu is open.
+    pub key: &'static str,
+    /// User-facing action label.
+    pub label: &'static str,
+    /// Task-oriented menu section.
+    pub group: ActionMenuGroup,
+    /// Safety and execution cue displayed before selection runs.
+    pub safety: ActionMenuSafety,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ActionId {
+    ActionMenu,
     Move,
     LineScroll,
     PageDown,
@@ -94,7 +188,8 @@ const fn default_help_group(action: ActionId) -> HelpGroup {
         | ActionId::FoldFile
         | ActionId::FoldAll
         | ActionId::FoldHunk => HelpGroup::Views,
-        ActionId::OpenDescribe
+        ActionId::ActionMenu
+        | ActionId::OpenDescribe
         | ActionId::NewChange
         | ActionId::EditChange
         | ActionId::Abandon
@@ -139,6 +234,7 @@ impl HelpGroup {
 impl ActionId {
     const fn label(self) -> &'static str {
         match self {
+            Self::ActionMenu => "Open action menu",
             Self::Move => "Move selection",
             Self::LineScroll => "Scroll line",
             Self::PageDown => "Page down",
@@ -189,6 +285,8 @@ impl ActionId {
 /// Command or interaction family used by contextual help.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CommandFamily {
+    /// Context-aware repository action menu.
+    ActionMenu,
     /// Commands and actions related to `jj log`.
     JjLog,
     /// Commands and actions related to `jj diff`.
@@ -238,6 +336,7 @@ pub enum CommandFamily {
 impl CommandFamily {
     const fn label(self) -> &'static str {
         match self {
+            Self::ActionMenu => "actions",
             Self::JjLog => "jj log",
             Self::JjDiff => "jj diff",
             Self::JjDescribe => "jj describe",
@@ -276,6 +375,16 @@ struct KeyBinding {
     hotbar_rank: Option<u8>,
     show_in_help: bool,
     show_in_discovery: bool,
+    action_menu: Option<ActionMenuMetadata>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ActionMenuMetadata {
+    action: ActionMenuAction,
+    key: &'static str,
+    group: ActionMenuGroup,
+    safety: ActionMenuSafety,
+    rank: u8,
 }
 
 impl KeyBinding {
@@ -291,6 +400,7 @@ impl KeyBinding {
             hotbar_rank: None,
             show_in_help: true,
             show_in_discovery: true,
+            action_menu: None,
         }
     }
 
@@ -315,12 +425,34 @@ impl KeyBinding {
         self
     }
 
+    const fn with_action_menu(
+        mut self,
+        action: ActionMenuAction,
+        key: &'static str,
+        group: ActionMenuGroup,
+        safety: ActionMenuSafety,
+        rank: u8,
+    ) -> Self {
+        self.action_menu = Some(ActionMenuMetadata {
+            action,
+            key,
+            group,
+            safety,
+            rank,
+        });
+        self
+    }
+
     fn help_line(self, key_width: usize) -> String {
         format!("  {:<key_width$} {}", self.keys, self.help)
     }
 }
 
 const LOG_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(ActionId::ActionMenu, "a", "open context-aware action menu")
+        .with_family(CommandFamily::ActionMenu)
+        .with_aliases(&["actions", "mutation", "rewrite", "recovery"])
+        .with_hotbar(16, "a actions"),
     KeyBinding::new(ActionId::OpenShow, "enter", "open change / drill into ~")
         .with_family(CommandFamily::JjShow)
         .with_aliases(&["details", "inspect"])
@@ -345,30 +477,66 @@ const LOG_BINDINGS: &[KeyBinding] = &[
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["operation", "op log", "undo", "redo", "recovery"])
         .with_hotbar(10, "o ops"),
-    KeyBinding::new(ActionId::OpenDescribe, "m", "describe selected revision")
+    KeyBinding::new(ActionId::OpenDescribe, "a m", "describe selected revision")
         .with_family(CommandFamily::JjDescribe)
-        .with_aliases(&["message", "description", "mutation", "preview"])
-        .with_hotbar(6, "m describe"),
-    KeyBinding::new(ActionId::NewChange, "n", "preview jj new")
+        .with_aliases(&["message", "description", "mutation", "action menu"])
+        .with_action_menu(
+            ActionMenuAction::Describe,
+            "m",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::InlineSubmit,
+            10,
+        ),
+    KeyBinding::new(ActionId::NewChange, "a n", "run jj new")
         .with_family(CommandFamily::JjNew)
         .with_aliases(&["new", "change", "parent", "mutation", "preview"])
-        .with_hotbar(15, "n new"),
-    KeyBinding::new(ActionId::EditChange, "e", "preview jj edit")
+        .with_action_menu(
+            ActionMenuAction::NewChange,
+            "n",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::ImmediateLocal,
+            20,
+        ),
+    KeyBinding::new(ActionId::EditChange, "a e", "run jj edit")
         .with_family(CommandFamily::JjEdit)
         .with_aliases(&["edit", "checkout", "working copy", "mutation", "preview"])
-        .with_hotbar(17, "e edit"),
-    KeyBinding::new(ActionId::Abandon, "a", "preview jj abandon")
+        .with_action_menu(
+            ActionMenuAction::EditChange,
+            "e",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::ImmediateLocal,
+            30,
+        ),
+    KeyBinding::new(ActionId::Abandon, "a a", "preview jj abandon")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["abandon", "delete", "destructive", "mutation", "preview"])
-        .with_hotbar(16, "a abandon"),
-    KeyBinding::new(ActionId::Undo, "u", "preview jj undo")
+        .with_action_menu(
+            ActionMenuAction::Abandon,
+            "a",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::ConditionalDestructive,
+            40,
+        ),
+    KeyBinding::new(ActionId::Undo, "a u", "run jj undo")
         .with_family(CommandFamily::JjOperation)
-        .with_aliases(&["undo", "operation", "recovery"])
-        .with_hotbar(12, "u undo"),
-    KeyBinding::new(ActionId::Redo, "U", "preview jj redo")
+        .with_aliases(&["undo", "operation", "recovery", "run"])
+        .with_action_menu(
+            ActionMenuAction::Undo,
+            "u",
+            ActionMenuGroup::Recovery,
+            ActionMenuSafety::ImmediateLocal,
+            50,
+        ),
+    KeyBinding::new(ActionId::Redo, "a U", "run jj redo")
         .with_family(CommandFamily::JjOperation)
-        .with_aliases(&["redo", "operation", "recovery"])
-        .with_hotbar(14, "U redo"),
+        .with_aliases(&["redo", "operation", "recovery", "run"])
+        .with_action_menu(
+            ActionMenuAction::Redo,
+            "U",
+            ActionMenuGroup::Recovery,
+            ActionMenuSafety::ImmediateLocal,
+            60,
+        ),
     KeyBinding::new(ActionId::Mark, "space", "mark/unmark selected revision")
         .with_family(CommandFamily::Mark)
         .with_aliases(&["selected", "revision", "toggle"])
@@ -702,6 +870,29 @@ const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
         .with_hotbar(8, "q quit")
         .hotbar_only(),
 ];
+
+/// Returns repository actions meaningful in the current screen context.
+#[must_use]
+pub fn action_menu_rows(context: BindingContext) -> Vec<ActionMenuRow> {
+    let mut rows = bindings(context)
+        .iter()
+        .filter_map(|binding| {
+            let menu = binding.action_menu?;
+            Some((
+                menu.rank,
+                ActionMenuRow {
+                    action: menu.action,
+                    key: menu.key,
+                    label: binding.action.label(),
+                    group: menu.group,
+                    safety: menu.safety,
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by_key(|(rank, _)| *rank);
+    rows.into_iter().map(|(_, row)| row).collect()
+}
 
 /// Returns hotbar text for the current binding context.
 pub fn hotbar(context: BindingContext) -> String {
@@ -1295,7 +1486,7 @@ mod tests {
     fn log_hotbar_matches_current_status_text() {
         assert_eq!(
             hotbar(BindingContext::Log),
-            "? help  H home  L log  r refresh  enter open  d diff  m describe  v evolog  s status  space mark  o ops  c clear  u undo  j/k move  U redo  n new  a abandon  e edit  V options  q quit"
+            "? help  H home  L log  r refresh  enter open  d diff  v evolog  s status  space mark  o ops  c clear  j/k move  a actions  V options  q quit"
         );
     }
 
@@ -1356,13 +1547,13 @@ mod tests {
         assert!(status.contains("q quit"));
         assert!(status.contains("enter open"));
         assert!(status.contains("d diff"));
-        assert!(status.contains("m describe"));
+        assert!(!status.contains("m describe"));
         assert!(status.contains("v evolog"));
         assert!(status.contains("s status"));
         assert!(status.contains("..."));
-        assert!(!status.contains("space mark"));
+        assert!(status.contains("space mark"));
         assert!(!status.contains("n new"));
-        assert!(!status.contains("a abandon"));
+        assert!(!status.contains("a actions"));
         assert!(!status.contains("e edit"));
         assert!(!status.contains("j/k move"));
     }
@@ -1373,7 +1564,7 @@ mod tests {
 
         assert_eq!(
             status,
-            "? help  H home  L log  r refresh  enter open  d diff  ...  q quit"
+            "? help  H home  L log  r refresh  enter open  d diff  v evolog  ...  q quit"
         );
     }
 
@@ -1441,7 +1632,7 @@ mod tests {
                 "  PgUp, Ctrl-b page up",
                 "  →, l         expand change / drill into ~",
                 "Change actions:",
-                "  m            describe selected revision",
+                "  a m          describe selected revision",
                 "  space        mark/unmark selected revision",
                 "History and recovery:",
                 "  o            open operation log",
@@ -1590,6 +1781,57 @@ mod tests {
 
         assert_eq!(evolog_row.action, "Open evolog");
         assert_eq!(evolog_row.command_family_label(), Some("jj evolog"));
+    }
+
+    #[test]
+    fn log_action_menu_is_contextual_ranked_and_safety_labeled() {
+        let rows = action_menu_rows(BindingContext::Log);
+
+        assert_eq!(
+            rows.iter().map(|row| row.action).collect::<Vec<_>>(),
+            vec![
+                ActionMenuAction::Describe,
+                ActionMenuAction::NewChange,
+                ActionMenuAction::EditChange,
+                ActionMenuAction::Abandon,
+                ActionMenuAction::Undo,
+                ActionMenuAction::Redo,
+            ]
+        );
+        assert_eq!(rows[0].group, ActionMenuGroup::Change);
+        assert_eq!(rows[0].safety, ActionMenuSafety::InlineSubmit);
+        assert_eq!(rows[1].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[2].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[3].safety, ActionMenuSafety::ConditionalDestructive);
+        assert_eq!(rows[4].group, ActionMenuGroup::Recovery);
+        assert_eq!(rows[4].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[5].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[3].key, "a");
+    }
+
+    #[test]
+    fn read_only_contexts_do_not_offer_repository_actions() {
+        for context in [
+            BindingContext::Diff,
+            BindingContext::Inspection,
+            BindingContext::CommandHistory,
+            BindingContext::OperationLog,
+            BindingContext::Workspaces,
+        ] {
+            assert!(action_menu_rows(context).is_empty(), "{context:?}");
+        }
+    }
+
+    #[test]
+    fn log_discovery_distinguishes_action_menu_from_abandon_accelerator() {
+        let rows = discovery_rows(BindingContext::Log);
+        assert_eq!(discovery_row_for_key(&rows, "a").action, "Open action menu");
+        assert_eq!(discovery_row_for_key(&rows, "a n").action, "New change");
+        assert_eq!(discovery_row_for_key(&rows, "a e").action, "Edit change");
+        assert_eq!(
+            discovery_row_for_key(&rows, "a a").action,
+            "Abandon revision"
+        );
     }
 
     #[test]

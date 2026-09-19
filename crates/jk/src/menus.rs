@@ -1,5 +1,5 @@
 use jk_cli::{DiffFormat, LogTemplateSelection};
-use jk_tui::command_discovery::BindingContext;
+use jk_tui::command_discovery::{ActionMenuRow, BindingContext, action_menu_rows};
 use jk_tui::diff_view::DiffView;
 
 #[derive(Clone, Copy)]
@@ -34,6 +34,74 @@ pub fn wrapped_selection(selected: usize, row_count: usize, direction: MenuDirec
     match direction {
         MenuDirection::Previous => selected.checked_sub(1).unwrap_or(row_count - 1),
         MenuDirection::Next => (selected + 1) % row_count,
+    }
+}
+
+pub fn action_menu_lines(context: BindingContext, selected: usize, width: usize) -> Vec<String> {
+    let rows = action_menu_rows(context);
+    if rows.is_empty() {
+        return vec![
+            "This view is read-only; no repository actions are available.".to_owned(),
+            String::new(),
+            "esc close".to_owned(),
+        ];
+    }
+
+    let compact = width < 64;
+    let key_width = rows.iter().map(|row| row.key.len()).max().unwrap_or(0);
+    let label_width = rows.iter().map(|row| row.label.len()).max().unwrap_or(0);
+    let mut lines = Vec::new();
+    let mut previous_group = None;
+    for (index, row) in rows.iter().enumerate() {
+        if previous_group != Some(row.group) {
+            if previous_group.is_some() {
+                lines.push(String::new());
+            }
+            lines.push(format!("{}:", row.group.label()));
+            previous_group = Some(row.group);
+        }
+        lines.push(action_menu_row_line(
+            *row,
+            index == selected,
+            key_width,
+            label_width,
+            compact,
+        ));
+    }
+
+    lines.push(String::new());
+    lines.push(if compact {
+        "enter open   key select   esc close".to_owned()
+    } else {
+        "Safety cues show whether actions preview, save, or run now; inspection views stay read-only."
+            .to_owned()
+    });
+    if !compact {
+        lines.push("j/k or arrows move   enter open   action key select   esc close".to_owned());
+    }
+    lines
+}
+
+fn action_menu_row_line(
+    row: ActionMenuRow,
+    selected: bool,
+    key_width: usize,
+    label_width: usize,
+    compact: bool,
+) -> String {
+    let marker = if selected { ">" } else { " " };
+    let safety = if compact {
+        row.safety.compact_label()
+    } else {
+        row.safety.label()
+    };
+    if compact {
+        format!("{marker} {:<key_width$}  {}  {safety}", row.key, row.label)
+    } else {
+        format!(
+            "{marker} {:<key_width$}  {:<label_width$}  {safety}",
+            row.key, row.label
+        )
     }
 }
 
@@ -155,6 +223,59 @@ mod tests {
         assert_eq!(wrapped_selection(99, 3, MenuDirection::Previous), 1);
         assert_eq!(wrapped_selection(99, 3, MenuDirection::Next), 0);
         assert_eq!(wrapped_selection(4, 0, MenuDirection::Next), 0);
+    }
+
+    #[test]
+    fn action_menu_groups_ranked_actions_and_marks_selection() {
+        let lines = action_menu_lines(BindingContext::Log, 3, 80);
+
+        assert_eq!(lines[0], "Change actions:");
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.starts_with("  m  Describe revision"))
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.starts_with("> a  Abandon revision")
+                    && line.contains("checks first"))
+        );
+        assert!(lines.iter().any(|line| line == "History and recovery:"));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("inspection views stay read-only"))
+        );
+    }
+
+    #[test]
+    fn action_menu_compacts_without_losing_keys_or_safety() {
+        let lines = action_menu_lines(BindingContext::Log, 0, 40);
+
+        assert!(lines.iter().all(|line| line.chars().count() <= 40));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.starts_with("> m  Describe revision"))
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("a  Abandon revision  checks first"))
+        );
+    }
+
+    #[test]
+    fn action_menu_explains_read_only_contexts() {
+        assert_eq!(
+            action_menu_lines(BindingContext::Inspection, 0, 80),
+            vec![
+                "This view is read-only; no repository actions are available.".to_owned(),
+                String::new(),
+                "esc close".to_owned(),
+            ]
+        );
     }
 
     #[test]

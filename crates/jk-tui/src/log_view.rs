@@ -190,6 +190,17 @@ impl LogView {
         self.state.selected_revision_id()
     }
 
+    /// Selects the visible entry with the given change identifier.
+    #[must_use]
+    pub fn select_change_id(&mut self, change_id: &str) -> bool {
+        self.state.select_change_id(change_id)
+    }
+
+    /// Selects the first visible log entry.
+    pub fn select_first(&mut self) {
+        self.state.select_first();
+    }
+
     /// Returns the visible change before the selected graph elision.
     #[must_use]
     pub fn selected_elision_before_change_id(&self) -> Option<&str> {
@@ -354,10 +365,16 @@ impl LogView {
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
 
-        let status = status
-            .map(ToOwned::to_owned)
-            .or_else(|| self.status_message.clone())
-            .unwrap_or_else(|| adaptive_hotbar(BindingContext::Log, areas.status_width()));
+        let status = status.map_or_else(
+            || {
+                composed_status(
+                    self.status_message.as_deref(),
+                    BindingContext::Log,
+                    areas.status_width(),
+                )
+            },
+            ToOwned::to_owned,
+        );
         let chrome = ViewChrome::new(self.state.title(), &status);
         chrome.render(frame, areas);
 
@@ -389,6 +406,49 @@ impl LogView {
             );
         }
     }
+}
+
+fn composed_status(message: Option<&str>, context: BindingContext, width: u16) -> String {
+    const SEPARATOR_WIDTH: usize = 2;
+    const MIN_HOTBAR_WIDTH: usize = 4;
+    const MAX_MESSAGE_WIDTH: usize = 28;
+
+    let terminal_width = width;
+    let width = usize::from(terminal_width);
+    let hotbar = adaptive_hotbar(context, terminal_width);
+    let Some(message) = message else {
+        return hotbar;
+    };
+
+    let message_width = width
+        .saturating_sub(SEPARATOR_WIDTH + MIN_HOTBAR_WIDTH)
+        .min(MAX_MESSAGE_WIDTH);
+    if message_width == 0 {
+        return hotbar;
+    }
+
+    let message = truncate_status(message, message_width);
+    let hotbar_width = width.saturating_sub(message.chars().count() + SEPARATOR_WIDTH);
+    let hotbar_width = u16::try_from(hotbar_width).unwrap_or(terminal_width);
+    let hotbar = adaptive_hotbar(context, hotbar_width);
+    if hotbar.is_empty() {
+        message
+    } else {
+        format!("{message}  {hotbar}")
+    }
+}
+
+fn truncate_status(status: &str, width: usize) -> String {
+    if status.chars().count() <= width {
+        return status.to_owned();
+    }
+    if width == 1 {
+        return "…".to_owned();
+    }
+
+    let mut truncated = status.chars().take(width - 1).collect::<String>();
+    truncated.push('…');
+    truncated
 }
 
 fn paint_mark_overlays(
@@ -508,10 +568,10 @@ mod tests {
     }
 
     #[test]
-    fn status_messages_replace_default_hotbar_until_refresh() {
+    fn status_messages_share_space_with_default_hotbar_until_refresh() {
         let mut view = LogView::new(snapshot(["aaa"]));
-        view.show_status("u undo  U redo  o operation  C history");
-        let backend = TestBackend::new(56, 4);
+        view.show_status("✓ Created new change");
+        let backend = TestBackend::new(80, 4);
         let mut terminal = match Terminal::new(backend) {
             Ok(terminal) => terminal,
             Err(error) => match error {},
@@ -519,13 +579,17 @@ mod tests {
 
         let draw_result = terminal.draw(|frame| view.render(frame));
         assert!(draw_result.is_ok());
-        assert!(buffer_line(terminal.backend().buffer(), 3).contains("u undo"));
-        assert!(buffer_line(terminal.backend().buffer(), 3).contains("C history"));
+        let status = buffer_line(terminal.backend().buffer(), 3);
+        assert!(status.contains("✓ Created new change"));
+        assert!(status.contains("? help"));
+        assert!(status.contains("q quit"));
 
         view.refresh(snapshot(["bbb"]));
         let draw_result = terminal.draw(|frame| view.render(frame));
         assert!(draw_result.is_ok());
-        assert!(!buffer_line(terminal.backend().buffer(), 3).contains("u undo"));
+        let status = buffer_line(terminal.backend().buffer(), 3);
+        assert!(!status.contains("Created new change"));
+        assert!(status.contains("r refresh"));
     }
 
     #[test]
@@ -576,7 +640,7 @@ mod tests {
         assert!(rendered.contains("preview jj abandon"));
         assert!(rendered.contains("expand change / drill into ~"));
         assert!(rendered.contains("History and recovery:"));
-        assert!(rendered.contains("preview jj undo"));
+        assert!(rendered.contains("run jj undo"));
         assert!(rendered.contains("Session:"));
         assert!(rendered.contains("close help"));
     }
@@ -920,7 +984,7 @@ mod tests {
         assert_eq!(buffer_line(buffer, 0).chars().count(), 16);
         assert_eq!(buffer_line(buffer, 3).chars().count(), 16);
         assert!(buffer_line(buffer, 0).contains("jk jj"));
-        assert!(buffer_line(buffer, 3).contains("refresh failed"));
+        assert!(buffer_line(buffer, 3).contains("refresh"));
     }
 
     fn snapshot<const N: usize>(change_ids: [&str; N]) -> LogSnapshot {

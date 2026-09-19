@@ -7,7 +7,7 @@ pub struct PendingCommandPreview {
     pub(crate) source_action: SourceAction,
     pub(crate) source_key: &'static str,
     pub(crate) failure_label: &'static str,
-    pub(crate) copy_status: Option<String>,
+    pub(crate) success_message: &'static str,
 }
 
 impl PendingCommandPreview {
@@ -15,9 +15,9 @@ impl PendingCommandPreview {
         Self {
             preview,
             source_action: SourceAction::DescribeRevision,
-            source_key: "m",
+            source_key: "a m",
             failure_label: "jj describe",
-            copy_status: None,
+            success_message: "Described revision",
         }
     }
 
@@ -25,9 +25,9 @@ impl PendingCommandPreview {
         Self {
             preview,
             source_action: SourceAction::AbandonRevision,
-            source_key: "a",
+            source_key: "a a",
             failure_label: "jj abandon",
-            copy_status: None,
+            success_message: "Abandoned revision",
         }
     }
 
@@ -35,9 +35,9 @@ impl PendingCommandPreview {
         Self {
             preview,
             source_action: SourceAction::NewRevision,
-            source_key: "n",
+            source_key: "a n",
             failure_label: "jj new",
-            copy_status: None,
+            success_message: "Created new change",
         }
     }
 
@@ -45,9 +45,9 @@ impl PendingCommandPreview {
         Self {
             preview,
             source_action: SourceAction::EditRevision,
-            source_key: "e",
+            source_key: "a e",
             failure_label: "jj edit",
-            copy_status: None,
+            success_message: "Edited revision",
         }
     }
 
@@ -55,9 +55,9 @@ impl PendingCommandPreview {
         Self {
             preview,
             source_action: SourceAction::Undo,
-            source_key: "u",
+            source_key: "a u",
             failure_label: "jj undo",
-            copy_status: None,
+            success_message: "Undid operation",
         }
     }
 
@@ -65,9 +65,9 @@ impl PendingCommandPreview {
         Self {
             preview,
             source_action: SourceAction::Redo,
-            source_key: "U",
+            source_key: "a U",
             failure_label: "jj redo",
-            copy_status: None,
+            success_message: "Redid operation",
         }
     }
 }
@@ -83,13 +83,39 @@ pub fn selected_new_parents(log: &LogView) -> Vec<String> {
         .collect()
 }
 
-pub fn describe_message_lines(rev: &str, message: &str) -> Vec<String> {
-    vec![
-        format!("Revision: {rev}"),
-        format!("Message: {message}"),
-        String::new(),
-        "type message   enter preview   Ctrl-u clear   backspace edit   esc cancel".to_owned(),
-    ]
+pub(crate) fn new_change_id_from_output(stderr: &[u8]) -> Option<String> {
+    String::from_utf8_lossy(stderr).lines().find_map(|line| {
+        let line = strip_ansi(line);
+        if !line.contains("Working copy") {
+            return None;
+        }
+        let (_, after_marker) = line.split_once("now at:")?;
+        after_marker
+            .split_whitespace()
+            .next()
+            .map(ToOwned::to_owned)
+    })
+}
+
+fn strip_ansi(text: &str) -> String {
+    let mut stripped = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character != '\u{1b}' {
+            stripped.push(character);
+            continue;
+        }
+
+        if chars.next_if_eq(&'[').is_none() {
+            continue;
+        }
+        for code in chars.by_ref() {
+            if ('@'..='~').contains(&code) {
+                break;
+            }
+        }
+    }
+    stripped
 }
 
 pub fn command_failure_message(command: &str, stderr: &[u8], stdout: &[u8]) -> String {
@@ -121,32 +147,35 @@ mod tests {
     fn pending_preview_metadata_matches_source_actions() {
         let describe = PendingCommandPreview::describe(preview());
         assert_eq!(describe.source_action, SourceAction::DescribeRevision);
-        assert_eq!(describe.source_key, "m");
+        assert_eq!(describe.source_key, "a m");
         assert_eq!(describe.failure_label, "jj describe");
 
         let abandon = PendingCommandPreview::abandon(preview());
         assert_eq!(abandon.source_action, SourceAction::AbandonRevision);
-        assert_eq!(abandon.source_key, "a");
+        assert_eq!(abandon.source_key, "a a");
         assert_eq!(abandon.failure_label, "jj abandon");
+
+        let new_change = PendingCommandPreview::new_change(preview());
+        assert_eq!(new_change.source_key, "a n");
+
+        let edit = PendingCommandPreview::edit(preview());
+        assert_eq!(edit.source_key, "a e");
 
         let redo = PendingCommandPreview::redo(preview());
         assert_eq!(redo.source_action, SourceAction::Redo);
-        assert_eq!(redo.source_key, "U");
+        assert_eq!(redo.source_key, "a U");
         assert_eq!(redo.failure_label, "jj redo");
     }
 
     #[test]
-    fn describe_prompt_lines_include_revision_message_and_controls() {
+    fn new_change_id_parser_reads_working_copy_output() {
         assert_eq!(
-            describe_message_lines("abc123", "current message"),
-            vec![
-                "Revision: abc123".to_owned(),
-                "Message: current message".to_owned(),
-                String::new(),
-                "type message   enter preview   Ctrl-u clear   backspace edit   esc cancel"
-                    .to_owned(),
-            ]
+            new_change_id_from_output(
+                b"\x1b[1mWorking copy  (@) now at: pomznpsy 72f6e428 second\x1b[0m\n"
+            ),
+            Some("pomznpsy".to_owned())
         );
+        assert_eq!(new_change_id_from_output(b"no working copy output\n"), None);
     }
 
     #[test]
