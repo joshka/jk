@@ -54,6 +54,7 @@ mod cli;
 mod clipboard;
 mod command_history;
 mod command_mode;
+mod description_editor;
 mod key;
 mod menus;
 mod mutation_preview;
@@ -81,6 +82,7 @@ pub(crate) use command_history::{
     open_command_history_operation, open_operation_log, push_selected_command_history_details,
 };
 use command_mode::{command_mode_snapshot, command_mode_spec, parse_jj_command_args};
+use description_editor::DescriptionEditor;
 use key::AppKey;
 use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
 #[cfg(test)]
@@ -310,10 +312,19 @@ fn handle_input_mode(
         return handle_jj_command_mode(state, command_repository, key);
     }
     if matches!(
-        (state.modes.active(), key.code),
-        (Some(InputMode::DescribeMessage { .. }), KeyCode::Enter)
+        state.modes.active(),
+        Some(InputMode::DescribeMessage { .. })
     ) {
-        submit_describe_message(state, source, describe_source);
+        if key.kind == crossterm::event::KeyEventKind::Release {
+            return InputModeResult::Handled;
+        }
+        if key.code == KeyCode::Esc {
+            state.modes.pop();
+        } else if key.code == KeyCode::Enter && key.modifiers.is_empty() {
+            submit_describe_message(state, source, describe_source);
+        } else if let Some(InputMode::DescribeMessage { message, .. }) = state.modes.active_mut() {
+            message.input(key);
+        }
         return InputModeResult::Handled;
     }
 
@@ -354,23 +365,7 @@ fn handle_input_mode(
             code: KeyCode::Backspace,
             ..
         } => {
-            if let InputMode::DescribeMessage { message, .. } = mode
-                && !message.is_empty()
-            {
-                message.pop();
-                return InputModeResult::Handled;
-            }
             state.modes.pop();
-            InputModeResult::Handled
-        }
-        KeyEvent {
-            code: KeyCode::Char('u'),
-            modifiers,
-            ..
-        } if modifiers == KeyModifiers::CONTROL => {
-            if let InputMode::DescribeMessage { message, .. } = mode {
-                message.clear();
-            }
             InputModeResult::Handled
         }
         KeyEvent {
@@ -382,9 +377,7 @@ fn handle_input_mode(
                 InputMode::DiffSearch { query } | InputMode::InspectionSearch { query } => {
                     query.push(character);
                 }
-                InputMode::DescribeMessage { message, .. } => {
-                    message.push(character);
-                }
+                InputMode::DescribeMessage { .. } => unreachable!(),
                 InputMode::ActionMenu { .. } => unreachable!(),
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
@@ -679,7 +672,9 @@ fn open_describe_message(state: &mut AppState) {
         log.show_error("No revision selected");
         return;
     };
-    let message = describe_message_from_log(log.selected_description().unwrap_or_default());
+    let message = DescriptionEditor::new(&describe_message_from_log(
+        log.selected_description().unwrap_or_default(),
+    ));
 
     state
         .modes
@@ -707,7 +702,7 @@ fn submit_describe_message_with_runner<R: JjCommandRunner>(
     let Some(InputMode::DescribeMessage { rev, message }) = state.modes.pop() else {
         return;
     };
-    if message.trim().is_empty() {
+    if message.text().trim().is_empty() {
         state
             .modes
             .push(InputMode::DescribeMessage { rev, message });
@@ -715,7 +710,7 @@ fn submit_describe_message_with_runner<R: JjCommandRunner>(
     }
 
     let preview = describe_source
-        .spec_for(&DescribeQuery::new(rev, message))
+        .spec_for(&DescribeQuery::new(rev, message.text()))
         .command_preview();
     execute_pending_command_with_runner(
         state,
@@ -2776,7 +2771,7 @@ mod tests {
         let mut state = AppState::new(AppView::Log(LogView::default()));
         state.modes.push(InputMode::DescribeMessage {
             rev: "abc123".to_owned(),
-            message: "Draft\nwith a body".to_owned(),
+            message: DescriptionEditor::new("Draft\nwith a body"),
         });
 
         terminal
@@ -2787,8 +2782,8 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
 
-        assert!(rendered.contains("Message: Draft"));
-        assert!(rendered.contains("         with a body"));
+        assert!(rendered.contains("Draft"));
+        assert!(rendered.contains("with a body"));
         assert!(!rendered.contains('▌'));
         let second_line = (0..16)
             .find(|row| buffer_line(terminal.backend().buffer(), *row).contains("with a body"))
@@ -3013,7 +3008,7 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abcdefgh".to_owned(),
-                message: "abcdefghijklmnop summary".to_owned(),
+                message: DescriptionEditor::new("abcdefghijklmnop summary"),
             })
         );
     }
@@ -3031,7 +3026,7 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abc123".to_owned(),
-                message: "Current summary\n\nCurrent body".to_owned(),
+                message: DescriptionEditor::new("Current summary\n\nCurrent body"),
             })
         );
     }
@@ -3062,7 +3057,7 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abc123".to_owned(),
-                message: String::new(),
+                message: DescriptionEditor::new(""),
             })
         );
     }
@@ -3072,7 +3067,7 @@ mod tests {
         let mut state = AppState::new(log_app_view("abc123"));
         state.modes.push(InputMode::DescribeMessage {
             rev: "abc123".to_owned(),
-            message: "New description".to_owned(),
+            message: DescriptionEditor::new("New description"),
         });
         let mut source = JjLog::default();
         let runner = SequencedRunner::successes(vec![
@@ -3113,7 +3108,7 @@ mod tests {
         let mut state = AppState::new(log_app_view("abc123"));
         state.modes.push(InputMode::DescribeMessage {
             rev: "abc123".to_owned(),
-            message: "   ".to_owned(),
+            message: DescriptionEditor::new("   "),
         });
         let mut source = JjLog::default();
 
@@ -3128,7 +3123,7 @@ mod tests {
             state.modes.active(),
             Some(&InputMode::DescribeMessage {
                 rev: "abc123".to_owned(),
-                message: "   ".to_owned(),
+                message: DescriptionEditor::new("   "),
             })
         );
         assert_eq!(state.command_history().records().count(), 0);

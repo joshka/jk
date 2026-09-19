@@ -46,9 +46,12 @@ pub fn render_app(
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
             }
-            Some(InputMode::DescribeMessage { rev, message }) => {
+            Some(InputMode::DescribeMessage { .. }) => {
                 log.render(frame);
-                render_describe_editor(frame, rev, message);
+                if let Some(InputMode::DescribeMessage { rev, message }) = state.modes.active_mut()
+                {
+                    message.render(frame, rev);
+                }
             }
             Some(InputMode::AbandonConfirmation { .. }) => {
                 log.render(frame);
@@ -294,74 +297,6 @@ const fn command_discovery_visible_rows(content_width: usize, area_height: u16) 
     } else {
         12
     }
-}
-
-/// Hard-wrap once, then use those exact rows for both painting and cursor placement. Keeping the
-/// final blank cell also handles insertion after a completely full row.
-fn describe_editor_rows(message: &str, width: usize) -> Vec<String> {
-    let mut rows = Vec::new();
-    for (index, line) in message.split('\n').enumerate() {
-        let prefix = if index == 0 { "Message: " } else { "         " };
-        let text = Span::raw(format!("{prefix}{line}"));
-        let mut row = String::new();
-        let mut used = 0;
-        for grapheme in text.styled_graphemes(Style::default()) {
-            let cells = Span::raw(grapheme.symbol).width();
-            if used + cells > width {
-                rows.push(std::mem::take(&mut row));
-                used = 0;
-            }
-            row.push_str(grapheme.symbol);
-            used += cells;
-        }
-        rows.push(row);
-    }
-    if rows
-        .last()
-        .is_some_and(|row| Span::raw(row.as_str()).width() == width)
-    {
-        rows.push(String::new());
-    }
-    rows
-}
-
-fn render_describe_editor(frame: &mut ratatui::Frame<'_>, rev: &str, message: &str) {
-    let area = frame.area();
-    if area.width < 12 || area.height < 8 {
-        return;
-    }
-    let width = area.width.min(80);
-    let rows = describe_editor_rows(message, usize::from(width - 2));
-    let height = u16::try_from(rows.len().saturating_add(6))
-        .unwrap_or(u16::MAX)
-        .min(area.height - 2);
-    let overlay = Rect::new(
-        area.x + (area.width - width) / 2,
-        area.y + (area.height - height) / 2,
-        width,
-        height,
-    );
-    frame.render_widget(Clear, overlay);
-    frame.render_widget(Block::bordered().title("Describe revision"), overlay);
-    let inner = Rect::new(overlay.x + 1, overlay.y + 1, width - 2, height - 2);
-    frame.render_widget(Paragraph::new(format!("Revision: {rev}")), inner);
-    let editor = Rect::new(inner.x, inner.y + 2, inner.width, inner.height - 3);
-    let start = rows.len().saturating_sub(usize::from(editor.height));
-    let visible = rows[start..]
-        .iter()
-        .map(|row| Line::from(row.as_str()))
-        .collect::<Vec<_>>();
-    frame.render_widget(Paragraph::new(visible), editor);
-    let footer = Rect::new(inner.x, inner.bottom() - 1, inner.width, 1);
-    frame.render_widget(
-        Paragraph::new("enter save · Ctrl-u clear · esc cancel"),
-        footer,
-    );
-    let last_width = rows.last().map_or(0, |row| Span::raw(row.as_str()).width());
-    frame.set_cursor_position((
-        editor.x + u16::try_from(last_width).unwrap_or(0),
-        editor.y + u16::try_from(rows.len() - start - 1).unwrap_or(0),
-    ));
 }
 
 fn render_mode_overlay(
@@ -617,85 +552,5 @@ mod tests {
                     .unwrap();
             }
         }
-    }
-
-    #[test]
-    fn describe_wraps_graphemes_and_keeps_an_insertion_cell() {
-        assert_eq!(describe_editor_rows("abc", 12), ["Message: abc", ""]);
-        assert_eq!(
-            describe_editor_rows("abc\nz", 12),
-            ["Message: abc", "         z"]
-        );
-        assert_eq!(
-            describe_editor_rows("界e\u{301}X", 12),
-            ["Message: 界e\u{301}", "X"]
-        );
-        assert_eq!(
-            describe_editor_rows("one two three", 16),
-            ["Message: one two", " three"]
-        );
-        assert_eq!(
-            describe_editor_rows("summary\n\nbody\n", 30),
-            [
-                "Message: summary",
-                "         ",
-                "         body",
-                "         "
-            ]
-        );
-    }
-
-    #[test]
-    fn describe_cursor_tracks_painted_text_after_wrapping_and_scrolling() {
-        let long_message = "line\n".repeat(40);
-        for (width, height) in [(18, 8), (32, 12), (80, 24)] {
-            for message in [
-                "",
-                "words that wrap differently than a paragraph would wrap them",
-                "界界e\u{301}👩‍💻",
-                "first\n\nlast",
-                &long_message,
-            ] {
-                let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-                terminal
-                    .draw(|frame| render_describe_editor(frame, "abc123", message))
-                    .unwrap();
-                let before = terminal.backend().cursor_position();
-                assert_eq!(
-                    terminal.backend().buffer()[(before.x, before.y)].symbol(),
-                    " "
-                );
-                let edited = format!("{message}X");
-                terminal
-                    .draw(|frame| render_describe_editor(frame, "abc123", &edited))
-                    .unwrap();
-                let cursor = terminal.backend().cursor_position();
-                assert!(cursor.x > 0 && cursor.x < width - 1);
-                assert!(cursor.y > 0 && cursor.y < height - 1);
-                assert_eq!(
-                    terminal.backend().buffer()[(cursor.x - 1, cursor.y)].symbol(),
-                    "X",
-                    "{width}x{height}: {message:?}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn describe_cursor_moves_to_blank_row_after_exact_width_text() {
-        let mut terminal = Terminal::new(TestBackend::new(14, 12)).unwrap();
-        terminal
-            .draw(|frame| render_describe_editor(frame, "abc123", "abc"))
-            .unwrap();
-        let cursor = terminal.backend().cursor_position();
-        assert_eq!(cursor.x, 1);
-        assert_eq!(
-            terminal.backend().buffer()[(12, cursor.y - 1)].symbol(),
-            "c"
-        );
-        assert_eq!(
-            terminal.backend().buffer()[(cursor.x, cursor.y)].symbol(),
-            " "
-        );
     }
 }

@@ -277,7 +277,7 @@ pub enum InputMode {
     },
     DescribeMessage {
         rev: String,
-        message: String,
+        message: crate::description_editor::DescriptionEditor,
     },
     AbandonConfirmation {
         pending: PendingCommandPreview,

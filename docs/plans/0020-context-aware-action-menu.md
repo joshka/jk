@@ -174,6 +174,11 @@ Add or finish tests for these contracts:
 #### Existing Behavior Reuse
 
 - Menu describe enters the existing describe-message mode.
+- Describe uses ratatui-textarea for cursor editing and undo history, with a native terminal cursor.
+  Arrows move within and between displayed rows; Home/End move within a line, Ctrl-Home/Ctrl-End move
+  through the whole description, and Ctrl-Left/Ctrl-Right move by word. Shift selects text.
+  Ctrl-j inserts a newline, Ctrl-u clears, Ctrl-z undoes, and Ctrl-r redoes. Enter saves immediately;
+  Esc cancels. Long descriptions wrap and scroll to keep the cursor visible.
 - Menu Describe, New, Edit, Undo, and Redo execute through the existing recorded mutation runner.
   Empty-revision Abandon does the same after a `self.empty()` probe that snapshots current files;
   non-empty Abandon opens a content-sized confirmation with the change description, changed paths,

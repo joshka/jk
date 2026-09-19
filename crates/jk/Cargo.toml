@@ -25,6 +25,7 @@ jk-cli = { path = "../jk-cli", version = "0.2.7" }
 jk-core = { path = "../jk-core", version = "0.2.7" }
 jk-tui = { path = "../jk-tui", version = "0.2.7" }
 ratatui.workspace = true
+ratatui-textarea.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
