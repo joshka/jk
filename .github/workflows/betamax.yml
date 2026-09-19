@@ -1,0 +1,48 @@
+name: Betamax
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: betamax-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master
+        with:
+          toolchain: stable
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Install jj
+        uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
+        with:
+          tool: jj-cli@0.45.1
+
+      - name: Build jk
+        run: cargo build --locked -p jk
+
+      - name: Prepare preview repository
+        run: bash scripts/prepare-preview.sh
+
+      - name: Render previews
+        uses: joshka/betamax-action@34b48d5acd439f60d3e03ccabf2539dfe93527f2
+        with:
+          tapes: tapes/ci/*.tape
+          formats: gif,png
+          extra-outputs: target/betamax-preview/*.png
