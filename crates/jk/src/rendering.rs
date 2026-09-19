@@ -392,7 +392,7 @@ fn render_mode_overlay_with_sizing(
 ) -> Option<Rect> {
     use ratatui::layout::Rect;
     use ratatui::prelude::Text;
-    use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+    use ratatui::widgets::{Block, Clear, Padding, Paragraph, Wrap};
 
     let area = frame.area();
     if area.is_empty() {
@@ -423,24 +423,45 @@ fn render_mode_overlay_with_sizing(
     let display_title = if command_discovery { "Help" } else { title };
     let mut text_lines = Vec::new();
     if !command_discovery {
-        text_lines.push(Line::from(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        )));
+        text_lines.push(
+            Line::from(Span::styled(
+                format!(
+                    "{display_title:<width$}",
+                    width = usize::from(width.saturating_sub(2))
+                ),
+                Style::new()
+                    .fg(Color::LightCyan)
+                    .add_modifier(Modifier::BOLD),
+            ))
+            .style(Style::new().bg(Color::Rgb(58, 72, 90))),
+        );
         text_lines.push(Line::from(""));
     }
-    text_lines.extend(lines.iter().map(|line| overlay_line(line)));
+    text_lines.extend(lines.iter().map(|line| {
+        if line.starts_with("> ") {
+            Line::from(format!(
+                "{line:<width$}",
+                width = usize::from(width.saturating_sub(2))
+            ))
+            .style(Style::new().fg(Color::Black).bg(Color::LightCyan))
+        } else {
+            overlay_line(line)
+        }
+    }));
     let text = Text::from(text_lines);
-    let mut block = Block::bordered();
-    if command_discovery {
-        block = block.title(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ));
-    }
+    let block = if command_discovery {
+        Block::default()
+            .title(Span::styled(
+                display_title,
+                Style::new().fg(Color::LightCyan),
+            ))
+            .padding(Padding::horizontal(1))
+    } else {
+        Block::default().padding(Padding::uniform(1))
+    };
     let paragraph = Paragraph::new(text)
         .block(block)
-        .style(Style::new().fg(Color::White).bg(Color::Black))
+        .style(Style::new().fg(Color::White).bg(Color::Rgb(30, 35, 47)))
         .wrap(Wrap { trim: false });
     frame.render_widget(paragraph, overlay);
     Some(overlay)

@@ -2,14 +2,18 @@
 //!
 //! This view renders [`jk_core::CommandPreview`] data and intentionally owns no execution behavior.
 
-use jk_core::{CommandPreview, CommandPreviewWarning, ExecutionMode, RefreshPlan, SafetyClass};
+use jk_core::{CommandPreview, CommandPreviewWarning, SafetyClass};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
-use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Clear, Padding, Paragraph, Wrap};
 
 const PANEL_WIDTH: u16 = 78;
 const MIN_PANEL_HEIGHT: u16 = 8;
+const BACKGROUND: Color = Color::Rgb(30, 35, 47);
+const HEADER: Color = Color::Rgb(58, 72, 90);
+const COMMAND: Color = Color::Rgb(22, 27, 38);
+const MUTED: Color = Color::Rgb(161, 174, 190);
 
 /// A compact confirmation view for a pending command.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -48,15 +52,20 @@ impl CommandPreviewView {
             return;
         }
 
-        let text = self.body_text();
+        let mut text = self.body_text();
         let panel_width = PANEL_WIDTH.min(area.width);
         let content_width = panel_width.saturating_sub(2).max(1);
+        if let Some(title) = text.lines.first_mut() {
+            title.spans.push(Span::raw(
+                " ".repeat(usize::from(content_width).saturating_sub(title.width())),
+            ));
+        }
         let panel = centered_panel(area, panel_height(&text, content_width).saturating_add(3));
         frame.render_widget(Clear, panel);
 
-        let block = Block::bordered()
-            .title(" Confirm command ")
-            .style(Style::new().fg(Color::White).bg(Color::Black));
+        let block = Block::default()
+            .padding(Padding::uniform(1))
+            .style(Style::new().fg(Color::White).bg(BACKGROUND));
         let inner = block.inner(panel);
         frame.render_widget(block, panel);
         if inner.is_empty() {
@@ -78,13 +87,16 @@ impl CommandPreviewView {
 
         if !body_area.is_empty() {
             let paragraph = Paragraph::new(text)
-                .style(Style::new().fg(Color::White).bg(Color::Black))
+                .style(Style::new().fg(Color::White).bg(BACKGROUND))
                 .wrap(Wrap { trim: false });
             frame.render_widget(paragraph, body_area);
         }
         frame.render_widget(
-            Paragraph::new(footer_line(self.status.as_deref()))
-                .style(Style::new().fg(Color::White).bg(Color::Black)),
+            Paragraph::new(footer_line(
+                self.status.as_deref(),
+                self.preview.safety == SafetyClass::DestructiveLocal,
+            ))
+            .style(Style::new().fg(Color::White).bg(HEADER)),
             footer_area,
         );
     }
@@ -92,44 +104,33 @@ impl CommandPreviewView {
     fn body_text(&self) -> Text<'_> {
         let mut lines = vec![
             Line::from(Span::styled(
-                self.preview.title.as_str(),
-                Style::new().add_modifier(Modifier::BOLD),
-            )),
+                format!("  {}", self.preview.title),
+                Style::new()
+                    .fg(Color::LightCyan)
+                    .add_modifier(Modifier::BOLD),
+            ))
+            .style(Style::new().bg(HEADER)),
             Line::from(""),
-            Line::from(Span::styled(
-                "Command",
-                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            )),
+            Line::from(Span::styled("Review command", Style::new().fg(MUTED))),
             Line::from(Span::styled(
                 self.preview.command_line.as_str(),
-                Style::new().fg(Color::Yellow),
-            )),
+                Style::new().fg(Color::White),
+            ))
+            .style(Style::new().bg(COMMAND)),
             Line::from(""),
             Line::from(Span::styled(
-                "Summary",
-                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(format!("Safety: {}", safety_label(self.preview.safety))),
-            Line::from(format!(
-                "Execution: {}",
-                execution_label(self.preview.execution_mode)
-            )),
-            Line::from(format!(
-                "Refresh: {}",
-                refresh_label(self.preview.refresh_plan)
+                effect_label(&self.preview),
+                Style::new().fg(MUTED),
             )),
         ];
 
         lines.push(Line::from(""));
-        if self.preview.warnings.is_empty() {
+        if !self.preview.warnings.is_empty() {
             lines.push(Line::from(Span::styled(
-                "No warnings for this command.",
-                Style::new().fg(Color::Green),
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                "Warnings",
-                Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+                "Before you continue",
+                Style::new()
+                    .fg(Color::LightRed)
+                    .add_modifier(Modifier::BOLD),
             )));
             lines.extend(self.preview.warnings.iter().map(warning_line));
         }
@@ -138,7 +139,7 @@ impl CommandPreviewView {
     }
 }
 
-fn footer_line(status: Option<&str>) -> Line<'static> {
+fn footer_line(status: Option<&str>, destructive: bool) -> Line<'static> {
     if let Some(status) = status {
         return Line::from(vec![
             Span::styled(
@@ -154,19 +155,24 @@ fn footer_line(status: Option<&str>) -> Line<'static> {
 
     Line::from(vec![
         Span::styled(
-            "enter run",
-            Style::new().fg(Color::Green).add_modifier(Modifier::BOLD),
+            " enter run ",
+            Style::new()
+                .fg(if destructive {
+                    Color::White
+                } else {
+                    Color::Black
+                })
+                .bg(if destructive {
+                    Color::Rgb(120, 45, 50)
+                } else {
+                    Color::LightCyan
+                })
+                .add_modifier(Modifier::BOLD),
         ),
         Span::raw("    "),
-        Span::styled(
-            "y copy",
-            Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ),
+        Span::styled("y copy", Style::new().fg(MUTED)),
         Span::raw("    "),
-        Span::styled(
-            "esc cancel",
-            Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
-        ),
+        Span::styled("esc cancel", Style::new().fg(Color::White)),
     ])
 }
 
@@ -177,36 +183,23 @@ fn warning_line(warning: &CommandPreviewWarning) -> Line<'_> {
     ])
 }
 
-const fn safety_label(safety: SafetyClass) -> &'static str {
-    match safety {
-        SafetyClass::ReadOnly => "read-only",
-        SafetyClass::LocalMetadata => "local metadata",
-        SafetyClass::LocalRewrite => "local rewrite",
-        SafetyClass::DestructiveLocal => "destructive local",
-        SafetyClass::NetworkRead => "network read",
-        SafetyClass::NetworkWrite => "network write",
-        SafetyClass::ExternalCommand => "external command",
-        _ => "unknown",
+fn effect_label(preview: &CommandPreview) -> &'static str {
+    if preview.title.contains("push") && preview.title.contains("dry-run") {
+        return "Contacts the remote to check the push. Remote bookmarks stay unchanged.";
     }
-}
-
-const fn execution_label(mode: ExecutionMode) -> &'static str {
-    match mode {
-        ExecutionMode::RenderReadOnly => "render read-only",
-        ExecutionMode::ConfirmMutation => "confirm mutation",
-        ExecutionMode::ConfirmNetworkRead => "confirm network read",
-        ExecutionMode::ConfirmExternalTool => "confirm external tool",
-        ExecutionMode::DryRunThenConfirm => "dry-run then confirm",
-        ExecutionMode::CommandMode => "command mode",
-        _ => "unknown",
-    }
-}
-
-const fn refresh_label(refresh_plan: RefreshPlan) -> &'static str {
-    match refresh_plan {
-        RefreshPlan::None => "app-controlled refresh",
-        RefreshPlan::ReRunSpec => "re-run current command",
-        _ => "unknown",
+    match preview.safety {
+        SafetyClass::NetworkRead if preview.title == "jj git fetch" => {
+            "Fetches remote changes and refreshes your local bookmark list."
+        }
+        SafetyClass::NetworkRead => "Reads from the selected remote.",
+        SafetyClass::NetworkWrite => "Updates the selected remote.",
+        SafetyClass::DestructiveLocal if preview.title == "jj bookmark delete" => {
+            "Deletes the local bookmark. A later push can delete its remote copy."
+        }
+        SafetyClass::DestructiveLocal => "Deletes or replaces local repository data.",
+        SafetyClass::LocalMetadata => "Updates this repository's local metadata.",
+        SafetyClass::LocalRewrite => "Changes local history.",
+        _ => "Review the command before continuing.",
     }
 }
 
@@ -288,13 +281,22 @@ mod tests {
         assert!(draw_result.is_ok());
 
         let rendered = buffer_to_string(terminal.backend().buffer());
-        assert!(rendered.contains("Confirm command"));
         assert!(rendered.contains("Describe workspace"));
         assert!(rendered.contains("jj --no-pager --color always --ignore-working-copy describe"));
         assert!(rendered.contains("--message"));
         assert!(rendered.contains("'Update preview renderer'"));
-        assert!(rendered.contains("Safety: local rewrite"));
-        assert!(rendered.contains("Execution: confirm mutation"));
+        assert!(!rendered.contains("Safety:"));
+        assert!(!rendered.contains("Execution:"));
+        assert!(!rendered.contains("Refresh:"));
+        assert!(!rendered.contains('┌'));
+        assert!(
+            terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .any(|cell| cell.bg == HEADER)
+        );
         assert!(rendered.contains("Rewrites local history."));
         assert!(rendered.contains("Ignores the current working-copy snapshot."));
         assert!(rendered.contains("enter"));
@@ -306,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn command_preview_without_warnings_says_so() {
+    fn command_preview_omits_empty_warning_sections() {
         let preview = JjCommandSpec::render_read_only(["log"])
             .with_mode(ExecutionMode::RenderReadOnly)
             .with_safety(SafetyClass::ReadOnly)
@@ -325,8 +327,7 @@ mod tests {
 
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("jj --no-pager --color always log"));
-        assert!(rendered.contains("Safety: read-only"));
-        assert!(rendered.contains("No warnings for this command."));
+        assert!(!rendered.contains("No warnings"));
         assert!(rendered.contains("enter run"));
         assert!(rendered.contains("y copy"));
         assert!(rendered.contains("esc cancel"));
@@ -351,6 +352,32 @@ mod tests {
         assert!(rendered.contains("copied command"));
         assert!(rendered.contains("enter run"));
         assert!(!rendered.contains("y copy"));
+    }
+
+    #[test]
+    fn destructive_preview_uses_red_action_region_without_borders() {
+        let preview = JjCommandSpec::confirm_mutation(
+            ["bookmark", "delete", "--", "exact:topic"],
+            SafetyClass::DestructiveLocal,
+        )
+        .with_title("jj bookmark delete")
+        .command_preview();
+        for (width, height) in [(40, 18), (80, 24), (120, 30)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("terminal");
+            terminal
+                .draw(|frame| CommandPreviewView::new(preview.clone()).render(frame))
+                .expect("draw");
+            let buffer = terminal.backend().buffer();
+            let rendered = buffer_to_string(buffer);
+            assert!(!rendered.chars().any(|ch| "┌┐└┘│─".contains(ch)));
+            assert!(rendered.contains("esc cancel"));
+            assert!(
+                buffer
+                    .content
+                    .iter()
+                    .any(|cell| cell.bg == Color::Rgb(120, 45, 50))
+            );
+        }
     }
 
     fn buffer_to_string(buffer: &ratatui::buffer::Buffer) -> String {
