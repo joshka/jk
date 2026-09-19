@@ -57,13 +57,16 @@ impl JjAbandon {
         .with_refresh_plan(RefreshPlan::None)
     }
 
-    /// Returns the read-only probe used to decide whether confirmation is necessary.
+    /// Returns the probe used to decide whether confirmation is necessary.
+    ///
+    /// Snapshot the working copy first so newly added or edited files cannot be mistaken for an
+    /// empty revision. This does not abandon anything, but can update jj's working-copy snapshot.
     #[must_use]
     pub fn empty_probe_spec_for(&self, query: &AbandonQuery) -> JjCommandSpec {
         let global_options = self
             .global_options
             .clone()
-            .with_working_copy(WorkingCopyPolicy::Ignore)
+            .with_working_copy(WorkingCopyPolicy::SnapshotAndUpdate)
             .with_output(OutputPolicy {
                 color: ColorPolicy::Never,
                 ..OutputPolicy::default()
@@ -179,7 +182,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_probe_uses_a_read_only_log_template() {
+    fn empty_probe_snapshots_before_evaluating_the_log_template() {
         let source = JjAbandon::default().with_repository("/tmp/repo");
         let spec = source.empty_probe_spec_for(&AbandonQuery::new("abc123"));
 
@@ -191,7 +194,6 @@ mod tests {
                 "never",
                 "--repository",
                 "/tmp/repo",
-                "--ignore-working-copy",
                 "log",
                 "-r",
                 "abc123",
@@ -211,6 +213,74 @@ mod tests {
             parse_empty_probe_output(b"true false\n"),
             Err(AbandonProbeError::InvalidOutput(value)) if value == "true false"
         ));
+    }
+
+    #[test]
+    fn empty_probe_detects_unsnapshotted_file_changes() -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs;
+        use std::process::Command;
+        use std::time::SystemTime;
+
+        use crate::command::SystemJjCommandRunner;
+
+        let nonce = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)?
+            .as_nanos();
+        let repository =
+            std::env::temp_dir().join(format!("jk-abandon-probe-{}-{nonce}", std::process::id()));
+        fs::create_dir(&repository)?;
+        let init = Command::new("jj")
+            .current_dir(&repository)
+            .env("JJ_CONFIG", "")
+            .args(["git", "init", "."])
+            .output()?;
+        assert!(
+            init.status.success(),
+            "{}",
+            String::from_utf8_lossy(&init.stderr)
+        );
+        fs::write(
+            repository.join(".jj/repo/config.toml"),
+            "[user]\nname = 'Test'\nemail = 'test@example.com'\n[signing]\nbehavior = 'drop'\n[snapshot]\nauto-track = 'all()'\n",
+        )?;
+
+        let source = JjAbandon::default().with_repository(&repository);
+        let mut runner = SystemJjCommandRunner;
+        let query = AbandonQuery::new("@");
+        assert!(source.is_empty_with_runner(&query, &mut runner)?);
+
+        // Keep the same change identifier across the snapshot, as the log selection does.
+        let id_spec = JjCommandSpec::render_read_only([
+            "log",
+            "--color",
+            "never",
+            "-r",
+            "@",
+            "--no-graph",
+            "-T",
+            "change_id",
+        ])
+        .with_repository(&repository);
+        let id_output = runner.run(&id_spec)?;
+        assert!(id_output.status.success());
+        let query = AbandonQuery::new(String::from_utf8(id_output.stdout)?);
+        let file = repository.join("file.txt");
+        fs::write(&file, "initial contents\n")?;
+        assert!(!source.is_empty_with_runner(&query, &mut runner)?);
+
+        let new_spec = JjCommandSpec::render_read_only(["new"]).with_repository(&repository);
+        assert!(runner.run(&new_spec)?.status.success());
+        let query = AbandonQuery::new("@");
+        assert!(source.is_empty_with_runner(&query, &mut runner)?);
+        fs::write(&file, "edited contents\n")?;
+        assert!(!source.is_empty_with_runner(&query, &mut runner)?);
+
+        fs::write(&file, "initial contents\n")?;
+        assert!(source.is_empty_with_runner(&query, &mut runner)?);
+        fs::remove_file(&file)?;
+        assert!(!source.is_empty_with_runner(&query, &mut runner)?);
+        fs::remove_dir_all(&repository)?;
+        Ok(())
     }
 
     #[test]

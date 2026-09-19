@@ -175,8 +175,8 @@ Add or finish tests for these contracts:
 
 - Menu describe enters the existing describe-message mode.
 - Menu Describe, New, Edit, Undo, and Redo execute through the existing recorded mutation runner.
-  Empty-revision Abandon does the same after a read-only `self.empty()` probe; non-empty Abandon
-  creates the existing command preview.
+  Empty-revision Abandon does the same after a `self.empty()` probe that snapshots current files;
+  non-empty Abandon creates the existing command preview.
 - `SourceAction`, safety class, source key, preview command, confirmation, refresh, and command-history
   behavior remain owned by the existing mutation gateways. Successful executions show a short-lived
   toast without replacing the normal footer controls.

@@ -64,9 +64,9 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
 
 /// Executes an empty revision's abandon immediately, or opens a destructive preview otherwise.
 ///
-/// If the read-only emptiness probe fails, this takes the conservative path and opens the same
-/// destructive preview used for a non-empty revision. The user can inspect or cancel instead of
-/// having an uncertain probe turn into an immediate mutation.
+/// The emptiness probe snapshots working-copy edits before checking. If it fails, this takes the
+/// conservative path and opens the same destructive preview used for a non-empty revision. The user
+/// can inspect or cancel instead of having an uncertain probe turn into an immediate mutation.
 pub fn abandon_or_preview(state: &mut AppState, source: &mut JjLog, abandon_source: &JjAbandon) {
     abandon_or_preview_with_runner(state, source, abandon_source, SystemJjCommandRunner);
 }
