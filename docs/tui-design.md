@@ -56,6 +56,20 @@ is initially shown. Copy operations must exclude chrome, selection markers, and 
 
 ## 3. Visual hierarchy and appearance
 
+### Terminal cell contract
+
+All UI geometry is an integer number of terminal cells. Use the same configured terminal font and
+font size for headings, body text, hints, fields, and hotbars. Emphasis comes from color, terminal
+attributes, alignment, and cell spacing, never browser-like typography or fractional positioning.
+
+Default to borderless regions distinguished by flat background colors and whitespace. Menus and
+dialogs may use an opaque surface color without a surrounding box. Reserve Unicode borders for cases
+where containment is otherwise unclear, including a monochrome fallback. Do not add rounded pixel
+corners, shadows, or window decorations as part of jk's terminal interface.
+
+Review visual proposals as fixed-cell terminal PNGs. Browser interaction studies may supplement
+these images, but cannot establish that a design fits or looks right in a terminal.
+
 ### Emphasis budget
 
 Use this hierarchy in every screen:
@@ -127,7 +141,8 @@ Reserve persistent chrome space so a transient status does not make the content 
 Use a one-cell horizontal inset for jk-owned prose and controls where space permits. Use one blank
 line between logical groups, not between every item. Do not indent or pad jj output inconsistently.
 Align keys, labels, values, and status columns across the entire surface. Prefer whitespace to
-nested boxes. Use one simple border around a floating overlay when it helps distinguish ownership.
+nested boxes. Prefer a flat surface color for floating overlays. Use a simple Unicode border only
+when color and spacing do not adequately distinguish ownership.
 
 Optional preview panes must earn their space. Show them only when both content regions remain
 readable. Label their target and focus state. On constrained terminals use a full view with a stable
@@ -242,10 +257,16 @@ A mutation preview uses this reading order:
 1. Exact jj command or sequence, with a full inspection/copy path.
 1. Execute, edit where supported, copy, and cancel controls.
 
+Use cell-aligned colored button regions for dialog actions, with one font size throughout.
+Focus must have a textual marker as well as color. Prefer no dialog outline; the flat surface and
+padding establish its extent.
+
 Use concrete control wording such as `Run rebase`, not `OK`. Preserve the established preview key
-contract from the product plan. Enter may run only the currently reviewed, valid preview; opening a
-menu or selecting a target must not also execute it. Changes to operands, edited commands, or
-repository state that invalidate the preview require a refreshed preview before execution.
+contract from the product plan except for explicit button-based confirmations. In destructive
+confirmations, initially focus Cancel; Enter activates the focused button. Explicit Run controls may
+run only the currently reviewed, valid preview. Opening a menu or selecting a target must not also
+execute it. Changes to operands, edited commands, or repository state that invalidate the preview
+require a refreshed preview before execution.
 
 Do not claim a predicted graph or effect is authoritative unless it is validated. Clearly label
 estimates and unavailable previews. Warnings must identify the actual condition; avoid generic
@@ -345,6 +366,9 @@ for each revision. Review graph, diff, help, a picker, and a mutation preview to
 shared styling. A screenshot cannot substitute for interaction or config-fidelity checks.
 
 ## 14. Adoption
+
+The [screen atlas](design/README.md) applies this contract to command-specific mockups and workflow
+journeys, with an inventory of the installed jj CLI and explicit prototype limitations.
 
 Apply this guide to new surfaces immediately. Bring existing surfaces into compliance in small,
 reviewable changes rather than combining a behavior rewrite with a palette change.
