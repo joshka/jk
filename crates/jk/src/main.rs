@@ -31,7 +31,10 @@ use jk_cli::{
     RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
     WorkspaceInspectionQuery,
 };
-use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
+use jk_core::{
+    CommandHistory, CommandSource, SelectionCandidates, SelectionDecision, SelectionRequest,
+    SelectionResolution, SelectorKind, SelectorRole, SourceAction, SourceView, resolve_selection,
+};
 #[cfg(test)]
 use jk_tui::command_discovery::ActionMenuAction;
 use jk_tui::command_discovery::{BindingContext, action_menu_rows, discovery_scroll_limit};
@@ -739,11 +742,18 @@ fn new_preview_pending(state: &mut AppState, new_source: &JjNew) -> Option<Pendi
     let AppView::Log(log) = state.views.active_mut() else {
         return None;
     };
-    let parents = selected_new_parents(log);
-    if parents.is_empty() {
-        log.show_error("No parent revision selected");
-        return None;
-    }
+    let parents = match selected_new_parents(log) {
+        SelectionResolution::Resolved(selection) => selection.into_values(),
+        SelectionResolution::Invalid { .. } => {
+            log.show_error("No parent revision selected");
+            return None;
+        }
+        SelectionResolution::Ambiguous { .. } => {
+            log.show_error("Parent revision selection is ambiguous");
+            return None;
+        }
+        SelectionResolution::Cancelled { .. } => return None,
+    };
 
     let preview = new_source
         .spec_for(&NewQuery::new(parents))
@@ -949,9 +959,29 @@ fn apply_diff_file_list_selection(state: &mut AppState) {
         Some(InputMode::DiffFileList { selected }) => *selected,
         _ => return,
     };
+    let cursor = match state.views.active() {
+        AppView::Diff { view, .. } => view.file_paths().get(selected).map(ToString::to_string),
+        _ => None,
+    };
+    let candidates = SelectionCandidates::cursor(cursor);
+    let request = SelectionRequest::one(SelectorKind::Fileset, SelectorRole::Target);
+    let resolved = resolve_selection(request, SelectionDecision::Submit(candidates));
     state.modes.pop();
 
+    let SelectionResolution::Resolved(selection) = resolved else {
+        return;
+    };
+    let Some(selected_path) = selection.into_values().into_iter().next() else {
+        return;
+    };
     let AppView::Diff { view, .. } = state.views.active_mut() else {
+        return;
+    };
+    let file_paths = view.file_paths();
+    let Some(selected) = file_paths
+        .iter()
+        .position(|path| *path == selected_path.as_str())
+    else {
         return;
     };
     view.select_file_index(selected);
@@ -3867,6 +3897,25 @@ mod tests {
             panic!("expected diff view");
         };
         assert_eq!(view.selected_file_index(), Some(1));
+    }
+
+    #[test]
+    fn diff_file_list_rejects_a_stale_selected_index() {
+        let mut state = AppState::new(AppView::Diff {
+            view: real_diff_view("aaa"),
+            query: diff_query("aaa"),
+        });
+        state.modes.push(InputMode::DiffFileList {
+            selected: usize::MAX,
+        });
+
+        apply_diff_file_list_selection(&mut state);
+
+        assert_eq!(state.modes.active(), None);
+        let AppView::Diff { view, .. } = state.views.active() else {
+            panic!("expected diff view");
+        };
+        assert_eq!(view.selected_file_index(), Some(0));
     }
 
     #[test]

@@ -10,6 +10,9 @@ use crate::menus::{
 };
 use crate::state::{AppState, AppView, InputMode};
 
+const OVERLAY_BACKGROUND: Color = Color::Rgb(30, 35, 47);
+const OVERLAY_HEADER: Color = Color::Rgb(58, 72, 90);
+
 pub fn render_app(
     frame: &mut ratatui::Frame<'_>,
     state: &mut AppState,
@@ -344,28 +347,32 @@ fn render_mode_overlay_with_sizing(
 
     let command_discovery = title == "Command discovery";
     let display_title = if command_discovery { "Help" } else { title };
-    let mut text_lines = Vec::new();
-    if !command_discovery {
-        text_lines.push(Line::from(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        )));
-        text_lines.push(Line::from(""));
-    }
-    text_lines.extend(lines.iter().map(|line| overlay_line(line)));
+    frame.render_widget(
+        Block::default().style(Style::new().fg(Color::White).bg(OVERLAY_BACKGROUND)),
+        overlay,
+    );
+    let header = Rect::new(overlay.x, overlay.y, overlay.width, overlay.height.min(1));
+    frame.render_widget(
+        Paragraph::new(format!("  {display_title}"))
+            .style(Style::new().fg(Color::White).bg(OVERLAY_HEADER).bold()),
+        header,
+    );
+
+    let body = Rect::new(
+        overlay.x.saturating_add(2),
+        overlay.y.saturating_add(2),
+        overlay.width.saturating_sub(4),
+        overlay.height.saturating_sub(2),
+    );
+    let text_lines = lines
+        .iter()
+        .map(|line| overlay_line(line, usize::from(body.width)))
+        .collect::<Vec<_>>();
     let text = Text::from(text_lines);
-    let mut block = Block::bordered();
-    if command_discovery {
-        block = block.title(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ));
-    }
     let paragraph = Paragraph::new(text)
-        .block(block)
-        .style(Style::new().fg(Color::White).bg(Color::Black))
+        .style(Style::new().fg(Color::White).bg(OVERLAY_BACKGROUND))
         .wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, overlay);
+    frame.render_widget(paragraph, body);
     Some(overlay)
 }
 
@@ -403,7 +410,7 @@ fn overlay_height(title: &str, lines: &[String]) -> usize {
     lines.len().saturating_add(4)
 }
 
-fn overlay_line(line: &str) -> Line<'_> {
+fn overlay_line(line: &str, content_width: usize) -> Line<'_> {
     if line.ends_with(':') {
         return Line::from(Span::styled(
             line,
@@ -426,9 +433,13 @@ fn overlay_line(line: &str) -> Line<'_> {
     }
 
     if line.starts_with('>') {
+        let padding = content_width.saturating_sub(Span::raw(line).width());
         return Line::from(Span::styled(
-            line,
-            Style::new().fg(Color::Green).add_modifier(Modifier::BOLD),
+            format!("{line}{}", " ".repeat(padding)),
+            Style::new()
+                .fg(Color::Black)
+                .bg(Color::LightCyan)
+                .add_modifier(Modifier::BOLD),
         ));
     }
 
@@ -551,6 +562,43 @@ mod tests {
                     .draw(|frame| render_toast(frame, "Created new change"))
                     .unwrap();
             }
+        }
+    }
+
+    #[test]
+    fn mode_overlay_uses_colored_regions_without_a_border() {
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).expect("terminal");
+        let mut overlay = None;
+        terminal
+            .draw(|frame| {
+                overlay = render_mode_overlay(
+                    frame,
+                    "Actions",
+                    &["> new change".into(), "  describe".into()],
+                );
+            })
+            .expect("draw mode overlay");
+
+        let overlay = overlay.expect("overlay area");
+        let buffer = terminal.backend().buffer();
+        let rendered = buffer
+            .content()
+            .iter()
+            .map(ratatui::buffer::Cell::symbol)
+            .collect::<String>();
+        assert!(
+            !['┌', '┐', '└', '┘']
+                .into_iter()
+                .any(|glyph| rendered.contains(glyph))
+        );
+        assert_eq!(buffer[(overlay.x, overlay.y)].bg, OVERLAY_HEADER);
+        assert_eq!(
+            buffer[(overlay.x, overlay.y.saturating_add(1))].bg,
+            OVERLAY_BACKGROUND
+        );
+        let selected_y = overlay.y.saturating_add(2);
+        for x in overlay.x.saturating_add(2)..overlay.right().saturating_sub(2) {
+            assert_eq!(buffer[(x, selected_y)].bg, Color::LightCyan);
         }
     }
 }

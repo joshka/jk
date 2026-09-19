@@ -4,6 +4,10 @@
 //! [`OperationLogAction`], and handle returned [`OperationLogActionResult`] values for effects such
 //! as refresh, operation show, operation diff, back navigation, and quit.
 
+use jk_core::{
+    SelectionCandidates, SelectionDecision, SelectionRequest, SelectionResolution, SelectorKind,
+    SelectorRole, resolve_selection,
+};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
@@ -271,18 +275,16 @@ impl OperationLogView {
                 OperationLogActionResult::Continue
             }
             OperationLogAction::Refresh => OperationLogActionResult::Refresh,
-            OperationLogAction::OpenShow => self.selected_operation_id().map_or(
-                OperationLogActionResult::Continue,
-                |operation_id| OperationLogActionResult::OperationShow {
-                    operation_id: operation_id.to_owned(),
-                },
-            ),
-            OperationLogAction::OpenDiff => self.selected_operation_id().map_or(
-                OperationLogActionResult::Continue,
-                |operation_id| OperationLogActionResult::OperationDiff {
-                    operation_id: operation_id.to_owned(),
-                },
-            ),
+            OperationLogAction::OpenShow => self
+                .resolved_operation_id()
+                .map_or(OperationLogActionResult::Continue, |operation_id| {
+                    OperationLogActionResult::OperationShow { operation_id }
+                }),
+            OperationLogAction::OpenDiff => self
+                .resolved_operation_id()
+                .map_or(OperationLogActionResult::Continue, |operation_id| {
+                    OperationLogActionResult::OperationDiff { operation_id }
+                }),
             OperationLogAction::ToggleHelp => {
                 self.help_visible = !self.help_visible;
                 OperationLogActionResult::Continue
@@ -336,6 +338,18 @@ impl OperationLogView {
         };
         let last = self.snapshot.rows.len().saturating_sub(1);
         self.selected = Some(selected.saturating_add(10).min(last));
+    }
+
+    fn resolved_operation_id(&self) -> Option<String> {
+        let candidates =
+            SelectionCandidates::cursor(self.selected_operation_id().map(ToOwned::to_owned));
+        let request = SelectionRequest::one(SelectorKind::Operation, SelectorRole::Target);
+        match resolve_selection(request, SelectionDecision::Submit(candidates)) {
+            SelectionResolution::Resolved(selection) => selection.into_values().into_iter().next(),
+            SelectionResolution::Ambiguous { .. }
+            | SelectionResolution::Invalid { .. }
+            | SelectionResolution::Cancelled { .. } => None,
+        }
     }
 
     fn keep_selected_in_view(&mut self, height: usize) {

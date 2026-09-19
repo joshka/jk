@@ -6,6 +6,7 @@
 
 mod command;
 mod command_history;
+mod selector;
 
 pub use command::{
     ColorPolicy, CommandPreview, CommandPreviewWarning, ConfigOverlay, ExecutionMode,
@@ -17,6 +18,11 @@ pub use command_history::{
     CommandRecordFinish, CommandRecordId, CommandRecordStart, CommandResultSummary, CommandSource,
     CommandTiming, ExitStatusSummary, GlobalOptionsSnapshot, OutputRetention, PendingCommandRecord,
     SourceAction, SourceView, StreamSummary,
+};
+pub use selector::{
+    InvalidSelection, ResolvedSelection, SelectionCandidates, SelectionCardinality,
+    SelectionDecision, SelectionOrder, SelectionRequest, SelectionResolution, SelectorKind,
+    SelectorRole, resolve_selection,
 };
 
 /// A rendered `jj` log view plus semantic records for navigation.

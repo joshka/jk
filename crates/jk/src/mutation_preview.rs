@@ -1,4 +1,7 @@
-use jk_core::{CommandPreview, SourceAction};
+use jk_core::{
+    CommandPreview, SelectionCandidates, SelectionDecision, SelectionRequest, SelectionResolution,
+    SelectorKind, SelectorRole, SourceAction, resolve_selection,
+};
 use jk_tui::log_view::LogView;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -72,15 +75,13 @@ impl PendingCommandPreview {
     }
 }
 
-pub fn selected_new_parents(log: &LogView) -> Vec<String> {
-    if log.has_marks() {
-        return log.marked_revision_ids();
-    }
-
-    log.selected_revision_id()
-        .map(ToOwned::to_owned)
-        .into_iter()
-        .collect()
+pub fn selected_new_parents(log: &LogView) -> SelectionResolution<String> {
+    let candidates = SelectionCandidates::new(
+        log.selected_revision_id().map(ToOwned::to_owned),
+        log.marked_revision_ids(),
+    );
+    let request = SelectionRequest::one_or_more(SelectorKind::Revision, SelectorRole::Parent);
+    resolve_selection(request, SelectionDecision::Submit(candidates))
 }
 
 pub(crate) fn new_change_id_from_output(stderr: &[u8]) -> Option<String> {
@@ -182,7 +183,10 @@ mod tests {
     fn selected_new_parents_use_short_selected_revision() {
         let log = log_view(["abcdefghijklmnop", "zyxwvutsrqponmlk"]);
 
-        assert_eq!(selected_new_parents(&log), ["abcdefgh"]);
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("selected revision should resolve as a parent");
+        };
+        assert_eq!(resolved.values(), ["abcdefgh"]);
     }
 
     #[test]
@@ -193,7 +197,10 @@ mod tests {
         let _ = log.apply(LogAction::Next);
         let _ = log.apply(LogAction::ToggleMark);
 
-        assert_eq!(selected_new_parents(&log), ["abcdefgh", "zyxwvuts"]);
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("ordered revision marks should resolve as parents");
+        };
+        assert_eq!(resolved.values(), ["abcdefgh", "zyxwvuts"]);
     }
 
     #[test]
