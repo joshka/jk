@@ -1,6 +1,5 @@
 use jk_cli::LogTemplateSelection;
 use jk_tui::command_discovery::{BindingContext, discovery_lines_for_width_and_rows};
-use jk_tui::command_preview_view::CommandPreviewView;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style};
 use ratatui::widgets::{Block, Clear, Paragraph};
@@ -51,11 +50,13 @@ pub fn render_app(
                 log.render(frame);
                 render_describe_editor(frame, rev, message);
             }
-            Some(InputMode::CommandPreview { pending }) => {
+            Some(InputMode::AbandonConfirmation { .. }) => {
                 log.render(frame);
-                CommandPreviewView::new(pending.preview.clone())
-                    .with_status(pending.copy_status.clone())
-                    .render(frame);
+                if let Some(InputMode::AbandonConfirmation { dialog, .. }) =
+                    state.modes.active_mut()
+                {
+                    dialog.render(frame);
+                }
             }
             _ => log.render(frame),
         },

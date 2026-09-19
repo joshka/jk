@@ -4,18 +4,11 @@ use jk_cli::{
 };
 use jk_core::{CommandSource, SourceAction, SourceView};
 
+use crate::abandon_confirmation::AbandonConfirmation;
 use crate::mutation_preview::{
     PendingCommandPreview, command_failure_message, new_change_id_from_output,
 };
 use crate::state::{AppState, AppView, InputMode};
-
-pub fn confirm_command_preview(
-    state: &mut AppState,
-    source: &mut JjLog,
-    pending: PendingCommandPreview,
-) {
-    confirm_command_preview_with_runner(state, source, pending, SystemJjCommandRunner);
-}
 
 pub fn confirm_command_preview_with_runner<R: JjCommandRunner>(
     state: &mut AppState,
@@ -81,23 +74,24 @@ pub(crate) fn abandon_or_preview_with_runner<R: JjCommandRunner>(
         show_log_error(state, "No revision selected".to_owned());
         return;
     };
-    let query = AbandonQuery::new(rev);
-    let pending = || InputMode::CommandPreview {
-        pending: PendingCommandPreview::abandon(abandon_source.spec_for(&query).command_preview()),
-    };
-    match abandon_source.is_empty_with_runner(&query, &mut runner) {
-        Ok(true) => execute_pending_command_with_runner(
+    let query = AbandonQuery::new(&rev);
+    let probe = abandon_source.is_empty_with_runner(&query, &mut runner);
+    if matches!(probe, Ok(true)) {
+        execute_pending_command_with_runner(
             state,
             source,
             PendingCommandPreview::abandon(abandon_source.spec_for(&query).command_preview()),
             runner,
-        ),
-        Ok(false) => state.modes.push(pending()),
-        Err(error) => {
-            show_log_error(state, error.to_string());
-            state.modes.push(pending());
-        }
+        );
+        return;
     }
+    let details = abandon_source
+        .details_with_runner(&query, &mut runner)
+        .map_err(|error| error.to_string());
+    state.modes.push(InputMode::AbandonConfirmation {
+        pending: PendingCommandPreview::abandon(abandon_source.spec_for(&query).command_preview()),
+        dialog: Box::new(AbandonConfirmation::new(rev, details, probe.is_err())),
+    });
 }
 
 /// Runs an operation recovery command through the recorded mutation path.

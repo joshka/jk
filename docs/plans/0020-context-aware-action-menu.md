@@ -176,7 +176,17 @@ Add or finish tests for these contracts:
 - Menu describe enters the existing describe-message mode.
 - Menu Describe, New, Edit, Undo, and Redo execute through the existing recorded mutation runner.
   Empty-revision Abandon does the same after a `self.empty()` probe that snapshots current files;
-  non-empty Abandon creates the existing command preview.
+  non-empty Abandon opens a content-sized confirmation with the change description, changed paths,
+  exact added/removed line counts, and descendant impact. Cancel starts focused. Tab/Shift-Tab or
+  Left/Right moves between View diff, Cancel, and Abandon change; Enter/Space activates the focused
+  button. `y` confirms, while `n` or Esc cancels. This replaces the generic execution-metadata preview.
+- Long confirmation details scroll with Up/Down, Page Up/Page Down, and Home/End; the consequences and
+  buttons remain visible. Narrow dialogs stack buttons. View diff opens an inspectable patch inside
+  the dialog; Esc, Enter, or Space returns to the same confirmation and scroll position, and `n`
+  cancels the whole decision. Abandon shortcuts are inactive while reading the patch.
+- If details cannot be loaded, the dialog reports that fact rather than displaying an empty summary.
+  View diff is disabled, Cancel remains the default, and explicit confirmation is still required to
+  abandon without a preview. Terminals too small to show the decision offer cancellation only.
 - `SourceAction`, safety class, source key, preview command, confirmation, refresh, and command-history
   behavior remain owned by the existing mutation gateways. Successful executions show a short-lived
   toast without replacing the normal footer controls.
@@ -197,6 +207,11 @@ Prefer structural assertions over a broad full-buffer snapshot.
 
 Create `tapes/action-menu.tape` or another focused Betamax tape using the deterministic repository
 fixture pattern from existing tapes.
+
+`just betamax-abandon-confirmation` captures the shipped confirmation against an isolated synthetic
+forecast-service repository: added/modified/deleted files, two descendants, patch inspection and
+return, keyboard-selected confirmation, and cancellation of a long scrollable file list. The tapes
+hide setup and leave generated media under ignored `target/dogfood-artifacts/betamax/`.
 
 The tape should:
 

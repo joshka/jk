@@ -48,6 +48,7 @@ use jk_tui::rendered_view::{RenderedAction, RenderedActionResult, RenderedView};
 use jk_tui::workspaces_view::WorkspaceViewSnapshot;
 use jk_tui::workspaces_view::{WorkspacesActionResult, WorkspacesView};
 
+mod abandon_confirmation;
 mod actions;
 mod cli;
 mod clipboard;
@@ -85,10 +86,7 @@ use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
 #[cfg(test)]
 use menus::{diff_file_list_lines, view_options_lines};
 use mutation_preview::{PendingCommandPreview, selected_new_parents};
-use mutations::{
-    abandon_or_preview, confirm_command_preview, execute_pending_command_with_runner,
-    execute_recovery_action,
-};
+use mutations::{abandon_or_preview, execute_pending_command_with_runner, execute_recovery_action};
 #[cfg(test)]
 use mutations::{
     abandon_or_preview_with_runner, confirm_command_preview_with_runner,
@@ -301,8 +299,12 @@ fn handle_input_mode(
     ) {
         return handle_command_discovery_mode(state, key);
     }
-    if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
-        return handle_command_preview_mode(state, source, key);
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::AbandonConfirmation { .. })
+    ) {
+        abandon_confirmation::handle_input(state, source, key);
+        return InputModeResult::Handled;
     }
     if matches!(state.modes.active(), Some(InputMode::JjCommand { .. })) {
         return handle_jj_command_mode(state, command_repository, key);
@@ -338,7 +340,9 @@ fn handle_input_mode(
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
-                InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::AbandonConfirmation { .. } => {
+                    unreachable!()
+                }
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             };
@@ -385,7 +389,9 @@ fn handle_input_mode(
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
-                InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::AbandonConfirmation { .. } => {
+                    unreachable!()
+                }
                 InputMode::JjCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
             }
@@ -520,46 +526,6 @@ fn handle_command_discovery_mode(state: &mut AppState, key: KeyEvent) -> InputMo
             modifiers,
             ..
         } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
-            InputModeResult::Handled
-        }
-        _ => InputModeResult::Handled,
-    }
-}
-
-fn handle_command_preview_mode(
-    state: &mut AppState,
-    source: &mut JjLog,
-    key: KeyEvent,
-) -> InputModeResult {
-    match key {
-        KeyEvent {
-            code: KeyCode::Esc | KeyCode::Backspace,
-            ..
-        }
-        | KeyEvent {
-            code: KeyCode::Char('q'),
-            modifiers: KeyModifiers::NONE,
-            ..
-        } => {
-            state.modes.pop();
-            InputModeResult::Handled
-        }
-        KeyEvent {
-            code: KeyCode::Enter,
-            ..
-        } => {
-            let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
-                return InputModeResult::Handled;
-            };
-            confirm_command_preview(state, source, pending);
-            InputModeResult::Handled
-        }
-        KeyEvent {
-            code: KeyCode::Char('y'),
-            modifiers: KeyModifiers::NONE,
-            ..
-        } => {
-            copy_pending_command(state);
             InputModeResult::Handled
         }
         _ => InputModeResult::Handled,
@@ -759,31 +725,6 @@ fn submit_describe_message_with_runner<R: JjCommandRunner>(
     );
 }
 
-#[cfg(test)]
-fn open_abandon_preview(state: &mut AppState, abandon_source: &JjAbandon) {
-    let AppView::Log(log) = state.views.active_mut() else {
-        return;
-    };
-    let Some(rev) = log.selected_revision_id().map(ToOwned::to_owned) else {
-        log.show_error("No revision selected");
-        return;
-    };
-
-    let preview = abandon_source
-        .spec_for(&AbandonQuery::new(rev))
-        .command_preview();
-    state.modes.push(InputMode::CommandPreview {
-        pending: PendingCommandPreview::abandon(preview),
-    });
-}
-
-#[cfg(test)]
-fn open_new_preview(state: &mut AppState, new_source: &JjNew) {
-    if let Some(pending) = new_preview_pending(state, new_source) {
-        state.modes.push(InputMode::CommandPreview { pending });
-    }
-}
-
 fn execute_new_action(state: &mut AppState, source: &mut JjLog, new_source: &JjNew) {
     execute_new_action_with_runner(state, source, new_source, SystemJjCommandRunner);
 }
@@ -815,13 +756,6 @@ fn new_preview_pending(state: &mut AppState, new_source: &JjNew) -> Option<Pendi
     Some(PendingCommandPreview::new_change(preview))
 }
 
-#[cfg(test)]
-fn open_edit_preview(state: &mut AppState, edit_source: &JjEdit) {
-    if let Some(pending) = edit_preview_pending(state, edit_source) {
-        state.modes.push(InputMode::CommandPreview { pending });
-    }
-}
-
 fn execute_edit_action(state: &mut AppState, source: &mut JjLog, edit_source: &JjEdit) {
     execute_edit_action_with_runner(state, source, edit_source, SystemJjCommandRunner);
 }
@@ -851,14 +785,6 @@ fn edit_preview_pending(
 
     let preview = edit_source.spec_for(&EditQuery::new(rev)).command_preview();
     Some(PendingCommandPreview::edit(preview))
-}
-
-fn copy_pending_command(state: &mut AppState) {
-    let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() else {
-        return;
-    };
-    let status = copy_command_line(&pending.preview.command_line);
-    pending.copy_status = Some(status);
 }
 
 fn copy_selected_command(state: &mut AppState) {
@@ -3212,10 +3138,15 @@ mod tests {
     fn abandon_preview_uses_selected_revision() {
         let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
-        open_abandon_preview(&mut state, &JjAbandon::default());
+        abandon_or_preview_with_runner(
+            &mut state,
+            &mut JjLog::default(),
+            &JjAbandon::default(),
+            SequencedRunner::successes(vec![output(0, "false", ""), output(1, "", "unavailable")]),
+        );
 
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected abandon command preview");
+        let Some(InputMode::AbandonConfirmation { pending, .. }) = state.modes.active() else {
+            panic!("expected abandon confirmation");
         };
         assert_eq!(pending.source_action, SourceAction::AbandonRevision);
         assert_eq!(pending.source_key, "a a");
@@ -3238,11 +3169,7 @@ mod tests {
     fn new_preview_uses_selected_revision_as_parent() {
         let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
-        open_new_preview(&mut state, &JjNew::default());
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected new command preview");
-        };
+        let pending = new_preview_pending(&mut state, &JjNew::default()).expect("pending new");
         assert_eq!(pending.source_action, SourceAction::NewRevision);
         assert_eq!(pending.source_key, "a n");
         assert_eq!(pending.failure_label, "jj new");
@@ -3272,11 +3199,7 @@ mod tests {
         let _ = log.apply(LogAction::Next);
         let _ = log.apply(LogAction::ToggleMark);
 
-        open_new_preview(&mut state, &JjNew::default());
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected new command preview");
-        };
+        let pending = new_preview_pending(&mut state, &JjNew::default()).expect("pending new");
         assert_eq!(
             pending.preview.command_line,
             "jj --no-pager --color always new abcdefgh zyxwvuts"
@@ -3287,11 +3210,7 @@ mod tests {
     fn edit_preview_uses_selected_revision() {
         let mut state = AppState::new(log_app_view("abcdefghijklmnop"));
 
-        open_edit_preview(&mut state, &JjEdit::default());
-
-        let Some(InputMode::CommandPreview { pending }) = state.modes.active() else {
-            panic!("expected edit command preview");
-        };
+        let pending = edit_preview_pending(&mut state, &JjEdit::default()).expect("pending edit");
         assert_eq!(pending.source_action, SourceAction::EditRevision);
         assert_eq!(pending.source_key, "a e");
         assert_eq!(pending.failure_label, "jj edit");
@@ -3398,15 +3317,50 @@ mod tests {
     fn non_empty_abandon_keeps_the_destructive_preview() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
-        let runner = SequencedRunner::successes(vec![output(0, "false\n", "")]);
+        let runner = SequencedRunner::successes(vec![
+            output(0, "false\n", ""),
+            output(1, "", "details unavailable"),
+        ]);
 
         abandon_or_preview_with_runner(&mut state, &mut source, &JjAbandon::default(), runner);
 
         assert!(matches!(
             state.modes.active(),
-            Some(InputMode::CommandPreview { pending })
+            Some(InputMode::AbandonConfirmation { pending, .. })
                 if pending.source_action == SourceAction::AbandonRevision
         ));
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn non_empty_abandon_loads_contents_without_executing() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let runner = SequencedRunner::successes(vec![
+            output(0, "false\n", ""),
+            output(0, "\"abc123\"\t\"Add cache\\n\"\ttrue\n", ""),
+            output(0, "\"src/cache.rs\"\t\"A\"\t84\t0\n", ""),
+            output(0, "2\n", ""),
+            output(0, "+cache contents\n", ""),
+        ]);
+        abandon_or_preview_with_runner(
+            &mut state,
+            &mut JjLog::default(),
+            &JjAbandon::default(),
+            runner,
+        );
+        let Some(InputMode::AbandonConfirmation { dialog, .. }) = state.modes.active_mut() else {
+            panic!("expected confirmation");
+        };
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal.draw(|frame| dialog.render(frame)).expect("render");
+        let rendered = (0..30)
+            .map(|y| crate::test_support::buffer_line(terminal.backend().buffer(), y))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(rendered.contains("src/cache.rs"));
+        assert!(rendered.contains("+84"));
+        assert!(rendered.contains("> Cancel <"));
         assert_eq!(state.command_history().records().count(), 0);
     }
 

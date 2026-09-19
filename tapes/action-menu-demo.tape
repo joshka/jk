@@ -90,11 +90,11 @@ Type "a"
 Wait+Screen "Actions"
 Sleep 2s
 Type "a"
-Wait+Screen "Confirm command"
+Wait+Screen "Abandon this change?"
 Caption "This change contains work. Confirm before removing it."
 Sleep 8s
 Screenshot target/dogfood-artifacts/betamax/action-menu-concise-confirm-20260918.png
-Enter
+Type "y"
 Wait+Screen "Abandoned revision"
 Caption "Experiment removed. Earlier work intact."
 Sleep 4s

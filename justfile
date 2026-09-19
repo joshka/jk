@@ -52,6 +52,10 @@ betamax-action-menu:
 betamax-action-menu-demo:
     {{betamax}} run tapes/action-menu-demo.tape
 
+betamax-abandon-confirmation:
+    {{betamax}} run tapes/abandon-confirmation.tape
+    {{betamax}} run tapes/abandon-confirmation-long.tape
+
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
 

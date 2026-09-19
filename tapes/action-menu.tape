@@ -75,7 +75,7 @@ Sleep 300ms
 Type "a"
 Wait+Screen "Actions"
 Type "a"
-Wait+Screen "Confirm command"
+Wait+Screen "Abandon this change?"
 Sleep 1000ms
 Screenshot target/dogfood-artifacts/betamax/action-menu-abandon-preview.png
 State target/dogfood-artifacts/betamax/action-menu-abandon-preview.json

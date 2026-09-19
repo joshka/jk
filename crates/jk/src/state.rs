@@ -279,8 +279,9 @@ pub enum InputMode {
         rev: String,
         message: String,
     },
-    CommandPreview {
+    AbandonConfirmation {
         pending: PendingCommandPreview,
+        dialog: Box<crate::abandon_confirmation::AbandonConfirmation>,
     },
     JjCommand {
         input: String,
