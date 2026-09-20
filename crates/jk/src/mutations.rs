@@ -82,16 +82,32 @@ fn confirm_bookmark_command_preview_with_runner(
     let runner = runner.into_inner();
     match result {
         Ok(output) if output.status.success() => {
+            if matches!(
+                state.modes.active(),
+                Some(InputMode::BookmarkMutation { .. })
+            ) {
+                state.modes.pop();
+            }
             crate::bookmark_routes::refresh_bookmarks_with_runner(state, bookmarks_source, runner)
         }
         Ok(output) => {
             let message =
                 command_failure_message(pending.failure_label, &output.stderr, &output.stdout);
+            if let Some(InputMode::BookmarkMutation { error, .. }) = state.modes.active_mut() {
+                *error = Some(message.clone());
+            }
             if let AppView::Bookmarks { view } = state.views.active_mut() {
                 view.show_error(message);
             }
         }
         Err(error) => {
+            if let Some(InputMode::BookmarkMutation {
+                error: prompt_error,
+                ..
+            }) = state.modes.active_mut()
+            {
+                *prompt_error = Some(format!("failed to run {}: {error}", pending.failure_label));
+            }
             if let AppView::Bookmarks { view } = state.views.active_mut() {
                 view.show_error(format!("failed to run {}: {error}", pending.failure_label));
             }
@@ -269,6 +285,35 @@ mod refs_tests {
     use crate::test_support::{SequencedRunner, output};
 
     #[test]
+    fn failed_bookmark_create_keeps_input_and_jj_diagnostic() {
+        let mut state = AppState::new(AppView::Bookmarks {
+            view: BookmarkView::new(BookmarkViewSnapshot::new(Vec::new())),
+        });
+        crate::bookmark_routes::open_bookmark_create_prompt(&mut state);
+        if let Some(InputMode::BookmarkMutation { name, .. }) = state.modes.active_mut() {
+            *name = "existing".to_owned();
+        }
+        let source = JjBookmarks::default();
+        let spec = source.mutation_spec(&jk_cli::BookmarkMutation::Create {
+            name: "existing".to_owned(),
+            revision: "@".to_owned(),
+        });
+        confirm_bookmark_command_preview_with_runner(
+            &mut state,
+            &source,
+            PendingCommandPreview::bookmark_create(spec.command_preview()),
+            SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
+                output(1, "", "Bookmark already exists: existing"),
+            ]),
+        );
+        assert!(
+            matches!(state.modes.active(), Some(InputMode::BookmarkMutation { name, revision, error: Some(error), .. }) if name == "existing" && revision == "@" && error.contains("Bookmark already exists: existing"))
+        );
+        assert_eq!(state.history.records().count(), 1);
+    }
+
+    #[test]
     fn failed_fetch_retains_output_history_and_last_bookmark_snapshot() {
         let mut state = AppState::new(AppView::Bookmarks {
             view: BookmarkView::new(BookmarkViewSnapshot::new(vec![BookmarkRow::new(
@@ -286,6 +331,7 @@ mod refs_tests {
             &JjBookmarks::default(),
             pending,
             SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
                 output(1, "partial output", "fixture unavailable"),
                 output(1, "", "refresh unavailable"),
             ]),
@@ -337,7 +383,9 @@ mod refs_tests {
             &JjBookmarks::default(),
             pending,
             SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
                 output(0, "", "fetched"),
+                output(0, "222222222222\n", ""),
                 output(0, "{\"name\":\"topic\",\"target\":[\"after\"]}\n", ""),
             ]),
         );
@@ -345,6 +393,16 @@ mod refs_tests {
             state.views.active(),
             AppView::CommandOutput { .. }
         ));
+        assert_eq!(
+            state
+                .history
+                .records()
+                .next()
+                .expect("fetch history")
+                .operation_id
+                .as_deref(),
+            Some("222222222222")
+        );
         state.views.pop();
         let AppView::Bookmarks { view } = state.views.active() else {
             panic!("bookmarks");

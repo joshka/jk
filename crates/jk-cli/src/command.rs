@@ -144,7 +144,10 @@ const fn should_probe_resulting_operation(spec: &JjCommandSpec) -> bool {
         ExecutionMode::ConfirmMutation | ExecutionMode::ConfirmNetworkRead
     ) && matches!(
         spec.safety(),
-        SafetyClass::LocalMetadata | SafetyClass::LocalRewrite | SafetyClass::DestructiveLocal
+        SafetyClass::LocalMetadata
+            | SafetyClass::LocalRewrite
+            | SafetyClass::DestructiveLocal
+            | SafetyClass::NetworkRead
     )
 }
 

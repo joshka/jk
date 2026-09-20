@@ -75,17 +75,7 @@ pub fn render_app(
                     || "Fetch from remote".to_owned(),
                     |name| format!("Push dry-run: {name}"),
                 );
-                let start =
-                    selected.saturating_sub(usize::from(frame.area().height.saturating_sub(10)));
-                let mut lines = names
-                    .iter()
-                    .enumerate()
-                    .skip(start)
-                    .map(|(index, name)| {
-                        format!("{} {name}", if index == *selected { ">" } else { " " })
-                    })
-                    .collect::<Vec<_>>();
-                lines.push("↑/↓ choose  Enter preview  Esc cancel".to_owned());
+                let lines = remote_picker_lines(names, *selected, frame.area().height);
                 render_mode_overlay(frame, &title, &lines);
             }
             Some(InputMode::BookmarkMutation {
@@ -93,12 +83,13 @@ pub fn render_app(
                 name,
                 revision,
                 field,
+                error,
             }) => {
                 view.render(frame);
                 render_mode_overlay(
                     frame,
                     "Bookmark mutation",
-                    &bookmark_mutation_lines(*kind, name, revision, *field),
+                    &bookmark_mutation_lines(*kind, name, revision, *field, error.as_deref()),
                 );
             }
             Some(InputMode::CommandPreview { pending }) => {
@@ -239,17 +230,38 @@ fn render_toast(frame: &mut ratatui::Frame<'_>, message: &str) {
     frame.render_widget(paragraph, toast);
 }
 
+fn remote_picker_lines(names: &[String], selected: usize, height: u16) -> Vec<String> {
+    let visible = usize::from(height.saturating_sub(8)).max(1);
+    let start = selected.saturating_sub(visible.saturating_sub(1));
+    let end = start.saturating_add(visible).min(names.len());
+    let mut lines = names
+        .iter()
+        .enumerate()
+        .take(end)
+        .skip(start)
+        .map(|(index, name)| format!("{} {name}", if index == selected { ">" } else { " " }))
+        .collect::<Vec<_>>();
+    if names.len() > visible {
+        lines.push(format!("{}–{} of {} remotes", start + 1, end, names.len()));
+    } else {
+        lines.push(String::new());
+    }
+    lines.push("↑/↓ choose  Enter preview  Esc cancel".to_owned());
+    lines
+}
+
 fn bookmark_mutation_lines(
     kind: BookmarkMutationKind,
     name: &str,
     revision: &str,
     field: BookmarkMutationField,
+    error: Option<&str>,
 ) -> Vec<String> {
     let operation = match kind {
         BookmarkMutationKind::Create => "create",
         BookmarkMutationKind::Move => "move",
     };
-    vec![
+    let mut lines = vec![
         format!("Operation: bookmark {operation}"),
         format!(
             "{} Name: {name}",
@@ -268,8 +280,18 @@ fn bookmark_mutation_lines(
             }
         ),
         String::new(),
-        "tab switch field   enter preview   backspace edit   esc cancel".to_owned(),
-    ]
+    ];
+    if let Some(error) = error {
+        lines.push(error.to_owned());
+    }
+    lines.push(
+        match kind {
+            BookmarkMutationKind::Create => "Tab field  Enter preview  Esc cancel",
+            BookmarkMutationKind::Move => "Enter preview  Esc cancel",
+        }
+        .to_owned(),
+    );
+    lines
 }
 
 fn render_inspection(
@@ -635,6 +657,27 @@ fn skip_spaces(line: &str, start: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn remote_picker_scrolls_selection_without_hiding_controls() {
+        let names = (0..40)
+            .map(|index| format!("remote-{index}"))
+            .collect::<Vec<_>>();
+        for height in [16, 24, 40, 50] {
+            for selected in [0, 20, 39] {
+                let lines = super::remote_picker_lines(&names, selected, height);
+                assert!(
+                    lines
+                        .iter()
+                        .any(|line| line == &format!("> remote-{selected}"))
+                );
+                assert_eq!(
+                    lines.last().map(String::as_str),
+                    Some("↑/↓ choose  Enter preview  Esc cancel")
+                );
+                assert!(lines.len() + 6 <= usize::from(height));
+            }
+        }
+    }
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 

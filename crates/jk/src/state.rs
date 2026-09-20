@@ -288,6 +288,7 @@ pub enum InputMode {
         name: String,
         revision: String,
         field: BookmarkMutationField,
+        error: Option<String>,
     },
     RemotePicker {
         names: Vec<String>,

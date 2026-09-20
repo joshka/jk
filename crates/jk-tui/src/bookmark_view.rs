@@ -1,11 +1,10 @@
 //! Provider-neutral bookmark list view.
 
 use ratatui::Frame;
-use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
+use ratatui::prelude::{Line, Text};
 use ratatui::widgets::Paragraph;
 
 use crate::chrome::{ViewChrome, render_help_overlay};
-use crate::selected_row::paint_subtle_selected_row;
 
 /// Snapshot consumed by [`BookmarkView`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -55,17 +54,27 @@ pub struct BookmarkRow {
     pub targets: Vec<String>,
     /// Whether the reference is tracked.
     pub tracked: bool,
+    /// Removed target IDs in a bookmark conflict.
+    pub removed_targets: Vec<String>,
+    /// Whether the target is a merge, even when only one added ID survives.
+    pub conflicted: bool,
+    /// Whether a tracked remote has exactly the same target as its local bookmark.
+    pub synchronized: bool,
 }
 
 impl BookmarkRow {
     /// Creates a display row.
     #[must_use]
     pub fn new(name: impl Into<String>, targets: Vec<String>) -> Self {
+        let conflicted = targets.len() > 1;
         Self {
             name: name.into(),
             remote: None,
             targets,
             tracked: false,
+            removed_targets: Vec::new(),
+            conflicted,
+            synchronized: false,
         }
     }
 
@@ -83,16 +92,31 @@ impl BookmarkRow {
         self
     }
 
+    /// Sets synchronization state derived from jj's full target merge terms.
+    #[must_use]
+    pub const fn with_synchronized(mut self, synchronized: bool) -> Self {
+        self.synchronized = synchronized;
+        self
+    }
+
+    /// Retains conflict state separately from the number of added target IDs.
+    #[must_use]
+    pub fn with_conflict(mut self, conflicted: bool, removed_targets: Vec<String>) -> Self {
+        self.conflicted = conflicted;
+        self.removed_targets = removed_targets;
+        self
+    }
+
     /// Returns whether this is a local bookmark with one target.
     #[must_use]
     pub const fn can_mutate(&self) -> bool {
-        self.remote.is_none() && self.targets.len() == 1
+        self.remote.is_none() && !self.conflicted && self.targets.len() == 1
     }
 
     /// Returns the one target when inspection is unambiguous.
     #[must_use]
     pub fn normal_target(&self) -> Option<&str> {
-        (self.targets.len() == 1).then(|| self.targets[0].as_str())
+        (!self.conflicted && self.targets.len() == 1).then(|| self.targets[0].as_str())
     }
 }
 
@@ -190,16 +214,23 @@ impl BookmarkView {
             .map(|row| (row.name.clone(), row.remote.clone()));
         let previous = self.selected;
         self.snapshot = snapshot;
-        self.selected = selected_identity
-            .and_then(|(name, remote)| {
-                self.snapshot
-                    .rows
-                    .iter()
-                    .position(|row| row.name == name && row.remote == remote)
-            })
-            .or_else(|| clamp_index(previous.or(Some(0)), self.snapshot.rows.len()));
+        let preserved = selected_identity.as_ref().and_then(|(name, remote)| {
+            self.snapshot
+                .rows
+                .iter()
+                .position(|row| &row.name == name && &row.remote == remote)
+        });
+        self.selected =
+            preserved.or_else(|| clamp_index(previous.or(Some(0)), self.snapshot.rows.len()));
         self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rows.len());
-        self.status_message = None;
+        self.status_message = if selected_identity.is_some() && preserved.is_none() {
+            Some(
+                "Selected bookmark disappeared; selection moved to the nearest remaining row."
+                    .to_owned(),
+            )
+        } else {
+            None
+        };
     }
 
     /// Shows an error while keeping the last usable rows.
@@ -219,9 +250,24 @@ impl BookmarkView {
             .and_then(|index| self.snapshot.rows.get(index))
     }
 
+    /// Returns whether help currently owns keyboard focus.
+    #[must_use]
+    pub const fn help_visible(&self) -> bool {
+        self.help_visible
+    }
+
     /// Applies one input action.
     #[must_use]
     pub fn apply(&mut self, action: BookmarkAction) -> BookmarkActionResult {
+        if self.help_visible {
+            if matches!(
+                action,
+                BookmarkAction::ToggleHelp | BookmarkAction::ReturnBack | BookmarkAction::Quit
+            ) {
+                self.help_visible = false;
+            }
+            return BookmarkActionResult::Continue;
+        }
         match action {
             BookmarkAction::Continue => BookmarkActionResult::Continue,
             BookmarkAction::Previous => {
@@ -299,14 +345,15 @@ impl BookmarkView {
         let area = frame.area();
         let areas = ViewChrome::layout(area);
         self.keep_selected_in_view(usize::from(areas.content.height));
-        let fallback_status = "c create  m move  x delete  F fetch  P push  r refresh  Esc back";
+        let fallback_status = if area.width >= 90 {
+            "Enter inspect  c create  m move  x delete  F fetch  P dry-run  ? help  Esc back"
+        } else {
+            "Enter inspect  c create  F fetch  ? help  Esc back"
+        };
         let status = self.status_message.as_deref().unwrap_or(fallback_status);
         ViewChrome::new(self.snapshot.title(), status).render(frame, areas);
         let body = self.visible_text();
         frame.render_widget(Paragraph::new(body), areas.content);
-        if let Some(selected) = self.selected {
-            paint_subtle_selected_row(frame, areas.content, selected, self.scroll_offset);
-        }
         if self.help_visible {
             render_help_overlay(
                 frame,
@@ -314,13 +361,14 @@ impl BookmarkView {
                 "Bookmarks keys",
                 &[
                     "j/k or arrows  move selection".to_owned(),
-                    "enter          inspect selected target".to_owned(),
+                    "Enter          inspect selected target".to_owned(),
                     "c              create bookmark preview".to_owned(),
                     "m              move bookmark preview".to_owned(),
                     "x              delete bookmark preview".to_owned(),
-                    "F              fetch selected remote (confirm)".to_owned(),
-                    "P              push dry-run for selected remote".to_owned(),
-                    "r              refresh    Esc back".to_owned(),
+                    "F              choose remote and preview fetch".to_owned(),
+                    "P              choose remote and preview push dry-run".to_owned(),
+                    "r              refresh".to_owned(),
+                    "Esc / ? / q    close help".to_owned(),
                 ],
             );
         }
@@ -344,38 +392,49 @@ impl BookmarkView {
     fn visible_text(&self) -> Text<'_> {
         if self.snapshot.rows.is_empty() {
             return Text::from(vec![
-                Line::from(Span::styled(
-                    "No bookmarks found.",
-                    Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-                )),
+                Line::from("No bookmarks found."),
                 Line::from(""),
-                Line::from("Press r to refresh."),
+                Line::from("Press c to create a bookmark, F to fetch, or r to refresh."),
             ]);
         }
         Text::from(
             self.snapshot
                 .rows
                 .iter()
+                .enumerate()
                 .skip(self.scroll_offset)
-                .map(bookmark_line)
+                .map(|(index, row)| bookmark_line(row, self.selected == Some(index)))
                 .collect::<Vec<_>>(),
         )
     }
 }
 
-fn bookmark_line(row: &BookmarkRow) -> Line<'static> {
-    let marker = if row.remote.is_some() { "R" } else { "L" };
-    let remote = row.remote.as_deref().unwrap_or("local");
-    let tracking = if row.tracked { " tracked" } else { "" };
-    let target = match row.targets.as_slice() {
-        [] => "(deleted)".to_owned(),
-        [target] => target.chars().take(12).collect(),
-        targets => format!("conflict ({} targets)", targets.len()),
+fn bookmark_line(row: &BookmarkRow, selected: bool) -> Line<'static> {
+    let marker = if selected { ">" } else { " " };
+    let name = row.remote.as_ref().map_or_else(
+        || row.name.clone(),
+        |remote| format!("{}@{remote}", row.name),
+    );
+    let state = match (row.remote.is_some(), row.tracked) {
+        (false, _) => "local",
+        (true, false) => "untracked",
+        (true, true) if row.synchronized => "tracked, synced",
+        (true, true) => "tracked, differs from local",
     };
-    Line::from(format!(
-        "{marker} {remote:<10} {name:<32} {target}{tracking}",
-        name = row.name
-    ))
+    let target = if row.conflicted {
+        format!(
+            "conflict (+{}/-{})",
+            row.targets.len(),
+            row.removed_targets.len()
+        )
+    } else {
+        match row.targets.as_slice() {
+            [] => "(deleted)".to_owned(),
+            [target] => target.chars().take(12).collect(),
+            targets => format!("conflict ({} targets)", targets.len()),
+        }
+    };
+    Line::from(format!("{marker} {name}: {target} ({state})"))
 }
 
 fn clamp_index(index: Option<usize>, len: usize) -> Option<usize> {
@@ -420,6 +479,74 @@ mod tests {
     }
 
     #[test]
+    fn refresh_reports_when_selected_identity_disappears() {
+        let mut view = BookmarkView::new(BookmarkViewSnapshot::new(vec![row("old", "a")]));
+        view.refresh(BookmarkViewSnapshot::new(vec![row("new", "b")]));
+        assert_eq!(
+            view.selected_row().map(|row| row.name.as_str()),
+            Some("new")
+        );
+        assert!(
+            view.status_message
+                .as_deref()
+                .is_some_and(|message| message.contains("disappeared"))
+        );
+    }
+
+    #[test]
+    fn help_owns_selection_and_mutation_keys_until_closed() {
+        let mut view = BookmarkView::new(BookmarkViewSnapshot::new(vec![
+            row("one", "a"),
+            row("two", "b"),
+        ]));
+        let _ = view.apply(BookmarkAction::ToggleHelp);
+        for action in [
+            BookmarkAction::Next,
+            BookmarkAction::Create,
+            BookmarkAction::Move,
+            BookmarkAction::Delete,
+            BookmarkAction::OpenTarget,
+            BookmarkAction::Refresh,
+        ] {
+            assert_eq!(view.apply(action), BookmarkActionResult::Continue);
+        }
+        assert_eq!(
+            view.selected_row().map(|row| row.name.as_str()),
+            Some("one")
+        );
+        assert_eq!(
+            view.apply(BookmarkAction::ReturnBack),
+            BookmarkActionResult::Continue
+        );
+        assert!(!view.help_visible());
+    }
+
+    #[test]
+    fn remote_rows_explain_tracking_and_sync_state() {
+        let synced = row("topic", "a")
+            .with_remote("origin")
+            .with_tracked(true)
+            .with_synchronized(true);
+        let deleted_local = row("topic", "a").with_remote("origin").with_tracked(true);
+        let untracked = row("topic", "a").with_remote("other");
+        assert!(
+            bookmark_line(&synced, true)
+                .to_string()
+                .contains("topic@origin: a (tracked, synced)")
+        );
+        assert!(
+            bookmark_line(&deleted_local, false)
+                .to_string()
+                .contains("tracked, differs from local")
+        );
+        assert!(
+            bookmark_line(&untracked, false)
+                .to_string()
+                .contains("(untracked)")
+        );
+    }
+
+    #[test]
     fn remote_and_conflicted_rows_cannot_mutate() {
         let mut view = BookmarkView::new(BookmarkViewSnapshot::new(vec![
             row("remote", "a").with_remote("origin"),
@@ -433,6 +560,18 @@ mod tests {
         assert_eq!(
             view.apply(BookmarkAction::Delete),
             BookmarkActionResult::Continue
+        );
+    }
+
+    #[test]
+    fn modify_delete_conflict_with_one_added_target_is_not_actionable() {
+        let row = row("topic", "new").with_conflict(true, vec!["old".into()]);
+        assert!(!row.can_mutate());
+        assert_eq!(row.normal_target(), None);
+        assert!(
+            bookmark_line(&row, true)
+                .to_string()
+                .contains("conflict (+1/-1)")
         );
     }
 
@@ -472,11 +611,7 @@ mod tests {
             .collect::<String>();
         assert!(text.contains("bookmark-4"));
         assert!(!text.contains("bookmark-0"));
-        assert_eq!(
-            buffer[(0, 2)].bg,
-            Color::Rgb(34, 40, 44),
-            "the selected final row remains highlighted in the viewport"
-        );
+        assert_eq!(buffer[(0, 2)].symbol(), ">");
     }
 
     #[test]
@@ -492,8 +627,8 @@ mod tests {
         terminal.draw(|frame| view.render(frame)).expect("render");
 
         let buffer = terminal.backend().buffer();
-        assert_eq!(buffer[(0, 1)].bg, Color::Rgb(34, 40, 44));
-        assert_eq!(buffer[(13, 1)].symbol(), "4");
+        assert_eq!(buffer[(0, 1)].symbol(), ">");
+        assert_eq!(buffer[(2, 1)].symbol(), "4");
     }
 
     #[test]
@@ -516,7 +651,7 @@ mod tests {
             .map(ratatui::buffer::Cell::symbol)
             .collect::<String>();
         assert!(text.contains("(deleted)"));
-        assert!(text.contains("conflict (2 targets)"));
+        assert!(text.contains("conflict (+2/-0)"));
         assert!(text.contains("tracked"));
     }
 }

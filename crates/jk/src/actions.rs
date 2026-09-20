@@ -46,6 +46,17 @@ pub fn dispatch_app_key(
     key: KeyEvent,
     app_key: AppKey,
 ) -> DispatchResult {
+    if let AppView::Bookmarks { view } = state.views.active_mut() {
+        if view.help_visible() {
+            if matches!(key.code, KeyCode::Esc | KeyCode::Char('q' | '?')) {
+                let _ = view.apply(jk_tui::bookmark_view::BookmarkAction::ToggleHelp);
+            }
+            return DispatchResult::Continue;
+        }
+        if matches!(app_key, AppKey::Action(LogAction::Quit)) {
+            return DispatchResult::Quit;
+        }
+    }
     if matches!(state.views.active(), AppView::Bookmarks { .. }) {
         let action = match key.code {
             KeyCode::Char('m') => Some(jk_tui::bookmark_view::BookmarkAction::Move),

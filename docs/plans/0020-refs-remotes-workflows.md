@@ -66,9 +66,12 @@ jj git push --remote REMOTE --bookmark BOOKMARK --dry-run
 {"name":"main","remote":"origin","target":["COMMIT_ID"],"tracking_target":["COMMIT_ID"]}
 ```
 
-The `target` array can contain multiple IDs for conflicted bookmarks and can be absent or empty for
-a deleted target. Do not assume every row has one target. Keep the raw full commit IDs in the model
-and shorten only for display.
+The `target` array preserves jj's merge terms: added, removed, added, and so on. A normal bookmark
+has one commit ID; a deleted target is `[null]`. A conflict can contain `null` terms and must stay
+conflicted even when it has only one added commit ID. Keep added and removed IDs separate, retain
+conflict state, and shorten full IDs only for display. The presence of `tracking_target` indicates
+tracking even when its value is `[null]` after a local deletion. Compare the full target merge terms
+when reporting whether a tracked remote is synchronized.
 
 Important upstream behavior to preserve in UI text and tests:
 

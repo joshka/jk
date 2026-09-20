@@ -378,14 +378,20 @@ fn handle_input_mode(
                     kind,
                     name,
                     revision,
+                    error,
                     ..
                 } => {
                     let Some(mutation) =
                         bookmark_mutation_from_prompt(*kind, name.clone(), revision.clone())
                     else {
+                        *error = Some(if name.trim().is_empty() {
+                            "Enter a bookmark name.".to_owned()
+                        } else {
+                            "Enter a target revision.".to_owned()
+                        });
                         return InputModeResult::Handled;
                     };
-                    state.modes.pop();
+                    *error = None;
                     open_bookmark_preview(state, bookmarks_source, mutation);
                     return InputModeResult::Handled;
                 }
@@ -430,7 +436,12 @@ fn handle_input_mode(
         KeyEvent {
             code: KeyCode::Tab, ..
         } => {
-            if let Some(InputMode::BookmarkMutation { field, .. }) = state.modes.active_mut() {
+            if let Some(InputMode::BookmarkMutation {
+                kind: state::BookmarkMutationKind::Create,
+                field,
+                ..
+            }) = state.modes.active_mut()
+            {
                 *field = match field {
                     BookmarkMutationField::Name => BookmarkMutationField::Revision,
                     BookmarkMutationField::Revision => BookmarkMutationField::Name,

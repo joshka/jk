@@ -10,9 +10,9 @@ Set FontSize 22
 Set Width 1200
 Set Height 720
 Set Padding 0
-Set Margin 20
-Set WindowBar Colorful
-Set BorderRadius 8
+Set Margin 0
+Set WindowBar ""
+Set BorderRadius 0
 Set CursorBlink false
 Set KeyboardOverlay Input
 Set TypingSpeed 20ms
@@ -23,10 +23,10 @@ Hide
 Type 'repo=$(mktemp -d /tmp/jk-refs-demo.XXXXXX) && jj git init --no-colocate "$repo/client" && jj git init --no-colocate "$repo/remote" && jj -R "$repo/client" bookmark create demo && jj -R "$repo/client" git remote add fixture "$repo/remote/.jj/repo/store/git" && echo JK_REFS_REMOTES_READY'
 Enter
 Wait+Screen "JK_REFS_REMOTES_READY"
-Type 'cargo build --manifest-path /Users/joshka/local/jk/work/refs-remotes/Cargo.toml -p jk >/tmp/jk-refs-remotes-borderless-build.log 2>&1 && echo JK_BUILD_READY'
+Type 'CARGO_BUILD_JOBS=3 cargo build -p jk >/tmp/jk-refs-remotes-borderless-build.log 2>&1 && echo JK_BUILD_READY'
 Enter
 Wait+Screen "JK_BUILD_READY"
-Type 'clear; /Users/joshka/local/jk/work/refs-remotes/target/debug/jk -R "$repo/client"'
+Type 'clear; ./target/debug/jk -R "$repo/client"'
 Enter
 Wait+Screen "jk jj"
 Show
@@ -46,6 +46,8 @@ Sleep 800ms
 Enter
 Wait+Screen "jj bookmark create"
 Sleep 1800ms
+Escape
+Wait+Screen "Bookmark mutation"
 Escape
 Type "x"
 Wait+Screen "jj bookmark delete"

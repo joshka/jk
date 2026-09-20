@@ -26,12 +26,18 @@ pub struct BookmarkRef {
     pub name: String,
     /// Remote name for a remote reference.
     pub remote: Option<String>,
-    /// Target commit IDs. Multiple IDs represent a conflicted bookmark.
+    /// Added target commit IDs, excluding removed conflict terms and absent targets.
     pub targets: Vec<String>,
+    /// Removed target commit IDs in a conflicted bookmark.
+    pub removed_targets: Vec<String>,
+    /// Whether jj reports a target merge, including modify/delete conflicts with one added ID.
+    pub conflicted: bool,
     /// Target commit IDs from the local tracking bookmark, when reported by jj.
     pub tracking_targets: Vec<String>,
     /// Whether the reference is tracked by a local bookmark.
     pub tracked: bool,
+    /// Whether the remote and local tracking targets have identical merge terms.
+    pub synchronized: bool,
 }
 
 impl BookmarkRef {
@@ -44,7 +50,7 @@ impl BookmarkRef {
     /// Returns whether the bookmark has exactly one normal target.
     #[must_use]
     pub fn normal_target(&self) -> Option<&str> {
-        (self.targets.len() == 1).then(|| self.targets[0].as_str())
+        (!self.conflicted && self.targets.len() == 1).then(|| self.targets[0].as_str())
     }
 
     /// Returns whether this row can be changed by the first bookmark mutation slice.
@@ -60,9 +66,9 @@ struct BookmarkRecord {
     #[serde(default)]
     remote: Option<String>,
     #[serde(default)]
-    target: Vec<String>,
+    target: Vec<Option<String>>,
     #[serde(default)]
-    tracking_target: Vec<String>,
+    tracking_target: Option<Vec<Option<String>>>,
     #[serde(default)]
     tracked: bool,
 }
@@ -74,13 +80,32 @@ impl TryFrom<BookmarkRecord> for BookmarkRef {
         if record.name.is_empty() {
             return Err(BookmarkParseError::MissingName);
         }
-        let tracked = record.tracked || !record.tracking_target.is_empty();
+        // A tracked remote can point at a locally deleted bookmark. In that case jj emits an
+        // empty tracking target; the field's presence, not its length, carries tracking state.
+        let tracked = record.tracked || record.tracking_target.is_some();
+        let synchronized = record.tracking_target.as_ref() == Some(&record.target);
+        let conflicted = record.target.len() > 1;
+        // jj serializes RefTarget as alternating added/removed merge terms. A deleted target is
+        // [null], and null can also occur on either side of a conflict.
+        let targets = record.target.iter().step_by(2).flatten().cloned().collect();
+        let removed_targets = record
+            .target
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .flatten()
+            .cloned()
+            .collect();
+        let tracking_targets = record.tracking_target.unwrap_or_default();
         Ok(Self {
             name: record.name,
             remote: record.remote,
-            targets: record.target,
-            tracking_targets: record.tracking_target,
+            targets,
+            removed_targets,
+            conflicted,
+            tracking_targets: tracking_targets.into_iter().step_by(2).flatten().collect(),
             tracked,
+            synchronized,
         })
     }
 }
@@ -402,8 +427,8 @@ mod tests {
             r#"{"name":"main","target":["abc"]}
 {"name":"main","remote":"origin","target":["def"],"tracking_target":["abc"],"tracked":true}
 {"name":"inferred","remote":"origin","target":["ghi"],"tracking_target":["abc"]}
-{"name":"conflicted","target":["old","new"]}
-{"name":"deleted"}
+{"name":"conflicted","target":["left","old","right"]}
+{"name":"deleted","target":[null]}
 "#,
         )
         .expect("valid bookmark JSON");
@@ -420,6 +445,87 @@ mod tests {
         let error = parse_bookmark_list("{\"name\":\"ok\"}\nnot-json\n")
             .expect_err("malformed JSON should fail");
         assert!(error.to_string().contains("line 2"));
+    }
+
+    #[test]
+    fn deleted_local_tracking_target_still_marks_remote_as_tracked() {
+        let rows = parse_bookmark_list(
+            r#"{"name":"topic","remote":"origin","target":["abc"],"tracking_target":[null]}"#,
+        )
+        .expect("valid tracked remote");
+        assert!(rows[0].tracked);
+        assert!(rows[0].tracking_targets.is_empty());
+    }
+
+    #[test]
+    fn target_merge_keeps_removed_terms_and_modify_delete_conflicts() {
+        let rows = parse_bookmark_list(
+            r#"{"name":"topic","target":[null,"old","new"]}
+{"name":"topic","remote":"origin","target":["left","old","right"],"tracking_target":["left","other-old","right"]}"#,
+        ).expect("valid jj merge targets");
+        assert_eq!(rows[0].targets, ["new"]);
+        assert_eq!(rows[0].removed_targets, ["old"]);
+        assert!(rows[0].conflicted);
+        assert_eq!(rows[0].normal_target(), None);
+        assert!(!rows[0].supports_local_mutation());
+        assert_eq!(rows[1].targets, ["left", "right"]);
+        assert_eq!(rows[1].removed_targets, ["old"]);
+        assert!(rows[1].tracked);
+        assert!(!rows[1].synchronized);
+    }
+
+    #[test]
+    fn local_fixture_loads_modify_delete_bookmark_conflicts() {
+        let repository = fixture_directory();
+        init_repository(&repository);
+        run_jj(&repository, &["describe", "-m", "left"]);
+        run_jj(&repository, &["bookmark", "create", "topic"]);
+        run_jj(&repository, &["new", "-m", "right"]);
+        let before = Command::new("jj")
+            .arg("--repository")
+            .arg(&repository)
+            .args([
+                "--color",
+                "never",
+                "op",
+                "log",
+                "--no-graph",
+                "-T",
+                "id",
+                "-n",
+                "1",
+            ])
+            .output()
+            .expect("read fixture operation");
+        assert!(before.status.success());
+        let before = String::from_utf8(before.stdout).expect("operation id");
+        run_jj(&repository, &["bookmark", "delete", "topic"]);
+        run_jj(
+            &repository,
+            &[
+                "--at-operation",
+                before.trim(),
+                "bookmark",
+                "move",
+                "--to",
+                "@",
+                "topic",
+            ],
+        );
+        let snapshot = JjBookmarks::default()
+            .with_repository(&repository)
+            .load()
+            .expect("load conflicted bookmark emitted by jj");
+        let bookmark = snapshot
+            .bookmarks
+            .iter()
+            .find(|bookmark| bookmark.name == "topic")
+            .expect("conflicted bookmark remains visible");
+        assert!(bookmark.conflicted);
+        assert_eq!(bookmark.targets.len(), 1);
+        assert_eq!(bookmark.removed_targets.len(), 1);
+        assert_eq!(bookmark.normal_target(), None);
+        std::fs::remove_dir_all(repository).expect("remove fixture repository");
     }
 
     #[test]
