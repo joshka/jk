@@ -282,6 +282,7 @@ mod tests {
         crate::handle_command_preview_mode(
             &mut state,
             &mut source,
+            &jk_cli::JjBookmarks::default(),
             KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
         );
 

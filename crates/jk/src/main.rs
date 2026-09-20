@@ -14,6 +14,7 @@
 
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use clap::Parser;
 use color_eyre::Result;
@@ -25,13 +26,17 @@ use jk_cli::AbandonQuery;
 #[cfg(test)]
 use jk_cli::RecoveryCommand;
 use jk_cli::{
-    DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, JjAbandon, JjCommandRunner,
-    JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery,
-    JjRestore, JjShow, JjSquash, JjStatus, JjWorkspaces, LogTemplateSelection, NewQuery,
-    OperationQuery, RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemJjCommandRunner,
-    WorkspaceInspectionQuery,
+    DescribeQuery, DiffFormat, DiffQuery, EditQuery, EvologQuery, ExternalCommandRunner, JjAbandon,
+    JjBookmarks, JjCommandRunner, JjDescribe, JjDiff, JjEdit, JjEvolog, JjGitRemote, JjLog,
+    JjLogCommand, JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash, JjStatus,
+    JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery, RecordingExternalCommandRunner,
+    RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemExternalCommandRunner,
+    SystemJjCommandRunner, WorkspaceInspectionQuery,
 };
-use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
+use jk_core::{
+    CommandHistory, CommandSource, SelectionCandidates, SelectionDecision, SelectionRequest,
+    SelectionResolution, SelectorKind, SelectorRole, SourceAction, SourceView, resolve_selection,
+};
 #[cfg(test)]
 use jk_tui::command_discovery::ActionMenuAction;
 use jk_tui::command_discovery::{BindingContext, action_menu_rows, discovery_scroll_limit};
@@ -50,6 +55,7 @@ use jk_tui::workspaces_view::{WorkspacesActionResult, WorkspacesView};
 
 mod abandon_confirmation;
 mod actions;
+mod bookmark_routes;
 mod cli;
 mod clipboard;
 mod command_history;
@@ -62,6 +68,7 @@ mod mutations;
 mod operation_log;
 mod rebase;
 mod refresh;
+pub mod refresh_runner;
 mod rendering;
 mod root_views;
 mod runner;
@@ -74,6 +81,10 @@ mod workspace_routes;
 mod workspaces;
 
 use actions::{AppSources, DispatchResult, dispatch_app_key};
+use bookmark_routes::{
+    apply_bookmark_action, bookmark_mutation_from_prompt, open_bookmark_preview, open_bookmarks,
+    open_remote_preview,
+};
 use cli::{Args, Command};
 use clipboard::copy_command_line;
 use command_history::{apply_command_history_action, open_command_history};
@@ -84,7 +95,10 @@ pub(crate) use command_history::{
 pub(crate) use command_history::{
     open_command_history_operation, open_operation_log, push_selected_command_history_details,
 };
-use command_mode::{command_mode_snapshot, command_mode_spec, parse_jj_command_args};
+use command_mode::{
+    command_mode_snapshot, command_mode_spec, external_command_snapshot, external_command_spec,
+    parse_command_args, parse_jj_command_args, validate_command_mode_args,
+};
 use description_editor::DescriptionEditor;
 use key::AppKey;
 use menus::{MenuDirection, ViewOptionRow, view_option_rows, wrapped_selection};
@@ -104,10 +118,10 @@ use mutations::{
 use refresh::show_log_template_load_error;
 use refresh::{
     OperationRenderedKind, apply_log_template_selection, operation_rendered_transition,
-    refresh_diff, refresh_evolog, refresh_log, refresh_operation_log, refresh_operation_rendered,
-    refresh_show, refresh_status, refresh_workspace_inspection, refresh_workspaces,
-    switch_log_command,
+    refresh_diff, refresh_evolog, refresh_operation_log, refresh_operation_rendered, refresh_show,
+    refresh_status, refresh_workspace_inspection, refresh_workspaces, switch_log_command,
 };
+use refresh_runner::{LogRefreshRunner, RefreshCompletion};
 use rendering::render_app;
 use root_views::{
     root_diff_view, root_log_view, root_show_view, root_status_view, root_workspaces_view,
@@ -116,7 +130,10 @@ pub(crate) use runner::recording_runner;
 use squash::open_squash_preview;
 #[cfg(test)]
 use state::ViewStack;
-use state::{AppState, AppView, InputMode, InputModeResult, ModeStack};
+use state::{
+    AppState, AppView, BookmarkMutationField, CommandInputKind, InputMode, InputModeResult,
+    ModeStack,
+};
 use workspace_routes::{
     WorkspaceInspectionKind, open_workspaces, push_selected_workspace_diff,
     push_selected_workspace_log, push_selected_workspace_status, push_status,
@@ -148,6 +165,8 @@ fn main() -> Result<()> {
     let operation_source = args.operation_source();
     let recovery_source = args.recovery_source();
     let workspaces_source = args.workspaces_source();
+    let bookmarks_source = args.bookmarks_source();
+    let remotes_source = args.git_remote_source();
     let mut history = CommandHistory::default();
     let app = match &args.command {
         Some(Command::Diff(diff_args)) => {
@@ -183,6 +202,8 @@ fn main() -> Result<()> {
         &operation_source,
         &recovery_source,
         &workspaces_source,
+        &bookmarks_source,
+        &remotes_source,
         args.repository,
         history,
     )?;
@@ -211,6 +232,8 @@ fn run_terminal(
     operation_source: &JjOperation,
     recovery_source: &JjRecovery,
     workspaces_source: &JjWorkspaces,
+    bookmarks_source: &JjBookmarks,
+    remotes_source: &JjGitRemote,
     command_repository: Option<PathBuf>,
     history: CommandHistory,
 ) -> Result<()> {
@@ -227,20 +250,24 @@ fn run_terminal(
     let mut state = AppState::with_history(app, history);
 
     loop {
+        if apply_log_refresh_completions(&mut state, &source) {
+            needs_redraw = true;
+        }
+
         if needs_redraw {
             terminal.draw(|frame| render_app(frame, &mut state, source.template()))?;
             needs_redraw = false;
         }
 
-        let event = if let Some(timeout) = state.toast_timeout() {
-            if !event::poll(timeout)? {
-                needs_redraw = true;
-                continue;
-            }
-            event::read()?
-        } else {
-            event::read()?
-        };
+        let refresh_poll = Duration::from_millis(50);
+        let timeout = state
+            .toast_timeout()
+            .map_or(refresh_poll, |toast| toast.min(refresh_poll));
+        if !event::poll(timeout)? {
+            needs_redraw = state.toast_timeout().is_some();
+            continue;
+        }
+        let event = event::read()?;
 
         match event {
             Event::Key(key) => {
@@ -250,6 +277,7 @@ fn run_terminal(
                     diff_source,
                     describe_source,
                     workspaces_source,
+                    bookmarks_source,
                     command_repository.as_deref(),
                     key,
                 );
@@ -276,6 +304,8 @@ fn run_terminal(
                     operation: operation_source,
                     recovery: recovery_source,
                     workspaces: workspaces_source,
+                    bookmarks: bookmarks_source,
+                    remotes: remotes_source,
                 };
                 if dispatch_app_key(&mut state, &mut sources, key, app_key) == DispatchResult::Quit
                 {
@@ -293,6 +323,39 @@ fn run_terminal(
     Ok(())
 }
 
+fn apply_log_refresh_completions(state: &mut AppState, source: &JjLog) -> bool {
+    let completions = state.refreshes.drain();
+    if completions.is_empty() {
+        return false;
+    }
+
+    for completion in completions {
+        let result = match completion {
+            RefreshCompletion::Current(result) => Some(result),
+            RefreshCompletion::Superseded(result) => {
+                state.history.absorb(result.history);
+                None
+            }
+        };
+        let Some(result) = result else {
+            continue;
+        };
+        state.history.absorb(result.history);
+        if &result.source != source {
+            continue;
+        }
+        let AppView::Log(log) = state.views.active_mut() else {
+            continue;
+        };
+        match result.outcome {
+            Ok(snapshot) => log.refresh(snapshot),
+            Err(error) => log.show_error(format!("Refresh failed: {error}")),
+        }
+    }
+
+    true
+}
+
 /// Handles key input while a prompt-like mode is active.
 fn handle_input_mode_with_workspaces(
     state: &mut AppState,
@@ -300,6 +363,7 @@ fn handle_input_mode_with_workspaces(
     diff_source: &JjDiff,
     describe_source: &JjDescribe,
     workspaces_source: &JjWorkspaces,
+    bookmarks_source: &JjBookmarks,
     command_repository: Option<&Path>,
     key: KeyEvent,
 ) -> InputModeResult {
@@ -327,15 +391,21 @@ fn handle_input_mode_with_workspaces(
     ) {
         return handle_command_discovery_mode(state, key);
     }
+    if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
+        return handle_command_preview_mode(state, source, bookmarks_source, key);
+    }
+    if matches!(state.modes.active(), Some(InputMode::RemotePicker { .. })) {
+        let remotes = command_repository.map_or_else(JjGitRemote::default, |repository| {
+            JjGitRemote::default().with_repository(repository)
+        });
+        return bookmark_routes::handle_remote_picker(state, &remotes, key);
+    }
     if matches!(
         state.modes.active(),
         Some(InputMode::AbandonConfirmation { .. })
     ) {
         abandon_confirmation::handle_input(state, source, key);
         return InputModeResult::Handled;
-    }
-    if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
-        return handle_command_preview_mode(state, source, key);
     }
     if matches!(
         state.modes.active(),
@@ -365,6 +435,12 @@ fn handle_input_mode_with_workspaces(
     }
     if matches!(state.modes.active(), Some(InputMode::JjCommand { .. })) {
         return handle_jj_command_mode(state, command_repository, key);
+    }
+    if matches!(
+        state.modes.active(),
+        Some(InputMode::ExternalCommand { .. })
+    ) {
+        return handle_external_command_mode(state, command_repository, key);
     }
     if matches!(
         state.modes.active(),
@@ -403,6 +479,21 @@ fn handle_input_mode_with_workspaces(
                 InputMode::InspectionSearch { query } => SearchSubmit::Inspection(query.clone()),
                 InputMode::DescribeMessage { .. } => unreachable!(),
                 InputMode::ActionMenu { .. } => unreachable!(),
+                InputMode::BookmarkMutation {
+                    kind,
+                    name,
+                    revision,
+                    ..
+                } => {
+                    let Some(mutation) =
+                        bookmark_mutation_from_prompt(*kind, name.clone(), revision.clone())
+                    else {
+                        return InputModeResult::Handled;
+                    };
+                    state.modes.pop();
+                    open_bookmark_preview(state, bookmarks_source, mutation);
+                    return InputModeResult::Handled;
+                }
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
@@ -413,7 +504,9 @@ fn handle_input_mode_with_workspaces(
                 InputMode::RebaseDestination { .. } => unreachable!(),
                 InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
+                InputMode::ExternalCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
+                InputMode::RemotePicker { .. } => unreachable!(),
             };
             state.modes.pop();
             apply_search_submit(state, action);
@@ -423,7 +516,54 @@ fn handle_input_mode_with_workspaces(
             code: KeyCode::Backspace,
             ..
         } => {
+            if let InputMode::BookmarkMutation {
+                field,
+                name,
+                revision,
+                ..
+            } = mode
+            {
+                match field {
+                    BookmarkMutationField::Name => {
+                        name.pop();
+                    }
+                    BookmarkMutationField::Revision => {
+                        revision.pop();
+                    }
+                }
+                return InputModeResult::Handled;
+            }
             state.modes.pop();
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Tab, ..
+        } => {
+            if let Some(InputMode::BookmarkMutation { field, .. }) = state.modes.active_mut() {
+                *field = match field {
+                    BookmarkMutationField::Name => BookmarkMutationField::Revision,
+                    BookmarkMutationField::Revision => BookmarkMutationField::Name,
+                };
+            }
+            InputModeResult::Handled
+        }
+        KeyEvent {
+            code: KeyCode::Char('u'),
+            modifiers,
+            ..
+        } if modifiers == KeyModifiers::CONTROL => {
+            if let InputMode::BookmarkMutation {
+                field,
+                name,
+                revision,
+                ..
+            } = mode
+            {
+                match field {
+                    BookmarkMutationField::Name => name.clear(),
+                    BookmarkMutationField::Revision => revision.clear(),
+                }
+            }
             InputModeResult::Handled
         }
         KeyEvent {
@@ -437,6 +577,15 @@ fn handle_input_mode_with_workspaces(
                 }
                 InputMode::DescribeMessage { .. } => unreachable!(),
                 InputMode::ActionMenu { .. } => unreachable!(),
+                InputMode::BookmarkMutation {
+                    field,
+                    name,
+                    revision,
+                    ..
+                } => match field {
+                    BookmarkMutationField::Name => name.push(character),
+                    BookmarkMutationField::Revision => revision.push(character),
+                },
                 InputMode::ViewOptions { .. } => unreachable!(),
                 InputMode::DiffFileList { .. } => unreachable!(),
                 InputMode::CommandDiscovery { .. } => unreachable!(),
@@ -447,7 +596,9 @@ fn handle_input_mode_with_workspaces(
                 InputMode::RebaseDestination { .. } => unreachable!(),
                 InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
+                InputMode::ExternalCommand { .. } => unreachable!(),
                 InputMode::LogTemplate { .. } => unreachable!(),
+                InputMode::RemotePicker { .. } => unreachable!(),
             }
             InputModeResult::Handled
         }
@@ -458,6 +609,7 @@ fn handle_input_mode_with_workspaces(
 fn handle_command_preview_mode(
     state: &mut AppState,
     source: &mut JjLog,
+    bookmarks_source: &JjBookmarks,
     key: KeyEvent,
 ) -> InputModeResult {
     // A held Enter from the previous selector must not confirm a mutation.
@@ -505,7 +657,22 @@ fn handle_command_preview_mode(
             let Some(InputMode::CommandPreview { pending }) = state.modes.pop() else {
                 return InputModeResult::Handled;
             };
-            execute_pending_command_with_runner(state, source, pending, SystemJjCommandRunner);
+            match pending.source_action {
+                SourceAction::BookmarkCreate
+                | SourceAction::BookmarkMove
+                | SourceAction::BookmarkDelete => {
+                    mutations::confirm_bookmark_command_preview(state, bookmarks_source, pending);
+                }
+                SourceAction::GitFetch | SourceAction::GitPushDryRun => {
+                    mutations::confirm_remote_command_preview(state, bookmarks_source, pending);
+                }
+                _ => execute_pending_command_with_runner(
+                    state,
+                    source,
+                    pending,
+                    SystemJjCommandRunner,
+                ),
+            }
         }
         KeyEvent {
             code: KeyCode::Char('y'),
@@ -535,6 +702,7 @@ fn handle_input_mode(
         diff_source,
         describe_source,
         &JjWorkspaces::default(),
+        &JjBookmarks::default(),
         command_repository,
         key,
     )
@@ -736,6 +904,68 @@ fn handle_jj_command_mode(
     }
 }
 
+fn handle_external_command_mode(
+    state: &mut AppState,
+    working_directory: Option<&Path>,
+    key: KeyEvent,
+) -> InputModeResult {
+    match key {
+        KeyEvent {
+            code: KeyCode::Esc, ..
+        } => {
+            state.modes.pop();
+        }
+        KeyEvent {
+            code: KeyCode::Backspace,
+            ..
+        } => {
+            let should_close = match state.modes.active_mut() {
+                Some(InputMode::ExternalCommand { input, error }) if input.is_empty() => {
+                    *error = None;
+                    true
+                }
+                Some(InputMode::ExternalCommand { input, error }) => {
+                    input.pop();
+                    *error = None;
+                    false
+                }
+                _ => false,
+            };
+            if should_close {
+                state.modes.pop();
+            }
+        }
+        KeyEvent {
+            code: KeyCode::Enter,
+            ..
+        } => {
+            submit_external_command_mode(state, working_directory);
+        }
+        KeyEvent {
+            code: KeyCode::Char('u'),
+            modifiers,
+            ..
+        } if modifiers == KeyModifiers::CONTROL => {
+            if let Some(InputMode::ExternalCommand { input, error }) = state.modes.active_mut() {
+                input.clear();
+                *error = None;
+            }
+        }
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers,
+            ..
+        } if !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
+            if let Some(InputMode::ExternalCommand { input, error }) = state.modes.active_mut() {
+                input.push(character);
+                *error = None;
+            }
+        }
+        _ => {}
+    }
+    InputModeResult::Handled
+}
+
 fn open_jj_command_mode(state: &mut AppState) {
     open_jj_command_mode_with_input(state, String::new());
 }
@@ -746,11 +976,24 @@ fn open_jj_command_mode_with_input(state: &mut AppState, input: String) {
         .push(InputMode::JjCommand { input, error: None });
 }
 
+fn open_external_command_mode(state: &mut AppState) {
+    open_external_command_mode_with_input(state, String::new());
+}
+
+fn open_external_command_mode_with_input(state: &mut AppState, input: String) {
+    state
+        .modes
+        .push(InputMode::ExternalCommand { input, error: None });
+}
+
 fn edit_command_output(state: &mut AppState) {
-    let AppView::CommandOutput { input, .. } = state.views.active() else {
+    let AppView::CommandOutput { input, kind, .. } = state.views.active() else {
         return;
     };
-    open_jj_command_mode_with_input(state, input.clone());
+    match kind {
+        CommandInputKind::Jj => open_jj_command_mode_with_input(state, input.clone()),
+        CommandInputKind::External => open_external_command_mode_with_input(state, input.clone()),
+    }
 }
 
 fn submit_jj_command_mode(state: &mut AppState, repository: Option<&Path>) {
@@ -789,6 +1032,8 @@ fn run_jj_command_mode_with_runner<R: JjCommandRunner>(
         return Err("type a jj command after :".to_owned());
     }
 
+    validate_command_mode_args(&argv)?;
+
     let spec = command_mode_spec(argv, repository);
     let command_line = spec.command_preview().command_line;
     let mut runner = RecordingJjCommandRunner::new(
@@ -803,8 +1048,65 @@ fn run_jj_command_mode_with_runner<R: JjCommandRunner>(
     let result = runner.run(&spec);
     let snapshot = command_mode_snapshot(&command_line, result.as_ref());
     state.views.push(AppView::CommandOutput {
-        view: RenderedView::new(snapshot),
+        view: RenderedView::command_output(snapshot),
         input: input.trim().to_owned(),
+        kind: CommandInputKind::Jj,
+    });
+    Ok(())
+}
+
+fn submit_external_command_mode(state: &mut AppState, working_directory: Option<&Path>) {
+    let input = match state.modes.active() {
+        Some(InputMode::ExternalCommand { input, .. }) => input.clone(),
+        _ => return,
+    };
+
+    match run_external_command_mode_with_runner(
+        state,
+        working_directory,
+        &input,
+        SystemExternalCommandRunner,
+    ) {
+        Ok(()) => {
+            state.modes.pop();
+        }
+        Err(error) => {
+            if let Some(InputMode::ExternalCommand {
+                error: active_error,
+                ..
+            }) = state.modes.active_mut()
+            {
+                *active_error = Some(error);
+            }
+        }
+    }
+}
+
+fn run_external_command_mode_with_runner<R: ExternalCommandRunner>(
+    state: &mut AppState,
+    working_directory: Option<&Path>,
+    input: &str,
+    runner: R,
+) -> std::result::Result<(), String> {
+    let argv = parse_command_args(input)?;
+    let spec = external_command_spec(argv, working_directory)
+        .ok_or_else(|| "type an external command after !".to_owned())?;
+    let command_line = spec.preview();
+    let mut runner = RecordingExternalCommandRunner::new(
+        runner,
+        &mut state.history,
+        CommandSource::new(
+            SourceView::Other("external command mode".to_owned()),
+            SourceAction::UserExternalCommand,
+        )
+        .with_key("!"),
+    );
+    let result = runner.run(&spec);
+    let snapshot = external_command_snapshot(&command_line, result.as_ref());
+    state.views.push(AppView::CommandOutput {
+        view: RenderedView::command_output(snapshot),
+        input: input.to_owned(),
+        kind: CommandInputKind::External,
     });
     Ok(())
 }
@@ -884,11 +1186,18 @@ fn new_preview_pending(state: &mut AppState, new_source: &JjNew) -> Option<Pendi
     let AppView::Log(log) = state.views.active_mut() else {
         return None;
     };
-    let parents = selected_new_parents(log);
-    if parents.is_empty() {
-        log.show_error("No parent revision selected");
-        return None;
-    }
+    let parents = match selected_new_parents(log) {
+        SelectionResolution::Resolved(selection) => selection.into_values(),
+        SelectionResolution::Invalid { .. } => {
+            log.show_error("No parent revision selected");
+            return None;
+        }
+        SelectionResolution::Ambiguous { .. } => {
+            log.show_error("Parent revision selection is ambiguous");
+            return None;
+        }
+        SelectionResolution::Cancelled { .. } => return None,
+    };
 
     let preview = new_source
         .spec_for(&NewQuery::new(parents))
@@ -1094,9 +1403,29 @@ fn apply_diff_file_list_selection(state: &mut AppState) {
         Some(InputMode::DiffFileList { selected }) => *selected,
         _ => return,
     };
+    let cursor = match state.views.active() {
+        AppView::Diff { view, .. } => view.file_paths().get(selected).map(ToString::to_string),
+        _ => None,
+    };
+    let candidates = SelectionCandidates::cursor(cursor);
+    let request = SelectionRequest::one(SelectorKind::Fileset, SelectorRole::Target);
+    let resolved = resolve_selection(request, SelectionDecision::Submit(candidates));
     state.modes.pop();
 
+    let SelectionResolution::Resolved(selection) = resolved else {
+        return;
+    };
+    let Some(selected_path) = selection.into_values().into_iter().next() else {
+        return;
+    };
     let AppView::Diff { view, .. } = state.views.active_mut() else {
+        return;
+    };
+    let file_paths = view.file_paths();
+    let Some(selected) = file_paths
+        .iter()
+        .position(|path| *path == selected_path.as_str())
+    else {
         return;
     };
     view.select_file_index(selected);
@@ -1191,7 +1520,7 @@ fn active_binding_context(state: &AppState) -> BindingContext {
         | AppView::OperationDiff { .. }
         | AppView::CommandOutput { .. }
         | AppView::CommandHistoryDetails { .. } => BindingContext::Inspection,
-        AppView::Workspaces { .. } => BindingContext::Workspaces,
+        AppView::Workspaces { .. } | AppView::Bookmarks { .. } => BindingContext::Workspaces,
         AppView::CommandHistory { .. } => BindingContext::CommandHistory,
         AppView::OperationLog { .. } => BindingContext::OperationLog,
     }
@@ -1393,6 +1722,7 @@ fn apply_search_action(state: &mut AppState, direction: SearchDirection) {
             let _ = view.apply(action);
         }
         AppView::Log(_)
+        | AppView::Bookmarks { .. }
         | AppView::Workspaces { .. }
         | AppView::CommandHistory { .. }
         | AppView::OperationLog { .. } => {}
@@ -1432,9 +1762,16 @@ fn apply_action(
     action: jk_tui::log_view::LogAction,
 ) -> AppLoop {
     let transition = {
-        let AppState { views, history, .. } = state;
+        let AppState {
+            views,
+            history,
+            refreshes,
+            ..
+        } = state;
         match views.active_mut() {
-            AppView::Log(log) => apply_log_action(log, history, source, diff_source, action),
+            AppView::Log(log) => {
+                apply_log_action(log, history, refreshes, source, diff_source, action)
+            }
             AppView::Diff { view, query } => {
                 apply_diff_action(view, query, history, diff_source, action)
             }
@@ -1496,6 +1833,7 @@ fn apply_action(
                 SourceView::OperationDiff,
                 action,
             ),
+            AppView::Bookmarks { .. } => AppTransition::Continue,
         }
     };
 
@@ -1541,24 +1879,28 @@ fn apply_action(
 fn apply_log_action(
     log: &mut LogView,
     history: &mut CommandHistory,
+    refreshes: &mut LogRefreshRunner,
     source: &mut JjLog,
     diff_source: &JjDiff,
     action: jk_tui::log_view::LogAction,
 ) -> AppTransition {
     match log.apply(action) {
         ActionResult::Refresh => {
-            refresh_log(
-                log,
-                history,
-                source,
-                CommandSource::new(SourceView::Log, SourceAction::Refresh),
-            );
+            log.show_loading();
+            refreshes.start_manual(source.clone());
         }
         ActionResult::SwitchHome => {
+            refreshes.cancel_active();
             switch_log_command(log, history, source, JjLogCommand::ConfiguredDefault);
         }
-        ActionResult::SwitchLog => switch_log_command(log, history, source, JjLogCommand::Log),
-        ActionResult::DrillElision => return drill_log_elision(log, history, source),
+        ActionResult::SwitchLog => {
+            refreshes.cancel_active();
+            switch_log_command(log, history, source, JjLogCommand::Log);
+        }
+        ActionResult::DrillElision => {
+            refreshes.cancel_active();
+            return drill_log_elision(log, history, source);
+        }
         ActionResult::Quit => return AppTransition::Quit,
         _ => {}
     }
@@ -3420,6 +3762,7 @@ mod tests {
         handle_command_preview_mode(
             &mut state,
             &mut source,
+            &JjBookmarks::default(),
             KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
         );
 
@@ -3970,6 +4313,144 @@ mod tests {
     }
 
     #[test]
+    fn command_mode_rejects_network_fetch_and_real_push() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let fetch = run_jj_command_mode_with_runner(
+            &mut state,
+            None,
+            "git fetch --remote origin",
+            SequencedRunner::successes(vec![]),
+        )
+        .expect_err("fetch should require the reviewed route");
+        assert!(fetch.contains("bookmark view's F action"));
+
+        let push = run_jj_command_mode_with_runner(
+            &mut state,
+            None,
+            "git push --remote origin --bookmark main",
+            SequencedRunner::successes(vec![]),
+        )
+        .expect_err("real push should be unavailable");
+        assert!(push.contains("bookmark view's P action"));
+    }
+
+    #[test]
+    fn external_command_empty_enter_keeps_prompt_with_error() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        open_external_command_mode(&mut state);
+
+        submit_external_command_mode(&mut state, None);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ExternalCommand {
+                input: String::new(),
+                error: Some("type an external command after !".to_owned()),
+            })
+        );
+        assert_eq!(state.views.len(), 1);
+        assert_eq!(state.command_history().records().count(), 0);
+    }
+
+    #[test]
+    fn external_command_records_distinct_identity_status_and_source() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        run_external_command_mode_with_runner(
+            &mut state,
+            Some(Path::new("/repo/dogfood")),
+            "printf '%s' 'two words'",
+            SequencedRunner::successes(vec![output(7, "two words", "warning\n")]),
+        )
+        .expect("external command runs");
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandOutput {
+                kind: CommandInputKind::External,
+                ..
+            }
+        ));
+        let record = state.command_history().records().next().expect("record");
+        assert_eq!(
+            record.command.command_family,
+            jk_core::CommandFamily::ExternalCommand
+        );
+        assert_eq!(record.command.process_preview(), "printf '%s' 'two words'");
+        assert_eq!(
+            record.context.cwd.as_deref(),
+            Some(Path::new("/repo/dogfood"))
+        );
+        assert_eq!(record.context.repository, None);
+        assert_eq!(record.source.action, SourceAction::UserExternalCommand);
+        assert_eq!(record.source.key.as_deref(), Some("!"));
+        assert_eq!(
+            record.execution_mode,
+            jk_core::ExecutionMode::ExternalCommand
+        );
+        assert_eq!(
+            record
+                .result
+                .exit_status
+                .as_ref()
+                .and_then(|status| status.code),
+            Some(7)
+        );
+        assert!(record.result.stdout.snippet.contains("two words"));
+        assert!(record.result.stderr.snippet.contains("warning"));
+    }
+
+    #[test]
+    fn external_command_output_edit_reopens_external_prompt() {
+        let mut state = AppState::new(log_app_view("abc123"));
+
+        run_external_command_mode_with_runner(
+            &mut state,
+            None,
+            "printf ''",
+            SequencedRunner::successes(vec![output(0, "", "")]),
+        )
+        .expect("external command runs");
+        edit_command_output(&mut state);
+
+        assert_eq!(
+            state.modes.active(),
+            Some(&InputMode::ExternalCommand {
+                input: "printf ''".to_owned(),
+                error: None,
+            })
+        );
+    }
+
+    #[test]
+    fn missing_external_executable_keeps_spawn_failure_inspectable() {
+        let mut state = AppState::new(log_app_view("abc123"));
+        let error = io::Error::new(io::ErrorKind::NotFound, "program not found");
+
+        run_external_command_mode_with_runner(
+            &mut state,
+            None,
+            "missing-program",
+            SequencedRunner::results(vec![Err(error)]),
+        )
+        .expect("spawn failure still opens command output");
+
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandOutput {
+                kind: CommandInputKind::External,
+                ..
+            }
+        ));
+        let record = state.command_history().records().next().expect("record");
+        assert_eq!(
+            record.result.spawn_error.as_deref(),
+            Some("program not found")
+        );
+        assert_eq!(record.result.exit_status, None);
+    }
+
+    #[test]
     fn undo_records_recovery_action_before_refresh() {
         let mut state = AppState::new(log_app_view("abc123"));
         let mut source = JjLog::default();
@@ -4137,6 +4618,25 @@ mod tests {
             panic!("expected diff view");
         };
         assert_eq!(view.selected_file_index(), Some(1));
+    }
+
+    #[test]
+    fn diff_file_list_rejects_a_stale_selected_index() {
+        let mut state = AppState::new(AppView::Diff {
+            view: real_diff_view("aaa"),
+            query: diff_query("aaa"),
+        });
+        state.modes.push(InputMode::DiffFileList {
+            selected: usize::MAX,
+        });
+
+        apply_diff_file_list_selection(&mut state);
+
+        assert_eq!(state.modes.active(), None);
+        let AppView::Diff { view, .. } = state.views.active() else {
+            panic!("expected diff view");
+        };
+        assert_eq!(view.selected_file_index(), Some(0));
     }
 
     #[test]

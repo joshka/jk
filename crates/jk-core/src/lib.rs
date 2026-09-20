@@ -6,17 +6,24 @@
 
 mod command;
 mod command_history;
+mod selector;
 
 pub use command::{
     ColorPolicy, CommandPreview, CommandPreviewWarning, ConfigOverlay, ExecutionMode,
-    GlobalOptions, ImmutabilityPolicy, JjCommandSpec, OperationIntegrationPolicy,
-    OperationLoadPolicy, OutputPolicy, PagerPolicy, RefreshPlan, SafetyClass, WorkingCopyPolicy,
+    ExternalCommandSpec, GlobalOptions, ImmutabilityPolicy, JjCommandSpec,
+    OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, PagerPolicy, RefreshPlan,
+    SafetyClass, WorkingCopyPolicy,
 };
 pub use command_history::{
     CommandExecutionContext, CommandFamily, CommandHistory, CommandIdentity, CommandRecord,
     CommandRecordFinish, CommandRecordId, CommandRecordStart, CommandResultSummary, CommandSource,
     CommandTiming, ExitStatusSummary, GlobalOptionsSnapshot, OutputRetention, PendingCommandRecord,
     SourceAction, SourceView, StreamSummary,
+};
+pub use selector::{
+    InvalidSelection, ResolvedSelection, SelectionCandidates, SelectionCardinality,
+    SelectionDecision, SelectionOrder, SelectionRequest, SelectionResolution, SelectorKind,
+    SelectorRole, resolve_selection,
 };
 
 /// A rendered `jj` log view plus semantic records for navigation.

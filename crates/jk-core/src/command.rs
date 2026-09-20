@@ -9,6 +9,83 @@ use std::path::{Path, PathBuf};
 
 use crate::command_history::redaction::redact_argv;
 
+/// A shell-free description of one external process invocation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExternalCommandSpec {
+    argv: Vec<OsString>,
+    cwd: Option<PathBuf>,
+    title: String,
+}
+
+impl ExternalCommandSpec {
+    /// Creates an external command spec from an executable followed by its arguments.
+    ///
+    /// The argv is executed directly. No shell parses metacharacters, expands variables, or
+    /// performs redirection unless the executable itself is an explicitly requested shell.
+    #[must_use]
+    pub fn new(argv: impl IntoIterator<Item = impl Into<OsString>>) -> Option<Self> {
+        let argv = argv.into_iter().map(Into::into).collect::<Vec<_>>();
+        if argv.is_empty() {
+            return None;
+        }
+        let title = preview_process_argv(&redact_argv(argv.clone()));
+        Some(Self {
+            argv,
+            cwd: None,
+            title,
+        })
+    }
+
+    /// Sets the child process working directory.
+    #[must_use]
+    pub fn with_cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
+        self.cwd = Some(cwd.into());
+        self
+    }
+
+    /// Returns the executable followed by its exact arguments.
+    #[must_use]
+    pub fn argv(&self) -> &[OsString] {
+        &self.argv
+    }
+
+    /// Returns the child process working directory.
+    #[must_use]
+    pub fn cwd(&self) -> Option<&Path> {
+        self.cwd.as_deref()
+    }
+
+    /// Returns the redacted display-only command line.
+    #[must_use]
+    pub fn preview(&self) -> String {
+        preview_process_argv(&redact_argv(self.argv.clone()))
+    }
+
+    /// Returns the redacted display title.
+    #[must_use]
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    /// Returns the execution mode used by captured `!` commands.
+    #[must_use]
+    pub const fn mode(&self) -> ExecutionMode {
+        ExecutionMode::ExternalCommand
+    }
+
+    /// Returns the external-command safety classification.
+    #[must_use]
+    pub const fn safety(&self) -> SafetyClass {
+        SafetyClass::ExternalCommand
+    }
+
+    /// Returns the refresh behavior for captured external commands.
+    #[must_use]
+    pub const fn refresh_plan(&self) -> RefreshPlan {
+        RefreshPlan::None
+    }
+}
+
 /// A typed description of one `jj` command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjCommandSpec {
@@ -234,6 +311,7 @@ impl CommandPreview {
         matches!(
             self.execution_mode,
             ExecutionMode::ConfirmMutation
+                | ExecutionMode::ConfirmNetworkRead
                 | ExecutionMode::ConfirmExternalTool
                 | ExecutionMode::DryRunThenConfirm
         )
@@ -598,12 +676,16 @@ pub enum ExecutionMode {
     RenderReadOnly,
     /// Show a mutation confirmation before execution.
     ConfirmMutation,
+    /// Show a confirmation before a network read.
+    ConfirmNetworkRead,
     /// Restore the terminal and run a foreground external tool.
     ConfirmExternalTool,
     /// Run a dry-run first, then ask before the real command.
     DryRunThenConfirm,
     /// User-entered command mode.
     CommandMode,
+    /// User-entered shell-free external command with captured output.
+    ExternalCommand,
 }
 
 /// The safety class for command preview and confirmation policy.
@@ -645,6 +727,19 @@ pub fn preview_argv(argv: &[OsString]) -> String {
     preview
 }
 
+/// Renders an executable and argv for display without evaluating it as shell input.
+#[must_use]
+pub fn preview_process_argv(argv: &[OsString]) -> String {
+    let mut preview = String::new();
+    for (index, arg) in argv.iter().enumerate() {
+        if index > 0 {
+            preview.push(' ');
+        }
+        preview.push_str(&quote_arg(arg));
+    }
+    preview
+}
+
 fn quote_arg(arg: &OsStr) -> String {
     let arg = arg.to_string_lossy();
     if arg.is_empty() {
@@ -677,6 +772,32 @@ mod tests {
 
         assert_eq!(spec.preview(), "jj");
         assert_eq!(spec.title(), "jj");
+    }
+
+    #[test]
+    fn external_spec_keeps_executable_identity_and_quotes_arguments() {
+        let Some(spec) = ExternalCommandSpec::new(["printf", "%s", "two words"]) else {
+            panic!("expected external spec");
+        };
+        let spec = spec.with_cwd("/tmp");
+
+        assert_eq!(
+            strings(spec.argv().iter().cloned()),
+            vec!["printf", "%s", "two words"]
+        );
+        assert_eq!(spec.preview(), "printf '%s' 'two words'");
+        assert_eq!(spec.cwd(), Some(Path::new("/tmp")));
+        assert_eq!(spec.mode(), ExecutionMode::ExternalCommand);
+        assert_eq!(spec.safety(), SafetyClass::ExternalCommand);
+    }
+
+    #[test]
+    fn external_spec_rejects_empty_argv_and_redacts_preview() {
+        assert_eq!(ExternalCommandSpec::new(Vec::<String>::new()), None);
+        let Some(spec) = ExternalCommandSpec::new(["env", "token=secret"]) else {
+            panic!("expected external spec");
+        };
+        assert_eq!(spec.preview(), "env 'token=<redacted>'");
     }
 
     #[test]
@@ -862,6 +983,18 @@ mod tests {
         assert_eq!(spec.mode(), ExecutionMode::ConfirmMutation);
         assert_eq!(spec.safety(), SafetyClass::LocalMetadata);
         assert_eq!(spec.refresh_plan(), RefreshPlan::ReRunSpec);
+    }
+
+    #[test]
+    fn network_read_preview_requires_explicit_confirmation() {
+        let spec = JjCommandSpec::render_read_only(["git", "fetch"])
+            .with_mode(ExecutionMode::ConfirmNetworkRead)
+            .with_safety(SafetyClass::NetworkRead);
+        let preview = spec.command_preview();
+
+        assert!(preview.requires_confirmation());
+        assert_eq!(preview.execution_mode, ExecutionMode::ConfirmNetworkRead);
+        assert_eq!(preview.safety, SafetyClass::NetworkRead);
     }
 
     #[test]

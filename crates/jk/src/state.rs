@@ -5,6 +5,7 @@ use jk_cli::{
     WorkspaceInspectionQuery,
 };
 use jk_core::CommandHistory;
+use jk_tui::bookmark_view::BookmarkView;
 use jk_tui::command_discovery::{ActionMenuAction, BindingContext};
 use jk_tui::command_history_view::CommandHistoryView;
 use jk_tui::diff_view::DiffView;
@@ -14,6 +15,7 @@ use jk_tui::rendered_view::RenderedView;
 use jk_tui::workspaces_view::WorkspacesView;
 
 use crate::mutation_preview::PendingCommandPreview;
+use crate::refresh_runner::LogRefreshRunner;
 
 const TOAST_DURATION: Duration = Duration::from_secs(3);
 
@@ -26,6 +28,9 @@ struct Toast {
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AppView {
+    Bookmarks {
+        view: BookmarkView,
+    },
     Log(LogView),
     Diff {
         view: DiffView,
@@ -55,6 +60,7 @@ pub enum AppView {
     CommandOutput {
         view: RenderedView,
         input: String,
+        kind: CommandInputKind,
     },
     OperationLog {
         view: OperationLogView,
@@ -87,6 +93,7 @@ pub struct AppState {
     pub(crate) views: ViewStack,
     pub(crate) modes: ModeStack,
     pub(crate) history: CommandHistory,
+    pub(crate) refreshes: LogRefreshRunner,
     log_source_stack: Vec<JjLog>,
     toast: Option<Toast>,
 }
@@ -102,6 +109,7 @@ impl AppState {
             views: ViewStack::new(root),
             modes: ModeStack::default(),
             history,
+            refreshes: LogRefreshRunner::default(),
             log_source_stack: Vec::new(),
             toast: None,
         }
@@ -282,6 +290,17 @@ pub enum InputMode {
         rev: String,
         message: crate::description_editor::DescriptionEditor,
     },
+    BookmarkMutation {
+        kind: BookmarkMutationKind,
+        name: String,
+        revision: String,
+        field: BookmarkMutationField,
+    },
+    RemotePicker {
+        names: Vec<String>,
+        selected: usize,
+        bookmark: Option<String>,
+    },
     AbandonConfirmation {
         pending: PendingCommandPreview,
         dialog: Box<crate::abandon_confirmation::AbandonConfirmation>,
@@ -296,10 +315,35 @@ pub enum InputMode {
         input: String,
         error: Option<String>,
     },
+    ExternalCommand {
+        input: String,
+        error: Option<String>,
+    },
     LogTemplate {
         options: Vec<LogTemplateSelection>,
         selected: usize,
     },
+}
+
+/// Which direct-command prompt owns a captured command output view.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CommandInputKind {
+    Jj,
+    External,
+}
+
+/// Bookmark mutation prompt kind.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BookmarkMutationKind {
+    Create,
+    Move,
+}
+
+/// Field edited by the bookmark mutation prompt.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BookmarkMutationField {
+    Name,
+    Revision,
 }
 
 /// Whether an input-mode handler consumed a key event.

@@ -3,9 +3,9 @@ use std::process::Command as ProcessCommand;
 
 use clap::{Parser, Subcommand};
 use jk_cli::{
-    DiffFormat, DiffQuery, JjAbandon, JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand,
-    JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash, JjStatus, JjWorkspaces,
-    LogTemplateSelection, ShowQuery, StatusQuery,
+    DiffFormat, DiffQuery, JjAbandon, JjBookmarks, JjDescribe, JjDiff, JjEdit, JjEvolog,
+    JjGitRemote, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash,
+    JjStatus, JjWorkspaces, LogTemplateSelection, ShowQuery, StatusQuery,
 };
 
 /// Command-line options for the first log-oriented `jk` surface.
@@ -135,6 +135,16 @@ impl Args {
     /// Builds the workspace source for workspace list and selected-workspace inspection.
     pub(crate) fn workspaces_source(&self) -> JjWorkspaces {
         self.with_repository(JjWorkspaces::default())
+    }
+
+    /// Builds the bookmark source for the bookmark list and future mutations.
+    pub(crate) fn bookmarks_source(&self) -> JjBookmarks {
+        self.with_repository(JjBookmarks::default())
+    }
+
+    /// Builds the Git remote source for explicit fetch and push previews.
+    pub(crate) fn git_remote_source(&self) -> JjGitRemote {
+        self.with_repository(JjGitRemote::default())
     }
 
     fn with_repository<T>(&self, source: T) -> T
@@ -267,6 +277,8 @@ impl_with_repository!(
     JjSquash,
     JjStatus,
     JjWorkspaces,
+    JjBookmarks,
+    JjGitRemote,
 );
 
 #[cfg(test)]

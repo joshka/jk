@@ -3,12 +3,20 @@
 use jk_core::InspectionSnapshot;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::widgets::Paragraph;
+use ratatui::prelude::{Color, Style};
+use ratatui::widgets::{Block, Paragraph};
 
 use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::rendered_log::rendered_text;
 use crate::rendered_state::RenderedState;
+
+const COMMAND_OUTPUT_BACKGROUND: Color = Color::Rgb(30, 35, 47);
+const COMMAND_METADATA_BACKGROUND: Color = Color::Rgb(58, 72, 90);
+const COMMAND_SECTION_BACKGROUND: Color = Color::Rgb(40, 45, 55);
+const COMMAND_SUCCESS_BACKGROUND: Color = Color::Rgb(33, 91, 83);
+const COMMAND_FAILURE_BACKGROUND: Color = Color::Rgb(120, 45, 50);
+const COMMAND_ACTION_BACKGROUND: Color = Color::LightCyan;
 
 /// The effect requested after applying an input action to a rendered inspection view.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,6 +88,14 @@ pub struct RenderedView {
     state: RenderedState,
     status_message: Option<String>,
     help_visible: bool,
+    body_style: RenderedBodyStyle,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum RenderedBodyStyle {
+    #[default]
+    Plain,
+    CommandOutput,
 }
 
 impl RenderedView {
@@ -90,6 +106,16 @@ impl RenderedView {
             state: RenderedState::new(snapshot),
             status_message: None,
             help_visible: false,
+            body_style: RenderedBodyStyle::Plain,
+        }
+    }
+
+    /// Creates a borderless command-result view with color-backed semantic regions.
+    #[must_use]
+    pub fn command_output(snapshot: InspectionSnapshot) -> Self {
+        Self {
+            body_style: RenderedBodyStyle::CommandOutput,
+            ..Self::new(snapshot)
         }
     }
 
@@ -193,6 +219,9 @@ impl RenderedView {
         chrome.render(frame, areas);
 
         let body = self.state.visible_body(self.status_message.as_deref());
+        if self.body_style == RenderedBodyStyle::CommandOutput {
+            render_command_output_regions(frame, areas.content, &body, self.state.scroll_offset());
+        }
         let paragraph = Paragraph::new(rendered_text(&body)).scroll((
             u16::try_from(self.state.scroll_offset()).unwrap_or(u16::MAX),
             0,
@@ -208,6 +237,59 @@ impl RenderedView {
             );
         }
     }
+}
+
+fn render_command_output_regions(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    body: &str,
+    scroll_offset: usize,
+) {
+    frame.render_widget(
+        Block::default().style(Style::new().fg(Color::White).bg(COMMAND_OUTPUT_BACKGROUND)),
+        area,
+    );
+
+    for (row, line) in body
+        .lines()
+        .skip(scroll_offset)
+        .take(usize::from(area.height))
+        .enumerate()
+    {
+        let Some(style) = command_output_region_style(line) else {
+            continue;
+        };
+        let y = area
+            .y
+            .saturating_add(u16::try_from(row).unwrap_or(u16::MAX));
+        frame.render_widget(
+            Block::default().style(style),
+            Rect::new(area.x, y, area.width, 1),
+        );
+    }
+}
+
+fn command_output_region_style(line: &str) -> Option<Style> {
+    if line.starts_with("Command:") {
+        return Some(
+            Style::new()
+                .fg(Color::White)
+                .bg(COMMAND_METADATA_BACKGROUND),
+        );
+    }
+    if line == "Status: success" {
+        return Some(Style::new().fg(Color::White).bg(COMMAND_SUCCESS_BACKGROUND));
+    }
+    if line.starts_with("Status:") {
+        return Some(Style::new().fg(Color::White).bg(COMMAND_FAILURE_BACKGROUND));
+    }
+    if matches!(line, "Stdout:" | "Stderr:" | "Spawn error:") {
+        return Some(Style::new().fg(Color::White).bg(COMMAND_SECTION_BACKGROUND));
+    }
+    if line.starts_with("Actions:") {
+        return Some(Style::new().fg(Color::Black).bg(COMMAND_ACTION_BACKGROUND));
+    }
+    None
 }
 
 #[cfg(test)]
@@ -313,6 +395,56 @@ mod tests {
         assert!(rendered.contains("Inspection keys"));
         assert!(rendered.contains("Move and find:"));
         assert!(rendered.contains("search, next, previous"));
+        assert!(!rendered.contains('│'));
+        assert!(!rendered.contains('┌'));
+    }
+
+    #[test]
+    fn command_output_uses_borderless_color_regions() {
+        let snapshot = InspectionSnapshot::new(
+            "printf",
+            "Command: printf hello\nStatus: success\n\nStdout:\nhello\n\nStderr:\n<empty>\n\nActions: e edit/retry command\n",
+        )
+        .with_title("printf hello");
+        let mut view = RenderedView::command_output(snapshot);
+        let backend = TestBackend::new(48, 13);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(47, 1)].bg, COMMAND_METADATA_BACKGROUND);
+        assert_eq!(buffer[(47, 2)].bg, COMMAND_SUCCESS_BACKGROUND);
+        assert_eq!(buffer[(47, 4)].bg, COMMAND_SECTION_BACKGROUND);
+        assert_eq!(buffer[(47, 10)].bg, COMMAND_ACTION_BACKGROUND);
+        assert!(!buffer_to_string(buffer).contains('│'));
+    }
+
+    #[test]
+    fn failed_command_status_uses_destructive_region_color() {
+        let snapshot = InspectionSnapshot::new(
+            "false",
+            "Command: false\nStatus: exit 1\n\nStdout:\n<empty>\n",
+        )
+        .with_title("false");
+        let mut view = RenderedView::command_output(snapshot);
+        let backend = TestBackend::new(32, 8);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        assert_eq!(
+            terminal.backend().buffer()[(31, 2)].bg,
+            COMMAND_FAILURE_BACKGROUND
+        );
     }
 
     fn snapshot(target: &str, rendered: &str) -> InspectionSnapshot {

@@ -625,6 +625,7 @@ fn view_label(view: SourceView) -> String {
         SourceView::Status => "status".to_owned(),
         SourceView::Evolog => "evolog".to_owned(),
         SourceView::Workspaces => "workspaces".to_owned(),
+        SourceView::Bookmarks => "bookmarks".to_owned(),
         SourceView::WorkspaceLog => "workspace log".to_owned(),
         SourceView::WorkspaceStatus => "workspace status".to_owned(),
         SourceView::WorkspaceDiff => "workspace diff".to_owned(),
@@ -652,6 +653,13 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::WorkspaceAdd => "add workspace".to_owned(),
         SourceAction::WorkspaceRename => "rename workspace".to_owned(),
         SourceAction::WorkspaceForget => "forget workspace".to_owned(),
+        SourceAction::BookmarkList => "bookmark list".to_owned(),
+        SourceAction::BookmarkTarget => "bookmark target".to_owned(),
+        SourceAction::BookmarkCreate => "bookmark create".to_owned(),
+        SourceAction::BookmarkMove => "bookmark move".to_owned(),
+        SourceAction::BookmarkDelete => "bookmark delete".to_owned(),
+        SourceAction::GitFetch => "git fetch".to_owned(),
+        SourceAction::GitPushDryRun => "git push dry-run".to_owned(),
         SourceAction::WorkspaceList => "list".to_owned(),
         SourceAction::WorkspaceLog => "log".to_owned(),
         SourceAction::WorkspaceUpdateStale => "update-stale".to_owned(),
@@ -661,6 +669,7 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::Undo => "undo".to_owned(),
         SourceAction::Redo => "redo".to_owned(),
         SourceAction::UserJjCommand => "command".to_owned(),
+        SourceAction::UserExternalCommand => "external command".to_owned(),
         SourceAction::Other(label) => label,
         _ => "unknown".to_owned(),
     }
@@ -828,6 +837,18 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use super::*;
+
+    #[test]
+    fn refs_and_remote_actions_have_visible_history_labels() {
+        assert_eq!(
+            source_label(SourceView::Bookmarks, SourceAction::BookmarkList),
+            "bookmarks bookmark list"
+        );
+        assert_eq!(
+            action_label(SourceAction::GitPushDryRun),
+            "git push dry-run"
+        );
+    }
 
     #[test]
     fn snapshot_maps_records_newest_first() {

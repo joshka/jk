@@ -4,6 +4,10 @@
 //! [`OperationLogAction`], and handle returned [`OperationLogActionResult`] values for effects such
 //! as refresh, operation show, operation diff, back navigation, and quit.
 
+use jk_core::{
+    SelectionCandidates, SelectionDecision, SelectionRequest, SelectionResolution, SelectorKind,
+    SelectorRole, resolve_selection,
+};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
@@ -193,6 +197,7 @@ pub struct OperationLogView {
     snapshot: OperationLogSnapshot,
     selected: Option<usize>,
     scroll_offset: usize,
+    status_message: Option<String>,
     help_visible: bool,
 }
 
@@ -205,6 +210,7 @@ impl OperationLogView {
             snapshot,
             selected,
             scroll_offset: 0,
+            status_message: None,
             help_visible: false,
         }
     }
@@ -223,6 +229,12 @@ impl OperationLogView {
             .or_else(|| self.snapshot.current_index())
             .or_else(|| clamp_index(previous_selected, self.snapshot.rows.len()));
         self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rows.len());
+        self.status_message = None;
+    }
+
+    /// Shows a refresh failure without replacing the current operation rows.
+    pub fn show_error(&mut self, error: impl Into<String>) {
+        self.status_message = Some(error.into());
     }
 
     /// Returns the selected row, if any.
@@ -271,18 +283,16 @@ impl OperationLogView {
                 OperationLogActionResult::Continue
             }
             OperationLogAction::Refresh => OperationLogActionResult::Refresh,
-            OperationLogAction::OpenShow => self.selected_operation_id().map_or(
-                OperationLogActionResult::Continue,
-                |operation_id| OperationLogActionResult::OperationShow {
-                    operation_id: operation_id.to_owned(),
-                },
-            ),
-            OperationLogAction::OpenDiff => self.selected_operation_id().map_or(
-                OperationLogActionResult::Continue,
-                |operation_id| OperationLogActionResult::OperationDiff {
-                    operation_id: operation_id.to_owned(),
-                },
-            ),
+            OperationLogAction::OpenShow => self
+                .resolved_operation_id()
+                .map_or(OperationLogActionResult::Continue, |operation_id| {
+                    OperationLogActionResult::OperationShow { operation_id }
+                }),
+            OperationLogAction::OpenDiff => self
+                .resolved_operation_id()
+                .map_or(OperationLogActionResult::Continue, |operation_id| {
+                    OperationLogActionResult::OperationDiff { operation_id }
+                }),
             OperationLogAction::ToggleHelp => {
                 self.help_visible = !self.help_visible;
                 OperationLogActionResult::Continue
@@ -338,6 +348,18 @@ impl OperationLogView {
         self.selected = Some(selected.saturating_add(10).min(last));
     }
 
+    fn resolved_operation_id(&self) -> Option<String> {
+        let candidates =
+            SelectionCandidates::cursor(self.selected_operation_id().map(ToOwned::to_owned));
+        let request = SelectionRequest::one(SelectorKind::Operation, SelectorRole::Target);
+        match resolve_selection(request, SelectionDecision::Submit(candidates)) {
+            SelectionResolution::Resolved(selection) => selection.into_values().into_iter().next(),
+            SelectionResolution::Ambiguous { .. }
+            | SelectionResolution::Invalid { .. }
+            | SelectionResolution::Cancelled { .. } => None,
+        }
+    }
+
     fn keep_selected_in_view(&mut self, height: usize) {
         self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rendered_lines.len());
         let Some(selected_line) = self.selected_rendered_line() else {
@@ -358,7 +380,9 @@ impl OperationLogView {
         self.keep_selected_in_view(usize::from(areas.content.height));
 
         let fallback_status = adaptive_hotbar(BindingContext::OperationLog, areas.status_width());
-        let status = status_override.unwrap_or(&fallback_status);
+        let status = status_override
+            .or(self.status_message.as_deref())
+            .unwrap_or(&fallback_status);
         let chrome = ViewChrome::new(self.snapshot.title(), status);
         chrome.render(frame, areas);
 
@@ -648,6 +672,25 @@ mod tests {
         assert!(rendered.contains("open selected operation show"));
         assert!(rendered.contains('d'));
         assert!(rendered.contains("open selected operation diff"));
+    }
+
+    #[test]
+    fn refresh_failure_is_visible_without_replacing_operation_rows() {
+        let mut view =
+            OperationLogView::new(snapshot([row("op1-full", "op1", "initial checkout", true)]));
+        view.show_error("jj op log failed");
+        let backend = TestBackend::new(88, 5);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("initial checkout"));
+        assert!(rendered.contains("jj op log failed"));
     }
 
     fn snapshot<const N: usize>(rows: [OperationLogRow; N]) -> OperationLogSnapshot {

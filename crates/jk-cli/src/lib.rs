@@ -13,10 +13,12 @@
 mod command;
 
 pub mod abandon;
+pub mod bookmarks;
 pub mod describe;
 pub mod diff;
 pub mod edit;
 pub mod evolog;
+pub mod git_remote;
 pub mod log;
 pub mod new;
 pub mod operation;
@@ -31,11 +33,22 @@ pub mod workspaces;
 pub use abandon::{
     AbandonDetails, AbandonDetailsError, AbandonFile, AbandonProbeError, AbandonQuery, JjAbandon,
 };
-pub use command::{JjCommandRunner, RecordingJjCommandRunner, SystemJjCommandRunner};
+pub use bookmarks::{
+    BookmarkMutation, BookmarkParseError, BookmarkRef, BookmarkSnapshot, JjBookmarks,
+    JjBookmarksError, parse_bookmark_list,
+};
+pub use command::{
+    CancellableSystemJjCommandRunner, CancellationToken, ExternalCommandRunner, JjCommandRunner,
+    RecordingExternalCommandRunner, RecordingJjCommandRunner, SystemExternalCommandRunner,
+    SystemJjCommandRunner,
+};
 pub use describe::{DescribeQuery, JjDescribe};
 pub use diff::{DiffFormat, DiffQuery, JjDiff, JjDiffError};
 pub use edit::{EditQuery, JjEdit};
 pub use evolog::{EvologQuery, JjEvolog, JjEvologError};
+pub use git_remote::{
+    GitRemote, GitRemoteParseError, JjGitRemote, JjGitRemoteError, parse_remote_list,
+};
 pub use log::{JjLog, JjLogCommand, JjLogError, LogTemplateSelection};
 pub use new::{JjNew, NewQuery};
 pub use operation::{JjOperation, JjOperationError, OperationQuery};

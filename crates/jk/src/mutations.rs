@@ -1,5 +1,5 @@
 use jk_cli::{
-    AbandonQuery, JjAbandon, JjCommandRunner, JjLog, JjRecovery, JjRestore,
+    AbandonQuery, JjAbandon, JjBookmarks, JjCommandRunner, JjLog, JjRecovery, JjRestore,
     RecordingJjCommandRunner, RecoveryCommand, RestoreQuery, SystemJjCommandRunner,
 };
 use jk_core::{CommandSource, SourceAction, SourceView};
@@ -25,6 +25,7 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
     pending: PendingCommandPreview,
     runner: R,
 ) {
+    state.refreshes.cancel_active();
     let command_source = CommandSource::new(SourceView::Log, pending.source_action.clone())
         .with_key(pending.source_key);
     let reselect_change_id = pending.reselect_change_id.clone();
@@ -77,6 +78,90 @@ pub fn open_restore_preview(state: &mut AppState, restore_source: &JjRestore) {
     let preview = restore_source.spec_for(&query).command_preview();
     state.modes.push(InputMode::CommandPreview {
         pending: PendingCommandPreview::restore(preview, &source),
+    });
+}
+
+/// Executes a confirmed local bookmark mutation and refreshes the bookmark list.
+pub fn confirm_bookmark_command_preview(
+    state: &mut AppState,
+    bookmarks_source: &JjBookmarks,
+    pending: PendingCommandPreview,
+) {
+    confirm_bookmark_command_preview_with_runner(
+        state,
+        bookmarks_source,
+        pending,
+        SystemJjCommandRunner,
+    );
+}
+
+fn confirm_bookmark_command_preview_with_runner(
+    state: &mut AppState,
+    bookmarks_source: &JjBookmarks,
+    pending: PendingCommandPreview,
+    runner: impl JjCommandRunner,
+) {
+    let command_source = CommandSource::new(SourceView::Bookmarks, pending.source_action.clone())
+        .with_key(pending.source_key);
+    let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);
+    let result = runner.run_confirmed_mutation(&pending.preview.spec);
+    let runner = runner.into_inner();
+    match result {
+        Ok(output) if output.status.success() => {
+            crate::bookmark_routes::refresh_bookmarks_with_runner(state, bookmarks_source, runner)
+        }
+        Ok(output) => {
+            let message =
+                command_failure_message(pending.failure_label, &output.stderr, &output.stdout);
+            if let AppView::Bookmarks { view } = state.views.active_mut() {
+                view.show_error(message);
+            }
+        }
+        Err(error) => {
+            if let AppView::Bookmarks { view } = state.views.active_mut() {
+                view.show_error(format!("failed to run {}: {error}", pending.failure_label));
+            }
+        }
+    }
+}
+
+/// Executes a confirmed fetch or push dry-run and displays captured output.
+pub fn confirm_remote_command_preview(
+    state: &mut AppState,
+    bookmarks_source: &JjBookmarks,
+    pending: PendingCommandPreview,
+) {
+    confirm_remote_command_preview_with_runner(
+        state,
+        bookmarks_source,
+        pending,
+        SystemJjCommandRunner,
+    );
+}
+
+fn confirm_remote_command_preview_with_runner(
+    state: &mut AppState,
+    bookmarks_source: &JjBookmarks,
+    pending: PendingCommandPreview,
+    runner: impl JjCommandRunner,
+) {
+    let command_source = CommandSource::new(SourceView::Bookmarks, pending.source_action.clone())
+        .with_key(pending.source_key);
+    let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);
+    let command_line = pending.preview.command_line.clone();
+    let result = runner.run_confirmed_mutation(&pending.preview.spec);
+    let snapshot = match &result {
+        Ok(output) => crate::command_mode::command_mode_snapshot(&command_line, Ok(output)),
+        Err(error) => crate::command_mode::command_mode_snapshot(&command_line, Err(error)),
+    };
+    let runner = runner.into_inner();
+    if pending.source_action == SourceAction::GitFetch {
+        crate::bookmark_routes::refresh_bookmarks_with_runner(state, bookmarks_source, runner);
+    }
+    state.views.push(AppView::CommandOutput {
+        view: jk_tui::rendered_view::RenderedView::new(snapshot),
+        input: command_line,
+        kind: crate::state::CommandInputKind::Jj,
     });
 }
 
@@ -204,5 +289,103 @@ fn selected_revision_id(state: &AppState) -> Option<String> {
 fn show_log_error(state: &mut AppState, message: String) {
     if let AppView::Log(log) = state.views.active_mut() {
         log.show_error(message);
+    }
+}
+
+#[cfg(test)]
+mod refs_tests {
+    use jk_cli::JjGitRemote;
+    use jk_tui::bookmark_view::{BookmarkRow, BookmarkView, BookmarkViewSnapshot};
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    use super::*;
+    use crate::test_support::{SequencedRunner, output};
+
+    #[test]
+    fn failed_fetch_retains_output_history_and_last_bookmark_snapshot() {
+        let mut state = AppState::new(AppView::Bookmarks {
+            view: BookmarkView::new(BookmarkViewSnapshot::new(vec![BookmarkRow::new(
+                "topic",
+                vec!["before".into()],
+            )])),
+        });
+        let pending = PendingCommandPreview::git_fetch(
+            JjGitRemote::default()
+                .fetch_spec("fixture")
+                .command_preview(),
+        );
+        confirm_remote_command_preview_with_runner(
+            &mut state,
+            &JjBookmarks::default(),
+            pending,
+            SequencedRunner::successes(vec![
+                output(1, "partial output", "fixture unavailable"),
+                output(1, "", "refresh unavailable"),
+            ]),
+        );
+        assert_eq!(state.history.records().count(), 2);
+        assert_eq!(
+            state
+                .history
+                .records()
+                .next()
+                .expect("fetch record")
+                .source
+                .action,
+            SourceAction::GitFetch
+        );
+        let AppView::CommandOutput { view, .. } = state.views.active_mut() else {
+            panic!("output");
+        };
+        let mut terminal = Terminal::new(TestBackend::new(100, 20)).unwrap();
+        terminal.draw(|frame| view.render(frame)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let rendered = (0..20)
+            .map(|y| crate::test_support::buffer_line(buffer, y))
+            .collect::<String>();
+        assert!(rendered.contains("fixture unavailable"));
+        assert!(rendered.contains("partial output"));
+        state.views.pop();
+        let AppView::Bookmarks { view } = state.views.active() else {
+            panic!("bookmarks");
+        };
+        assert_eq!(
+            view.selected_row().expect("preserved bookmark").targets,
+            ["before"]
+        );
+    }
+
+    #[test]
+    fn successful_fetch_refreshes_bookmarks_before_showing_output() {
+        let mut state = AppState::new(AppView::Bookmarks {
+            view: BookmarkView::new(BookmarkViewSnapshot::new(Vec::new())),
+        });
+        let pending = PendingCommandPreview::git_fetch(
+            JjGitRemote::default()
+                .fetch_spec("fixture")
+                .command_preview(),
+        );
+        confirm_remote_command_preview_with_runner(
+            &mut state,
+            &JjBookmarks::default(),
+            pending,
+            SequencedRunner::successes(vec![
+                output(0, "", "fetched"),
+                output(0, "{\"name\":\"topic\",\"target\":[\"after\"]}\n", ""),
+            ]),
+        );
+        assert!(matches!(
+            state.views.active(),
+            AppView::CommandOutput { .. }
+        ));
+        state.views.pop();
+        let AppView::Bookmarks { view } = state.views.active() else {
+            panic!("bookmarks");
+        };
+        assert_eq!(
+            view.selected_row().expect("fetched bookmark").targets,
+            ["after"]
+        );
     }
 }

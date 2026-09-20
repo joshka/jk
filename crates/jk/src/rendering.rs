@@ -5,11 +5,14 @@ use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Modifier, Span, Style};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
-use crate::command_mode::jj_command_lines;
+use crate::command_mode::{external_command_lines, jj_command_lines};
 use crate::menus::{
     action_menu_lines, diff_file_list_lines, template_selector_lines, view_options_lines,
 };
-use crate::state::{AppState, AppView, InputMode};
+use crate::state::{AppState, AppView, BookmarkMutationField, BookmarkMutationKind, InputMode};
+
+const OVERLAY_BACKGROUND: Color = Color::Rgb(30, 35, 47);
+const OVERLAY_HEADER: Color = Color::Rgb(58, 72, 90);
 
 pub fn render_app(
     frame: &mut ratatui::Frame<'_>,
@@ -51,6 +54,11 @@ pub fn render_app(
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
             }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                log.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
+            }
             Some(InputMode::DescribeMessage { .. }) => {
                 log.render(frame);
                 if let Some(InputMode::DescribeMessage { rev, message }) = state.modes.active_mut()
@@ -81,6 +89,69 @@ pub fn render_app(
             }
             _ => log.render(frame),
         },
+        AppView::Bookmarks { view } => match &mode {
+            Some(InputMode::JjCommand { input, error }) => {
+                view.render(frame);
+                let lines = jj_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "jj command", &lines);
+            }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                view.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
+            }
+
+            Some(InputMode::RemotePicker {
+                names,
+                selected,
+                bookmark,
+            }) => {
+                view.render(frame);
+                let title = bookmark.as_ref().map_or_else(
+                    || "Fetch from remote".to_owned(),
+                    |name| format!("Push dry-run: {name}"),
+                );
+                let start =
+                    selected.saturating_sub(usize::from(frame.area().height.saturating_sub(10)));
+                let mut lines = names
+                    .iter()
+                    .enumerate()
+                    .skip(start)
+                    .map(|(index, name)| {
+                        format!("{} {name}", if index == *selected { ">" } else { " " })
+                    })
+                    .collect::<Vec<_>>();
+                lines.push("↑/↓ choose  Enter preview  Esc cancel".to_owned());
+                render_mode_overlay(frame, &title, &lines);
+            }
+            Some(InputMode::BookmarkMutation {
+                kind,
+                name,
+                revision,
+                field,
+            }) => {
+                view.render(frame);
+                render_mode_overlay(
+                    frame,
+                    "Bookmark mutation",
+                    &bookmark_mutation_lines(*kind, name, revision, *field),
+                );
+            }
+            Some(InputMode::CommandPreview { .. }) => {
+                view.render(frame);
+                let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() else {
+                    return;
+                };
+                let preview = CommandPreviewView::new(pending.preview.clone())
+                    .with_status(pending.copy_status.clone())
+                    .with_details(pending.details.clone());
+                pending.can_confirm = preview.can_confirm(frame.area());
+                pending.max_scroll = preview.max_scroll(frame.area());
+                pending.scroll = pending.scroll.min(pending.max_scroll);
+                preview.with_scroll(pending.scroll).render(frame);
+            }
+            _ => view.render(frame),
+        },
         AppView::Diff { view, query } => match &mode {
             Some(InputMode::ViewOptions { context, selected }) => {
                 let lines = view_options_lines(*context, *selected, template, Some(query.format()));
@@ -105,6 +176,10 @@ pub fn render_app(
             Some(InputMode::JjCommand { input, error }) => {
                 let lines = jj_command_lines(input, error.as_deref());
                 view.render_with_overlay(frame, "jj command", &lines);
+            }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                let lines = external_command_lines(input, error.as_deref());
+                view.render_with_overlay(frame, "external command", &lines);
             }
             _ => view.render(frame),
         },
@@ -142,6 +217,11 @@ pub fn render_app(
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
             }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                view.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
+            }
             _ => view.render(frame),
         },
         AppView::CommandHistory { view } => match &mode {
@@ -157,6 +237,11 @@ pub fn render_app(
                 view.render(frame);
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
+            }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                view.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
             }
             _ => view.render(frame),
         },
@@ -178,6 +263,11 @@ pub fn render_app(
                 view.render(frame);
                 let lines = jj_command_lines(input, error.as_deref());
                 render_mode_overlay(frame, "jj command", &lines);
+            }
+            Some(InputMode::ExternalCommand { input, error }) => {
+                view.render(frame);
+                let lines = external_command_lines(input, error.as_deref());
+                render_mode_overlay(frame, "external command", &lines);
             }
             _ => view.render(frame),
         },
@@ -225,6 +315,39 @@ fn render_toast(frame: &mut ratatui::Frame<'_>, message: &str) {
     frame.render_widget(paragraph, toast);
 }
 
+fn bookmark_mutation_lines(
+    kind: BookmarkMutationKind,
+    name: &str,
+    revision: &str,
+    field: BookmarkMutationField,
+) -> Vec<String> {
+    let operation = match kind {
+        BookmarkMutationKind::Create => "create",
+        BookmarkMutationKind::Move => "move",
+    };
+    vec![
+        format!("Operation: bookmark {operation}"),
+        format!(
+            "{} Name: {name}",
+            if field == BookmarkMutationField::Name {
+                ">"
+            } else {
+                " "
+            }
+        ),
+        format!(
+            "{} Revision: {revision}",
+            if field == BookmarkMutationField::Revision {
+                ">"
+            } else {
+                " "
+            }
+        ),
+        String::new(),
+        "tab switch field   enter preview   backspace edit   esc cancel".to_owned(),
+    ]
+}
+
 fn render_inspection(
     frame: &mut ratatui::Frame<'_>,
     view: &mut jk_tui::rendered_view::RenderedView,
@@ -251,6 +374,10 @@ fn render_inspection(
         Some(InputMode::JjCommand { input, error }) => {
             let lines = jj_command_lines(input, error.as_deref());
             view.render_with_overlay(frame, "jj command", &lines);
+        }
+        Some(InputMode::ExternalCommand { input, error }) => {
+            let lines = external_command_lines(input, error.as_deref());
+            view.render_with_overlay(frame, "external command", &lines);
         }
         _ => view.render(frame),
     }
@@ -374,29 +501,58 @@ fn render_mode_overlay_with_sizing(
 
     let command_discovery = title == "Command discovery";
     let display_title = if command_discovery { "Help" } else { title };
-    let mut text_lines = Vec::new();
-    if !command_discovery {
-        text_lines.push(Line::from(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        )));
-        text_lines.push(Line::from(""));
-    }
-    text_lines.extend(lines.iter().map(|line| overlay_line(line)));
+    frame.render_widget(
+        Block::default().style(Style::new().fg(Color::White).bg(OVERLAY_BACKGROUND)),
+        overlay,
+    );
+    let header = Rect::new(overlay.x, overlay.y, overlay.width, overlay.height.min(1));
+    frame.render_widget(
+        Paragraph::new(format!("  {display_title}"))
+            .style(Style::new().fg(Color::White).bg(OVERLAY_HEADER).bold()),
+        header,
+    );
+
+    let body = Rect::new(
+        overlay.x.saturating_add(2),
+        overlay.y.saturating_add(2),
+        overlay.width.saturating_sub(4),
+        overlay.height.saturating_sub(2),
+    );
+    render_overlay_regions(frame, body, lines);
+    let text_lines = lines
+        .iter()
+        .map(|line| overlay_line(line, usize::from(body.width)))
+        .collect::<Vec<_>>();
     let text = Text::from(text_lines);
-    let mut block = Block::bordered();
-    if command_discovery {
-        block = block.title(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ));
-    }
     let paragraph = Paragraph::new(text)
-        .block(block)
-        .style(Style::new().fg(Color::White).bg(Color::Black))
+        .style(Style::new().fg(Color::White))
         .wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, overlay);
+    frame.render_widget(paragraph, body);
     Some(overlay)
+}
+
+fn render_overlay_regions(frame: &mut ratatui::Frame<'_>, body: Rect, lines: &[String]) {
+    use ratatui::widgets::Block;
+
+    for (row, line) in lines.iter().take(usize::from(body.height)).enumerate() {
+        let background = if line.starts_with("! ") || line.starts_with(": ") {
+            Some(Color::Rgb(58, 72, 90))
+        } else if line.starts_with("error:") {
+            Some(Color::Rgb(120, 45, 50))
+        } else {
+            None
+        };
+        let Some(background) = background else {
+            continue;
+        };
+        let y = body
+            .y
+            .saturating_add(u16::try_from(row).unwrap_or(u16::MAX));
+        frame.render_widget(
+            Block::default().style(Style::new().fg(Color::White).bg(background)),
+            Rect::new(body.x, y, body.width, 1),
+        );
+    }
 }
 
 fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
@@ -427,13 +583,13 @@ fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
 
 fn overlay_height(title: &str, lines: &[String]) -> usize {
     if title == "Command discovery" {
-        return lines.len().saturating_add(2);
+        return lines.len().saturating_add(3);
     }
 
     lines.len().saturating_add(4)
 }
 
-fn overlay_line(line: &str) -> Line<'_> {
+fn overlay_line(line: &str, content_width: usize) -> Line<'_> {
     if line.ends_with(':') {
         return Line::from(Span::styled(
             line,
@@ -456,9 +612,13 @@ fn overlay_line(line: &str) -> Line<'_> {
     }
 
     if line.starts_with('>') {
+        let padding = content_width.saturating_sub(Span::raw(line).width());
         return Line::from(Span::styled(
-            line,
-            Style::new().fg(Color::Green).add_modifier(Modifier::BOLD),
+            format!("{line}{}", " ".repeat(padding)),
+            Style::new()
+                .fg(Color::Black)
+                .bg(Color::LightCyan)
+                .add_modifier(Modifier::BOLD),
         ));
     }
 
@@ -573,6 +733,71 @@ mod tests {
     use super::*;
 
     #[test]
+    fn bookmark_preview_requires_visible_controls_and_fresh_enter() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+        use jk_cli::{BookmarkMutation, JjBookmarks, JjLog};
+        use jk_tui::bookmark_view::{BookmarkView, BookmarkViewSnapshot};
+
+        let mut state = AppState::new(AppView::Bookmarks {
+            view: BookmarkView::new(BookmarkViewSnapshot::new(Vec::new())),
+        });
+        let bookmarks = JjBookmarks::default();
+        let mut log = JjLog::default();
+        crate::bookmark_routes::open_bookmark_preview(
+            &mut state,
+            &bookmarks,
+            BookmarkMutation::Delete {
+                name: "topic".into(),
+            },
+        );
+
+        let enter = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        crate::handle_command_preview_mode(&mut state, &mut log, &bookmarks, enter);
+        assert!(matches!(
+            state.modes.active(),
+            Some(InputMode::CommandPreview { .. })
+        ));
+        assert_eq!(state.history.records().count(), 0);
+
+        let mut terminal = Terminal::new(TestBackend::new(30, 6)).expect("small terminal");
+        terminal
+            .draw(|frame| render_app(frame, &mut state, &LogTemplateSelection::Configured))
+            .expect("small preview");
+        assert!(
+            matches!(state.modes.active(), Some(InputMode::CommandPreview { pending })
+            if !pending.can_confirm)
+        );
+        crate::handle_command_preview_mode(&mut state, &mut log, &bookmarks, enter);
+        assert_eq!(state.history.records().count(), 0);
+
+        let mut terminal = Terminal::new(TestBackend::new(90, 24)).expect("wide terminal");
+        terminal
+            .draw(|frame| render_app(frame, &mut state, &LogTemplateSelection::Configured))
+            .expect("wide preview");
+        assert!(
+            matches!(state.modes.active(), Some(InputMode::CommandPreview { pending })
+            if pending.can_confirm)
+        );
+        let repeated_enter = KeyEvent {
+            kind: KeyEventKind::Repeat,
+            ..enter
+        };
+        crate::handle_command_preview_mode(&mut state, &mut log, &bookmarks, repeated_enter);
+        assert!(matches!(
+            state.modes.active(),
+            Some(InputMode::CommandPreview { .. })
+        ));
+        assert_eq!(state.history.records().count(), 0);
+        crate::handle_command_preview_mode(
+            &mut state,
+            &mut log,
+            &bookmarks,
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+        );
+        assert!(state.modes.active().is_none());
+    }
+
+    #[test]
     fn toast_handles_tiny_terminals_without_panicking() {
         for width in 0..=14 {
             for height in 0..=8 {
@@ -581,6 +806,83 @@ mod tests {
                     .draw(|frame| render_toast(frame, "Created new change"))
                     .unwrap();
             }
+        }
+    }
+
+    #[test]
+    fn command_overlay_uses_color_regions_without_a_border() {
+        let lines = vec![
+            "! printf hello".to_owned(),
+            "error: fixture".to_owned(),
+            String::new(),
+            "enter run   esc cancel".to_owned(),
+        ];
+        let backend = TestBackend::new(80, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                let _ = render_mode_overlay(frame, "external command", &lines);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let rendered = buffer
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(!rendered.contains('│'));
+        assert!(!rendered.contains('┌'));
+
+        let overlay_width = 56;
+        let overlay_height = 8;
+        let overlay_x = (80 - overlay_width) / 2;
+        let overlay_y = 1 + (18 - overlay_height) / 2;
+        assert_eq!(buffer[(overlay_x, overlay_y)].bg, Color::Rgb(58, 72, 90));
+        assert_eq!(
+            buffer[(overlay_x + 2, overlay_y + 2)].bg,
+            Color::Rgb(58, 72, 90)
+        );
+        assert_eq!(
+            buffer[(overlay_x + 2, overlay_y + 3)].bg,
+            Color::Rgb(120, 45, 50)
+        );
+    }
+
+    #[test]
+    fn mode_overlay_uses_colored_regions_without_a_border() {
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).expect("terminal");
+        let mut overlay = None;
+        terminal
+            .draw(|frame| {
+                overlay = render_mode_overlay(
+                    frame,
+                    "Actions",
+                    &["> new change".into(), "  describe".into()],
+                );
+            })
+            .expect("draw mode overlay");
+
+        let overlay = overlay.expect("overlay area");
+        let buffer = terminal.backend().buffer();
+        let rendered = buffer
+            .content()
+            .iter()
+            .map(ratatui::buffer::Cell::symbol)
+            .collect::<String>();
+        assert!(
+            !['┌', '┐', '└', '┘']
+                .into_iter()
+                .any(|glyph| rendered.contains(glyph))
+        );
+        assert_eq!(buffer[(overlay.x, overlay.y)].bg, OVERLAY_HEADER);
+        assert_eq!(
+            buffer[(overlay.x, overlay.y.saturating_add(1))].bg,
+            OVERLAY_BACKGROUND
+        );
+        let selected_y = overlay.y.saturating_add(2);
+        for x in overlay.x.saturating_add(2)..overlay.right().saturating_sub(2) {
+            assert_eq!(buffer[(x, selected_y)].bg, Color::LightCyan);
         }
     }
 }

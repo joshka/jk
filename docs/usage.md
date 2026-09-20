@@ -106,7 +106,7 @@ the preview confirms. Escape cancels without a graph mutation (while searching, 
 exits search). Commands use full commit IDs so later selection changes cannot retarget the preview.
 Immutable revisions are never overridden: jj failures remain inspectable in Command History.
 
-## Run A Direct jj Command
+## Run Direct Commands
 
 Press `:` to run a direct `jj` command without leaving the TUI:
 
@@ -120,6 +120,28 @@ Command mode accepts an optional `jj` prefix. It parses argv-like input, does no
 captures stdout and stderr, and records the result in Command History.
 
 From command output, press `e` to reopen command mode with the previous input.
+
+Press `!` to run an external executable with explicit argv:
+
+```text
+!printf '%s\n' 'hello from jk'
+!rg -n 'CommandHistory' crates
+!sh -c 'printf "shell requested explicitly\n" | cat'
+```
+
+External command mode never adds a shell. Quotes and backslashes group argv for `jk`; shell
+metacharacters such as `$`, `|`, `>`, and `&&` remain literal arguments. Run `sh -c` (or another
+shell) explicitly when shell expansion, pipes, redirects, or built-ins are intentional.
+
+This first external-command mode is captured and noninteractive: stdin is closed, stdout and stderr
+are retained in the output view, and the exit code or terminating signal is recorded in Command
+History. Commands that require a foreground terminal, password prompt, or full-screen TUI are not
+supported in this mode; run them after leaving `jk`. This keeps `jk`'s terminal state intact while a
+future foreground/cancellable runner can own terminal suspension and restoration explicitly.
+
+Failures remain inspectable. Press `e` to edit or retry the same `!` input, `C` to inspect its
+redacted history record, or `y` in Command History to copy the redacted command line. Obvious
+secret-looking argv, stdout, and stderr values use the same redaction policy as `jj` commands.
 
 ## Inspect History And Operations
 
@@ -151,6 +173,28 @@ Press `W` to list jj workspaces, or start there with `jk workspaces`. From there
 
 Missing workspace roots are reported inside `jk` instead of pushing a broken view.
 
+## Inspect Bookmarks And Remote Safety
+
+Press `B` from the log to inspect local and remote bookmark rows. The bookmark view keeps remote,
+tracking, deleted, and conflicted rows visible while limiting local mutations to unambiguous local
+bookmarks.
+
+- `c` opens a create-bookmark prompt, then a confirmation preview.
+- `m` edits the selected bookmark's target and opens a move preview.
+- `x` opens a destructive delete preview.
+- `F` lists configured remotes, including remotes with no bookmarks yet. Choose one and press
+  `Enter` to preview fetch; confirm separately to run it.
+- `P` starts from a local bookmark with one target. Choose a configured remote, then review and
+  confirm the scoped push dry-run. Deleted, conflicted, and remote-only rows cannot start a push.
+
+Pattern-based jj arguments use exact matching so a bookmark or remote name cannot expand into
+multiple targets. Command mode routes bookmark mutations, fetch, and push back to these workflows.
+
+Fetch and push dry-run output is shown in a retained command-output view and recorded in Command
+History. Fetch refreshes the underlying bookmark list before displaying output; a failed refresh
+preserves the last usable snapshot. Push dry-run may contact the selected remote but does not update
+its refs. Real push remains unavailable.
+
 ## Command Entry Points
 
 The current root commands are:
@@ -175,8 +219,8 @@ history.
 ## Current Limits
 
 - Command History is in-memory for the current `jk` session.
-- Split, file/hunk restore, bookmarks, fetch, and push are planned workflows.
+- Split, file/hunk restore, and real remote pushes remain planned workflows.
 - Squash is whole-change only; file and hunk selection remain planned.
 - The action menu covers log revision changes, recovery, and workspace lifecycle actions.
-  Rebase has a direct `R` entry; refs and remote actions remain planned.
+  Rebase has a direct `R` entry; bookmark actions use the bookmark screen.
 - Public README, crates.io, and website media still need a release-media refresh.

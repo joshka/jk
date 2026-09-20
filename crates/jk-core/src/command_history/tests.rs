@@ -4,8 +4,8 @@ use std::time::{Duration, SystemTime};
 
 use super::*;
 use crate::{
-    ConfigOverlay, ExecutionMode, GlobalOptions, JjCommandSpec, OutputPolicy, PagerPolicy,
-    SafetyClass,
+    ConfigOverlay, ExecutionMode, ExternalCommandSpec, GlobalOptions, JjCommandSpec, OutputPolicy,
+    PagerPolicy, SafetyClass,
 };
 
 fn strings(argv: &[OsString]) -> Vec<String> {
@@ -190,6 +190,36 @@ fn command_mode_specs_use_user_command_family() {
 }
 
 #[test]
+fn external_command_specs_keep_executable_identity_without_jj_context() {
+    let Some(spec) = ExternalCommandSpec::new(["env", "token=secret", "two words"]) else {
+        panic!("expected external spec");
+    };
+    let spec = spec.with_cwd("/tmp/repo");
+    let start = CommandRecordStart::from_external_spec(
+        &spec,
+        source(
+            SourceView::Other("external command mode".to_owned()),
+            SourceAction::UserExternalCommand,
+        ),
+    );
+
+    assert_eq!(start.command.command_family, CommandFamily::ExternalCommand);
+    assert_eq!(
+        strings(&start.command.argv),
+        vec!["env", "token=<redacted>", "two words"]
+    );
+    assert_eq!(
+        start.command.process_preview(),
+        "env 'token=<redacted>' 'two words'"
+    );
+    assert_eq!(start.context.cwd.as_deref(), Some(Path::new("/tmp/repo")));
+    assert_eq!(start.context.repository, None);
+    assert!(start.context.global_options.argv.is_empty());
+    assert_eq!(start.execution_mode, ExecutionMode::ExternalCommand);
+    assert_eq!(start.safety, SafetyClass::ExternalCommand);
+}
+
+#[test]
 fn context_global_options_are_redacted() {
     let spec = JjCommandSpec::render_read_only(["log"]).with_global_options(
         GlobalOptions::default().with_config_overlay(ConfigOverlay::Inline {
@@ -349,6 +379,17 @@ fn spawn_error_has_no_exit_code() {
 }
 
 #[test]
+fn spawn_error_redacts_secret_looking_context() {
+    let finish =
+        CommandRecordFinish::from_spawn_error("failed with token=secret", "", "", finish_at());
+
+    assert_eq!(
+        finish.result.spawn_error.as_deref(),
+        Some("failed with token=<redacted>")
+    );
+}
+
+#[test]
 fn finish_keeps_first_result() {
     let spec = JjCommandSpec::render_read_only(["status"]);
     let mut history = CommandHistory::new(1);
@@ -456,4 +497,27 @@ fn command_identity_redacts_secret_looking_args() {
             "log"
         ]
     );
+}
+
+#[test]
+fn absorb_reassigns_ids_and_preserves_background_record_order() {
+    let spec = JjCommandSpec::render_read_only(["log"]);
+    let mut foreground = CommandHistory::new(4);
+    foreground.append(
+        start_from_spec(&spec, source(SourceView::Log, SourceAction::InitialLoad)),
+        CommandRecordFinish::from_exit_code(0, "initial", "", finish_at()),
+    );
+    let mut background = CommandHistory::new(4);
+    background.append(
+        start_from_spec(&spec, source(SourceView::Log, SourceAction::Refresh)),
+        CommandRecordFinish::from_exit_code(0, "refresh", "", finish_at()),
+    );
+
+    foreground.absorb(background);
+
+    let records = foreground.records().collect::<Vec<_>>();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0].id.get(), 1);
+    assert_eq!(records[1].id.get(), 2);
+    assert_eq!(records[1].result.stdout.snippet, "refresh");
 }

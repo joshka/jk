@@ -43,8 +43,14 @@ betamax-log:
 betamax-diff:
     {{betamax}} run tapes/jk-diff.tape
 
+betamax-refs-remotes:
+    {{betamax}} run tapes/refs-remotes.tape
+
 betamax-release-smoke:
     {{betamax}} run tapes/release-smoke.tape
+
+betamax-external-command:
+    {{betamax}} run tapes/external-command-mode.tape
 
 betamax-action-menu:
     {{betamax}} run tapes/action-menu.tape
@@ -55,6 +61,12 @@ betamax-action-menu-demo:
 betamax-workspace-lifecycle:
     cargo build -p jk
     JK_SOURCE_REPO="$PWD" {{betamax}} run tapes/workspace-lifecycle.tape
+
+betamax-cancellable-refresh:
+    {{betamax}} run tapes/cancellable-refresh.tape
+
+betamax-shared-selectors:
+    {{betamax}} run tapes/shared-selectors.tape
 
 betamax-abandon-confirmation:
     {{betamax}} run tapes/abandon-confirmation.tape

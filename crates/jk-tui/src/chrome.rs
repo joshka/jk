@@ -8,8 +8,37 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
-const CHROME_STYLE: Style = Style::new().fg(Color::White).bg(Color::Black);
-const CHROME_BADGE_STYLE: Style = Style::new().fg(Color::Black).bg(Color::White);
+const SURFACE_BACKGROUND: Color = Color::Rgb(30, 35, 47);
+const REGION_BACKGROUND: Color = Color::Rgb(58, 72, 90);
+const DANGER_BACKGROUND: Color = Color::Rgb(120, 45, 50);
+const ACCENT_BACKGROUND: Color = Color::LightCyan;
+const CHROME_STYLE: Style = Style::new().fg(Color::White).bg(SURFACE_BACKGROUND);
+const CHROME_BADGE_STYLE: Style = Style::new().fg(Color::Black).bg(ACCENT_BACKGROUND);
+
+/// Semantic color treatment for the borderless status region.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum StatusTone {
+    /// Normal navigation and command hints.
+    #[default]
+    Neutral,
+    /// Work is in progress but the current content remains interactive.
+    Loading,
+    /// The requested work failed and the last usable content remains visible.
+    Failure,
+}
+
+impl StatusTone {
+    const fn style(self) -> Style {
+        match self {
+            Self::Neutral => Style::new().fg(Color::White).bg(REGION_BACKGROUND),
+            Self::Loading => Style::new().fg(Color::Black).bg(ACCENT_BACKGROUND),
+            Self::Failure => Style::new().fg(Color::White).bg(DANGER_BACKGROUND),
+        }
+    }
+}
+
+const OVERLAY_BACKGROUND: Color = SURFACE_BACKGROUND;
+const OVERLAY_HEADER: Color = REGION_BACKGROUND;
 
 /// Renders a small mode-specific help overlay centered in the content area.
 pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[String]) {
@@ -26,28 +55,32 @@ pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines
 
     let command_discovery = title == "Command discovery";
     let display_title = if command_discovery { "Help" } else { title };
-    let mut text_lines = Vec::new();
-    if !command_discovery {
-        text_lines.push(Line::from(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        )));
-        text_lines.push(Line::from(""));
-    }
-    text_lines.extend(lines.iter().map(|line| overlay_line(line)));
+    frame.render_widget(
+        Block::default().style(Style::new().fg(Color::White).bg(OVERLAY_BACKGROUND)),
+        overlay,
+    );
+    let header = Rect::new(overlay.x, overlay.y, overlay.width, overlay.height.min(1));
+    frame.render_widget(
+        Paragraph::new(format!("  {display_title}"))
+            .style(Style::new().fg(Color::White).bg(OVERLAY_HEADER).bold()),
+        header,
+    );
+
+    let body = Rect::new(
+        overlay.x.saturating_add(2),
+        overlay.y.saturating_add(2),
+        overlay.width.saturating_sub(4),
+        overlay.height.saturating_sub(2),
+    );
+    let text_lines = lines
+        .iter()
+        .map(|line| overlay_line(line, usize::from(body.width)))
+        .collect::<Vec<_>>();
     let text = Text::from(text_lines);
-    let mut block = Block::bordered();
-    if command_discovery {
-        block = block.title(Span::styled(
-            display_title,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ));
-    }
     let paragraph = Paragraph::new(text)
-        .block(block)
-        .style(Style::new().fg(Color::White).bg(Color::Black))
+        .style(Style::new().fg(Color::White).bg(OVERLAY_BACKGROUND))
         .wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, overlay);
+    frame.render_widget(paragraph, body);
 }
 
 fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
@@ -78,13 +111,13 @@ fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
 
 fn overlay_height(title: &str, lines: &[String]) -> usize {
     if title == "Command discovery" {
-        return lines.len().saturating_add(2);
+        return lines.len().saturating_add(3);
     }
 
     lines.len().saturating_add(4)
 }
 
-fn overlay_line(line: &str) -> Line<'_> {
+fn overlay_line(line: &str, content_width: usize) -> Line<'_> {
     if line.ends_with(':') {
         return Line::from(Span::styled(
             line,
@@ -107,9 +140,13 @@ fn overlay_line(line: &str) -> Line<'_> {
     }
 
     if line.starts_with('>') {
+        let padding = content_width.saturating_sub(Span::raw(line).width());
         return Line::from(Span::styled(
-            line,
-            Style::new().fg(Color::Green).add_modifier(Modifier::BOLD),
+            format!("{line}{}", " ".repeat(padding)),
+            Style::new()
+                .fg(Color::Black)
+                .bg(Color::LightCyan)
+                .add_modifier(Modifier::BOLD),
         ));
     }
 
@@ -252,12 +289,23 @@ pub fn title_or_default(title: String) -> String {
 pub struct ViewChrome<'a> {
     title: &'a str,
     status: &'a str,
+    status_tone: StatusTone,
 }
 
 impl<'a> ViewChrome<'a> {
     /// Creates chrome for a command title and status message.
     pub const fn new(title: &'a str, status: &'a str) -> Self {
-        Self { title, status }
+        Self {
+            title,
+            status,
+            status_tone: StatusTone::Neutral,
+        }
+    }
+
+    /// Colors the full status row for its current semantic state.
+    pub const fn with_status_tone(mut self, status_tone: StatusTone) -> Self {
+        self.status_tone = status_tone;
+        self
     }
 
     /// Splits the terminal into title, content, and status rows.
@@ -286,7 +334,7 @@ impl<'a> ViewChrome<'a> {
         .style(CHROME_STYLE);
         frame.render_widget(title, areas.title);
 
-        let status = Paragraph::new(Line::from(self.status)).style(CHROME_STYLE);
+        let status = Paragraph::new(Line::from(self.status)).style(self.status_tone.style());
         frame.render_widget(status, areas.status);
     }
 }
@@ -304,5 +352,50 @@ impl ChromeAreas {
     /// Returns the width available to the one-line status row.
     pub const fn status_width(self) -> u16 {
         self.status.width
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    use super::*;
+
+    #[test]
+    fn selector_overlay_uses_colored_regions_without_a_border() {
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).expect("terminal");
+        terminal
+            .draw(|frame| {
+                render_help_overlay(
+                    frame,
+                    frame.area(),
+                    "Diff files",
+                    &["> src/main.rs".into(), "  src/lib.rs".into()],
+                );
+            })
+            .expect("draw selector overlay");
+
+        let buffer = terminal.backend().buffer();
+        let rendered = buffer
+            .content()
+            .iter()
+            .map(ratatui::buffer::Cell::symbol)
+            .collect::<String>();
+        let overlay = centered_rect(Rect::new(0, 0, 80, 20), 56, 6);
+        assert!(
+            !['┌', '┐', '└', '┘']
+                .into_iter()
+                .any(|glyph| rendered.contains(glyph))
+        );
+        assert_eq!(buffer[(overlay.x, overlay.y)].bg, OVERLAY_HEADER);
+        assert_eq!(
+            buffer[(overlay.x, overlay.y.saturating_add(1))].bg,
+            OVERLAY_BACKGROUND
+        );
+        let selected_y = overlay.y.saturating_add(2);
+        for x in overlay.x.saturating_add(2)..overlay.right().saturating_sub(2) {
+            assert_eq!(buffer[(x, selected_y)].bg, Color::LightCyan);
+        }
     }
 }

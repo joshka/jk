@@ -112,6 +112,9 @@ or disable overlays until the user-facing interaction begins.
 
 ## TUI App Layout Guidelines
 
+Follow [the TUI design guidelines](docs/tui-design.md) for all screens, controls, help, menus,
+dialogs, and views. They define jj presentation fidelity, shared visual states, and review criteria.
+
 Default to user comprehension over implementation structure. Screens,
 overlays, hotbars, menus, previews, and other discretionary layout
 should read like user-facing product surfaces, not debug views of

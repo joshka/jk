@@ -1,4 +1,7 @@
-use jk_core::{CommandPreview, SourceAction};
+use jk_core::{
+    CommandPreview, SelectionCandidates, SelectionDecision, SelectionRequest, SelectionResolution,
+    SelectorKind, SelectorRole, SourceAction, resolve_selection,
+};
 use jk_tui::log_view::LogView;
 
 use crate::squash::SquashSelection;
@@ -166,17 +169,95 @@ impl PendingCommandPreview {
             max_scroll: 0,
         }
     }
-}
 
-pub fn selected_new_parents(log: &LogView) -> Vec<String> {
-    if log.has_marks() {
-        return log.marked_revision_ids();
+    pub(crate) const fn bookmark_create(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkCreate,
+            source_key: "c",
+            failure_label: "jj bookmark create",
+            success_message: "Created bookmark",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
     }
 
-    log.selected_revision_id()
-        .map(ToOwned::to_owned)
-        .into_iter()
-        .collect()
+    pub(crate) const fn bookmark_move(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkMove,
+            source_key: "m",
+            failure_label: "jj bookmark move",
+            success_message: "Moved bookmark",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn bookmark_delete(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkDelete,
+            source_key: "x",
+            failure_label: "jj bookmark delete",
+            success_message: "Deleted bookmark",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn git_fetch(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::GitFetch,
+            source_key: "F",
+            failure_label: "jj git fetch",
+            success_message: "Fetched remote",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn git_push_dry_run(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::GitPushDryRun,
+            source_key: "P",
+            failure_label: "jj git push --dry-run",
+            success_message: "Push dry-run complete",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+}
+
+pub fn selected_new_parents(log: &LogView) -> SelectionResolution<String> {
+    let candidates = SelectionCandidates::new(
+        log.selected_revision_id().map(ToOwned::to_owned),
+        log.marked_revision_ids(),
+    );
+    let request = SelectionRequest::one_or_more(SelectorKind::Revision, SelectorRole::Parent);
+    resolve_selection(request, SelectionDecision::Submit(candidates))
 }
 
 pub(crate) fn new_change_id_from_output(stderr: &[u8]) -> Option<String> {
@@ -282,7 +363,10 @@ mod tests {
     fn selected_new_parents_use_short_selected_revision() {
         let log = log_view(["abcdefghijklmnop", "zyxwvutsrqponmlk"]);
 
-        assert_eq!(selected_new_parents(&log), ["abcdefgh"]);
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("selected revision should resolve as a parent");
+        };
+        assert_eq!(resolved.values(), ["abcdefgh"]);
     }
 
     #[test]
@@ -293,7 +377,10 @@ mod tests {
         let _ = log.apply(LogAction::Next);
         let _ = log.apply(LogAction::ToggleMark);
 
-        assert_eq!(selected_new_parents(&log), ["abcdefgh", "zyxwvuts"]);
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("ordered revision marks should resolve as parents");
+        };
+        assert_eq!(resolved.values(), ["abcdefgh", "zyxwvuts"]);
     }
 
     #[test]

@@ -43,7 +43,8 @@ The useful current workflows are:
 
 - inspect selected changes with `show`, `diff`, `evolog`, and `status`;
 - review diffs with file/hunk movement, folding, search, file list, and View Options;
-- run direct `jj` commands from `:` command mode and keep captured output in the TUI;
+- run direct `jj` commands with `:` or shell-free external commands with `!`, keeping captured
+  output in the TUI;
 - save an inline describe message directly with `Enter`; action-menu New, Edit, Undo, and Redo run
   immediately through the recorded mutation path, while non-empty abandon and whole-content
   restore keep destructive safety previews;
@@ -52,6 +53,8 @@ The useful current workflows are:
 - use Command History and Operation Log to inspect what ran and recover through `jj op` views;
 - inspect sibling jj workspaces, including workspace-scoped log/status/diff views, without leaving
   the TUI.
+- inspect local and remote bookmarks with `B`, preview local bookmark mutations, and review
+  explicit fetch or push dry-run commands with a configured remote chooser.
 
 The current implementation intentionally treats rendered `jj` output as the source of truth. The
 TUI parses only enough structure to support navigation, search, sticky headers, folding, command
@@ -63,18 +66,20 @@ Use `?` inside `jk` for the full key list for the active screen. For task-orient
 Current limitations:
 
 - command history is in-memory for the current `jk` session;
-- split, file/hunk restore, bookmarks, fetch, and push are still planned workflows;
+- split, file/hunk restore, and real remote pushes remain planned workflows;
 - `R` selects a rebase destination and previews exact source/placement roles before confirmation;
 - squash currently moves whole changes only; file and hunk selection remains planned;
 - the log action menu covers describe, new, edit, squash, restore, abandon, undo, and redo;
   rebase is available through `R` and workspace actions through `W`, then `a`.
+- bookmark inspection, local mutation previews, confirmed fetches, and push dry-runs are available;
 
 ## First Useful Paths
 
 Start with `jk` or `jk log`, then use:
 
 - `Enter`, `d`, `v`, and `s` to inspect the selected change;
-- `:` to run a direct `jj` command without dropping TUI context;
+- `:` to run a direct `jj` command or `!` to run an external executable without shell
+  interpretation;
 - `a` to open actions for the selected change, then `a` again to preview abandon;
 - `a`, then `r` to preview restoring all paths from the selected revision into `@`;
 - `a`, then `m` to edit and save a description inline; choose New, Edit, Undo, or Redo from `a`

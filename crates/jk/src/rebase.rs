@@ -610,6 +610,7 @@ mod tests {
             crate::handle_command_preview_mode(
                 &mut state,
                 &mut source,
+                &jk_cli::JjBookmarks::default(),
                 repeated_key(KeyCode::Enter),
             ),
             InputModeResult::Handled
@@ -619,7 +620,12 @@ mod tests {
             Some(InputMode::CommandPreview { .. })
         ));
         assert_eq!(
-            crate::handle_command_preview_mode(&mut state, &mut source, key(KeyCode::Esc)),
+            crate::handle_command_preview_mode(
+                &mut state,
+                &mut source,
+                &jk_cli::JjBookmarks::default(),
+                key(KeyCode::Esc)
+            ),
             InputModeResult::Handled
         );
         assert!(state.modes.active().is_none());
