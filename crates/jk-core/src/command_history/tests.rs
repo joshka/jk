@@ -484,3 +484,26 @@ fn command_identity_redacts_secret_looking_args() {
         ]
     );
 }
+
+#[test]
+fn absorb_reassigns_ids_and_preserves_background_record_order() {
+    let spec = JjCommandSpec::render_read_only(["log"]);
+    let mut foreground = CommandHistory::new(4);
+    foreground.append(
+        start_from_spec(&spec, source(SourceView::Log, SourceAction::InitialLoad)),
+        CommandRecordFinish::from_exit_code(0, "initial", "", finish_at()),
+    );
+    let mut background = CommandHistory::new(4);
+    background.append(
+        start_from_spec(&spec, source(SourceView::Log, SourceAction::Refresh)),
+        CommandRecordFinish::from_exit_code(0, "refresh", "", finish_at()),
+    );
+
+    foreground.absorb(background);
+
+    let records = foreground.records().collect::<Vec<_>>();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0].id.get(), 1);
+    assert_eq!(records[1].id.get(), 2);
+    assert_eq!(records[1].result.stdout.snippet, "refresh");
+}

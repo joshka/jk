@@ -44,7 +44,7 @@ const TEMPLATE_TITLE_LIMIT: usize = 48;
 /// variables so the rendered pass keeps the configured terminal colors. Configured default commands
 /// must be log-like enough to accept the semantic template pass; unsupported commands return
 /// [`JjLogError::UnsupportedSemanticCommand`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjLog {
     repository: Option<PathBuf>,
     command: JjLogCommand,

@@ -11,7 +11,7 @@ use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 
-use crate::chrome::{ViewChrome, render_help_overlay};
+use crate::chrome::{StatusTone, ViewChrome, render_help_overlay};
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::log_state::LogState;
 use crate::rendered_log::{ExpandedDetails, RenderedLog, rendered_text};
@@ -143,8 +143,14 @@ pub enum LogAction {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct LogView {
     state: LogState,
-    status_message: Option<String>,
+    status_message: Option<StatusMessage>,
     help_visible: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StatusMessage {
+    text: String,
+    tone: StatusTone,
 }
 
 impl LogView {
@@ -167,14 +173,39 @@ impl LogView {
         self.status_message = None;
     }
 
+    /// Shows that a refresh is running without replacing the current log body.
+    pub fn show_loading(&mut self) {
+        self.status_message = Some(StatusMessage {
+            text: "Refreshing…".to_owned(),
+            tone: StatusTone::Loading,
+        });
+    }
+
+    /// Removes pending-refresh feedback when its work is retired.
+    pub fn clear_loading(&mut self) {
+        if self
+            .status_message
+            .as_ref()
+            .is_some_and(|status| status.tone == StatusTone::Loading)
+        {
+            self.status_message = None;
+        }
+    }
+
     /// Shows a refresh or integration error without replacing the current log.
     pub fn show_error(&mut self, error: impl Into<String>) {
-        self.status_message = Some(error.into());
+        self.status_message = Some(StatusMessage {
+            text: error.into(),
+            tone: StatusTone::Failure,
+        });
     }
 
     /// Shows a non-error status message without replacing the current log.
     pub fn show_status(&mut self, status: impl Into<String>) {
-        self.status_message = Some(status.into());
+        self.status_message = Some(StatusMessage {
+            text: status.into(),
+            tone: StatusTone::Neutral,
+        });
     }
 
     /// Returns the selected change identifier for follow-up inspection commands.
@@ -368,14 +399,20 @@ impl LogView {
         let status = status.map_or_else(
             || {
                 composed_status(
-                    self.status_message.as_deref(),
+                    self.status_message
+                        .as_ref()
+                        .map(|message| message.text.as_str()),
                     BindingContext::Log,
                     areas.status_width(),
                 )
             },
             ToOwned::to_owned,
         );
-        let chrome = ViewChrome::new(self.state.title(), &status);
+        let status_tone = self
+            .status_message
+            .as_ref()
+            .map_or(StatusTone::Neutral, |message| message.tone);
+        let chrome = ViewChrome::new(self.state.title(), &status).with_status_tone(status_tone);
         chrome.render(frame, areas);
 
         let expanded_details = self
@@ -557,6 +594,14 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("aaa summary"));
         assert!(buffer_line(terminal.backend().buffer(), 3).contains("jj failed"));
+        assert_eq!(
+            terminal.backend().buffer()[(0, 3)].bg,
+            Color::Rgb(120, 45, 50)
+        );
+        assert_eq!(
+            terminal.backend().buffer()[(47, 3)].bg,
+            Color::Rgb(120, 45, 50)
+        );
 
         view.refresh(snapshot(["bbb"]));
         let draw_result = terminal.draw(|frame| view.render(frame));
@@ -565,6 +610,32 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("bbb summary"));
         assert!(buffer_line(terminal.backend().buffer(), 3).contains("r refresh"));
+    }
+
+    #[test]
+    fn loading_is_visible_and_refresh_keeps_the_open_help_overlay() {
+        let mut view = LogView::new(snapshot(["aaa"]));
+        let _ = view.apply(LogAction::ToggleHelp);
+        view.show_loading();
+        let backend = TestBackend::new(72, 56);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(terminal) => terminal,
+            Err(error) => match error {},
+        };
+
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        assert!(buffer_line(terminal.backend().buffer(), 55).contains("Refreshing…"));
+        assert!(buffer_to_string(terminal.backend().buffer()).contains("Log keys"));
+        assert_eq!(terminal.backend().buffer()[(0, 55)].bg, Color::LightCyan);
+        assert_eq!(terminal.backend().buffer()[(71, 55)].bg, Color::LightCyan);
+
+        view.refresh(snapshot(["bbb"]));
+        let draw_result = terminal.draw(|frame| view.render(frame));
+        assert!(draw_result.is_ok());
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(rendered.contains("bbb summary"));
+        assert!(rendered.contains("Log keys"));
     }
 
     #[test]
@@ -608,13 +679,13 @@ mod tests {
         assert!(buffer_line(buffer, 0).contains("jk jj log"));
         assert!(buffer_line(buffer, 3).contains("r refresh"));
         assert_eq!(buffer[(0, 0)].fg, Color::Black);
-        assert_eq!(buffer[(0, 0)].bg, Color::White);
+        assert_eq!(buffer[(0, 0)].bg, Color::LightCyan);
         assert_eq!(buffer[(3, 0)].fg, Color::White);
-        assert_eq!(buffer[(3, 0)].bg, Color::Black);
-        assert_eq!(buffer[(47, 0)].bg, Color::Black);
+        assert_eq!(buffer[(3, 0)].bg, Color::Rgb(30, 35, 47));
+        assert_eq!(buffer[(47, 0)].bg, Color::Rgb(30, 35, 47));
         assert_eq!(buffer[(0, 3)].fg, Color::White);
-        assert_eq!(buffer[(0, 3)].bg, Color::Black);
-        assert_eq!(buffer[(47, 3)].bg, Color::Black);
+        assert_eq!(buffer[(0, 3)].bg, Color::Rgb(58, 72, 90));
+        assert_eq!(buffer[(47, 3)].bg, Color::Rgb(58, 72, 90));
     }
 
     #[test]

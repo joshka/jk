@@ -8,8 +8,34 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
-const CHROME_STYLE: Style = Style::new().fg(Color::White).bg(Color::Black);
-const CHROME_BADGE_STYLE: Style = Style::new().fg(Color::Black).bg(Color::White);
+const SURFACE_BACKGROUND: Color = Color::Rgb(30, 35, 47);
+const REGION_BACKGROUND: Color = Color::Rgb(58, 72, 90);
+const DANGER_BACKGROUND: Color = Color::Rgb(120, 45, 50);
+const ACCENT_BACKGROUND: Color = Color::LightCyan;
+const CHROME_STYLE: Style = Style::new().fg(Color::White).bg(SURFACE_BACKGROUND);
+const CHROME_BADGE_STYLE: Style = Style::new().fg(Color::Black).bg(ACCENT_BACKGROUND);
+
+/// Semantic color treatment for the borderless status region.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum StatusTone {
+    /// Normal navigation and command hints.
+    #[default]
+    Neutral,
+    /// Work is in progress but the current content remains interactive.
+    Loading,
+    /// The requested work failed and the last usable content remains visible.
+    Failure,
+}
+
+impl StatusTone {
+    const fn style(self) -> Style {
+        match self {
+            Self::Neutral => Style::new().fg(Color::White).bg(REGION_BACKGROUND),
+            Self::Loading => Style::new().fg(Color::Black).bg(ACCENT_BACKGROUND),
+            Self::Failure => Style::new().fg(Color::White).bg(DANGER_BACKGROUND),
+        }
+    }
+}
 
 /// Renders a small mode-specific help overlay centered in the content area.
 pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[String]) {
@@ -266,12 +292,23 @@ pub fn title_or_default(title: String) -> String {
 pub struct ViewChrome<'a> {
     title: &'a str,
     status: &'a str,
+    status_tone: StatusTone,
 }
 
 impl<'a> ViewChrome<'a> {
     /// Creates chrome for a command title and status message.
     pub const fn new(title: &'a str, status: &'a str) -> Self {
-        Self { title, status }
+        Self {
+            title,
+            status,
+            status_tone: StatusTone::Neutral,
+        }
+    }
+
+    /// Colors the full status row for its current semantic state.
+    pub const fn with_status_tone(mut self, status_tone: StatusTone) -> Self {
+        self.status_tone = status_tone;
+        self
     }
 
     /// Splits the terminal into title, content, and status rows.
@@ -300,7 +337,7 @@ impl<'a> ViewChrome<'a> {
         .style(CHROME_STYLE);
         frame.render_widget(title, areas.title);
 
-        let status = Paragraph::new(Line::from(self.status)).style(CHROME_STYLE);
+        let status = Paragraph::new(Line::from(self.status)).style(self.status_tone.style());
         frame.render_widget(status, areas.status);
     }
 }

@@ -14,6 +14,7 @@ use jk_tui::rendered_view::RenderedView;
 use jk_tui::workspaces_view::WorkspacesView;
 
 use crate::mutation_preview::PendingCommandPreview;
+use crate::refresh_runner::LogRefreshRunner;
 
 const TOAST_DURATION: Duration = Duration::from_secs(3);
 
@@ -88,6 +89,7 @@ pub struct AppState {
     pub(crate) views: ViewStack,
     pub(crate) modes: ModeStack,
     pub(crate) history: CommandHistory,
+    pub(crate) refreshes: LogRefreshRunner,
     log_source_stack: Vec<JjLog>,
     toast: Option<Toast>,
 }
@@ -103,6 +105,7 @@ impl AppState {
             views: ViewStack::new(root),
             modes: ModeStack::default(),
             history,
+            refreshes: LogRefreshRunner::default(),
             log_source_stack: Vec::new(),
             toast: None,
         }
@@ -115,6 +118,14 @@ impl AppState {
 
     pub(crate) fn push_log_source(&mut self, source: JjLog) {
         self.log_source_stack.push(source);
+    }
+
+    /// Retires background work before an arbitrary command may change repository state.
+    pub(crate) fn cancel_log_refresh(&mut self) {
+        self.refreshes.cancel_active();
+        if let Some(log) = self.views.current_log_mut() {
+            log.clear_loading();
+        }
     }
 
     pub(crate) fn can_pop_log_drill(&self) -> bool {
@@ -199,6 +210,14 @@ impl ViewStack {
 
     pub(crate) fn push(&mut self, view: AppView) {
         self.views.push(view);
+    }
+
+    /// Returns the latest log even while an inspection view is above it.
+    pub(crate) fn current_log_mut(&mut self) -> Option<&mut LogView> {
+        self.views.iter_mut().rev().find_map(|view| match view {
+            AppView::Log(log) => Some(log),
+            _ => None,
+        })
     }
 
     pub(crate) fn pop(&mut self) -> bool {

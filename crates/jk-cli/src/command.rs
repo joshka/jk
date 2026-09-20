@@ -1,8 +1,11 @@
 //! Shared execution adapter for typed `jj` command specs.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Output, Stdio};
-use std::time::SystemTime;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use jk_core::{
     ColorPolicy, CommandHistory, CommandRecordFinish, CommandRecordStart, CommandResultSummary,
@@ -106,6 +109,55 @@ pub struct SystemJjCommandRunner;
 impl JjCommandRunner for SystemJjCommandRunner {
     fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
         run_system_jj_spec(spec)
+    }
+}
+
+/// Shared cancellation signal for a running read-only command.
+///
+/// Cancellation is cooperative at the runner boundary: the system runner observes the signal,
+/// terminates the child process, drains its output, and reaps it before returning an interrupted
+/// I/O error. Clones refer to the same signal.
+#[derive(Clone, Debug, Default)]
+pub struct CancellationToken {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl CancellationToken {
+    /// Creates a signal in the active state.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Requests cancellation of work observing this signal.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+    }
+
+    /// Returns whether cancellation has been requested.
+    #[must_use]
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+}
+
+/// Executes system `jj` commands while observing a cancellation signal.
+#[derive(Clone, Debug)]
+pub struct CancellableSystemJjCommandRunner {
+    cancellation: CancellationToken,
+}
+
+impl CancellableSystemJjCommandRunner {
+    /// Creates a runner tied to `cancellation`.
+    #[must_use]
+    pub const fn new(cancellation: CancellationToken) -> Self {
+        Self { cancellation }
+    }
+}
+
+impl JjCommandRunner for CancellableSystemJjCommandRunner {
+    fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
+        run_system_jj_spec_with_cancellation(spec, Some(&self.cancellation))
     }
 }
 
@@ -258,23 +310,124 @@ fn looks_like_operation_id(value: &str) -> bool {
 }
 
 fn run_system_jj_spec(spec: &JjCommandSpec) -> std::io::Result<Output> {
-    let mut command = build_jj_command(spec);
+    run_system_jj_spec_with_cancellation(spec, None)
+}
+
+fn run_system_jj_spec_with_cancellation(
+    spec: &JjCommandSpec,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<Output> {
+    run_captured_command(
+        build_jj_command(spec),
+        spec.stdin().map(str::as_bytes),
+        cancellation,
+    )
+}
+
+/// Drains output while writing stdin so a child cannot deadlock on full pipes. Cancellable commands
+/// own a Unix process group so terminating jj also closes pipes held by its helpers.
+fn run_captured_command(
+    mut command: Command,
+    input: Option<&[u8]>,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<Output> {
+    if cancellation.is_some_and(CancellationToken::is_cancelled) {
+        return Err(cancelled_error());
+    }
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
-    if spec.stdin().is_some() {
-        command.stdin(Stdio::piped());
+    command.stdin(if input.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
+    #[cfg(unix)]
+    if cancellation.is_some() {
+        use std::os::unix::process::CommandExt;
+
+        command.process_group(0);
     }
 
     let mut child = command.spawn()?;
-    if let Some(stdin) = spec.stdin() {
-        let child_stdin = child
-            .stdin
-            .as_mut()
-            .ok_or_else(|| std::io::Error::other("stdin was not piped"))?;
-        child_stdin.write_all(stdin.as_bytes())?;
-    }
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let stdin = child.stdin.take();
 
-    child.wait_with_output()
+    thread::scope(|scope| {
+        let stdout_reader = scope.spawn(|| stdout.map_or_else(|| Ok(Vec::new()), read_all));
+        let stderr_reader = scope.spawn(|| stderr.map_or_else(|| Ok(Vec::new()), read_all));
+        let stdin_writer = scope.spawn(|| match (stdin, input) {
+            (Some(mut stdin), Some(input)) => stdin.write_all(input),
+            _ => Ok(()),
+        });
+        let status = wait_for_child(&mut child, cancellation);
+        if status.is_err() {
+            terminate_child(&mut child, cancellation.is_some());
+            let _ = child.wait();
+        }
+        let (status, cancelled) = status?;
+        let stdin_result = stdin_writer
+            .join()
+            .map_err(|_| std::io::Error::other("jj stdin writer panicked"))?;
+        let stdout = join_reader(stdout_reader)?;
+        let stderr = join_reader(stderr_reader)?;
+
+        if cancelled {
+            return Err(cancelled_error());
+        }
+        stdin_result?;
+
+        Ok(Output {
+            status,
+            stdout,
+            stderr,
+        })
+    })
+}
+
+fn cancelled_error() -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Interrupted, "jj command cancelled")
+}
+
+fn read_all(mut reader: impl Read) -> std::io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn join_reader(
+    reader: thread::ScopedJoinHandle<'_, std::io::Result<Vec<u8>>>,
+) -> std::io::Result<Vec<u8>> {
+    reader
+        .join()
+        .map_err(|_| std::io::Error::other("jj output reader panicked"))?
+}
+
+fn wait_for_child(
+    child: &mut std::process::Child,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<(std::process::ExitStatus, bool)> {
+    loop {
+        if cancellation.is_some_and(CancellationToken::is_cancelled) {
+            terminate_child(child, true);
+            return child.wait().map(|status| (status, true));
+        }
+        if let Some(status) = child.try_wait()? {
+            return Ok((status, false));
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn terminate_child(child: &mut std::process::Child, process_group: bool) {
+    #[cfg(unix)]
+    if process_group {
+        let pid = rustix::process::Pid::from_child(child);
+        let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
+    }
+    #[cfg(not(unix))]
+    let _ = process_group;
+    let _ = child.kill();
 }
 
 fn finish_from_output(output: &Output, ended_at: SystemTime) -> CommandRecordFinish {
@@ -475,6 +628,82 @@ mod tests {
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("jj "));
         assert!(output.stderr.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_kills_and_reaps_a_slow_child() {
+        let mut child = Command::new("sh")
+            .args(["-c", "while :; do :; done"])
+            .spawn()
+            .expect("spawn fake slow command");
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+
+        let (status, cancelled) =
+            wait_for_child(&mut child, Some(&cancellation)).expect("reap cancelled child");
+
+        assert!(cancelled);
+        assert!(!status.success());
+        assert!(child.try_wait().expect("child already reaped").is_some());
+    }
+
+    #[test]
+    fn cancelled_work_does_not_spawn_another_process() {
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let command = Command::new("jk-test-executable-that-does-not-exist");
+
+        let error = run_captured_command(command, None, Some(&cancellation))
+            .expect_err("cancel before spawn");
+
+        assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_terminates_helpers_holding_output_pipes() {
+        let cancellation = CancellationToken::new();
+        let mut command = Command::new("sh");
+        command.args(["-c", "sleep 30 & wait"]);
+        let started = std::time::Instant::now();
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                thread::sleep(Duration::from_millis(100));
+                cancellation.cancel();
+            });
+
+            let error = run_captured_command(command, None, Some(&cancellation))
+                .expect_err("cancel process and its helper");
+
+            assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+        });
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn captured_command_drains_output_while_writing_stdin() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "head -c 131072 /dev/zero; cat"]);
+        let input = vec![b'x'; 131_072];
+        let cancellation = CancellationToken::new();
+        let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+        thread::scope(|scope| {
+            let timeout_cancellation = cancellation.clone();
+            scope.spawn(move || {
+                if finished_rx.recv_timeout(Duration::from_secs(5)).is_err() {
+                    timeout_cancellation.cancel();
+                }
+            });
+            let result = run_captured_command(command, Some(&input), Some(&cancellation));
+            let _ = finished_tx.send(());
+            let output = result.expect("drain both pipes without deadlocking");
+
+            assert!(output.status.success());
+            assert_eq!(output.stdout.len(), input.len() * 2);
+            assert_eq!(&output.stdout[input.len()..], input);
+        });
     }
 
     #[test]
