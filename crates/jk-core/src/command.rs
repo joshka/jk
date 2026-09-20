@@ -1,8 +1,7 @@
 //! Command descriptions shared across `jk` crates.
 //!
-//! [`JjCommandSpec`] stores argv as data first, then renders a display-only preview string for
-//! titles, help, and future command previews. Callers must execute the argv directly instead of
-//! sending the preview string through a shell.
+//! [`JjCommandSpec`] stores executable arguments separately from display previews. Callers must
+//! execute the arguments directly; preview strings are only for display.
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
@@ -21,7 +20,8 @@ impl ExternalCommandSpec {
     /// Creates an external command spec from an executable followed by its arguments.
     ///
     /// The argv is executed directly. No shell parses metacharacters, expands variables, or
-    /// performs redirection unless the executable itself is an explicitly requested shell.
+    /// performs redirection unless the executable itself is an explicitly requested shell. Returns
+    /// `None` when `argv` is empty.
     #[must_use]
     pub fn new(argv: impl IntoIterator<Item = impl Into<OsString>>) -> Option<Self> {
         let argv = argv.into_iter().map(Into::into).collect::<Vec<_>>();
@@ -130,14 +130,14 @@ impl JjCommandSpec {
             .with_safety(safety)
     }
 
-    /// Sets the process working directory metadata.
+    /// Sets the child process working directory.
     #[must_use]
     pub fn with_cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.cwd = Some(cwd.into());
         self
     }
 
-    /// Sets the repository path metadata.
+    /// Sets the repository path passed to `jj --repository`.
     #[must_use]
     pub fn with_repository(mut self, repository: impl Into<PathBuf>) -> Self {
         self.global_options.repository = Some(repository.into());
@@ -151,7 +151,7 @@ impl JjCommandSpec {
         self
     }
 
-    /// Sets stdin text for a future command runner.
+    /// Sets the text the command runner writes to stdin before closing it.
     #[must_use]
     pub fn with_stdin(mut self, stdin: impl Into<String>) -> Self {
         self.stdin = Some(stdin.into());
@@ -225,19 +225,19 @@ impl JjCommandSpec {
         argv
     }
 
-    /// Returns the process working directory metadata.
+    /// Returns the child process working directory.
     #[must_use]
     pub fn cwd(&self) -> Option<&Path> {
         self.cwd.as_deref()
     }
 
-    /// Returns the repository path metadata.
+    /// Returns the repository path passed to `jj --repository`.
     #[must_use]
     pub fn repository(&self) -> Option<&Path> {
         self.global_options.repository()
     }
 
-    /// Returns stdin text for a future command runner.
+    /// Returns the text to write to stdin, or `None` to run with closed stdin.
     #[must_use]
     pub fn stdin(&self) -> Option<&str> {
         self.stdin.as_deref()

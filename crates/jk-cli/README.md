@@ -1,10 +1,14 @@
 # jk-cli
 
-Command-line and `jj` process integration helpers for `jk`.
+`jj` process integration for `jk`.
 
-This crate owns the temporary shell-out boundary used by the current MVP. It runs `jj` once for
-CLI-equivalent rendered output and once with a narrow JSON template for semantic records.
+Log inspection combines configured `jj` rendering with JSON records for navigation and selection.
+Diff and other command modules provide the output and metadata needed by their views. Bookmark lists
+and abandon's embedded Git-format patch use fixed formats.
 
-The long-term direction is direct `jj-cli` / `jj-lib` integration when that can preserve user
-templates, colors, graph rendering, revsets, and command semantics without duplicating `jj` display
-logic.
+Queries build command specifications for inspection, mutations, workspaces, bookmarks, and remotes.
+Runners execute those specifications, with optional cancellation and history recording. External
+programs use a separate runner interface and receive arguments without implicit shell interpretation.
+
+Direct `jj-cli` / `jj-lib` integration remains a longer-term option if it can preserve jj's configured
+rendering and command semantics without duplicating its display logic.

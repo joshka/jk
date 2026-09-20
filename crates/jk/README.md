@@ -2,9 +2,10 @@
 
 `jk` is a jj-native terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
 
-It keeps `jj` output as the source of truth and adds an interactive jj TUI around it: inspect
-changes, run safe command previews, review command history, and recover through operation views
-without losing terminal context.
+Its log and inspection views render `jj` output, including configured graph styles, colors, revsets,
+and templates. `jk` adds navigation, search, repository actions, and command history.
+
+The media below shows the published release.
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
@@ -33,8 +34,7 @@ cargo install jk --locked
 
 ## Current Status
 
-This source checkout supports inspection, local history editing, workspace management, and sharing
-previews with consistent controls and command previews:
+In this source checkout, you can:
 
 - inspect changes with log, show, diff, evolog, and status;
 - navigate, search, fold, and compare diffs without losing the selected revision;
@@ -42,8 +42,8 @@ previews with consistent controls and command previews:
 - describe inline and use the action menu for New, Edit, Undo, Redo, and Abandon;
 - use `R` to choose rebase roles and a destination, `a s` for whole-change squash, and `a r` to
   restore all paths from the selected commit into the working copy;
-- inspect exact mutation commands before confirmation, with command-local Run Options on supported
-  previews, recorded results, and links to the resulting operation;
+- review rebase, squash, and restore commands before confirmation, adjust their Run Options, and
+  inspect recorded results and links to the resulting operation;
 - use `W` to inspect, add, rename, forget, and update stale workspaces;
 - use `B` for bookmarks, confirmed fetch from an explicit remote, and scoped push dry-runs.
 
@@ -62,13 +62,12 @@ Current limitations:
 - Native commit, split, absorb, resolve, and foreground editor/tool handoff remain planned.
   Captured command modes do not provide an interactive terminal to child processes.
 - Push stops at dry-run. Dedicated tags and advanced remote workflows remain planned.
-- Run Options currently covers working-copy policy, eligible historical operations, and immutable
-  override for a pending rebase, squash, or restore command. Repository and config editing remain
-  outside that drawer.
+- Run Options changes working-copy policy and immutable protection for a pending rebase, squash,
+  or restore command. Historical operation IDs are available for rebase and squash. Repository
+  and config editing remain outside that drawer.
 
-Use `?` inside the TUI for full screen-specific key help. The repository's
-[Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) guide has
-task-oriented examples for the current jk surface.
+Use `?` for the active screen's keys. See
+[Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) for workflows and examples.
 
 ## Commands
 
@@ -86,8 +85,8 @@ jk workspaces
 jk -R /path/to/repo -n 20
 ```
 
-Bare `jk` follows `jj`'s configured `ui.default-command` when that command is log-like enough for
-navigation. Use `jk log` for the explicit log path.
+Bare `jk` follows `jj`'s configured `ui.default-command`. The configured command must accept log
+templates so `jk` can identify revisions for navigation. Use `jk log` to open the log explicitly.
 
 ## Roadmap
 
@@ -96,9 +95,8 @@ The detailed roadmap lives in the repository docs:
 - [product plan](https://github.com/joshka/jk/blob/main/docs/product-plan.md);
 - [issue-sized roadmap](https://github.com/joshka/jk/blob/main/docs/roadmap.md).
 
-Near-term work stabilizes the integrated rebase, squash, restore, workspace, and refs workflows.
-The next command slices are foreground editor/tool handoff, shared fileset selection, and completing
-publication from the existing push dry-run flow.
+Near-term work stabilizes rebase, squash, restore, workspace, and bookmark workflows. The next
+priorities are foreground editor/tool handoff, shared fileset selection, and push after dry-run.
 
 See the repository README for the current status and development workflow.
 

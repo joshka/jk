@@ -2,11 +2,11 @@
 
 `jk` is a jj-native terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
 
-It keeps the parts of `jj` you already trust: the graph, colors, wording, revsets, templates, and
-diff output still come from `jj`. `jk` adds an interactive review loop around that output so you can
-keep context open while an editor, shell, or coding agent changes the repository.
+Its log and inspection views render `jj` output, including configured graph styles, colors, revsets,
+and templates. `jk` adds navigation, search, and repository actions so you can keep changes in view
+while an editor, shell, or coding agent works on the repository.
 
-The media below shows the published release; current integration proof is described in
+The media below shows the published release. Source-checkout validation is recorded in
 [workspace coherence](docs/workspace-coherence.md).
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
@@ -36,8 +36,7 @@ cargo install jk --locked
 
 ## Current Status
 
-This source checkout supports inspection, local history editing, workspace management, and sharing
-previews with consistent controls and command previews:
+In this source checkout, you can:
 
 - inspect changes with log, show, diff, evolog, and status;
 - navigate, search, fold, and compare diffs without losing the selected revision;
@@ -45,8 +44,8 @@ previews with consistent controls and command previews:
 - describe inline and use the action menu for New, Edit, Undo, Redo, and Abandon;
 - use `R` to choose rebase roles and a destination, `a s` for whole-change squash, and `a r` to
   restore all paths from the selected commit into the working copy;
-- inspect exact mutation commands before confirmation, with command-local Run Options on supported
-  previews, recorded results, and links to the resulting operation;
+- review rebase, squash, and restore commands before confirmation, adjust their Run Options, and
+  inspect recorded results and links to the resulting operation;
 - use `W` to inspect, add, rename, forget, and update stale workspaces;
 - use `B` for bookmarks, confirmed fetch from an explicit remote, and scoped push dry-runs.
 
@@ -65,9 +64,9 @@ Current limitations:
 - Native commit, split, absorb, resolve, and foreground editor/tool handoff remain planned.
   Captured command modes do not provide an interactive terminal to child processes.
 - Push stops at dry-run. Dedicated tags and advanced remote workflows remain planned.
-- Run Options currently covers working-copy policy, eligible historical operations, and immutable
-  override for a pending rebase, squash, or restore command. Repository and config editing remain
-  outside that drawer.
+- Run Options changes working-copy policy and immutable protection for a pending rebase, squash,
+  or restore command. Historical operation IDs are available for rebase and squash. Repository
+  and config editing remain outside that drawer.
 
 Use `?` inside `jk` for contextual help. See [Using jk](docs/usage.md) for workflows and
 [command coverage](docs/command-coverage.md) for implemented forms and the next priorities.
@@ -76,11 +75,11 @@ Use `?` inside `jk` for contextual help. See [Using jk](docs/usage.md) for workf
 
 Start with `jk` or `jk log`, then use:
 
-- `Enter`, `d`, `v`, and `s` to inspect the selected change;
+- `Enter`, `d`, and `v` to inspect the selected change; `s` for repository status;
 - `:` to run a direct `jj` command or `!` to run an external executable without shell
   interpretation;
-- `a` to open actions for the selected change, then `a` again to abandon it after an empty check
-  and, when content would be discarded, a confirmation;
+- `a`, then `a` to abandon the selected change: empty changes run immediately; other changes open
+  a confirmation with Cancel selected;
 - `a`, then `r` to preview restoring all paths from the selected revision into `@`;
 - `a`, then `m` to edit and save a description inline; choose New, Edit, Undo, or Redo from `a`
   to run them immediately;
@@ -111,18 +110,14 @@ jk -R /path/to/repo -n 20
 jk -R /path/to/repo log --limit 20
 ```
 
-Bare `jk` follows `jj`'s configured `ui.default-command` when that command is log-like enough for
-the semantic navigation pass. Use `jk log` when you want the explicit log command path.
+Bare `jk` follows `jj`'s configured `ui.default-command`. The configured command must accept log
+templates so `jk` can identify revisions for navigation. Use `jk log` to open the log explicitly.
 
 ## Roadmap
 
-The detailed product and engineering plan lives in
-[docs/product-plan.md](docs/product-plan.md). The shorter
-[docs/roadmap.md](docs/roadmap.md) turns that plan into issue-sized milestones.
+The [product plan](docs/product-plan.md) and [roadmap](docs/roadmap.md) track these priorities:
 
-The current stabilization direction is:
-
-- stabilize the integrated rebase, squash, restore, and workspace workflows;
+- stabilize rebase, squash, restore, workspace, and bookmark workflows;
 - keep README, crate README, changelog, website, and media aligned with released behavior;
 - use confirmations for consequential mutations and keep command history and operation recovery
   available after every mutation;
@@ -147,19 +142,20 @@ Visual README media is generated with:
 just readme-media
 ```
 
-By default this local development task writes to `target/dogfood-artifacts/readme-media/`. Public
-README, crates.io, and release-note media is published later from the separate
-[`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository and served from
-`https://www.joshka.net/jk-screenshots/`. Keeping generated media out of this source repo avoids
-making jj handle Git LFS-heavy screenshot and GIF churn.
+This task writes PNGs and GIFs to `assets/` in the sibling
+[`joshka/jk-screenshots`](https://github.com/joshka/jk-screenshots) repository. Set
+`JK_SCREENSHOTS_REPO` if that repository is elsewhere. Each recording retains its terminal-state
+JSON, tape, and binary metadata under `target/dogfood-artifacts/betamax/runs/`.
+
+Publish README, crates.io, and release-note media from `jk-screenshots`, which tracks it with Git LFS
+and serves it from `https://www.joshka.net/jk-screenshots/`. Generated media stays out of this source
+repository.
 
 ## Crates
 
-The workspace is split into narrow crates:
+The workspace contains:
 
 - `jk`: binary crate and terminal lifecycle;
 - `jk-cli`: temporary `jj` process integration;
 - `jk-core`: shared records and small data types;
 - `jk-tui`: Ratatui state, rendering, and input actions.
-
-Those boundaries keep `jj` presentation decisions at the edge while the TUI owns interaction state.

@@ -7,8 +7,8 @@ Jujutsu. The root `Cargo.toml` is workspace-only. The publishable
 crates live under `crates/`:
 
 - `crates/jk`: binary crate and current default workspace member.
-- `crates/jk-core`: shared log records.
-- `crates/jk-cli`: temporary `jj` process integration.
+- `crates/jk-core`: revision, selection, command, and history models.
+- `crates/jk-cli`: `jj` process integration.
 - `crates/jk-tui`: Ratatui state and rendering.
 
 Release and CI automation lives in `.github/`, `release-plz.toml`,
@@ -127,16 +127,15 @@ dialogs, and views. They define jj presentation fidelity, shared visual states, 
 
 The accepted direction is a calm, solid, CLI-like interface: preserve jj output and let spacing,
 alignment, hierarchy, and consistent behavior provide polish. Default to borderless content and
-restrained controls. Apply this contract to recovered workspace work as well as new features.
+restrained controls.
 
 Use the original action-menu colors and buttons as the reference for shared control styles.
 Prefer keyboard hints when buttons add no useful choice, and keep color roles consistent across
 dialogs, including focus, secondary actions, and destructive actions.
 
-Dialog screenshots must show a distinct opaque dialog fill and the real underlying repository view.
-Use enough fixture content behind and around the dialog to judge its placement, readability, and
-separation from context;
-do not present isolated dialogs on an otherwise empty canvas as visual proof.
+Dialog screenshots must show a distinct opaque fill with real repository content visible around it.
+Use populated fixtures so placement, readability, and separation from the underlying view can be
+inspected.
 
 Default to user comprehension over implementation structure. Screens,
 overlays, hotbars, menus, previews, and other discretionary layout

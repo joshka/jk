@@ -1,21 +1,12 @@
 //! Cancellable background execution for read-only refresh work.
 //!
-//! The first production slice deliberately owns only explicit log refresh. Preview-driven refresh
-//! may use the same runner only after the preview opts in and the host validates that the work is
-//! read-only. Timer-, watcher-, and repository-wide auto-refresh remain out of scope until every
-//! target has a stable preservation identity.
+//! Starting a log refresh cancels the previous request without blocking the application thread.
+//! Dropping the runner cancels pending work and joins its workers.
 //!
-//! Result promotion follows two independent checks: the request generation must still be current,
-//! and the loaded source must still identify the active view. A superseded success or failure may
-//! contribute command history, but it cannot replace content or status. An accepted failure keeps
-//! the last usable body and exposes the error in that view's status line.
-//!
-//! Refreshable views preserve interaction state by underlying-object identity: logs use full change
-//! ids for selection, ordered marks, and expansion; diffs use file paths and exact path-plus-hunk
-//! headers for folds; workspaces use canonical roots before display names; operation logs use full
-//! operation ids. Scroll offsets are retained and clamped. Help and input overlays live outside the
-//! refreshed snapshot and remain open. If a stable object disappears, list views fall back to the
-//! current row, then the nearest old index, then the first row or no selection.
+//! The runner labels results by request generation. Before applying a current result, the caller
+//! must also check that its source still matches the log view. Superseded results can contribute
+//! command history but must not replace content or status. On failure, the caller keeps the last
+//! usable snapshot and displays the error in the view's status line.
 
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
@@ -27,8 +18,8 @@ use jk_core::{CommandHistory, CommandSource, LogSnapshot, SourceAction, SourceVi
 
 /// Host policy for refreshes requested after a command preview completes.
 ///
-/// The default is deliberately disabled. A future preview may opt in to refreshing its originating
-/// live view after a successful mutation; it must not start arbitrary background work itself.
+/// Defaults to explicit user refresh. If a preview opts in, the host may refresh its originating
+/// view after a successful command.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PreviewRefreshPolicy {
     /// Keep refresh under explicit user control.
@@ -50,11 +41,11 @@ pub struct LogRefreshResult {
 }
 
 #[derive(Debug)]
-/// Whether a completion still owns promotion rights for its target.
+/// Whether a result belongs to the latest request.
 pub enum RefreshCompletion<T> {
-    /// The newest request, eligible for target validation and promotion.
+    /// The newest request; the caller must still check that its source matches the view.
     Current(T),
-    /// An older request whose state result must not be promoted.
+    /// An older or cancelled request; its result must not replace view content or status.
     Superseded(T),
 }
 
@@ -85,12 +76,12 @@ impl LogRefreshRunner {
         });
     }
 
-    /// Drains completed work, labelling results that were superseded before promotion.
+    /// Returns completed results, labelling those superseded or cancelled before this call.
     pub fn drain(&mut self) -> Vec<RefreshCompletion<LogRefreshResult>> {
         self.tasks.drain()
     }
 
-    /// Cancels and retires the active request so its eventual result cannot be promoted.
+    /// Requests cancellation without waiting and marks the eventual result as superseded.
     pub fn cancel_active(&mut self) {
         self.tasks.cancel_active();
     }

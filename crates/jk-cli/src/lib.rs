@@ -1,14 +1,17 @@
 //! `jj` process integration for `jk`.
 //!
-//! The current MVP needs two views of the same `jj` command:
+//! [`JjLog`] and [`JjDiff`] expose rendered terminal output alongside structured records for
+//! navigation. Log rendering retains the user's configured template, graph, revset, and colors;
+//! semantic records let the TUI move by change and recover selection after refresh.
 //!
-//! - rendered terminal output that keeps the user's configured template, graph, revset, and colors;
-//! - semantic records that let the TUI move by change, preserve selection, and expand the selected
-//!   description.
+//! Command modules provide queries for inspection, mutations, workspaces, bookmarks, and remotes.
+//! Their command specifications carry arguments and execution policies into [`JjCommandRunner`].
+//! The system runners launch `jj`; optional [`RecordingJjCommandRunner`] wrappers retain command
+//! history. External programs use the separate [`ExternalCommandRunner`] interface.
 //!
-//! `JjLog` provides that bridge by running `jj` as a child process. `JjDiff` follows the same
-//! rendered-output-first boundary for selected-change inspection. This is a temporary integration
-//! boundary until `jj-cli` / `jj-lib` can provide both pieces without parsing command output.
+//! Parsers expose the metadata needed by each workflow. Bookmark lists and abandon's embedded
+//! Git-format patch have their own formats; they do not inherit every configured jj presentation
+//! option.
 
 mod command;
 

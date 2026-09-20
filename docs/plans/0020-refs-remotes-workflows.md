@@ -1,33 +1,33 @@
 # Refs and Remotes Workflows
 
-Status: implemented through push dry-run; real push remains gated
+Status: implemented through push dry-run in the integration under review; real push remains disabled.
 
-Owner: Luna
+The [workspace coherence record](../workspace-coherence.md) tracks integration and validation;
+[command coverage](../command-coverage.md) lists the remaining native workflows. Bookmark create and
+move retain typed input when a preview is cancelled or execution fails. Fetch refreshes bookmarks
+and retains command output. The remote chooser freezes one named remote, and command specs use
+exact patterns for literal names. `:` rejects bookmark mutations, fetch, and push, including dry-run,
+and directs the user to the preview flows.
 
-Implementation note: the completed workflow uses a small in-app remote chooser, exact-pattern
-arguments, and local jj fixture repositories. Fetch refreshes bookmarks and retains command output.
-Command mode rejects these mutation/network commands in favor of the preview paths, including
-push dry-run. Real push remains disabled. The original design below records intended review and
-acceptance criteria; implementation file boundaries differ where existing app patterns were reused.
-
-Scope: bookmarks, explicit fetch, and push dry-run after the current mutation and history foundations
+The remaining sections preserve the original review plan and acceptance criteria. Proposed type
+names, file boundaries, test commands, and stack order describe that plan; they are not a map of the
+merged implementation. The real-push gate remains deferred work.
 
 ## Outcome
 
-Implement the refs/remotes roadmap in five dependency-ordered review units:
+The original plan divided refs and remotes into five review units:
 
 1. inspect local and remote bookmarks and open their target commits;
 1. preview and confirm local bookmark create, move, and delete operations;
-1. choose one named remote and run fetch with durable output and command history;
+1. choose one named remote and run fetch with retained output and command history;
 1. choose one local bookmark and one named remote, then run and display push dry-run;
 1. optionally enable a real push only after every gate in [Real Push Gate](#real-push-gate) passes.
 
-The default plan stops after push dry-run. A real push is a separate final review unit, not an
-implicit part of the dry-run change.
+The implemented scope stops after push dry-run. Real push requires its own review and the gate below.
 
-## Current Foundations
+## Foundations at planning time
 
-The implementation should reuse the foundations already present on `main`:
+The plan reused these foundations from its `main` baseline:
 
 - `jk_core::JjCommandSpec` owns process argv, global options, titles, execution mode, safety class,
   and refresh policy.
@@ -40,14 +40,14 @@ The implementation should reuse the foundations already present on `main`:
   stdout/stderr in a focused rendered view.
 - `jk::ViewStack` preserves the parent screen while target details or command output are open.
 
-Do not copy code from another active workspace or depend on unlanded shared-selector work. Build the
-small bookmark and remote selection state needed here from the landed patterns. A later change can
-adopt a shared selector after that selector lands independently.
+The original refs workspace stayed independent of the unlanded shared-selector work. Its bookmark
+and remote state followed these existing view patterns; shared-selector adoption remains separate
+from the refs behavior.
 
 ## Verified jj 0.44.0 Contract
 
-The command forms below were verified against the installed `jj 0.44.0` help. Re-run the same help
-checks before implementation in case Luna's installed version differs:
+The command forms below were verified against the installed `jj 0.44.0` help during planning.
+Recheck help when changing these forms or adding flags:
 
 ```text
 jj bookmark list --all-remotes -T 'json(self) ++ "\n"'
@@ -73,7 +73,7 @@ conflict state, and shorten full IDs only for display. The presence of `tracking
 tracking even when its value is `[null]` after a local deletion. Compare the full target merge terms
 when reporting whether a tracked remote is synchronized.
 
-Important upstream behavior to preserve in UI text and tests:
+Upstream behavior to preserve in UI text and tests:
 
 - `bookmark move` cannot create a missing bookmark.
 - Moving backwards or sideways fails unless `--allow-backwards` is explicitly supplied. Do not
@@ -100,7 +100,8 @@ These invariants apply across all review units:
   push flag out of the first push workflow.
 - Do not expose bookmark mutation actions for remote-only rows.
 - Do not allow a conflicted, deleted, or multi-target local bookmark into the first push workflow.
-- Opening or canceling a prompt, chooser, or preview must spawn no command and add no history record.
+- Opening or canceling a prompt or preview must not run its pending mutation. Opening the remote
+  chooser may load and record `jj git remote list`; choosing a row only prepares the preview.
 - Record every confirmed bookmark mutation, fetch, and push dry-run through
   `RecordingJjCommandRunner`.
 - Keep both successful and failed fetch/dry-run output visible in a pushed output/result view.
@@ -216,8 +217,8 @@ The exact names can change. The required policy is:
 - unknown commands keep the current command-mode behavior; broader mutation classification remains
   a separate roadmap concern.
 
-This is a narrow closure of the new feature's bypass, not a claim that all arbitrary command-mode
-mutations are now fully classified.
+This policy covers refs and remote commands. Arbitrary command-mode mutation classification remains
+separate work.
 
 ## Review Unit 1: Bookmark Inspection
 
@@ -490,7 +491,7 @@ fixture root before any fetch or push command runs.
 
 ## Documentation and Terminal Evidence
 
-When the first four units are complete:
+The original completion checklist was:
 
 1. Update `README.md`, `crates/jk/README.md`, and `docs/usage.md` together. Replace only the planned
    bookmark/fetch/push-dry-run wording that is now implemented; keep real push described as
@@ -522,7 +523,8 @@ website/media pass in the handoff instead of editing those repositories from thi
 
 ## Validation
 
-Run focused checks after each review unit, then the broad gate after the complete stack:
+The plan proposed the following focused checks and broad validation gate. Some test filters and
+file targets changed during implementation; use the workspace coherence record for executed checks.
 
 ```text
 cargo test -p jk-core command
@@ -548,7 +550,7 @@ change. Every review unit should build and pass its relevant tests without depen
 
 ## jj Stack Shape
 
-Starting from this plan change, Luna should create this stack sequentially:
+The original proposed stack was:
 
 ```text
 Add bookmark inspection
@@ -558,13 +560,12 @@ Add bookmark push dry-run
 Confirm guarded bookmark push    # optional; only after the real-push gate passes
 ```
 
-Use `jj new` for each unit and set its description before editing. Do not create bookmarks or push
-the stack from this workspace. If a follow-up is inseparable from the change below it, squash only
-after the descendant's focused tests pass; otherwise preserve the review boundary.
+Each planned unit used a new described jj change. The original task excluded publication and kept
+follow-up changes separate until their focused tests passed.
 
 ## Dependency and Merge Order
 
-Merge in the same order as the stack:
+The proposed dependency order was:
 
 1. bookmark inspection establishes the parsed ref model and selectable screen;
 1. bookmark mutations consume the selected local ref and reusable confirmation boundary;
@@ -572,11 +573,9 @@ Merge in the same order as the stack:
 1. push dry-run consumes both bookmark and remote selection plus persistent command output;
 1. optional real push consumes the frozen dry-run state and must remain last.
 
-Relative to other active `jk` workspaces, this stack depends only on current `main`. It must not
-depend on `work/shared-selectors`, `work/run-options`, or other unlanded workspace changes. After
-those stacks land, resolve overlap by rebasing this stack and adopting their public landed APIs in a
-separate mechanical change only when that reduces duplicated concepts without mixing behavior into
-the review units above.
+The original stack depended only on its `main` baseline. The later workspace coherence pass combined
+refs, selectors, Run Options, and other unfinished workflows, resolving their shared dispatch and
+preview code together. These dependency notes explain the original review boundaries.
 
 ## Non-Goals
 
@@ -595,7 +594,7 @@ the review units above.
 
 ## Completion Handoff
 
-Luna's final handoff should include:
+The original handoff checklist required:
 
 - exact workspace path;
 - `jj status` and `jj log -r 'main..@'` showing the review-unit stack;

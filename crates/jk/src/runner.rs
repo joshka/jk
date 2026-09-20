@@ -4,6 +4,8 @@ use jk_cli::{JjCommandRunner, RecordingJjCommandRunner, SystemJjCommandRunner};
 use jk_core::{CommandHistory, CommandSource, JjCommandSpec};
 
 /// Gives each jj invocation the width left after jk's interaction gutter.
+///
+/// Samples terminal width when constructed; create a new runner after a resize.
 pub(crate) struct TuiJjCommandRunner<R> {
     inner: R,
     columns: Option<u16>,

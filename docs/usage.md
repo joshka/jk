@@ -1,17 +1,16 @@
 # Using jk
 
-This guide shows the shortest paths through the current `jk` TUI. It is not a complete key
-reference. Press `?` inside `jk` for the full key list for the active screen.
+Press `?` inside `jk` for the full key list for the active screen.
 
 ## Start From The Log
 
-Run:
+Start `jk` in a jj repository:
 
 ```sh
 jk
 ```
 
-Use the log as the place to keep context while inspecting or changing the repository:
+From the log:
 
 - `Enter` opens `jj show` for the selected change.
 - `d` opens `jj diff` for the selected change.
@@ -22,6 +21,7 @@ Use the log as the place to keep context while inspecting or changing the reposi
 
 `jk log -T <template>` changes the rendered log template, but the navigation pass still uses `jk`'s
 internal template so movement and selection stay stable.
+Loading or refreshing the log snapshots working-copy changes, as ordinary `jj log` does.
 
 ## Review A Diff
 
@@ -33,7 +33,7 @@ jk diff --from <from> --to <to>
 jk diff --stat
 ```
 
-Use the smallest set of controls that gets you through review:
+In the diff view:
 
 - `[` and `]` move between files.
 - `{` and `}` move between hunks.
@@ -47,31 +47,28 @@ and format switching around that output.
 
 ## Open The Action Menu
 
-Press `a` from the log to open actions that are meaningful for the selected revision. The menu
-groups revision changes separately from history and recovery, labels safety and execution behavior,
-and routes each selection through the existing command runner:
+Press `a` from the log to open revision actions and recovery commands. Each row indicates whether
+the command runs immediately or opens a confirmation:
 
-- `m` opens an inline description editor for the selected revision; `Enter` saves it immediately.
-- `n` runs New change inside the action menu from marks or the selected revision.
-- `e` runs Edit change inside the action menu.
+- `m` edits the selected revision's description. `Ctrl-j` inserts a newline; `Enter` saves.
+- `n` creates a new change from ordered marks or the selected revision.
+- `e` edits the selected revision.
+- `a` checks whether the selected revision is empty before abandoning it.
 - `s` previews Squash after resolving ordered marks as sources and the cursor as destination.
 - `r` previews copying all paths from the selected revision into `@`.
-- `u` runs `jj undo` inside the action menu.
-- `U` runs `jj redo` inside the action menu.
+- `u` runs `jj undo`.
+- `U` runs `jj redo`.
 
-Inside the menu, press an action key or select a row with `j`/`k` and `Enter`. In particular, `a a`
-checks whether the selected revision is empty before abandoning it: empty revisions run
-immediately, while non-empty revisions open the destructive preview. Describe, New, Edit, Undo,
-and Redo are menu-only there. Restore rejects revision marks as ambiguous, resolves the selected
-source to an exact commit, and shows source, destination, and `all paths` scope before confirmation.
-Inspection views remain read-only and do not offer repository actions.
+Inside the menu, press an action key or select a row with `j`/`k` and `Enter`. These mutation keys
+are active only while the menu is open. Show, diff, status, and evolog views do not offer repository
+actions.
 
-Squash currently operates on whole changes. Mark one or more source revisions in the order you want
+Squash operates on whole changes. Mark one or more source revisions in the order you want
 them shown, move the cursor to a distinct destination, then press `a s`. The confirmation labels
 each role, shows the exact command, keeps the destination description, and supports cancellation.
-File and hunk selection are intentionally deferred.
+File and hunk selection are not yet available.
 
-For actions that open a preview:
+Command previews other than [Abandon](#abandon-a-change) use these controls:
 
 - `Enter` runs the displayed command.
 - `y` copies the displayed command line.
@@ -84,10 +81,25 @@ Command History. The normal footer controls remain visible alongside a short suc
 message. After `jj new` succeeds, selection moves to the newly created working copy. When jj reports
 a resulting operation id, Command History can open the exact `jj op show` view.
 
-The first restore slice intentionally supports only all-path content copying from one selected
-revision into the working copy. Fileset selection, alternate destinations, `--changes-in`, and hunk
-restore remain follow-up work. Immutable destinations fail through jj's normal check unless you
-explicitly allow rewriting in Run options. Failures remain inspectable in Command History.
+Restore copies all paths from the selected revision into `@`. It rejects revision marks as ambiguous,
+resolves the source to an exact commit, and shows both operands and the `all paths` scope before
+confirmation. Fileset selection, alternate destinations, `--changes-in`, and hunk restore are not
+yet available. Immutable destinations fail through jj's normal check unless you explicitly allow
+rewriting in Run options. Failures remain inspectable in Command History.
+
+## Abandon A Change
+
+Press `a`, then `a` from the log. Empty revisions are abandoned immediately. Non-empty revisions,
+or a failed emptiness check, open a confirmation with Cancel selected.
+
+Use Left/Right or Tab to choose View diff, Cancel, or Abandon, then press Enter. From the summary,
+`y` confirms abandonment; `n` or Escape cancels. In the embedded diff, Enter or Escape returns to
+the summary, and `n` cancels. A terminal too small to show the decision must be enlarged before
+confirmation is available.
+
+The embedded patch uses Git-format output with jk's addition/deletion colors. It does not yet
+inherit configured jj diff formatting or colors. To inspect that configured output before
+abandoning, open the normal diff view with `d` from the log.
 
 ## Rebase A Revision
 
@@ -102,9 +114,9 @@ after the destination and also rewrites its existing descendants; `B` inserts be
 the destination and its descendants. These broader modes can affect other workspaces: review their
 scope carefully. `o` returns to onto placement.
 
-Enter opens a separate, exact-command preview; it does not execute from the picker. Enter again in
-the preview confirms. Escape cancels without a graph mutation (while searching, the first Escape
-exits search). Commands use full commit IDs so later selection changes cannot retarget the preview.
+Enter opens the command preview; Enter again confirms. Escape cancels without a graph mutation
+(while searching, the first Escape exits search). Commands use full commit IDs so later selection
+changes cannot retarget the preview.
 Immutable revisions remain protected unless explicitly overridden in Run Options. jj failures
 remain inspectable in Command History.
 
@@ -112,7 +124,7 @@ remain inspectable in Command History.
 
 Dialogs have a distinct filled surface over the repository view. jk detects a light or dark terminal
 at startup. Use `jk --dialog-theme light` or `jk --dialog-theme dark` to override detection; `auto`
-is the default. Unsupported or slow terminals use the readable dark surface. This setting changes
+is the default. Unsupported or slow terminals use the dark surface. This setting changes
 jk dialogs only; it preserves jj's configured graph, diff colors, and terminal background.
 
 ## Run Direct Commands
@@ -142,22 +154,15 @@ External command mode never adds a shell. Quotes and backslashes group argv for 
 metacharacters such as `$`, `|`, `>`, and `&&` remain literal arguments. Run `sh -c` (or another
 shell) explicitly when shell expansion, pipes, redirects, or built-ins are intentional.
 
-This first external-command mode is captured and noninteractive: stdin is closed, stdout and stderr
-are retained in the output view, and the exit code or terminating signal is recorded in Command
-History. Commands that require a foreground terminal, password prompt, or full-screen TUI are not
-supported in this mode; run them after leaving `jk`. This keeps `jk`'s terminal state intact while a
-future foreground/cancellable runner can own terminal suspension and restoration explicitly.
+Both command modes are noninteractive: stdin is closed, stdout and stderr are retained in the
+output view, and the exit code or terminating signal is recorded in Command History. Commands that
+require a foreground terminal, password prompt, or full-screen TUI must run after leaving `jk`.
 
-Failures remain inspectable. Press `e` to edit or retry the same `!` input, `C` to inspect its
-redacted history record, or `y` in Command History to copy the redacted command line. Obvious
-secret-looking argv, stdout, and stderr values use the same redaction policy as `jj` commands.
+Press `e` to edit or retry the same `!` input, `C` to inspect its history record, or `y` in Command
+History to copy the recorded command line. History redacts recognized secret patterns in argv,
+stdout, and stderr using the same rules as `jj` commands.
 
 ## Inspect History And Operations
-
-Press `C` for Command History. Use it to inspect what `jk` ran, copy exact commands, and follow
-operation links.
-
-Useful history path:
 
 1. Press `C`.
 1. Press `Enter` to inspect argv, output, status, duration, and operation metadata.
@@ -180,7 +185,7 @@ Press `W` to list jj workspaces, or start there with `jk workspaces`. From there
 - Forget removes only jj workspace metadata; the workspace directory and files remain on disk.
 - `r` refreshes the workspace list.
 
-Missing workspace roots are reported inside `jk` instead of pushing a broken view.
+If a workspace directory is missing, `jk` displays an error and keeps the workspace list open.
 
 ## Inspect Bookmarks And Remote Safety
 
@@ -197,7 +202,9 @@ bookmarks.
   confirm the scoped push dry-run. Deleted, conflicted, and remote-only rows cannot start a push.
 
 Pattern-based jj arguments use exact matching so a bookmark or remote name cannot expand into
-multiple targets. Command mode routes bookmark mutations, fetch, and push back to these workflows.
+multiple targets. Command mode rejects `bookmark create`, `bookmark move`, `bookmark delete`,
+`git fetch`, and `git push` with instructions to use the bookmark screen. Other bookmark commands
+remain available through command mode.
 
 Fetch and push dry-run output is shown in a retained command-output view and recorded in Command
 History. Fetch refreshes the underlying bookmark list before displaying output; a failed refresh
@@ -206,7 +213,7 @@ its refs. Real push remains unavailable.
 
 ## Command Entry Points
 
-The current root commands are:
+Command-line entry points include:
 
 ```sh
 jk
@@ -219,10 +226,11 @@ jk diff --git
 jk diff --color-words
 jk show <revision>...
 jk status [fileset]...
+jk workspaces
 jk -R /path/to/repo -n 20
 ```
 
-`jk` also has in-app paths for evolog, workspaces, operation views, command previews, and command
+`jk` also has in-app paths for evolog, bookmarks, operation views, command previews, and command
 history.
 
 ## Current Limits

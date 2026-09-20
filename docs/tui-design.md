@@ -1,26 +1,25 @@
 # TUI design guidelines
 
-Status: design contract for new and revised UI, not a claim that every rule is implemented today.
+Status: design contract for new and revised UI. See the [coverage audit](command-coverage.md) for
+implemented workflows and remaining work.
 
-This guide defines the visual and interaction language for all jk screens, items, controls, help,
-menus, dialogs, and views. It elaborates the [product plan](product-plan.md), especially sections
-3.2 through 3.8. That plan owns command semantics and key assignments; this guide owns their
-presentation. Changes to either must preserve the other, or update both with an explicit rationale.
+[Design a coherent TUI UI strategy][design-task] established the direction reaffirmed on 2026-09-20:
+a calm, solid interface that looks like jj CLI output, with borderless content and deliberate
+spacing, alignment, and hierarchy. This applies to screens, controls, help, menus, and dialogs across
+all in-progress workspaces.
 
-The originating discussion is [Design a coherent TUI UI strategy][design-task]. The 2026-09-20
-integration direction reaffirms a calm, solid interface that looks like jj CLI output, with borderless
-content and deliberate spacing, alignment, and hierarchy. Apply that direction to all in-progress
-workspaces. Mockup palettes and shortcut assignments remain proposals until explicitly implemented
-and validated; they do not override this contract or the existing keymap.
+The [product plan](product-plan.md), especially sections 3.2 through 3.8, defines command semantics
+and key assignments. This guide defines their presentation. Update both when a design decision
+changes that relationship. Mockup palettes and shortcuts remain proposals until implemented and
+validated.
 
 [design-task]: codex://threads/01a0b680-89a8-7ee2-8840-db4d9533e8d9
 
 ## 1. Design intent
 
 jk should feel like an interactive form of the user's jj CLI: familiar output, precise controls,
-clear consequences, and stable context. Its visual character is restrained and deliberate.
-Readability, alignment, spacing, and consistent emphasis provide polish. Decoration must not compete
-with repository content. A muted interface still needs obvious focus and readable text.
+clear consequences, and stable context. Use readable text and consistent emphasis; decoration must
+not compete with repository content. A muted interface still needs obvious focus.
 
 Every surface must answer:
 
@@ -72,9 +71,9 @@ attributes, alignment, and cell spacing, never browser-like typography or fracti
 
 Default to borderless regions distinguished by flat background colors and whitespace. Menus and
 dialogs use a distinct opaque surface color without a surrounding box. Keep the actual repository
-view visible around the surface. Reserve Unicode borders for cases
-where containment is otherwise unclear, including a monochrome fallback. Do not add rounded pixel
-corners, shadows, or window decorations as part of jk's terminal interface.
+view visible around the surface. Reserve Unicode borders for cases where containment is otherwise
+unclear, including a monochrome fallback. Do not add rounded pixel corners, shadows, or window
+decorations as part of jk's terminal interface.
 
 Review visual proposals as fixed-cell terminal PNGs. Browser interaction studies may supplement
 these images, but cannot establish that a design fits or looks right in a terminal.
@@ -92,8 +91,7 @@ One surface owns keyboard focus at a time. Avoid several equally bright bars, bo
 Use bold for short titles or key facts, not whole panes. Preserve jj's own emphasis within content.
 Use bold and explicit symbols for focus; an optional restrained accent must remain readable on its
 surface. Semantic warning and error styles remain distinct. Do not use gradients, pulsing
-highlights, decorative shadows, or animated
-selection transitions by default.
+highlights, decorative shadows, or animated selection transitions by default.
 
 Use the original action and abandon menus as the color reference: slate dialog surfaces, teal keys
 and focus, blue-gray secondary actions, and burgundy destructive actions. Apply these roles
@@ -278,9 +276,10 @@ A mutation preview uses this reading order:
 1. Exact jj command or sequence, with a full inspection/copy path.
 1. Execute, edit where supported, copy, and cancel controls.
 
-Use cell-aligned colored button regions for dialog actions, with one font size throughout.
-Focus must have a textual marker as well as color. Prefer no dialog outline; the flat surface and
-padding establish its extent.
+Prefer keyboard hints with accented keys. When a decision needs distinct action regions, use
+cell-aligned buttons with the shared neutral, confirm, or danger colors and a textual focus marker.
+Keep one font size throughout. The opaque surface and padding establish the dialog's extent;
+an outline is usually unnecessary.
 
 Use concrete control wording such as `Run rebase`, not `OK`. Preserve the established preview key
 contract from the product plan except for explicit button-based confirmations. In destructive
@@ -317,6 +316,11 @@ require dismissing a success dialog for routine operations.
 Diff folds need a visible fold marker and hidden extent. Sticky headers must remain distinguishable
 from original lines. File/hunk navigation must not silently mark content. Do not change diff format
 merely to accommodate a layout; use an explicit view option.
+
+The abandon confirmation's **View diff** is a remaining exception: it requests a fixed Git-format
+patch without jj colors, then colors addition/deletion lines and wraps them locally. It does not yet
+honor the configured diff format or palette. Preserve this limitation in review and release notes
+until that inspection path uses configured jj rendering.
 
 Long output gets a document view, not a growing dialog. Reading a command history entry must never
 rerun it. Opening another workspace for inspection must not silently retarget the next mutation.
@@ -363,8 +367,8 @@ short success messages may expire. Respect reduced-motion preferences and avoid 
 
 Use shared semantic styles and shared control behavior. Avoid per-view color constants or string
 heuristics that decide whether a line is a heading, warning, or selected control. Keep semantic
-state separate from rendered text. This is a design boundary, not a requirement for a large widget
-framework or a new renderer.
+state separate from rendered text without introducing a widget framework or renderer merely to
+enforce these roles.
 
 For each UI change, reviewers must be able to identify:
 
@@ -388,9 +392,9 @@ The current development repository and other in-progress workspaces are never sc
 Use layout assertions for bounds, alignment, scroll indicators, focus, and selection preservation.
 Dialog screenshots must show both a distinct filled dialog surface and the real repository view
 behind and around it. Populate fixtures with enough graph, diff, or list content to judge separation
-and placement in context.
-An isolated dialog on an otherwise empty canvas is insufficient proof. Constrained-terminal checks
-must show the actual layout, including when a necessary full-screen surface leaves little context.
+and placement in context. An isolated dialog on an otherwise empty canvas is insufficient proof.
+Constrained-terminal checks must show the actual layout, including when a necessary full-screen
+surface leaves little context.
 
 Use PNG proof for visual hierarchy and readability, with deterministic fixtures and a fresh filename
 for each revision. Review graph, diff, help, a picker, and a mutation preview together when changing
@@ -405,17 +409,14 @@ in the task or pull request reviewing the change.
 
 ## 14. Adoption
 
-The [screen atlas](design/README.md) applies this contract to command-specific mockups and workflow
-journeys, with an inventory of the installed jj CLI and explicit prototype limitations.
+The [screen atlas](design/README.md) contains proposed workflows and a jj CLI inventory.
 
 Apply this guide to new surfaces immediately. Bring existing surfaces into compliance in small,
 reviewable changes rather than combining a behavior rewrite with a palette change.
 
-Start with shared styles and the selection/focus/mark contract, then chrome and help, then menus,
-inputs, and mutation previews. Legacy bright graph selection, fixed black/white chrome, and
-per-surface style choices are migration targets, not approved exceptions. Preserve jj output and
-existing documented key semantics throughout.
+Use the shared styles for selection, focus, marks, chrome, help, menus, inputs, and mutation previews.
+Do not reintroduce saturated graph selection, fixed black/white chrome, or per-view palettes.
+Preserve jj output and documented key semantics throughout.
 
-A visual-only change does not require new product claims. Once visible behavior or appearance ships,
-review the README, crate README, website, and media for consistency under the repository's normal
-publication rules. This document itself adds no new implemented capabilities.
+When visible behavior or appearance ships, review the README, crate README, website, and media under
+the repository's publication rules. Describe only the capabilities included in that release.

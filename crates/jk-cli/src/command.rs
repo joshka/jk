@@ -18,18 +18,17 @@ const HISTORY_STREAM_LIMIT: usize = 8 * 1024;
 
 /// Runs typed `jj` command specs.
 ///
-/// Loaders may call [`JjCommandRunner::run`] more than once for a single user action when they need
-/// both rendered output and secondary metadata. Implementations should therefore avoid assuming
-/// one-shot use unless the caller documents that restriction explicitly.
+/// Loaders reuse a runner for rendered output and navigation metadata, so implementations must
+/// support multiple calls for one user action.
 pub trait JjCommandRunner {
     /// Runs a typed `jj` command spec.
     ///
-    /// Returns the child-process output when the command starts, writes any stdin, and exits
-    /// successfully enough for the caller to inspect the [`Output`].
+    /// Returns captured output and exit status, including unsuccessful exit statuses. The caller
+    /// decides whether the status represents a command failure.
     ///
     /// # Errors
     ///
-    /// Returns the underlying I/O error when spawning, writing, or waiting fails.
+    /// Returns an I/O error when spawning, writing stdin, reading output, or waiting fails.
     fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output>;
 }
 
@@ -37,9 +36,11 @@ pub trait JjCommandRunner {
 pub trait ExternalCommandRunner {
     /// Runs the executable and argv directly, without shell interpretation.
     ///
+    /// An unsuccessful exit status is returned in [`Output`], not as an I/O error.
+    ///
     /// # Errors
     ///
-    /// Returns the underlying I/O error when the process cannot be spawned or waited on.
+    /// Returns an I/O error when spawning, reading output, or waiting fails.
     fn run(&mut self, spec: &ExternalCommandSpec) -> std::io::Result<Output>;
 }
 
@@ -100,9 +101,8 @@ where
 
 /// Executes `jj` commands with the system `jj` binary.
 ///
-/// Each call spawns a fresh `jj` process. Callers that use loaders with multiple passes should
-/// expect multiple invocations and the corresponding I/O errors if the binary cannot be started or
-/// read.
+/// Each call spawns a process with captured stdout and stderr. Stdin receives the spec's input, or
+/// is closed when no input is supplied.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemJjCommandRunner;
 
@@ -114,16 +114,15 @@ impl JjCommandRunner for SystemJjCommandRunner {
 
 /// Shared cancellation signal for a running read-only command.
 ///
-/// Cancellation is cooperative at the runner boundary: the system runner observes the signal,
-/// terminates the child process, drains its output, and reaps it before returning an interrupted
-/// I/O error. Clones refer to the same signal.
+/// Clones share the signal. Calling [`Self::cancel`] sets it permanently; the runner must observe
+/// the signal and stop its work.
 #[derive(Clone, Debug, Default)]
 pub struct CancellationToken {
     cancelled: Arc<AtomicBool>,
 }
 
 impl CancellationToken {
-    /// Creates a signal in the active state.
+    /// Creates a signal with no cancellation requested.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -142,6 +141,11 @@ impl CancellationToken {
 }
 
 /// Executes system `jj` commands while observing a cancellation signal.
+///
+/// Checks for cancellation before spawning and while waiting for process exit or pipe I/O. On
+/// cancellation, terminates and reaps the child and finishes pipe I/O before returning an
+/// interrupted I/O error. On Unix, also terminates helpers in the child's process group. On other
+/// platforms, helpers that retain pipes can delay return until they close those pipes.
 #[derive(Clone, Debug)]
 pub struct CancellableSystemJjCommandRunner {
     cancellation: CancellationToken,
@@ -214,17 +218,16 @@ where
         self.inner
     }
 
-    /// Runs a confirmed mutation and records the resulting operation id when the current operation
-    /// context advances in a bounded before/after probe.
+    /// Runs a confirmed command and records its operation id when the current operation changes.
     ///
-    /// The operation probes are intentionally not recorded in command history. Callers should use
-    /// this only after user confirmation, and ordinary read-only specs fall back to
-    /// [`JjCommandRunner::run`].
+    /// Call only after user confirmation. For supported mutation and fetch specs, compares the
+    /// current operation before and after a successful command. Probes do not appear in command
+    /// history; a failed probe leaves the operation id unset without changing the command result.
+    /// Other specs use [`JjCommandRunner::run`] without probes.
     ///
     /// # Errors
     ///
-    /// Returns the underlying I/O error when the mutation command or operation probe cannot be
-    /// spawned, written to, or waited on.
+    /// Returns an I/O error from running the confirmed command.
     pub fn run_confirmed_mutation(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
         if !should_probe_resulting_operation(spec) {
             return self.run(spec);
@@ -329,8 +332,8 @@ fn run_system_jj_spec_with_cancellation(
     )
 }
 
-/// Drains output while writing stdin so a child cannot deadlock on full pipes. Cancellable commands
-/// own a Unix process group so terminating jj also closes pipes held by its helpers.
+/// Drains output while writing stdin to avoid deadlocks on full pipes. On Unix, cancellable
+/// commands own a process group so cancellation can terminate helpers that retain those pipes.
 fn run_captured_command(
     mut command: Command,
     input: Option<&[u8]>,

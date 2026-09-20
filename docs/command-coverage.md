@@ -1,55 +1,59 @@
 # Routine jj command coverage
 
-Status: integration review on 2026-09-20. The unfinished source workspaces have been combined in
-`integration-all`; this is the implemented scope under review, not a released-version claim.
+Source coverage reviewed on 2026-09-20. These workflows describe this checkout; installed releases
+may have fewer features.
 
-The [product plan](product-plan.md) remains the direction. The CLI surface addendum records jj 0.42;
-installed `jj help` now also exposes `converge`, `run`, and remote tag tracking. Recheck installed
-help when adding command forms. The screen atlas is a design study, not implemented coverage.
+The [CLI surface addendum](plans/cli-surface-addendum.md) records jj 0.42. The installed `jj help`
+used for this review also exposes `converge`, `run`, and remote tag tracking. Check the installed
+version's help when adding command forms. The [screen atlas](design/atlas.html) is a design study.
 
 ## Implemented and remaining workflows
 
-| Family                 | Current native scope                                                    | Remaining scope                                                  |
-| ---------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Log, show, status      | Focused jj-rendered views; log templates and navigation                 | Shared display options beyond log/diff                           |
-| Diff                   | Revision and from/to forms; formats, file/hunk movement, search         | Fileset operands and richer comparisons                          |
-| Evolog, interdiff      | Selected-change evolog                                                  | Native interdiff; typed commands remain available                |
-| New, edit, describe    | Menu actions; ordered new parents; multiline inline description         | Editor handoff and advanced new options                          |
-| Commit                 | Typed noninteractive commands                                           | Native working-copy commit workflow; commit has no revision flag |
-| Rebase                 | Explicit source/destination roles, visible-log search, exact preview    | Multiple destinations and graph preview                          |
-| Squash, restore        | Whole-change squash; selected-commit all-path restore into working copy | File and hunk selection                                          |
-| Split, absorb, resolve | Typed noninteractive forms only                                         | Native actions; foreground diff/merge tool handoff               |
-| Abandon                | Empty-check fast path; destructive confirmation otherwise               | Broader multi-revision forms                                     |
-| Duplicate, revert      | Typed commands                                                          | Native P2 actions                                                |
-| Bookmarks              | List, create, move, delete                                              | Configured list templates; advanced bookmark actions             |
-| Tags                   | Typed commands                                                          | Native list and scoped actions                                   |
-| Git fetch/push         | Explicit remote fetch; one-bookmark push dry-run                        | Real push is disabled; advanced remote forms                     |
-| Undo/redo, operations  | Undo/redo; operation log/show/diff; history links                       | Native operation restore/integrate and display options           |
-| Workspaces             | List, scoped inspection, add/rename/forget/update-stale                 | Creation parents/message/sparse options                          |
+| Family                 | Native workflow                                                     | Gaps and command-mode alternatives                                           |
+| ---------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Log, show, status      | jj-rendered views; log templates and navigation                     | Shared display options beyond log/diff                                       |
+| Diff                   | Revision and from/to forms; formats, file/hunk movement, search     | Fileset operands and richer comparisons                                      |
+| Evolog, interdiff      | Selected-change evolog                                              | Interdiff is available through command mode                                  |
+| New, edit, describe    | Menu actions; ordered new parents; multiline inline description     | Editor handoff and advanced new options                                      |
+| Commit                 | None                                                                | Noninteractive command mode; commit operates on the working copy             |
+| Rebase                 | Source/destination roles, visible-log search, exact command preview | Multiple destinations and graph preview                                      |
+| Squash, restore        | Whole-change squash; all-path restore into the working copy         | File and hunk selection                                                      |
+| Split, absorb, resolve | None                                                                | Noninteractive command mode; foreground diff/merge tools unavailable         |
+| Abandon                | Empty revisions run immediately; other cases open confirmation      | Multi-revision forms use command mode                                        |
+| Duplicate, revert      | None                                                                | Available through command mode                                               |
+| Bookmarks              | List, create, move, delete                                          | Configured list templates; other actions use command mode                    |
+| Tags                   | None                                                                | Available through command mode                                               |
+| Git fetch/push         | Explicit remote fetch; one-bookmark push dry-run                    | Real push is unavailable; other remote workflows remain planned              |
+| Undo/redo, operations  | Undo/redo; operation log/show/diff; history links                   | Operation restore/integrate use command mode; display options remain planned |
+| Workspaces             | List, scoped inspection, add/rename/forget/update-stale             | Creation parents/message/sparse options                                      |
 
-Command mode captures output and keeps failures visible. It is not a foreground terminal handoff.
-The refs flow restricts bookmark mutation, fetch, and push command-mode entry to its dedicated
-flows. In particular, a successful push dry-run does not mean publication is implemented.
+Command mode (`:`) captures output with stdin closed. Use noninteractive forms, such as supplying a
+message to commands that would otherwise open an editor. Interactive editors, diff tools, and merge
+tools require leaving jk.
 
-## Integrated foundations
+Command mode rejects bookmark create/move/delete and Git fetch/push, including push dry-run, with
+instructions to use the bookmark screen. Other bookmark commands remain available. The bookmark
+screen's push dry-run may contact the remote but does not publish changes.
 
-- The [safe workflow integration](workflow-integration.md) retains explicit operand roles, exact
-  previews, recorded results, operation links, and borderless confirmation surfaces.
-- Shared selectors provide a small typed handoff from view selections to command roles. Preserve
-  existing navigation and rendering rather than replacing them with a generic selector framework.
-- The integration provides captured shell-free external commands and cancellable log refresh.
-  Its null-stdin external runner does not support interactive editors or merge tools.
-- Refs work provides real bookmark and remote workflows through dry-run, with exact patterns and
-  explicit destinations. Preserve its distinction between deletion, forgetting, and abandonment.
+## Shared command behavior
 
-## Next coherent slices
+- Rebase, squash, and restore use explicit source/destination roles and exact command previews.
+  [Run options](run-options.md) changes execution settings for that pending command only.
+- Command History retains executed commands, diagnostic output, and resulting operation links for
+  the session. See [workflow integration](workflow-integration.md) for operand and refresh behavior.
+- External command mode (`!`) runs an executable without adding a shell. Like jj command mode, it
+  captures output and closes stdin. Explicit log refresh runs in the background and can be cancelled.
+- Bookmark and remote workflows use exact name patterns and an explicit remote. Deleting a bookmark,
+  forgetting workspace metadata, and abandoning a revision remain separate actions.
+
+## Next workflows
 
 1. Add foreground jj tool handoff, beginning with editor describe. Restore the terminal, record
    success/failure, and refresh when returning. Reuse it for split, diffedit, and resolve.
 1. Add shared fileset selection for commit/split, then extend squash/restore. Show selected and
    remaining content, keep commit scoped to the working copy, and preserve explicit command roles.
 1. Complete publication from the existing push dry-run flow, retaining the chosen bookmark and
-   remote through final confirmation. Native interdiff is a smaller independent inspection slice.
+   remote through final confirmation. Native interdiff is a smaller independent inspection task.
 
 Use fresh disposable repositories for execution tests and Betamax scenarios. Review terminal text
 and PNG checkpoints together. Build from source workspaces; do not exercise mutation workflows on

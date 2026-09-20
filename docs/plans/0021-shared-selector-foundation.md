@@ -1,5 +1,10 @@
 # Shared Selector Foundation
 
+Status: the resolver and initial consumers are integrated under review. See
+[workspace coherence](../workspace-coherence.md) for validation and
+[command coverage](../command-coverage.md) for native workflow scope. The adoption sections below
+identify remaining migrations.
+
 ## Purpose
 
 Command workflows need the same answers before constructing a preview: which repository objects
@@ -7,7 +12,7 @@ were chosen, which command role they fill, whether their order is meaningful, an
 cancelled or submitted unusable state. Those answers should not be inferred independently by each
 rebase, squash, restore, refs, or workspace form.
 
-The foundation in `jk-core` deliberately starts after interaction and before command construction.
+The `jk-core` resolver runs after interaction and before command construction.
 Views still own navigation, search, rendering, scrolling, refresh preservation, and ordered marks.
 Provider adapters still own loading jj data. Command modules still own jj arguments.
 
@@ -39,16 +44,16 @@ view cursor + ordered choices
   vector is never a successful selection.
 - `ResolvedSelection` records whether ordering came from the cursor or explicit user ordering.
 
-The model is generic over the selected value. A revision view can submit a stable change ID, an
-operation list can submit a full operation ID, and a future bookmark screen can submit its own
-provider-neutral identifier without teaching the resolver about jj output or terminal rows.
+The model is generic over the selected value. A revision workflow can submit a full commit ID, an
+operation list can submit a full operation ID, and a bookmark consumer can submit its own identifier.
+The resolver does not parse jj output or terminal rows.
 
 ## Initial Consumers
 
-The first migrations validate boundary behavior without replacing mature view state:
+Three consumers use the resolver:
 
 - `jj new` resolves ordered revision marks as parents, falling back to the cursor revision;
-- the diff file-list popup resolves one fileset target and rejects a stale index;
+- the diff file-list popup resolves one fileset target and rejects an out-of-range index;
 - operation show and diff resolve one full operation ID before returning an action result.
 
 The semantic log cursor, diff navigation state, operation refresh policy, menu rendering, and
@@ -62,7 +67,7 @@ identity or uniqueness.
 
 ## Adopting The Foundation
 
-Mutation workspaces should construct a `SelectionRequest` at the point where roles become known:
+Further workflow migrations should construct a `SelectionRequest` when command roles become known:
 
 - rebase resolves revision sources separately from one or more destinations;
 - squash resolves source revisions separately from the destination revision;
@@ -72,8 +77,7 @@ Mutation workspaces should construct a `SelectionRequest` at the point where rol
 
 Each workflow should match every `SelectionResolution` variant before constructing its existing
 command query. Ambiguous, invalid, and cancelled outcomes must not invoke a runner or create a
-command-history record. This preserves one command-construction owner while making the handoff from
-interactive state auditable and testable.
+command-history record. Command modules retain ownership of their queries and argv.
 
 ## Concrete Integration Boundaries
 
@@ -90,8 +94,8 @@ The workspace lifecycle form captures its workspace name before input begins. Re
 workspace as `Workspace` / `Target` at that handoff; keep destination-path validation, add/forget
 semantics, and active-workspace protections in the lifecycle form.
 
-These are adoption seams, not claims that the separate workflow branches have migrated. The
-foundation deliberately does not add a generic picker widget or move provider checks into core.
+These workflows still own their selection checks; they have not migrated to the shared resolver.
+Provider checks remain in each workflow, and the resolver supplies no generic picker widget.
 
 ## Remaining Interaction Work
 
@@ -99,11 +103,12 @@ This boundary cannot preserve hidden marks by itself. The current log refresh re
 present in the replacement snapshot, so a narrower revset can clear marks silently. Separate
 filtering from object removal and show hidden-mark counts before adopting filtered multi-selection.
 
-The diff-file popup still stores a row index while open. Its out-of-range guard prevents a stale
-index from selecting a file, but cannot detect a reorder that leaves the index valid. Freeze the
-selected path when adding asynchronous refresh or filtering to that popup.
+The diff-file popup stores a row index while open. A terminal resize now captures the selected path
+before reloading the diff and restores that path afterward; a missing path leaves selection invalid.
+Any future asynchronous refresh or filtering must preserve the same identity rule rather than
+reuse a valid index for a different file.
 
-Overlay sizing uses terminal-cell width for Unicode text. Long names still need a full inspection
-path and a selected-row viewport on constrained terminals. The existing fixed dark/cyan overlay
-palette also remains a migration target under the TUI design contract; it is not a shared semantic
-style API.
+Overlay sizing uses terminal-cell width for Unicode text. The integrated overlays use shared styles
+under the [TUI design contract](../tui-design.md), replacing the initial fixed dark/cyan palette.
+Long names still need inspection and selection behavior that keeps their identity readable on
+constrained terminals.

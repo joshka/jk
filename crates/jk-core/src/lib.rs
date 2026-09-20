@@ -1,8 +1,13 @@
-//! Shared log records used by `jk` integration and TUI crates.
+//! Revision, selection, command, and history models shared by `jk` crates.
 //!
-//! `jk-core` keeps the boundary between opaque `jj` rendering and semantic log state explicit. The
-//! rendered log body is still owned by `jj`; `jk` only keeps enough structured metadata to move by
-//! change, preserve selection across refresh, and insert inline details at the right rendered line.
+//! [`LogSnapshot`] pairs opaque `jj` output with [`LogEntry`] metadata for navigation, selection
+//! recovery, and inline details. Diff and inspection snapshots likewise retain rendered output
+//! alongside the metadata their views need.
+//!
+//! [`SelectionRequest`] and [`resolve_selection`] check selected objects against command roles.
+//! [`JjCommandSpec`] describes arguments, execution policies, and previews; [`CommandHistory`]
+//! records execution results. This crate models those requests and results without launching
+//! processes or rendering terminal widgets.
 
 mod command;
 mod command_history;

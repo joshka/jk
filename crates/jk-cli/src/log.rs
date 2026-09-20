@@ -117,10 +117,11 @@ impl JjLog {
         self
     }
 
-    /// Sets whether loading the log snapshots and updates working-copy files.
+    /// Sets the working-copy policy for both rendered and semantic log passes.
     ///
-    /// The default follows ordinary jj behavior. Use [`WorkingCopyPolicy::Ignore`] for a temporary
-    /// refresh after a command that explicitly leaves working-copy files untouched.
+    /// The default allows jj to snapshot and update working-copy files. Apply
+    /// [`WorkingCopyPolicy::Ignore`] to a clone for a refresh after a command that leaves those
+    /// files untouched. This keeps the original source's policy for later loads.
     #[must_use]
     pub const fn with_working_copy(mut self, working_copy: WorkingCopyPolicy) -> Self {
         self.working_copy = working_copy;
@@ -191,10 +192,8 @@ impl JjLog {
 
     /// Loads a rendered log snapshot and semantic entries from `jj`.
     ///
-    /// This method executes `jj` twice: once for the user's rendered log output and once with a
-    /// JSON template for navigation metadata. A failed retry is useful when the repository state or
-    /// `jj` configuration has changed; parse and unsupported-command errors usually need
-    /// configuration or integration changes instead.
+    /// Executes `jj` once for the user's rendered log output, then again with a JSON template for
+    /// navigation metadata. Both passes use the source's working-copy policy.
     ///
     /// # Errors
     ///

@@ -1,51 +1,51 @@
-# Workspace coherence pass
+# Workspace integration
 
-This pass consolidates unfinished work as of 2026-09-20 in the `integration-all` jj workspace.
-The source workspaces and recovery bookmarks remain available. The integration is review work,
-not a claim that every planned command has shipped.
+The `integration-all` jj workspace combines the unfinished workflows reviewed on 2026-09-20.
+The source workspaces and recovery bookmarks remain available. These changes are ready for local
+review and have not been published or merged into main.
 
 ## Product direction
 
-The [TUI design guide](tui-design.md) is the visual and interaction contract. The
-[screen atlas](design/README.md) illustrates a proposed destination; it is not feature coverage.
-The [command coverage audit](command-coverage.md) separates native workflows from partial and
-deferred forms. [Community signals](plans/0022-community-workflow-signals.md) contribute dated
-observations and acceptance criteria without replacing the maintainer's direction.
-The user confirmed this direction in
-[Design a coherent TUI UI strategy](codex://threads/01a0b680-89a8-7ee2-8840-db4d9533e8d9):
+The [TUI design guide](tui-design.md) records the direction established in
+[Design a coherent TUI UI strategy](codex://threads/01a0b680-89a8-7ee2-8840-db4d9533e8d9)
+and refined during this integration:
 
 - Make jk feel like the interactive jj CLI, including configured graph, templates, and colors.
 - Build visual hierarchy from alignment, spacing, clear labels, and restrained color regions.
 - Keep normal views borderless and preserve one dominant task rather than competing panels.
 - Give dialogs a distinct opaque fill and retain real repository content around them in screenshots.
+- Use the original menu's slate, teal, blue-gray, and burgundy roles across dialog controls.
 - Distinguish cursor position, marks, working copy, focus, and mutation operands.
 - Show the objects, consequences, exact command, and controls before executing a mutation.
 - Cover ordinary jj workflows coherently; document partial forms and advanced-command escape paths.
 
+[Command coverage](command-coverage.md) lists implemented workflows and remaining forms. The
+[screen atlas](design/README.md) contains proposals, while
+[community reports](plans/0022-community-workflow-signals.md) supply additional validation cases.
+
 ## Recovered work
 
-| Source workspace             | Recovered input | Treatment                                                     |
-| ---------------------------- | --------------- | ------------------------------------------------------------- |
-| `work/workflows-integration` | `330a0b57`      | Rebase, squash, restore, and workspace lifecycle foundation   |
-| `tui-design-guidelines`      | `ac1db262`      | Integrate guide and distinguish atlas proposals from behavior |
-| `work/refs-remotes`          | `843810c7`      | Review bookmarks, explicit fetch, and push dry-run            |
-| `work/external-command-mode` | `f82c856e`      | Integrate shell-free captured external commands               |
-| `work/cancellable-refresh`   | `ceae5e9c`      | Integrate cancellable log refresh and stale-result protection |
-| `work/shared-selectors`      | `d890ed38`      | Review operand identity and adopt existing selector consumers |
-| `work/run-options`           | Empty change    | Complete a bounded command-scoped Run Options slice           |
-| `work/discord-requirements`  | Empty change    | Complete the public-archive requirements note                 |
+| Source workspace             | Recovered input | Treatment                                                       |
+| ---------------------------- | --------------- | --------------------------------------------------------------- |
+| `work/workflows-integration` | `330a0b57`      | Rebase, squash, restore, and workspace lifecycle foundation     |
+| `tui-design-guidelines`      | `ac1db262`      | Integrate guide and distinguish atlas proposals from behavior   |
+| `work/refs-remotes`          | `843810c7`      | Review bookmarks, explicit fetch, and push dry-run              |
+| `work/external-command-mode` | `f82c856e`      | Integrate shell-free captured external commands                 |
+| `work/cancellable-refresh`   | `ceae5e9c`      | Integrate cancellable log refresh and stale-result protection   |
+| `work/shared-selectors`      | `d890ed38`      | Review operand identity and adopt existing selector consumers   |
+| `work/run-options`           | Empty change    | Add per-command working-copy, operation, and immutable policies |
+| `work/discord-requirements`  | Empty change    | Record public-archive workflow reports and validation cases     |
 
 The action-menu, contextual help, layout-guideline, Betamax PR preview, graph-prefix, and release
 workspaces contain earlier work already represented on main. The old `vibe`, prototype, and recovery
-branches are historical reference, not competing implementations to merge wholesale. In particular,
-the conflicted rebase/action-menu variants are superseded by the recovered workflow integration.
+branches remain historical references. The recovered workflow integration supersedes the conflicted
+rebase/action-menu variants.
 
-## Integration discipline
+## Repository and visual checks
 
-All changes to the shared jj graph are coordinated sequentially. Review work uses sibling jj
-workspaces; it does not rewrite source changes or insert new revisions before unrelated workspaces.
-A multi-parent integration retains source provenance while resolving shared command dispatch,
-rendering, history, and refresh seams together.
+Changes to the shared jj graph run sequentially. Sibling jj workspaces preserve the source changes;
+the integration joins their histories and resolves shared dispatch, rendering, history, and refresh
+behavior at the combined tip.
 
 Behavior tests and recordings run against fresh disposable jj repositories with isolated config
 and identity. The source workspace supplies the binary; it is never the test repository. Local
@@ -56,20 +56,7 @@ Inspect pixels for hierarchy and spacing, and `viewport_text` and styles for con
 fidelity. Narrow layouts, cancellation, failures, and context-preserving returns are part of the
 review. Generated media stays in ignored output directories or the separate media repositories.
 
-## Completion criteria
-
-1. Resolve all shared dispatch and model conflicts without dropping any completed workflow.
-1. Apply the design contract to shared selection, chrome, selectors, and confirmation surfaces.
-1. Fix source-identity, cancellation, history, and operation-link defects found during review.
-1. Validate each integrated command family on fresh fixtures and inspect text plus image evidence.
-1. Align README, crate README, usage, roadmap, and command coverage with actual behavior.
-1. Record the review boundary, validation results, and remaining limits before publication.
-
-The companion website currently describes the released surface. Its rebase, squash, restore,
-refs/remotes, and media claims need updating with the release that lands these changes. A local
-integration build is not sufficient evidence to advertise them as released.
-
-## Integration verification
+## Verified behavior
 
 The combined source passes 675 Rust tests, strict all-target Clippy, and nightly formatting.
 Fresh-repository refs regressions verify literal wildcard names, deleted tracked bookmarks, and
@@ -80,15 +67,15 @@ viewports, distinct marks, and confirmation controls.
 Review fixes include exact new-parent operands, nullable/conflicted bookmark target parsing,
 fetch operation links, preserved input and picker selection, cancellation before mutations,
 terminal-default canvas styling, coordinated opaque dialogs, and child-process output width matched
-to the content viewport.
-Run Options applies to one pending local command and requires the updated preview to be confirmed.
+to the content viewport. Run Options applies to one pending local command and requires the updated
+preview to be confirmed.
 
 Normal log loads and explicit refreshes follow jj's working-copy snapshot behavior. Only the
 immediate refresh after an ignore-working-copy or historical mutation suppresses snapshots, so that
 refresh cannot undo the command's chosen policy. Cancellation remains observable while helper
 processes hold output pipes after their parent exits. Confirmation controls ignore key releases.
 
-### Release compatibility
+## Release compatibility
 
 The new variants in the public exhaustive `jk_tui::command_discovery::CommandFamily` enum break
 downstream exhaustive matches. The action-menu enums also gain variants relative to main. Release
@@ -97,14 +84,23 @@ it into the pending patch release unchanged. Coordinate versions of dependent wo
 through the release workflow. Other reviewed public constructors, accessors, and modules are
 additive.
 
-Behavior changes also deserve release notes: normal log refresh now snapshots working-copy edits
-like jj, and captured commands receive null stdin. Interactive editor/merge-tool handoff is still
-deferred. The background graph keeps its cursor marker while a modal owns input; the modal hides
-the background hotbar, and an explicit unfocused graph treatment remains a visual refinement.
+Release notes should mention that normal log refresh now snapshots working-copy edits like jj,
+and captured commands receive null stdin. Interactive editor/merge-tool handoff remains planned.
+
+Update the companion website's rebase, squash, restore, refs/remotes, and media claims with the
+release that lands these changes. It currently describes released features.
+
+## Remaining presentation limits
+
+The background graph keeps its cursor marker while a modal owns input. The modal hides the
+background hotbar; a separate unfocused graph treatment remains to be designed.
 
 Abandon's embedded patch preview still uses a fixed Git-format diff with local addition/deletion
 colors. It does not yet inherit configured jj diff formatting and colors. The normal diff view
-preserves jj rendering; returning from that view to an abandon confirmation is a separate follow-up.
+preserves jj rendering. A return path from that view to abandon confirmation would remove this
+separate patch renderer.
+
+## Betamax evidence
 
 Fifteen Betamax workflow and layout scenarios pass on fresh fixtures. Two targeted recordings verify
 the final keyboard-hint styles in normal and narrow forms, bringing the total to 17 recordings and

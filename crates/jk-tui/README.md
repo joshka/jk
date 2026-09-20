@@ -2,8 +2,10 @@
 
 Ratatui views and interaction state for `jk`.
 
-This crate owns the current jj-native TUI surface: title and status chrome, movement and expansion
-actions, rendered-log conversion, and selected-row highlighting.
+Views cover logs, diffs, workspaces, bookmarks, operations, command history, and command previews.
+They consume caller-provided snapshots and manage navigation, selection, and rendering. The calling
+application executes commands and supplies refreshed data.
 
-The log body is intentionally borderless and remains visually based on `jj` output. `jk-tui` adds
-only the interaction state needed for selection, refresh, and inline details.
+Log and diff views preserve jj-rendered content inside borderless title and status chrome. Cursor
+and mark indicators occupy a separate gutter. Shared styles define light and dark dialog surfaces,
+keyboard accents, supporting text, and ordinary or destructive action colors.

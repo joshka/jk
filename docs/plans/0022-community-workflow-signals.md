@@ -1,16 +1,15 @@
 # Community workflow signals
 
-Status: bounded requirements evidence, recorded 2026-09-20. This note completes the unfinished
-[jk: Distill Ratatui Discord require…][requirements-task] documentation pass. It introduces no new
-implemented feature claims.
+Archive research recorded 2026-09-20 for
+[jk: Distill Ratatui Discord require…][requirements-task]. These historical reports inform validation
+priorities; implemented scope is recorded in the [coverage audit](../command-coverage.md).
 
 ## Authority and scope
 
-The accepted [TUI design contract](../tui-design.md), established in
-[Design a coherent TUI UI strategy][design-task], owns jk's direction: familiar jj output, calm
-borderless content, clear scope, and polish through alignment, spacing, hierarchy, and continuity.
-Community examples below help choose validation cases. Isolated preferences do not override that
-contract or establish community consensus.
+The [TUI design contract](../tui-design.md), established in
+[Design a coherent TUI UI strategy][design-task], sets jk's direction: familiar jj output, calm
+borderless content, clear scope, and consistent interaction. The requirements below apply that
+contract to individual reports; they are planning conclusions, not community consensus.
 
 This pass used the local Discrawl archive with automatic updates disabled. Its reported last sync
 was 2026-09-20 07:41:09 UTC. Reads were restricted to Ratatui's known `#help` channel and threads
@@ -18,53 +17,50 @@ recorded as `thread_public` with `is_private_thread = 0`. No DMs, private/team-c
 sync, archive export, or publication were used.
 
 The cached guild is a Discord Desktop stub; several channels lack parent and permission metadata.
-Public-thread classification is available, but this pass cannot independently verify current
-effective Discord permissions or reconstruct every forum parent. Accordingly, sources name the
-recorded thread channels without inventing a `#help` parent. Links require appropriate Discord access.
-The selected examples span 2025-05-08 through 2026-05-19; they are historical reports, not claims
-about current Ratatui behavior.
+Public-thread classification is available, but current effective permissions and some forum parents
+could not be verified. Sources therefore use recorded thread names; links require Discord access.
+The selected examples span 2025-05-08 through 2026-05-19. No current Ratatui behavior was verified.
 
-## Observed reports and planning implications
+## Reports and implications
 
 ### Interaction tests need more than a screenshot
 
-**Observed:** In the public thread channel *Approach for acceptance testing?*, on 2025-06-14 and
+In the public thread channel *Approach for acceptance testing?*, on 2025-06-14 and
 2025-06-15, a participant wanted to drive a sequence of user actions and inspect resulting state.
 They identified output timing and coupling to the terminal backend as obstacles. Replies distinguished
 rendering checks, input-to-action checks, application-state checks, and end-to-end flows.
 [Initial question][acceptance-question] · [interaction requirement][acceptance-flow] ·
 [testing layers][acceptance-layers].
 
-**Inference for jk:** Keep focused state/layout assertions and fixture-based Betamax journeys
-complementary. A PNG demonstrates appearance; semantic waits and terminal-state JSON demonstrate
-what appeared at the checkpoint. Neither alone proves that a repository mutation had the intended
-effect. Some testing advice came from jk's maintainer and is not independent demand evidence.
+For jk, use focused state/layout assertions alongside fixture-based Betamax journeys. PNGs reveal
+appearance; semantic waits and terminal-state JSON check checkpoint content. Repository assertions
+must verify mutation effects. Some testing advice came from jk's maintainer, so it is not independent
+demand evidence.
 
 ### Pending work must leave the interface responsive
 
-**Observed:** In *Async example*, on 2025-06-25, a participant implementing an HTTP-backed action
+In *Async example*, on 2025-06-25, a participant implementing an HTTP-backed action
 wanted input and rendering to continue while waiting, including immediate application exit. Replies
 called out resize events and deliberate handling of keyboard events during the pending action.
 [Resize/input discussion][async-input] · [participant's exit requirement][async-exit].
 
-**Inference for jk:** Slow refresh and preview work should preserve responsive navigation and a
-visible cancellation path. Superseded results must not replace the current target's content. The
-stale-result rule follows jk's design contract; this discussion does not itself document stale jj
-results or prescribe a particular async architecture.
+Slow jk refreshes and previews should leave navigation and cancellation responsive. The design
+contract also requires ignoring superseded results; the discussion concerns input during a pending
+request and provides no evidence about stale jj results or a preferred async architecture.
 
-### Focus and input routing need one understandable owner
+### Focus determines where input goes
 
-**Observed:** In *Focus and event captures*, on 2026-01-02, a participant described the burden of
+In *Focus and event captures*, on 2026-01-02, a participant described the burden of
 managing focus and routing events through components. Replies offered different approaches rather
 than a single established solution. [Question][focus-question] · [discussion][focus-discussion].
 
-**Inference for jk:** Menus, selectors, text input, and the underlying graph need an explicit focus
-contract. Printable input must not trigger graph actions; closing a transient surface should restore
-the originating selection and focus. This evidence does not justify adopting a new UI framework.
+jk's menus, selectors, text input, and graph need an explicit focus contract. Printable input must
+not trigger graph actions, and closing a transient surface should restore the originating selection
+and focus. Choosing a UI framework is outside this requirement.
 
 ### Captured output and terminal handoff are separate capabilities
 
-**Observed:** In *Best way to display std::process::Command output in ratatui widgets*, on
+In *Best way to display std::process::Command output in ratatui widgets*, on
 2025-05-08, a participant reported command output obscuring surrounding chrome. A 2025-06-06 reply
 distinguished displaying captured output from embedding a terminal. [Report][output-report] ·
 [distinction][output-distinction]. In *Hey all, I’m working on running an*, on 2025-12-11,
@@ -72,24 +68,24 @@ participants discussed stopping event polling, leaving raw/alternate-screen mode
 restoring the TUI. A reply questioned the example's assumptions; it was not a verified recipe.
 [Handoff example][handoff-example] · [unresolved questions][handoff-questions].
 
-**Inference for jk:** Review shell-free captured commands independently of interactive editor or
-diff-editor support. Future handoff tests must exercise input ownership and terminal restoration on
-both success and failure. Capturing stdout is insufficient evidence that an interactive tool works.
+Captured commands and interactive editor support need separate validation. Handoff tests must check
+input ownership and terminal restoration after both success and failure; stdout capture alone cannot
+exercise those conditions.
 
 ### Terminal geometry needs real-terminal proof
 
-**Observed:** In *Resize messes up nerdfont icons on kitty?*, on 2026-05-19, a participant reported
+In *Resize messes up nerdfont icons on kitty?*, on 2026-05-19, a participant reported
 icons changing apparent width after resize and a spacing workaround. This is one unverified report
 about a particular terminal/font combination. [Report][resize-report].
 
-**Inference for jk:** Use ordinary terminal-cell controls with no required patched font, and inspect
-resize and constrained-width states in a real terminal. This supports a concrete edge case; it does
-not establish user demand for a particular narrow-screen layout or diagnose a current library bug.
+Include that resize case in terminal inspection, and keep essential jk controls usable without a
+patched font. The report leaves the cause unresolved and says nothing about a preferred narrow-screen
+layout.
 
 ## Requirements and integration ownership
 
-These priorities apply the existing design contract to the [workspace integration][coherence].
-Source workspaces identify provenance; implementation status belongs in that integration ledger.
+The [workspace integration][coherence] records implementation status and recovered changes from the
+source workspaces below.
 
 | Priority | Integration area and source workspace                                 | Acceptance criterion                                                                                                                             |
 | -------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -101,10 +97,9 @@ Source workspaces identify provenance; implementation status belongs in that int
 | P1       | External tools; `work/external-command-mode`                          | Captured output is inspectable without losing context. Interactive handoff remains a separate claim requiring success/failure terminal tests.    |
 | P1       | Run options; `work/run-options`                                       | Option editing preserves focus and operands; cancellation leaves the reviewed command unchanged; changed options require a current preview.      |
 
-For cancellation, distinguish closing an unexecuted preview, stopping pending read work, and undoing
-a completed mutation. These are different effects. A local undo must not be advertised as reversing
-a remote push. These requirements come from jk's accepted command and recovery semantics, not from
-the generic Ratatui examples.
+Cancellation closes an unexecuted preview or stops pending work; undo recovers from a completed local
+mutation. A local undo cannot reverse a remote push. Keep these distinctions from jk's command and
+recovery contract when applying the generic Ratatui examples.
 
 ## Verified local context and limits
 
@@ -131,10 +126,10 @@ No direct requirement for jj mutation safety, bookmark/remotes behavior, a palet
 foregrounds was established by this sample. Keyboard exit during pending work had direct evidence;
 specific process-cancellation semantics did not.
 
-Archive omissions, exact-word matching, and the public-only scope limit recall. Different preferences
-about application architecture and the unresolved editor example remain visible uncertainties.
-Do not convert missing search results into a claim that nobody has raised a topic. The accepted
-design contract remains the authority for color fidelity, narrow layouts, and safe jj workflows.
+Archive omissions, exact-word matching, and the public-only scope limit recall; missing results do
+not mean nobody has raised a topic. Architecture preferences varied, and the editor example remained
+unresolved. Color fidelity, narrow layouts, and safe jj workflows remain project requirements from
+the accepted design contract.
 
 [requirements-task]: codex://threads/019fdfb7-3346-7c43-b739-b272da276966
 [design-task]: codex://threads/01a0b680-89a8-7ee2-8840-db4d9533e8d9
