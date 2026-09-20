@@ -55,6 +55,11 @@ The semantic log cursor, diff navigation state, operation refresh policy, menu r
 command builders remain unchanged. They own additional behavior that a generic selector should not
 absorb.
 
+Parent operands use full commit IDs. Stable change IDs continue to own marks and refresh selection,
+but every marked change must resolve to one visible commit before submission. Missing or divergent
+marks reject the request without falling back to the cursor. Display prefixes never determine
+identity or uniqueness.
+
 ## Adopting The Foundation
 
 Mutation workspaces should construct a `SelectionRequest` at the point where roles become known:
@@ -69,3 +74,36 @@ Each workflow should match every `SelectionResolution` variant before constructi
 command query. Ambiguous, invalid, and cancelled outcomes must not invoke a runner or create a
 command-history record. This preserves one command-construction owner while making the handoff from
 interactive state auditable and testable.
+
+## Concrete Integration Boundaries
+
+The rebase workflow's `PendingRebase::from_log` already freezes exact commit IDs. Its source
+resolution can submit those IDs as `Revision` / `Source`, then resolve the chosen destination as
+`Revision` / `Destination` when preparing the preview. Keep its source-role validation and stale or
+divergent mark checks in the workflow: the shared resolver does not know jj semantics.
+
+The refs workflow's `RemotePicker` owns a frozen list of remote names and a selected row. On Enter,
+submit the selected name as `Remote` / `Target` before constructing fetch or push previews. The
+bookmark row still owns local/remote identity and mutation eligibility.
+
+The workspace lifecycle form captures its workspace name before input begins. Resolve a selected
+workspace as `Workspace` / `Target` at that handoff; keep destination-path validation, add/forget
+semantics, and active-workspace protections in the lifecycle form.
+
+These are adoption seams, not claims that the separate workflow branches have migrated. The
+foundation deliberately does not add a generic picker widget or move provider checks into core.
+
+## Remaining Interaction Work
+
+This boundary cannot preserve hidden marks by itself. The current log refresh retains only marks
+present in the replacement snapshot, so a narrower revset can clear marks silently. Separate
+filtering from object removal and show hidden-mark counts before adopting filtered multi-selection.
+
+The diff-file popup still stores a row index while open. Its out-of-range guard prevents a stale
+index from selecting a file, but cannot detect a reorder that leaves the index valid. Freeze the
+selected path when adding asynchronous refresh or filtering to that popup.
+
+Overlay sizing uses terminal-cell width for Unicode text. Long names still need a full inspection
+path and a selected-row viewport on constrained terminals. The existing fixed dark/cyan overlay
+palette also remains a migration target under the TUI design contract; it is not a shared semantic
+style API.

@@ -744,6 +744,13 @@ fn new_preview_pending(state: &mut AppState, new_source: &JjNew) -> Option<Pendi
     };
     let parents = match selected_new_parents(log) {
         SelectionResolution::Resolved(selection) => selection.into_values(),
+        SelectionResolution::Invalid {
+            reason: jk_core::InvalidSelection::UnresolvedIdentity,
+            ..
+        } => {
+            log.show_error("Marked parent is missing or divergent; refresh and reselect");
+            return None;
+        }
         SelectionResolution::Invalid { .. } => {
             log.show_error("No parent revision selected");
             return None;
@@ -3200,7 +3207,7 @@ mod tests {
         assert_eq!(pending.failure_label, "jj new");
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always new abcdefgh"
+            "jj --no-pager --color always new commit"
         );
         assert_eq!(pending.preview.safety, jk_core::SafetyClass::LocalRewrite);
         assert_eq!(
@@ -3211,11 +3218,18 @@ mod tests {
 
     #[test]
     fn new_preview_uses_ordered_marks_as_parents() {
-        let mut state = AppState::new(log_app_view_with_changes([
-            "abcdefghijklmnop",
-            "bbbbbbbbcccccccc",
-            "zyxwvutsrqponmlk",
-        ]));
+        let log = LogView::new(jk_core::LogSnapshot::new(
+            "@ first\n○ second\n○ third\n",
+            vec![
+                jk_core::LogEntry::new("abcdefgh11111111", "first-commit", "first")
+                    .with_rendered_line(0),
+                jk_core::LogEntry::new("bbbbbbbbcccccccc", "second-commit", "second")
+                    .with_rendered_line(1),
+                jk_core::LogEntry::new("abcdefgh22222222", "third-commit", "third")
+                    .with_rendered_line(2),
+            ],
+        ));
+        let mut state = AppState::new(AppView::Log(log));
         let AppView::Log(log) = state.views.active_mut() else {
             panic!("expected log");
         };
@@ -3227,7 +3241,7 @@ mod tests {
         let pending = new_preview_pending(&mut state, &JjNew::default()).expect("pending new");
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always new abcdefgh zyxwvuts"
+            "jj --no-pager --color always new first-commit third-commit"
         );
     }
 
@@ -3286,7 +3300,7 @@ mod tests {
             .next()
             .expect("new record");
         assert_eq!(record.source.action, SourceAction::NewRevision);
-        assert_eq!(record.command.spec_preview, "jj new abc123");
+        assert_eq!(record.command.spec_preview, "jj new commit");
     }
 
     #[test]

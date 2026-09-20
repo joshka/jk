@@ -155,21 +155,35 @@ impl LogState {
             .map(|entry| revision_id_prefix(entry.change_id()))
     }
 
+    /// Returns the selected entry's full commit id for exact mutation targeting.
+    pub fn selected_commit_id(&self) -> Option<&str> {
+        self.selected_entry().map(LogEntry::commit_id)
+    }
+
+    /// Returns the full commit id for a visible, non-divergent stable change id.
+    pub fn commit_id_for_change_id(&self, change_id: &str) -> Option<&str> {
+        let mut matches = self
+            .entries
+            .iter()
+            .filter(|entry| entry.change_id() == change_id);
+        let entry = matches.next()?;
+        // Divergent changes have more than one commit. Do not guess which mark meant.
+        matches.next().is_none().then(|| entry.commit_id())
+    }
+
     /// Selects the visible entry with the given change identifier or unique prefix.
     #[must_use]
     pub fn select_change_id(&mut self, change_id: &str) -> bool {
-        let Some(index) = self
-            .entries
-            .iter()
-            .position(|entry| entry.change_id() == change_id)
-            .or_else(|| {
-                self.entries
-                    .iter()
-                    .position(|entry| entry.change_id().starts_with(change_id))
-            })
-        else {
+        let mut matches =
+            self.entries.iter().enumerate().filter(|(_, entry)| {
+                !change_id.is_empty() && entry.change_id().starts_with(change_id)
+            });
+        let Some((index, _)) = matches.next() else {
             return false;
         };
+        if matches.next().is_some() {
+            return false;
+        }
         self.selected = Some(LogSelection::Entry(index));
         self.follow_selection = true;
         self.expanded_change_id = None;
@@ -1274,6 +1288,43 @@ mod tests {
         assert_eq!(
             state.selected_entry().map(LogEntry::change_id),
             Some("abcdefgh12345678")
+        );
+    }
+
+    #[test]
+    fn selecting_ambiguous_or_empty_prefix_keeps_the_previous_selection() {
+        let mut state = LogState::new(snapshot(["current", "abcdefgh1", "abcdefgh2"]));
+
+        assert!(!state.select_change_id("abcdefgh"));
+        assert!(!state.select_change_id(""));
+        assert_eq!(
+            state.selected_entry().map(LogEntry::change_id),
+            Some("current")
+        );
+        assert!(state.select_change_id("abcdefgh2"));
+        assert_eq!(
+            state.selected_entry().map(LogEntry::change_id),
+            Some("abcdefgh2")
+        );
+    }
+
+    #[test]
+    fn divergent_changes_require_an_explicit_commit_for_mutations() {
+        let state = LogState::new(LogSnapshot::new(
+            "@ first\n○ second\n○ unique\n",
+            vec![
+                LogEntry::new("divergent", "first-commit", "first").with_rendered_line(0),
+                LogEntry::new("divergent", "second-commit", "second").with_rendered_line(1),
+                LogEntry::new("unique", "unique-commit", "unique").with_rendered_line(2),
+            ],
+        ));
+
+        assert_eq!(state.selected_commit_id(), Some("first-commit"));
+        assert_eq!(state.commit_id_for_change_id("divergent"), None);
+        assert_eq!(state.commit_id_for_change_id("missing"), None);
+        assert_eq!(
+            state.commit_id_for_change_id("unique"),
+            Some("unique-commit")
         );
     }
 

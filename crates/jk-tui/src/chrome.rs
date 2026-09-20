@@ -227,7 +227,7 @@ const fn skip_spaces(line: &str, start: usize) -> usize {
 }
 
 fn visible_width(text: &str) -> usize {
-    text.chars().count()
+    Span::raw(text).width()
 }
 
 fn centered_rect(area: Rect, preferred_width: usize, preferred_height: usize) -> Rect {
@@ -323,6 +323,37 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use super::*;
+
+    #[test]
+    fn overlay_width_uses_terminal_cells_for_wide_and_combining_characters() {
+        let wide = format!("> {}", "界".repeat(29));
+        assert_eq!(overlay_width("Diff files", &[wide], 80), 64);
+
+        let combining = "e\u{301}".repeat(55);
+        assert_eq!(overlay_width("Diff files", &[combining], 80), 59);
+    }
+
+    #[test]
+    fn wide_selected_path_and_following_row_remain_on_separate_lines() {
+        let selected = format!("> {}", "界".repeat(29));
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("terminal");
+        terminal
+            .draw(|frame| {
+                render_help_overlay(
+                    frame,
+                    frame.area(),
+                    "Diff files",
+                    &[selected.clone(), "  next.rs".into()],
+                );
+            })
+            .expect("draw wide selector");
+
+        let buffer = terminal.backend().buffer();
+        let overlay = centered_rect(Rect::new(0, 0, 80, 24), 64, 6);
+        assert_eq!(buffer[(overlay.x + 2, overlay.y + 2)].symbol(), ">");
+        assert_eq!(buffer[(overlay.right() - 4, overlay.y + 2)].symbol(), "界");
+        assert_eq!(buffer[(overlay.x + 4, overlay.y + 3)].symbol(), "n");
+    }
 
     #[test]
     fn selector_overlay_uses_colored_regions_without_a_border() {

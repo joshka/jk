@@ -53,7 +53,7 @@ betamax-action-menu-demo:
     {{betamax}} run tapes/action-menu-demo.tape
 
 betamax-shared-selectors:
-    {{betamax}} run tapes/shared-selectors.tape
+    JK_REPO="$PWD" {{betamax}} run tapes/shared-selectors.tape
 
 betamax-abandon-confirmation:
     {{betamax}} run tapes/abandon-confirmation.tape

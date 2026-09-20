@@ -1,6 +1,6 @@
 use jk_core::{
-    CommandPreview, SelectionCandidates, SelectionDecision, SelectionRequest, SelectionResolution,
-    SelectorKind, SelectorRole, SourceAction, resolve_selection,
+    CommandPreview, InvalidSelection, SelectionCandidates, SelectionDecision, SelectionRequest,
+    SelectionResolution, SelectorKind, SelectorRole, SourceAction, resolve_selection,
 };
 use jk_tui::log_view::LogView;
 
@@ -76,11 +76,19 @@ impl PendingCommandPreview {
 }
 
 pub fn selected_new_parents(log: &LogView) -> SelectionResolution<String> {
-    let candidates = SelectionCandidates::new(
-        log.selected_revision_id().map(ToOwned::to_owned),
-        log.marked_revision_ids(),
-    );
     let request = SelectionRequest::one_or_more(SelectorKind::Revision, SelectorRole::Parent);
+    let mut parents = Vec::new();
+    for change_id in log.marked_change_ids() {
+        let Some(commit_id) = log.commit_id_for_change_id(change_id) else {
+            return SelectionResolution::Invalid {
+                request,
+                reason: InvalidSelection::UnresolvedIdentity,
+            };
+        };
+        parents.push(commit_id.to_owned());
+    }
+    let candidates =
+        SelectionCandidates::new(log.selected_commit_id().map(ToOwned::to_owned), parents);
     resolve_selection(request, SelectionDecision::Submit(candidates))
 }
 
@@ -180,17 +188,20 @@ mod tests {
     }
 
     #[test]
-    fn selected_new_parents_use_short_selected_revision() {
+    fn selected_new_parents_use_exact_selected_commit() {
         let log = log_view(["abcdefghijklmnop", "zyxwvutsrqponmlk"]);
 
         let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
             panic!("selected revision should resolve as a parent");
         };
-        assert_eq!(resolved.values(), ["abcdefgh"]);
+        assert_eq!(
+            resolved.values(),
+            ["0000000000000000000000000000000000000001"]
+        );
     }
 
     #[test]
-    fn selected_new_parents_use_short_marked_revisions() {
+    fn selected_new_parents_use_exact_marked_commits_in_order() {
         let mut log = log_view(["abcdefghijklmnop", "bbbbbbbbcccccccc", "zyxwvutsrqponmlk"]);
         let _ = log.apply(LogAction::ToggleMark);
         let _ = log.apply(LogAction::Next);
@@ -200,7 +211,42 @@ mod tests {
         let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
             panic!("ordered revision marks should resolve as parents");
         };
-        assert_eq!(resolved.values(), ["abcdefgh", "zyxwvuts"]);
+        assert_eq!(
+            resolved.values(),
+            [
+                "0000000000000000000000000000000000000001",
+                "0000000000000000000000000000000000000003",
+            ]
+        );
+    }
+
+    #[test]
+    fn marked_parents_with_the_same_short_prefix_remain_distinct() {
+        let mut log = log_view(["abcdefgh11111111", "abcdefgh22222222"]);
+        let _ = log.apply(LogAction::ToggleMark);
+        let _ = log.apply(LogAction::Next);
+        let _ = log.apply(LogAction::ToggleMark);
+
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("distinct marked commits should resolve even when display prefixes collide");
+        };
+        assert_eq!(resolved.values().len(), 2);
+        assert_ne!(resolved.values()[0], resolved.values()[1]);
+    }
+
+    #[test]
+    fn marked_divergent_parent_is_rejected_without_falling_back_to_cursor() {
+        let mut log = log_view(["divergent", "divergent", "cursor"]);
+        let _ = log.apply(LogAction::ToggleMark);
+        let _ = log.apply(LogAction::Last);
+
+        assert!(matches!(
+            selected_new_parents(&log),
+            SelectionResolution::Invalid {
+                reason: InvalidSelection::UnresolvedIdentity,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -232,7 +278,8 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(index, change_id)| {
-                LogEntry::new(*change_id, "commit", "summary").with_rendered_line(index)
+                LogEntry::new(*change_id, format!("{:040x}", index + 1), "summary")
+                    .with_rendered_line(index)
             })
             .collect();
         LogView::new(LogSnapshot::new(rendered, entries))

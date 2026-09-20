@@ -382,8 +382,8 @@ fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
     if title == "Command discovery" {
         let content_width = lines
             .iter()
-            .map(|line| line.chars().count())
-            .chain(std::iter::once("Help".chars().count()))
+            .map(|line| Span::raw(line).width())
+            .chain(std::iter::once(Span::raw("Help").width()))
             .max()
             .unwrap_or(0);
         let area_width = usize::from(area_width);
@@ -395,8 +395,8 @@ fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
 
     let content_width = lines
         .iter()
-        .map(|line| line.chars().count())
-        .chain(std::iter::once(title.chars().count()))
+        .map(|line| Span::raw(line).width())
+        .chain(std::iter::once(Span::raw(title).width()))
         .max()
         .unwrap_or(0);
     content_width.saturating_add(4).clamp(56, 96)
@@ -552,6 +552,15 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use super::*;
+
+    #[test]
+    fn overlay_width_uses_terminal_cells_for_wide_and_combining_characters() {
+        let wide = format!("> {}", "界".repeat(29));
+        assert_eq!(overlay_width("Actions", &[wide], 80), 64);
+
+        let combining = "e\u{301}".repeat(55);
+        assert_eq!(overlay_width("Actions", &[combining], 80), 59);
+    }
 
     #[test]
     fn toast_handles_tiny_terminals_without_panicking() {
