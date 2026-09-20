@@ -19,6 +19,12 @@ pub fn render_app(
     let mode = state.modes.active().cloned();
     match state.views.active_mut() {
         AppView::Log(log) => match &mode {
+            Some(InputMode::RunOptions { .. }) => {
+                log.render(frame);
+                if let Some(InputMode::RunOptions { dialog }) = state.modes.active_mut() {
+                    dialog.render(frame);
+                }
+            }
             Some(InputMode::RebaseDestination { pending }) => {
                 log.render(frame);
                 pending.render(frame);
@@ -71,9 +77,13 @@ pub fn render_app(
                 let Some(InputMode::CommandPreview { pending }) = state.modes.active_mut() else {
                     return;
                 };
+                let mut details = pending.details.clone();
+                if crate::run_options::available(&pending.preview.spec) {
+                    details.push("o  Run options for this command".to_owned());
+                }
                 let view = CommandPreviewView::new(pending.preview.clone())
                     .with_status(pending.copy_status.clone())
-                    .with_details(pending.details.clone());
+                    .with_details(details);
                 pending.can_confirm = view.can_confirm(frame.area());
                 pending.max_scroll = view.max_scroll(frame.area());
                 pending.scroll = pending.scroll.min(pending.max_scroll);

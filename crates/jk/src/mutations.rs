@@ -36,8 +36,9 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
             let new_change_id = (pending.source_action == SourceAction::NewRevision)
                 .then(|| new_change_id_from_output(&output.stderr))
                 .flatten();
-            let refreshed =
-                refresh_after_mutation_with_runner(state, source, runner, pending.success_message);
+            let message =
+                crate::run_options::success_message(&pending.preview.spec, pending.success_message);
+            let refreshed = refresh_after_mutation_with_runner(state, source, runner, message);
             if refreshed && pending.source_action == SourceAction::NewRevision {
                 select_new_change(state, new_change_id.as_deref());
             }

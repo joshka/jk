@@ -383,6 +383,30 @@ impl GlobalOptions {
         self.repository.as_deref()
     }
 
+    /// Returns the explicitly selected working-copy policy.
+    #[must_use]
+    pub const fn working_copy(&self) -> WorkingCopyPolicy {
+        self.working_copy
+    }
+
+    /// Returns the operation context selected for this command.
+    #[must_use]
+    pub const fn operation(&self) -> &OperationLoadPolicy {
+        &self.operation
+    }
+
+    /// Returns whether this command may rewrite immutable commits.
+    #[must_use]
+    pub const fn immutability(&self) -> ImmutabilityPolicy {
+        self.immutability
+    }
+
+    /// Returns whether the command integrates its resulting operation.
+    #[must_use]
+    pub const fn operation_integration(&self) -> OperationIntegrationPolicy {
+        self.operation_integration
+    }
+
     /// Returns global `jj` arguments in canonical render order.
     #[must_use]
     pub fn argv(&self) -> Vec<OsString> {

@@ -289,6 +289,9 @@ pub enum InputMode {
     CommandPreview {
         pending: PendingCommandPreview,
     },
+    RunOptions {
+        dialog: Box<crate::run_options::RunOptionsDialog>,
+    },
     WorkspaceLifecycle {
         dialog: Box<crate::workspace_lifecycle::WorkspaceLifecycleDialog>,
     },

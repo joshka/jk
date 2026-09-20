@@ -64,6 +64,7 @@ mod rebase;
 mod refresh;
 mod rendering;
 mod root_views;
+mod run_options;
 mod runner;
 mod squash;
 mod state;
@@ -334,6 +335,9 @@ fn handle_input_mode_with_workspaces(
         abandon_confirmation::handle_input(state, source, key);
         return InputModeResult::Handled;
     }
+    if matches!(state.modes.active(), Some(InputMode::RunOptions { .. })) {
+        return run_options::handle_input(state, key);
+    }
     if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
         return handle_command_preview_mode(state, source, key);
     }
@@ -410,6 +414,7 @@ fn handle_input_mode_with_workspaces(
                     unreachable!()
                 }
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::RunOptions { .. } => unreachable!(),
                 InputMode::RebaseDestination { .. } => unreachable!(),
                 InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
@@ -444,6 +449,7 @@ fn handle_input_mode_with_workspaces(
                     unreachable!()
                 }
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::RunOptions { .. } => unreachable!(),
                 InputMode::RebaseDestination { .. } => unreachable!(),
                 InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
@@ -465,6 +471,11 @@ fn handle_command_preview_mode(
         return InputModeResult::Handled;
     }
     match key {
+        KeyEvent {
+            code: KeyCode::Char('o'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => run_options::open(state),
         KeyEvent {
             code:
                 KeyCode::Down
