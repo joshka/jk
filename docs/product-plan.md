@@ -69,6 +69,21 @@ not "jj renders every byte forever." The invariant is:
 The goal is to be so good that a terminal-oriented jj user instinctively reaches for `jk` first, and
 a new jj user learns jj faster because `jk` makes the underlying commands visible.
 
+The 2026-09-20 integration direction is broad coverage of the jj commands a normal user regularly
+uses, presented through coherent native workflows. Prioritize inspection, creating and editing
+changes, moving changes and content, bookmarks and sharing, workspace management, and recovery.
+Command mode keeps installed commands and aliases accessible while native workflows grow. Availability
+through command mode or representation in the [screen atlas](design/README.md) does not mean a command
+has a completed native flow. Keep implemented behavior, unmerged work, and roadmap targets
+explicit in release and review notes.
+
+The visual direction established in [Design a coherent TUI UI strategy][design-task] is equally
+central: jj CLI presentation, calm borderless content, and polish through spacing, alignment,
+hierarchy, and continuity. The [TUI design guidelines](tui-design.md) apply to all recovered and new
+work; breadth of command coverage does not excuse an inconsistent interface.
+
+[design-task]: codex://threads/01a0b680-89a8-7ee2-8840-db4d9533e8d9
+
 ### 1.1 What winning looks like
 
 A user can:
@@ -1710,6 +1725,10 @@ Cleanup rules:
 
 ### 13.2 Integration tests
 
+Create a fresh disposable jj repository for each scenario. Build in the source workspace, then run
+the binary against an explicit fixture path. Do not use the current development repository or other
+in-progress workspaces as integration or Betamax test data.
+
 Use fixture jj repos for:
 
 - Linear history.
@@ -1760,6 +1779,14 @@ in-process with `cosmic-text` and `swash`, and writes screenshots or animations.
 treated as both a capture tool and a terminal testing harness: tapes can run interactive terminal
 programs, wait for expected screen text, capture screenshots, write structured terminal state, and
 fail when expected output does not appear before a timeout.
+
+Capture important checkpoints with both `Screenshot` and `State` after semantic `Wait+Screen`
+assertions. Review the PNG's layout and hierarchy alongside the JSON's `viewport_text`, styled spans,
+and style table. Use this pair to check readable content and jj color preservation, including a
+color-enabled fixture and a constrained terminal. `NO_COLOR` captures are useful for the monochrome
+case but cannot establish color fidelity. Include fresh-name PNGs or GIFs and matching text/state
+evidence in the task or pull request that reviews the behavior. Use GIFs for meaningful transitions;
+retain PNG/state checkpoints for close inspection.
 
 The current repo already has the seed of this model:
 

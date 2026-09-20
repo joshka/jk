@@ -5,17 +5,12 @@ use std::path::{Path, PathBuf};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use jk_cli::{JjWorkspaces, WorkspaceInspectionQuery};
 use jk_core::JjCommandSpec;
+use jk_tui::styles;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::prelude::{Color, Line, Span, Style};
+use ratatui::prelude::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph, Wrap};
 
-const BACKGROUND: Color = Color::Rgb(30, 35, 47);
-const HEADER: Color = Color::Rgb(46, 55, 72);
-const MUTED: Color = Color::Rgb(161, 174, 190);
-const INPUT: Color = Color::Rgb(37, 45, 59);
-const DANGER: Color = Color::Rgb(153, 48, 63);
-const CONFIRM: Color = Color::Rgb(28, 112, 121);
 const MIN_CONFIRM_WIDTH: u16 = 40;
 const MIN_CONFIRM_HEIGHT: u16 = 8;
 
@@ -191,19 +186,13 @@ impl WorkspaceLifecycleDialog {
             height,
         );
         frame.render_widget(Clear, panel);
-        frame.render_widget(Paragraph::new("").style(Style::new().bg(BACKGROUND)), panel);
+        frame.render_widget(Paragraph::new("").style(styles::dialog()), panel);
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 format!("  {}", self.kind.title()),
-                Style::new().fg(Color::White).bold(),
+                styles::dialog_accent(),
             )))
-            .style(
-                Style::new().bg(if self.kind == WorkspaceLifecycleKind::Forget {
-                    DANGER
-                } else {
-                    HEADER
-                }),
-            ),
+            .style(styles::dialog()),
             Rect::new(panel.x, panel.y, panel.width, 2.min(panel.height)),
         );
         let inner = Rect::new(
@@ -214,11 +203,11 @@ impl WorkspaceLifecycleDialog {
         );
         let mut lines = vec![
             Line::from(vec![
-                Span::styled("Workspace  ", Style::new().fg(MUTED)),
+                Span::styled("Workspace  ", styles::dialog_supporting()),
                 Span::raw(&self.workspace_name),
             ]),
             Line::from(vec![
-                Span::styled("Path       ", Style::new().fg(MUTED)),
+                Span::styled("Path       ", styles::dialog_supporting()),
                 Span::raw(self.workspace_root.display().to_string()),
             ]),
             Line::from(""),
@@ -228,18 +217,18 @@ impl WorkspaceLifecycleDialog {
                 WorkspaceLifecycleKind::Add => {
                     let destination = resolve_destination(&self.workspace_root, self.input.trim());
                     lines.push(Line::from(vec![
-                        Span::styled("Destination ", Style::new().fg(MUTED)),
+                        Span::styled("Destination ", styles::dialog_supporting()),
                         Span::raw(destination.display().to_string()),
                     ]));
                     lines.push(Line::from(vec![
-                        Span::styled("Name        ", Style::new().fg(MUTED)),
+                        Span::styled("Name        ", styles::dialog_supporting()),
                         Span::raw(destination_name(&self.input).unwrap_or_default()),
                     ]));
                     lines.push(Line::from(""));
                 }
                 WorkspaceLifecycleKind::Rename => {
                     lines.push(Line::from(vec![
-                        Span::styled("New name    ", Style::new().fg(MUTED)),
+                        Span::styled("New name    ", styles::dialog_supporting()),
                         Span::raw(self.input.trim().to_owned()),
                     ]));
                     lines.push(Line::from(""));
@@ -249,13 +238,13 @@ impl WorkspaceLifecycleDialog {
             if self.kind == WorkspaceLifecycleKind::Forget {
                 lines.push(Line::from(Span::styled(
                     "Files are not deleted. Only jj workspace metadata is forgotten.",
-                    Style::new().fg(Color::LightYellow).bold(),
+                    styles::dialog_warning().bold(),
                 )));
                 lines.push(Line::from(""));
             }
             lines.push(Line::from(Span::styled(
                 "Exact command",
-                Style::new().fg(MUTED),
+                styles::dialog_supporting(),
             )));
             lines.extend(wrap_command_line(
                 &command.command_preview().command_line,
@@ -267,42 +256,24 @@ impl WorkspaceLifecycleDialog {
             } else {
                 "New workspace name"
             };
-            lines.push(Line::from(Span::styled(label, Style::new().fg(MUTED))));
+            lines.push(Line::from(Span::styled(label, styles::dialog_supporting())));
             lines.push(Line::from(Span::styled(
                 format!(" {}_", self.input),
-                Style::new().fg(Color::White).bg(INPUT),
+                styles::FOCUS,
             )));
             if let Some(error) = &self.error {
-                lines.push(Line::from(Span::styled(
-                    error,
-                    Style::new().fg(Color::LightRed),
-                )));
+                lines.push(Line::from(Span::styled(error, styles::dialog_error())));
             }
         }
         let paragraph = Paragraph::new(lines)
-            .style(Style::new().fg(Color::White).bg(BACKGROUND))
+            .style(styles::dialog())
             .wrap(Wrap { trim: false });
         let content_height = paragraph.line_count(inner.width.max(1));
         let max_scroll = content_height.saturating_sub(usize::from(inner.height));
         self.scroll = self.scroll.min(max_scroll.try_into().unwrap_or(u16::MAX));
         frame.render_widget(paragraph.scroll((self.scroll, 0)), inner);
-        let footer = if self.command.is_some() {
-            if area.width < 56 {
-                "  ↑↓ review  enter/y  esc/n  "
-            } else {
-                "  ↑/↓ Review    Enter / y Confirm    Esc / n Cancel  "
-            }
-        } else {
-            "  Enter  Review command    Esc  Cancel  "
-        };
         frame.render_widget(
-            Paragraph::new(footer).style(Style::new().fg(Color::White).bg(
-                if self.kind == WorkspaceLifecycleKind::Forget {
-                    DANGER
-                } else {
-                    CONFIRM
-                },
-            )),
+            Paragraph::new(self.footer(area.width < 56)).style(styles::dialog()),
             Rect::new(
                 panel.x + 2,
                 panel.y + panel.height.saturating_sub(2),
@@ -310,6 +281,39 @@ impl WorkspaceLifecycleDialog {
                 1,
             ),
         );
+    }
+    fn footer(&self, compact: bool) -> Line<'static> {
+        let key = styles::dialog_accent();
+        if self.command.is_none() {
+            return Line::from(vec![
+                Span::raw("  "),
+                Span::styled("Enter", key),
+                Span::raw("  Review command    "),
+                Span::styled("Esc", key),
+                Span::raw("  Cancel  "),
+            ]);
+        }
+        if compact {
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled("↑↓", key),
+                Span::raw(" review  "),
+                Span::styled("enter/y", key),
+                Span::raw("  "),
+                Span::styled("esc/n", key),
+                Span::raw("  "),
+            ])
+        } else {
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled("↑/↓", key),
+                Span::raw(" Review    "),
+                Span::styled("Enter / y", key),
+                Span::raw(" Confirm    "),
+                Span::styled("Esc / n", key),
+                Span::raw(" Cancel  "),
+            ])
+        }
     }
 }
 
@@ -354,16 +358,13 @@ fn wrap_command_line(command: &str, width: u16) -> Vec<Line<'static>> {
         if !line.is_empty() && Line::from(candidate.as_str()).width() > width {
             lines.push(Line::from(Span::styled(
                 std::mem::take(&mut line),
-                Style::new().fg(Color::LightCyan),
+                styles::FOCUS,
             )));
         }
         line.push(character);
     }
 
-    lines.push(Line::from(Span::styled(
-        line,
-        Style::new().fg(Color::LightCyan),
-    )));
+    lines.push(Line::from(Span::styled(line, styles::FOCUS)));
     lines
 }
 
@@ -371,6 +372,9 @@ fn wrap_command_line(command: &str, width: u16) -> Vec<Line<'static>> {
 mod tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Position;
+    use ratatui::prelude::{Color, Style};
 
     use super::*;
 
@@ -384,6 +388,89 @@ mod tests {
         terminal
             .draw(|frame| dialog.render(frame))
             .expect("dialog renders");
+    }
+
+    #[test]
+    fn panels_cover_repository_text_and_preserve_the_surrounding_view() {
+        let source = JjWorkspaces::default().with_repository("/repo/default");
+        for (kind, panel) in [
+            (WorkspaceLifecycleKind::Add, Rect::new(2, 5, 76, 13)),
+            (WorkspaceLifecycleKind::Forget, Rect::new(2, 1, 76, 21)),
+        ] {
+            let mut dialog = WorkspaceLifecycleDialog::new(
+                kind,
+                "scratch".to_owned(),
+                PathBuf::from("/repo/scratch"),
+                &source,
+            );
+            let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("terminal");
+            let mut backdrop = Buffer::empty(Rect::new(0, 0, 80, 24));
+            terminal
+                .draw(|frame| {
+                    frame.render_widget(
+                        Paragraph::new(vec![Line::from("◆".repeat(80)); 24])
+                            .style(Style::new().fg(Color::Magenta).bg(Color::Blue)),
+                        frame.area(),
+                    );
+                    backdrop = frame.buffer_mut().clone();
+                    dialog.render(frame);
+                })
+                .expect("dialog renders");
+            let buffer = terminal.backend().buffer();
+            for y in 0..24 {
+                for x in 0..80 {
+                    let cell = &buffer[(x, y)];
+                    if panel.contains(Position::new(x, y)) {
+                        assert_ne!(cell.symbol(), "◆", "repository text at ({x}, {y})");
+                        assert_ne!(cell.bg, Color::Reset, "transparent cell at ({x}, {y})");
+                        assert_ne!(cell.bg, Color::Blue, "repository background at ({x}, {y})");
+                    } else {
+                        assert_eq!(cell, &backdrop[(x, y)], "backdrop at ({x}, {y})");
+                    }
+                }
+            }
+            assert_eq!(Some(buffer[(panel.x, panel.y)].bg), styles::dialog().bg);
+            assert_eq!(
+                Some(buffer[(panel.x + 2, panel.y)].fg),
+                styles::dialog_accent().fg
+            );
+        }
+    }
+
+    #[test]
+    fn cancellation_keeps_keyboard_styling_in_destructive_confirmations() {
+        let source = JjWorkspaces::default().with_repository("/repo/default");
+        for width in [48, 80] {
+            let mut dialog = WorkspaceLifecycleDialog::new(
+                WorkspaceLifecycleKind::Forget,
+                "scratch".to_owned(),
+                PathBuf::from("/repo/scratch"),
+                &source,
+            );
+            let mut terminal = Terminal::new(TestBackend::new(width, 24)).expect("terminal");
+            terminal
+                .draw(|frame| dialog.render(frame))
+                .expect("workspace confirmation");
+            let buffer = terminal.backend().buffer();
+            let needle = if width < 56 { "esc/n" } else { "Esc / n" };
+            let (x, y) = (0..24)
+                .find_map(|y| {
+                    let line = (0..width)
+                        .map(|x| buffer[(x, y)].symbol())
+                        .collect::<String>();
+                    line.find(needle).map(|x| {
+                        (
+                            u16::try_from(Span::raw(&line[..x]).width()).unwrap_or(u16::MAX),
+                            y,
+                        )
+                    })
+                })
+                .unwrap_or_else(|| panic!("missing cancellation key"));
+            assert_eq!(Some(buffer[(x, y)].fg), styles::dialog_accent().fg);
+            for x in 4..width - 4 {
+                assert_eq!(Some(buffer[(x, y)].bg), styles::dialog().bg);
+            }
+        }
     }
 
     #[test]

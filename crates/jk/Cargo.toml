@@ -26,6 +26,7 @@ jk-core = { path = "../jk-core", version = "0.2.7" }
 jk-tui = { path = "../jk-tui", version = "0.2.7" }
 ratatui.workspace = true
 ratatui-textarea.workspace = true
+terminal-colorsaurus = "1.0"
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

@@ -13,6 +13,7 @@ Set Margin 20
 Set WindowBar Colorful
 Set BorderRadius 8
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Input
 Set TypingSpeed 20ms
 Set WaitTimeout 30s
@@ -27,7 +28,7 @@ Hide
 Type "source_repo=${JK_SOURCE_REPO:-$PWD}; bin=${JK_BIN:-$source_repo/target/debug/jk}"
 Enter
 Wait
-Type "test -x \"$bin\" && echo JK_BUILD_READY"
+Type "test -x \"$bin\" && printf 'JK_%s\\n' BUILD_READY"
 Enter
 Wait+Screen "JK_BUILD_READY"
 Type "fixture=$(mktemp -d) && cd \"$fixture\" && jj git init --colocate >/dev/null 2>&1"
@@ -74,6 +75,15 @@ Wait+Screen "Refresh failed:"
 Sleep 1000ms
 Screenshot target/dogfood-artifacts/betamax/cancellable-refresh-03-failure.png
 State target/dogfood-artifacts/betamax/cancellable-refresh-03-failure.json
+
+Caption "Command History retains the complete failure reason."
+Type "C"
+Wait+Screen "Command History"
+Enter
+Wait+Screen "fixture refresh failed"
+Sleep 700ms
+Screenshot target/dogfood-artifacts/betamax/cancellable-refresh-04-failure-details.png
+State target/dogfood-artifacts/betamax/cancellable-refresh-04-failure-details.json
 
 Caption ""
 Type "q"

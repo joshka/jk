@@ -168,6 +168,11 @@ impl AppState {
             .map(|toast| toast.expires_at.saturating_duration_since(Instant::now()))
     }
 
+    /// Requests one redraw when a toast expires, not on every background-refresh poll.
+    pub(crate) fn toast_redraw_due(&self) -> bool {
+        self.toast_redraw_due_at(Instant::now())
+    }
+
     fn show_toast_until(&mut self, message: impl Into<String>, expires_at: Instant) {
         self.toast = Some(Toast {
             message: message.into(),
@@ -176,14 +181,16 @@ impl AppState {
     }
 
     fn toast_message_at(&mut self, now: Instant) -> Option<&str> {
-        let expired = self
-            .toast
-            .as_ref()
-            .is_some_and(|toast| toast.expires_at <= now);
-        if expired {
+        if self.toast_redraw_due_at(now) {
             self.toast = None;
         }
         self.toast.as_ref().map(|toast| toast.message.as_str())
+    }
+
+    fn toast_redraw_due_at(&self, now: Instant) -> bool {
+        self.toast
+            .as_ref()
+            .is_some_and(|toast| toast.expires_at <= now)
     }
 }
 
@@ -311,6 +318,7 @@ pub enum InputMode {
         name: String,
         revision: String,
         field: BookmarkMutationField,
+        error: Option<String>,
     },
     RemotePicker {
         names: Vec<String>,
@@ -323,6 +331,9 @@ pub enum InputMode {
     },
     CommandPreview {
         pending: PendingCommandPreview,
+    },
+    RunOptions {
+        dialog: Box<crate::run_options::RunOptionsDialog>,
     },
     WorkspaceLifecycle {
         dialog: Box<crate::workspace_lifecycle::WorkspaceLifecycleDialog>,
@@ -382,5 +393,31 @@ mod tests {
 
         assert_eq!(state.toast_message_at(now), Some("Created new change"));
         assert_eq!(state.toast_message_at(now + TOAST_DURATION), None);
+    }
+
+    #[test]
+    fn refresh_polling_redraws_a_toast_only_when_it_expires() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let now = Instant::now();
+        state.show_toast_until("Rebased revisions · a u undo", now + TOAST_DURATION);
+
+        // Frequent refresh polling must leave the terminal idle between the first toast draw and
+        // its removal. Otherwise terminal recorders cannot observe the message between redraws.
+        let mut redraws = Vec::new();
+        for tick in 1..=80 {
+            let elapsed = Duration::from_millis(tick * 50);
+            if state.toast_redraw_due_at(now + elapsed) {
+                redraws.push(elapsed);
+                assert_eq!(state.toast_message_at(now + elapsed), None);
+            } else if elapsed < TOAST_DURATION {
+                assert_eq!(
+                    state.toast_message_at(now + elapsed),
+                    Some("Rebased revisions · a u undo")
+                );
+            }
+        }
+
+        assert_eq!(redraws, [TOAST_DURATION]);
+        assert!(state.toast_timeout().is_none());
     }
 }

@@ -1,7 +1,7 @@
 use jk_cli::{
     DiffQuery, EvologQuery, JjCommandRunner, JjDiff, JjEvolog, JjLog, JjLogCommand, JjOperation,
     JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, OperationQuery, RecordingJjCommandRunner,
-    ShowQuery, StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery,
+    ShowQuery, StatusQuery, WorkspaceInspectionQuery,
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
 use jk_tui::diff_view::DiffView;
@@ -115,7 +115,7 @@ pub fn refresh_workspaces(
     history: &mut CommandHistory,
     source: &JjWorkspaces,
 ) {
-    refresh_workspaces_with_runner(app, history, source, SystemJjCommandRunner);
+    refresh_workspaces_with_runner(app, history, source, crate::runner::system_runner());
 }
 
 pub fn refresh_workspaces_with_runner<R: JjCommandRunner>(
@@ -168,7 +168,7 @@ pub fn operation_rendered_transition(
         source_view,
         action,
         kind,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     )
 }
 

@@ -1,6 +1,6 @@
 use jk_cli::{
     JjCommandRunner, JjStatus, JjWorkspaces, RecordingJjCommandRunner, StatusQuery,
-    SystemJjCommandRunner, WorkspaceInspectionQuery,
+    WorkspaceInspectionQuery,
 };
 use jk_core::{CommandSource, JjCommandSpec, SourceAction, SourceView};
 use jk_tui::rendered_view::RenderedView;
@@ -55,7 +55,7 @@ pub fn execute_workspace_lifecycle(
         spec,
         kind,
         preferred,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     );
 }
 
@@ -129,7 +129,7 @@ pub(crate) fn execute_workspace_lifecycle_with_runner<R: JjCommandRunner>(
 }
 
 pub fn push_status(state: &mut AppState, status_source: &JjStatus) {
-    push_status_with_runner(state, status_source, SystemJjCommandRunner);
+    push_status_with_runner(state, status_source, crate::runner::system_runner());
 }
 
 pub fn push_status_with_runner<R: JjCommandRunner>(
@@ -163,7 +163,7 @@ pub fn push_status_with_runner<R: JjCommandRunner>(
 }
 
 pub fn open_workspaces(state: &mut AppState, workspaces_source: &JjWorkspaces) {
-    open_workspaces_with_runner(state, workspaces_source, SystemJjCommandRunner);
+    open_workspaces_with_runner(state, workspaces_source, crate::runner::system_runner());
 }
 
 pub fn open_workspaces_with_runner<R: JjCommandRunner>(
@@ -214,7 +214,7 @@ pub fn push_selected_workspace_status(state: &mut AppState, workspaces_source: &
         state,
         workspaces_source,
         WorkspaceInspectionKind::Status,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     );
 }
 
@@ -223,7 +223,7 @@ pub fn push_selected_workspace_log(state: &mut AppState, workspaces_source: &JjW
         state,
         workspaces_source,
         WorkspaceInspectionKind::Log,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     );
 }
 
@@ -246,7 +246,7 @@ pub fn push_selected_workspace_diff(state: &mut AppState, workspaces_source: &Jj
         state,
         workspaces_source,
         WorkspaceInspectionKind::Diff,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     );
 }
 

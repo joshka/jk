@@ -14,16 +14,20 @@ Set Padding 0
 Set Margin 20
 Set WindowBar Colorful
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Input
 Set TypingSpeed 80ms
 Set WaitTimeout 60s
 Env NO_COLOR "1"
 
 Hide
-Type "cd /Users/joshka/local/jk/work/action-menu && cargo build -q -p jk && JK_DEMO_REPO=$(bash scripts/action-menu-demo-fixture.sh) && export JK_DEMO_REPO"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" forecast"
 Enter
-Wait
-Type "clear && exec target/debug/jk -R $JK_DEMO_REPO -n 8"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
+Enter
+Wait+Line
+Type "clear && exec \"$bin\" -R \"$JK_DEMO_REPO\" -n 8"
 Enter
 Wait+Screen "jk jj"
 Wait+Screen "Experiment with forecast caching"
@@ -56,6 +60,7 @@ Wait+Screen "Describe revision"
 Caption "Pick up where you left off"
 Sleep 3s
 Screenshot target/dogfood-artifacts/betamax/action-menu-concise-describe-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-concise-describe-20260918.json
 Type " safely"
 Sleep 2s
 Enter
@@ -71,6 +76,7 @@ Type "n"
 Wait+Screen "Created new change"
 Sleep 4s
 Screenshot target/dogfood-artifacts/betamax/action-menu-concise-new-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-concise-new-20260918.json
 
 Caption "Abandon an empty change"
 Type "a"
@@ -82,6 +88,7 @@ Sleep 3s
 Caption "jj leaves a fresh empty working copy"
 Sleep 4s
 Screenshot target/dogfood-artifacts/betamax/action-menu-concise-empty-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-concise-empty-20260918.json
 
 Caption "Abandon the cache experiment"
 Type "j"
@@ -94,11 +101,13 @@ Wait+Screen "Abandon this change?"
 Caption "This change contains work. Confirm before removing it."
 Sleep 8s
 Screenshot target/dogfood-artifacts/betamax/action-menu-concise-confirm-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-concise-confirm-20260918.json
 Type "y"
 Wait+Screen "Abandoned revision"
 Caption "Experiment removed. Earlier work intact."
 Sleep 4s
 Screenshot target/dogfood-artifacts/betamax/action-menu-concise-finished-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-concise-finished-20260918.json
 Hide
 Caption ""
 Type "q"

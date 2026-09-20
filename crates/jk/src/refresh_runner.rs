@@ -72,6 +72,7 @@ impl LogRefreshRunner {
             let command_source =
                 CommandSource::new(SourceView::Log, SourceAction::Refresh).with_key("r");
             let system = CancellableSystemJjCommandRunner::new(cancellation);
+            let system = crate::runner::TuiJjCommandRunner::new(system);
             let mut runner = RecordingJjCommandRunner::new(system, &mut history, command_source);
             let outcome = source
                 .load_with_runner(&mut runner)

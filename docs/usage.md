@@ -77,6 +77,7 @@ For actions that open a preview:
 - `y` copies the displayed command line.
 - `Esc` cancels.
 - Arrow keys and Page Up/Down scroll long previews without hiding the confirmation controls.
+- `o` opens [Run options](run-options.md) for rebase, squash, and restore previews.
 
 After a successful action, `jk` refreshes the log and records the command and resulting operation in
 Command History. The normal footer controls remain visible alongside a short success or error
@@ -85,8 +86,8 @@ a resulting operation id, Command History can open the exact `jj op show` view.
 
 The first restore slice intentionally supports only all-path content copying from one selected
 revision into the working copy. Fileset selection, alternate destinations, `--changes-in`, and hunk
-restore remain follow-up work. Immutable destinations fail through jj's normal check; `jk` keeps
-stderr inspectable in Command History and does not expose `--ignore-immutable` in this workflow.
+restore remain follow-up work. Immutable destinations fail through jj's normal check unless you
+explicitly allow rewriting in Run options. Failures remain inspectable in Command History.
 
 ## Rebase A Revision
 
@@ -104,7 +105,15 @@ scope carefully. `o` returns to onto placement.
 Enter opens a separate, exact-command preview; it does not execute from the picker. Enter again in
 the preview confirms. Escape cancels without a graph mutation (while searching, the first Escape
 exits search). Commands use full commit IDs so later selection changes cannot retarget the preview.
-Immutable revisions are never overridden: jj failures remain inspectable in Command History.
+Immutable revisions remain protected unless explicitly overridden in Run Options. jj failures
+remain inspectable in Command History.
+
+## Dialog appearance
+
+Dialogs have a distinct filled surface over the repository view. jk detects a light or dark terminal
+at startup. Use `jk --dialog-theme light` or `jk --dialog-theme dark` to override detection; `auto`
+is the default. Unsupported or slow terminals use the readable dark surface. This setting changes
+jk dialogs only; it preserves jj's configured graph, diff colors, and terminal background.
 
 ## Run Direct Commands
 

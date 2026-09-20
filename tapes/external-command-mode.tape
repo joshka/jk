@@ -13,6 +13,7 @@ Set Margin 20
 Set WindowBar Colorful
 Set BorderRadius 8
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Input
 Set TypingSpeed 35ms
 Set WaitTimeout 60s
@@ -27,7 +28,7 @@ Hide
 Type "source_repo=${JK_SOURCE_REPO:-$PWD}; bin=${JK_BIN:-$source_repo/target/debug/jk}"
 Enter
 Wait
-Type "test -x \"$bin\" && echo JK_BUILD_READY"
+Type "test -x \"$bin\" && printf 'JK_%s\\n' BUILD_READY"
 Enter
 Wait+Screen "JK_BUILD_READY"
 Type "fixture=$(mktemp -d) && cd \"$fixture\" && jj git init --colocate >/dev/null 2>&1"
@@ -47,6 +48,7 @@ Type "!"
 Type "printf '%s\\n' 'hello from jk'"
 Enter
 Wait+Screen "hello from jk"
+Wait+Screen "Status: success"
 Sleep 2s
 Screenshot target/dogfood-artifacts/betamax/external-command-success-20260919.png
 State target/dogfood-artifacts/betamax/external-command-success-20260919.json

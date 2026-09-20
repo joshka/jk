@@ -5,17 +5,14 @@
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::prelude::{Color, Line, Modifier, Span, Style, Text};
-use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+use ratatui::prelude::{Line, Span, Style, Text};
+use ratatui::widgets::{Block, Clear, Padding, Paragraph, Wrap};
 
-const SURFACE_BACKGROUND: Color = Color::Rgb(30, 35, 47);
-const REGION_BACKGROUND: Color = Color::Rgb(58, 72, 90);
-const DANGER_BACKGROUND: Color = Color::Rgb(120, 45, 50);
-const ACCENT_BACKGROUND: Color = Color::LightCyan;
-const CHROME_STYLE: Style = Style::new().fg(Color::White).bg(SURFACE_BACKGROUND);
-const CHROME_BADGE_STYLE: Style = Style::new().fg(Color::Black).bg(ACCENT_BACKGROUND);
+use crate::styles::{
+    CANVAS, FOCUS, SUPPORTING, TITLE, WARNING, dialog, dialog_accent, dialog_error,
+};
 
-/// Semantic color treatment for the borderless status region.
+/// Semantic emphasis for the borderless status region.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum StatusTone {
     /// Normal navigation and command hints.
@@ -28,139 +25,87 @@ pub enum StatusTone {
 }
 
 impl StatusTone {
-    const fn style(self) -> Style {
+    fn style(self) -> Style {
         match self {
-            Self::Neutral => Style::new().fg(Color::White).bg(REGION_BACKGROUND),
-            Self::Loading => Style::new().fg(Color::Black).bg(ACCENT_BACKGROUND),
-            Self::Failure => Style::new().fg(Color::White).bg(DANGER_BACKGROUND),
+            Self::Neutral => CANVAS,
+            Self::Loading => CANVAS.patch(FOCUS),
+            Self::Failure => CANVAS.patch(WARNING),
         }
     }
 }
 
-const OVERLAY_BACKGROUND: Color = SURFACE_BACKGROUND;
-const OVERLAY_HEADER: Color = REGION_BACKGROUND;
-
-/// Renders a small mode-specific help overlay centered in the content area.
+/// Renders a content-sized borderless overlay centered in the content area.
 pub fn render_help_overlay(frame: &mut Frame<'_>, area: Rect, title: &str, lines: &[String]) {
     if area.is_empty() {
         return;
     }
-
-    let overlay = centered_rect(
-        area,
-        overlay_width(title, lines, area.width),
-        overlay_height(title, lines),
-    );
+    let title = if title == "Command discovery" {
+        "Help"
+    } else {
+        title
+    };
+    let text = overlay_text(title, lines);
+    let width = u16::try_from(text.width().saturating_add(4))
+        .unwrap_or(u16::MAX)
+        .min(area.width);
+    let paragraph = Paragraph::new(text)
+        .style(dialog())
+        .wrap(Wrap { trim: false });
+    let height = paragraph
+        .line_count(width.saturating_sub(4).max(1))
+        .saturating_add(2);
+    let overlay = centered_rect(area, usize::from(width), height);
     frame.render_widget(Clear, overlay);
-
-    let command_discovery = title == "Command discovery";
-    let display_title = if command_discovery { "Help" } else { title };
+    frame.render_widget(Block::default().style(dialog()), overlay);
     frame.render_widget(
-        Block::default().style(Style::new().fg(Color::White).bg(OVERLAY_BACKGROUND)),
+        paragraph.block(Block::default().padding(Padding::new(2, 2, 1, 1))),
         overlay,
     );
-    let header = Rect::new(overlay.x, overlay.y, overlay.width, overlay.height.min(1));
-    frame.render_widget(
-        Paragraph::new(format!("  {display_title}"))
-            .style(Style::new().fg(Color::White).bg(OVERLAY_HEADER).bold()),
-        header,
-    );
-
-    let body = Rect::new(
-        overlay.x.saturating_add(2),
-        overlay.y.saturating_add(2),
-        overlay.width.saturating_sub(4),
-        overlay.height.saturating_sub(2),
-    );
-    let text_lines = lines
-        .iter()
-        .map(|line| overlay_line(line, usize::from(body.width)))
-        .collect::<Vec<_>>();
-    let text = Text::from(text_lines);
-    let paragraph = Paragraph::new(text)
-        .style(Style::new().fg(Color::White).bg(OVERLAY_BACKGROUND))
-        .wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, body);
 }
 
-fn overlay_width(title: &str, lines: &[String], area_width: u16) -> usize {
-    const COMMAND_DISCOVERY_MAX_WIDTH: usize = 132;
-
-    if title == "Command discovery" {
-        let content_width = lines
-            .iter()
-            .map(|line| visible_width(line))
-            .chain(std::iter::once(visible_width("Help")))
-            .max()
-            .unwrap_or(0);
-        let area_width = usize::from(area_width);
-        return content_width
-            .saturating_add(4)
-            .clamp(56, COMMAND_DISCOVERY_MAX_WIDTH)
-            .min(area_width);
-    }
-
-    let content_width = lines
-        .iter()
-        .map(|line| visible_width(line))
-        .chain(std::iter::once(visible_width(title)))
-        .max()
-        .unwrap_or(0);
-    content_width.saturating_add(4).clamp(56, 96)
+fn overlay_text<'a>(title: &'a str, lines: &'a [String]) -> Text<'a> {
+    let mut text = vec![
+        Line::from(Span::styled(title, dialog_accent())),
+        Line::default(),
+    ];
+    text.extend(lines.iter().map(|line| overlay_line(line)));
+    Text::from(text)
 }
 
-fn overlay_height(title: &str, lines: &[String]) -> usize {
-    if title == "Command discovery" {
-        return lines.len().saturating_add(3);
-    }
-
-    lines.len().saturating_add(4)
-}
-
-fn overlay_line(line: &str, content_width: usize) -> Line<'_> {
+/// Styles one jk-owned overlay row using the shared heading, key, cursor, and error roles.
+///
+/// Rows use the existing help/menu text convention: two spaces separate key and action columns; a
+/// leading `>` marks the current candidate. Never apply this formatter to jj-owned output.
+#[must_use]
+pub fn overlay_line(line: &str) -> Line<'_> {
     if line.ends_with(':') {
-        return Line::from(Span::styled(
-            line,
-            Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-        ));
+        return Line::from(Span::styled(line, TITLE));
     }
-
-    if let Some(line) = command_row_line(line) {
-        return line;
+    if line.starts_with("error:") {
+        return Line::from(Span::styled(line, dialog_error()));
     }
-
-    if line.starts_with("Type ")
-        || line == "actions, and aliases."
-        || line.starts_with("Examples:")
-        || line.contains(" closes")
-        || line.starts_with("showing ")
-        || line.trim_start().starts_with("key ")
-    {
-        return Line::from(Span::styled(line, Style::new().fg(Color::Gray)));
+    if line.starts_with('>') || line.starts_with("! ") || line.starts_with(": ") {
+        return Line::from(vec![
+            Span::styled(&line[..1], dialog_accent()),
+            Span::raw(&line[1..]),
+        ]);
     }
-
-    if line.starts_with('>') {
-        let padding = content_width.saturating_sub(Span::raw(line).width());
-        return Line::from(Span::styled(
-            format!("{line}{}", " ".repeat(padding)),
-            Style::new()
-                .fg(Color::Black)
-                .bg(Color::LightCyan)
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-
-    Line::from(line)
+    command_row_line(line).unwrap_or_else(|| Line::from(Span::styled(line, SUPPORTING)))
 }
 
 fn command_row_line(line: &str) -> Option<Line<'_>> {
-    if !line.starts_with("  ") || line.trim_start().starts_with("no matching") {
+    if line.trim_start().starts_with("no matching") || find_space_run(line, 0, 2).is_none() {
         return None;
     }
 
     let mut spans = Vec::new();
     let mut cursor = 0;
-    while let Some(prefix_start) = find_cell_prefix(line, cursor) {
+    let mut prefix = if line.starts_with(' ') {
+        find_cell_prefix(line, 0)
+    } else {
+        Some(0)
+    };
+    while let Some(prefix_start) = prefix {
         if prefix_start > cursor {
             spans.push(Span::raw(&line[cursor..prefix_start]));
         }
@@ -174,23 +119,15 @@ fn command_row_line(line: &str) -> Option<Line<'_>> {
         }
 
         spans.push(Span::raw(&line[prefix_start..key_start]));
-        spans.push(Span::styled(
-            key,
-            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-        ));
+        spans.push(Span::styled(key, dialog_accent()));
         spans.push(Span::raw(&line[separator_start..separator_end]));
 
         let next_prefix = find_next_cell_prefix(line, separator_end);
         let action_end = next_prefix.unwrap_or(line.len());
-        spans.push(Span::styled(
-            &line[separator_end..action_end],
-            Style::new().fg(Color::White),
-        ));
+        spans.push(Span::styled(&line[separator_end..action_end], SUPPORTING));
 
         cursor = action_end;
-        if next_prefix.is_none() {
-            break;
-        }
+        prefix = next_prefix;
     }
 
     if cursor < line.len() {
@@ -253,10 +190,6 @@ const fn skip_spaces(line: &str, start: usize) -> usize {
     cursor
 }
 
-fn visible_width(text: &str) -> usize {
-    Span::raw(text).width()
-}
-
 fn centered_rect(area: Rect, preferred_width: usize, preferred_height: usize) -> Rect {
     let width = u16::try_from(preferred_width)
         .unwrap_or(u16::MAX)
@@ -302,7 +235,7 @@ impl<'a> ViewChrome<'a> {
         }
     }
 
-    /// Colors the full status row for its current semantic state.
+    /// Emphasizes the status row according to its current semantic state.
     pub const fn with_status_tone(mut self, status_tone: StatusTone) -> Self {
         self.status_tone = status_tone;
         self
@@ -327,11 +260,10 @@ impl<'a> ViewChrome<'a> {
     /// Renders the title and status rows without touching the content area.
     pub fn render(&self, frame: &mut Frame<'_>, areas: ChromeAreas) {
         let title = Paragraph::new(Line::from(vec![
-            Span::styled("jk", CHROME_BADGE_STYLE),
-            Span::styled(" ", CHROME_STYLE),
-            Span::styled(self.title, CHROME_STYLE.add_modifier(Modifier::BOLD)),
+            Span::styled("jk ", SUPPORTING),
+            Span::styled(self.title, TITLE),
         ]))
-        .style(CHROME_STYLE);
+        .style(CANVAS);
         frame.render_widget(title, areas.title);
 
         let status = Paragraph::new(Line::from(self.status)).style(self.status_tone.style());
@@ -359,74 +291,133 @@ impl ChromeAreas {
 mod tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::prelude::Color;
 
     use super::*;
 
     #[test]
-    fn overlay_width_uses_terminal_cells_for_wide_and_combining_characters() {
-        let wide = format!("> {}", "界".repeat(29));
-        assert_eq!(overlay_width("Diff files", &[wide], 80), 64);
+    fn overlay_clears_panel_text_and_preserves_surrounding_canvas() {
+        let mut terminal = Terminal::new(TestBackend::new(32, 12)).expect("test terminal");
+        terminal
+            .draw(|frame| {
+                frame.render_widget(Paragraph::new("underlying".repeat(50)), frame.area());
+                render_help_overlay(
+                    frame,
+                    frame.area(),
+                    "Actions",
+                    &["n  new change".to_owned()],
+                );
+            })
+            .expect("draw help");
+        let buffer = terminal.backend().buffer();
+        let blank = &buffer[(8, 3)];
+        assert_eq!(blank.symbol(), " ");
+        assert_eq!(Some(blank.fg), dialog().fg);
+        assert_eq!(Some(blank.bg), dialog().bg);
+        assert_eq!(buffer[(0, 0)].symbol(), "u");
+        assert_eq!(buffer[(0, 0)].bg, Color::Reset);
+        assert!(
+            !buffer
+                .content
+                .iter()
+                .any(|cell| matches!(cell.symbol(), "┌" | "┐" | "│"))
+        );
+    }
 
-        let combining = "e\u{301}".repeat(55);
-        assert_eq!(overlay_width("Diff files", &[combining], 80), 59);
+    #[test]
+    fn all_overlay_paths_style_key_columns_selection_and_errors() {
+        let rows = vec![
+            "Enter          inspect selected target".to_owned(),
+            "  d  open diff".to_owned(),
+            "> chosen revision".to_owned(),
+            "error: unavailable revision".to_owned(),
+        ];
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).expect("terminal");
+        terminal
+            .draw(|frame| render_help_overlay(frame, frame.area(), "Choices", &rows))
+            .expect("overlay");
+        let buffer = terminal.backend().buffer();
+        for (needle, foreground) in [
+            ("Enter", dialog_accent().fg),
+            ("d  open", dialog_accent().fg),
+            ("> chosen", dialog_accent().fg),
+            ("error:", dialog_error().fg),
+        ] {
+            let position = (0..20)
+                .find_map(|y| {
+                    let line = (0..80).map(|x| buffer[(x, y)].symbol()).collect::<String>();
+                    line.find(needle)
+                        .and_then(|x| u16::try_from(x).ok().map(|x| (x, y)))
+                })
+                .unwrap_or_else(|| panic!("missing {needle}"));
+            assert_eq!(Some(buffer[position].fg), foreground);
+            assert_eq!(Some(buffer[position].bg), dialog().bg);
+        }
+    }
+
+    #[test]
+    fn overlay_measures_wide_and_combining_characters_in_cells() {
+        let lines = vec!["界界 e\u{301}".to_owned()];
+        let text = overlay_text("Help", &lines);
+        assert_eq!(text.width(), 6);
+        let mut terminal = Terminal::new(TestBackend::new(12, 8)).expect("test terminal");
+        terminal
+            .draw(|frame| render_help_overlay(frame, frame.area(), "Help", &lines))
+            .expect("draw");
+        assert_eq!(terminal.backend().buffer()[(3, 4)].symbol(), "界");
+        assert_eq!(terminal.backend().buffer()[(8, 4)].symbol(), "e\u{301}");
     }
 
     #[test]
     fn wide_selected_path_and_following_row_remain_on_separate_lines() {
         let selected = format!("> {}", "界".repeat(29));
+        let lines = vec![selected, "  next.rs".to_owned()];
         let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("terminal");
         terminal
             .draw(|frame| {
-                render_help_overlay(
-                    frame,
-                    frame.area(),
-                    "Diff files",
-                    &[selected.clone(), "  next.rs".into()],
-                );
+                render_help_overlay(frame, frame.area(), "Diff files", &lines);
             })
             .expect("draw wide selector");
 
         let buffer = terminal.backend().buffer();
         let overlay = centered_rect(Rect::new(0, 0, 80, 24), 64, 6);
-        assert_eq!(buffer[(overlay.x + 2, overlay.y + 2)].symbol(), ">");
-        assert_eq!(buffer[(overlay.right() - 4, overlay.y + 2)].symbol(), "界");
-        assert_eq!(buffer[(overlay.x + 4, overlay.y + 3)].symbol(), "n");
+        assert_eq!(buffer[(overlay.x + 2, overlay.y + 3)].symbol(), ">");
+        assert_eq!(buffer[(overlay.right() - 4, overlay.y + 3)].symbol(), "界");
+        assert_eq!(buffer[(overlay.x + 4, overlay.y + 4)].symbol(), "n");
+        for y in overlay.top()..overlay.bottom() {
+            for x in overlay.left()..overlay.right() {
+                // Ratatui resets the placeholder after a wide glyph; the glyph's leading cell
+                // supplies the style for both terminal columns.
+                if x > overlay.left() && Span::raw(buffer[(x - 1, y)].symbol()).width() > 1 {
+                    continue;
+                }
+                assert_eq!(Some(buffer[(x, y)].bg), dialog().bg, "panel cell ({x},{y})");
+            }
+        }
+        assert_eq!(buffer[(0, 0)].bg, Color::Reset);
     }
 
     #[test]
-    fn selector_overlay_uses_colored_regions_without_a_border() {
-        let mut terminal = Terminal::new(TestBackend::new(80, 20)).expect("terminal");
-        terminal
-            .draw(|frame| {
-                render_help_overlay(
-                    frame,
-                    frame.area(),
-                    "Diff files",
-                    &["> src/main.rs".into(), "  src/lib.rs".into()],
-                );
-            })
-            .expect("draw selector overlay");
+    fn wide_and_combining_selector_rows_use_content_width_in_terminal_cells() {
+        let wide = vec![format!("> {}", "界".repeat(29))];
+        assert_eq!(overlay_text("Diff files", &wide).width(), 60);
 
-        let buffer = terminal.backend().buffer();
-        let rendered = buffer
-            .content()
-            .iter()
-            .map(ratatui::buffer::Cell::symbol)
-            .collect::<String>();
-        let overlay = centered_rect(Rect::new(0, 0, 80, 20), 56, 6);
-        assert!(
-            !['┌', '┐', '└', '┘']
-                .into_iter()
-                .any(|glyph| rendered.contains(glyph))
-        );
-        assert_eq!(buffer[(overlay.x, overlay.y)].bg, OVERLAY_HEADER);
-        assert_eq!(
-            buffer[(overlay.x, overlay.y.saturating_add(1))].bg,
-            OVERLAY_BACKGROUND
-        );
-        let selected_y = overlay.y.saturating_add(2);
-        for x in overlay.x.saturating_add(2)..overlay.right().saturating_sub(2) {
-            assert_eq!(buffer[(x, selected_y)].bg, Color::LightCyan);
+        let combining = vec!["e\u{301}".repeat(55)];
+        assert_eq!(overlay_text("Diff files", &combining).width(), 55);
+    }
+
+    #[test]
+    fn tiny_help_surfaces_do_not_write_outside_the_viewport() {
+        for width in 0..12 {
+            for height in 0..6 {
+                let mut terminal =
+                    Terminal::new(TestBackend::new(width, height)).expect("terminal");
+                terminal
+                    .draw(|frame| {
+                        render_help_overlay(frame, frame.area(), "Help", &["j next".to_owned()]);
+                    })
+                    .expect("draw");
+            }
         }
     }
 }

@@ -114,7 +114,9 @@ pub(crate) fn bookmark_view_snapshot(snapshot: BookmarkSnapshot) -> BookmarkView
             .into_iter()
             .map(|bookmark| {
                 let mut row = BookmarkRow::new(bookmark.name, bookmark.targets)
-                    .with_tracked(bookmark.tracked);
+                    .with_tracked(bookmark.tracked)
+                    .with_synchronized(bookmark.synchronized)
+                    .with_conflict(bookmark.conflicted, bookmark.removed_targets);
                 if let Some(remote) = bookmark.remote {
                     row = row.with_remote(remote);
                 }

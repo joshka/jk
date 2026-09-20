@@ -7,6 +7,14 @@ menus, dialogs, and views. It elaborates the [product plan](product-plan.md), es
 3.2 through 3.8. That plan owns command semantics and key assignments; this guide owns their
 presentation. Changes to either must preserve the other, or update both with an explicit rationale.
 
+The originating discussion is [Design a coherent TUI UI strategy][design-task]. The 2026-09-20
+integration direction reaffirms a calm, solid interface that looks like jj CLI output, with borderless
+content and deliberate spacing, alignment, and hierarchy. Apply that direction to all in-progress
+workspaces. Mockup palettes and shortcut assignments remain proposals until explicitly implemented
+and validated; they do not override this contract or the existing keymap.
+
+[design-task]: codex://threads/01a0b680-89a8-7ee2-8840-db4d9533e8d9
+
 ## 1. Design intent
 
 jk should feel like an interactive form of the user's jj CLI: familiar output, precise controls,
@@ -63,7 +71,8 @@ font size for headings, body text, hints, fields, and hotbars. Emphasis comes fr
 attributes, alignment, and cell spacing, never browser-like typography or fractional positioning.
 
 Default to borderless regions distinguished by flat background colors and whitespace. Menus and
-dialogs may use an opaque surface color without a surrounding box. Reserve Unicode borders for cases
+dialogs use a distinct opaque surface color without a surrounding box. Keep the actual repository
+view visible around the surface. Reserve Unicode borders for cases
 where containment is otherwise unclear, including a monochrome fallback. Do not add rounded pixel
 corners, shadows, or window decorations as part of jk's terminal interface.
 
@@ -81,9 +90,16 @@ Use this hierarchy in every screen:
 
 One surface owns keyboard focus at a time. Avoid several equally bright bars, borders, and headings.
 Use bold for short titles or key facts, not whole panes. Preserve jj's own emphasis within content.
-Use one restrained configurable accent for jk focus and active controls. Semantic warning and error
-styles remain distinct. Do not use gradients, pulsing highlights, decorative shadows, or animated
+Use bold and explicit symbols for focus; an optional restrained accent must remain readable on its
+surface. Semantic warning and error styles remain distinct. Do not use gradients, pulsing
+highlights, decorative shadows, or animated
 selection transitions by default.
+
+Use the original action and abandon menus as the color reference: slate dialog surfaces, teal keys
+and focus, blue-gray secondary actions, and burgundy destructive actions. Apply these roles
+consistently across dialogs, with readable equivalents on light terminals. Keyboard hints are the
+usual controls; use filled buttons when a visible choice such as Cancel or Abandon benefits from
+them. Focusing a destructive action must retain its danger color and add an explicit focus marker.
 
 ### Semantic styles
 
@@ -97,7 +113,7 @@ Define shared roles rather than choosing colors independently in each renderer:
 | Supporting text | Lower emphasis, still readable; never essential text in faint gray. |
 | Title           | Short bold label, normally without a filled badge.                  |
 | Separator       | Quiet line or spacing; no competing emphasis.                       |
-| Focus           | Accent marker and an explicit active-control indication.            |
+| Focus           | Bold marker and an explicit active-control indication.              |
 | Selection       | Quiet flat background when compatible, plus a persistent marker.    |
 | Mark            | Explicit persistent symbol; optional accent.                        |
 | Search match    | Local span emphasis, distinct from selection and focus.             |
@@ -118,6 +134,11 @@ particular RGB values in the user's palette.
 A coordinated light or dark appearance may style jk-owned surfaces, but must not overwrite jj
 content colors. Provide semantic overrides and selection styles rather than per-screen palettes.
 Appearance settings must not alter key behavior, action scope, or information ordering.
+
+Dialog foreground and background are a coordinated pair. Choose the light or dark surface from the
+terminal appearance, with `--dialog-theme light` or `--dialog-theme dark` as an explicit override.
+Automatic detection runs once before input handling, with a bounded timeout and a readable dark
+fallback. Only jk-owned surfaces use this palette; the canvas and jj output keep their own colors.
 
 Support marker-only and high-contrast interaction treatments. In monochrome or reduced-color output,
 focus, marks, warnings, and selected options must remain distinguishable by symbols and wording.
@@ -360,10 +381,27 @@ errors, off-screen marks, and refresh while inspecting. These sizes are review f
 breakpoints. Compare jj-owned content with output from the same installed jj/config and content
 width; normalize only known variable fields.
 
+Create fresh disposable jj repositories for integration tests and Betamax scenarios. Build from the
+source workspace, then run the resulting binary against an explicitly selected fixture repository.
+The current development repository and other in-progress workspaces are never scenario data.
+
 Use layout assertions for bounds, alignment, scroll indicators, focus, and selection preservation.
+Dialog screenshots must show both a distinct filled dialog surface and the real repository view
+behind and around it. Populate fixtures with enough graph, diff, or list content to judge separation
+and placement in context.
+An isolated dialog on an otherwise empty canvas is insufficient proof. Constrained-terminal checks
+must show the actual layout, including when a necessary full-screen surface leaves little context.
+
 Use PNG proof for visual hierarchy and readability, with deterministic fixtures and a fresh filename
 for each revision. Review graph, diff, help, a picker, and a mutation preview together when changing
 shared styling. A screenshot cannot substitute for interaction or config-fidelity checks.
+
+After semantic `Wait+Screen` assertions, capture paired `Screenshot` and `State` checkpoints. Inspect
+the PNG for visual hierarchy and the state JSON's `viewport_text`, styled spans, and style table for
+content and presentation fidelity. Include color-enabled jj output and a narrow layout; a
+`NO_COLOR`-only capture cannot demonstrate that selection preserves jj colors. Use a GIF when motion
+or a transition matters, with PNG/state checkpoints for its important states. Include this evidence
+in the task or pull request reviewing the change.
 
 ## 14. Adoption
 
@@ -374,7 +412,7 @@ Apply this guide to new surfaces immediately. Bring existing surfaces into compl
 reviewable changes rather than combining a behavior rewrite with a palette change.
 
 Start with shared styles and the selection/focus/mark contract, then chrome and help, then menus,
-inputs, and mutation previews. Current bright graph selection, fixed black/white chrome, and
+inputs, and mutation previews. Legacy bright graph selection, fixed black/white chrome, and
 per-surface style choices are migration targets, not approved exceptions. Preserve jj output and
 existing documented key semantics throughout.
 

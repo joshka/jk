@@ -3,7 +3,7 @@
 //! The public surface is currently the log view in [`log_view`], selected-change diff view in
 //! [`diff_view`], and workspace list view in [`workspaces_view`]. They accept caller-provided
 //! snapshots, apply input actions, and render borderless views that keep `jj` output visually
-//! intact while adding title/status chrome and selected-row highlighting.
+//! intact while adding title/status chrome and separate cursor and mark indicators.
 
 pub mod bookmark_view;
 pub mod command_history_view;
@@ -22,9 +22,13 @@ mod log_state;
 mod rendered_log;
 mod rendered_state;
 mod selected_row;
+pub mod styles;
+
+pub use selected_row::content_width;
 
 /// Contextual command-help metadata and popup formatting.
 pub mod command_discovery {
+    pub use crate::chrome::overlay_line;
     pub use crate::keymap::{
         ActionMenuAction, ActionMenuGroup, ActionMenuRow, ActionMenuSafety, BindingContext,
         CommandFamily, DiscoveryRow, action_menu_rows, discovery_len, discovery_lines,

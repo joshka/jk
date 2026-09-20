@@ -51,6 +51,18 @@ pub fn dispatch_app_key(
     key: KeyEvent,
     app_key: AppKey,
 ) -> DispatchResult {
+    if let AppView::Bookmarks { view } = state.views.active_mut()
+        && view.help_visible()
+    {
+        if matches!(
+            app_key,
+            AppKey::Action(LogAction::Quit | LogAction::ToggleHelp)
+        ) || key.code == KeyCode::Esc
+        {
+            let _ = view.apply(BookmarkAction::ToggleHelp);
+        }
+        return DispatchResult::Continue;
+    }
     if matches!(state.views.active(), AppView::Bookmarks { .. })
         && matches!(app_key, AppKey::Action(LogAction::ToggleHelp))
     {

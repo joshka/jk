@@ -14,18 +14,18 @@ Set Margin 20
 Set WindowBar Colorful
 Set BorderRadius 8
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Input
 Set TypingSpeed 60ms
 Set WaitTimeout 60s
 Env NO_COLOR "1"
 
 Hide
-Type "cd \"${JK_REPO:?Set JK_REPO to the jk checkout}\" && test -f crates/jk/Cargo.toml && CARGO_BUILD_JOBS=3 cargo build -q -p jk && SELECTOR_DEMO_REPO=$(bash scripts/shared-selector-demo-fixture.sh) && export SELECTOR_DEMO_REPO && echo JK_FIXTURE_READY"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" selectors"
 Enter
-Wait+Screen /(?m)^JK_FIXTURE_READY$/
-Type "clear && exec target/debug/jk -R $SELECTOR_DEMO_REPO -n 8"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear; \"$bin\" -R \"$fixture\" -n 8"
 Enter
-Wait+Screen "jk jj"
 Wait+Screen "Configure request timeouts"
 Show
 

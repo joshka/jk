@@ -6,6 +6,9 @@ It keeps the parts of `jj` you already trust: the graph, colors, wording, revset
 diff output still come from `jj`. `jk` adds an interactive review loop around that output so you can
 keep context open while an editor, shell, or coding agent changes the repository.
 
+The media below shows the published release; current integration proof is described in
+[workspace coherence](docs/workspace-coherence.md).
+
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
 ## Installation
@@ -33,45 +36,41 @@ cargo install jk --locked
 
 ## Current Status
 
-`jk` now covers the daily inspection and recovery loop:
+This source checkout supports inspection, local history editing, workspace management, and sharing
+previews with consistent controls and command previews:
 
-```text
-log -> inspect -> preview command -> run -> history -> operation recovery
-```
+- inspect changes with log, show, diff, evolog, and status;
+- navigate, search, fold, and compare diffs without losing the selected revision;
+- use `:` for captured jj commands and `!` for shell-free captured external commands;
+- describe inline and use the action menu for New, Edit, Undo, Redo, and Abandon;
+- use `R` to choose rebase roles and a destination, `a s` for whole-change squash, and `a r` to
+  restore all paths from the selected commit into the working copy;
+- inspect exact mutation commands before confirmation, with command-local Run Options on supported
+  previews, recorded results, and links to the resulting operation;
+- use `W` to inspect, add, rename, forget, and update stale workspaces;
+- use `B` for bookmarks, confirmed fetch from an explicit remote, and scoped push dry-runs.
 
-The useful current workflows are:
-
-- inspect selected changes with `show`, `diff`, `evolog`, and `status`;
-- review diffs with file/hunk movement, folding, search, file list, and View Options;
-- run direct `jj` commands with `:` or shell-free external commands with `!`, keeping captured
-  output in the TUI;
-- save an inline describe message directly with `Enter`; action-menu New, Edit, Undo, and Redo run
-  immediately through the recorded mutation path, while non-empty abandon and whole-content
-  restore keep destructive safety previews;
-- mark squash sources, leave the cursor on the destination, and use `a s` to review the exact
-  whole-change `jj squash` command before confirming it;
-- use Command History and Operation Log to inspect what ran and recover through `jj op` views;
-- inspect sibling jj workspaces, including workspace-scoped log/status/diff views, without leaving
-  the TUI.
-- inspect local and remote bookmarks with `B`, preview local bookmark mutations, and review
-  explicit fetch or push dry-run commands with a configured remote chooser.
-
-The current implementation intentionally treats rendered `jj` output as the source of truth. The
-TUI parses only enough structure to support navigation, search, sticky headers, folding, command
-recording, and recovery-oriented links.
-
-Use `?` inside `jk` for the full key list for the active screen. For task-oriented examples, see
-[Using jk](docs/usage.md).
+The main canvas inherits terminal colors. A separate gutter identifies the cursor and marked
+changes without replacing jj's graph symbols or semantic text colors. Explicit log refresh runs
+in the background, can be cancelled, and preserves the view's context.
+Dialogs use a distinct opaque light or dark surface with the repository still visible around them.
+Use `--dialog-theme light` or `--dialog-theme dark` to override automatic terminal detection.
 
 Current limitations:
 
-- command history is in-memory for the current `jk` session;
-- split, file/hunk restore, and real remote pushes remain planned workflows;
-- `R` selects a rebase destination and previews exact source/placement roles before confirmation;
-- squash currently moves whole changes only; file and hunk selection remains planned;
-- the log action menu covers describe, new, edit, squash, restore, abandon, undo, and redo;
-  rebase is available through `R` and workspace actions through `W`, then `a`.
-- bookmark inspection, local mutation previews, confirmed fetches, and push dry-runs are available;
+- Command History lasts for the current session.
+- Rebase selects one source and one destination from the visible log; multi-parent destinations and
+  graph predictions remain planned.
+- Squash and restore operate on whole changes; fileset and hunk selection remain planned.
+- Native commit, split, absorb, resolve, and foreground editor/tool handoff remain planned.
+  Captured command modes do not provide an interactive terminal to child processes.
+- Push stops at dry-run. Dedicated tags and advanced remote workflows remain planned.
+- Run Options currently covers working-copy policy, eligible historical operations, and immutable
+  override for a pending rebase, squash, or restore command. Repository and config editing remain
+  outside that drawer.
+
+Use `?` inside `jk` for contextual help. See [Using jk](docs/usage.md) for workflows and
+[command coverage](docs/command-coverage.md) for implemented forms and the next priorities.
 
 ## First Useful Paths
 
@@ -80,12 +79,16 @@ Start with `jk` or `jk log`, then use:
 - `Enter`, `d`, `v`, and `s` to inspect the selected change;
 - `:` to run a direct `jj` command or `!` to run an external executable without shell
   interpretation;
-- `a` to open actions for the selected change, then `a` again to preview abandon;
+- `a` to open actions for the selected change, then `a` again to abandon it after an empty check
+  and, when content would be discarded, a confirmation;
 - `a`, then `r` to preview restoring all paths from the selected revision into `@`;
 - `a`, then `m` to edit and save a description inline; choose New, Edit, Undo, or Redo from `a`
   to run them immediately;
 - `C` and `o` to inspect Command History and Operation Log;
-- `W` to inspect other jj workspaces.
+- `R` to select a rebase destination and review the command;
+- `o` inside a supported mutation preview to edit its Run Options;
+- `B` for bookmarks and remote workflows;
+- `W` for workspace inspection and lifecycle actions.
 
 ![jk diff view](https://www.joshka.net/jk-screenshots/assets/jk-diff-v3.gif)
 
@@ -121,7 +124,8 @@ The current stabilization direction is:
 
 - stabilize the integrated rebase, squash, restore, and workspace workflows;
 - keep README, crate README, changelog, website, and media aligned with released behavior;
-- keep mutating workflows behind command previews, command history, and operation recovery;
+- use confirmations for consequential mutations and keep command history and operation recovery
+  available after every mutation;
 - make [Betamax](https://www.joshka.net/betamax/) tapes the source for regression tests,
   README/site media, and release demos.
 

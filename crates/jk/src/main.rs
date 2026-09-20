@@ -31,7 +31,7 @@ use jk_cli::{
     JjLogCommand, JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash, JjStatus,
     JjWorkspaces, LogTemplateSelection, NewQuery, OperationQuery, RecordingExternalCommandRunner,
     RecordingJjCommandRunner, ShowQuery, StatusQuery, SystemExternalCommandRunner,
-    SystemJjCommandRunner, WorkspaceInspectionQuery,
+    WorkspaceInspectionQuery,
 };
 use jk_core::{
     CommandHistory, CommandSource, SelectionCandidates, SelectionDecision, SelectionRequest,
@@ -71,6 +71,7 @@ mod refresh;
 pub mod refresh_runner;
 mod rendering;
 mod root_views;
+mod run_options;
 mod runner;
 mod squash;
 mod state;
@@ -185,6 +186,7 @@ fn main() -> Result<()> {
         Some(Command::Log(_)) | None => root_log_view(&source, &mut history)?,
     };
 
+    initialize_dialog_theme(args.dialog_theme);
     run_terminal(
         app,
         source,
@@ -264,7 +266,7 @@ fn run_terminal(
             .toast_timeout()
             .map_or(refresh_poll, |toast| toast.min(refresh_poll));
         if !event::poll(timeout)? {
-            needs_redraw = state.toast_timeout().is_some();
+            needs_redraw = state.toast_redraw_due();
             continue;
         }
         let event = event::read()?;
@@ -314,6 +316,16 @@ fn run_terminal(
                 needs_redraw = true;
             }
             Event::Resize(_, _) => {
+                refresh_active_view_for_resize(
+                    &mut state,
+                    &mut source,
+                    diff_source,
+                    evolog_source,
+                    show_source,
+                    status_source,
+                    operation_source,
+                    workspaces_source,
+                );
                 needs_redraw = true;
             }
             _ => {}
@@ -321,6 +333,85 @@ fn run_terminal(
     }
 
     Ok(())
+}
+
+/// Query before the event loop owns terminal input; unsupported terminals keep a readable fallback.
+fn initialize_dialog_theme(preference: cli::DialogThemeOption) {
+    use jk_tui::styles::DialogTheme;
+    use terminal_colorsaurus::{QueryOptions, ThemeMode};
+
+    let theme = match preference {
+        cli::DialogThemeOption::Light => DialogTheme::Light,
+        cli::DialogThemeOption::Dark => DialogTheme::Dark,
+        cli::DialogThemeOption::Auto => {
+            let mut options = QueryOptions::default();
+            options.timeout = Duration::from_millis(200);
+            if io::stdin().is_terminal()
+                && io::stdout().is_terminal()
+                && matches!(
+                    terminal_colorsaurus::theme_mode(options),
+                    Ok(ThemeMode::Light)
+                )
+            {
+                DialogTheme::Light
+            } else {
+                DialogTheme::Dark
+            }
+        }
+    };
+    jk_tui::styles::initialize_dialog_theme(theme);
+}
+
+/// Reloads live jj output at the new terminal width while preserving open controls.
+fn refresh_active_view_for_resize(
+    state: &mut AppState,
+    source: &mut JjLog,
+    diff_source: &JjDiff,
+    evolog_source: &JjEvolog,
+    show_source: &JjShow,
+    status_source: &JjStatus,
+    operation_source: &JjOperation,
+    workspaces_source: &JjWorkspaces,
+) {
+    if matches!(
+        state.views.active(),
+        AppView::Bookmarks { .. }
+            | AppView::Workspaces { .. }
+            | AppView::CommandHistory { .. }
+            | AppView::CommandHistoryDetails { .. }
+            | AppView::CommandOutput { .. }
+    ) {
+        return;
+    }
+    let selected_path = match (state.views.active(), state.modes.active()) {
+        (AppView::Diff { view, .. }, Some(InputMode::DiffFileList { selected })) => view
+            .file_paths()
+            .get(*selected)
+            .map(|path| (*path).to_owned()),
+        _ => None,
+    };
+    let _ = apply_action(
+        state,
+        source,
+        diff_source,
+        evolog_source,
+        show_source,
+        status_source,
+        operation_source,
+        workspaces_source,
+        jk_tui::log_view::LogAction::Refresh,
+    );
+    if let (Some(path), AppView::Diff { view, .. }, Some(InputMode::DiffFileList { selected })) = (
+        selected_path,
+        state.views.active(),
+        state.modes.active_mut(),
+    ) {
+        *selected = view
+            .file_paths()
+            .iter()
+            .position(|candidate| *candidate == path)
+            .unwrap_or(usize::MAX);
+    }
 }
 
 fn apply_log_refresh_completions(state: &mut AppState, source: &JjLog) -> bool {
@@ -390,6 +481,9 @@ fn handle_input_mode_with_workspaces(
         Some(InputMode::CommandDiscovery { .. })
     ) {
         return handle_command_discovery_mode(state, key);
+    }
+    if matches!(state.modes.active(), Some(InputMode::RunOptions { .. })) {
+        return run_options::handle_input(state, key);
     }
     if matches!(state.modes.active(), Some(InputMode::CommandPreview { .. })) {
         return handle_command_preview_mode(state, source, bookmarks_source, key);
@@ -483,14 +577,20 @@ fn handle_input_mode_with_workspaces(
                     kind,
                     name,
                     revision,
+                    error,
                     ..
                 } => {
                     let Some(mutation) =
                         bookmark_mutation_from_prompt(*kind, name.clone(), revision.clone())
                     else {
+                        *error = Some(if name.trim().is_empty() {
+                            "Enter a bookmark name.".to_owned()
+                        } else {
+                            "Enter a target revision.".to_owned()
+                        });
                         return InputModeResult::Handled;
                     };
-                    state.modes.pop();
+                    *error = None;
                     open_bookmark_preview(state, bookmarks_source, mutation);
                     return InputModeResult::Handled;
                 }
@@ -501,6 +601,7 @@ fn handle_input_mode_with_workspaces(
                     unreachable!()
                 }
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::RunOptions { .. } => unreachable!(),
                 InputMode::RebaseDestination { .. } => unreachable!(),
                 InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
@@ -539,7 +640,12 @@ fn handle_input_mode_with_workspaces(
         KeyEvent {
             code: KeyCode::Tab, ..
         } => {
-            if let Some(InputMode::BookmarkMutation { field, .. }) = state.modes.active_mut() {
+            if let Some(InputMode::BookmarkMutation {
+                kind: state::BookmarkMutationKind::Create,
+                field,
+                ..
+            }) = state.modes.active_mut()
+            {
                 *field = match field {
                     BookmarkMutationField::Name => BookmarkMutationField::Revision,
                     BookmarkMutationField::Revision => BookmarkMutationField::Name,
@@ -593,6 +699,7 @@ fn handle_input_mode_with_workspaces(
                     unreachable!()
                 }
                 InputMode::CommandPreview { .. } => unreachable!(),
+                InputMode::RunOptions { .. } => unreachable!(),
                 InputMode::RebaseDestination { .. } => unreachable!(),
                 InputMode::WorkspaceLifecycle { .. } => unreachable!(),
                 InputMode::JjCommand { .. } => unreachable!(),
@@ -617,6 +724,11 @@ fn handle_command_preview_mode(
         return InputModeResult::Handled;
     }
     match key {
+        KeyEvent {
+            code: KeyCode::Char('o'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => run_options::open(state),
         KeyEvent {
             code:
                 KeyCode::Down
@@ -670,7 +782,7 @@ fn handle_command_preview_mode(
                     state,
                     source,
                     pending,
-                    SystemJjCommandRunner,
+                    crate::runner::system_runner(),
                 ),
             }
         }
@@ -1002,7 +1114,8 @@ fn submit_jj_command_mode(state: &mut AppState, repository: Option<&Path>) {
         _ => return,
     };
 
-    match run_jj_command_mode_with_runner(state, repository, &input, SystemJjCommandRunner) {
+    match run_jj_command_mode_with_runner(state, repository, &input, crate::runner::system_runner())
+    {
         Ok(()) => {
             state.modes.pop();
         }
@@ -1139,7 +1252,12 @@ fn describe_message_from_log(description: &str) -> String {
 }
 
 fn submit_describe_message(state: &mut AppState, source: &mut JjLog, describe_source: &JjDescribe) {
-    submit_describe_message_with_runner(state, source, describe_source, SystemJjCommandRunner);
+    submit_describe_message_with_runner(
+        state,
+        source,
+        describe_source,
+        crate::runner::system_runner(),
+    );
 }
 
 fn submit_describe_message_with_runner<R: JjCommandRunner>(
@@ -1170,7 +1288,7 @@ fn submit_describe_message_with_runner<R: JjCommandRunner>(
 }
 
 fn execute_new_action(state: &mut AppState, source: &mut JjLog, new_source: &JjNew) {
-    execute_new_action_with_runner(state, source, new_source, SystemJjCommandRunner);
+    execute_new_action_with_runner(state, source, new_source, crate::runner::system_runner());
 }
 
 fn execute_new_action_with_runner<R: JjCommandRunner>(
@@ -1215,7 +1333,7 @@ fn new_preview_pending(state: &mut AppState, new_source: &JjNew) -> Option<Pendi
 }
 
 fn execute_edit_action(state: &mut AppState, source: &mut JjLog, edit_source: &JjEdit) {
-    execute_edit_action_with_runner(state, source, edit_source, SystemJjCommandRunner);
+    execute_edit_action_with_runner(state, source, edit_source, crate::runner::system_runner());
 }
 
 fn execute_edit_action_with_runner<R: JjCommandRunner>(
@@ -1441,7 +1559,12 @@ fn apply_diff_file_list_selection(state: &mut AppState) {
 }
 
 fn apply_diff_format_option(state: &mut AppState, diff_source: &JjDiff, format: DiffFormat) {
-    apply_diff_format_option_with_runner(state, diff_source, format, SystemJjCommandRunner);
+    apply_diff_format_option_with_runner(
+        state,
+        diff_source,
+        format,
+        crate::runner::system_runner(),
+    );
 }
 
 fn apply_diff_format_option_with_runner<R: JjCommandRunner>(
@@ -5001,6 +5124,21 @@ mod tests {
         assert!(matches!(mark_transition, AppTransition::Continue));
         assert!(matches!(page_transition, AppTransition::Continue));
         assert_eq!(mark_status, page_status);
+    }
+
+    #[test]
+    fn dialog_theme_is_global_and_preserves_jj_view_options() {
+        let args =
+            Args::try_parse_from(["jk", "log", "--dialog-theme", "light", "-T", "description"])
+                .expect("valid global dialog theme");
+        assert_eq!(args.dialog_theme, cli::DialogThemeOption::Light);
+        assert_eq!(
+            args.log_source().template(),
+            &LogTemplateSelection::Custom("description".to_owned())
+        );
+        let default = Args::try_parse_from(["jk"]).expect("valid default args");
+        assert_eq!(default.dialog_theme, cli::DialogThemeOption::Auto);
+        assert!(Args::try_parse_from(["jk", "--dialog-theme", "unknown"]).is_err());
     }
 
     #[test]

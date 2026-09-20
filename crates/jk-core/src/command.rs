@@ -93,6 +93,7 @@ pub struct JjCommandSpec {
     global_options: GlobalOptions,
     cwd: Option<PathBuf>,
     stdin: Option<String>,
+    display_columns: Option<u16>,
     title: String,
     mode: ExecutionMode,
     safety: SafetyClass,
@@ -110,6 +111,7 @@ impl JjCommandSpec {
             global_options: GlobalOptions::default(),
             cwd: None,
             stdin: None,
+            display_columns: None,
             title,
             mode: ExecutionMode::RenderReadOnly,
             safety: SafetyClass::ReadOnly,
@@ -154,6 +156,19 @@ impl JjCommandSpec {
     pub fn with_stdin(mut self, stdin: impl Into<String>) -> Self {
         self.stdin = Some(stdin.into());
         self
+    }
+
+    /// Sets the available output width without changing executable arguments or repository options.
+    #[must_use]
+    pub const fn with_display_columns(mut self, columns: u16) -> Self {
+        self.display_columns = Some(if columns == 0 { 1 } else { columns });
+        self
+    }
+
+    /// Returns the output width supplied to jj through its child-process `COLUMNS` environment.
+    #[must_use]
+    pub const fn display_columns(&self) -> Option<u16> {
+        self.display_columns
     }
 
     /// Sets the display title independently from the executable argv.
@@ -459,6 +474,30 @@ impl GlobalOptions {
     #[must_use]
     pub fn repository(&self) -> Option<&Path> {
         self.repository.as_deref()
+    }
+
+    /// Returns the explicitly selected working-copy policy.
+    #[must_use]
+    pub const fn working_copy(&self) -> WorkingCopyPolicy {
+        self.working_copy
+    }
+
+    /// Returns the operation context selected for this command.
+    #[must_use]
+    pub const fn operation(&self) -> &OperationLoadPolicy {
+        &self.operation
+    }
+
+    /// Returns whether this command may rewrite immutable commits.
+    #[must_use]
+    pub const fn immutability(&self) -> ImmutabilityPolicy {
+        self.immutability
+    }
+
+    /// Returns whether the command integrates its resulting operation.
+    #[must_use]
+    pub const fn operation_integration(&self) -> OperationIntegrationPolicy {
+        self.operation_integration
     }
 
     /// Returns global `jj` arguments in canonical render order.

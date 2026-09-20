@@ -1,6 +1,6 @@
 use jk_cli::{
     BookmarkMutation, BookmarkSnapshot, JjBookmarks, JjCommandRunner, JjGitRemote, JjShow,
-    RecordingJjCommandRunner, ShowQuery, SystemJjCommandRunner,
+    RecordingJjCommandRunner, ShowQuery,
 };
 use jk_core::{CommandSource, SourceAction, SourceView};
 use jk_tui::bookmark_view::{
@@ -14,7 +14,7 @@ use crate::state::{AppState, AppView, BookmarkMutationField, BookmarkMutationKin
 
 /// Opens the bookmark list as a child view.
 pub fn open_bookmarks(state: &mut AppState, source: &JjBookmarks) {
-    open_bookmarks_with_runner(state, source, SystemJjCommandRunner);
+    open_bookmarks_with_runner(state, source, crate::runner::system_runner());
 }
 
 pub fn open_bookmarks_with_runner<R: JjCommandRunner>(
@@ -92,6 +92,7 @@ pub fn open_bookmark_create_prompt(state: &mut AppState) {
         name: String::new(),
         revision: "@".to_owned(),
         field: BookmarkMutationField::Name,
+        error: None,
     });
 }
 
@@ -102,6 +103,7 @@ pub fn open_bookmark_move_prompt(state: &mut AppState, name: String) {
         name,
         revision: "@".to_owned(),
         field: BookmarkMutationField::Revision,
+        error: None,
     });
 }
 
@@ -137,7 +139,7 @@ pub fn bookmark_mutation_from_prompt(
 
 /// Loads configured remotes and asks for a destination before building a preview.
 pub fn open_remote_preview(state: &mut AppState, remotes: &JjGitRemote, push: bool) {
-    open_remote_picker_with_runner(state, remotes, push, SystemJjCommandRunner);
+    open_remote_picker_with_runner(state, remotes, push, crate::runner::system_runner());
 }
 
 fn open_remote_picker_with_runner(
@@ -236,7 +238,7 @@ pub fn handle_remote_picker(
 }
 
 pub fn refresh_bookmarks(state: &mut AppState, source: &JjBookmarks) {
-    refresh_bookmarks_with_runner(state, source, SystemJjCommandRunner);
+    refresh_bookmarks_with_runner(state, source, crate::runner::system_runner());
 }
 
 pub fn refresh_bookmarks_with_runner(
@@ -268,6 +270,53 @@ mod tests {
     use super::*;
     use crate::state::InputMode;
     use crate::test_support::{SequencedRunner, log_app_view, output};
+
+    fn prompt_key(state: &mut AppState, code: crossterm::event::KeyCode) {
+        let _ = crate::handle_input_mode(
+            state,
+            &mut jk_cli::JjLog::default(),
+            &jk_cli::JjDiff::default(),
+            &jk_cli::JjDescribe::default(),
+            None,
+            crossterm::event::KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
+        );
+    }
+
+    #[test]
+    fn create_prompt_validates_and_survives_canceled_preview() {
+        use crossterm::event::KeyCode;
+        let mut state = AppState::new(log_app_view("abc"));
+        open_bookmark_create_prompt(&mut state);
+        prompt_key(&mut state, KeyCode::Enter);
+        assert!(
+            matches!(state.modes.active(), Some(InputMode::BookmarkMutation { error: Some(error), .. }) if error == "Enter a bookmark name.")
+        );
+        for character in "topic".chars() {
+            prompt_key(&mut state, KeyCode::Char(character));
+        }
+        prompt_key(&mut state, KeyCode::Enter);
+        assert!(matches!(
+            state.modes.active(),
+            Some(InputMode::CommandPreview { .. })
+        ));
+        prompt_key(&mut state, KeyCode::Esc);
+        assert!(
+            matches!(state.modes.active(), Some(InputMode::BookmarkMutation { name, revision, error: None, .. }) if name == "topic" && revision == "@")
+        );
+        assert_eq!(state.history.records().count(), 0);
+    }
+
+    #[test]
+    fn move_prompt_keeps_selected_name_fixed() {
+        use crossterm::event::KeyCode;
+        let mut state = AppState::new(log_app_view("abc"));
+        open_bookmark_move_prompt(&mut state, "topic".into());
+        prompt_key(&mut state, KeyCode::Tab);
+        prompt_key(&mut state, KeyCode::Char('-'));
+        assert!(
+            matches!(state.modes.active(), Some(InputMode::BookmarkMutation { name, revision, field: BookmarkMutationField::Revision, .. }) if name == "topic" && revision == "@-")
+        );
+    }
 
     #[test]
     fn fetch_works_without_remote_bookmarks_and_cancel_does_not_run_it() {

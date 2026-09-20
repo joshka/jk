@@ -13,36 +13,36 @@ Set Margin 20
 Set WindowBar Colorful
 Set BorderRadius 8
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Input
 Set TypingSpeed 24ms
 Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "repo=${JK_REPO:-$HOME/local/jk/default}"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" inspection"
 Enter
-Wait
-Type "cd \"$repo\" && test -f Cargo.toml && test -d .jj && mkdir -p target/dogfood-artifacts/readme-media target/dogfood-artifacts/betamax"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
 Enter
 Wait+Line
-Type "cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-readme-betamax-build.log 2>&1 && echo JK_BUILD_READY"
-Enter
-Wait+Screen "JK_BUILD_READY"
 Ctrl+L
 Sleep 200ms
 
-Type "./target/debug/jk -R . diff @-"
+Type "\"$bin\" -R \"$fixture\" diff @-"
 Enter
 Wait+Screen "jk jj diff"
 Sleep 1100ms
 Show
 Screenshot target/dogfood-artifacts/readme-media/jk-diff-v3.png
+State target/dogfood-artifacts/readme-media/jk-diff-v3.json
 
 Hide
 Caption "Help appears as an overlay, keeping the diff in place underneath."
 Type "?"
 Sleep 1200ms
 Screenshot target/dogfood-artifacts/readme-media/jk-diff-help-v3.png
+State target/dogfood-artifacts/readme-media/jk-diff-help-v3.json
 
 Type "?"
 Sleep 300ms
@@ -54,6 +54,7 @@ Type "diff"
 Enter
 Sleep 1400ms
 Screenshot target/dogfood-artifacts/readme-media/jk-diff-search-v3.png
+State target/dogfood-artifacts/readme-media/jk-diff-search-v3.json
 
 Caption "Hunk and file folding keeps large diffs scannable."
 Type "}"
@@ -61,6 +62,7 @@ Sleep 700ms
 Type "-"
 Sleep 1400ms
 Screenshot target/dogfood-artifacts/readme-media/jk-diff-folded-hunk-v3.png
+State target/dogfood-artifacts/readme-media/jk-diff-folded-hunk-v3.json
 
 Type "j"
 Sleep 180ms
@@ -79,6 +81,7 @@ Sleep 700ms
 Type "h"
 Sleep 1400ms
 Screenshot target/dogfood-artifacts/readme-media/jk-diff-folded-file-v3.png
+State target/dogfood-artifacts/readme-media/jk-diff-folded-file-v3.json
 
 Caption ""
 Hide

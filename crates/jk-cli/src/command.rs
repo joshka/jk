@@ -261,7 +261,10 @@ const fn should_probe_resulting_operation(spec: &JjCommandSpec) -> bool {
         ExecutionMode::ConfirmMutation | ExecutionMode::ConfirmNetworkRead
     ) && matches!(
         spec.safety(),
-        SafetyClass::LocalMetadata | SafetyClass::LocalRewrite | SafetyClass::DestructiveLocal
+        SafetyClass::LocalMetadata
+            | SafetyClass::LocalRewrite
+            | SafetyClass::DestructiveLocal
+            | SafetyClass::NetworkRead
     )
 }
 
@@ -362,6 +365,17 @@ fn run_captured_command(
             (Some(mut stdin), Some(input)) => stdin.write_all(input),
             _ => Ok(()),
         });
+        // Helpers can keep these pipes open after jj exits. Observe cancellation until they close,
+        // and leave the child unreaped so its process-group id cannot be reused before termination.
+        while !stdin_writer.is_finished()
+            || !stdout_reader.is_finished()
+            || !stderr_reader.is_finished()
+        {
+            if cancellation.is_some_and(CancellationToken::is_cancelled) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
         let status = wait_for_child(&mut child, cancellation);
         if status.is_err() {
             terminate_child(&mut child, cancellation.is_some());
@@ -480,6 +494,9 @@ pub fn build_jj_command(spec: &JjCommandSpec) -> Command {
     command.env_remove("NO_COLOR");
     command.env_remove("CLICOLOR");
     command.env_remove("CLICOLOR_FORCE");
+    if let Some(columns) = spec.display_columns() {
+        command.env("COLUMNS", columns.to_string());
+    }
 
     if let Some(cwd) = spec.cwd() {
         command.current_dir(cwd);
@@ -568,6 +585,21 @@ mod tests {
         assert!(envs.contains(&("NO_COLOR".to_owned(), true)));
         assert!(envs.contains(&("CLICOLOR".to_owned(), true)));
         assert!(envs.contains(&("CLICOLOR_FORCE".to_owned(), true)));
+    }
+
+    #[test]
+    fn display_width_changes_only_the_child_environment() {
+        let spec = JjCommandSpec::render_read_only(["log"]);
+        let fitted = spec.clone().with_display_columns(37);
+        let command = build_jj_command(&fitted);
+        assert_eq!(fitted.process_argv(), spec.process_argv());
+        assert!(
+            command.get_envs().any(|(key, value)| {
+                key == "COLUMNS" && value == Some(std::ffi::OsStr::new("37"))
+            })
+        );
+        assert_eq!(spec.display_columns(), None);
+        assert_eq!(spec.with_display_columns(0).display_columns(), Some(1));
     }
 
     #[test]
@@ -677,6 +709,27 @@ mod tests {
 
             let error = run_captured_command(command, None, Some(&cancellation))
                 .expect_err("cancel process and its helper");
+
+            assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+        });
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_terminates_helpers_after_parent_exits() {
+        let cancellation = CancellationToken::new();
+        let mut command = Command::new("sh");
+        command.args(["-c", "sleep 30 &"]);
+        let started = std::time::Instant::now();
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                thread::sleep(Duration::from_millis(100));
+                cancellation.cancel();
+            });
+
+            let error = run_captured_command(command, None, Some(&cancellation))
+                .expect_err("cancel helper after its parent exits");
 
             assert_eq!(error.kind(), io::ErrorKind::Interrupted);
         });

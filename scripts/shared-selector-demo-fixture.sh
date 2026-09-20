@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build an isolated repository with sibling revisions, multiple files, and operation history.
 set -euo pipefail
+source "$(dirname "$0")/betamax-fixture-env.sh"
 cd "$(dirname "$0")/.."
 mkdir -p target/dogfood-artifacts/betamax
 fixture=$(mktemp -d "$PWD/target/shared-selector-demo.XXXXXX")

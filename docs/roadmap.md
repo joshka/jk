@@ -15,6 +15,19 @@ rendering, safe previews, operation recovery, and first-class workspaces.
 
 The product test is simple: `jk` should feel like interactive jj, not a Git dashboard for jj.
 
+## Current integration and next work
+
+The [coverage audit](command-coverage.md) is the current command-family inventory. The integrated
+work includes safe rebase/squash/restore, workspace lifecycle, bookmark mutations, confirmed fetch,
+push dry-run, captured external commands, cancellable log refresh, shared selector handoffs, and
+command-local Run Options. Milestone numbers below describe dependency order, not released versions.
+
+The next coherent slices are foreground jj editor/tool handoff, shared fileset selection for
+commit/split and partial content movement, and completing confirmed push after dry-run. Native
+interdiff is a smaller independent inspection improvement. Preserve jj presentation and the
+[design contract](tui-design.md) while adding each slice; use fresh fixtures and paired Betamax
+pixels/text for proof.
+
 ## Milestones
 
 ### 0.3 Foundation
@@ -67,8 +80,8 @@ Add the two features that turn `jk` from an inspection helper into a daily jj TU
 Introduce mutating workflows through recorded command execution, using command previews and recovery
 for safety-sensitive actions.
 
-- Add a reusable Run Options drawer for global options and advanced safety toggles before mutating
-  wizards depend on them.
+- Extend the command-local [Run Options drawer](run-options.md) beyond working-copy policy,
+  eligible historical operations, and immutable override only when scope and recovery are explicit.
 - Add inline and editor describe flows. The current implementation prefills the inline `m` prompt
   from the selected revision's full description, shows an insertion cursor, supports `Ctrl-u` clear,
   and saves directly on `Enter`; editor describe and before/after review remain follow-up work.
@@ -101,8 +114,9 @@ Bring file and hunk workflows into the same command-shaped model.
 
 Make bookmarks, tags, fetch, and push first-class screens.
 
-- Add bookmark and tag list screens with scoped actions.
-- Add fetch and push flows, with push dry-run first.
+- Bookmarks now have inspection and create/move/delete previews; dedicated tags remain.
+- Explicit remote fetch and scoped push dry-run are implemented. Real push remains deferred until
+  its final confirmation and remote-result recovery contract are complete.
 - Add remote management only after the common fetch/push path is solid.
 
 ### 0.9 Hybrid Rendering Beta

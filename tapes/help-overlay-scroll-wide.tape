@@ -14,25 +14,23 @@ Set Margin 20
 Set WindowBar Colorful
 Set BorderRadius 8
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Input
 Set TypingSpeed 20ms
 Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "repo=${JK_REPO:-/Users/joshka/local/jk/help-overlays}"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" inspection"
 Enter
-Wait
-Type "cd \"$repo\" && test -f Cargo.toml && test -d .jj && echo JK_REPO_READY"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
 Enter
-Wait+Screen "JK_REPO_READY"
-Type "cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-help-overlay-scroll-wide-build.log 2>&1 && echo JK_BUILD_READY"
-Enter
-Wait+Screen "JK_BUILD_READY"
+Wait+Line
 Show
 
 Caption "Wide terminal around 200x50 cells: Help uses aligned columns."
-Type "./target/debug/jk -R . -n 8"
+Type "\"$bin\" -R \"$fixture\" -n 8"
 Enter
 Wait+Screen "jk jj"
 Sleep 800ms

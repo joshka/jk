@@ -124,7 +124,7 @@ impl SquashSelection {
             .map(|(index, source)| format!("Source {}: {}", index + 1, source.commit_id))
             .collect::<Vec<_>>();
         details.push(format!("Destination: {}", self.destination.commit_id));
-        details.push("Scope: whole changes (file and hunk selection deferred)".to_owned());
+        details.push("Scope: whole changes".to_owned());
         details.push("Message: keep destination description".to_owned());
         details
     }
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_details_name_roles_and_deferred_scope() {
+    fn preview_details_name_roles_and_scope() {
         let selection = SquashSelection::resolve(
             vec![revision("source", "aaaaaaaa")],
             revision("destination", "dddddddd"),
@@ -240,7 +240,7 @@ mod tests {
             [
                 "Source 1: aaaaaaaa",
                 "Destination: dddddddd",
-                "Scope: whole changes (file and hunk selection deferred)",
+                "Scope: whole changes",
                 "Message: keep destination description",
             ]
         );
@@ -266,7 +266,7 @@ mod tests {
             [
                 "Source 1: aaaaaaaaaaaaaaaa",
                 "Destination: dddddddddddddddd",
-                "Scope: whole changes (file and hunk selection deferred)",
+                "Scope: whole changes",
                 "Message: keep destination description",
             ]
         );

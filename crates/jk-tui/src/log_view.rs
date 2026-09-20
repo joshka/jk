@@ -8,14 +8,13 @@
 use jk_core::LogSnapshot;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::prelude::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 
 use crate::chrome::{StatusTone, ViewChrome, render_help_overlay};
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::log_state::LogState;
 use crate::rendered_log::{ExpandedDetails, RenderedLog, rendered_text};
-use crate::selected_row::paint_selected_row;
+use crate::selected_row::{interaction_areas, paint_cursor, paint_extent, paint_mark};
 
 /// A visible revision eligible for explicit destination selection.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -407,26 +406,33 @@ impl LogView {
     /// Renders the log view.
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
-        self.render_area(frame, area, None);
+        self.render_area(frame, area, None, true);
     }
 
     /// Renders the log view with a caller-owned status line.
     pub fn render_with_status(&mut self, frame: &mut Frame<'_>, status: &str) {
         let area = frame.area();
-        self.render_area(frame, area, Some(status));
+        self.render_area(frame, area, Some(status), true);
     }
 
     /// Renders the log view with a centered selector overlay.
     pub fn render_with_selector(&mut self, frame: &mut Frame<'_>, title: &str, lines: &[String]) {
         let area = frame.area();
-        self.render_area(frame, area, None);
+        self.render_area(frame, area, None, false);
         let areas = ViewChrome::layout(area);
         render_help_overlay(frame, areas.content, title, lines);
     }
 
-    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status: Option<&str>) {
+    fn render_area(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        status: Option<&str>,
+        focused: bool,
+    ) {
         let areas = ViewChrome::layout(area);
-        let height = usize::from(areas.content.height);
+        let (gutter, content) = interaction_areas(areas.content);
+        let height = usize::from(content.height);
         self.state.keep_selected_in_view(height);
 
         let status = status.map_or_else(
@@ -441,6 +447,7 @@ impl LogView {
             },
             ToOwned::to_owned,
         );
+        let status = marked_status(&self.state, &status, areas.status_width());
         let status_tone = self
             .status_message
             .as_ref()
@@ -455,16 +462,28 @@ impl LogView {
             .map(|(line, description)| ExpandedDetails::new(line, description));
         let rendered_log =
             RenderedLog::new(self.state.rendered()).with_expanded_details(expanded_details);
-        let content_width = usize::from(areas.content.width);
+        let content_width = usize::from(content.width);
         let rendered = rendered_log.render_with_width(content_width);
         let text = rendered_text(&rendered);
         let scroll = u16::try_from(self.state.scroll_offset()).unwrap_or(u16::MAX);
         let paragraph = Paragraph::new(text).scroll((scroll, 0));
-        frame.render_widget(paragraph, areas.content);
+        frame.render_widget(paragraph, content);
 
-        paint_mark_overlays(frame, areas.content, &self.state, &rendered_log);
+        paint_mark_overlays(frame, gutter, content_width, &self.state, &rendered_log);
         if let Some(line) = self.state.selected_rendered_line() {
-            paint_selected_row(frame, areas.content, line, self.state.scroll_offset());
+            let focused = focused && !self.help_visible;
+            let end = self.state.selected_entry_end_line().unwrap_or(line);
+            let end = rendered_log.line_after_insertions(end.saturating_add(1), content_width);
+            for continuation in line.saturating_add(1)..end {
+                paint_extent(
+                    frame,
+                    gutter,
+                    continuation,
+                    self.state.scroll_offset(),
+                    focused,
+                );
+            }
+            paint_cursor(frame, gutter, line, self.state.scroll_offset(), focused);
         }
 
         if self.help_visible {
@@ -521,51 +540,36 @@ fn truncate_status(status: &str, width: usize) -> String {
     truncated
 }
 
+fn marked_status(state: &LogState, status: &str, width: u16) -> String {
+    let count = state.marked_change_ids().len();
+    if count == 0 {
+        return status.to_owned();
+    }
+    let marks = state.selected_mark_index().map_or_else(
+        || format!("{count} marked"),
+        |index| format!("mark {}/{count}", index + 1),
+    );
+    let available = usize::from(width).saturating_sub(marks.len() + 2);
+    if available == 0 {
+        marks
+    } else {
+        format!("{marks}  {}", truncate_status(status, available))
+    }
+}
+
 fn paint_mark_overlays(
     frame: &mut Frame<'_>,
-    area: Rect,
+    gutter: Rect,
+    content_width: usize,
     state: &LogState,
     rendered_log: &RenderedLog<'_>,
 ) {
-    if area.is_empty() || area.width < 3 {
-        return;
-    }
-
-    let content_width = usize::from(area.width);
     for change_id in state.marked_change_ids() {
-        let Some(mark_index) = state.mark_index_for_change_id(change_id) else {
-            continue;
-        };
         let Some(rendered_line) = state.rendered_line_for_change_id(change_id) else {
             continue;
         };
         let rendered_line = rendered_log.line_after_insertions(rendered_line, content_width);
-        let Some(visible_line) = rendered_line.checked_sub(state.scroll_offset()) else {
-            continue;
-        };
-        let Ok(visible_line) = u16::try_from(visible_line) else {
-            continue;
-        };
-        if visible_line >= area.height {
-            continue;
-        }
-
-        let label = format!("[{}]", mark_index + 1);
-        let label_width = u16::try_from(label.chars().count()).unwrap_or(u16::MAX);
-        if label_width > area.width {
-            continue;
-        }
-
-        let y = area.y + visible_line;
-        let x = area.right() - label_width;
-        frame.buffer_mut().set_string(
-            x,
-            y,
-            label,
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        );
+        paint_mark(frame, gutter, rendered_line, state.scroll_offset());
     }
 }
 
@@ -627,14 +631,10 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
         assert!(rendered.contains("aaa summary"));
         assert!(buffer_line(terminal.backend().buffer(), 3).contains("jj failed"));
-        assert_eq!(
-            terminal.backend().buffer()[(0, 3)].bg,
-            Color::Rgb(120, 45, 50)
-        );
-        assert_eq!(
-            terminal.backend().buffer()[(47, 3)].bg,
-            Color::Rgb(120, 45, 50)
-        );
+        for point in [(0, 3), (47, 3)] {
+            assert_eq!(terminal.backend().buffer()[point].fg, Color::Yellow);
+            assert_eq!(terminal.backend().buffer()[point].bg, Color::Reset);
+        }
 
         view.refresh(snapshot(["bbb"]));
         let draw_result = terminal.draw(|frame| view.render(frame));
@@ -660,8 +660,15 @@ mod tests {
         assert!(draw_result.is_ok());
         assert!(buffer_line(terminal.backend().buffer(), 55).contains("Refreshing…"));
         assert!(buffer_to_string(terminal.backend().buffer()).contains("Log keys"));
-        assert_eq!(terminal.backend().buffer()[(0, 55)].bg, Color::LightCyan);
-        assert_eq!(terminal.backend().buffer()[(71, 55)].bg, Color::LightCyan);
+        for point in [(0, 55), (71, 55)] {
+            assert_eq!(terminal.backend().buffer()[point].fg, Color::Reset);
+            assert!(
+                terminal.backend().buffer()[point]
+                    .modifier
+                    .contains(ratatui::prelude::Modifier::BOLD)
+            );
+            assert_eq!(terminal.backend().buffer()[point].bg, Color::Reset);
+        }
 
         view.refresh(snapshot(["bbb"]));
         let draw_result = terminal.draw(|frame| view.render(frame));
@@ -711,14 +718,10 @@ mod tests {
         let buffer = terminal.backend().buffer();
         assert!(buffer_line(buffer, 0).contains("jk jj log"));
         assert!(buffer_line(buffer, 3).contains("r refresh"));
-        assert_eq!(buffer[(0, 0)].fg, Color::Black);
-        assert_eq!(buffer[(0, 0)].bg, Color::LightCyan);
-        assert_eq!(buffer[(3, 0)].fg, Color::White);
-        assert_eq!(buffer[(3, 0)].bg, Color::Rgb(30, 35, 47));
-        assert_eq!(buffer[(47, 0)].bg, Color::Rgb(30, 35, 47));
-        assert_eq!(buffer[(0, 3)].fg, Color::White);
-        assert_eq!(buffer[(0, 3)].bg, Color::Rgb(58, 72, 90));
-        assert_eq!(buffer[(47, 3)].bg, Color::Rgb(58, 72, 90));
+        for point in [(0, 0), (3, 0), (47, 0), (0, 3), (47, 3)] {
+            assert_eq!(buffer[point].fg, Color::Reset);
+            assert_eq!(buffer[point].bg, Color::Reset);
+        }
     }
 
     #[test]
@@ -824,31 +827,21 @@ mod tests {
         let draw_result = terminal.draw(|frame| view.render(frame));
         assert!(draw_result.is_ok());
 
-        let cell = &terminal.backend().buffer()[(0, 1)];
+        let buffer = terminal.backend().buffer();
+        let cell = &buffer[(3, 1)];
         assert_eq!(cell.symbol(), "@");
-        assert_eq!(cell.fg, Color::Rgb(15, 20, 31));
-        assert_eq!(cell.bg, Color::Rgb(82, 196, 192));
-        assert_eq!(
-            terminal.backend().buffer()[(23, 1)].bg,
-            Color::Rgb(82, 196, 192)
-        );
-        assert_eq!(
-            terminal.backend().buffer()[(23, 1)].fg,
-            Color::Rgb(15, 20, 31)
-        );
-        assert_eq!(
-            terminal.backend().buffer()[(36, 1)].bg,
-            Color::Rgb(82, 196, 192)
-        );
-        assert_eq!(
-            terminal.backend().buffer()[(36, 1)].fg,
-            Color::Rgb(15, 20, 31)
-        );
+        assert_eq!(cell.fg, Color::Indexed(2));
+        assert_eq!(cell.bg, Color::Reset);
         assert!(cell.modifier.contains(ratatui::prelude::Modifier::BOLD));
+        assert_eq!(buffer[(0, 1)].symbol(), "›");
+        for x in 4..48 {
+            assert_eq!(buffer[(x, 1)].fg, Color::Reset);
+            assert_eq!(buffer[(x, 1)].bg, Color::Reset);
+        }
     }
 
     #[test]
-    fn selected_background_moves_with_selected_change() {
+    fn cursor_moves_independently_of_jj_working_copy_node() {
         let mut view = LogView::new(LogSnapshot::new(
             "@  aaa first\n○  bbb second\n",
             vec![
@@ -867,13 +860,20 @@ mod tests {
         assert!(draw_result.is_ok());
 
         let buffer = terminal.backend().buffer();
-        assert_eq!(buffer[(0, 1)].bg, Color::Reset);
-        assert_eq!(buffer[(0, 2)].bg, Color::Rgb(82, 196, 192));
-        assert_eq!(buffer[(0, 2)].fg, Color::Rgb(15, 20, 31));
-        assert_eq!(buffer[(23, 2)].bg, Color::Rgb(82, 196, 192));
-        assert_eq!(buffer[(23, 2)].fg, Color::Rgb(15, 20, 31));
-        assert_eq!(buffer[(36, 2)].bg, Color::Rgb(82, 196, 192));
-        assert_eq!(buffer[(36, 2)].fg, Color::Rgb(15, 20, 31));
+        assert_eq!(buffer[(0, 1)].symbol(), " ");
+        assert_eq!(buffer[(0, 2)].symbol(), "›");
+        assert_eq!(buffer[(3, 1)].symbol(), "@");
+        assert_eq!(buffer[(3, 2)].symbol(), "○");
+        assert_eq!(buffer[(0, 2)].fg, Color::Reset);
+        assert!(
+            buffer[(0, 2)]
+                .modifier
+                .contains(ratatui::prelude::Modifier::BOLD)
+        );
+        for x in 3..48 {
+            assert_eq!(buffer[(x, 2)].bg, Color::Reset);
+            assert_eq!(buffer[(x, 2)].fg, Color::Reset);
+        }
     }
 
     #[test]
@@ -893,13 +893,14 @@ mod tests {
         assert!(draw_result.is_ok());
 
         let buffer = terminal.backend().buffer();
-        assert!(buffer_line(buffer, 1).ends_with("[1]"));
-        assert!(!buffer_line(buffer, 2).contains('['));
-        assert!(buffer_line(buffer, 3).ends_with("[2]"));
+        assert_eq!(buffer[(1, 1)].symbol(), "*");
+        assert_eq!(buffer[(1, 2)].symbol(), " ");
+        assert_eq!(buffer[(1, 3)].symbol(), "*");
+        assert!(buffer_line(buffer, 5).starts_with("mark 2/2"));
     }
 
     #[test]
-    fn selected_marked_row_keeps_selected_background() {
+    fn selected_marked_row_keeps_separate_cursor_and_mark() {
         let mut view = LogView::new(snapshot(["aaa", "bbb"]));
         let _ = view.apply(LogAction::ToggleMark);
         let backend = TestBackend::new(48, 5);
@@ -912,8 +913,8 @@ mod tests {
         assert!(draw_result.is_ok());
 
         let buffer = terminal.backend().buffer();
-        assert_eq!(buffer[(0, 1)].bg, Color::Rgb(82, 196, 192));
-        assert!(buffer_line(buffer, 1).contains("[1]"));
+        assert_eq!(buffer[(0, 1)].symbol(), "›");
+        assert_eq!(buffer[(1, 1)].symbol(), "*");
     }
 
     #[test]
@@ -942,8 +943,8 @@ mod tests {
 
         let buffer = terminal.backend().buffer();
         assert!(buffer_line(buffer, 5).contains("○  bbb second"));
-        assert!(buffer_line(buffer, 5).ends_with("[1]"));
-        assert!(!buffer_line(buffer, 1).contains("[1]"));
+        assert_eq!(buffer[(1, 5)].symbol(), "*");
+        assert_eq!(buffer[(1, 1)].symbol(), " ");
     }
 
     #[test]
@@ -960,7 +961,8 @@ mod tests {
         let draw_result = terminal.draw(|frame| view.render(frame));
         assert!(draw_result.is_ok());
 
-        assert!(!buffer_to_string(terminal.backend().buffer()).contains("[1]"));
+        assert_eq!(terminal.backend().buffer()[(1, 1)].symbol(), " ");
+        assert!(!buffer_line(terminal.backend().buffer(), 4).contains("marked"));
     }
 
     #[test]
@@ -1034,7 +1036,7 @@ mod tests {
         let wrapped = rendered.find("five six").unwrap_or_default();
         let second = rendered.find("○  bbb second").unwrap_or_default();
         assert_eq!(view.state.scroll_offset(), 0);
-        assert_eq!(buffer[(0, 1)].bg, Color::Rgb(82, 196, 192));
+        assert_eq!(buffer[(0, 1)].symbol(), "›");
         assert!(selected < wrapped);
         assert!(wrapped < second);
     }
@@ -1089,6 +1091,63 @@ mod tests {
         assert_eq!(buffer_line(buffer, 3).chars().count(), 16);
         assert!(buffer_line(buffer, 0).contains("jk jj"));
         assert!(buffer_line(buffer, 3).contains("refresh"));
+    }
+
+    #[test]
+    fn marks_remain_counted_when_their_rows_scroll_out_of_view() {
+        let mut view = LogView::new(snapshot(["aaa", "bbb", "ccc", "ddd"]));
+        let _ = view.apply(LogAction::ToggleMark);
+        let _ = view.apply(LogAction::Last);
+        let mut terminal = Terminal::new(TestBackend::new(48, 4)).expect("terminal");
+        terminal.draw(|frame| view.render(frame)).expect("draw");
+        let buffer = terminal.backend().buffer();
+        assert!(!buffer_to_string(buffer).contains("aaa summary"));
+        assert!(buffer_line(buffer, 3).starts_with("1 marked"));
+        assert_eq!(buffer[(1, 1)].symbol(), " ");
+    }
+
+    #[test]
+    fn multiline_selection_has_a_gutter_extent_without_recoloring_text() {
+        let mut view = LogView::new(LogSnapshot::new(
+            "@  aaa first\n│  details\n○  bbb second\n",
+            vec![
+                LogEntry::new("aaa", "111", "first").with_rendered_line(0),
+                LogEntry::new("bbb", "222", "second").with_rendered_line(2),
+            ],
+        ));
+        let mut terminal = Terminal::new(TestBackend::new(48, 6)).expect("terminal");
+        terminal.draw(|frame| view.render(frame)).expect("draw");
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 1)].symbol(), "›");
+        assert_eq!(buffer[(0, 2)].symbol(), "·");
+        assert_eq!(buffer[(0, 3)].symbol(), " ");
+        assert_eq!(buffer[(3, 2)].symbol(), "│");
+        assert_eq!(buffer[(3, 2)].fg, Color::Reset);
+    }
+
+    #[test]
+    fn cursor_and_mark_do_not_clip_content_at_representative_widths() {
+        for width in [60, 80, 120, 160] {
+            let text = format!(
+                "@ {}",
+                "x".repeat(usize::from(crate::content_width(width)) - 2)
+            );
+            let mut view = LogView::new(LogSnapshot::new(
+                &text,
+                vec![LogEntry::new("aaa", "111", "selected").with_rendered_line(0)],
+            ));
+            let _ = view.apply(LogAction::ToggleMark);
+            let mut terminal = Terminal::new(TestBackend::new(width, 4)).expect("terminal");
+            terminal.draw(|frame| view.render(frame)).expect("draw");
+            let buffer = terminal.backend().buffer();
+            assert_eq!(buffer[(0, 1)].symbol(), "›");
+            assert_eq!(buffer[(1, 1)].symbol(), "*");
+            assert_eq!(buffer[(width - 1, 1)].symbol(), "x");
+            assert_eq!(
+                buffer_line(buffer, 1).strip_prefix("›* "),
+                Some(text.as_str())
+            );
+        }
     }
 
     fn snapshot<const N: usize>(change_ids: [&str; N]) -> LogSnapshot {

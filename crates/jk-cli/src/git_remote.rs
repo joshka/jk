@@ -409,6 +409,26 @@ mod tests {
             "dry-run must not update remote refs"
         );
 
+        run_jj(&local, &["bookmark", "delete", "fixture"]);
+        let deleted = JjBookmarks::default()
+            .with_repository(&local)
+            .load()
+            .expect("load deleted tracked bookmark");
+        let deleted_local = deleted
+            .bookmarks
+            .iter()
+            .find(|bookmark| bookmark.name == "fixture" && bookmark.is_local())
+            .expect("local deletion remains pending push");
+        assert!(deleted_local.targets.is_empty());
+        let tracked_remote = deleted
+            .bookmarks
+            .iter()
+            .find(|bookmark| bookmark.remote.as_deref() == Some("fixture"))
+            .expect("tracked remote survives local deletion");
+        assert!(tracked_remote.tracked);
+        assert!(tracked_remote.tracking_targets.is_empty());
+        assert!(!tracked_remote.synchronized);
+
         std::fs::remove_dir_all(root).expect("remove fixture repositories");
     }
 }

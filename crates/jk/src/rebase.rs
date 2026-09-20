@@ -6,17 +6,14 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use jk_cli::{JjRebase, RebaseDestinationRole, RebaseQuery, RebaseSourceRole};
 use jk_tui::log_view::{LogView, RevisionChoice};
+use jk_tui::styles::{dialog, dialog_accent, dialog_error, dialog_supporting};
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::prelude::{Color, Line, Span, Style};
+use ratatui::prelude::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 
 use crate::mutation_preview::PendingCommandPreview;
 use crate::state::{AppState, AppView, InputMode, InputModeResult};
-
-const BACKGROUND: Color = Color::Rgb(30, 35, 47);
-const HEADER: Color = Color::Rgb(46, 55, 72);
-const ACCENT: Color = Color::Rgb(28, 112, 121);
 
 /// Frozen source revisions plus transient destination-selection state.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -86,7 +83,7 @@ impl PendingRebase {
             frame.render_widget(Clear, area);
             frame.render_widget(
                 Paragraph::new("Enlarge terminal to choose a rebase destination.\nEsc cancels")
-                    .style(Style::new().fg(Color::White).bg(BACKGROUND)),
+                    .style(dialog()),
                 area,
             );
             return;
@@ -99,14 +96,13 @@ impl PendingRebase {
             height,
         );
         frame.render_widget(Clear, panel);
-        frame.render_widget(Paragraph::new("").style(Style::new().bg(BACKGROUND)), panel);
+        frame.render_widget(Paragraph::new("").style(dialog()), panel);
         frame.render_widget(
-            Paragraph::new("  Choose rebase destination")
-                .style(Style::new().fg(Color::White).bg(HEADER).bold()),
+            Paragraph::new("  Choose rebase destination").style(dialog_accent()),
             Rect::new(panel.x, panel.y, panel.width, 1),
         );
 
-        let controls = if width < 74 {
+        let mut controls = if width < 74 {
             vec![
                 Line::from(format!("Source: {}", short_ids(&self.sources))),
                 Line::from(format!("Scope: {} [r/b/s]", self.source_role.label())),
@@ -116,6 +112,11 @@ impl PendingRebase {
         } else {
             self.control_lines()
         };
+        if self.searching
+            && let Some(search) = controls.last_mut()
+        {
+            search.style = dialog_accent();
+        }
         let content = Rect::new(
             panel.x + 2,
             panel.y + 2,
@@ -124,7 +125,7 @@ impl PendingRebase {
         );
         let controls_height = controls.len() as u16;
         frame.render_widget(
-            Paragraph::new(controls).style(Style::new().fg(Color::White).bg(BACKGROUND)),
+            Paragraph::new(controls),
             Rect::new(content.x, content.y, content.width, controls_height),
         );
         let candidates = Rect::new(
@@ -134,17 +135,32 @@ impl PendingRebase {
             content.height.saturating_sub(controls_height),
         );
         frame.render_widget(
-            Paragraph::new(self.candidate_lines(usize::from(candidates.height)))
-                .style(Style::new().fg(Color::White).bg(BACKGROUND)),
+            Paragraph::new(self.candidate_lines(usize::from(candidates.height))),
             candidates,
         );
+        let bindings = if width < 60 {
+            [
+                ("/", " find  "),
+                ("↑↓", " move  "),
+                ("Enter", " next  "),
+                ("Esc", ""),
+            ]
+        } else {
+            [
+                ("/", " search   "),
+                ("↑/↓", " choose   "),
+                ("Enter", " preview   "),
+                ("Esc", " cancel"),
+            ]
+        };
+        let footer = Line::from(
+            bindings
+                .into_iter()
+                .flat_map(|(key, label)| [Span::styled(key, dialog_accent()), Span::raw(label)])
+                .collect::<Vec<_>>(),
+        );
         frame.render_widget(
-            Paragraph::new(if width < 60 {
-                "/ find  ↑↓ move  Enter next  Esc"
-            } else {
-                "  / search   ↑/↓ choose   Enter preview   Esc cancel  "
-            })
-            .style(Style::new().fg(Color::White).bg(ACCENT)),
+            Paragraph::new(footer).style(dialog_supporting()),
             Rect::new(
                 panel.x + 2,
                 panel.y + panel.height.saturating_sub(2),
@@ -194,27 +210,28 @@ impl PendingRebase {
             .skip(start)
             .take(visible_rows)
             .map(|(index, choice)| {
-                let marker = if index == selected { ">" } else { " " };
-                let style = if index == selected {
-                    Style::new().fg(Color::White).bg(ACCENT)
+                let focused = index == selected && !self.searching;
+                let marker = if index == selected { "› " } else { "  " };
+                let marker_style = if focused {
+                    dialog_accent()
                 } else {
-                    Style::new().fg(Color::White).bg(BACKGROUND)
+                    dialog_supporting()
                 };
-                Line::from(Span::styled(
-                    format!(
-                        "{marker} {}  {}",
+                Line::from(vec![
+                    Span::styled(marker, marker_style),
+                    Span::raw(format!(
+                        "{}  {}",
                         short_id(&choice.revision),
                         choice.summary
-                    ),
-                    style,
-                ))
+                    )),
+                ])
             })
             .collect::<Vec<_>>();
 
         if let Some(error) = &self.error {
             lines.push(Line::from(Span::styled(
                 format!("Error: {error}"),
-                Style::new().fg(Color::LightRed),
+                dialog_error(),
             )));
         }
         lines
@@ -424,6 +441,7 @@ mod tests {
     use jk_tui::log_view::LogAction;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::prelude::{Color, Style};
 
     use super::*;
     use crate::state::AppView;
@@ -649,8 +667,12 @@ mod tests {
             output(0, "111111111111\n", ""),
             output(0, "", ""),
             output(0, "222222222222\n", ""),
-            output(0, "refreshed rendered log\n", ""),
-            output(0, "{}\n", ""),
+            output(0, "@  target-change Rebase destination\n", ""),
+            output(
+                0,
+                "{\"change_id\":\"target-change\",\"commit_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"description\":\"Rebase destination\"}\t\"\"\n",
+                "",
+            ),
         ]);
 
         crate::mutations::execute_pending_command_with_runner(
@@ -667,6 +689,24 @@ mod tests {
         assert_eq!(records[0].operation_id.as_deref(), Some("222222222222"));
         assert_eq!(records[1].source.action, SourceAction::Refresh);
         assert_eq!(records[2].source.action, SourceAction::Refresh);
+
+        assert!(!state.toast_redraw_due());
+        let mut terminal = Terminal::new(TestBackend::new(104, 39)).expect("terminal");
+        terminal
+            .draw(|frame| {
+                crate::rendering::render_app(
+                    frame,
+                    &mut state,
+                    &jk_cli::LogTemplateSelection::Configured,
+                );
+            })
+            .expect("draw successful rebase");
+        let toast = crate::test_support::buffer_line(terminal.backend().buffer(), 37);
+        assert!(toast.contains("Rebased revisions"));
+        assert!(toast.contains("u undo"));
+        assert!(
+            crate::test_support::buffer_line(terminal.backend().buffer(), 38).contains("? help")
+        );
     }
 
     #[test]
@@ -729,6 +769,19 @@ mod tests {
     }
 
     #[test]
+    fn rebase_candidate_focus_does_not_recolor_destination_text() {
+        let mut pending = PendingRebase::from_log(&log(), JjRebase::default())
+            .unwrap_or_else(|error| panic!("selector opens: {error}"));
+        let lines = pending.candidate_lines(2);
+        assert_eq!(lines[0].spans[0].content, "› ");
+        assert_eq!(lines[0].spans[0].style, dialog_accent());
+        assert_eq!(lines[0].spans[1].style, Style::default());
+        pending.searching = true;
+        let lines = pending.candidate_lines(2);
+        assert_eq!(lines[0].spans[0].style, dialog_supporting());
+    }
+
+    #[test]
     fn narrow_render_is_borderless_and_stays_in_bounds() {
         let pending = PendingRebase::from_log(&log(), JjRebase::default())
             .unwrap_or_else(|error| panic!("selector opens: {error}"));
@@ -754,20 +807,52 @@ mod tests {
         assert!(!rendered.contains('┌'));
         assert!(!rendered.contains('╭'));
 
+        let backdrop = Style::new().fg(Color::Cyan).bg(Color::Magenta);
         let mut terminal = Terminal::new(TestBackend::new(120, 50)).expect("large test terminal");
         terminal
-            .draw(|frame| pending.render(frame))
+            .draw(|frame| {
+                frame.render_widget(
+                    Paragraph::new(vec![Line::from("▒".repeat(120)); 50]).style(backdrop),
+                    frame.area(),
+                );
+                pending.render(frame);
+            })
             .expect("selector renders");
         let panel_rows = terminal
             .backend()
             .buffer()
             .content()
             .chunks(120)
-            .filter(|row| row[60].bg != Color::Reset)
+            .filter(|row| Some(row[60].bg) == dialog().bg)
             .count();
         assert_eq!(
             panel_rows, 10,
             "short destination lists have content-sized panels"
         );
+        let panel = Rect::new(17, 20, 86, 10);
+        let buffer = terminal.backend().buffer();
+        for y in 0..50 {
+            for x in 0..120 {
+                let cell = &buffer[(x, y)];
+                if panel.contains((x, y).into()) {
+                    assert_eq!(Some(cell.bg), dialog().bg, "{x},{y}");
+                    assert!(
+                        [dialog().fg, dialog_accent().fg, dialog_supporting().fg]
+                            .contains(&Some(cell.fg)),
+                        "{x},{y}"
+                    );
+                    assert_ne!(cell.symbol(), "▒", "{x},{y}");
+                } else {
+                    assert_eq!(cell.symbol(), "▒", "{x},{y}");
+                    assert_eq!(cell.fg, Color::Cyan, "{x},{y}");
+                    assert_eq!(cell.bg, Color::Magenta, "{x},{y}");
+                }
+            }
+        }
+        assert_eq!(Some(buffer[(19, 20)].fg), dialog_accent().fg);
+        assert_eq!(Some(buffer[(19, 26)].fg), dialog_accent().fg);
+        assert_eq!(Some(buffer[(21, 26)].fg), dialog().fg);
+        assert_eq!(Some(buffer[(19, 28)].fg), dialog_accent().fg);
+        assert_eq!(Some(buffer[(21, 28)].fg), dialog_supporting().fg);
     }
 }

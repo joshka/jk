@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use jk_cli::{
     DiffFormat, DiffQuery, JjAbandon, JjBookmarks, JjDescribe, JjDiff, JjEdit, JjEvolog,
     JjGitRemote, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash,
@@ -20,9 +20,21 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub(crate) limit: Option<usize>,
 
+    /// Dialog appearance; repository output keeps the terminal's jj colors.
+    #[arg(long, global = true, value_enum, default_value_t = DialogThemeOption::Auto)]
+    pub(crate) dialog_theme: DialogThemeOption,
+
     /// View to open. If omitted, jk follows jj's configured default command.
     #[command(subcommand)]
     pub(crate) command: Option<Command>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+pub(crate) enum DialogThemeOption {
+    #[default]
+    Auto,
+    Dark,
+    Light,
 }
 
 impl Args {

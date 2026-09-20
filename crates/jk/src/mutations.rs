@@ -1,8 +1,8 @@
 use jk_cli::{
     AbandonQuery, JjAbandon, JjBookmarks, JjCommandRunner, JjLog, JjRecovery, JjRestore,
-    RecordingJjCommandRunner, RecoveryCommand, RestoreQuery, SystemJjCommandRunner,
+    RecordingJjCommandRunner, RecoveryCommand, RestoreQuery,
 };
-use jk_core::{CommandSource, SourceAction, SourceView};
+use jk_core::{CommandSource, OperationLoadPolicy, SourceAction, SourceView, WorkingCopyPolicy};
 
 use crate::abandon_confirmation::AbandonConfirmation;
 use crate::mutation_preview::{
@@ -37,8 +37,17 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
             let new_change_id = (pending.source_action == SourceAction::NewRevision)
                 .then(|| new_change_id_from_output(&output.stderr))
                 .flatten();
+            let message =
+                crate::run_options::success_message(&pending.preview.spec, pending.success_message);
+            let options = pending.preview.spec.global_options();
+            let mut refresh_source = source.clone();
+            if options.working_copy() == WorkingCopyPolicy::Ignore
+                || matches!(options.operation(), OperationLoadPolicy::AtOperation(_))
+            {
+                refresh_source = refresh_source.with_working_copy(WorkingCopyPolicy::Ignore);
+            }
             let refreshed =
-                refresh_after_mutation_with_runner(state, source, runner, pending.success_message);
+                refresh_after_mutation_with_runner(state, &refresh_source, runner, message);
             if refreshed && pending.source_action == SourceAction::NewRevision {
                 select_new_change(state, new_change_id.as_deref());
             }
@@ -91,7 +100,7 @@ pub fn confirm_bookmark_command_preview(
         state,
         bookmarks_source,
         pending,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     );
 }
 
@@ -109,16 +118,32 @@ fn confirm_bookmark_command_preview_with_runner(
     let runner = runner.into_inner();
     match result {
         Ok(output) if output.status.success() => {
+            if matches!(
+                state.modes.active(),
+                Some(InputMode::BookmarkMutation { .. })
+            ) {
+                state.modes.pop();
+            }
             crate::bookmark_routes::refresh_bookmarks_with_runner(state, bookmarks_source, runner)
         }
         Ok(output) => {
             let message =
                 command_failure_message(pending.failure_label, &output.stderr, &output.stdout);
+            if let Some(InputMode::BookmarkMutation { error, .. }) = state.modes.active_mut() {
+                *error = Some(message.clone());
+            }
             if let AppView::Bookmarks { view } = state.views.active_mut() {
                 view.show_error(message);
             }
         }
         Err(error) => {
+            if let Some(InputMode::BookmarkMutation {
+                error: prompt_error,
+                ..
+            }) = state.modes.active_mut()
+            {
+                *prompt_error = Some(format!("failed to run {}: {error}", pending.failure_label));
+            }
             if let AppView::Bookmarks { view } = state.views.active_mut() {
                 view.show_error(format!("failed to run {}: {error}", pending.failure_label));
             }
@@ -136,7 +161,7 @@ pub fn confirm_remote_command_preview(
         state,
         bookmarks_source,
         pending,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     );
 }
 
@@ -173,7 +198,12 @@ fn confirm_remote_command_preview_with_runner(
 /// conservative path and opens the same destructive preview used for a non-empty revision. The user
 /// can inspect or cancel instead of having an uncertain probe turn into an immediate mutation.
 pub fn abandon_or_preview(state: &mut AppState, source: &mut JjLog, abandon_source: &JjAbandon) {
-    abandon_or_preview_with_runner(state, source, abandon_source, SystemJjCommandRunner);
+    abandon_or_preview_with_runner(
+        state,
+        source,
+        abandon_source,
+        crate::runner::system_runner(),
+    );
 }
 
 pub(crate) fn abandon_or_preview_with_runner<R: JjCommandRunner>(
@@ -218,7 +248,7 @@ pub fn execute_recovery_action(
         source,
         recovery_source,
         command,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     );
 }
 
@@ -243,7 +273,7 @@ pub(crate) fn execute_recovery_action_with_runner<R: JjCommandRunner>(
 
 fn refresh_after_mutation_with_runner<R: JjCommandRunner>(
     state: &mut AppState,
-    source: &mut JjLog,
+    source: &JjLog,
     runner: R,
     success_message: &'static str,
 ) -> bool {
@@ -295,6 +325,100 @@ fn show_log_error(state: &mut AppState, message: String) {
 }
 
 #[cfg(test)]
+mod working_copy_tests {
+    use jk_core::{CommandHistory, GlobalOptions, JjCommandSpec, SafetyClass};
+
+    use super::*;
+    use crate::test_support::{SequencedRunner, log_app_view, output};
+
+    #[test]
+    fn post_command_refresh_respects_ignore_without_changing_later_manual_refresh() {
+        let policies = [
+            (GlobalOptions::default(), false),
+            (
+                GlobalOptions::default().with_working_copy(WorkingCopyPolicy::Ignore),
+                true,
+            ),
+            (
+                GlobalOptions::default()
+                    .with_operation(OperationLoadPolicy::AtOperation("012345abcdef".to_owned())),
+                true,
+            ),
+        ];
+        for (options, ignore_refresh) in policies {
+            let original = JjLog::default();
+            let mut source = original.clone();
+            let mut state = AppState::new(log_app_view("selected"));
+            let spec = JjCommandSpec::confirm_mutation(
+                ["rebase", "-r", "source", "-o", "destination"],
+                SafetyClass::LocalRewrite,
+            )
+            .with_global_options(options);
+            let runner = SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
+                output(0, "", ""),
+                output(0, "222222222222\n", ""),
+                output(0, "", ""),
+                output(0, "", ""),
+            ]);
+
+            execute_pending_command_with_runner(
+                &mut state,
+                &mut source,
+                PendingCommandPreview::rebase(spec.command_preview(), Vec::new()),
+                runner,
+            );
+
+            let refreshes = state
+                .history
+                .records()
+                .filter(|record| record.source.action == SourceAction::Refresh)
+                .collect::<Vec<_>>();
+            assert_eq!(refreshes.len(), 2);
+            for record in refreshes {
+                assert_eq!(
+                    record
+                        .command
+                        .argv
+                        .iter()
+                        .any(|arg| arg == "--ignore-working-copy"),
+                    ignore_refresh
+                );
+                assert!(
+                    !record
+                        .command
+                        .argv
+                        .iter()
+                        .any(|arg| arg == "--at-operation")
+                );
+            }
+            assert_eq!(source, original);
+
+            let mut history = CommandHistory::default();
+            let runner = SequencedRunner::successes(vec![output(0, "", ""), output(0, "", "")]);
+            let mut recorder = RecordingJjCommandRunner::new(
+                runner,
+                &mut history,
+                CommandSource::new(SourceView::Log, SourceAction::Refresh),
+            );
+            source
+                .load_with_runner(&mut recorder)
+                .expect("manual refresh succeeds");
+            for record in history.records() {
+                assert!(
+                    !record
+                        .command
+                        .argv
+                        .iter()
+                        .any(|arg| arg == "--ignore-working-copy")
+                );
+                assert!(!record.command.argv.iter().any(|arg| arg == "log"));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod refs_tests {
     use jk_cli::JjGitRemote;
     use jk_tui::bookmark_view::{BookmarkRow, BookmarkView, BookmarkViewSnapshot};
@@ -303,6 +427,35 @@ mod refs_tests {
 
     use super::*;
     use crate::test_support::{SequencedRunner, output};
+
+    #[test]
+    fn failed_bookmark_create_keeps_input_and_jj_diagnostic() {
+        let mut state = AppState::new(AppView::Bookmarks {
+            view: BookmarkView::new(BookmarkViewSnapshot::new(Vec::new())),
+        });
+        crate::bookmark_routes::open_bookmark_create_prompt(&mut state);
+        if let Some(InputMode::BookmarkMutation { name, .. }) = state.modes.active_mut() {
+            *name = "existing".to_owned();
+        }
+        let source = JjBookmarks::default();
+        let spec = source.mutation_spec(&jk_cli::BookmarkMutation::Create {
+            name: "existing".to_owned(),
+            revision: "@".to_owned(),
+        });
+        confirm_bookmark_command_preview_with_runner(
+            &mut state,
+            &source,
+            PendingCommandPreview::bookmark_create(spec.command_preview()),
+            SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
+                output(1, "", "Bookmark already exists: existing"),
+            ]),
+        );
+        assert!(
+            matches!(state.modes.active(), Some(InputMode::BookmarkMutation { name, revision, error: Some(error), .. }) if name == "existing" && revision == "@" && error.contains("Bookmark already exists: existing"))
+        );
+        assert_eq!(state.history.records().count(), 1);
+    }
 
     #[test]
     fn failed_fetch_retains_output_history_and_last_bookmark_snapshot() {
@@ -322,6 +475,7 @@ mod refs_tests {
             &JjBookmarks::default(),
             pending,
             SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
                 output(1, "partial output", "fixture unavailable"),
                 output(1, "", "refresh unavailable"),
             ]),
@@ -373,7 +527,9 @@ mod refs_tests {
             &JjBookmarks::default(),
             pending,
             SequencedRunner::successes(vec![
+                output(0, "111111111111\n", ""),
                 output(0, "", "fetched"),
+                output(0, "222222222222\n", ""),
                 output(0, "{\"name\":\"topic\",\"target\":[\"after\"]}\n", ""),
             ]),
         );
@@ -381,6 +537,16 @@ mod refs_tests {
             state.views.active(),
             AppView::CommandOutput { .. }
         ));
+        assert_eq!(
+            state
+                .history
+                .records()
+                .next()
+                .expect("fetch history")
+                .operation_id
+                .as_deref(),
+            Some("222222222222")
+        );
         state.views.pop();
         let AppView::Bookmarks { view } = state.views.active() else {
             panic!("bookmarks");

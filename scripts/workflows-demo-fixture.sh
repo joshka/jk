@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Create isolated repositories for the combined mutation-workflow tape.
 set -euo pipefail
+source "$(dirname "$0")/betamax-fixture-env.sh"
 
 artifact_root=${1:?usage: workflows-demo-fixture.sh ARTIFACT_ROOT}
 mkdir -p "$artifact_root"
@@ -49,6 +50,8 @@ workspaces_repo="$fixture_root/workspaces/repo"
 scratch_workspace="$fixture_root/workspaces/scratch"
 mkdir -p "$fixture_root/workspaces/one" "$fixture_root/workspaces/two"
 init_repo "$workspaces_repo"
+printf 'Workspace lifecycle demo files\n' > "$workspaces_repo/README.md"
+jj -R "$workspaces_repo" commit --message "Add workspace demo files" >/dev/null 2>&1
 jj -R "$workspaces_repo" describe --message "Workspace lifecycle demo" >/dev/null 2>&1
 jj -R "$workspaces_repo" workspace add "$scratch_workspace" --name scratch >/dev/null 2>&1
 printf 'workspace files remain after metadata changes\n' >"$scratch_workspace/KEEP-ME.txt"
