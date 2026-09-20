@@ -344,7 +344,7 @@ fn apply_log_refresh_completions(state: &mut AppState, source: &JjLog) -> bool {
         if &result.source != source {
             continue;
         }
-        let AppView::Log(log) = state.views.active_mut() else {
+        let Some(log) = state.views.current_log_mut() else {
             continue;
         };
         match result.outcome {
@@ -1036,6 +1036,7 @@ fn run_jj_command_mode_with_runner<R: JjCommandRunner>(
 
     let spec = command_mode_spec(argv, repository);
     let command_line = spec.command_preview().command_line;
+    state.cancel_log_refresh();
     let mut runner = RecordingJjCommandRunner::new(
         runner,
         &mut state.history,
@@ -1092,6 +1093,7 @@ fn run_external_command_mode_with_runner<R: ExternalCommandRunner>(
     let spec = external_command_spec(argv, working_directory)
         .ok_or_else(|| "type an external command after !".to_owned())?;
     let command_line = spec.preview();
+    state.cancel_log_refresh();
     let mut runner = RecordingExternalCommandRunner::new(
         runner,
         &mut state.history,
@@ -1188,6 +1190,13 @@ fn new_preview_pending(state: &mut AppState, new_source: &JjNew) -> Option<Pendi
     };
     let parents = match selected_new_parents(log) {
         SelectionResolution::Resolved(selection) => selection.into_values(),
+        SelectionResolution::Invalid {
+            reason: jk_core::InvalidSelection::UnresolvedIdentity,
+            ..
+        } => {
+            log.show_error("Marked parent is missing or divergent; refresh and reselect");
+            return None;
+        }
         SelectionResolution::Invalid { .. } => {
             log.show_error("No parent revision selected");
             return None;
@@ -2456,6 +2465,39 @@ mod tests {
     }
 
     #[test]
+    fn refresh_completes_on_log_under_an_inspection_view() {
+        let source = JjLog::default();
+        let mut state = AppState::new(log_app_view("old"));
+        let worker_source = source.clone();
+        state
+            .refreshes
+            .start_with(move |_| refresh_runner::LogRefreshResult {
+                source: worker_source,
+                outcome: Ok(jk_core::LogSnapshot::new(
+                    "@ new refreshed\n",
+                    vec![jk_core::LogEntry::new("new", "111", "refreshed").with_rendered_line(0)],
+                )),
+                history: CommandHistory::default(),
+            });
+        state.views.push(diff_app_view("old"));
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !apply_log_refresh_completions(&mut state, &source) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "refresh should complete"
+            );
+            std::thread::yield_now();
+        }
+
+        assert!(matches!(state.views.active(), AppView::Diff { .. }));
+        assert!(state.views.pop());
+        let AppView::Log(log) = state.views.active() else {
+            panic!("return to originating log");
+        };
+        assert_eq!(log.selected_change_id(), Some("new"));
+    }
+
+    #[test]
     fn app_state_exposes_retained_command_history_for_tests() {
         let mut history = CommandHistory::new(4);
         let spec = jk_core::JjCommandSpec::render_read_only(["status"]);
@@ -3658,7 +3700,7 @@ mod tests {
         assert_eq!(pending.failure_label, "jj new");
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always new abcdefgh"
+            "jj --no-pager --color always new commit"
         );
         assert_eq!(pending.preview.safety, jk_core::SafetyClass::LocalRewrite);
         assert_eq!(
@@ -3669,11 +3711,18 @@ mod tests {
 
     #[test]
     fn new_preview_uses_ordered_marks_as_parents() {
-        let mut state = AppState::new(log_app_view_with_changes([
-            "abcdefghijklmnop",
-            "bbbbbbbbcccccccc",
-            "zyxwvutsrqponmlk",
-        ]));
+        let log = LogView::new(jk_core::LogSnapshot::new(
+            "@ first\n○ second\n○ third\n",
+            vec![
+                jk_core::LogEntry::new("abcdefgh11111111", "first-commit", "first")
+                    .with_rendered_line(0),
+                jk_core::LogEntry::new("bbbbbbbbcccccccc", "second-commit", "second")
+                    .with_rendered_line(1),
+                jk_core::LogEntry::new("abcdefgh22222222", "third-commit", "third")
+                    .with_rendered_line(2),
+            ],
+        ));
+        let mut state = AppState::new(AppView::Log(log));
         let AppView::Log(log) = state.views.active_mut() else {
             panic!("expected log");
         };
@@ -3685,7 +3734,7 @@ mod tests {
         let pending = new_preview_pending(&mut state, &JjNew::default()).expect("pending new");
         assert_eq!(
             pending.preview.command_line,
-            "jj --no-pager --color always new abcdefgh zyxwvuts"
+            "jj --no-pager --color always new first-commit third-commit"
         );
     }
 
@@ -3869,7 +3918,7 @@ mod tests {
             .next()
             .expect("new record");
         assert_eq!(record.source.action, SourceAction::NewRevision);
-        assert_eq!(record.command.spec_preview, "jj new abc123");
+        assert_eq!(record.command.spec_preview, "jj new commit");
     }
 
     #[test]

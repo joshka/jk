@@ -144,6 +144,8 @@ pub enum InvalidSelection {
     Missing,
     /// An explicitly ordered value appeared more than once.
     Duplicate,
+    /// A submitted identity cannot be resolved to one available object by the caller.
+    UnresolvedIdentity,
 }
 
 /// A successful selection with explicit role and ordering provenance.

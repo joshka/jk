@@ -67,6 +67,7 @@ pub(crate) fn execute_workspace_lifecycle_with_runner<R: JjCommandRunner>(
     preferred: Option<String>,
     runner: R,
 ) {
+    state.cancel_log_refresh();
     let command_source = CommandSource::new(SourceView::Workspaces, kind.action());
     let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);
     let result = runner.run_confirmed_mutation(&spec);

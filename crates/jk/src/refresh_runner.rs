@@ -95,7 +95,7 @@ impl LogRefreshRunner {
     }
 
     #[cfg(test)]
-    fn start_with(
+    pub(crate) fn start_with(
         &mut self,
         task: impl FnOnce(CancellationToken) -> LogRefreshResult + Send + 'static,
     ) {
@@ -311,5 +311,27 @@ mod tests {
             PreviewRefreshPolicy::default(),
             PreviewRefreshPolicy::OptInAfterSuccess
         );
+    }
+
+    #[test]
+    fn dropping_runner_cancels_and_joins_its_worker() {
+        let (started_tx, started_rx) = mpsc::channel();
+        let (finished_tx, finished_rx) = mpsc::channel();
+        let mut runner = LogRefreshRunner::default();
+        runner.start_with(move |cancellation| {
+            started_tx.send(()).expect("report worker start");
+            while !cancellation.is_cancelled() {
+                thread::yield_now();
+            }
+            finished_tx.send(()).expect("report cancellation observed");
+            result("cancelled")
+        });
+        started_rx.recv().expect("worker started");
+
+        drop(runner);
+
+        finished_rx
+            .try_recv()
+            .expect("drop joined the cancelled worker");
     }
 }

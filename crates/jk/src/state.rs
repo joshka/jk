@@ -124,6 +124,14 @@ impl AppState {
         self.log_source_stack.push(source);
     }
 
+    /// Retires background work before an arbitrary command may change repository state.
+    pub(crate) fn cancel_log_refresh(&mut self) {
+        self.refreshes.cancel_active();
+        if let Some(log) = self.views.current_log_mut() {
+            log.clear_loading();
+        }
+    }
+
     pub(crate) fn can_pop_log_drill(&self) -> bool {
         self.views.active_is_log_with_log_parent() && !self.log_source_stack.is_empty()
     }
@@ -206,6 +214,14 @@ impl ViewStack {
 
     pub(crate) fn push(&mut self, view: AppView) {
         self.views.push(view);
+    }
+
+    /// Returns the latest log even while an inspection view is above it.
+    pub(crate) fn current_log_mut(&mut self) -> Option<&mut LogView> {
+        self.views.iter_mut().rev().find_map(|view| match view {
+            AppView::Log(log) => Some(log),
+            _ => None,
+        })
     }
 
     pub(crate) fn pop(&mut self) -> bool {

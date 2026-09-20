@@ -1,7 +1,6 @@
 Output target/dogfood-artifacts/betamax/cancellable-refresh-20260919.gif
 Output target/dogfood-artifacts/betamax/cancellable-refresh-final-state.json
 
-Require cargo
 Require jj
 
 Set Shell "bash"
@@ -18,57 +17,63 @@ Set KeyboardOverlay Input
 Set TypingSpeed 20ms
 Set WaitTimeout 30s
 Env NO_COLOR "1"
+Env JJ_CONFIG "/dev/null"
+Env JJ_USER "Demo Author"
+Env JJ_EMAIL "demo@example.invalid"
+Env JJ_TIMESTAMP "2026-01-01T12:00:00Z"
+Env JJ_OP_TIMESTAMP "2026-01-01T12:00:00Z"
 
 Hide
-Type "repo=/Users/joshka/local/jk/work/cancellable-refresh"
+Type "source_repo=${JK_SOURCE_REPO:-$PWD}; bin=${JK_BIN:-$source_repo/target/debug/jk}"
 Enter
 Wait
-Type "cd \"$repo\" && test -f Cargo.toml && test -d .jj"
-Enter
-Wait
-Type "cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-cancellable-refresh-build.log 2>&1 && echo JK_BUILD_READY"
+Type "test -x \"$bin\" && echo JK_BUILD_READY"
 Enter
 Wait+Screen "JK_BUILD_READY"
-Type "mkdir -p target/dogfood-artifacts/betamax/fake-bin target/dogfood-artifacts/betamax/cancellable-state"
+Type "fixture=$(mktemp -d) && cd \"$fixture\" && jj git init --colocate >/dev/null 2>&1"
 Enter
 Wait
-Type "rm -f target/dogfood-artifacts/betamax/cancellable-state/count && real_jj=$(command -v jj)"
+Type "jj describe -m 'Base change' >/dev/null 2>&1 && jj new -m 'Refresh demo' >/dev/null 2>&1"
 Enter
 Wait
-Type "ln -sf \"$PWD/scripts/betamax-cancellable-jj.sh\" target/dogfood-artifacts/betamax/fake-bin/jj && chmod +x scripts/betamax-cancellable-jj.sh"
+Type "mkdir fake-bin state && ln -s \"$source_repo/scripts/betamax-cancellable-jj.sh\" fake-bin/jj"
 Enter
 Wait
-Type "export JK_REAL_JJ=\"$real_jj\" JK_FAKE_JJ_STATE=\"$PWD/target/dogfood-artifacts/betamax/cancellable-state\" PATH=\"$PWD/target/dogfood-artifacts/betamax/fake-bin:$PATH\""
+Type "export JK_REAL_JJ=$(command -v jj) JK_FAKE_JJ_STATE=\"$fixture/state\" PATH=\"$fixture/fake-bin:$PATH\""
 Enter
 Wait
+Type "clear && \"$bin\" -R \"$fixture\" -n 5"
+Enter
+Wait+Screen "Refresh demo"
 Show
 
 Caption "A slow refresh keeps the current log visible."
-Type "./target/debug/jk -R . -n 5"
-Enter
-Wait+Screen "jk jj"
 Type "r"
 Wait+Screen "Refreshing…"
 Sleep 700ms
 Screenshot target/dogfood-artifacts/betamax/cancellable-refresh-00-loading.png
+State target/dogfood-artifacts/betamax/cancellable-refresh-00-loading.json
 
 Caption "Navigation remains responsive while jj is still running."
 Type "j"
 Wait+Screen "Refreshing…"
 Sleep 700ms
 Screenshot target/dogfood-artifacts/betamax/cancellable-refresh-01-navigation.png
+State target/dogfood-artifacts/betamax/cancellable-refresh-01-navigation.json
 
 Caption "A newer refresh cancels and supersedes the old generation."
 Type "r"
 Wait+Screen "Refreshing…"
 Sleep 1800ms
 Screenshot target/dogfood-artifacts/betamax/cancellable-refresh-02-complete.png
+State target/dogfood-artifacts/betamax/cancellable-refresh-02-complete.json
 
 Caption "Failure keeps the last usable log and reports what failed."
 Type "r"
 Wait+Screen "Refresh failed:"
 Sleep 1000ms
 Screenshot target/dogfood-artifacts/betamax/cancellable-refresh-03-failure.png
+State target/dogfood-artifacts/betamax/cancellable-refresh-03-failure.json
 
 Caption ""
 Type "q"

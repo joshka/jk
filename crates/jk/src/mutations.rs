@@ -25,7 +25,7 @@ pub(crate) fn execute_pending_command_with_runner<R: JjCommandRunner>(
     pending: PendingCommandPreview,
     runner: R,
 ) {
-    state.refreshes.cancel_active();
+    state.cancel_log_refresh();
     let command_source = CommandSource::new(SourceView::Log, pending.source_action.clone())
         .with_key(pending.source_key);
     let reselect_change_id = pending.reselect_change_id.clone();
@@ -101,6 +101,7 @@ fn confirm_bookmark_command_preview_with_runner(
     pending: PendingCommandPreview,
     runner: impl JjCommandRunner,
 ) {
+    state.cancel_log_refresh();
     let command_source = CommandSource::new(SourceView::Bookmarks, pending.source_action.clone())
         .with_key(pending.source_key);
     let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);
@@ -145,6 +146,7 @@ fn confirm_remote_command_preview_with_runner(
     pending: PendingCommandPreview,
     runner: impl JjCommandRunner,
 ) {
+    state.cancel_log_refresh();
     let command_source = CommandSource::new(SourceView::Bookmarks, pending.source_action.clone())
         .with_key(pending.source_key);
     let mut runner = RecordingJjCommandRunner::new(runner, &mut state.history, command_source);

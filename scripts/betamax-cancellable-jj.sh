@@ -6,7 +6,7 @@ real_jj=${JK_REAL_JJ:?JK_REAL_JJ must name the real jj binary}
 mkdir -p "$state_dir"
 
 while ! mkdir "$state_dir/count.lock" 2>/dev/null; do
-    :
+    sleep 0.01
 done
 count=0
 if [[ -f "$state_dir/count" ]]; then
@@ -18,16 +18,10 @@ rmdir "$state_dir/count.lock"
 
 case "$count" in
     3)
-        end=$((SECONDS + 5))
-        while ((SECONDS < end)); do
-            :
-        done
+        sleep 5
         ;;
     4)
-        end=$((SECONDS + 1))
-        while ((SECONDS < end)); do
-            :
-        done
+        sleep 1
         ;;
     6)
         printf '%s\n' "fixture refresh failed" >&2

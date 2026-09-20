@@ -1,4 +1,5 @@
-Output target/dogfood-artifacts/betamax/shared-selectors-regions-20260919.gif
+Output target/dogfood-artifacts/betamax/shared-selectors-review-20260920.gif
+Output target/dogfood-artifacts/betamax/shared-selectors-review-20260920-final.json
 
 Require cargo
 Require jj
@@ -19,9 +20,9 @@ Set WaitTimeout 60s
 Env NO_COLOR "1"
 
 Hide
-Type "cd /Users/joshka/local/jk/work/shared-selectors && cargo build -q -p jk && SELECTOR_DEMO_REPO=$(bash scripts/shared-selector-demo-fixture.sh) && export SELECTOR_DEMO_REPO"
+Type "cd \"${JK_REPO:?Set JK_REPO to the jk checkout}\" && test -f crates/jk/Cargo.toml && CARGO_BUILD_JOBS=3 cargo build -q -p jk && SELECTOR_DEMO_REPO=$(bash scripts/shared-selector-demo-fixture.sh) && export SELECTOR_DEMO_REPO && echo JK_FIXTURE_READY"
 Enter
-Wait
+Wait+Screen /(?m)^JK_FIXTURE_READY$/
 Type "clear && exec target/debug/jk -R $SELECTOR_DEMO_REPO -n 8"
 Enter
 Wait+Screen "jk jj"
@@ -35,7 +36,8 @@ Sleep 800ms
 Type "f"
 Wait+Screen "src/timeout.js"
 Sleep 1800ms
-Screenshot target/dogfood-artifacts/betamax/shared-selectors-fileset-regions-20260919.png
+Screenshot target/dogfood-artifacts/betamax/shared-selectors-fileset-review-20260920.png
+State target/dogfood-artifacts/betamax/shared-selectors-fileset-review-20260920.json
 Type "j"
 Sleep 500ms
 Enter
@@ -51,7 +53,8 @@ Type "j"
 Sleep 500ms
 Type " "
 Sleep 1800ms
-Screenshot target/dogfood-artifacts/betamax/shared-selectors-revisions-regions-20260919.png
+Screenshot target/dogfood-artifacts/betamax/shared-selectors-revisions-review-20260920.png
+State target/dogfood-artifacts/betamax/shared-selectors-revisions-review-20260920.json
 Type "a"
 Wait+Screen "Actions"
 Type "n"
@@ -62,11 +65,13 @@ Caption "Operation actions resolve the selected full operation ID before opening
 Type "o"
 Wait+Screen "jj op log"
 Sleep 1800ms
-Screenshot target/dogfood-artifacts/betamax/shared-selectors-operations-regions-20260919.png
+Screenshot target/dogfood-artifacts/betamax/shared-selectors-operations-review-20260920.png
+State target/dogfood-artifacts/betamax/shared-selectors-operations-review-20260920.json
 Enter
 Wait+Screen "jj op show"
 Sleep 2200ms
-Screenshot target/dogfood-artifacts/betamax/shared-selectors-operation-show-regions-20260919.png
+Screenshot target/dogfood-artifacts/betamax/shared-selectors-operation-show-review-20260920.png
+State target/dogfood-artifacts/betamax/shared-selectors-operation-show-review-20260920.json
 
 Hide
 Caption ""

@@ -25,6 +25,8 @@ jj -R "$fixture" status >&2
 
 jj -R "$fixture" new "$base_change" -m 'Configure request timeouts' >&2
 printf 'export const requestTimeoutMs = 3000;\n' > "$fixture/src/timeout.js"
+printf 'export const localizedMessage = "Ready";\n' \
+  > "$fixture/src/界界界界界界界界界界界界界界界界界界界界界界界界界界.js"
 printf '\nRequests time out after three seconds.\n' >> "$fixture/README.md"
 jj -R "$fixture" status >&2
 

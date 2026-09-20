@@ -190,6 +190,17 @@ impl LogView {
         });
     }
 
+    /// Removes pending-refresh feedback when its work is retired.
+    pub fn clear_loading(&mut self) {
+        if self
+            .status_message
+            .as_ref()
+            .is_some_and(|status| status.tone == StatusTone::Loading)
+        {
+            self.status_message = None;
+        }
+    }
+
     /// Shows a refresh or integration error without replacing the current log.
     pub fn show_error(&mut self, error: impl Into<String>) {
         self.status_message = Some(StatusMessage {
@@ -238,7 +249,7 @@ impl LogView {
             .collect()
     }
 
-    /// Returns the full commit id for a visible stable change id.
+    /// Returns the full commit id for a visible, non-divergent stable change id.
     #[must_use]
     pub fn commit_id_for_change_id(&self, change_id: &str) -> Option<&str> {
         self.state.commit_id_for_change_id(change_id)

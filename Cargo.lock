@@ -732,6 +732,7 @@ name = "jk-cli"
 version = "0.2.7"
 dependencies = [
  "jk-core",
+ "rustix",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
