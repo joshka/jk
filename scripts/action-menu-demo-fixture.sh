@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build an isolated, disposable project history; print its path for the demo launcher.
 set -euo pipefail
+source "$(dirname "$0")/betamax-fixture-env.sh"
 cd "$(dirname "$0")/.."
 mkdir -p target/dogfood-artifacts/betamax
 fixture=$(mktemp -d "$PWD/target/forecast-demo.XXXXXX")

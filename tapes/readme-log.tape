@@ -19,29 +19,28 @@ Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "repo=${JK_REPO:-$HOME/local/jk/default}"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" inspection"
 Enter
-Wait
-Type "cd \"$repo\" && test -f Cargo.toml && test -d .jj && mkdir -p target/dogfood-artifacts/readme-media target/dogfood-artifacts/betamax"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
 Enter
 Wait+Line
-Type "cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-readme-betamax-build.log 2>&1 && echo JK_BUILD_READY"
-Enter
-Wait+Screen "JK_BUILD_READY"
 Ctrl+L
 Sleep 200ms
 
-Type "./target/debug/jk -R . -n 8"
+Type "\"$bin\" -R \"$fixture\" -n 8"
 Enter
 Wait+Screen "jk jj"
 Sleep 1s
 Show
 Screenshot target/dogfood-artifacts/readme-media/jk-log-v3.png
+State target/dogfood-artifacts/readme-media/jk-log-v3.json
 
 Hide
 Type "?"
 Sleep 500ms
 Screenshot target/dogfood-artifacts/readme-media/jk-log-help-v3.png
+State target/dogfood-artifacts/readme-media/jk-log-help-v3.json
 
 Type "?"
 Sleep 300ms
@@ -51,10 +50,12 @@ Sleep 450ms
 Type "j"
 Sleep 700ms
 Screenshot target/dogfood-artifacts/readme-media/jk-log-selection-v3.png
+State target/dogfood-artifacts/readme-media/jk-log-selection-v3.json
 
 Enter
 Sleep 700ms
 Screenshot target/dogfood-artifacts/readme-media/jk-log-expanded-v3.png
+State target/dogfood-artifacts/readme-media/jk-log-expanded-v3.json
 
 Type "d"
 Wait+Screen "jk jj diff"

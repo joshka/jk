@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Extend the isolated forecast demo with a mixed change and two descendants.
 set -euo pipefail
+source "$(dirname "$0")/betamax-fixture-env.sh"
 cd "$(dirname "$0")/.."
 fixture=$(bash scripts/action-menu-demo-fixture.sh)
 printf '{\n  "requestTimeoutMs": 3000,\n  "cacheTtlSeconds": 120\n}\n' > "$fixture/config.json"

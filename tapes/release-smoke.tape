@@ -20,30 +20,12 @@ Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "source_repo=${JK_SOURCE_REPO:-$HOME/local/jk/default}"
-Enter
-Wait
-Type "cd \"$source_repo\" && test -f Cargo.toml && mkdir -p target/dogfood-artifacts/betamax && echo JK_SOURCE_READY"
-Enter
-Wait+Screen "JK_SOURCE_READY"
-Type "cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-release-smoke-build.log 2>&1 && echo JK_BUILD_READY"
-Enter
-Wait+Screen "JK_BUILD_READY"
-Type "fixture=$(mktemp -d)"
-Enter
-Wait
-Type "cd \"$fixture\" && jj git init --colocate >/tmp/jk-release-smoke-init.log 2>&1"
-Enter
-Wait
-Type "printf 'one\\n' > file.txt && jj file track file.txt >/dev/null 2>&1 || true"
-Enter
-Wait
-Type "jj describe -m 'Initial workspace' >/dev/null && jj new -m 'Second change' >/dev/null"
-Enter
-Wait
-Type "printf 'two\\n' >> file.txt && bin=\"$source_repo/target/debug/jk\" && echo JK_FIXTURE_READY"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" simple"
 Enter
 Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
+Enter
+Wait+Line
 Show
 
 Caption "Root status opens the same rendered jk surface used inside jk."
@@ -103,13 +85,13 @@ Type "m"
 Wait+Screen "Describe revision"
 Ctrl+U
 Type "Release smoke message"
-Enter
-Wait+Screen "Confirm command"
-Sleep 1200ms
-State target/dogfood-artifacts/betamax/release-smoke-describe-preview.json
-Enter
 Wait+Screen "Release smoke message"
-Caption "After confirmation, jk refreshes the log with the new description."
+Sleep 800ms
+Screenshot target/dogfood-artifacts/betamax/release-smoke-describe-editing.png
+State target/dogfood-artifacts/betamax/release-smoke-describe-editing.json
+Enter
+Wait+Screen "Described revision"
+Caption "Saving refreshes the log with the new description."
 Sleep 1200ms
 State target/dogfood-artifacts/betamax/release-smoke-after-describe.json
 Caption "Command History records the mutation, output, and captured operation."

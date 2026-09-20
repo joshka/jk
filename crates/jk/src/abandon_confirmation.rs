@@ -198,10 +198,12 @@ impl AbandonConfirmation {
         };
         frame.render_widget(Clear, panel);
         frame.render_widget(
-            Block::bordered()
-                .title(title)
-                .style(Style::new().fg(Color::White).bg(BACKGROUND)),
+            Block::default().style(Style::new().fg(Color::White).bg(BACKGROUND)),
             panel,
+        );
+        frame.render_widget(
+            Paragraph::new(title.trim()).style(Style::new().fg(Color::White).bg(BACKGROUND).bold()),
+            Rect::new(panel.x + 3, panel.y, content_width, 1),
         );
         let inner = Rect::new(
             panel.x + 3,

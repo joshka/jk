@@ -9,7 +9,7 @@ use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::diff_state::DiffState;
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
 use crate::rendered_log::rendered_text;
-use crate::selected_row::paint_subtle_selected_row;
+use crate::selected_row::{interaction_areas, paint_cursor};
 
 /// The effect requested after applying an input action to the diff view.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -289,34 +289,40 @@ impl DiffView {
     /// Renders the diff view.
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
-        self.render_area(frame, area, None);
+        self.render_area(frame, area, None, true);
     }
 
     /// Renders the diff view with a temporary status-line override.
     pub fn render_with_status(&mut self, frame: &mut Frame<'_>, status: &str) {
         let area = frame.area();
-        self.render_area(frame, area, Some(status));
+        self.render_area(frame, area, Some(status), true);
     }
 
     /// Renders the diff view with a caller-owned centered overlay.
     pub fn render_with_overlay(&mut self, frame: &mut Frame<'_>, title: &str, lines: &[String]) {
         let area = frame.area();
-        self.render_area(frame, area, None);
+        self.render_area(frame, area, None, false);
         let areas = ViewChrome::layout(area);
         render_help_overlay(frame, areas.content, title, lines);
     }
 
-    fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
+    fn render_area(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        status_override: Option<&str>,
+        focused: bool,
+    ) {
         let areas = ViewChrome::layout(area);
+        let (gutter, content) = interaction_areas(areas.content);
         let height = usize::from(areas.content.height);
         self.state.keep_selected_in_view(height);
-        self.state
-            .set_viewport_width(usize::from(areas.content.width));
+        self.state.set_viewport_width(usize::from(content.width));
         let sticky_header = self.state.sticky_header();
         let body_area = if sticky_header.is_some() {
-            area_below_sticky_header(areas.content)
+            area_below_sticky_header(content)
         } else {
-            areas.content
+            content
         };
         self.state
             .keep_selected_in_view(usize::from(body_area.height));
@@ -347,15 +353,32 @@ impl DiffView {
         if let Some(header) = sticky_header {
             let sticky_area = Rect {
                 height: 1,
-                ..areas.content
+                ..content
             };
             let paragraph = Paragraph::new(rendered_text(&header)).scroll((0, horizontal_scroll));
             frame.render_widget(paragraph, sticky_area);
-            paint_subtle_selected_row(frame, sticky_area, 0, 0);
+            frame.render_widget(
+                Paragraph::new("^"),
+                Rect {
+                    height: 1,
+                    ..gutter
+                },
+            );
         }
 
         if let Some(line) = self.state.selected_visible_line() {
-            paint_subtle_selected_row(frame, body_area, line, self.state.scroll_offset());
+            let cursor_area = Rect {
+                y: body_area.y,
+                height: body_area.height,
+                ..gutter
+            };
+            paint_cursor(
+                frame,
+                cursor_area,
+                line,
+                self.state.scroll_offset(),
+                focused && !self.help_visible,
+            );
         }
 
         if self.help_visible {

@@ -262,7 +262,11 @@ impl DescriptionEditor {
             height,
         );
         frame.render_widget(Clear, panel);
-        frame.render_widget(Block::bordered().title("Describe revision"), panel);
+        frame.render_widget(Block::default().style(jk_tui::styles::SURFACE), panel);
+        frame.render_widget(
+            Paragraph::new("Describe revision").style(jk_tui::styles::TITLE),
+            Rect::new(panel.x + 1, panel.y, width - 2, 1),
+        );
         frame.render_widget(
             Paragraph::new(format!("Revision: {rev}")),
             Rect::new(panel.x + 1, panel.y + 1, width - 2, 1),

@@ -20,12 +20,12 @@ Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "cd \"${JK_SOURCE_REPO:?Run just betamax-restore-preview}\" && bin=$PWD/target/debug/jk && fixture_root=$(bash scripts/workflows-demo-fixture.sh target/dogfood-artifacts) && printf 'JK_%s\\n' RESTORE_READY"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" workflows"
 Enter
-Wait+Screen "JK_RESTORE_READY"
-Type "clear"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
 Enter
-Wait
+Wait+Line
 Show
 
 Caption "Choose one source revision, then open Restore from the action menu."

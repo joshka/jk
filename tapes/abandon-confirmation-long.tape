@@ -16,10 +16,13 @@ Set WaitTimeout 60s
 Env NO_COLOR "1"
 
 Hide
-Type "cd /Users/joshka/local/jk/work/action-menu && JK_DEMO_REPO=$(bash scripts/abandon-dialog-fixture.sh 24) && export JK_DEMO_REPO"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" abandon 24"
 Enter
-Wait
-Type "clear && exec target/debug/jk -R $JK_DEMO_REPO -n 8"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
+Enter
+Wait+Line
+Type "clear && exec \"$bin\" -R \"$JK_DEMO_REPO\" -n 8"
 Enter
 Wait+Screen "Tune forecast caching"
 Sleep 1s
@@ -29,11 +32,13 @@ Sleep 1s
 Show
 Sleep 4s
 Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-long-top-20260919.png
+State target/dogfood-artifacts/betamax/abandon-confirmation-long-top-20260919.json
 PageDown
 Sleep 2s
 End
 Sleep 3s
 Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-long-bottom-20260919.png
+State target/dogfood-artifacts/betamax/abandon-confirmation-long-bottom-20260919.json
 Type "n"
 Sleep 1s
 Hide

@@ -18,14 +18,12 @@ Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "cd \"${JK_SOURCE_REPO:?Run just betamax-workflows}\" && source_repo=$PWD && bin=$PWD/target/debug/jk && test -x \"$bin\" && fixture_root=$(bash scripts/workflows-demo-fixture.sh target/dogfood-artifacts) && printf 'JK_%s\\n' FIXTURES_READY"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" workflows"
 Enter
-Wait+Screen "JK_FIXTURES_READY"
-Type "rebase_repo=$fixture_root/rebase && squash_repo=$fixture_root/squash && restore_repo=$fixture_root/restore && workspaces_repo=$fixture_root/workspaces/repo"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
 Enter
-Wait
-Type "clear"
-Enter
+Wait+Line
 Show
 
 Caption "Rebase previews an exact destination, and Escape leaves the graph unchanged."
@@ -41,15 +39,18 @@ Type "R"
 Wait+Screen "Choose rebase destination"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-rebase-selector.png
+State target/dogfood-artifacts/betamax/workflows-rebase-selector.json
 Type "/destination"
 Enter
-Wait+Screen "Confirm command"
+Wait+Screen "Source role:"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-rebase-preview.png
+State target/dogfood-artifacts/betamax/workflows-rebase-preview.json
 Escape
 Wait+Screen "Rebase destination"
 Sleep 600ms
 Screenshot target/dogfood-artifacts/betamax/workflows-rebase-cancelled.png
+State target/dogfood-artifacts/betamax/workflows-rebase-cancelled.json
 
 Hide
 Type "q"
@@ -68,19 +69,22 @@ Type "j"
 Type "R"
 Wait+Screen "Choose rebase destination"
 Enter
-Wait+Screen "Confirm command"
+Wait+Screen "Source role:"
 Enter
 Wait+Screen "u undo"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/workflows-rebase-success.png
+State target/dogfood-artifacts/betamax/workflows-rebase-success.json
 Type "C"
 Wait+Screen "Command History"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-rebase-history.png
+State target/dogfood-artifacts/betamax/workflows-rebase-history.json
 Type "o"
 Wait+Screen "Changed commits"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-rebase-operation.png
+State target/dogfood-artifacts/betamax/workflows-rebase-operation.json
 Hide
 Type "q"
 Wait
@@ -99,30 +103,35 @@ Type "j"
 Type "a"
 Wait+Screen "Squash"
 Type "s"
-Wait+Screen "Details"
+Wait+Screen "Source 1:"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-squash-preview.png
+State target/dogfood-artifacts/betamax/workflows-squash-preview.json
 Escape
 Wait+Screen "Squash destination"
 Sleep 600ms
 Screenshot target/dogfood-artifacts/betamax/workflows-squash-cancelled.png
+State target/dogfood-artifacts/betamax/workflows-squash-cancelled.json
 
 Caption "The confirmed squash has an auditable Command History entry and operation link."
 Type "a"
 Type "s"
-Wait+Screen "Details"
+Wait+Screen "Source 1:"
 Enter
 Wait+Screen "Squashed source changes"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/workflows-squash-success.png
+State target/dogfood-artifacts/betamax/workflows-squash-success.json
 Type "C"
 Wait+Screen "Command History"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-squash-history.png
+State target/dogfood-artifacts/betamax/workflows-squash-history.json
 Type "o"
 Wait+Screen "Changed commits"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-squash-operation.png
+State target/dogfood-artifacts/betamax/workflows-squash-operation.json
 Hide
 Type "q"
 Wait
@@ -140,10 +149,12 @@ Type "r"
 Wait+Screen "Affected content: all paths"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-restore-preview.png
+State target/dogfood-artifacts/betamax/workflows-restore-preview.json
 Escape
 Wait+Screen "Restore base"
 Sleep 600ms
 Screenshot target/dogfood-artifacts/betamax/workflows-restore-cancelled.png
+State target/dogfood-artifacts/betamax/workflows-restore-cancelled.json
 
 Caption "Confirming restore refreshes the working copy and captures its recovery operation."
 Type "a"
@@ -153,14 +164,17 @@ Enter
 Wait+Screen "Restored all paths into working copy"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/workflows-restore-success.png
+State target/dogfood-artifacts/betamax/workflows-restore-success.json
 Type "C"
 Wait+Screen "Command History"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-restore-history.png
+State target/dogfood-artifacts/betamax/workflows-restore-history.json
 Type "o"
 Wait+Screen "Changed commits"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-restore-operation.png
+State target/dogfood-artifacts/betamax/workflows-restore-operation.json
 Hide
 Type "q"
 Wait
@@ -178,10 +192,12 @@ Type "f"
 Wait+Screen "Files are not deleted"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-forget-preview.png
+State target/dogfood-artifacts/betamax/workflows-workspace-forget-preview.json
 Type "n"
 Wait+Screen "scratch"
 Sleep 600ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-cancelled.png
+State target/dogfood-artifacts/betamax/workflows-workspace-cancelled.json
 
 Caption "Adding a workspace confirms exact argv, refreshes the list, and records an operation."
 Type "a"
@@ -192,10 +208,12 @@ Enter
 Wait+Screen "Exact command"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-add-preview.png
+State target/dogfood-artifacts/betamax/workflows-workspace-add-preview.json
 Enter
 Wait+Screen "demo-added"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-success.png
+State target/dogfood-artifacts/betamax/workflows-workspace-success.json
 
 Caption "A second path with the same workspace name fails safely and stays visible in history."
 Type "a"
@@ -209,6 +227,7 @@ State target/dogfood-artifacts/betamax/workflows-workspace-failure-state.json
 Wait+Screen "failed:"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-failure.png
+State target/dogfood-artifacts/betamax/workflows-workspace-failure.json
 
 Caption "Rename updates only the selected workspace after reviewing the exact command."
 Type "a"
@@ -221,6 +240,7 @@ Enter
 Wait+Screen "renamed-demo"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-rename.png
+State target/dogfood-artifacts/betamax/workflows-workspace-rename.json
 
 Caption "Confirming forget removes metadata but retains the workspace directory and files."
 Type "a"
@@ -230,10 +250,12 @@ Type "y"
 Wait+Screen "default"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-forgotten.png
+State target/dogfood-artifacts/betamax/workflows-workspace-forgotten.json
 Type "C"
 Wait+Screen "Command History"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-history.png
+State target/dogfood-artifacts/betamax/workflows-workspace-history.json
 Type "j"
 Type "j"
 Type "j"
@@ -245,6 +267,7 @@ Type "o"
 Wait+Screen "Changed commits"
 Sleep 800ms
 Screenshot target/dogfood-artifacts/betamax/workflows-workspace-operation.png
+State target/dogfood-artifacts/betamax/workflows-workspace-operation.json
 Caption ""
 Hide
 Type "q"

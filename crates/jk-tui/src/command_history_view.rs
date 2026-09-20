@@ -16,7 +16,7 @@ use ratatui::widgets::Paragraph;
 use crate::ansi_text::strip_ansi;
 use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
-use crate::selected_row::paint_subtle_selected_row;
+use crate::selected_row::{interaction_areas, paint_cursor};
 
 const DEFAULT_TITLE: &str = "Command History";
 const DEFAULT_ROW_LIMIT: usize = 128;
@@ -529,6 +529,7 @@ impl CommandHistoryView {
 
     fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
         let areas = ViewChrome::layout(area);
+        let (gutter, content) = interaction_areas(areas.content);
         self.keep_selected_in_view(usize::from(areas.content.height));
 
         let fallback_status = adaptive_hotbar(BindingContext::CommandHistory, areas.status_width());
@@ -541,10 +542,16 @@ impl CommandHistoryView {
         chrome.render(frame, areas);
 
         let paragraph = Paragraph::new(self.visible_text());
-        frame.render_widget(paragraph, areas.content);
+        frame.render_widget(paragraph, content);
 
         if let Some(selected) = self.selected {
-            paint_subtle_selected_row(frame, areas.content, selected, self.scroll_offset);
+            paint_cursor(
+                frame,
+                gutter,
+                selected,
+                self.scroll_offset,
+                !self.help_visible,
+            );
         }
 
         if self.help_visible {

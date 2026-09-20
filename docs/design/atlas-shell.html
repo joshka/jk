@@ -1,0 +1,94 @@
+<style>
+#jk-atlas { --jk-bg:light-dark(#faf9f6,#10151d); --jk-fg:light-dark(#262b31,#d0d5df); --jk-muted:light-dark(#616971,#949da9); --jk-line:light-dark(#d2d6d8,#343d48); --jk-surface:light-dark(#f1f1ed,#1a222c); --jk-select:light-dark(#e2e9e7,#25312f); --jk-accent:light-dark(#17645f,#81b9ad); --jk-green:light-dark(#256536,#89ba83); --jk-red:light-dark(#9e393c,#d48a8c); --jk-purple:light-dark(#7b438c,#c191d5); --jk-yellow:light-dark(#806120,#c6ae71); --jk-blue:light-dark(#355f9a,#8caed9); color:var(--jk-fg); font:14px/1.55 ui-monospace,'SFMono-Regular',Consolas,monospace; }
+#jk-atlas * { box-sizing:border-box; }
+#jk-atlas .atlas-bar,#jk-atlas .atlas-caption,#jk-atlas .journey {color-scheme:light dark;}
+#jk-atlas .atlas-bar { color:light-dark(#262b31,#d0d5df);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:0 0 12px;font:13px/1.5 system-ui,sans-serif; }
+#jk-atlas .atlas-bar label { display:flex;align-items:center;gap:8px; }
+#jk-atlas select,#jk-atlas .atlas-button {font:inherit;color:var(--jk-fg);background:var(--jk-surface);border:1px solid var(--jk-line);padding:6px 9px;border-radius:4px;max-width:100%;}
+#jk-atlas .atlas-screen { flex:1;min-width:220px; }
+#jk-atlas .atlas-screen select {width:100%;}
+#jk-atlas .atlas-caption {display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 0;color:var(--jk-muted);font:12px/1.5 system-ui,sans-serif;}
+#jk-atlas .atlas-caption strong {font-weight:600;color:var(--jk-fg);}
+#jk-atlas .journey {display:flex;gap:8px;align-items:center;flex-wrap:wrap;font:12px/1.4 system-ui,sans-serif;margin:10px 0;}
+#jk-atlas .journey button {font:inherit;color:var(--jk-muted);background:transparent;border:0;border-bottom:2px solid transparent;padding:4px 0;}
+#jk-atlas .journey button[aria-current=step] {color:var(--jk-accent);border-color:var(--jk-accent);}
+#jk-atlas .terminal {background:var(--jk-bg);border:1px solid var(--jk-line);border-radius:6px;overflow:hidden;max-width:100%;}
+#jk-atlas .windowbar {display:flex;align-items:center;gap:7px;padding:9px 14px;background:var(--jk-surface);color:var(--jk-muted);font:12px/1.4 system-ui,sans-serif;}
+#jk-atlas .windowbar i {width:7px;height:7px;border:1px solid var(--jk-muted);border-radius:50%;}
+#jk-atlas .windowbar span {margin-left:8px;}
+#jk-atlas .scope {margin-left:auto!important;}
+#jk-atlas .command-head {padding:8px 12px;display:flex;gap:12px;border-bottom:1px solid var(--jk-line);white-space:normal;overflow-wrap:anywhere;}
+#jk-atlas .brand {color:var(--jk-accent);font-weight:600;}
+#jk-atlas .command-title {flex:1;}
+#jk-atlas .body {position:relative;height:510px;min-height:0;padding:12px 10px;overflow:auto;}
+#jk-atlas .rows {min-width:max-content;}
+#jk-atlas .line {white-space:pre;min-height:22px;display:flex;}
+#jk-atlas .gutter {color:var(--jk-accent);display:inline-block;width:4ch;flex:0 0 4ch;user-select:none;}
+#jk-atlas .selected {background:var(--jk-select);}
+#jk-atlas[data-selection=marker] .selected {background:transparent;}
+#jk-atlas .line-content {white-space:pre;}
+#jk-atlas .muted {color:var(--jk-muted);}
+#jk-atlas .add,.green {color:var(--jk-green);}
+#jk-atlas .del {color:var(--jk-red);}
+#jk-atlas .id {color:var(--jk-purple);}
+#jk-atlas .hash {color:var(--jk-blue);}
+#jk-atlas .ref {color:var(--jk-green);}
+#jk-atlas .date {color:var(--jk-accent);}
+#jk-atlas .author {color:var(--jk-yellow);}
+#jk-atlas .section {color:var(--jk-fg);font-weight:600;}
+#jk-atlas mark {background:var(--jk-yellow);color:var(--jk-bg);}
+#jk-atlas .overlay {position:relative;margin:12px auto;max-width:78ch;width:100%;background:var(--jk-surface);border:1px solid var(--jk-line);padding:12px 16px;z-index:2;max-height:calc(100% - 92px);overflow:auto;}
+#jk-atlas .overlay .rows {min-width:0;}
+#jk-atlas .overlay .line-content {white-space:pre-wrap;overflow-wrap:anywhere;}
+#jk-atlas .overlay .line {white-space:normal;}
+#jk-atlas .overlay h3 {font:600 14px/1.5 ui-monospace,monospace;color:var(--jk-accent);margin:0 0 14px;}
+#jk-atlas .context-graph {height:58px;overflow:hidden;color:var(--jk-muted);margin-bottom:10px;}
+#jk-atlas .context-graph .line {background:transparent;}
+#jk-atlas .context-graph .gutter {visibility:hidden;}
+#jk-atlas .preview-command {border-top:1px solid var(--jk-line);padding:12px 0 0;margin-top:14px;overflow-wrap:anywhere;white-space:pre-wrap;}
+#jk-atlas .preview-command .muted {display:block;margin-bottom:4px;}
+#jk-atlas .status {padding:6px 12px;color:var(--jk-muted);border-top:1px solid var(--jk-line);min-height:32px;}
+#jk-atlas .hotbar {display:flex;flex-wrap:wrap;gap:4px 18px;padding:7px 12px;background:var(--jk-surface);}
+#jk-atlas .hotbar button {font:inherit;padding:2px 0;border:0;background:transparent;color:var(--jk-fg);}
+#jk-atlas .hotbar kbd {font:inherit;color:var(--jk-accent);margin-right:7px;}
+#jk-atlas .input-label {display:block;color:var(--jk-muted);margin:0 0 12px;}
+#jk-atlas input {font:inherit;display:block;width:100%;border:0;border-bottom:1px solid var(--jk-accent);border-radius:0;background:var(--jk-bg);color:var(--jk-fg);padding:6px 8px;margin-top:4px;}
+#jk-atlas .catalog-list {display:grid;gap:0;}
+#jk-atlas .catalog-list button {font:inherit;text-align:left;border:0;background:transparent;color:var(--jk-fg);padding:5px 8px;display:grid;grid-template-columns:24ch 1fr;gap:12px;}
+#jk-atlas .catalog-list button:hover,#jk-atlas .catalog-list button:focus-visible {background:var(--jk-select);}
+#jk-atlas .catalog-list .desc {color:var(--jk-muted);font-size:12px;}
+#jk-atlas .help-details {margin-top:14px;color:var(--jk-muted);}
+#jk-atlas .help-details pre {font:inherit;white-space:pre-wrap;color:var(--jk-fg);}
+#jk-atlas .terminal.compact {max-width:72ch;}
+#jk-atlas[data-density=roomy] .line {min-height:26px;}
+#jk-atlas .terminal.compact .body {height:360px;}
+@media(max-width:650px){#jk-atlas{font-size:12px;}#jk-atlas .body{height:430px;padding:8px 4px;}#jk-atlas .overlay{padding:10px 8px;}#jk-atlas .catalog-list button{grid-template-columns:1fr;gap:0;}#jk-atlas .scope{display:none;}#jk-atlas .atlas-screen{min-width:100%;}#jk-atlas .hotbar{gap:4px 12px;}}
+</style>
+<div id="jk-atlas" aria-label="jk TUI design atlas">
+  <div class="atlas-bar">
+    <label class="atlas-screen">Screen <select id="jk-screen" aria-label="Mockup screen"></select></label>
+    <button class="atlas-button cursor-interaction" id="jk-prev" aria-label="Previous mockup">←</button>
+    <button class="atlas-button cursor-interaction" id="jk-next" aria-label="Next mockup">→</button>
+    <label>Journey <select id="jk-journey" aria-label="Workflow journey"><option value="">All screens</option></select></label>
+    <button class="atlas-button cursor-interaction" id="jk-baseline-toggle">Show existing capture</button>
+  </div>
+  <div id="jk-baseline" hidden></div>
+  <div class="atlas-caption"><strong id="jk-screen-title"></strong><span id="jk-count"></span></div>
+  <div id="jk-steps" class="journey" aria-label="Journey steps"></div>
+  <div class="terminal" id="jk-terminal" tabindex="0" aria-label="Interactive terminal mockup">
+    <div class="windowbar"><i></i><i></i><i></i><span>jk</span><span class="scope" id="jk-scope">/work/jk · default</span></div>
+    <div class="command-head"><span class="brand">jk</span><span class="command-title" id="jk-command"></span></div>
+    <div class="body" id="jk-body"></div>
+    <div class="status" id="jk-status"></div>
+    <div class="hotbar" id="jk-hotbar"></div>
+  </div>
+  <div class="atlas-caption"><span id="jk-note"></span><span>Design study · synthetic repository · no commands execute</span></div>
+</div>
+<script>
+(() => {
+/* INVENTORY */
+/* BASELINES */
+/* SCREENS */
+/* RUNTIME */
+})();
+</script>

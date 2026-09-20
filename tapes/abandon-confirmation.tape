@@ -17,10 +17,13 @@ Set WaitTimeout 60s
 Env NO_COLOR "1"
 
 Hide
-Type "cd /Users/joshka/local/jk/work/action-menu && cargo build -q -p jk && JK_DEMO_REPO=$(bash scripts/abandon-dialog-fixture.sh) && export JK_DEMO_REPO"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" abandon"
 Enter
-Wait
-Type "clear && exec target/debug/jk -R $JK_DEMO_REPO -n 8"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
+Enter
+Wait+Line
+Type "clear && exec \"$bin\" -R \"$JK_DEMO_REPO\" -n 8"
 Enter
 Wait+Screen "Tune forecast caching"
 Sleep 1s
@@ -31,6 +34,7 @@ Sleep 1s
 Show
 Sleep 5s
 Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-short-v2-20260919.png
+State target/dogfood-artifacts/betamax/abandon-confirmation-short-v2-20260919.json
 Left
 Sleep 1s
 Enter
@@ -40,6 +44,7 @@ Down
 Down
 Sleep 2s
 Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-diff-v2-20260919.png
+State target/dogfood-artifacts/betamax/abandon-confirmation-diff-v2-20260919.json
 Escape
 Wait+Screen "Abandon this change?"
 Sleep 2s
@@ -48,6 +53,7 @@ Sleep 1s
 Right
 Sleep 2s
 Screenshot target/dogfood-artifacts/betamax/abandon-confirmation-focused-v2-20260919.png
+State target/dogfood-artifacts/betamax/abandon-confirmation-focused-v2-20260919.json
 Space
 Wait+Screen "Abandoned revision"
 Sleep 3s

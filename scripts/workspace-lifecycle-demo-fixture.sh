@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "$0")/betamax-fixture-env.sh"
 
 fixture_root=$(mktemp -d "${TMPDIR:-/tmp}/jk-workspaces.XXXXXX")
 repo="$fixture_root/repo"

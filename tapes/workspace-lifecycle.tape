@@ -17,10 +17,13 @@ Set WaitTimeout 60s
 Env NO_COLOR "1"
 
 Hide
-Type "cd \"${JK_SOURCE_REPO:?Run just betamax-workspace-lifecycle}\" && fixture_root=$(bash scripts/workflows-demo-fixture.sh target/dogfood-artifacts) && JK_DEMO_REPO=$fixture_root/workspaces/repo && printf 'JK_%s\\n' WORKSPACES_READY"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" workflows"
 Enter
-Wait+Screen "JK_WORKSPACES_READY"
-Type "clear && exec target/debug/jk -R \"$JK_DEMO_REPO\" workspaces"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
+Enter
+Wait+Line
+Type "clear && exec \"$bin\" -R \"$JK_DEMO_REPO\" workspaces"
 Enter
 Wait+Screen "jj workspace list"
 Wait+Screen "scratch"
@@ -32,12 +35,14 @@ Type "a"
 Wait+Screen "Workspace lifecycle"
 Sleep 5s
 Screenshot target/dogfood-artifacts/betamax/workspace-lifecycle-menu-20260919.png
+State target/dogfood-artifacts/betamax/workspace-lifecycle-menu-20260919.json
 
 Caption "Forget says exactly what changes—and what does not"
 Type "f"
 Wait+Screen "Files are not deleted"
 Sleep 7s
 Screenshot target/dogfood-artifacts/betamax/workspace-lifecycle-forget-20260919.png
+State target/dogfood-artifacts/betamax/workspace-lifecycle-forget-20260919.json
 Type "n"
 Wait+Screen "scratch"
 Caption "Cancel returns to the same usable list"
@@ -52,6 +57,7 @@ Enter
 Wait+Screen "Exact command"
 Sleep 6s
 Screenshot target/dogfood-artifacts/betamax/workspace-lifecycle-add-20260919.png
+State target/dogfood-artifacts/betamax/workspace-lifecycle-add-20260919.json
 Enter
 Wait+Screen "demo-added"
 Sleep 4s
@@ -77,6 +83,7 @@ Type "y"
 Wait+Screen "default"
 Sleep 5s
 Screenshot target/dogfood-artifacts/betamax/workspace-lifecycle-finished-20260919.png
+State target/dogfood-artifacts/betamax/workspace-lifecycle-finished-20260919.json
 Hide
 Caption ""
 Type "q"

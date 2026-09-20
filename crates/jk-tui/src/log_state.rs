@@ -502,7 +502,7 @@ impl LogState {
     }
 
     /// Returns the final rendered line that belongs to the selected entry.
-    fn selected_entry_end_line(&self) -> Option<usize> {
+    pub(crate) fn selected_entry_end_line(&self) -> Option<usize> {
         let LogSelection::Entry(selected) = self.selected? else {
             return None;
         };

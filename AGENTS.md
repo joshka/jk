@@ -73,6 +73,10 @@ behavior, such as `refresh_keeps_selected_change_when_still_visible`.
 Run focused tests while editing and `just release-check` before
 release-oriented changes.
 
+Run repository integration tests and Betamax scenarios against newly created, disposable jj
+repositories. Build the binary from the source workspace, then use its absolute path and an explicit
+fixture repository scope. Do not use the current or another development workspace as test data.
+
 ## Betamax Demo & Media Guidelines
 
 Betamax tapes should show the behavior under review, not setup noise.
@@ -94,6 +98,12 @@ only when animation, navigation, typing, state transitions, or timing
 are part of the behavior being reviewed. For GIFs, also capture one or
 more PNG checkpoints when they make review easier.
 
+Pair important `Screenshot` checkpoints with `State` JSON after semantic `Wait+Screen` assertions.
+Inspect both the pixels and `viewport_text`/styled spans: screenshots show hierarchy and spacing;
+terminal state exposes missing text, clipping, and color changes. Include color-enabled jj output and
+a narrow terminal for shared UI changes. Use a fresh artifact path for each revision, and include the
+PNG or GIF plus its matching text/state evidence in the task or pull request reviewing the change.
+
 Use readable dwell times, but keep them intentional:
 
 - Wait on semantic screen text before sleeping.
@@ -111,6 +121,13 @@ Avoid showing long setup commands in keyboard overlays; keep setup hidden
 or disable overlays until the user-facing interaction begins.
 
 ## TUI App Layout Guidelines
+
+Follow [the TUI design guidelines](docs/tui-design.md) for all screens, controls, help, menus,
+dialogs, and views. They define jj presentation fidelity, shared visual states, and review criteria.
+
+The accepted direction is a calm, solid, CLI-like interface: preserve jj output and let spacing,
+alignment, hierarchy, and consistent behavior provide polish. Default to borderless content and
+restrained controls. Apply this contract to recovered workspace work as well as new features.
 
 Default to user comprehension over implementation structure. Screens,
 overlays, hotbars, menus, previews, and other discretionary layout

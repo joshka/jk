@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Create isolated repositories for the combined mutation-workflow tape.
 set -euo pipefail
+source "$(dirname "$0")/betamax-fixture-env.sh"
 
 artifact_root=${1:?usage: workflows-demo-fixture.sh ARTIFACT_ROOT}
 mkdir -p "$artifact_root"
