@@ -1,8 +1,8 @@
 # Workspace integration
 
-The `integration-all` jj workspace combines the unfinished workflows reviewed on 2026-09-20.
-The source workspaces and recovery bookmarks remain available. These changes are ready for local
-review and have not been published or merged into main.
+The `integration-all` jj workspace combines the unfinished workflows reviewed on 2026-09-20. The
+source workspaces and recovery bookmarks remain available. The local review bookmark is
+`joshka/workflow-coherence`; publication and merge status are tracked on its GitHub pull request.
 
 ## Product direction
 
@@ -78,11 +78,10 @@ processes hold output pipes after their parent exits. Confirmation controls igno
 ## Release compatibility
 
 The new variants in the public exhaustive `jk_tui::command_discovery::CommandFamily` enum break
-downstream exhaustive matches. The action-menu enums also gain variants relative to main. Release
-this integration with a minor version increase for `jk-tui` under the current 0.2 series; do not fold
-it into the pending patch release unchanged. Coordinate versions of dependent workspace crates
-through the release workflow. Other reviewed public constructors, accessors, and modules are
-additive.
+downstream exhaustive matches. The action-menu enums also gain variants relative to main. The
+workspace is prepared for 0.3.0, with matching internal dependency requirements. The release
+workflow must refresh its pending patch-release proposal to use this minor version. Other reviewed
+public constructors, accessors, and modules are additive.
 
 Release notes should mention that normal log refresh now snapshots working-copy edits like jj,
 and captured commands receive null stdin. Interactive editor/merge-tool handoff remains planned.
@@ -105,9 +104,9 @@ separate patch renderer.
 Fifteen Betamax workflow and layout scenarios pass on fresh fixtures. Two targeted recordings verify
 the final keyboard-hint styles in normal and narrow forms, bringing the total to 17 recordings and
 91 paired PNG/terminal-state checkpoints. The index distinguishes the behavioral baseline from the
-later changes to form-key colors. The layout matrix covers dark and light terminals, 80x24, and 60x16.
-Dialogs retain an opaque fill and visible repository context; compact previews keep their controls
-visible while the complete command scrolls.
+later changes to form-key colors. The layout matrix covers dark and light terminals, 80x24, and
+60x16. Dialogs retain an opaque fill and visible repository context; compact previews keep their
+controls visible while the complete command scrolls.
 
 Repository assertions verify rebase cancellation and the confirmed destination, squashed source
 content, restored file contents, and files retained after forgetting a workspace. Other scenarios

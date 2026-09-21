@@ -713,7 +713,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jk"
-version = "0.2.7"
+version = "0.3.0"
 dependencies = [
  "clap",
  "color-eyre",
@@ -730,7 +730,7 @@ dependencies = [
 
 [[package]]
 name = "jk-cli"
-version = "0.2.7"
+version = "0.3.0"
 dependencies = [
  "jk-core",
  "rustix",
@@ -741,11 +741,11 @@ dependencies = [
 
 [[package]]
 name = "jk-core"
-version = "0.2.7"
+version = "0.3.0"
 
 [[package]]
 name = "jk-tui"
-version = "0.2.7"
+version = "0.3.0"
 dependencies = [
  "ansi-to-tui",
  "jk-core",

@@ -5,6 +5,17 @@ Entries are grouped by user workflow and release impact instead of following the
 
 ## Unreleased
 
+### 0.3 compatibility and workflows
+
+- Prepare the workspace for 0.3.0. New public command-family and action-menu variants require
+  downstream exhaustive matches to be updated.
+- Add rebase, whole-change squash, all-path restore, workspace lifecycle, bookmark mutations,
+  explicit remote fetch, and push dry-run workflows with command previews and operation history.
+- Add command-local Run Options, captured external commands, and cancellable log refresh.
+- Preserve jj-rendered content while sharing borderless dialog surfaces, light/dark colors, and
+  keyboard controls. Normal log refresh now snapshots working-copy changes like jj.
+- Close stdin for captured commands. Interactive editor and merge-tool handoff remains planned.
+
 ## 0.2.7 - 2026-06-24
 
 This patch release tightens log graph behavior and workspace discovery after the dogfoodable 0.2.6
