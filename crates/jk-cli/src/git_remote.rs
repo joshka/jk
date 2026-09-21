@@ -226,8 +226,17 @@ mod tests {
         ))
     }
 
-    fn init_repository(repository: &Path, colocate: bool) {
+    fn fixture_command() -> Command {
         let mut command = Command::new("jj");
+        command.env("JJ_CONFIG", "");
+        command.env("JJ_USER", "Fixture Author");
+        command.env("JJ_EMAIL", "fixture@example.com");
+        command.args(["--config", "signing.behavior=drop"]);
+        command
+    }
+
+    fn init_repository(repository: &Path, colocate: bool) {
+        let mut command = fixture_command();
         command.args(["git", "init"]);
         if colocate {
             command.arg("--colocate");
@@ -239,7 +248,7 @@ mod tests {
     }
 
     fn run_jj(repository: &Path, args: &[&str]) {
-        let status = Command::new("jj")
+        let status = fixture_command()
             .arg("--repository")
             .arg(repository)
             .args(args)
@@ -249,7 +258,7 @@ mod tests {
     }
 
     fn jj_output(repository: &Path, args: &[&str]) -> Output {
-        let output = Command::new("jj")
+        let output = fixture_command()
             .arg("--repository")
             .arg(repository)
             .args(args)
@@ -263,13 +272,14 @@ mod tests {
     }
 
     fn run_spec(spec: &JjCommandSpec) -> Output {
-        let output = Command::new("jj")
+        let output = fixture_command()
             .args(spec.process_argv())
             .output()
             .expect("jj is installed");
         assert!(
             output.status.success(),
-            "generated jj command should succeed"
+            "generated jj command should succeed: {}",
+            String::from_utf8_lossy(&output.stderr)
         );
         output
     }

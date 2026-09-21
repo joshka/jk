@@ -43,6 +43,8 @@ jobs:
       - name: Render previews
         uses: joshka/betamax-action@34b48d5acd439f60d3e03ccabf2539dfe93527f2
         with:
+          version: "0.1.21"
+          sha256: 8dd5893d8d74cdf28ff4052be31b2b72810f40bf8c08385b84e53c572209848a
           tapes: tapes/ci/*.tape
           formats: gif,png
           extra-outputs: target/betamax-preview/*.png
