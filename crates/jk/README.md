@@ -2,9 +2,10 @@
 
 `jk` is a jj-native terminal UI for [Jujutsu](https://github.com/jj-vcs/jj).
 
-It keeps `jj` output as the source of truth and adds an interactive jj TUI around it: inspect
-changes, run safe command previews, review command history, and recover through operation views
-without losing terminal context.
+Its log and inspection views render `jj` output, including configured graph styles, colors, revsets,
+and templates. `jk` adds navigation, search, repository actions, and command history.
+
+The media below shows the published release.
 
 ![jk log view](https://www.joshka.net/jk-screenshots/assets/jk-log-v3.gif)
 
@@ -33,26 +34,40 @@ cargo install jk --locked
 
 ## Current Status
 
-`jk` currently focuses on the daily inspect-and-recover loop:
+In this source checkout, you can:
 
-- inspect changes through log, show, diff, evolog, and status views;
-- review diffs with file/hunk navigation, folding, search, and View Options;
-- run direct `jj` commands from `:` command mode with captured output;
-- save an inline describe message directly with `Enter`; run New, Edit, Undo, and Redo immediately
-  from the action menu; retain the safety preview for non-empty abandon;
-- inspect Command History, Operation Log, and sibling jj workspaces, including workspace-scoped
-  log/status/diff views.
+- inspect changes with log, show, diff, evolog, and status;
+- navigate, search, fold, and compare diffs without losing the selected revision;
+- use `:` for captured jj commands and `!` for shell-free captured external commands;
+- describe inline and use the action menu for New, Edit, Undo, Redo, and Abandon;
+- use `R` to choose rebase roles and a destination, `a s` for whole-change squash, and `a r` to
+  restore all paths from the selected commit into the working copy;
+- review rebase, squash, and restore commands before confirmation, adjust their Run Options, and
+  inspect recorded results and links to the resulting operation;
+- use `W` to inspect, add, rename, forget, and update stale workspaces;
+- use `B` for bookmarks, confirmed fetch from an explicit remote, and scoped push dry-runs.
+
+The main canvas inherits terminal colors. A separate gutter identifies the cursor and marked
+changes without replacing jj's graph symbols or semantic text colors. Explicit log refresh runs
+in the background, can be cancelled, and preserves the view's context.
+Dialogs use a distinct opaque light or dark surface with the repository still visible around them.
+Use `--dialog-theme light` or `--dialog-theme dark` to override automatic terminal detection.
 
 Current limitations:
 
-- command history is in-memory for the current `jk` session;
-- rebase, squash, split, restore, bookmarks, fetch, and push are still planned workflows;
-- the action menu currently covers describe, new, edit, abandon, undo, and redo from the log;
-  revision rebase, squash, restore, refs, remote, and workspace actions remain planned.
+- Command History lasts for the current session.
+- Rebase selects one source and one destination from the visible log; multi-parent destinations and
+  graph predictions remain planned.
+- Squash and restore operate on whole changes; fileset and hunk selection remain planned.
+- Native commit, split, absorb, resolve, and foreground editor/tool handoff remain planned.
+  Captured command modes do not provide an interactive terminal to child processes.
+- Push stops at dry-run. Dedicated tags and advanced remote workflows remain planned.
+- Run Options changes working-copy policy and immutable protection for a pending rebase, squash,
+  or restore command. Historical operation IDs are available for rebase and squash. Repository
+  and config editing remain outside that drawer.
 
-Use `?` inside the TUI for full screen-specific key help. The repository's
-[Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) guide has
-task-oriented examples for the current jk surface.
+Use `?` for the active screen's keys. See
+[Using jk](https://github.com/joshka/jk/blob/main/docs/usage.md) for workflows and examples.
 
 ## Commands
 
@@ -70,8 +85,8 @@ jk workspaces
 jk -R /path/to/repo -n 20
 ```
 
-Bare `jk` follows `jj`'s configured `ui.default-command` when that command is log-like enough for
-navigation. Use `jk log` for the explicit log path.
+Bare `jk` follows `jj`'s configured `ui.default-command`. The configured command must accept log
+templates so `jk` can identify revisions for navigation. Use `jk log` to open the log explicitly.
 
 ## Roadmap
 
@@ -80,8 +95,8 @@ The detailed roadmap lives in the repository docs:
 - [product plan](https://github.com/joshka/jk/blob/main/docs/product-plan.md);
 - [issue-sized roadmap](https://github.com/joshka/jk/blob/main/docs/roadmap.md).
 
-Near-term work stabilizes this dogfoodable jk TUI for release before adding rebase-specific
-behavior.
+Near-term work stabilizes rebase, squash, restore, workspace, and bookmark workflows. The next
+priorities are foreground editor/tool handoff, shared fileset selection, and push after dry-run.
 
 See the repository README for the current status and development workflow.
 

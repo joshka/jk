@@ -5,6 +5,7 @@ use jk_cli::{
     WorkspaceInspectionQuery,
 };
 use jk_core::CommandHistory;
+use jk_tui::bookmark_view::BookmarkView;
 use jk_tui::command_discovery::{ActionMenuAction, BindingContext};
 use jk_tui::command_history_view::CommandHistoryView;
 use jk_tui::diff_view::DiffView;
@@ -14,6 +15,7 @@ use jk_tui::rendered_view::RenderedView;
 use jk_tui::workspaces_view::WorkspacesView;
 
 use crate::mutation_preview::PendingCommandPreview;
+use crate::refresh_runner::LogRefreshRunner;
 
 const TOAST_DURATION: Duration = Duration::from_secs(3);
 
@@ -26,6 +28,9 @@ struct Toast {
 /// Active top-level application view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AppView {
+    Bookmarks {
+        view: BookmarkView,
+    },
     Log(LogView),
     Diff {
         view: DiffView,
@@ -55,6 +60,7 @@ pub enum AppView {
     CommandOutput {
         view: RenderedView,
         input: String,
+        kind: CommandInputKind,
     },
     OperationLog {
         view: OperationLogView,
@@ -87,6 +93,7 @@ pub struct AppState {
     pub(crate) views: ViewStack,
     pub(crate) modes: ModeStack,
     pub(crate) history: CommandHistory,
+    pub(crate) refreshes: LogRefreshRunner,
     log_source_stack: Vec<JjLog>,
     toast: Option<Toast>,
 }
@@ -102,6 +109,7 @@ impl AppState {
             views: ViewStack::new(root),
             modes: ModeStack::default(),
             history,
+            refreshes: LogRefreshRunner::default(),
             log_source_stack: Vec::new(),
             toast: None,
         }
@@ -114,6 +122,14 @@ impl AppState {
 
     pub(crate) fn push_log_source(&mut self, source: JjLog) {
         self.log_source_stack.push(source);
+    }
+
+    /// Retires background work before an arbitrary command may change repository state.
+    pub(crate) fn cancel_log_refresh(&mut self) {
+        self.refreshes.cancel_active();
+        if let Some(log) = self.views.current_log_mut() {
+            log.clear_loading();
+        }
     }
 
     pub(crate) fn can_pop_log_drill(&self) -> bool {
@@ -152,6 +168,11 @@ impl AppState {
             .map(|toast| toast.expires_at.saturating_duration_since(Instant::now()))
     }
 
+    /// Requests one redraw when a toast expires, not on every background-refresh poll.
+    pub(crate) fn toast_redraw_due(&self) -> bool {
+        self.toast_redraw_due_at(Instant::now())
+    }
+
     fn show_toast_until(&mut self, message: impl Into<String>, expires_at: Instant) {
         self.toast = Some(Toast {
             message: message.into(),
@@ -160,14 +181,16 @@ impl AppState {
     }
 
     fn toast_message_at(&mut self, now: Instant) -> Option<&str> {
-        let expired = self
-            .toast
-            .as_ref()
-            .is_some_and(|toast| toast.expires_at <= now);
-        if expired {
+        if self.toast_redraw_due_at(now) {
             self.toast = None;
         }
         self.toast.as_ref().map(|toast| toast.message.as_str())
+    }
+
+    fn toast_redraw_due_at(&self, now: Instant) -> bool {
+        self.toast
+            .as_ref()
+            .is_some_and(|toast| toast.expires_at <= now)
     }
 }
 
@@ -198,6 +221,14 @@ impl ViewStack {
 
     pub(crate) fn push(&mut self, view: AppView) {
         self.views.push(view);
+    }
+
+    /// Returns the latest log even while an inspection view is above it.
+    pub(crate) fn current_log_mut(&mut self) -> Option<&mut LogView> {
+        self.views.iter_mut().rev().find_map(|view| match view {
+            AppView::Log(log) => Some(log),
+            _ => None,
+        })
     }
 
     pub(crate) fn pop(&mut self) -> bool {
@@ -253,6 +284,9 @@ impl ModeStack {
 /// Transient input modes owned by the terminal loop.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InputMode {
+    RebaseDestination {
+        pending: crate::rebase::PendingRebase,
+    },
     ActionMenu {
         context: BindingContext,
         selected: usize,
@@ -279,11 +313,36 @@ pub enum InputMode {
         rev: String,
         message: crate::description_editor::DescriptionEditor,
     },
+    BookmarkMutation {
+        kind: BookmarkMutationKind,
+        name: String,
+        revision: String,
+        field: BookmarkMutationField,
+        error: Option<String>,
+    },
+    RemotePicker {
+        names: Vec<String>,
+        selected: usize,
+        bookmark: Option<String>,
+    },
     AbandonConfirmation {
         pending: PendingCommandPreview,
         dialog: Box<crate::abandon_confirmation::AbandonConfirmation>,
     },
+    CommandPreview {
+        pending: PendingCommandPreview,
+    },
+    RunOptions {
+        dialog: Box<crate::run_options::RunOptionsDialog>,
+    },
+    WorkspaceLifecycle {
+        dialog: Box<crate::workspace_lifecycle::WorkspaceLifecycleDialog>,
+    },
     JjCommand {
+        input: String,
+        error: Option<String>,
+    },
+    ExternalCommand {
         input: String,
         error: Option<String>,
     },
@@ -291,6 +350,27 @@ pub enum InputMode {
         options: Vec<LogTemplateSelection>,
         selected: usize,
     },
+}
+
+/// Which direct-command prompt owns a captured command output view.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CommandInputKind {
+    Jj,
+    External,
+}
+
+/// Bookmark mutation prompt kind.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BookmarkMutationKind {
+    Create,
+    Move,
+}
+
+/// Field edited by the bookmark mutation prompt.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BookmarkMutationField {
+    Name,
+    Revision,
 }
 
 /// Whether an input-mode handler consumed a key event.
@@ -313,5 +393,31 @@ mod tests {
 
         assert_eq!(state.toast_message_at(now), Some("Created new change"));
         assert_eq!(state.toast_message_at(now + TOAST_DURATION), None);
+    }
+
+    #[test]
+    fn refresh_polling_redraws_a_toast_only_when_it_expires() {
+        let mut state = AppState::new(AppView::Log(LogView::default()));
+        let now = Instant::now();
+        state.show_toast_until("Rebased revisions · a u undo", now + TOAST_DURATION);
+
+        // Frequent refresh polling must leave the terminal idle between the first toast draw and
+        // its removal. Otherwise terminal recorders cannot observe the message between redraws.
+        let mut redraws = Vec::new();
+        for tick in 1..=80 {
+            let elapsed = Duration::from_millis(tick * 50);
+            if state.toast_redraw_due_at(now + elapsed) {
+                redraws.push(elapsed);
+                assert_eq!(state.toast_message_at(now + elapsed), None);
+            } else if elapsed < TOAST_DURATION {
+                assert_eq!(
+                    state.toast_message_at(now + elapsed),
+                    Some("Rebased revisions · a u undo")
+                );
+            }
+        }
+
+        assert_eq!(redraws, [TOAST_DURATION]);
+        assert!(state.toast_timeout().is_none());
     }
 }

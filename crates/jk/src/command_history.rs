@@ -1,6 +1,4 @@
-use jk_cli::{
-    JjCommandRunner, JjOperation, OperationQuery, RecordingJjCommandRunner, SystemJjCommandRunner,
-};
+use jk_cli::{JjCommandRunner, JjOperation, OperationQuery, RecordingJjCommandRunner};
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
 use jk_tui::command_history_view::{
     CommandHistoryAction, CommandHistoryActionResult, CommandHistorySnapshot, CommandHistoryView,
@@ -45,7 +43,11 @@ pub fn push_selected_command_history_details(state: &mut AppState) {
 }
 
 pub fn open_command_history_operation(state: &mut AppState, operation_source: &JjOperation) {
-    open_command_history_operation_with_runner(state, operation_source, SystemJjCommandRunner);
+    open_command_history_operation_with_runner(
+        state,
+        operation_source,
+        crate::runner::system_runner(),
+    );
 }
 
 pub fn open_command_history_operation_with_runner<R: JjCommandRunner>(
@@ -105,7 +107,12 @@ pub fn open_operation_log_from(
     operation_source: &JjOperation,
     source: CommandSource,
 ) {
-    open_operation_log_from_with_runner(state, operation_source, source, SystemJjCommandRunner);
+    open_operation_log_from_with_runner(
+        state,
+        operation_source,
+        source,
+        crate::runner::system_runner(),
+    );
 }
 
 pub fn open_operation_log_from_with_runner<R: JjCommandRunner>(

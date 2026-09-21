@@ -13,7 +13,7 @@ use ratatui::widgets::Paragraph;
 
 use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
-use crate::selected_row::paint_subtle_selected_row;
+use crate::selected_row::{interaction_areas, paint_cursor};
 
 const DEFAULT_TITLE: &str = "jj workspace list";
 
@@ -59,6 +59,12 @@ impl WorkspaceViewSnapshot {
 
     fn named_index(&self, name: &str) -> Option<usize> {
         self.rows.iter().position(|row| row.name == name)
+    }
+
+    fn rooted_index(&self, root: &Path) -> Option<usize> {
+        self.rows
+            .iter()
+            .position(|row| row.root.as_deref() == Some(root))
     }
 }
 
@@ -207,15 +213,34 @@ impl WorkspacesView {
 
     /// Replaces rows after a successful refresh.
     ///
-    /// Selection is preserved by workspace name when possible, then falls back to the current
-    /// workspace row, then clamps to the nearest available row.
+    /// Selection is preserved by canonical workspace root when available, then by workspace name,
+    /// then by the current workspace row, and finally by the nearest available row.
     pub fn refresh(&mut self, snapshot: WorkspaceViewSnapshot) {
-        let previous_name = self.selected_row().map(|row| row.name.clone());
+        self.refresh_selecting(snapshot, None);
+    }
+
+    /// Replaces rows and prefers an explicit workspace name after a lifecycle mutation.
+    ///
+    /// If the preferred name is absent, preserves the previous selection by root and then name.
+    pub fn refresh_selecting(&mut self, snapshot: WorkspaceViewSnapshot, preferred: Option<&str>) {
+        let previous_identity = self
+            .selected_row()
+            .map(|row| (row.root.clone(), row.name.clone()));
         let previous_selected = self.selected;
         self.snapshot = snapshot;
-        self.selected = previous_name
-            .as_deref()
+        self.selected = preferred
             .and_then(|name| self.snapshot.named_index(name))
+            .or_else(|| {
+                previous_identity
+                    .as_ref()
+                    .and_then(|(root, _)| root.as_deref())
+                    .and_then(|root| self.snapshot.rooted_index(root))
+            })
+            .or_else(|| {
+                previous_identity
+                    .as_ref()
+                    .and_then(|(_, name)| self.snapshot.named_index(name))
+            })
             .or_else(|| self.snapshot.current_index())
             .or_else(|| clamp_index(previous_selected, self.snapshot.rows.len()));
         self.scroll_offset = clamp_scroll(self.scroll_offset, self.snapshot.rows.len());
@@ -353,6 +378,7 @@ impl WorkspacesView {
 
     fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
         let areas = ViewChrome::layout(area);
+        let (gutter, content) = interaction_areas(areas.content);
         self.keep_selected_in_view(usize::from(areas.content.height));
 
         let fallback_status = adaptive_hotbar(BindingContext::Workspaces, areas.status_width());
@@ -363,10 +389,16 @@ impl WorkspacesView {
         chrome.render(frame, areas);
 
         let paragraph = Paragraph::new(self.visible_text());
-        frame.render_widget(paragraph, areas.content);
+        frame.render_widget(paragraph, content);
 
         if let Some(selected) = self.selected {
-            paint_subtle_selected_row(frame, areas.content, selected, self.scroll_offset);
+            paint_cursor(
+                frame,
+                gutter,
+                selected,
+                self.scroll_offset,
+                !self.help_visible,
+            );
         }
 
         if self.help_visible {
@@ -484,6 +516,41 @@ mod tests {
         ]));
 
         assert_eq!(view.selected_workspace_name(), Some("dogfood"));
+    }
+
+    #[test]
+    fn refresh_can_prefer_workspace_created_or_renamed_by_mutation() {
+        let mut view = WorkspacesView::new(WorkspaceViewSnapshot::new(vec![
+            row("default", true),
+            row("scratch", false),
+        ]));
+
+        view.refresh_selecting(
+            WorkspaceViewSnapshot::new(vec![row("default", true), row("renamed", false)]),
+            Some("renamed"),
+        );
+
+        assert_eq!(view.selected_workspace_name(), Some("renamed"));
+    }
+
+    #[test]
+    fn refresh_prefers_workspace_root_when_name_changes_or_collides() {
+        let mut view = WorkspacesView::new(WorkspaceViewSnapshot::new(vec![
+            row("default", true).with_root("/repo/default"),
+            row("dogfood", false).with_root("/repo/dogfood"),
+        ]));
+        let _ = view.apply(WorkspacesAction::Next);
+
+        view.refresh(WorkspaceViewSnapshot::new(vec![
+            row("dogfood", false).with_root("/repo/other"),
+            row("renamed", false).with_root("/repo/dogfood"),
+        ]));
+
+        assert_eq!(view.selected_workspace_name(), Some("renamed"));
+        assert_eq!(
+            view.selected_row().and_then(WorkspaceViewRow::root),
+            Some(Path::new("/repo/dogfood"))
+        );
     }
 
     #[test]

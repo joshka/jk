@@ -44,7 +44,7 @@ const TEMPLATE_TITLE_LIMIT: usize = 48;
 /// variables so the rendered pass keeps the configured terminal colors. Configured default commands
 /// must be log-like enough to accept the semantic template pass; unsupported commands return
 /// [`JjLogError::UnsupportedSemanticCommand`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JjLog {
     repository: Option<PathBuf>,
     command: JjLogCommand,
@@ -52,6 +52,7 @@ pub struct JjLog {
     template: LogTemplateSelection,
     custom_template: Option<String>,
     revset: Option<String>,
+    working_copy: WorkingCopyPolicy,
 }
 
 impl Default for JjLog {
@@ -63,6 +64,7 @@ impl Default for JjLog {
             template: LogTemplateSelection::Configured,
             custom_template: None,
             revset: None,
+            working_copy: WorkingCopyPolicy::SnapshotAndUpdate,
         }
     }
 }
@@ -112,6 +114,17 @@ impl JjLog {
     #[must_use]
     pub fn with_repository(mut self, repository: impl Into<PathBuf>) -> Self {
         self.repository = Some(repository.into());
+        self
+    }
+
+    /// Sets the working-copy policy for both rendered and semantic log passes.
+    ///
+    /// The default allows jj to snapshot and update working-copy files. Apply
+    /// [`WorkingCopyPolicy::Ignore`] to a clone for a refresh after a command that leaves those
+    /// files untouched. This keeps the original source's policy for later loads.
+    #[must_use]
+    pub const fn with_working_copy(mut self, working_copy: WorkingCopyPolicy) -> Self {
+        self.working_copy = working_copy;
         self
     }
 
@@ -179,10 +192,8 @@ impl JjLog {
 
     /// Loads a rendered log snapshot and semantic entries from `jj`.
     ///
-    /// This method executes `jj` twice: once for the user's rendered log output and once with a
-    /// JSON template for navigation metadata. A failed retry is useful when the repository state or
-    /// `jj` configuration has changed; parse and unsupported-command errors usually need
-    /// configuration or integration changes instead.
+    /// Executes `jj` once for the user's rendered log output, then again with a JSON template for
+    /// navigation metadata. Both passes use the source's working-copy policy.
     ///
     /// # Errors
     ///
@@ -259,7 +270,7 @@ impl JjLog {
             argv.push(template.to_owned());
         }
 
-        let global_options = GlobalOptions::default().with_working_copy(WorkingCopyPolicy::Ignore);
+        let global_options = GlobalOptions::default().with_working_copy(self.working_copy);
         let spec = JjCommandSpec::render_read_only(argv)
             .with_global_options(global_options)
             .with_title(command_title(command_args, &self.template));
@@ -488,7 +499,6 @@ mod tests {
                 "always",
                 "--repository",
                 "/tmp/repo",
-                "--ignore-working-copy",
                 "log"
             ]
         );
@@ -506,13 +516,43 @@ mod tests {
 
         assert!(command_args.is_empty());
         assert!(!args.iter().any(|arg| arg == "log"));
-        assert!(args.iter().any(|arg| arg == "--ignore-working-copy"));
+        assert!(!args.iter().any(|arg| arg == "--ignore-working-copy"));
         assert!(args.windows(2).any(|args| args == ["-n", "3"]));
         assert!(args.windows(2).any(|args| args == ["-T", LOG_TEMPLATE]));
         assert_eq!(
             command_title(&command_args, &LogTemplateSelection::Configured),
             "jj"
         );
+    }
+
+    #[test]
+    fn working_copy_override_preserves_configured_home_and_only_affects_its_clone() {
+        let source = JjLog::default().with_limit(Some(3));
+        let ignored = source.clone().with_working_copy(WorkingCopyPolicy::Ignore);
+        for mode in [DefaultCommandMode::Rendered, DefaultCommandMode::Json] {
+            let normal_spec = source.command_spec(mode, &source.command_args());
+            let ignored_spec = ignored.command_spec(mode, &ignored.command_args());
+
+            assert_eq!(normal_spec.argv(), ignored_spec.argv());
+            assert!(!normal_spec.argv().iter().any(|arg| arg == "log"));
+            assert_eq!(normal_spec.title(), "jj");
+            assert_eq!(
+                normal_spec.global_options().working_copy(),
+                WorkingCopyPolicy::SnapshotAndUpdate
+            );
+            assert!(
+                ignored_spec
+                    .process_argv()
+                    .iter()
+                    .any(|arg| arg == "--ignore-working-copy")
+            );
+            assert!(
+                !normal_spec
+                    .process_argv()
+                    .iter()
+                    .any(|arg| arg == "--ignore-working-copy")
+            );
+        }
     }
 
     #[test]

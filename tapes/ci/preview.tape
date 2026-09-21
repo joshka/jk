@@ -10,6 +10,7 @@ Set Margin 20
 Set WindowBar Colorful
 Set BorderRadius 8
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Off
 Set TypingSpeed 20ms
 Set WaitTimeout 30s
@@ -23,12 +24,14 @@ Wait+Screen "Improve greeting"
 Sleep 800ms
 Show
 Screenshot target/betamax-preview/log.png
+State target/betamax-preview/log.json
 Sleep 1s
 
 Type "?"
 Wait+Screen "Open and inspect:"
 Sleep 1200ms
 Screenshot target/betamax-preview/log-help.png
+State target/betamax-preview/log-help.json
 Escape
 Sleep 300ms
 
@@ -37,11 +40,13 @@ Wait+Screen "jk jj diff"
 Wait+Screen "Review changes from your terminal."
 Sleep 1200ms
 Screenshot target/betamax-preview/diff.png
+State target/betamax-preview/diff.json
 
 Type "?"
 Wait+Screen "Move and find:"
 Sleep 1200ms
 Screenshot target/betamax-preview/diff-help.png
+State target/betamax-preview/diff-help.json
 Escape
 Sleep 300ms
 Type "L"

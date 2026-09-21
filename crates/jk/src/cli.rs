@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use jk_cli::{
-    DiffFormat, DiffQuery, JjAbandon, JjDescribe, JjDiff, JjEdit, JjEvolog, JjLog, JjLogCommand,
-    JjNew, JjOperation, JjRecovery, JjShow, JjStatus, JjWorkspaces, LogTemplateSelection,
-    ShowQuery, StatusQuery,
+    DiffFormat, DiffQuery, JjAbandon, JjBookmarks, JjDescribe, JjDiff, JjEdit, JjEvolog,
+    JjGitRemote, JjLog, JjLogCommand, JjNew, JjOperation, JjRecovery, JjRestore, JjShow, JjSquash,
+    JjStatus, JjWorkspaces, LogTemplateSelection, ShowQuery, StatusQuery,
 };
 
 /// Command-line options for the first log-oriented `jk` surface.
@@ -20,9 +20,21 @@ pub struct Args {
     #[arg(short = 'n', long)]
     pub(crate) limit: Option<usize>,
 
+    /// Dialog appearance; repository output keeps the terminal's jj colors.
+    #[arg(long, global = true, value_enum, default_value_t = DialogThemeOption::Auto)]
+    pub(crate) dialog_theme: DialogThemeOption,
+
     /// View to open. If omitted, jk follows jj's configured default command.
     #[command(subcommand)]
     pub(crate) command: Option<Command>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+pub(crate) enum DialogThemeOption {
+    #[default]
+    Auto,
+    Dark,
+    Light,
 }
 
 impl Args {
@@ -107,6 +119,21 @@ impl Args {
         self.with_repository(JjEdit::default())
     }
 
+    /// Builds the squash source for ordered source marks and the selected destination.
+    pub(crate) fn squash_source(&self) -> JjSquash {
+        self.with_repository(JjSquash::default())
+    }
+
+    /// Builds the restore source for selected-revision mutation preview.
+    pub(crate) fn restore_source(&self) -> JjRestore {
+        self.with_repository(JjRestore::default())
+    }
+
+    /// Builds the command source for the explicit rebase picker.
+    pub(crate) fn rebase_source(&self) -> jk_cli::JjRebase {
+        self.with_repository(jk_cli::JjRebase::default())
+    }
+
     /// Builds the operation source for operation log/show/diff inspection.
     pub(crate) fn operation_source(&self) -> JjOperation {
         self.with_repository(JjOperation::default())
@@ -120,6 +147,16 @@ impl Args {
     /// Builds the workspace source for workspace list and selected-workspace inspection.
     pub(crate) fn workspaces_source(&self) -> JjWorkspaces {
         self.with_repository(JjWorkspaces::default())
+    }
+
+    /// Builds the bookmark source for the bookmark list and future mutations.
+    pub(crate) fn bookmarks_source(&self) -> JjBookmarks {
+        self.with_repository(JjBookmarks::default())
+    }
+
+    /// Builds the Git remote source for explicit fetch and push previews.
+    pub(crate) fn git_remote_source(&self) -> JjGitRemote {
+        self.with_repository(JjGitRemote::default())
     }
 
     fn with_repository<T>(&self, source: T) -> T
@@ -246,9 +283,14 @@ impl_with_repository!(
     JjNew,
     JjOperation,
     JjRecovery,
+    JjRestore,
+    jk_cli::JjRebase,
     JjShow,
+    JjSquash,
     JjStatus,
     JjWorkspaces,
+    JjBookmarks,
+    JjGitRemote,
 );
 
 #[cfg(test)]

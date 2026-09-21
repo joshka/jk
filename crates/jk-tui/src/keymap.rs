@@ -23,6 +23,14 @@ pub enum BindingContext {
 /// Repository action selected from the context-aware action menu.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionMenuAction {
+    /// Add a workspace at a destination path.
+    AddWorkspace,
+    /// Rename the selected workspace.
+    RenameWorkspace,
+    /// Forget selected workspace metadata without deleting files.
+    ForgetWorkspace,
+    /// Update selected stale workspace metadata.
+    UpdateStaleWorkspace,
     /// Describe the selected revision.
     Describe,
     /// Create a new change from the selected or marked revisions.
@@ -31,6 +39,10 @@ pub enum ActionMenuAction {
     EditChange,
     /// Abandon the selected revision.
     Abandon,
+    /// Squash marked sources into the selected destination.
+    Squash,
+    /// Restore all paths from the selected revision into the working copy.
+    Restore,
     /// Undo the latest operation.
     Undo,
     /// Redo the latest undone operation.
@@ -40,6 +52,8 @@ pub enum ActionMenuAction {
 /// User-facing section in the action menu.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionMenuGroup {
+    /// Actions that manage workspace lifecycle metadata.
+    Workspace,
     /// Actions that change revisions or working-copy state.
     Change,
     /// Actions that recover through operation history.
@@ -51,6 +65,7 @@ impl ActionMenuGroup {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
+            Self::Workspace => "Workspace lifecycle",
             Self::Change => "Change actions",
             Self::Recovery => "History and recovery",
         }
@@ -60,6 +75,12 @@ impl ActionMenuGroup {
 /// Safety and execution cue shown before an action runs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActionMenuSafety {
+    /// Creates a workspace directory after preview.
+    FilesystemCreate,
+    /// Changes workspace metadata after preview.
+    LocalMetadata,
+    /// Forgets metadata but leaves files on disk.
+    MetadataOnlyForget,
     /// The command rewrites local repository state and requires a preview.
     LocalRewrite,
     /// The command opens an inline editor whose Enter key saves the change immediately.
@@ -77,6 +98,9 @@ impl ActionMenuSafety {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
+            Self::FilesystemCreate => "creates files · preview",
+            Self::LocalMetadata => "local metadata · preview",
+            Self::MetadataOnlyForget => "forgets metadata · files stay",
             Self::LocalRewrite => "local rewrite · preview",
             Self::InlineSubmit => "local rewrite · enter saves",
             Self::ImmediateLocal => "local rewrite · runs now",
@@ -89,7 +113,9 @@ impl ActionMenuSafety {
     #[must_use]
     pub const fn compact_label(self) -> &'static str {
         match self {
-            Self::LocalRewrite => "preview",
+            Self::FilesystemCreate => "creates files",
+            Self::LocalMetadata | Self::LocalRewrite => "preview",
+            Self::MetadataOnlyForget => "files stay",
             Self::InlineSubmit => "enter saves",
             Self::ImmediateLocal => "runs now",
             Self::ConditionalDestructive => "checks first",
@@ -138,12 +164,19 @@ enum ActionId {
     OpenCommandDetails,
     CopyCommand,
     CommandMode,
+    ExternalCommandMode,
     NewChange,
     EditChange,
     Abandon,
+    Squash,
+    Restore,
+    Rebase,
     Undo,
     Redo,
     UpdateStale,
+    AddWorkspace,
+    RenameWorkspace,
+    ForgetWorkspace,
     ViewOptions,
     Refresh,
     SwitchLogCommand,
@@ -193,8 +226,14 @@ const fn default_help_group(action: ActionId) -> HelpGroup {
         | ActionId::NewChange
         | ActionId::EditChange
         | ActionId::Abandon
+        | ActionId::Squash
+        | ActionId::Rebase
+        | ActionId::Restore
         | ActionId::Mark
         | ActionId::ClearMarks => HelpGroup::Mutations,
+        ActionId::AddWorkspace | ActionId::RenameWorkspace | ActionId::ForgetWorkspace => {
+            HelpGroup::Mutations
+        }
         ActionId::OpenCommandHistory
         | ActionId::OpenCommandDetails
         | ActionId::CopyCommand
@@ -203,6 +242,7 @@ const fn default_help_group(action: ActionId) -> HelpGroup {
         | ActionId::Undo
         | ActionId::Redo => HelpGroup::Recovery,
         ActionId::CommandMode
+        | ActionId::ExternalCommandMode
         | ActionId::Refresh
         | ActionId::UpdateStale
         | ActionId::CloseHelp
@@ -257,12 +297,19 @@ impl ActionId {
             Self::OpenCommandDetails => "Open command details",
             Self::CopyCommand => "Copy command",
             Self::CommandMode => "Run jj command",
+            Self::ExternalCommandMode => "Run external command",
             Self::NewChange => "New change",
             Self::EditChange => "Edit change",
             Self::Abandon => "Abandon revision",
+            Self::Squash => "Squash revisions",
+            Self::Rebase => "Rebase revisions",
+            Self::Restore => "Restore all paths",
             Self::Undo => "Undo",
             Self::Redo => "Redo",
             Self::UpdateStale => "Update stale",
+            Self::AddWorkspace => "Add workspace",
+            Self::RenameWorkspace => "Rename workspace",
+            Self::ForgetWorkspace => "Forget workspace metadata",
             Self::ViewOptions => "View options",
             Self::Refresh => "Refresh",
             Self::SwitchLogCommand => "Switch log command",
@@ -297,6 +344,12 @@ pub enum CommandFamily {
     JjNew,
     /// Commands and actions related to `jj edit`.
     JjEdit,
+    /// Commands and actions related to `jj squash`.
+    JjSquash,
+    /// Commands related to `jj rebase`.
+    JjRebase,
+    /// Commands and actions related to `jj restore`.
+    JjRestore,
     /// Commands and actions related to `jj evolog`.
     JjEvolog,
     /// Commands and actions related to `jj show`.
@@ -327,6 +380,8 @@ pub enum CommandFamily {
     ViewOptions,
     /// User-entered `jj` command mode.
     CommandMode,
+    /// User-entered shell-free external command mode.
+    ExternalCommandMode,
     /// Help controls.
     Help,
     /// Quitting the application.
@@ -342,6 +397,9 @@ impl CommandFamily {
             Self::JjDescribe => "jj describe",
             Self::JjNew => "jj new",
             Self::JjEdit => "jj edit",
+            Self::JjSquash => "jj squash",
+            Self::JjRebase => "jj rebase",
+            Self::JjRestore => "jj restore",
             Self::JjEvolog => "jj evolog",
             Self::JjShow => "jj show",
             Self::JjStatus => "jj status",
@@ -357,6 +415,7 @@ impl CommandFamily {
             Self::Hunk => "hunk",
             Self::ViewOptions => "view options",
             Self::CommandMode => "jj command",
+            Self::ExternalCommandMode => "external command",
             Self::Help => "help",
             Self::Quit => "quit",
         }
@@ -507,6 +566,26 @@ const LOG_BINDINGS: &[KeyBinding] = &[
             ActionMenuSafety::ImmediateLocal,
             30,
         ),
+    KeyBinding::new(ActionId::Rebase, "R", "choose rebase destination")
+        .with_family(CommandFamily::JjRebase)
+        .with_aliases(&["rebase", "branch", "source", "destination", "preview"]),
+    KeyBinding::new(ActionId::Squash, "a s", "preview jj squash")
+        .with_family(CommandFamily::JjSquash)
+        .with_aliases(&[
+            "squash",
+            "source",
+            "destination",
+            "whole change",
+            "mutation",
+            "preview",
+        ])
+        .with_action_menu(
+            ActionMenuAction::Squash,
+            "s",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::LocalRewrite,
+            35,
+        ),
     KeyBinding::new(ActionId::Abandon, "a a", "preview jj abandon")
         .with_family(CommandFamily::JjOperation)
         .with_aliases(&["abandon", "delete", "destructive", "mutation", "preview"])
@@ -516,6 +595,22 @@ const LOG_BINDINGS: &[KeyBinding] = &[
             ActionMenuGroup::Change,
             ActionMenuSafety::ConditionalDestructive,
             40,
+        ),
+    KeyBinding::new(ActionId::Restore, "a r", "preview all-path jj restore")
+        .with_family(CommandFamily::JjRestore)
+        .with_aliases(&[
+            "restore",
+            "working copy",
+            "all paths",
+            "destructive",
+            "preview",
+        ])
+        .with_action_menu(
+            ActionMenuAction::Restore,
+            "r",
+            ActionMenuGroup::Change,
+            ActionMenuSafety::DestructiveLocal,
+            45,
         ),
     KeyBinding::new(ActionId::Undo, "a u", "run jj undo")
         .with_family(CommandFamily::JjOperation)
@@ -555,6 +650,9 @@ const LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "template", "jj log"])
@@ -623,6 +721,9 @@ const DIFF_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -666,6 +767,9 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -700,6 +804,58 @@ const INSPECTION_BINDINGS: &[KeyBinding] = &[
 ];
 
 const WORKSPACES_BINDINGS: &[KeyBinding] = &[
+    KeyBinding::new(ActionId::AddWorkspace, "a a", "add workspace")
+        .with_family(CommandFamily::JjWorkspace)
+        .with_aliases(&["workspace", "add", "create", "destination", "preview"])
+        .with_action_menu(
+            ActionMenuAction::AddWorkspace,
+            "a",
+            ActionMenuGroup::Workspace,
+            ActionMenuSafety::FilesystemCreate,
+            10,
+        ),
+    KeyBinding::new(
+        ActionId::RenameWorkspace,
+        "a r",
+        "rename selected workspace",
+    )
+    .with_family(CommandFamily::JjWorkspace)
+    .with_aliases(&["workspace", "rename", "name", "preview"])
+    .with_action_menu(
+        ActionMenuAction::RenameWorkspace,
+        "r",
+        ActionMenuGroup::Workspace,
+        ActionMenuSafety::LocalMetadata,
+        20,
+    ),
+    KeyBinding::new(
+        ActionId::ForgetWorkspace,
+        "a f",
+        "forget selected workspace metadata",
+    )
+    .with_family(CommandFamily::JjWorkspace)
+    .with_aliases(&["workspace", "forget", "metadata", "files stay", "preview"])
+    .with_action_menu(
+        ActionMenuAction::ForgetWorkspace,
+        "f",
+        ActionMenuGroup::Workspace,
+        ActionMenuSafety::MetadataOnlyForget,
+        30,
+    ),
+    KeyBinding::new(
+        ActionId::UpdateStale,
+        "a u",
+        "update selected stale workspace",
+    )
+    .with_family(CommandFamily::JjWorkspace)
+    .with_aliases(&["update", "stale", "workspace", "metadata", "preview"])
+    .with_action_menu(
+        ActionMenuAction::UpdateStaleWorkspace,
+        "u",
+        ActionMenuGroup::Workspace,
+        ActionMenuSafety::LocalMetadata,
+        40,
+    ),
     KeyBinding::new(ActionId::OpenLog, "l", "open selected workspace log")
         .with_family(CommandFamily::JjLog)
         .with_aliases(&["log", "workspace", "selected"])
@@ -730,6 +886,9 @@ const WORKSPACES_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::ViewOptions, "V", "open view options")
         .with_family(CommandFamily::ViewOptions)
         .with_aliases(&["view", "options", "display"])
@@ -791,6 +950,9 @@ const COMMAND_HISTORY_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "command", "current row"])
@@ -839,6 +1001,9 @@ const OPERATION_LOG_BINDINGS: &[KeyBinding] = &[
     KeyBinding::new(ActionId::CommandMode, ":", "run jj command")
         .with_family(CommandFamily::CommandMode)
         .with_aliases(&["command", "prompt", "colon", "jj"]),
+    KeyBinding::new(ActionId::ExternalCommandMode, "!", "run external command")
+        .with_family(CommandFamily::ExternalCommandMode)
+        .with_aliases(&["external", "argv", "program", "shell-free", "bang"]),
     KeyBinding::new(ActionId::Move, "↑/↓, j/k", "move selection")
         .with_family(CommandFamily::Navigation)
         .with_aliases(&["selection", "operation", "current row"])
@@ -1793,7 +1958,9 @@ mod tests {
                 ActionMenuAction::Describe,
                 ActionMenuAction::NewChange,
                 ActionMenuAction::EditChange,
+                ActionMenuAction::Squash,
                 ActionMenuAction::Abandon,
+                ActionMenuAction::Restore,
                 ActionMenuAction::Undo,
                 ActionMenuAction::Redo,
             ]
@@ -1802,11 +1969,15 @@ mod tests {
         assert_eq!(rows[0].safety, ActionMenuSafety::InlineSubmit);
         assert_eq!(rows[1].safety, ActionMenuSafety::ImmediateLocal);
         assert_eq!(rows[2].safety, ActionMenuSafety::ImmediateLocal);
-        assert_eq!(rows[3].safety, ActionMenuSafety::ConditionalDestructive);
-        assert_eq!(rows[4].group, ActionMenuGroup::Recovery);
-        assert_eq!(rows[4].safety, ActionMenuSafety::ImmediateLocal);
-        assert_eq!(rows[5].safety, ActionMenuSafety::ImmediateLocal);
-        assert_eq!(rows[3].key, "a");
+        assert_eq!(rows[3].safety, ActionMenuSafety::LocalRewrite);
+        assert_eq!(rows[4].safety, ActionMenuSafety::ConditionalDestructive);
+        assert_eq!(rows[5].safety, ActionMenuSafety::DestructiveLocal);
+        assert_eq!(rows[6].group, ActionMenuGroup::Recovery);
+        assert_eq!(rows[6].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[7].safety, ActionMenuSafety::ImmediateLocal);
+        assert_eq!(rows[3].key, "s");
+        assert_eq!(rows[4].key, "a");
+        assert_eq!(rows[5].key, "r");
     }
 
     #[test]
@@ -1816,10 +1987,25 @@ mod tests {
             BindingContext::Inspection,
             BindingContext::CommandHistory,
             BindingContext::OperationLog,
-            BindingContext::Workspaces,
         ] {
             assert!(action_menu_rows(context).is_empty(), "{context:?}");
         }
+    }
+
+    #[test]
+    fn workspace_action_menu_exposes_lifecycle_with_metadata_safety() {
+        let rows = action_menu_rows(BindingContext::Workspaces);
+        assert_eq!(
+            rows.iter().map(|row| row.action).collect::<Vec<_>>(),
+            vec![
+                ActionMenuAction::AddWorkspace,
+                ActionMenuAction::RenameWorkspace,
+                ActionMenuAction::ForgetWorkspace,
+                ActionMenuAction::UpdateStaleWorkspace,
+            ]
+        );
+        assert_eq!(rows[2].safety, ActionMenuSafety::MetadataOnlyForget);
+        assert_eq!(rows[2].safety.label(), "forgets metadata · files stay");
     }
 
     #[test]
@@ -1828,6 +2014,10 @@ mod tests {
         assert_eq!(discovery_row_for_key(&rows, "a").action, "Open action menu");
         assert_eq!(discovery_row_for_key(&rows, "a n").action, "New change");
         assert_eq!(discovery_row_for_key(&rows, "a e").action, "Edit change");
+        assert_eq!(
+            discovery_row_for_key(&rows, "a r").action,
+            "Restore all paths"
+        );
         assert_eq!(
             discovery_row_for_key(&rows, "a a").action,
             "Abandon revision"
@@ -1881,6 +2071,24 @@ mod tests {
 
             assert_eq!(row.action, "Run jj command");
             assert_eq!(row.command_family_label(), Some("jj command"));
+        }
+    }
+
+    #[test]
+    fn discovery_keeps_bang_external_command_mode() {
+        for context in [
+            BindingContext::Log,
+            BindingContext::Diff,
+            BindingContext::Inspection,
+            BindingContext::Workspaces,
+            BindingContext::CommandHistory,
+            BindingContext::OperationLog,
+        ] {
+            let rows = discovery_rows(context);
+            let row = discovery_row_for_key(&rows, "!");
+
+            assert_eq!(row.action, "Run external command");
+            assert_eq!(row.command_family_label(), Some("external command"));
         }
     }
 

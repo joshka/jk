@@ -2,6 +2,7 @@
 //! keys.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use jk_tui::styles::{dialog, dialog_accent, dialog_supporting};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -262,7 +263,11 @@ impl DescriptionEditor {
             height,
         );
         frame.render_widget(Clear, panel);
-        frame.render_widget(Block::bordered().title("Describe revision"), panel);
+        frame.render_widget(Block::default().style(dialog()), panel);
+        frame.render_widget(
+            Paragraph::new("Describe revision").style(dialog_accent()),
+            Rect::new(panel.x + 1, panel.y, width - 2, 1),
+        );
         frame.render_widget(
             Paragraph::new(format!("Revision: {rev}")),
             Rect::new(panel.x + 1, panel.y + 1, width - 2, 1),
@@ -288,15 +293,31 @@ impl DescriptionEditor {
                     .saturating_sub(self.scroll_top)
                     .min(self.page_height - 1) as u16,
         ));
-        let hint = if width >= 72 {
-            "Enter save · Esc cancel · Ctrl-j newline · Ctrl-u clear · arrows move"
+        let bindings: &[(&str, &str)] = if width >= 72 {
+            &[
+                ("Enter", " save · "),
+                ("Esc", " cancel · "),
+                ("Ctrl-j", " newline · "),
+                ("Ctrl-u", " clear · "),
+                ("arrows", " move"),
+            ]
         } else if width >= 44 {
-            "Enter save · Esc cancel · Ctrl-j newline"
+            &[
+                ("Enter", " save · "),
+                ("Esc", " cancel · "),
+                ("Ctrl-j", " newline"),
+            ]
         } else {
-            "Enter save · Esc cancel"
+            &[("Enter", " save · "), ("Esc", " cancel")]
         };
+        let hint = Line::from(
+            bindings
+                .iter()
+                .flat_map(|(key, label)| [Span::styled(*key, dialog_accent()), Span::raw(*label)])
+                .collect::<Vec<_>>(),
+        );
         frame.render_widget(
-            Paragraph::new(hint),
+            Paragraph::new(hint).style(dialog_supporting()),
             Rect::new(panel.x + 1, panel.bottom() - 2, width - 2, 1),
         );
     }
@@ -306,11 +327,54 @@ impl DescriptionEditor {
 mod tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::style::Color;
 
     use super::*;
 
     fn press(editor: &mut DescriptionEditor, code: KeyCode, modifiers: KeyModifiers) {
         editor.input(KeyEvent::new(code, modifiers));
+    }
+
+    #[test]
+    fn editor_fills_its_panel_and_preserves_surrounding_repository_cells() {
+        let mut editor = DescriptionEditor::new("Update documentation");
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).expect("terminal");
+        terminal
+            .draw(|frame| {
+                let backdrop = Style::new().fg(Color::Cyan).bg(Color::Magenta);
+                frame.render_widget(
+                    Paragraph::new(vec![Line::from("▒".repeat(120)); 40]).style(backdrop),
+                    frame.area(),
+                );
+                editor.render(frame, "abc123");
+            })
+            .expect("draw");
+
+        let panel = Rect::new(20, 16, 80, 8);
+        let surface = dialog();
+        let buffer = terminal.backend().buffer();
+        for y in 0..40 {
+            for x in 0..120 {
+                let cell = &buffer[(x, y)];
+                if panel.contains((x, y).into()) {
+                    assert_eq!(Some(cell.bg), surface.bg, "{x},{y}");
+                    assert!(
+                        [surface.fg, dialog_accent().fg, dialog_supporting().fg]
+                            .contains(&Some(cell.fg)),
+                        "{x},{y}"
+                    );
+                    assert_ne!(cell.symbol(), "▒", "{x},{y}");
+                } else {
+                    assert_eq!(cell.symbol(), "▒", "{x},{y}");
+                    assert_eq!(cell.fg, Color::Cyan, "{x},{y}");
+                    assert_eq!(cell.bg, Color::Magenta, "{x},{y}");
+                }
+            }
+        }
+        assert_eq!(Some(buffer[(21, 16)].fg), dialog_accent().fg);
+        assert_eq!(Some(buffer[(21, 19)].fg), surface.fg);
+        assert_eq!(Some(buffer[(21, 22)].fg), dialog_accent().fg);
+        assert_eq!(Some(buffer[(27, 22)].fg), dialog_supporting().fg);
     }
 
     #[test]

@@ -1,0 +1,1207 @@
+{
+  "version": "jj 0.45.1",
+  "screens": [
+    {
+      "id": "log",
+      "title": "Revision graph",
+      "group": "P0 · Inspect",
+      "command": "log"
+    },
+    {
+      "id": "expanded",
+      "title": "Inline inspection",
+      "group": "P0 · Inspect",
+      "command": "log"
+    },
+    {
+      "id": "marks",
+      "title": "Ordered revision marks",
+      "group": "P0 · Inspect",
+      "command": "log"
+    },
+    {
+      "id": "show",
+      "title": "Change details",
+      "group": "P0 · Inspect",
+      "command": "show qpvuntsm"
+    },
+    {
+      "id": "diff",
+      "title": "Diff · configured color-words",
+      "group": "P0 · Inspect",
+      "command": "diff -r mzrqpvnu"
+    },
+    {
+      "id": "folded",
+      "title": "Diff · folded context",
+      "group": "P0 · Inspect",
+      "command": "diff -r mzrqpvnu"
+    },
+    {
+      "id": "search",
+      "title": "Diff · search",
+      "group": "P0 · Inspect",
+      "command": "diff -r mzrqpvnu"
+    },
+    {
+      "id": "files",
+      "title": "Diff · file picker",
+      "group": "P0 · Inspect",
+      "command": "diff -r mzrqpvnu"
+    },
+    {
+      "id": "compare",
+      "title": "Compare two revisions",
+      "group": "P0 · Inspect",
+      "command": "diff --from mzrqpvnu --to qpvuntsm"
+    },
+    {
+      "id": "status",
+      "title": "Working-copy status",
+      "group": "P0 · Inspect",
+      "command": "status"
+    },
+    {
+      "id": "revset",
+      "title": "Revset filter and completion",
+      "group": "P0 · Inspect",
+      "command": "log -r \"mine() & mutable()\""
+    },
+    {
+      "id": "filtered",
+      "title": "Filtered graph",
+      "group": "P0 · Inspect",
+      "command": "log -r \"mine() & mutable()\""
+    },
+    {
+      "id": "actions",
+      "title": "Contextual action menu",
+      "group": "P0 · Controls",
+      "command": "log"
+    },
+    {
+      "id": "help-log",
+      "title": "Contextual help · graph",
+      "group": "P0 · Controls",
+      "command": "log"
+    },
+    {
+      "id": "help-diff",
+      "title": "Contextual help · diff",
+      "group": "P0 · Controls",
+      "command": "diff -r mzrqpvnu"
+    },
+    {
+      "id": "view-options",
+      "title": "View options · diff",
+      "group": "P0 · Controls",
+      "command": "diff -r mzrqpvnu"
+    },
+    {
+      "id": "git-diff",
+      "title": "Diff · Git patch format",
+      "group": "P0 · Inspect",
+      "command": "diff -r mzrqpvnu --git"
+    },
+    {
+      "id": "run-options",
+      "title": "Run options · shared scope",
+      "group": "P0 · Controls",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "command",
+      "title": "All jj commands",
+      "group": "P0 · Controls",
+      "command": ""
+    },
+    {
+      "id": "describe-form",
+      "title": "Describe · edit text",
+      "group": "P0 · Change",
+      "command": "describe qpvuntsm"
+    },
+    {
+      "id": "commit-form",
+      "title": "Commit · working-copy message",
+      "group": "P0 · Change",
+      "command": "commit"
+    },
+    {
+      "id": "rebase-target",
+      "title": "Rebase · choose destination",
+      "group": "P0 · Change",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "rebase-preview",
+      "title": "Rebase · review graph change",
+      "group": "P0 · Change",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "content-picker",
+      "title": "Fileset selector",
+      "group": "P0 · Content",
+      "command": "split -r pvsouytl"
+    },
+    {
+      "id": "squash-files",
+      "title": "Squash · source and content",
+      "group": "P0 · Content",
+      "command": "squash --from pvsouytl --into qpvuntsm"
+    },
+    {
+      "id": "split-files",
+      "title": "Split · selected and remaining content",
+      "group": "P0 · Content",
+      "command": "split -r pvsouytl"
+    },
+    {
+      "id": "restore-files",
+      "title": "Restore · explicit direction",
+      "group": "P0 · Content",
+      "command": "restore --from @- --into @ docs/tui-design.md"
+    },
+    {
+      "id": "running",
+      "title": "Command running",
+      "group": "P0 · Recovery",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "success",
+      "title": "Mutation complete",
+      "group": "P0 · Recovery",
+      "command": "log"
+    },
+    {
+      "id": "interrupted",
+      "title": "Interrupted command",
+      "group": "P0 · Recovery",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "op-log",
+      "title": "Operation history",
+      "group": "P0 · Recovery",
+      "command": "operation log"
+    },
+    {
+      "id": "op-show",
+      "title": "Operation details",
+      "group": "P0 · Recovery",
+      "command": "operation show 734bb86a"
+    },
+    {
+      "id": "op-diff",
+      "title": "Operation comparison",
+      "group": "P0 · Recovery",
+      "command": "operation diff --from 6687b1c0 --to 734bb86a"
+    },
+    {
+      "id": "time-travel",
+      "title": "Graph at a prior operation",
+      "group": "P0 · Recovery",
+      "command": "--at-operation 6687b1c0 log"
+    },
+    {
+      "id": "history",
+      "title": "Command history",
+      "group": "P0 · Recovery",
+      "command": ""
+    },
+    {
+      "id": "history-detail",
+      "title": "Retained command output",
+      "group": "P0 · Recovery",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "bookmarks",
+      "title": "Bookmarks and tracking",
+      "group": "P0 · Share",
+      "command": "bookmark list"
+    },
+    {
+      "id": "push-review",
+      "title": "Push · dry-run review",
+      "group": "P0 · Share",
+      "command": "git push --remote origin --bookmark review-ui --dry-run"
+    },
+    {
+      "id": "push-result",
+      "title": "Push · result",
+      "group": "P0 · Share",
+      "command": "git push --remote origin --bookmark review-ui"
+    },
+    {
+      "id": "workspaces",
+      "title": "Workspace overview",
+      "group": "P0 · Workspaces",
+      "command": "workspace list"
+    },
+    {
+      "id": "workspace-status",
+      "title": "Status in another workspace",
+      "group": "P0 · Workspaces",
+      "command": "-R /work/jk/review status"
+    },
+    {
+      "id": "evolog",
+      "title": "Evolution of a change",
+      "group": "P1 · Inspect",
+      "command": "evolog -r qpvuntsm"
+    },
+    {
+      "id": "interdiff",
+      "title": "Compare change versions",
+      "group": "P1 · Inspect",
+      "command": "interdiff --from 591ef10c --to 0f71aeb2"
+    },
+    {
+      "id": "file-list",
+      "title": "Files at a revision",
+      "group": "P1 · Inspect",
+      "command": "file list -r qpvuntsm"
+    },
+    {
+      "id": "file-show",
+      "title": "File content",
+      "group": "P1 · Inspect",
+      "command": "file show -r qpvuntsm crates/jk-tui/src/selected_row.rs"
+    },
+    {
+      "id": "annotate",
+      "title": "File annotation",
+      "group": "P1 · Inspect",
+      "command": "file annotate -r qpvuntsm crates/jk-tui/src/selected_row.rs"
+    },
+    {
+      "id": "file-search",
+      "title": "Search repository content",
+      "group": "P1 · Inspect",
+      "command": "file search -r qpvuntsm --pattern selection"
+    },
+    {
+      "id": "conflicts",
+      "title": "Conflicted files",
+      "group": "P1 · Content",
+      "command": "resolve --list"
+    },
+    {
+      "id": "external-diff",
+      "title": "External editor handoff",
+      "group": "P1 · Content",
+      "command": "split -r pvsouytl --interactive"
+    },
+    {
+      "id": "file-actions",
+      "title": "File actions",
+      "group": "P1 · Content",
+      "command": ""
+    },
+    {
+      "id": "tags",
+      "title": "Tags",
+      "group": "P1 · Share",
+      "command": "tag list"
+    },
+    {
+      "id": "remotes",
+      "title": "Git remotes",
+      "group": "P1 · Share",
+      "command": "git remote list"
+    },
+    {
+      "id": "welcome",
+      "title": "Open or create a repository",
+      "group": "P1 · Setup",
+      "command": ""
+    },
+    {
+      "id": "sparse",
+      "title": "Sparse working-copy paths",
+      "group": "P2 · Advanced",
+      "command": "sparse list"
+    },
+    {
+      "id": "config",
+      "title": "Configuration and provenance",
+      "group": "P2 · Advanced",
+      "command": "config list"
+    },
+    {
+      "id": "immutable",
+      "title": "Blocked immutable target",
+      "group": "States · Edge cases",
+      "command": "edit main"
+    },
+    {
+      "id": "empty",
+      "title": "No matching revisions",
+      "group": "States · Edge cases",
+      "command": "log -r \"description(no-such-change)\""
+    },
+    {
+      "id": "error",
+      "title": "Command error · preserved context",
+      "group": "States · Edge cases",
+      "command": "git push --remote origin --bookmark review-ui"
+    },
+    {
+      "id": "refresh",
+      "title": "Refresh while inspecting",
+      "group": "States · Edge cases",
+      "command": "log"
+    },
+    {
+      "id": "narrow",
+      "title": "Compact terminal · graph",
+      "group": "States · Edge cases",
+      "command": "log"
+    },
+    {
+      "id": "cmd-abandon",
+      "title": "Abandon this change?",
+      "group": "P0 · Change",
+      "command": "abandon qpvuntsm"
+    },
+    {
+      "id": "cmd-absorb",
+      "title": "absorb · review",
+      "group": "P1 · Content",
+      "command": "absorb --from @"
+    },
+    {
+      "id": "cmd-arrange",
+      "title": "arrange · review",
+      "group": "P2 · Advanced",
+      "command": "arrange"
+    },
+    {
+      "id": "cmd-bisect-run",
+      "title": "bisect run · review",
+      "group": "P3 · Tools",
+      "command": "bisect run --range 'main..@' cargo test"
+    },
+    {
+      "id": "cmd-bookmark-advance",
+      "title": "bookmark advance · review",
+      "group": "P0 · Share",
+      "command": "bookmark advance review-ui --to @"
+    },
+    {
+      "id": "cmd-bookmark-create",
+      "title": "bookmark create · review",
+      "group": "P0 · Share",
+      "command": "bookmark create review-v2 -r @"
+    },
+    {
+      "id": "cmd-bookmark-delete",
+      "title": "bookmark delete · review",
+      "group": "P0 · Share",
+      "command": "bookmark delete review-ui"
+    },
+    {
+      "id": "cmd-bookmark-forget",
+      "title": "bookmark forget · review",
+      "group": "P0 · Share",
+      "command": "bookmark forget review-ui"
+    },
+    {
+      "id": "cmd-bookmark-move",
+      "title": "bookmark move · review",
+      "group": "P0 · Share",
+      "command": "bookmark move review-ui --to @"
+    },
+    {
+      "id": "cmd-bookmark-rename",
+      "title": "bookmark rename · review",
+      "group": "P0 · Share",
+      "command": "bookmark rename review-ui preview-focus"
+    },
+    {
+      "id": "cmd-bookmark-set",
+      "title": "bookmark set · review",
+      "group": "P0 · Share",
+      "command": "bookmark set review-ui -r @"
+    },
+    {
+      "id": "cmd-bookmark-track",
+      "title": "bookmark track · review",
+      "group": "P0 · Share",
+      "command": "bookmark track release@origin"
+    },
+    {
+      "id": "cmd-bookmark-untrack",
+      "title": "bookmark untrack · review",
+      "group": "P0 · Share",
+      "command": "bookmark untrack release@origin"
+    },
+    {
+      "id": "cmd-commit",
+      "title": "commit · review",
+      "group": "P0 · Change",
+      "command": "commit -m 'Add contextual action menu'"
+    },
+    {
+      "id": "cmd-config-edit",
+      "title": "config edit · review",
+      "group": "P3 · Tools",
+      "command": "config edit --repo"
+    },
+    {
+      "id": "cmd-config-gc",
+      "title": "config gc · review",
+      "group": "P3 · Tools",
+      "command": "config gc"
+    },
+    {
+      "id": "cmd-config-get",
+      "title": "config get · command output",
+      "group": "P2 · Advanced",
+      "command": "config get ui.diff-formatter"
+    },
+    {
+      "id": "cmd-config-list",
+      "title": "config list · command output",
+      "group": "P2 · Advanced",
+      "command": "config list"
+    },
+    {
+      "id": "cmd-config-path",
+      "title": "config path · command output",
+      "group": "P2 · Advanced",
+      "command": "config path --repo"
+    },
+    {
+      "id": "cmd-config-set",
+      "title": "config set · review",
+      "group": "P3 · Tools",
+      "command": "config set --repo ui.diff-formatter color-words"
+    },
+    {
+      "id": "cmd-config-unset",
+      "title": "config unset · review",
+      "group": "P3 · Tools",
+      "command": "config unset --repo ui.diff-formatter"
+    },
+    {
+      "id": "cmd-converge",
+      "title": "converge · review",
+      "group": "P2 · Advanced",
+      "command": "converge -r 'mutable()'"
+    },
+    {
+      "id": "cmd-describe",
+      "title": "describe · review",
+      "group": "P0 · Change",
+      "command": "describe qpvuntsm -m 'Keep focus when closing a preview'"
+    },
+    {
+      "id": "cmd-diffedit",
+      "title": "diffedit · review",
+      "group": "P1 · Content",
+      "command": "diffedit -r @"
+    },
+    {
+      "id": "cmd-duplicate",
+      "title": "duplicate · review",
+      "group": "P2 · Advanced",
+      "command": "duplicate qpvuntsm"
+    },
+    {
+      "id": "cmd-edit",
+      "title": "edit · review",
+      "group": "P0 · Change",
+      "command": "edit qpvuntsm"
+    },
+    {
+      "id": "cmd-file-chmod",
+      "title": "file chmod · review",
+      "group": "P1 · Content",
+      "command": "file chmod +x scripts/check.sh"
+    },
+    {
+      "id": "cmd-file-track",
+      "title": "file track · review",
+      "group": "P1 · Content",
+      "command": "file track docs/notes.md"
+    },
+    {
+      "id": "cmd-file-untrack",
+      "title": "file untrack · review",
+      "group": "P1 · Content",
+      "command": "file untrack docs/tui-design.md"
+    },
+    {
+      "id": "cmd-fix",
+      "title": "fix · review",
+      "group": "P1 · Content",
+      "command": "fix -s qpvuntsm"
+    },
+    {
+      "id": "cmd-gerrit-upload",
+      "title": "gerrit upload · review",
+      "group": "P3 · Tools",
+      "command": "gerrit upload"
+    },
+    {
+      "id": "cmd-git-clone",
+      "title": "git clone · review",
+      "group": "P1 · Setup",
+      "command": "git clone https://github.com/joshka/jk.git /work/jk-new"
+    },
+    {
+      "id": "cmd-git-colocation-disable",
+      "title": "git colocation disable · review",
+      "group": "P2 · Advanced",
+      "command": "git colocation disable"
+    },
+    {
+      "id": "cmd-git-colocation-enable",
+      "title": "git colocation enable · review",
+      "group": "P2 · Advanced",
+      "command": "git colocation enable"
+    },
+    {
+      "id": "cmd-git-colocation-status",
+      "title": "git colocation status · command output",
+      "group": "P2 · Advanced",
+      "command": "git colocation status"
+    },
+    {
+      "id": "cmd-git-export",
+      "title": "git export · review",
+      "group": "P1 · Share",
+      "command": "git export"
+    },
+    {
+      "id": "cmd-git-fetch",
+      "title": "git fetch · review",
+      "group": "P0 · Share",
+      "command": "git fetch --remote origin"
+    },
+    {
+      "id": "cmd-git-import",
+      "title": "git import · review",
+      "group": "P1 · Share",
+      "command": "git import"
+    },
+    {
+      "id": "cmd-git-init",
+      "title": "git init · review",
+      "group": "P1 · Setup",
+      "command": "git init /work/jk-new"
+    },
+    {
+      "id": "cmd-git-push",
+      "title": "git push · review",
+      "group": "P0 · Share",
+      "command": "git push --remote origin --bookmark review-ui"
+    },
+    {
+      "id": "cmd-git-remote-add",
+      "title": "git remote add · review",
+      "group": "P1 · Share",
+      "command": "git remote add upstream https://github.com/example/jk.git"
+    },
+    {
+      "id": "cmd-git-remote-remove",
+      "title": "git remote remove · review",
+      "group": "P1 · Share",
+      "command": "git remote remove upstream"
+    },
+    {
+      "id": "cmd-git-remote-rename",
+      "title": "git remote rename · review",
+      "group": "P1 · Share",
+      "command": "git remote rename upstream source"
+    },
+    {
+      "id": "cmd-git-remote-set-url",
+      "title": "git remote set-url · review",
+      "group": "P1 · Share",
+      "command": "git remote set-url origin https://github.com/joshka/jk.git"
+    },
+    {
+      "id": "cmd-git-root",
+      "title": "git root · command output",
+      "group": "P2 · Advanced",
+      "command": "git root"
+    },
+    {
+      "id": "cmd-metaedit",
+      "title": "metaedit · review",
+      "group": "P2 · Advanced",
+      "command": "metaedit qpvuntsm --author 'Joshka <joshka@users.noreply.github.com>'"
+    },
+    {
+      "id": "cmd-new",
+      "title": "new · review",
+      "group": "P0 · Change",
+      "command": "new qpvuntsm -m 'Continue preview work'"
+    },
+    {
+      "id": "cmd-next",
+      "title": "next · review",
+      "group": "P2 · Advanced",
+      "command": "next"
+    },
+    {
+      "id": "cmd-operation-abandon",
+      "title": "operation abandon · review",
+      "group": "P2 · Advanced",
+      "command": "operation abandon 412fe900"
+    },
+    {
+      "id": "cmd-operation-integrate",
+      "title": "operation integrate · review",
+      "group": "P2 · Advanced",
+      "command": "operation integrate 91ab32cd"
+    },
+    {
+      "id": "cmd-operation-restore",
+      "title": "operation restore · review",
+      "group": "P0 · Recovery",
+      "command": "operation restore 6687b1c0"
+    },
+    {
+      "id": "cmd-operation-revert",
+      "title": "operation revert · review",
+      "group": "P0 · Recovery",
+      "command": "operation revert 734bb86a"
+    },
+    {
+      "id": "cmd-parallelize",
+      "title": "parallelize · review",
+      "group": "P2 · Advanced",
+      "command": "parallelize 'mzrqpvnu::qpvuntsm'"
+    },
+    {
+      "id": "cmd-prev",
+      "title": "prev · review",
+      "group": "P2 · Advanced",
+      "command": "prev"
+    },
+    {
+      "id": "cmd-rebase",
+      "title": "rebase · review",
+      "group": "P0 · Change",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "cmd-redo",
+      "title": "redo · review",
+      "group": "P0 · Recovery",
+      "command": "redo"
+    },
+    {
+      "id": "cmd-resolve",
+      "title": "resolve · review",
+      "group": "P1 · Content",
+      "command": "resolve crates/jk-tui/src/chrome.rs"
+    },
+    {
+      "id": "cmd-restore",
+      "title": "restore · review",
+      "group": "P0 · Content",
+      "command": "restore --from @- --into @ docs/tui-design.md"
+    },
+    {
+      "id": "cmd-revert",
+      "title": "revert · review",
+      "group": "P2 · Advanced",
+      "command": "revert -r qpvuntsm -o @"
+    },
+    {
+      "id": "cmd-root",
+      "title": "root · command output",
+      "group": "P2 · Advanced",
+      "command": "root"
+    },
+    {
+      "id": "cmd-run",
+      "title": "run · review",
+      "group": "P2 · Advanced",
+      "command": "run -r 'main..@' --ignore-changes cargo test"
+    },
+    {
+      "id": "cmd-sign",
+      "title": "sign · review",
+      "group": "P3 · Tools",
+      "command": "sign -r qpvuntsm"
+    },
+    {
+      "id": "cmd-simplify-parents",
+      "title": "simplify-parents · review",
+      "group": "P2 · Advanced",
+      "command": "simplify-parents -r @"
+    },
+    {
+      "id": "cmd-sparse-edit",
+      "title": "sparse edit · review",
+      "group": "P2 · Advanced",
+      "command": "sparse edit"
+    },
+    {
+      "id": "cmd-sparse-reset",
+      "title": "sparse reset · review",
+      "group": "P2 · Advanced",
+      "command": "sparse reset"
+    },
+    {
+      "id": "cmd-sparse-set",
+      "title": "sparse set · review",
+      "group": "P2 · Advanced",
+      "command": "sparse set --clear --add crates/jk-tui --add docs"
+    },
+    {
+      "id": "cmd-split",
+      "title": "split · review",
+      "group": "P0 · Content",
+      "command": "split -r pvsouytl -m 'Add contextual action menu' crates/jk-tui/src/chrome.rs"
+    },
+    {
+      "id": "cmd-squash",
+      "title": "squash · review",
+      "group": "P0 · Content",
+      "command": "squash --from pvsouytl --into qpvuntsm --use-destination-message crates/jk-tui/src/chrome.rs"
+    },
+    {
+      "id": "cmd-tag-delete",
+      "title": "tag delete · review",
+      "group": "P1 · Share",
+      "command": "tag delete v0.2.7"
+    },
+    {
+      "id": "cmd-tag-set",
+      "title": "tag set · review",
+      "group": "P1 · Share",
+      "command": "tag set v0.2.8 -r @"
+    },
+    {
+      "id": "cmd-tag-track",
+      "title": "tag track · review",
+      "group": "P1 · Share",
+      "command": "tag track v0.2.7@origin"
+    },
+    {
+      "id": "cmd-tag-untrack",
+      "title": "tag untrack · review",
+      "group": "P1 · Share",
+      "command": "tag untrack v0.2.7@origin"
+    },
+    {
+      "id": "cmd-undo",
+      "title": "undo · review",
+      "group": "P0 · Recovery",
+      "command": "undo"
+    },
+    {
+      "id": "cmd-unsign",
+      "title": "unsign · review",
+      "group": "P3 · Tools",
+      "command": "unsign -r qpvuntsm"
+    },
+    {
+      "id": "cmd-util-backend-name",
+      "title": "util backend name · command output",
+      "group": "P3 · Tools",
+      "command": "util backend name"
+    },
+    {
+      "id": "cmd-util-completion",
+      "title": "util completion · command output",
+      "group": "P3 · Tools",
+      "command": "util completion bash"
+    },
+    {
+      "id": "cmd-util-config-schema",
+      "title": "util config-schema · command output",
+      "group": "P3 · Tools",
+      "command": "util config-schema"
+    },
+    {
+      "id": "cmd-util-exec",
+      "title": "util exec · review",
+      "group": "P3 · Tools",
+      "command": "util exec -- cargo test"
+    },
+    {
+      "id": "cmd-util-gc",
+      "title": "util gc · review",
+      "group": "P3 · Tools",
+      "command": "util gc"
+    },
+    {
+      "id": "cmd-util-install-man-pages",
+      "title": "util install-man-pages · review",
+      "group": "P3 · Tools",
+      "command": "util install-man-pages /work/man"
+    },
+    {
+      "id": "cmd-util-markdown-help",
+      "title": "util markdown-help · command output",
+      "group": "P3 · Tools",
+      "command": "util markdown-help"
+    },
+    {
+      "id": "cmd-util-snapshot",
+      "title": "util snapshot · review",
+      "group": "P3 · Tools",
+      "command": "util snapshot"
+    },
+    {
+      "id": "cmd-version",
+      "title": "version · command output",
+      "group": "P3 · Tools",
+      "command": "version"
+    },
+    {
+      "id": "cmd-workspace-add",
+      "title": "workspace add · review",
+      "group": "P0 · Workspaces",
+      "command": "workspace add --name review-v2 -r main --sparse-patterns full /work/jk/review-v2"
+    },
+    {
+      "id": "cmd-workspace-forget",
+      "title": "workspace forget · review",
+      "group": "P0 · Workspaces",
+      "command": "workspace forget review"
+    },
+    {
+      "id": "cmd-workspace-rename",
+      "title": "workspace rename · review",
+      "group": "P0 · Workspaces",
+      "command": "workspace rename review-v2"
+    },
+    {
+      "id": "cmd-workspace-root",
+      "title": "workspace root · command output",
+      "group": "P0 · Workspaces",
+      "command": "workspace root"
+    },
+    {
+      "id": "cmd-workspace-update-stale",
+      "title": "workspace update-stale · review",
+      "group": "P0 · Workspaces",
+      "command": "-R /work/jk/review workspace update-stale"
+    },
+    {
+      "id": "cmd-help",
+      "title": "help · command output",
+      "group": "P3 · Tools",
+      "command": "help rebase"
+    },
+    {
+      "id": "command-result",
+      "title": "Command output · reusable result",
+      "group": "States · Execution",
+      "command": ""
+    },
+    {
+      "id": "tool-session",
+      "title": "Interactive tool · return contract",
+      "group": "States · Execution",
+      "command": ""
+    },
+    {
+      "id": "run-progress",
+      "title": "Run across revisions · progress",
+      "group": "P2 · Advanced",
+      "command": "run -r 'main..@' --ignore-changes cargo test"
+    },
+    {
+      "id": "bisect-progress",
+      "title": "Bisect · test feedback",
+      "group": "P3 · Tools",
+      "command": "bisect run --range 'main..@' cargo test"
+    },
+    {
+      "id": "log-options",
+      "title": "View options · graph",
+      "group": "P0 · Controls",
+      "command": "log"
+    },
+    {
+      "id": "template-picker",
+      "title": "Configured and custom templates",
+      "group": "P0 · Controls",
+      "command": "log"
+    },
+    {
+      "id": "new-merge",
+      "title": "New change · multiple parents",
+      "group": "P0 · Change",
+      "command": "new qpvuntsm vtqsknru -m 'Combine UI and recovery docs'"
+    },
+    {
+      "id": "rebase-scope",
+      "title": "Rebase · choose source semantics",
+      "group": "P0 · Change",
+      "command": "rebase -s qpvuntsm -o main"
+    },
+    {
+      "id": "external-command",
+      "title": "External command mode",
+      "group": "P1 · Tools",
+      "command": ""
+    },
+    {
+      "id": "bookmark-conflict",
+      "title": "Bookmark conflict · inspect targets",
+      "group": "P0 · Share",
+      "command": "bookmark list"
+    },
+    {
+      "id": "help-workspaces",
+      "title": "Contextual help · workspaces",
+      "group": "P0 · Controls",
+      "command": "workspace list"
+    },
+    {
+      "id": "help-operations",
+      "title": "Contextual help · operation log",
+      "group": "P0 · Controls",
+      "command": "operation log"
+    },
+    {
+      "id": "help-history",
+      "title": "Contextual help · command history",
+      "group": "P0 · Controls",
+      "command": ""
+    },
+    {
+      "id": "description-review",
+      "title": "Describe · before and after",
+      "group": "P0 · Change",
+      "command": "describe qpvuntsm -m 'Keep focus when closing a preview'"
+    },
+    {
+      "id": "hunk-picker",
+      "title": "Partial content · external selector path",
+      "group": "P1 · Content",
+      "command": "squash --from pvsouytl --into qpvuntsm --interactive"
+    },
+    {
+      "id": "help-current",
+      "title": "Contextual help · current view",
+      "group": "P0 · Controls",
+      "command": ""
+    }
+  ],
+  "commandTargets": {
+    "abandon": "cmd-abandon",
+    "absorb": "cmd-absorb",
+    "arrange": "cmd-arrange",
+    "bisect run": "cmd-bisect-run",
+    "bookmark advance": "cmd-bookmark-advance",
+    "bookmark create": "cmd-bookmark-create",
+    "bookmark delete": "cmd-bookmark-delete",
+    "bookmark forget": "cmd-bookmark-forget",
+    "bookmark list": "bookmarks",
+    "bookmark move": "cmd-bookmark-move",
+    "bookmark rename": "cmd-bookmark-rename",
+    "bookmark set": "cmd-bookmark-set",
+    "bookmark track": "cmd-bookmark-track",
+    "bookmark untrack": "cmd-bookmark-untrack",
+    "commit": "cmd-commit",
+    "config edit": "cmd-config-edit",
+    "config gc": "cmd-config-gc",
+    "config get": "cmd-config-get",
+    "config list": "cmd-config-list",
+    "config path": "cmd-config-path",
+    "config set": "cmd-config-set",
+    "config unset": "cmd-config-unset",
+    "converge": "cmd-converge",
+    "describe": "cmd-describe",
+    "diff": "diff",
+    "diffedit": "cmd-diffedit",
+    "duplicate": "cmd-duplicate",
+    "edit": "cmd-edit",
+    "evolog": "evolog",
+    "file annotate": "annotate",
+    "file chmod": "cmd-file-chmod",
+    "file list": "file-list",
+    "file search": "file-search",
+    "file show": "file-show",
+    "file track": "cmd-file-track",
+    "file untrack": "cmd-file-untrack",
+    "fix": "cmd-fix",
+    "gerrit upload": "cmd-gerrit-upload",
+    "git clone": "cmd-git-clone",
+    "git colocation disable": "cmd-git-colocation-disable",
+    "git colocation enable": "cmd-git-colocation-enable",
+    "git colocation status": "cmd-git-colocation-status",
+    "git export": "cmd-git-export",
+    "git fetch": "cmd-git-fetch",
+    "git import": "cmd-git-import",
+    "git init": "cmd-git-init",
+    "git push": "cmd-git-push",
+    "git remote add": "cmd-git-remote-add",
+    "git remote list": "remotes",
+    "git remote remove": "cmd-git-remote-remove",
+    "git remote rename": "cmd-git-remote-rename",
+    "git remote set-url": "cmd-git-remote-set-url",
+    "git root": "cmd-git-root",
+    "interdiff": "interdiff",
+    "log": "log",
+    "metaedit": "cmd-metaedit",
+    "new": "cmd-new",
+    "next": "cmd-next",
+    "operation abandon": "cmd-operation-abandon",
+    "operation diff": "op-diff",
+    "operation integrate": "cmd-operation-integrate",
+    "operation log": "op-log",
+    "operation restore": "cmd-operation-restore",
+    "operation revert": "cmd-operation-revert",
+    "operation show": "op-show",
+    "parallelize": "cmd-parallelize",
+    "prev": "cmd-prev",
+    "rebase": "cmd-rebase",
+    "redo": "cmd-redo",
+    "resolve": "cmd-resolve",
+    "restore": "cmd-restore",
+    "revert": "cmd-revert",
+    "root": "cmd-root",
+    "run": "cmd-run",
+    "show": "show",
+    "sign": "cmd-sign",
+    "simplify-parents": "cmd-simplify-parents",
+    "sparse edit": "cmd-sparse-edit",
+    "sparse list": "sparse",
+    "sparse reset": "cmd-sparse-reset",
+    "sparse set": "cmd-sparse-set",
+    "split": "cmd-split",
+    "squash": "cmd-squash",
+    "status": "status",
+    "tag delete": "cmd-tag-delete",
+    "tag list": "tags",
+    "tag set": "cmd-tag-set",
+    "tag track": "cmd-tag-track",
+    "tag untrack": "cmd-tag-untrack",
+    "undo": "cmd-undo",
+    "unsign": "cmd-unsign",
+    "util backend name": "cmd-util-backend-name",
+    "util completion": "cmd-util-completion",
+    "util config-schema": "cmd-util-config-schema",
+    "util exec": "cmd-util-exec",
+    "util gc": "cmd-util-gc",
+    "util install-man-pages": "cmd-util-install-man-pages",
+    "util markdown-help": "cmd-util-markdown-help",
+    "util snapshot": "cmd-util-snapshot",
+    "version": "cmd-version",
+    "workspace add": "cmd-workspace-add",
+    "workspace forget": "cmd-workspace-forget",
+    "workspace list": "workspaces",
+    "workspace rename": "cmd-workspace-rename",
+    "workspace root": "cmd-workspace-root",
+    "workspace update-stale": "cmd-workspace-update-stale",
+    "help": "cmd-help"
+  },
+  "journeys": {
+    "Inspect a change": [
+      "log",
+      "expanded",
+      "show",
+      "diff",
+      "files",
+      "search",
+      "folded",
+      "help-diff",
+      "log-options",
+      "template-picker"
+    ],
+    "Rebase a stack": [
+      "log",
+      "actions",
+      "rebase-scope",
+      "rebase-target",
+      "rebase-preview",
+      "run-options",
+      "running",
+      "success",
+      "cmd-undo"
+    ],
+    "Split and squash": [
+      "status",
+      "content-picker",
+      "split-files",
+      "cmd-split",
+      "external-diff",
+      "squash-files",
+      "cmd-squash",
+      "hunk-picker"
+    ],
+    "Restore and resolve": [
+      "status",
+      "restore-files",
+      "cmd-restore",
+      "conflicts",
+      "cmd-resolve",
+      "tool-session"
+    ],
+    "Share work": [
+      "bookmarks",
+      "cmd-bookmark-move",
+      "cmd-git-fetch",
+      "push-review",
+      "push-result",
+      "error"
+    ],
+    "Recover a mistake": [
+      "history",
+      "history-detail",
+      "op-log",
+      "op-show",
+      "op-diff",
+      "time-travel",
+      "cmd-operation-restore"
+    ],
+    "Work across workspaces": [
+      "workspaces",
+      "workspace-status",
+      "cmd-workspace-update-stale",
+      "cmd-workspace-add",
+      "sparse",
+      "help-workspaces"
+    ],
+    "Inspect history deeply": [
+      "evolog",
+      "interdiff",
+      "file-list",
+      "file-show",
+      "annotate",
+      "file-search"
+    ],
+    "Configure and maintain": [
+      "config",
+      "cmd-config-get",
+      "cmd-config-set",
+      "remotes",
+      "cmd-git-remote-add",
+      "welcome",
+      "cmd-git-clone"
+    ],
+    "Advanced workflows": [
+      "cmd-converge",
+      "cmd-parallelize",
+      "cmd-arrange",
+      "cmd-run",
+      "run-progress",
+      "cmd-bisect-run",
+      "bisect-progress"
+    ],
+    "Adapt and recover": [
+      "narrow",
+      "help-log",
+      "empty",
+      "refresh",
+      "immutable",
+      "error",
+      "interrupted"
+    ]
+  }
+}

@@ -713,7 +713,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jk"
-version = "0.2.7"
+version = "0.3.0"
 dependencies = [
  "clap",
  "color-eyre",
@@ -723,15 +723,17 @@ dependencies = [
  "jk-tui",
  "ratatui",
  "ratatui-textarea",
+ "terminal-colorsaurus",
  "tracing",
  "tracing-subscriber",
 ]
 
 [[package]]
 name = "jk-cli"
-version = "0.2.7"
+version = "0.3.0"
 dependencies = [
  "jk-core",
+ "rustix",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -739,11 +741,11 @@ dependencies = [
 
 [[package]]
 name = "jk-core"
-version = "0.2.7"
+version = "0.3.0"
 
 [[package]]
 name = "jk-tui"
-version = "0.2.7"
+version = "0.3.0"
 dependencies = [
  "ansi-to-tui",
  "jk-core",
@@ -1599,6 +1601,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "terminal-colorsaurus"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a46bb5364467da040298c573c8a95dbf9a512efc039630409a03126e3703e90"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "memchr",
+ "mio",
+ "terminal-trx",
+ "windows-sys",
+ "xterm-color",
+]
+
+[[package]]
+name = "terminal-trx"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b3f27d9a8a177e57545481faec87acb45c6e854ed1e5a3658ad186c106f38ed"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "windows-sys",
+]
+
+[[package]]
 name = "terminal_size"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2070,6 +2098,12 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "xterm-color"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7008a9d8ba97a7e47d9b2df63fcdb8dade303010c5a7cd5bf2469d4da6eba673"
 
 [[package]]
 name = "zmij"

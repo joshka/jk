@@ -32,29 +32,66 @@ betamax: betamax-log betamax-diff
 readme-media: readme-log-media readme-diff-media
 
 readme-log-media:
-    {{betamax}} run tapes/readme-log.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh --readme-media tapes/readme-log.tape
 
 readme-diff-media:
-    {{betamax}} run tapes/readme-diff.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh --readme-media tapes/readme-diff.tape
 
 betamax-log:
-    {{betamax}} run tapes/jk-log.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/jk-log.tape
 
 betamax-diff:
-    {{betamax}} run tapes/jk-diff.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/jk-diff.tape
+
+betamax-refs-remotes:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/refs-remotes.tape
 
 betamax-release-smoke:
-    {{betamax}} run tapes/release-smoke.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/release-smoke.tape
 
 betamax-action-menu:
-    {{betamax}} run tapes/action-menu.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/action-menu.tape
 
 betamax-action-menu-demo:
-    {{betamax}} run tapes/action-menu-demo.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/action-menu-demo.tape
+
+betamax-workspace-lifecycle:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/workspace-lifecycle.tape
+
+betamax-shared-selectors:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/shared-selectors.tape
 
 betamax-abandon-confirmation:
-    {{betamax}} run tapes/abandon-confirmation.tape
-    {{betamax}} run tapes/abandon-confirmation-long.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/abandon-confirmation.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/abandon-confirmation-long.tape
+
+betamax-restore-preview:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/restore-preview.tape
+
+betamax-external-command:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/external-command-mode.tape
+
+betamax-cancellable-refresh:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/cancellable-refresh.tape
+
+betamax-run-options:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/run-options.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/run-options-narrow.tape
+
+betamax-form-styles:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/form-style-normal.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/form-style-narrow.tape
+
+betamax-design:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/design-proof-normal.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/design-proof-narrow.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/design-proof-light.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/design-proof-standard.tape
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/design-proof-compact.tape
+
+# Exercise the integrated workflows in isolated local fixtures, never this checkout's graph.
+betamax-workflows:
+    BETAMAX="{{betamax}}" bash scripts/run-betamax.sh tapes/workflows-integration.tape
 
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings

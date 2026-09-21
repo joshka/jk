@@ -227,7 +227,7 @@ mod tests {
 
     #[test]
     fn action_menu_groups_ranked_actions_and_marks_selection() {
-        let lines = action_menu_lines(BindingContext::Log, 3, 80);
+        let lines = action_menu_lines(BindingContext::Log, 4, 80);
 
         assert_eq!(lines[0], "Change actions:");
         assert!(

@@ -1,46 +1,167 @@
 //! Shared execution adapter for typed `jj` command specs.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Output, Stdio};
-use std::time::SystemTime;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use jk_core::{
     ColorPolicy, CommandHistory, CommandRecordFinish, CommandRecordStart, CommandResultSummary,
-    CommandSource, ExecutionMode, ExitStatusSummary, ImmutabilityPolicy, JjCommandSpec,
-    OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, SafetyClass, StreamSummary,
-    WorkingCopyPolicy,
+    CommandSource, ExecutionMode, ExitStatusSummary, ExternalCommandSpec, ImmutabilityPolicy,
+    JjCommandSpec, OperationIntegrationPolicy, OperationLoadPolicy, OutputPolicy, SafetyClass,
+    StreamSummary, WorkingCopyPolicy,
 };
 
 const HISTORY_STREAM_LIMIT: usize = 8 * 1024;
 
 /// Runs typed `jj` command specs.
 ///
-/// Loaders may call [`JjCommandRunner::run`] more than once for a single user action when they need
-/// both rendered output and secondary metadata. Implementations should therefore avoid assuming
-/// one-shot use unless the caller documents that restriction explicitly.
+/// Loaders reuse a runner for rendered output and navigation metadata, so implementations must
+/// support multiple calls for one user action.
 pub trait JjCommandRunner {
     /// Runs a typed `jj` command spec.
     ///
-    /// Returns the child-process output when the command starts, writes any stdin, and exits
-    /// successfully enough for the caller to inspect the [`Output`].
+    /// Returns captured output and exit status, including unsuccessful exit statuses. The caller
+    /// decides whether the status represents a command failure.
     ///
     /// # Errors
     ///
-    /// Returns the underlying I/O error when spawning, writing, or waiting fails.
+    /// Returns an I/O error when spawning, writing stdin, reading output, or waiting fails.
     fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output>;
+}
+
+/// Runs a shell-free external command spec and returns its captured output.
+pub trait ExternalCommandRunner {
+    /// Runs the executable and argv directly, without shell interpretation.
+    ///
+    /// An unsuccessful exit status is returned in [`Output`], not as an I/O error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error when spawning, reading output, or waiting fails.
+    fn run(&mut self, spec: &ExternalCommandSpec) -> std::io::Result<Output>;
+}
+
+/// Executes captured external commands with null stdin and piped stdout/stderr.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SystemExternalCommandRunner;
+
+impl ExternalCommandRunner for SystemExternalCommandRunner {
+    fn run(&mut self, spec: &ExternalCommandSpec) -> std::io::Result<Output> {
+        let mut command = build_external_command(spec);
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+    }
+}
+
+/// Records command-history entries around an external command runner.
+#[derive(Debug)]
+pub struct RecordingExternalCommandRunner<'a, R> {
+    inner: R,
+    history: &'a mut CommandHistory,
+    source: CommandSource,
+}
+
+impl<'a, R> RecordingExternalCommandRunner<'a, R> {
+    /// Creates a recording runner for one external command source action.
+    pub const fn new(inner: R, history: &'a mut CommandHistory, source: CommandSource) -> Self {
+        Self {
+            inner,
+            history,
+            source,
+        }
+    }
+}
+
+impl<R> ExternalCommandRunner for RecordingExternalCommandRunner<'_, R>
+where
+    R: ExternalCommandRunner,
+{
+    fn run(&mut self, spec: &ExternalCommandSpec) -> std::io::Result<Output> {
+        let pending = self.history.start(CommandRecordStart::from_external_spec(
+            spec,
+            self.source.clone(),
+        ));
+        let result = self.inner.run(spec);
+        let finish = match &result {
+            Ok(output) => finish_from_output(output, SystemTime::now()),
+            Err(error) => {
+                CommandRecordFinish::from_spawn_error(error.to_string(), "", "", SystemTime::now())
+            }
+        };
+        self.history.finish(&pending, finish);
+        result
+    }
 }
 
 /// Executes `jj` commands with the system `jj` binary.
 ///
-/// Each call spawns a fresh `jj` process. Callers that use loaders with multiple passes should
-/// expect multiple invocations and the corresponding I/O errors if the binary cannot be started or
-/// read.
+/// Each call spawns a process with captured stdout and stderr. Stdin receives the spec's input, or
+/// is closed when no input is supplied.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SystemJjCommandRunner;
 
 impl JjCommandRunner for SystemJjCommandRunner {
     fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
         run_system_jj_spec(spec)
+    }
+}
+
+/// Shared cancellation signal for a running read-only command.
+///
+/// Clones share the signal. Calling [`Self::cancel`] sets it permanently; the runner must observe
+/// the signal and stop its work.
+#[derive(Clone, Debug, Default)]
+pub struct CancellationToken {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl CancellationToken {
+    /// Creates a signal with no cancellation requested.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Requests cancellation of work observing this signal.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+    }
+
+    /// Returns whether cancellation has been requested.
+    #[must_use]
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+}
+
+/// Executes system `jj` commands while observing a cancellation signal.
+///
+/// Checks for cancellation before spawning and while waiting for process exit or pipe I/O. On
+/// cancellation, terminates and reaps the child and finishes pipe I/O before returning an
+/// interrupted I/O error. On Unix, also terminates helpers in the child's process group. On other
+/// platforms, helpers that retain pipes can delay return until they close those pipes.
+#[derive(Clone, Debug)]
+pub struct CancellableSystemJjCommandRunner {
+    cancellation: CancellationToken,
+}
+
+impl CancellableSystemJjCommandRunner {
+    /// Creates a runner tied to `cancellation`.
+    #[must_use]
+    pub const fn new(cancellation: CancellationToken) -> Self {
+        Self { cancellation }
+    }
+}
+
+impl JjCommandRunner for CancellableSystemJjCommandRunner {
+    fn run(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
+        run_system_jj_spec_with_cancellation(spec, Some(&self.cancellation))
     }
 }
 
@@ -97,17 +218,16 @@ where
         self.inner
     }
 
-    /// Runs a confirmed mutation and records the resulting operation id when the current operation
-    /// context advances in a bounded before/after probe.
+    /// Runs a confirmed command and records its operation id when the current operation changes.
     ///
-    /// The operation probes are intentionally not recorded in command history. Callers should use
-    /// this only after user confirmation, and ordinary read-only specs fall back to
-    /// [`JjCommandRunner::run`].
+    /// Call only after user confirmation. For supported mutation and fetch specs, compares the
+    /// current operation before and after a successful command. Probes do not appear in command
+    /// history; a failed probe leaves the operation id unset without changing the command result.
+    /// Other specs use [`JjCommandRunner::run`] without probes.
     ///
     /// # Errors
     ///
-    /// Returns the underlying I/O error when the mutation command or operation probe cannot be
-    /// spawned, written to, or waited on.
+    /// Returns an I/O error from running the confirmed command.
     pub fn run_confirmed_mutation(&mut self, spec: &JjCommandSpec) -> std::io::Result<Output> {
         if !should_probe_resulting_operation(spec) {
             return self.run(spec);
@@ -139,11 +259,16 @@ where
 }
 
 const fn should_probe_resulting_operation(spec: &JjCommandSpec) -> bool {
-    matches!(spec.mode(), ExecutionMode::ConfirmMutation)
-        && matches!(
-            spec.safety(),
-            SafetyClass::LocalMetadata | SafetyClass::LocalRewrite | SafetyClass::DestructiveLocal
-        )
+    matches!(
+        spec.mode(),
+        ExecutionMode::ConfirmMutation | ExecutionMode::ConfirmNetworkRead
+    ) && matches!(
+        spec.safety(),
+        SafetyClass::LocalMetadata
+            | SafetyClass::LocalRewrite
+            | SafetyClass::DestructiveLocal
+            | SafetyClass::NetworkRead
+    )
 }
 
 fn current_operation_id(
@@ -193,23 +318,135 @@ fn looks_like_operation_id(value: &str) -> bool {
 }
 
 fn run_system_jj_spec(spec: &JjCommandSpec) -> std::io::Result<Output> {
-    let mut command = build_jj_command(spec);
+    run_system_jj_spec_with_cancellation(spec, None)
+}
+
+fn run_system_jj_spec_with_cancellation(
+    spec: &JjCommandSpec,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<Output> {
+    run_captured_command(
+        build_jj_command(spec),
+        spec.stdin().map(str::as_bytes),
+        cancellation,
+    )
+}
+
+/// Drains output while writing stdin to avoid deadlocks on full pipes. On Unix, cancellable
+/// commands own a process group so cancellation can terminate helpers that retain those pipes.
+fn run_captured_command(
+    mut command: Command,
+    input: Option<&[u8]>,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<Output> {
+    if cancellation.is_some_and(CancellationToken::is_cancelled) {
+        return Err(cancelled_error());
+    }
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
-    if spec.stdin().is_some() {
-        command.stdin(Stdio::piped());
+    command.stdin(if input.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
+    #[cfg(unix)]
+    if cancellation.is_some() {
+        use std::os::unix::process::CommandExt;
+
+        command.process_group(0);
     }
 
     let mut child = command.spawn()?;
-    if let Some(stdin) = spec.stdin() {
-        let child_stdin = child
-            .stdin
-            .as_mut()
-            .ok_or_else(|| std::io::Error::other("stdin was not piped"))?;
-        child_stdin.write_all(stdin.as_bytes())?;
-    }
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let stdin = child.stdin.take();
 
-    child.wait_with_output()
+    thread::scope(|scope| {
+        let stdout_reader = scope.spawn(|| stdout.map_or_else(|| Ok(Vec::new()), read_all));
+        let stderr_reader = scope.spawn(|| stderr.map_or_else(|| Ok(Vec::new()), read_all));
+        let stdin_writer = scope.spawn(|| match (stdin, input) {
+            (Some(mut stdin), Some(input)) => stdin.write_all(input),
+            _ => Ok(()),
+        });
+        // Helpers can keep these pipes open after jj exits. Observe cancellation until they close,
+        // and leave the child unreaped so its process-group id cannot be reused before termination.
+        while !stdin_writer.is_finished()
+            || !stdout_reader.is_finished()
+            || !stderr_reader.is_finished()
+        {
+            if cancellation.is_some_and(CancellationToken::is_cancelled) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        let status = wait_for_child(&mut child, cancellation);
+        if status.is_err() {
+            terminate_child(&mut child, cancellation.is_some());
+            let _ = child.wait();
+        }
+        let (status, cancelled) = status?;
+        let stdin_result = stdin_writer
+            .join()
+            .map_err(|_| std::io::Error::other("jj stdin writer panicked"))?;
+        let stdout = join_reader(stdout_reader)?;
+        let stderr = join_reader(stderr_reader)?;
+
+        if cancelled {
+            return Err(cancelled_error());
+        }
+        stdin_result?;
+
+        Ok(Output {
+            status,
+            stdout,
+            stderr,
+        })
+    })
+}
+
+fn cancelled_error() -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Interrupted, "jj command cancelled")
+}
+
+fn read_all(mut reader: impl Read) -> std::io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn join_reader(
+    reader: thread::ScopedJoinHandle<'_, std::io::Result<Vec<u8>>>,
+) -> std::io::Result<Vec<u8>> {
+    reader
+        .join()
+        .map_err(|_| std::io::Error::other("jj output reader panicked"))?
+}
+
+fn wait_for_child(
+    child: &mut std::process::Child,
+    cancellation: Option<&CancellationToken>,
+) -> std::io::Result<(std::process::ExitStatus, bool)> {
+    loop {
+        if cancellation.is_some_and(CancellationToken::is_cancelled) {
+            terminate_child(child, true);
+            return child.wait().map(|status| (status, true));
+        }
+        if let Some(status) = child.try_wait()? {
+            return Ok((status, false));
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn terminate_child(child: &mut std::process::Child, process_group: bool) {
+    #[cfg(unix)]
+    if process_group {
+        let pid = rustix::process::Pid::from_child(child);
+        let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
+    }
+    #[cfg(not(unix))]
+    let _ = process_group;
+    let _ = child.kill();
 }
 
 fn finish_from_output(output: &Output, ended_at: SystemTime) -> CommandRecordFinish {
@@ -260,12 +497,28 @@ pub fn build_jj_command(spec: &JjCommandSpec) -> Command {
     command.env_remove("NO_COLOR");
     command.env_remove("CLICOLOR");
     command.env_remove("CLICOLOR_FORCE");
+    if let Some(columns) = spec.display_columns() {
+        command.env("COLUMNS", columns.to_string());
+    }
 
     if let Some(cwd) = spec.cwd() {
         command.current_dir(cwd);
     }
 
     command.args(spec.argv());
+    command
+}
+
+/// Builds a process command directly from an external executable and argv.
+pub fn build_external_command(spec: &ExternalCommandSpec) -> Command {
+    let Some((executable, argv)) = spec.argv().split_first() else {
+        unreachable!("ExternalCommandSpec always contains an executable");
+    };
+    let mut command = Command::new(executable);
+    command.args(argv);
+    if let Some(cwd) = spec.cwd() {
+        command.current_dir(cwd);
+    }
     command
 }
 
@@ -288,6 +541,37 @@ mod tests {
     }
 
     #[test]
+    fn external_command_keeps_program_args_and_cwd_distinct() {
+        let spec = ExternalCommandSpec::new(["printf", "%s", "a; echo unsafe"])
+            .expect("non-empty external argv")
+            .with_cwd("/tmp");
+        let command = build_external_command(&spec);
+
+        assert_eq!(command.get_program(), "printf");
+        assert_eq!(
+            strings(command.get_args().map(std::ffi::OsStr::to_owned)),
+            vec!["%s", "a; echo unsafe"]
+        );
+        assert_eq!(
+            command.get_current_dir(),
+            Some(std::path::Path::new("/tmp"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn captured_external_command_has_no_foreground_terminal_stdin() {
+        let spec = ExternalCommandSpec::new(["test", "-t", "0"]).expect("non-empty external argv");
+        let output = SystemExternalCommandRunner
+            .run(&spec)
+            .expect("test executable runs");
+
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        assert!(output.stderr.is_empty());
+    }
+
+    #[test]
     fn command_adapter_forces_color_and_cleans_color_env() {
         let command = build_jj_command(&JjCommandSpec::render_read_only(["log"]));
         let args = command
@@ -304,6 +588,21 @@ mod tests {
         assert!(envs.contains(&("NO_COLOR".to_owned(), true)));
         assert!(envs.contains(&("CLICOLOR".to_owned(), true)));
         assert!(envs.contains(&("CLICOLOR_FORCE".to_owned(), true)));
+    }
+
+    #[test]
+    fn display_width_changes_only_the_child_environment() {
+        let spec = JjCommandSpec::render_read_only(["log"]);
+        let fitted = spec.clone().with_display_columns(37);
+        let command = build_jj_command(&fitted);
+        assert_eq!(fitted.process_argv(), spec.process_argv());
+        assert!(
+            command.get_envs().any(|(key, value)| {
+                key == "COLUMNS" && value == Some(std::ffi::OsStr::new("37"))
+            })
+        );
+        assert_eq!(spec.display_columns(), None);
+        assert_eq!(spec.with_display_columns(0).display_columns(), Some(1));
     }
 
     #[test]
@@ -366,6 +665,103 @@ mod tests {
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("jj "));
         assert!(output.stderr.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_kills_and_reaps_a_slow_child() {
+        let mut child = Command::new("sh")
+            .args(["-c", "while :; do :; done"])
+            .spawn()
+            .expect("spawn fake slow command");
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+
+        let (status, cancelled) =
+            wait_for_child(&mut child, Some(&cancellation)).expect("reap cancelled child");
+
+        assert!(cancelled);
+        assert!(!status.success());
+        assert!(child.try_wait().expect("child already reaped").is_some());
+    }
+
+    #[test]
+    fn cancelled_work_does_not_spawn_another_process() {
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let command = Command::new("jk-test-executable-that-does-not-exist");
+
+        let error = run_captured_command(command, None, Some(&cancellation))
+            .expect_err("cancel before spawn");
+
+        assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_terminates_helpers_holding_output_pipes() {
+        let cancellation = CancellationToken::new();
+        let mut command = Command::new("sh");
+        command.args(["-c", "sleep 30 & wait"]);
+        let started = std::time::Instant::now();
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                thread::sleep(Duration::from_millis(100));
+                cancellation.cancel();
+            });
+
+            let error = run_captured_command(command, None, Some(&cancellation))
+                .expect_err("cancel process and its helper");
+
+            assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+        });
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_terminates_helpers_after_parent_exits() {
+        let cancellation = CancellationToken::new();
+        let mut command = Command::new("sh");
+        command.args(["-c", "sleep 30 &"]);
+        let started = std::time::Instant::now();
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                thread::sleep(Duration::from_millis(100));
+                cancellation.cancel();
+            });
+
+            let error = run_captured_command(command, None, Some(&cancellation))
+                .expect_err("cancel helper after its parent exits");
+
+            assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+        });
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn captured_command_drains_output_while_writing_stdin() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "head -c 131072 /dev/zero; cat"]);
+        let input = vec![b'x'; 131_072];
+        let cancellation = CancellationToken::new();
+        let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+        thread::scope(|scope| {
+            let timeout_cancellation = cancellation.clone();
+            scope.spawn(move || {
+                if finished_rx.recv_timeout(Duration::from_secs(5)).is_err() {
+                    timeout_cancellation.cancel();
+                }
+            });
+            let result = run_captured_command(command, Some(&input), Some(&cancellation));
+            let _ = finished_tx.send(());
+            let output = result.expect("drain both pipes without deadlocking");
+
+            assert!(output.status.success());
+            assert_eq!(output.stdout.len(), input.len() * 2);
+            assert_eq!(&output.stdout[input.len()..], input);
+        });
     }
 
     #[test]

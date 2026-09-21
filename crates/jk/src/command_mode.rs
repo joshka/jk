@@ -2,7 +2,10 @@ use std::io;
 use std::path::Path;
 use std::process::Output;
 
-use jk_core::{ExecutionMode, InspectionSnapshot, JjCommandSpec, RefreshPlan, SafetyClass};
+use jk_core::{
+    ExecutionMode, ExternalCommandSpec, InspectionSnapshot, JjCommandSpec, RefreshPlan,
+    SafetyClass, StreamSummary,
+};
 
 pub fn command_mode_spec(argv: Vec<String>, repository: Option<&Path>) -> JjCommandSpec {
     let mut spec = JjCommandSpec::render_read_only(argv)
@@ -16,6 +19,17 @@ pub fn command_mode_spec(argv: Vec<String>, repository: Option<&Path>) -> JjComm
     spec.with_title(title)
 }
 
+pub fn external_command_spec(
+    argv: Vec<String>,
+    working_directory: Option<&Path>,
+) -> Option<ExternalCommandSpec> {
+    let mut spec = ExternalCommandSpec::new(argv)?;
+    if let Some(working_directory) = working_directory {
+        spec = spec.with_cwd(working_directory);
+    }
+    Some(spec)
+}
+
 pub fn jj_command_lines(input: &str, error: Option<&str>) -> Vec<String> {
     let mut lines = vec![format!(": {input}")];
     if let Some(error) = error {
@@ -26,13 +40,24 @@ pub fn jj_command_lines(input: &str, error: Option<&str>) -> Vec<String> {
     lines
 }
 
+pub fn external_command_lines(input: &str, error: Option<&str>) -> Vec<String> {
+    let mut lines = vec![format!("! {input}")];
+    if let Some(error) = error {
+        lines.push(format!("error: {error}"));
+    }
+    lines.push(String::new());
+    lines.push("enter run   Ctrl-u clear   backspace edit   esc cancel".to_owned());
+    lines.push("shell-free captured argv; use sh -c explicitly for shell syntax".to_owned());
+    lines
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum QuoteMode {
     Single,
     Double,
 }
 
-pub fn parse_jj_command_args(input: &str) -> std::result::Result<Vec<String>, String> {
+pub fn parse_command_args(input: &str) -> std::result::Result<Vec<String>, String> {
     let mut args = Vec::new();
     let mut current = String::new();
     let mut quote = None;
@@ -105,17 +130,106 @@ pub fn parse_jj_command_args(input: &str) -> std::result::Result<Vec<String>, St
     }
 }
 
+/// Rejects reference and remote mutations that require their dedicated confirmation flows.
+///
+/// `argv` is the parsed argument list after an optional leading `jj` has been removed.
+pub fn validate_command_mode_args(argv: &[String]) -> std::result::Result<(), String> {
+    let Some((family, action)) = command_family_and_action(argv) else {
+        return Ok(());
+    };
+
+    match (family, action) {
+        ("bookmark" | "b", "create" | "c" | "move" | "m" | "delete" | "d") => Err(
+            "bookmark changes are unavailable in command mode; use the bookmark view's B action"
+                .to_owned(),
+        ),
+        ("git", "fetch") => {
+            Err("use the bookmark view's F action to confirm jj git fetch".to_owned())
+        }
+        ("git", "push") => Err(
+            "git push is unavailable in command mode, including --dry-run; use the bookmark view's P action"
+                .to_owned(),
+        ),
+        _ => Ok(()),
+    }
+}
+
+fn command_family_and_action(argv: &[String]) -> Option<(&str, &str)> {
+    let family_index = first_command_word(argv)?;
+    let family = argv[family_index].as_str();
+    if !matches!(family, "bookmark" | "b" | "git") {
+        return None;
+    }
+
+    let action_index = next_command_word(argv, family_index + 1)?;
+    Some((family, argv[action_index].as_str()))
+}
+
+fn first_command_word(argv: &[String]) -> Option<usize> {
+    next_command_word(argv, 0)
+}
+
+fn next_command_word(argv: &[String], start: usize) -> Option<usize> {
+    let mut index = start;
+    while let Some(argument) = argv.get(index) {
+        if !argument.starts_with('-') || argument == "-" {
+            return Some(index);
+        }
+
+        index += 1;
+        if global_option_takes_value(argument) && !argument.contains('=') {
+            index += 1;
+        }
+    }
+    None
+}
+
+fn global_option_takes_value(argument: &str) -> bool {
+    matches!(
+        argument,
+        "-R" | "--repository"
+            | "--at-operation"
+            | "--at-op"
+            | "--color"
+            | "--config"
+            | "--config-file"
+    )
+}
+
+pub fn parse_jj_command_args(input: &str) -> std::result::Result<Vec<String>, String> {
+    parse_command_args(input)
+}
+
 pub fn command_mode_snapshot(
     command_line: &str,
     result: std::result::Result<&Output, &io::Error>,
 ) -> InspectionSnapshot {
-    let rendered = command_mode_rendered(command_line, result);
+    let rendered =
+        command_mode_rendered_with_action(command_line, result, ": run another jj command");
     InspectionSnapshot::new(command_line, rendered).with_title(command_line)
 }
 
+pub fn external_command_snapshot(
+    command_line: &str,
+    result: std::result::Result<&Output, &io::Error>,
+) -> InspectionSnapshot {
+    let rendered =
+        command_mode_rendered_with_action(command_line, result, "! run another external command");
+    InspectionSnapshot::new(command_line, rendered).with_title(command_line)
+}
+
+#[cfg(test)]
 pub fn command_mode_rendered(
     command_line: &str,
     result: std::result::Result<&Output, &io::Error>,
+) -> String {
+    command_mode_rendered_with_action(command_line, result, ": run another jj command")
+}
+
+fn command_mode_rendered_with_action(
+    command_line: &str,
+    result: std::result::Result<&Output, &io::Error>,
+    next_action: &str,
 ) -> String {
     let mut rendered = String::new();
     rendered.push_str(&format!("Command: {command_line}\n"));
@@ -127,12 +241,15 @@ pub fn command_mode_rendered(
         }
         Err(error) => {
             rendered.push_str("Status: spawn error\n");
-            rendered.push_str(&format!("Spawn error: {error}\n"));
+            let summary = StreamSummary::from_bytes(error.to_string().as_bytes(), usize::MAX);
+            rendered.push_str(&format!("Spawn error: {}\n", summary.snippet));
             push_command_stream(&mut rendered, "Stdout", &[]);
             push_command_stream(&mut rendered, "Stderr", &[]);
         }
     }
-    rendered.push_str("\nActions: e edit/retry command   : run another jj command\n");
+    rendered.push_str(&format!(
+        "\nActions: e edit/retry command   {next_action}\n"
+    ));
     rendered
 }
 
@@ -141,15 +258,24 @@ fn exit_status_label(output: &Output) -> String {
         return "success".to_owned();
     }
 
-    output
-        .status
-        .code()
-        .map_or_else(|| "failed".to_owned(), |code| format!("exit {code}"))
+    if let Some(code) = output.status.code() {
+        return format!("exit {code}");
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+
+        if let Some(signal) = output.status.signal() {
+            return format!("signal {signal}");
+        }
+    }
+    "failed".to_owned()
 }
 
 fn push_command_stream(rendered: &mut String, label: &str, bytes: &[u8]) {
     rendered.push_str(&format!("\n{label}:\n"));
-    let text = String::from_utf8_lossy(bytes);
+    let summary = StreamSummary::from_bytes(bytes, usize::MAX);
+    let text = summary.snippet;
     if text.is_empty() {
         rendered.push_str("<empty>\n");
     } else {
@@ -208,6 +334,28 @@ mod tests {
     }
 
     #[test]
+    fn parser_keeps_shell_metacharacters_as_literal_argv() {
+        assert_eq!(
+            parse_command_args("printf '%s' '$HOME; touch nope | cat && false'")
+                .expect("valid args"),
+            vec!["printf", "%s", "$HOME; touch nope | cat && false"]
+        );
+        assert_eq!(
+            parse_command_args("printf ''").expect("valid empty arg"),
+            vec!["printf", ""]
+        );
+    }
+
+    #[test]
+    fn external_spec_uses_repository_as_working_directory() {
+        let spec = external_command_spec(vec!["pwd".to_owned()], Some(Path::new("/tmp")))
+            .expect("non-empty argv");
+
+        assert_eq!(spec.cwd(), Some(Path::new("/tmp")));
+        assert_eq!(spec.preview(), "pwd");
+    }
+
+    #[test]
     fn parser_reports_incomplete_quotes() {
         assert_eq!(
             parse_jj_command_args("describe -m 'unfinished"),
@@ -217,6 +365,66 @@ mod tests {
             parse_jj_command_args("log \\"),
             Err("dangling escape".to_owned())
         );
+    }
+
+    #[test]
+    fn command_mode_validation_allows_read_only_commands() {
+        for argv in [
+            ["status"].as_slice(),
+            ["--repository", "/repo", "bookmark", "list"].as_slice(),
+            ["git", "remote", "list"].as_slice(),
+            ["--color=always", "log", "-r", "@"].as_slice(),
+        ] {
+            let argv = argv.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>();
+            assert_eq!(validate_command_mode_args(&argv), Ok(()));
+        }
+    }
+
+    #[test]
+    fn command_mode_validation_rejects_bookmark_mutations_through_aliases_and_global_flags() {
+        for argv in [
+            ["bookmark", "create", "main"].as_slice(),
+            ["b", "m", "main", "-r", "@"].as_slice(),
+            [
+                "--repository",
+                "/repo",
+                "bookmark",
+                "--color",
+                "always",
+                "delete",
+                "main",
+            ]
+            .as_slice(),
+        ] {
+            let argv = argv.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>();
+            let error = validate_command_mode_args(&argv).expect_err("mutation must be routed");
+            assert!(error.contains("bookmark view's B action"));
+        }
+    }
+
+    #[test]
+    fn command_mode_validation_rejects_remote_operations_even_with_dry_run() {
+        for argv in [
+            ["git", "fetch", "origin"].as_slice(),
+            [
+                "--color",
+                "always",
+                "git",
+                "--repository",
+                "/repo",
+                "push",
+                "--dry-run",
+            ]
+            .as_slice(),
+            ["git", "--dry-run", "push", "origin"].as_slice(),
+        ] {
+            let argv = argv.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>();
+            let error = validate_command_mode_args(&argv).expect_err("remote operation must route");
+            assert!(
+                error.contains("bookmark view's F action")
+                    || error.contains("bookmark view's P action")
+            );
+        }
     }
 
     #[test]
@@ -236,5 +444,34 @@ mod tests {
         assert!(rendered.contains("Status: exit 1"));
         assert!(rendered.contains("Stdout:\n<empty>"));
         assert!(rendered.contains("Stderr:\nbad revset"));
+    }
+
+    #[test]
+    fn rendered_external_output_redacts_secrets_and_reports_signals() {
+        let result = output(0, "token=secret\n", "password=hunter2\n");
+        let rendered = external_command_snapshot("env", Ok(&result))
+            .rendered()
+            .to_owned();
+
+        assert!(rendered.contains("token=<redacted>"));
+        assert!(rendered.contains("password=<redacted>"));
+        assert!(!rendered.contains("secret"));
+        assert!(rendered.contains("! run another external command"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rendered_external_output_names_terminating_signal() {
+        use std::os::unix::process::ExitStatusExt;
+
+        let result = Output {
+            status: std::process::ExitStatus::from_raw(9),
+            stdout: Vec::new(),
+            stderr: b"terminated\n".to_vec(),
+        };
+        let snapshot = external_command_snapshot("worker", Ok(&result));
+
+        assert!(snapshot.rendered().contains("Status: signal 9"));
+        assert!(snapshot.rendered().contains("Stderr:\nterminated"));
     }
 }

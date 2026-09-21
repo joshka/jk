@@ -1,5 +1,10 @@
-use jk_core::{CommandPreview, SourceAction};
+use jk_core::{
+    CommandPreview, InvalidSelection, SelectionCandidates, SelectionDecision, SelectionRequest,
+    SelectionResolution, SelectorKind, SelectorRole, SourceAction, resolve_selection,
+};
 use jk_tui::log_view::LogView;
+
+use crate::squash::SquashSelection;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingCommandPreview {
@@ -8,9 +13,31 @@ pub struct PendingCommandPreview {
     pub(crate) source_key: &'static str,
     pub(crate) failure_label: &'static str,
     pub(crate) success_message: &'static str,
+    pub(crate) details: Vec<String>,
+    pub(crate) reselect_change_id: Option<String>,
+    pub(crate) copy_status: Option<String>,
+    /// Updated by rendering; confirmation is disabled until its controls are visible.
+    pub(crate) can_confirm: bool,
+    pub(crate) scroll: u16,
+    pub(crate) max_scroll: u16,
 }
 
 impl PendingCommandPreview {
+    pub(crate) fn rebase(preview: CommandPreview, details: Vec<String>) -> Self {
+        Self {
+            preview,
+            details,
+            source_action: SourceAction::RebaseRevision,
+            source_key: "R",
+            failure_label: "jj rebase",
+            success_message: "Rebased revisions · a u undo · C history · o operations",
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
     pub(crate) const fn describe(preview: CommandPreview) -> Self {
         Self {
             preview,
@@ -18,6 +45,12 @@ impl PendingCommandPreview {
             source_key: "a m",
             failure_label: "jj describe",
             success_message: "Described revision",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -28,6 +61,12 @@ impl PendingCommandPreview {
             source_key: "a a",
             failure_label: "jj abandon",
             success_message: "Abandoned revision",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -38,6 +77,12 @@ impl PendingCommandPreview {
             source_key: "a n",
             failure_label: "jj new",
             success_message: "Created new change",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -48,6 +93,32 @@ impl PendingCommandPreview {
             source_key: "a e",
             failure_label: "jj edit",
             success_message: "Edited revision",
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+            details: Vec::new(),
+        }
+    }
+
+    pub(crate) fn restore(preview: CommandPreview, source: &str) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::RestoreRevision,
+            source_key: "a r",
+            failure_label: "jj restore",
+            success_message: "Restored all paths into working copy",
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+            details: vec![
+                format!("Source: {source}"),
+                "Destination: @ (working copy)".to_owned(),
+                "Affected content: all paths".to_owned(),
+            ],
         }
     }
 
@@ -58,6 +129,12 @@ impl PendingCommandPreview {
             source_key: "a u",
             failure_label: "jj undo",
             success_message: "Undid operation",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 
@@ -68,19 +145,127 @@ impl PendingCommandPreview {
             source_key: "a U",
             failure_label: "jj redo",
             success_message: "Redid operation",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) fn squash(preview: CommandPreview, selection: &SquashSelection) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::SquashRevision,
+            source_key: "a s",
+            failure_label: "jj squash",
+            success_message: "Squashed source changes · a u undo · C history",
+            details: selection.preview_details(),
+            reselect_change_id: Some(selection.destination_change_id().to_owned()),
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn bookmark_create(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkCreate,
+            source_key: "c",
+            failure_label: "jj bookmark create",
+            success_message: "Created bookmark",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn bookmark_move(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkMove,
+            source_key: "m",
+            failure_label: "jj bookmark move",
+            success_message: "Moved bookmark",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn bookmark_delete(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::BookmarkDelete,
+            source_key: "x",
+            failure_label: "jj bookmark delete",
+            success_message: "Deleted bookmark",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn git_fetch(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::GitFetch,
+            source_key: "F",
+            failure_label: "jj git fetch",
+            success_message: "Fetched remote",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
+        }
+    }
+
+    pub(crate) const fn git_push_dry_run(preview: CommandPreview) -> Self {
+        Self {
+            preview,
+            source_action: SourceAction::GitPushDryRun,
+            source_key: "P",
+            failure_label: "jj git push --dry-run",
+            success_message: "Push dry-run complete",
+            details: Vec::new(),
+            reselect_change_id: None,
+            copy_status: None,
+            can_confirm: false,
+            scroll: 0,
+            max_scroll: 0,
         }
     }
 }
 
-pub fn selected_new_parents(log: &LogView) -> Vec<String> {
-    if log.has_marks() {
-        return log.marked_revision_ids();
+pub fn selected_new_parents(log: &LogView) -> SelectionResolution<String> {
+    let request = SelectionRequest::one_or_more(SelectorKind::Revision, SelectorRole::Parent);
+    let mut parents = Vec::new();
+    for change_id in log.marked_change_ids() {
+        let Some(commit_id) = log.commit_id_for_change_id(change_id) else {
+            return SelectionResolution::Invalid {
+                request,
+                reason: InvalidSelection::UnresolvedIdentity,
+            };
+        };
+        parents.push(commit_id.to_owned());
     }
-
-    log.selected_revision_id()
-        .map(ToOwned::to_owned)
-        .into_iter()
-        .collect()
+    let candidates =
+        SelectionCandidates::new(log.selected_commit_id().map(ToOwned::to_owned), parents);
+    resolve_selection(request, SelectionDecision::Submit(candidates))
 }
 
 pub(crate) fn new_change_id_from_output(stderr: &[u8]) -> Option<String> {
@@ -119,12 +304,16 @@ fn strip_ansi(text: &str) -> String {
 }
 
 pub fn command_failure_message(command: &str, stderr: &[u8], stdout: &[u8]) -> String {
-    let stderr = String::from_utf8_lossy(stderr).trim().to_owned();
+    let stderr = strip_ansi(&String::from_utf8_lossy(stderr))
+        .trim()
+        .to_owned();
     if !stderr.is_empty() {
         return format!("{command} failed: {stderr}");
     }
 
-    let stdout = String::from_utf8_lossy(stdout).trim().to_owned();
+    let stdout = strip_ansi(&String::from_utf8_lossy(stdout))
+        .trim()
+        .to_owned();
     if !stdout.is_empty() {
         return format!("{command} failed: {stdout}");
     }
@@ -179,21 +368,65 @@ mod tests {
     }
 
     #[test]
-    fn selected_new_parents_use_short_selected_revision() {
+    fn selected_new_parents_use_exact_selected_commit() {
         let log = log_view(["abcdefghijklmnop", "zyxwvutsrqponmlk"]);
 
-        assert_eq!(selected_new_parents(&log), ["abcdefgh"]);
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("selected revision should resolve as a parent");
+        };
+        assert_eq!(
+            resolved.values(),
+            ["0000000000000000000000000000000000000001"]
+        );
     }
 
     #[test]
-    fn selected_new_parents_use_short_marked_revisions() {
+    fn selected_new_parents_use_exact_marked_commits_in_order() {
         let mut log = log_view(["abcdefghijklmnop", "bbbbbbbbcccccccc", "zyxwvutsrqponmlk"]);
         let _ = log.apply(LogAction::ToggleMark);
         let _ = log.apply(LogAction::Next);
         let _ = log.apply(LogAction::Next);
         let _ = log.apply(LogAction::ToggleMark);
 
-        assert_eq!(selected_new_parents(&log), ["abcdefgh", "zyxwvuts"]);
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("ordered revision marks should resolve as parents");
+        };
+        assert_eq!(
+            resolved.values(),
+            [
+                "0000000000000000000000000000000000000001",
+                "0000000000000000000000000000000000000003",
+            ]
+        );
+    }
+
+    #[test]
+    fn marked_parents_with_the_same_short_prefix_remain_distinct() {
+        let mut log = log_view(["abcdefgh11111111", "abcdefgh22222222"]);
+        let _ = log.apply(LogAction::ToggleMark);
+        let _ = log.apply(LogAction::Next);
+        let _ = log.apply(LogAction::ToggleMark);
+
+        let SelectionResolution::Resolved(resolved) = selected_new_parents(&log) else {
+            panic!("distinct marked commits should resolve even when display prefixes collide");
+        };
+        assert_eq!(resolved.values().len(), 2);
+        assert_ne!(resolved.values()[0], resolved.values()[1]);
+    }
+
+    #[test]
+    fn marked_divergent_parent_is_rejected_without_falling_back_to_cursor() {
+        let mut log = log_view(["divergent", "divergent", "cursor"]);
+        let _ = log.apply(LogAction::ToggleMark);
+        let _ = log.apply(LogAction::Last);
+
+        assert!(matches!(
+            selected_new_parents(&log),
+            SelectionResolution::Invalid {
+                reason: InvalidSelection::UnresolvedIdentity,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -225,7 +458,8 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(index, change_id)| {
-                LogEntry::new(*change_id, "commit", "summary").with_rendered_line(index)
+                LogEntry::new(*change_id, format!("{:040x}", index + 1), "summary")
+                    .with_rendered_line(index)
             })
             .collect();
         LogView::new(LogSnapshot::new(rendered, entries))

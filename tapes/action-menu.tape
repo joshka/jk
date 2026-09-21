@@ -14,43 +14,23 @@ Set Margin 20
 Set WindowBar Colorful
 Set BorderRadius 8
 Set CursorBlink false
+Set Framerate 15
 Set KeyboardOverlay Input
 Set TypingSpeed 20ms
 Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "test -f /Users/joshka/local/jk/work/action-menu/Cargo.toml && mkdir -p /Users/joshka/local/jk/work/action-menu/target/dogfood-artifacts/betamax"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" action"
 Enter
-Wait
-Type "cd /Users/joshka/local/jk/work/action-menu && cargo build --manifest-path Cargo.toml -p jk >/tmp/jk-action-menu-build.log 2>&1"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
 Enter
-Wait
-Type "rm -rf /tmp/jk-action-menu-fixture"
-Enter
-Wait
-Type "mkdir -p /tmp/jk-action-menu-fixture && cd /tmp/jk-action-menu-fixture && jj git init --colocate"
-Enter
-Wait
-Type "printf 'one\\n' > /tmp/jk-action-menu-fixture/file.txt && cd /tmp/jk-action-menu-fixture && jj file track file.txt"
-Enter
-Wait
-Type "cd /tmp/jk-action-menu-fixture && jj describe -m 'Initial workspace'"
-Enter
-Wait
-Type "cd /tmp/jk-action-menu-fixture && jj new -m 'Second change'"
-Enter
-Wait
-Type "printf 'two\\n' >> /tmp/jk-action-menu-fixture/file.txt"
-Enter
-Wait
-Type "cd /tmp/jk-action-menu-fixture && jj commit -m 'Second change with content'"
-Enter
-Wait
+Wait+Line
 Show
 
 Caption "The action menu groups shipped change and recovery actions."
-Type "/Users/joshka/local/jk/work/action-menu/target/debug/jk -R /tmp/jk-action-menu-fixture -n 3"
+Type "\"$bin\" -R \"$fixture\" -n 3"
 Enter
 Wait+Screen "jk jj"
 Sleep 800ms
@@ -85,7 +65,7 @@ Type "q"
 Sleep 300ms
 
 Caption "Describe uses the terminal cursor and saves on Enter without a second confirmation."
-Type "/Users/joshka/local/jk/work/action-menu/target/debug/jk -R /tmp/jk-action-menu-fixture -n 3"
+Type "\"$bin\" -R \"$fixture\" -n 3"
 Enter
 Wait+Screen "jk jj"
 Sleep 500ms

@@ -137,10 +137,24 @@ impl SequencedRunner {
             outputs: outputs.into_iter().map(Ok).collect(),
         }
     }
+
+    pub(crate) fn results(outputs: Vec<io::Result<Output>>) -> Self {
+        Self {
+            outputs: outputs.into(),
+        }
+    }
 }
 
 impl JjCommandRunner for SequencedRunner {
     fn run(&mut self, _spec: &jk_core::JjCommandSpec) -> io::Result<Output> {
+        self.outputs
+            .pop_front()
+            .expect("runner called too many times")
+    }
+}
+
+impl jk_cli::ExternalCommandRunner for SequencedRunner {
+    fn run(&mut self, _spec: &jk_core::ExternalCommandSpec) -> io::Result<Output> {
         self.outputs
             .pop_front()
             .expect("runner called too many times")

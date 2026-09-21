@@ -1,7 +1,7 @@
 use jk_cli::{
     DiffQuery, EvologQuery, JjCommandRunner, JjDiff, JjEvolog, JjLog, JjLogCommand, JjOperation,
     JjShow, JjStatus, JjWorkspaces, LogTemplateSelection, OperationQuery, RecordingJjCommandRunner,
-    ShowQuery, StatusQuery, SystemJjCommandRunner, WorkspaceInspectionQuery,
+    ShowQuery, StatusQuery, WorkspaceInspectionQuery,
 };
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
 use jk_tui::diff_view::DiffView;
@@ -19,16 +19,6 @@ use crate::{AppTransition, WorkspaceInspectionKind};
 pub enum OperationRenderedKind {
     Show,
     Diff,
-}
-
-/// Reloads the current command without replacing the view on failure.
-pub fn refresh_log(
-    app: &mut LogView,
-    history: &mut CommandHistory,
-    source: &JjLog,
-    command_source: CommandSource,
-) -> bool {
-    refresh_log_with_runner(app, history, source, command_source, SystemJjCommandRunner)
 }
 
 pub fn refresh_log_with_runner<R: JjCommandRunner>(
@@ -125,7 +115,7 @@ pub fn refresh_workspaces(
     history: &mut CommandHistory,
     source: &JjWorkspaces,
 ) {
-    refresh_workspaces_with_runner(app, history, source, SystemJjCommandRunner);
+    refresh_workspaces_with_runner(app, history, source, crate::runner::system_runner());
 }
 
 pub fn refresh_workspaces_with_runner<R: JjCommandRunner>(
@@ -159,7 +149,7 @@ pub fn refresh_operation_log(
             snapshot.title(),
             snapshot.rendered(),
         )),
-        Err(_error) => {}
+        Err(error) => app.show_error(error.to_string()),
     }
 }
 
@@ -178,7 +168,7 @@ pub fn operation_rendered_transition(
         source_view,
         action,
         kind,
-        SystemJjCommandRunner,
+        crate::runner::system_runner(),
     )
 }
 
@@ -285,6 +275,7 @@ pub fn apply_log_template_selection(
     if !matches!(state.views.active(), AppView::Log(_)) {
         return;
     }
+    state.refreshes.cancel_active();
 
     let next_source = source
         .clone()

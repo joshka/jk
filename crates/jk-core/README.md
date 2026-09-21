@@ -1,9 +1,15 @@
 # jk-core
 
-Shared log records and small text helpers for `jk`.
+Revision, selection, command, and history models shared by `jk` crates.
 
-This crate keeps the first shared contract narrow: a rendered `jj` log body plus semantic records
-for navigation, selection preservation, and inline expansion.
+Snapshots pair rendered `jj` output with metadata for navigation, selection recovery, and inline
+details. Command specifications describe arguments, execution policies, and previews; command history
+records execution results.
 
 The rendered text remains opaque `jj` output. Structured fields exist only where the TUI needs
-stable state that cannot be recovered safely from terminal text.
+stable identity and navigation data that cannot be recovered safely from terminal text.
+
+Selector resolution also lives here. Views keep ownership of cursor, marks, search, and refresh
+state; workflows submit those choices to a pure resolver that reports resolved, ambiguous, invalid,
+or cancelled outcomes without constructing jj commands. The crate does not launch processes or
+render terminal widgets.

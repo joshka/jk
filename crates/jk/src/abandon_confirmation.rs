@@ -1,7 +1,8 @@
 //! The decision to abandon a change: inspect its contents, cancel, or explicitly confirm.
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use jk_cli::{AbandonDetails, JjCommandRunner, JjLog, SystemJjCommandRunner};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use jk_cli::{AbandonDetails, JjCommandRunner, JjLog};
+use jk_tui::styles;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Line, Span, Style, Stylize};
@@ -9,9 +10,6 @@ use ratatui::widgets::{Block, Clear, Paragraph, Scrollbar, ScrollbarOrientation,
 
 use crate::mutations::confirm_command_preview_with_runner;
 use crate::state::{AppState, InputMode};
-
-const BACKGROUND: Color = Color::Rgb(30, 35, 47);
-const MUTED: Color = Color::Rgb(161, 174, 190);
 
 /// Retains the decision and scroll position while the user inspects the patch.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -69,6 +67,20 @@ impl AbandonConfirmation {
     }
 
     fn input(&mut self, key: KeyEvent) -> Decision {
+        if key.kind == KeyEventKind::Release
+            || (key.kind == KeyEventKind::Repeat
+                && !matches!(
+                    key.code,
+                    KeyCode::Up
+                        | KeyCode::Down
+                        | KeyCode::PageUp
+                        | KeyCode::PageDown
+                        | KeyCode::Home
+                        | KeyCode::End
+                ))
+        {
+            return Decision::Stay;
+        }
         if key
             .modifiers
             .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
@@ -155,7 +167,7 @@ impl AbandonConfirmation {
             frame.render_widget(Clear, area);
             frame.render_widget(
                 Paragraph::new("Enlarge terminal to review this change.\nEsc / n cancel")
-                    .style(Style::new().fg(Color::White).bg(BACKGROUND)),
+                    .style(styles::dialog()),
                 area,
             );
             return;
@@ -177,7 +189,7 @@ impl AbandonConfirmation {
             frame.render_widget(Clear, area);
             frame.render_widget(
                 Paragraph::new("Enlarge terminal to review this change.\nEsc / n cancel")
-                    .style(Style::new().fg(Color::White).bg(BACKGROUND)),
+                    .style(styles::dialog()),
                 area,
             );
             return;
@@ -197,11 +209,10 @@ impl AbandonConfirmation {
             " Abandon this change? "
         };
         frame.render_widget(Clear, panel);
+        frame.render_widget(Block::default().style(styles::dialog()), panel);
         frame.render_widget(
-            Block::bordered()
-                .title(title)
-                .style(Style::new().fg(Color::White).bg(BACKGROUND)),
-            panel,
+            Paragraph::new(title.trim()).style(styles::dialog().patch(styles::dialog_accent())),
+            Rect::new(panel.x + 3, panel.y, content_width, 1),
         );
         let inner = Rect::new(
             panel.x + 3,
@@ -290,14 +301,14 @@ impl AbandonConfirmation {
         match &self.details {
             Ok(details) if self.page == Page::Diff => {
                 details.diff.lines().flat_map(|line| {
-                    let color = if line.starts_with('+') { Color::Green } else if line.starts_with('-') { Color::Red } else { Color::White };
-                    wrap_cells(line, width).into_iter().map(move |s| Line::from(s).fg(color))
+                    let style = if line.starts_with('+') { Style::new().fg(Color::Green) } else if line.starts_with('-') { Style::new().fg(Color::Red) } else { Style::new() };
+                    wrap_cells(line, width).into_iter().map(move |s| Line::from(s).style(style))
                 }).collect()
             }
             Ok(details) => {
                 let mut lines = Vec::new();
                 if self.probe_failed {
-                    lines.extend(wrap("Couldn't check whether this change is empty. Review its contents before abandoning.", width).into_iter().map(|s| Line::from(s).yellow()));
+                    lines.extend(wrap("Couldn't check whether this change is empty. Review its contents before abandoning.", width).into_iter().map(|s| Line::from(s).style(styles::dialog_warning())));
                 } else {
                     lines.push(Line::from(format!("Changes to abandon ({} file{}):", details.files.len(), if details.files.len() == 1 { "" } else { "s" })).bold());
                 }
@@ -309,17 +320,17 @@ impl AbandonConfirmation {
                 let count_width = details.files.iter().map(|file| format!("+{} −{}", file.added, file.removed).len()).max().unwrap_or(0);
                 let path_width = usize::from(width).saturating_sub(count_width + 5);
                 for file in &details.files {
-                    let color = match file.status.as_str() { "A" => Color::Green, "D" => Color::Red, "M" => Color::Yellow, _ => Color::White };
+                    let style = match file.status.as_str() { "A" => Style::new().fg(Color::Green), "D" => Style::new().fg(Color::Red), "M" => styles::dialog_warning(), _ => Style::new() };
                     let path = middle_truncate(&file.path.escape_debug().to_string(), path_width);
                     let padding = " ".repeat(path_width.saturating_sub(Span::raw(&path).width()));
-                    lines.push(Line::from(vec![Span::styled(format!("{}  ", file.status), Style::new().fg(color)),
+                    lines.push(Line::from(vec![Span::styled(format!("{}  ", file.status), style),
                         Span::raw(format!("{path}{padding}  ")), Span::styled(format!("+{}", file.added), Style::new().fg(Color::Green)),
                         Span::styled(format!(" −{}", file.removed), Style::new().fg(Color::Red))]));
                 }
                 lines
             }
             Err(error) => wrap(&format!("Couldn't load the change details.\n{error}\n\nCancel to inspect first, or choose Abandon change to proceed without a preview."), width)
-                .into_iter().map(|s| Line::from(s).yellow()).collect(),
+                .into_iter().map(|s| Line::from(s).style(styles::dialog_warning())).collect(),
         }
     }
 
@@ -355,7 +366,7 @@ impl AbandonConfirmation {
         lines.extend(
             wrap("Recover with Undo in the action menu.", width)
                 .into_iter()
-                .map(|s| Line::from(s).fg(MUTED)),
+                .map(|line| Line::from(line).style(styles::dialog_supporting())),
         );
         lines
     }
@@ -371,7 +382,8 @@ impl AbandonConfirmation {
                 false,
             );
             frame.render_widget(
-                Paragraph::new("↑/↓ PgUp/PgDn scroll · Esc/Enter back").fg(MUTED),
+                Paragraph::new("↑/↓ PgUp/PgDn scroll · Esc/Enter back")
+                    .style(styles::dialog_supporting()),
                 Rect::new(area.x, area.y + 4, area.width, 1),
             );
             return;
@@ -409,7 +421,7 @@ impl AbandonConfirmation {
             format!("Tab/←/→ choose · Enter/Space select\ny abandon · n/Esc cancel   {scroll_hint}")
         };
         frame.render_widget(
-            Paragraph::new(hints).fg(MUTED),
+            Paragraph::new(hints).style(styles::dialog_supporting()),
             Rect::new(
                 area.x,
                 area.y + if stacked { 8 } else { 5 },
@@ -422,7 +434,7 @@ impl AbandonConfirmation {
 
 /// Routes only explicit confirmation through the existing recorded mutation gateway.
 pub fn handle_input(state: &mut AppState, source: &mut JjLog, key: KeyEvent) {
-    handle_input_with_runner(state, source, key, SystemJjCommandRunner);
+    handle_input_with_runner(state, source, key, crate::runner::system_runner());
 }
 
 fn handle_input_with_runner(
@@ -456,17 +468,15 @@ fn draw_button(
     disabled: bool,
 ) {
     let style = if disabled {
-        Style::new().fg(Color::DarkGray).bg(Color::Rgb(40, 45, 55))
-    } else if focused {
-        Style::new().fg(Color::Black).bg(Color::LightCyan).bold()
+        styles::dialog().patch(styles::dialog_supporting())
     } else if destructive {
-        Style::new()
-            .fg(Color::White)
-            .bg(Color::Rgb(120, 45, 50))
-            .bold()
+        styles::dialog_danger()
+    } else if focused {
+        styles::dialog_confirm()
     } else {
-        Style::new().fg(Color::White).bg(Color::Rgb(58, 72, 90))
+        styles::dialog_action()
     };
+    let style = if focused { style.bold() } else { style };
     frame.render_widget(Block::default().style(style), area);
     let text = if focused {
         format!("> {label} <")
@@ -559,6 +569,7 @@ mod tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
+    use ratatui::layout::Position;
 
     use super::*;
     use crate::mutation_preview::PendingCommandPreview;
@@ -669,14 +680,96 @@ mod tests {
             buffer
                 .content
                 .iter()
-                .any(|cell| cell.bg == Color::LightCyan)
+                .any(|cell| Some(cell.bg) == styles::dialog_confirm().bg)
         );
         assert!(
             buffer
                 .content
                 .iter()
-                .any(|cell| cell.bg == Color::Rgb(120, 45, 50))
+                .any(|cell| Some(cell.bg) == styles::dialog_danger().bg)
         );
+    }
+
+    #[test]
+    fn focused_destructive_button_keeps_its_danger_palette() {
+        for focused in [false, true] {
+            let mut terminal = Terminal::new(TestBackend::new(24, 3)).expect("terminal");
+            terminal
+                .draw(|frame| {
+                    let area = frame.area();
+                    draw_button(frame, area, "Abandon change", focused, true, false);
+                })
+                .expect("render");
+            let buffer = terminal.backend().buffer();
+            assert!(buffer.content.iter().all(|cell| {
+                Some(cell.bg) == styles::dialog_danger().bg
+                    && Some(cell.fg) == styles::dialog_danger().fg
+            }));
+            assert_eq!(text(buffer).contains("> Abandon change <"), focused);
+        }
+    }
+
+    #[test]
+    fn panel_covers_repository_text_and_preserves_the_surrounding_view() {
+        let mut dialog = dialog(3);
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).expect("terminal");
+        let mut backdrop = Buffer::empty(Rect::new(0, 0, 100, 30));
+        terminal
+            .draw(|frame| {
+                frame.render_widget(
+                    Paragraph::new(vec![Line::from("◆".repeat(100)); 30])
+                        .style(Style::new().fg(Color::Magenta).bg(Color::Blue)),
+                    frame.area(),
+                );
+                backdrop = frame.buffer_mut().clone();
+                dialog.render(frame);
+            })
+            .expect("render");
+        let buffer = terminal.backend().buffer();
+        let panel = Rect::new(16, 4, 68, 22);
+        for y in 0..30 {
+            for x in 0..100 {
+                let cell = &buffer[(x, y)];
+                if panel.contains(Position::new(x, y)) {
+                    assert_ne!(cell.symbol(), "◆", "repository text at ({x}, {y})");
+                    assert_ne!(cell.bg, Color::Reset, "transparent cell at ({x}, {y})");
+                    assert_ne!(cell.bg, Color::Blue, "repository background at ({x}, {y})");
+                } else {
+                    assert_eq!(cell, &backdrop[(x, y)], "backdrop at ({x}, {y})");
+                }
+            }
+        }
+        assert_eq!(Some(buffer[(16, 4)].bg), styles::dialog().bg);
+        assert_eq!(Some(buffer[(19, 4)].fg), styles::dialog_accent().fg);
+    }
+
+    #[test]
+    fn resize_fallback_uses_the_opaque_dialog_palette() {
+        let buffer = draw(&mut dialog(3), 30, 8);
+        for cell in &buffer.content {
+            assert_eq!(Some(cell.bg), styles::dialog().bg);
+            assert_eq!(Some(cell.fg), styles::dialog().fg);
+        }
+    }
+
+    #[test]
+    fn held_and_released_keys_do_not_activate_confirmation_controls() {
+        let mut dialog = dialog(40);
+        draw(&mut dialog, 100, 30);
+        press(&mut dialog, KeyCode::Left);
+        press(&mut dialog, KeyCode::Enter);
+        assert_eq!(dialog.page, Page::Diff);
+        let release =
+            KeyEvent::new_with_kind(KeyCode::Enter, KeyModifiers::NONE, KeyEventKind::Release);
+        assert_eq!(dialog.input(release), Decision::Stay);
+        assert_eq!(dialog.page, Page::Diff);
+        press(&mut dialog, KeyCode::Esc);
+        for code in [KeyCode::Enter, KeyCode::Char('y'), KeyCode::Tab] {
+            let repeat = KeyEvent::new_with_kind(code, KeyModifiers::NONE, KeyEventKind::Repeat);
+            assert_eq!(dialog.input(repeat), Decision::Stay);
+            assert_eq!(dialog.page, Page::Summary);
+            assert_eq!(dialog.selected, Button::ViewDiff);
+        }
     }
 
     #[test]

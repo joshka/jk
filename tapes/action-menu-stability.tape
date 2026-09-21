@@ -10,18 +10,19 @@ Set Padding 0
 Set Margin 20
 Set WindowBar Colorful
 Set CursorBlink false
+Set Framerate 15
 Set TypingSpeed 20ms
 Set WaitTimeout 30s
 Env NO_COLOR "1"
 
 Hide
-Type "cd /Users/joshka/local/jk/work/action-menu && export JK_DEMO_BIN=$PWD/target/debug/jk && export JK_DEMO_REPO=$(mktemp -d $PWD/target/action-menu-stability.XXXXXX) && jj git init $JK_DEMO_REPO"
+Type@0ms "source \"${JK_SOURCE_REPO:-$PWD}/scripts/betamax-setup.sh\" stability"
 Enter
-Wait
-Type "jj -R $JK_DEMO_REPO describe -m 'A description with enough words to wrap across the narrow editor and finish here'"
+Wait+Screen "JK_FIXTURE_READY"
+Type@0ms "clear"
 Enter
-Wait
-Type "$JK_DEMO_BIN -R $JK_DEMO_REPO"
+Wait+Line
+Type "\"$JK_DEMO_BIN\" -R \"$JK_DEMO_REPO\""
 Enter
 Wait+Screen "jk jj"
 Show
@@ -31,6 +32,7 @@ Type "am"
 Wait+Screen "Describe revision"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/action-menu-stability-before-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-stability-before-20260918.json
 Type "!"
 Sleep 700ms
 Enter
@@ -42,9 +44,11 @@ Type "am"
 Wait+Screen "Describe revision"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/action-menu-stability-reopened-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-stability-reopened-20260918.json
 Type " Again."
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/action-menu-stability-edited-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-stability-edited-20260918.json
 Enter
 Wait+Screen "Described revision"
 Sleep 700ms
@@ -54,6 +58,7 @@ Type "an"
 Wait+Screen "Created new change"
 Sleep 900ms
 Screenshot target/dogfood-artifacts/betamax/action-menu-stability-new-20260918.png
+State target/dogfood-artifacts/betamax/action-menu-stability-new-20260918.json
 Type "q"
 Hide
 Caption ""

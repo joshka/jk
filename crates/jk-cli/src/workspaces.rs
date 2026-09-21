@@ -1,10 +1,11 @@
 //! `jj workspace list` command integration.
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use jk_core::{
     ColorPolicy, ExecutionMode, GlobalOptions, InspectionSnapshot, JjCommandSpec, OutputPolicy,
-    RefreshPlan, SafetyClass,
+    RefreshPlan, SafetyClass, WorkingCopyPolicy,
 };
 use thiserror::Error;
 
@@ -130,8 +131,24 @@ impl JjWorkspaces {
         &self,
         runner: &mut impl JjCommandRunner,
     ) -> Result<WorkspaceListSnapshot, JjWorkspacesError> {
-        let spec = self.list_spec();
-        let output = runner.run(&spec)?;
+        let mut spec = self.list_spec();
+        let mut output = runner.run(&spec)?;
+        let mut stale_fallback = false;
+        if !output.status.success()
+            && String::from_utf8_lossy(&output.stderr).contains("working copy is stale")
+        {
+            stale_fallback = true;
+            let output_policy = OutputPolicy {
+                color: ColorPolicy::Never,
+                ..OutputPolicy::default()
+            };
+            spec = spec.with_global_options(
+                GlobalOptions::default()
+                    .with_output(output_policy)
+                    .with_working_copy(WorkingCopyPolicy::Ignore),
+            );
+            output = runner.run(&spec)?;
+        }
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
             return Err(JjWorkspacesError::CommandFailed(stderr));
@@ -145,7 +162,11 @@ impl JjWorkspaces {
         let workspaces = parse_workspace_list(&stdout, current_root.as_deref())?;
         Ok(WorkspaceListSnapshot {
             workspaces,
-            title: spec.title().to_owned(),
+            title: if stale_fallback {
+                "jj workspace list · stale snapshot · use update-stale".to_owned()
+            } else {
+                spec.title().to_owned()
+            },
         })
     }
 
@@ -335,6 +356,59 @@ impl JjWorkspaces {
             .with_mode(ExecutionMode::ConfirmMutation)
             .with_safety(SafetyClass::LocalMetadata)
             .with_refresh_plan(RefreshPlan::None)
+    }
+
+    /// Returns a confirmed `jj workspace add` command spec.
+    #[must_use]
+    pub fn add_spec(&self, destination: &Path, name: &str) -> JjCommandSpec {
+        let title = format!("Add workspace `{name}` at {}", destination.display());
+        let spec = JjCommandSpec::confirm_mutation(
+            [
+                "workspace".into(),
+                "add".into(),
+                destination.as_os_str().to_owned(),
+                "--name".into(),
+                name.into(),
+            ],
+            SafetyClass::LocalMetadata,
+        )
+        .with_title(title)
+        .with_refresh_plan(RefreshPlan::None);
+        self.with_repository_if_configured(spec)
+    }
+
+    /// Returns a confirmed `jj workspace rename` command spec scoped to `query`.
+    #[must_use]
+    pub fn rename_spec(&self, query: &WorkspaceInspectionQuery, name: &str) -> JjCommandSpec {
+        JjCommandSpec::confirm_mutation(
+            [
+                OsString::from("workspace"),
+                OsString::from("rename"),
+                OsString::from(name),
+            ],
+            SafetyClass::LocalMetadata,
+        )
+        .with_repository(query.workspace_root())
+        .with_title(format!("Rename workspace to `{name}`"))
+        .with_refresh_plan(RefreshPlan::None)
+    }
+
+    /// Returns a confirmed `jj workspace forget` command spec.
+    ///
+    /// This removes repository metadata only. Jujutsu does not delete the workspace directory.
+    #[must_use]
+    pub fn forget_spec(&self, name: &str) -> JjCommandSpec {
+        let spec = JjCommandSpec::confirm_mutation(
+            [
+                OsString::from("workspace"),
+                OsString::from("forget"),
+                OsString::from(name),
+            ],
+            SafetyClass::LocalMetadata,
+        )
+        .with_title(format!("Forget workspace metadata for `{name}`"))
+        .with_refresh_plan(RefreshPlan::None);
+        self.with_repository_if_configured(spec)
     }
 
     /// Returns the `jj root` command spec used for current-workspace selection.
@@ -664,6 +738,64 @@ mod tests {
         assert_eq!(spec.repository(), Some(Path::new("/tmp/workspace")));
         assert_eq!(spec.mode(), ExecutionMode::ConfirmMutation);
         assert_eq!(spec.safety(), SafetyClass::LocalMetadata);
+    }
+
+    #[test]
+    fn lifecycle_specs_preserve_arguments_and_scope_without_shell_interpretation() {
+        let source = JjWorkspaces::default().with_repository("/tmp/repo with spaces");
+        let query = WorkspaceInspectionQuery::new("/tmp/selected workspace");
+        let add = source.add_spec(Path::new("/tmp/new $(workspace)"), "name;still-one-arg");
+        let rename = source.rename_spec(&query, "renamed workspace");
+        let forget = source.forget_spec("old; workspace");
+
+        assert_eq!(
+            strings(&add.process_argv()),
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/repo with spaces",
+                "workspace",
+                "add",
+                "/tmp/new $(workspace)",
+                "--name",
+                "name;still-one-arg"
+            ]
+        );
+        assert_eq!(
+            strings(&rename.process_argv()),
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/selected workspace",
+                "workspace",
+                "rename",
+                "renamed workspace"
+            ]
+        );
+        assert_eq!(
+            strings(&forget.process_argv()),
+            vec![
+                "--no-pager",
+                "--color",
+                "always",
+                "--repository",
+                "/tmp/repo with spaces",
+                "workspace",
+                "forget",
+                "old; workspace"
+            ]
+        );
+        assert_eq!(forget.safety(), jk_core::SafetyClass::LocalMetadata);
+        assert!(
+            forget
+                .command_preview()
+                .command_line
+                .contains("'old; workspace'")
+        );
     }
 
     #[test]

@@ -29,6 +29,19 @@ pub enum AppKey {
     /// Open the workspace list.
     OpenWorkspaces,
 
+    /// Open the bookmark list.
+    OpenBookmarks,
+    BookmarkMove,
+
+    /// Preview fetching the selected bookmark's remote.
+    FetchRemote,
+
+    /// Preview a dry-run push for the selected bookmark and remote.
+    PushDryRun,
+
+    /// Preview deleting the selected bookmark.
+    DeleteBookmark,
+
     /// Open the command-history list.
     OpenCommandHistory,
 
@@ -59,11 +72,29 @@ pub enum AppKey {
     /// Preview abandoning the selected revision.
     StartAbandon,
 
+    /// Preview squashing marked sources into the selected destination.
+    StartSquash,
+
+    /// Preview restoring all paths from the selected revision into the working copy.
+    StartRestore,
+    /// Select explicit rebase roles and destination before confirmation.
+    StartRebase,
+    /// Start adding a workspace.
+    StartWorkspaceAdd,
+    /// Start renaming the selected workspace.
+    StartWorkspaceRename,
+    /// Preview forgetting selected workspace metadata.
+    StartWorkspaceForget,
+    /// Preview updating selected stale workspace metadata.
+    StartWorkspaceUpdateStale,
     /// Open view-scoped display and template options.
     OpenViewOptions,
 
     /// Start the `:` prompt for an arbitrary jj command.
     StartCommandMode,
+
+    /// Start the `!` prompt for a shell-free external command.
+    StartExternalCommandMode,
 
     /// Reopen command-output input.
     EditCommandOutput,
@@ -159,10 +190,16 @@ impl AppKey {
     /// Returns the existing application action for a menu selection.
     pub const fn from_action_menu(action: ActionMenuAction) -> Self {
         match action {
+            ActionMenuAction::AddWorkspace => Self::StartWorkspaceAdd,
+            ActionMenuAction::RenameWorkspace => Self::StartWorkspaceRename,
+            ActionMenuAction::ForgetWorkspace => Self::StartWorkspaceForget,
+            ActionMenuAction::UpdateStaleWorkspace => Self::StartWorkspaceUpdateStale,
             ActionMenuAction::Describe => Self::StartDescribe,
             ActionMenuAction::NewChange => Self::StartNew,
             ActionMenuAction::EditChange => Self::StartEdit,
             ActionMenuAction::Abandon => Self::StartAbandon,
+            ActionMenuAction::Squash => Self::StartSquash,
+            ActionMenuAction::Restore => Self::StartRestore,
             ActionMenuAction::Undo => Self::RunUndo,
             ActionMenuAction::Redo => Self::RunRedo,
         }
@@ -174,11 +211,17 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
     match character {
         'q' => Some(AppKey::Action(LogAction::Quit)),
         ':' => Some(AppKey::StartCommandMode),
+        '!' => Some(AppKey::StartExternalCommandMode),
         'r' => Some(AppKey::Action(LogAction::Refresh)),
         'H' => Some(AppKey::Action(LogAction::Home)),
         'L' => Some(AppKey::Action(LogAction::Log)),
         'V' => Some(AppKey::OpenViewOptions),
         'W' => Some(AppKey::OpenWorkspaces),
+        'B' => Some(AppKey::OpenBookmarks),
+        'm' => Some(AppKey::BookmarkMove),
+        'F' => Some(AppKey::FetchRemote),
+        'P' => Some(AppKey::PushDryRun),
+        'x' => Some(AppKey::DeleteBookmark),
         'C' => Some(AppKey::OpenCommandHistory),
         'e' => Some(AppKey::EditCommandOutput),
         'f' => Some(AppKey::OpenDiffFileList),
@@ -186,6 +229,7 @@ const fn action_for_character_key(character: char) -> Option<AppKey> {
         'y' => Some(AppKey::CopyCommand),
         'u' => Some(AppKey::StartUndo),
         'a' => Some(AppKey::OpenActionMenu),
+        'R' => Some(AppKey::StartRebase),
         'v' => Some(AppKey::OpenEvolog),
         'l' => Some(AppKey::Action(LogAction::ToggleExpanded)),
         'd' => Some(AppKey::Action(LogAction::OpenDiff)),
@@ -290,10 +334,34 @@ mod tests {
     }
 
     #[test]
+    fn bang_starts_external_command_mode() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('!'), KeyModifiers::NONE)),
+            AppKey::StartExternalCommandMode
+        );
+    }
+
+    #[test]
     fn uppercase_w_opens_workspaces() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('W'), KeyModifiers::NONE)),
             AppKey::OpenWorkspaces
+        );
+    }
+
+    #[test]
+    fn bookmark_remote_keys_are_explicit() {
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('F'), KeyModifiers::NONE)),
+            AppKey::FetchRemote
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::NONE)),
+            AppKey::PushDryRun
+        );
+        assert_eq!(
+            AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE)),
+            AppKey::DeleteBookmark
         );
     }
 
@@ -370,10 +438,10 @@ mod tests {
     }
 
     #[test]
-    fn lowercase_m_is_menu_only() {
+    fn lowercase_m_routes_only_the_bookmark_move_action() {
         assert_eq!(
             AppKey::from_crossterm(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE)),
-            AppKey::Ignore
+            AppKey::BookmarkMove
         );
     }
 
@@ -402,6 +470,14 @@ mod tests {
         assert_eq!(
             AppKey::from_action_menu(ActionMenuAction::Abandon),
             AppKey::StartAbandon
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Squash),
+            AppKey::StartSquash
+        );
+        assert_eq!(
+            AppKey::from_action_menu(ActionMenuAction::Restore),
+            AppKey::StartRestore
         );
         assert_eq!(
             AppKey::from_action_menu(ActionMenuAction::Undo),

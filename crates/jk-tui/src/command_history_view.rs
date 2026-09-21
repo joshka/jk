@@ -16,7 +16,7 @@ use ratatui::widgets::Paragraph;
 use crate::ansi_text::strip_ansi;
 use crate::chrome::{ViewChrome, render_help_overlay};
 use crate::keymap::{BindingContext, adaptive_hotbar, help_lines, help_title};
-use crate::selected_row::paint_subtle_selected_row;
+use crate::selected_row::{interaction_areas, paint_cursor};
 
 const DEFAULT_TITLE: &str = "Command History";
 const DEFAULT_ROW_LIMIT: usize = 128;
@@ -529,6 +529,7 @@ impl CommandHistoryView {
 
     fn render_area(&mut self, frame: &mut Frame<'_>, area: Rect, status_override: Option<&str>) {
         let areas = ViewChrome::layout(area);
+        let (gutter, content) = interaction_areas(areas.content);
         self.keep_selected_in_view(usize::from(areas.content.height));
 
         let fallback_status = adaptive_hotbar(BindingContext::CommandHistory, areas.status_width());
@@ -541,10 +542,16 @@ impl CommandHistoryView {
         chrome.render(frame, areas);
 
         let paragraph = Paragraph::new(self.visible_text());
-        frame.render_widget(paragraph, areas.content);
+        frame.render_widget(paragraph, content);
 
         if let Some(selected) = self.selected {
-            paint_subtle_selected_row(frame, areas.content, selected, self.scroll_offset);
+            paint_cursor(
+                frame,
+                gutter,
+                selected,
+                self.scroll_offset,
+                !self.help_visible,
+            );
         }
 
         if self.help_visible {
@@ -625,6 +632,7 @@ fn view_label(view: SourceView) -> String {
         SourceView::Status => "status".to_owned(),
         SourceView::Evolog => "evolog".to_owned(),
         SourceView::Workspaces => "workspaces".to_owned(),
+        SourceView::Bookmarks => "bookmarks".to_owned(),
         SourceView::WorkspaceLog => "workspace log".to_owned(),
         SourceView::WorkspaceStatus => "workspace status".to_owned(),
         SourceView::WorkspaceDiff => "workspace diff".to_owned(),
@@ -646,6 +654,19 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::OpenStatus | SourceAction::WorkspaceStatus => "status".to_owned(),
         SourceAction::OpenEvolog => "evolog".to_owned(),
         SourceAction::DescribeRevision => "describe".to_owned(),
+        SourceAction::SquashRevision => "squash".to_owned(),
+        SourceAction::RestoreRevision => "restore".to_owned(),
+        SourceAction::RebaseRevision => "rebase".to_owned(),
+        SourceAction::WorkspaceAdd => "add workspace".to_owned(),
+        SourceAction::WorkspaceRename => "rename workspace".to_owned(),
+        SourceAction::WorkspaceForget => "forget workspace".to_owned(),
+        SourceAction::BookmarkList => "bookmark list".to_owned(),
+        SourceAction::BookmarkTarget => "bookmark target".to_owned(),
+        SourceAction::BookmarkCreate => "bookmark create".to_owned(),
+        SourceAction::BookmarkMove => "bookmark move".to_owned(),
+        SourceAction::BookmarkDelete => "bookmark delete".to_owned(),
+        SourceAction::GitFetch => "git fetch".to_owned(),
+        SourceAction::GitPushDryRun => "git push dry-run".to_owned(),
         SourceAction::WorkspaceList => "list".to_owned(),
         SourceAction::WorkspaceLog => "log".to_owned(),
         SourceAction::WorkspaceUpdateStale => "update-stale".to_owned(),
@@ -655,6 +676,7 @@ fn action_label(action: SourceAction) -> String {
         SourceAction::Undo => "undo".to_owned(),
         SourceAction::Redo => "redo".to_owned(),
         SourceAction::UserJjCommand => "command".to_owned(),
+        SourceAction::UserExternalCommand => "external command".to_owned(),
         SourceAction::Other(label) => label,
         _ => "unknown".to_owned(),
     }
@@ -822,6 +844,18 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use super::*;
+
+    #[test]
+    fn refs_and_remote_actions_have_visible_history_labels() {
+        assert_eq!(
+            source_label(SourceView::Bookmarks, SourceAction::BookmarkList),
+            "bookmarks bookmark list"
+        );
+        assert_eq!(
+            action_label(SourceAction::GitPushDryRun),
+            "git push dry-run"
+        );
+    }
 
     #[test]
     fn snapshot_maps_records_newest_first() {

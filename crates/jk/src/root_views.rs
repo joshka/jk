@@ -1,5 +1,9 @@
-use jk_cli::{DiffQuery, JjDiff, JjLog, JjShow, JjStatus, JjWorkspaces, ShowQuery, StatusQuery};
+use jk_cli::{
+    BookmarkSnapshot, DiffQuery, JjDiff, JjLog, JjShow, JjStatus, JjWorkspaces, ShowQuery,
+    StatusQuery,
+};
 use jk_core::{CommandHistory, CommandSource, SourceAction, SourceView};
+use jk_tui::bookmark_view::{BookmarkRow, BookmarkViewSnapshot};
 use jk_tui::diff_view::DiffView;
 use jk_tui::log_view::LogView;
 use jk_tui::rendered_view::RenderedView;
@@ -101,4 +105,24 @@ pub fn root_workspaces_view(
         }
     };
     AppView::Workspaces { view }
+}
+
+pub(crate) fn bookmark_view_snapshot(snapshot: BookmarkSnapshot) -> BookmarkViewSnapshot {
+    BookmarkViewSnapshot::new(
+        snapshot
+            .bookmarks
+            .into_iter()
+            .map(|bookmark| {
+                let mut row = BookmarkRow::new(bookmark.name, bookmark.targets)
+                    .with_tracked(bookmark.tracked)
+                    .with_synchronized(bookmark.synchronized)
+                    .with_conflict(bookmark.conflicted, bookmark.removed_targets);
+                if let Some(remote) = bookmark.remote {
+                    row = row.with_remote(remote);
+                }
+                row
+            })
+            .collect(),
+    )
+    .with_title(snapshot.title)
 }
