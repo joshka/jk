@@ -5,6 +5,46 @@ Entries are grouped by user workflow and release impact instead of following the
 
 ## Unreleased
 
+## Other
+
+
+- Render op log like jj ([#55](https://github.com/joshka/jk/pull/55))
+
+- Improve contextual help overlays ([#56](https://github.com/joshka/jk/pull/56))
+
+- Add context-aware action menu ([#59](https://github.com/joshka/jk/pull/59))
+
+- Integrate daily workflows and consistent TUI design
+
+
+## Other
+
+
+- Render op log like jj ([#55](https://github.com/joshka/jk/pull/55))
+
+- Improve contextual help overlays ([#56](https://github.com/joshka/jk/pull/56))
+
+- Make chrome space helpers const ([#61](https://github.com/joshka/jk/pull/61))
+
+- Add context-aware action menu ([#59](https://github.com/joshka/jk/pull/59))
+
+- Integrate daily workflows and consistent TUI design
+
+
+## Other
+
+
+- Add context-aware action menu ([#59](https://github.com/joshka/jk/pull/59))
+
+- Integrate daily workflows and consistent TUI design
+
+
+## Other
+
+
+- Integrate daily workflows and consistent TUI design
+
+
 ### 0.3 compatibility and workflows
 
 - Prepare the workspace for 0.3.0. New public command-family and action-menu variants require
