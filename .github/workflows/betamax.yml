@@ -10,7 +10,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  render:
+  plan:
+    name: Plan complete manual collection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.collection.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Validate evidence runner
+        run: python3 -m unittest discover -s scripts -p 'test_manual_*.py'
+
+      - name: Check complete coverage and plan galleries
+        id: collection
+        run: |
+          python3 scripts/check-manual-coverage.py
+          matrix=$(python3 scripts/manual-recordings.py plan)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build exact recording binary
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -29,22 +54,116 @@ jobs:
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
+      - name: Build jk and retain log
+        shell: bash
+        run: |
+          mkdir -p target/manual-build
+          cargo build --locked -p jk 2>&1 | tee target/manual-build/build.log
+          cp target/debug/jk target/manual-build/jk
+          python3 scripts/manual-recordings.py provenance \
+            --binary target/manual-build/jk \
+            --output target/manual-build/binary-provenance.json
+        env:
+          JK_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+      - name: Preserve exact binary and build diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: manual-source-binary
+          path: target/manual-build/
+          retention-days: 30
+          if-no-files-found: error
+
+  render:
+    name: Manual · ${{ matrix.group }} · ${{ matrix.id }}
+    needs: [plan, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Download source binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: manual-source-binary
+          path: target/manual-build/
+
       - name: Install jj
         uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
         with:
           tool: jj-cli@0.45.1
 
-      - name: Build jk
-        run: cargo build --locked -p jk
+      - name: Prepare isolated scenario and provenance
+        env:
+          SCENARIO: ${{ matrix.id }}
+          JK_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          chmod +x target/manual-build/jk
+          python3 scripts/manual-recordings.py prepare \
+            --scenario "$SCENARIO" \
+            --directory "target/manual-ci/$SCENARIO" \
+            --binary target/manual-build/jk \
+            --build-provenance target/manual-build/binary-provenance.json \
+            --for-action
 
-      - name: Prepare preview repository
-        run: bash scripts/prepare-preview.sh
-
-      - name: Render previews
+      - name: Record human-paced scenario and gallery
+        id: capture
         uses: joshka/betamax-action@34b48d5acd439f60d3e03ccabf2539dfe93527f2
         with:
           version: "0.1.21"
           sha256: 8dd5893d8d74cdf28ff4052be31b2b72810f40bf8c08385b84e53c572209848a
-          tapes: tapes/ci/*.tape
-          formats: gif,png
-          extra-outputs: target/betamax-preview/*.png
+          working-directory: target/manual-ci/${{ matrix.id }}
+          tapes: ${{ matrix.id }}.tape
+          formats: mp4
+          extra-outputs: '*.png'
+          timeout-seconds: '600'
+          retention-days: '30'
+          variant: ${{ matrix.variant }}
+
+      - name: Verify states, styles, provenance, and repository outcomes
+        if: ${{ always() && steps.capture.outputs.output-directory != '' }}
+        env:
+          SCENARIO: ${{ matrix.id }}
+          ACTION_DIRECTORY: ${{ steps.capture.outputs.output-directory }}
+        run: |
+          python3 scripts/manual-recordings.py verify \
+            --directory "target/manual-ci/$SCENARIO" \
+            --action-directory "$ACTION_DIRECTORY"
+
+      # The action uploads media galleries. This archive keeps the paired states,
+      # assertions, fixture metadata, tapes, hashes and logs, including partial failures.
+      - name: Preserve complete scenario evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: manual-evidence-${{ matrix.id }}
+          path: target/manual-ci/${{ matrix.id }}/
+          retention-days: 30
+          if-no-files-found: error
+
+  required:
+    name: Manual collection
+    needs: [plan, build, render]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every scenario and evidence check
+        env:
+          RESULTS: ${{ toJson(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          results = json.loads(os.environ['RESULTS'])
+          print(json.dumps(results, indent=2))
+          assert all(job['result'] == 'success' for job in results.values())
+          PY

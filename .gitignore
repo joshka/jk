@@ -2,3 +2,4 @@
 /.plans/
 /.bacon-locations
 /AGENTS.override.md
+__pycache__/

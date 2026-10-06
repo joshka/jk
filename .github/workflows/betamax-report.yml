@@ -26,3 +26,6 @@ jobs:
         uses: joshka/betamax-action/report@34b48d5acd439f60d3e03ccabf2539dfe93527f2
         with:
           workflow: betamax.yml
+          # Gallery artifacts have per-variant limits. Inline attachments would
+          # impose a 20-file/40-MiB aggregate limit on the entire manual collection.
+          mode: artifacts

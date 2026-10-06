@@ -71,6 +71,10 @@ Current limitations:
 Use `?` inside `jk` for contextual help. See [Using jk](docs/usage.md) for workflows and
 [command coverage](docs/command-coverage.md) for implemented forms and the next priorities.
 
+The [manual coverage map](docs/manual-coverage.md) connects every native form to a recorded workflow.
+See [recording and reviewing scenarios](docs/manual-recordings.md) and the
+[workflow UX audit](docs/manual-ux-audit.md) for evidence and proposed improvements.
+
 ## First Useful Paths
 
 Start with `jk` or `jk log`, then use:

@@ -16,7 +16,8 @@ From the log:
 - `d` opens `jj diff` for the selected change.
 - `v` opens the selected change's evolog.
 - `s` opens repository status.
-- `Backspace` or `Esc` returns to the previous view.
+- `Backspace` returns to the previous view. `Esc` quits from ordinary rendered inspection or command
+  output; dialogs and list views handle it separately.
 - `r` refreshes the active view.
 
 `jk log -T <template>` changes the rendered log template, but the navigation pass still uses `jk`'s
@@ -36,7 +37,7 @@ jk diff --stat
 In the diff view:
 
 - `[` and `]` move between files.
-- `{` and `}` move between hunks.
+- `{` and `}` are hunk-navigation bindings, but normal diff formats do not produce recognized hunks.
 - `f` opens the file list.
 - `/`, `n`, and `N` search visible diff text.
 - `h` and `l` fold or unfold the current file.
@@ -44,6 +45,11 @@ In the diff view:
 
 The diff view still renders `jj diff`; `jk` adds navigation, folding, search, current-file context,
 and format switching around that output.
+
+Choose color-words for file navigation and folding. Git-format patches render, but the file parser
+does not recognize their headers, so the file picker reports no files. Hunk navigation and folding
+require both color-words file headers and Git-style hunk headers; ordinary output provides one or
+the other. Use scrolling or search to inspect content within a file.
 
 ## Open The Action Menu
 
@@ -140,7 +146,8 @@ Press `:` to run a direct `jj` command without leaving the TUI:
 Command mode accepts an optional `jj` prefix. It parses argv-like input, does not invoke a shell,
 captures stdout and stderr, and records the result in Command History.
 
-From command output, press `e` to reopen command mode with the previous input.
+From command output, press `e` to reopen command mode with the previous input. `Backspace` returns to
+the preceding view; `Esc` quits jk.
 
 Press `!` to run an external executable with explicit argv:
 
